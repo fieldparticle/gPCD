@@ -1,0 +1,156 @@
+/*******************************************************************
+%***      C PROPRIETARY SOURCE FILE IDENTIFICATION               ***
+%*******************************************************************
+% $Author: jb $
+%
+% $Date: 2023-05-03 15:30:42 -0400 (Wed, 03 May 2023) $
+% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src/vulkan/DescriptorSSBO.cpp $
+% $Id: DescriptorSSBO.cpp 28 2023-05-03 19:30:42Z jb $
+%*******************************************************************
+%***                         DESCRIPTION                         ***
+%*******************************************************************
+@doc
+@module
+			@author: Jackie Michael Bell<nl>
+			COPYRIGHT <cp> Jackie Michael Bell<nl>
+			Property of Jackie Michael Bell<rtm>. All Rights Reserved.<nl>
+			This source code file contains proprietary<nl>
+			and confidential information.<nl>
+
+
+@head3 		Description. |
+@normal
+
+
+********************************************************************
+%***                     SVN CHANGE RECORD                       ***
+%*******************************************************************
+%*$Revision: 28 $
+%*
+%*
+%******************************************************************/
+
+#version 460
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_420pack : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_scalar_block_layout :enable
+#extension GL_KHR_memory_scope_semantics:enable
+#extension GL_EXT_shader_atomic_float:enable
+#extension GL_KHR_shader_subgroup_basic:enable
+
+
+#include "../VerfPerf/params.glsl"
+#include "../common/constants.glsl"
+#include "../common/util.glsl"
+#include "../common/push.glsl"
+#include "../common/atomic.glsl"
+#include "../common/CollimageIndex.glsl"
+#include "../common/Lockimage.glsl"
+#include "../common/particle.glsl"
+#include "../VerfPerf/workgroups.glsl"
+#include "../common/isParticleContact.glsl"
+///
+// Use this one with 000_ParticleVerfPerfCountOnly.vert to
+// see if you are getting the right number of threads and particles in 
+// vert and comp piplines.
+////
+
+void main()  
+{
+
+	// Get invocation id which is particle numbner
+	uint index = gl_GlobalInvocationID.x;
+	if(index == 0)
+	{
+		collOut.numParticles = 0;
+		collOut.CollisionCount=0;
+		collOut.holdPidx = 0;
+		collOut.vnumParticles=0;
+		return;
+	}
+
+#ifdef DEBUG
+	// Thread count
+	atomicAdd(collOut.holdPidx,1);	
+#endif	
+
+
+	
+#ifdef DEBUG
+	// Particle count
+	atomicAdd(collOut.numParticles,1);	
+#endif
+	
+	
+	uint Findex = index;
+	uint Tindex = 0;
+	const uint DUP_LIST_SIZE = 32;
+	uint duplst[DUP_LIST_SIZE];
+	uint dupcnt = 0;
+	bool dupflg = false;
+	P[Findex].ColFlg = 0;
+	// Clear the duparray
+	for(uint kk =0; kk < 8; kk++)
+		duplst[kk] = 0;
+	
+	// For all of the corner locations in the particle corner array
+	for(uint ii = 0; ii < 8; ii++)
+	{
+		
+		// Set location of this corner to local variable.
+		uint loc = P[Findex].zlink[ii].ploc;
+		
+		// If the lcation is not zero...
+		if (loc != 0)
+		{
+			// Use the linked particle location to index into the particle-cell hash table 
+			// And compare this particle with all of the paricles at this location.
+			//uint lock_len = L[loc];
+			
+			// Run thru the cell array occupancy list slots
+			for(uint jj = 0; jj < MAX_CELL_OCCUPANY;jj++)
+			{
+				
+				// Get the particle number at the jj slot
+				Tindex = clink[loc].idx[jj];
+				// If the particle number is 0, then end of list
+				if(Tindex == 0)
+					break;
+				
+				if(isParticleContact(ii,Findex, Tindex) > 0)
+				{
+					// Run thru the duplicates list to the current count
+					for(uint dd = 0; dd < DUP_LIST_SIZE;dd++)
+					{
+						if (duplst[dd] == Tindex)
+							break;
+							
+						// If the end of the duplist no duplicate found so count the collison
+						if (duplst[dd] == 0)
+						{
+							// Set the collison flag
+							P[Findex].ColFlg = 1;
+							// Add the TO particle number ot the dups list.
+							duplst[dd] = Tindex;
+							// Report is verification
+							#ifdef DEBUG
+								atomicAdd(collOut.CollisionCount,1);
+							#endif
+							#if 1
+							if(uint(ShaderFlags.frameNum) == 3 && Findex == 58)
+								debugPrintfEXT("%d,%d",Tindex,Findex);
+							#endif
+							break;
+						}
+						
+					}
+				}
+				dupflg = true;
+			}
+		}
+	}
+	
+	
+	
+}

@@ -1,0 +1,334 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{0a13e573-6412-4843-b87f-09551a9a0a85}</ProjectGuid>
+    <RootNamespace>ParticleOnlyRemote</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>ParticleOnlyRemote</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <EnableASAN>false</EnableASAN>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseOfMfc>false</UseOfMfc>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>..\..\src\tcpip;..\..\..\..\FPIBG3rdPty\shaderc\third_party\glslang;../../../../FPIBG3rdPty/glfw/include/;..\..\..\..\FPIBG3rdPty\VMA\include;..\..\..\..\FPIBG3rdPty\tinyobjloader-release;..\..\src_app;..\..\src;..\..\..\..\FPIBG3rdPty\stb;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc_util\include;..\..\..\..\FPIBG3rdPty\shaderc\glslc\src;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc\include;..\..\..\..\FPIBG3rdPty\shaderc\third_party\SPIRV-Tools\include;..\..\..\..\FPIBG3rdPty\shaderc\build_vcc;..\..\..\..\FPIBG3rdPty\shaderc;..\..\..\..\FPIBG3rdPty\VulkanSDK\Include;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc_util;..\..\..\..\FPIBG3rdPty\glm;..\..\src\libconfig;$(VK_SDK_PATH)\include;$(IncludePath)</IncludePath>
+    <OutDir>..\..\run\particleOnly\</OutDir>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+    <TargetName>ParticleRemoteD</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>..\..\..\..\FPIBG3rdPty\shaderc\third_party\glslang;../../../../FPIBG3rdPty/glfw/include/;..\..\..\..\FPIBG3rdPty\VMA\include;..\..\..\..\FPIBG3rdPty\tinyobjloader-release;..\..\src_app;..\..\src\tcpip;..\..\src;..\..\..\..\FPIBG3rdPty\stb;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc_util\include;..\..\..\..\FPIBG3rdPty\shaderc\glslc\src;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc\include;..\..\..\..\FPIBG3rdPty\shaderc\third_party\SPIRV-Tools\include;..\..\..\..\FPIBG3rdPty\shaderc\build_vcc;..\..\..\..\FPIBG3rdPty\shaderc;..\..\..\..\FPIBG3rdPty\VulkanSDK\Include;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc_util;..\..\..\..\FPIBG3rdPty\glm;..\..\src\libconfig;$(VK_SDK_PATH)\include;$(IncludePath)</IncludePath>
+    <OutDir>..\..\run\ParticleOnlyRemote\</OutDir>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+    <TargetName>ParticleRemoteR</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>PARTICLE_ONLY;GLFW_INCLUDE_VULKAN;VK_VERSION_1_3;YY_USE_CONST;WIN32;WIN64;YY_NO_UNISTD_H;LIBCONFIG_EXPORTS;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <ShowIncludes>false</ShowIncludes>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>VulkanObj/VulkanApp.hpp</PrecompiledHeaderFile>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <DisableSpecificWarnings>4800</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>Shlwapi.lib;$(VULKAN_SDK)\Lib\vulkan-1.lib;..\..\..\..\FPIBG3rdPty\glfw\build\src\Debug\glfw3.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\glslc\Debug\glslc.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\libshaderc_util\Debug\shaderc_util.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\libshaderc\Debug\shaderc.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\glslang\Debug\glslangd.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\SPIRV\Debug\SPIRVd.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\spirv-tools\source\opt\Debug\SPIRV-Tools-opt.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\spirv-tools\source\Debug\SPIRV-Tools.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\glslang\Debug\MachineIndependentd.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\glslang\OSDependent\Windows\Debug\OSDependentd.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\glslang\Debug\GenericCodeGend.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <StackReserveSize>10000000</StackReserveSize>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>PARTICLE_ONLY;NDEBUG;GLFW_INCLUDE_VULKAN;VK_VERSION_1_3;YY_USE_CONST;WIN32;WIN64;YY_NO_UNISTD_H;LIBCONFIG_EXPORTS;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>VulkanObj.hpp</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>Shlwapi.lib;$(VULKAN_SDK)\Lib\vulkan-1.lib;..\..\..\..\FPIBG3rdPty\glfw\build\src\Release\glfw3.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\glslc\Release\glslc.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\libshaderc_util\Release\shaderc_util.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\libshaderc\Release\shaderc.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\glslang\Release\glslang.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\SPIRV\Release\SPIRV.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\spirv-tools\source\opt\Release\SPIRV-Tools-opt.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\spirv-tools\source\Release\SPIRV-Tools.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\glslang\Release\MachineIndependent.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\glslang\OSDependent\Windows\Release\OSDependent.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\glslang\Release\GenericCodeGen.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\FPIBG3rdParty\VMA\include\vk_mem_alloc.h" />
+    <ClInclude Include="..\..\src\glsl\call_glsl.hpp" />
+    <ClInclude Include="..\..\src\libconfig\grammar.h" />
+    <ClInclude Include="..\..\src\libconfig\libconfig.h" />
+    <ClInclude Include="..\..\src\libconfig\parsectx.h" />
+    <ClInclude Include="..\..\src\libconfig\scanctx.h" />
+    <ClInclude Include="..\..\src\libconfig\scanner.h" />
+    <ClInclude Include="..\..\src\libconfig\strbuf.h" />
+    <ClInclude Include="..\..\src\libconfig\strvec.h" />
+    <ClInclude Include="..\..\src\libconfig\util.h" />
+    <ClInclude Include="..\..\src\libconfig\wincompat.h" />
+    <ClInclude Include="..\..\src\mout2_0\mout.hpp" />
+    <ClInclude Include="..\..\src\tcpip\TCPCObj.hpp" />
+    <ClInclude Include="..\..\src\tcpip\TCPSObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\BaseObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\CommandObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\CommandPoolObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\ConfigObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\ContainerObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\ControlObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\Core.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\DrawObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\FrameBufferObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\ImageObject.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\Input.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\InstanceObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\ObjLoader.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\PerfObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\PhysDevObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\PipelineObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\RenderPassObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\Resource.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\ResourceVertexObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\ShaderObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\SwapChainObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\SyncObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\VulkanApp.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\VulkanDefines.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\VulkanObj.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\CommandParticleCompute.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\CommandParticleGraphics.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\ContainerCompute.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\ContainerGraphics.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\DrawParticleOnly.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\FrameBuffer.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\ParticleOnly.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\ParticleStruct.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\pdata.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\PipelineComputeParticle.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\PipelineGraphicsParticleOnly.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\RenderPassParticleOnly.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\ResourceAtomicCompute.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\ResourceAtomicGraphics.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\ResourceCollMatrix.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\ResourceLockMatrix.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\ResourcePushParticle.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\ResourceUBOParticle.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\ResourceVertexParticle.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\SwapChain.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\SyncObjParticleOnly.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\glsl\call_glsl.cpp" />
+    <ClCompile Include="..\..\src\libconfig\grammar.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\libconfig.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\scanctx.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\scanner.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\strbuf.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\strvec.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\util.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\wincompat.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\src\mout2_0\mout.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\src\system\WinSys.cpp" />
+    <ClCompile Include="..\..\src\tcpip\TCPCObj.cpp" />
+    <ClCompile Include="..\..\src\tcpip\TCPSObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\BaseObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\CommandObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\CommandPoolObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\ConfigObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\ContainerObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\DrawObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\FrameBufferObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\ImageObject.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\Input.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\InstanceObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\loop.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\main_remote.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\MemStats.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\ObjLoader.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\PerfObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\PhysDevObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\PipelineObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\RenderPassObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\Resource.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\ResourceVertexObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\ShaderObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\SwapChainObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\SyncObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\VulkanApp.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\VulkanDeviceLog.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\VulkanObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\VulkanObjDebug.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\VulkanObjMemory.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\CommandParticleCompute.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\CommandParticleGraphics.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\ConfigGetSettings.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\ContainerCompute.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\ContainerGraphics.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\DrawParticleOnly.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\FrameBuffer.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\NoPerfLoop.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\ParticleOnly.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\PipelineComputeParticle.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\PipelineGraphicsParticleOnly.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\RenderPassParticleOnly.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceAtomicCompute.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceAtomicGraphics.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceCollMatrix.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceLockIndexing.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceLockMatrix.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\ResourcePushParticle.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceUBOParticle.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceVertexParticle.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\SwapChain.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\SyncObjParticleOnly.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\run\particleOnly\mps.cfg" />
+    <None Include="..\..\run\particleOnly\Particle.cfg" />
+    <None Include="..\..\run\particle\Particle.cfg" />
+    <None Include="..\..\shaders\common\isParticleContact.glsl" />
+    <None Include="..\..\shaders\NoThreads\ParticleNoThreads.comp" />
+    <None Include="..\..\shaders\NoThreads\ParticleNoThreads.frag" />
+    <None Include="..\..\shaders\NoThreads\ParticleNoThreads.vert" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\run\particleOnly\particle.log" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

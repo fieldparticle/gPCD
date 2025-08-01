@@ -1,0 +1,3 @@
+
+integrate vulkan in qt6
+https://www.niangames.com/articles/qt-vulkan-renderer

@@ -1,0 +1,186 @@
+/*******************************************************************
+%***      C PROPRIETARY SOURCE FILE IDENTIFICATION               ***
+%*******************************************************************
+% $Author: jb $
+%
+% $Date: 2023-05-03 15:30:42 -0400 (Wed, 03 May 2023) $
+% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src/vulkan/DescriptorSSBO.cpp $
+% $Id: DescriptorSSBO.cpp 28 2023-05-03 19:30:42Z jb $
+%*******************************************************************
+%***                         DESCRIPTION                         ***
+%*******************************************************************
+@doc
+@module
+			@author: Jackie Michael Bell<nl>
+			COPYRIGHT <cp> Jackie Michael Bell<nl>
+			Property of Jackie Michael Bell<rtm>. All Rights Reserved.<nl>
+			This source code file contains proprietary<nl>
+			and confidential information.<nl>
+
+
+@head3 		Description. |
+@normal
+
+
+********************************************************************
+%***                     SVN CHANGE RECORD                       ***
+%*******************************************************************
+%*$Revision: 28 $
+%*
+%*
+%******************************************************************/
+
+#version 460
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_420pack : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_scalar_block_layout :enable
+#extension GL_KHR_memory_scope_semantics:enable
+#extension GL_EXT_shader_atomic_float:enable
+#extension GL_KHR_shader_subgroup_basic:enable
+
+
+#include "../params.glsl"
+#include "../common/constants.glsl"
+#include "../common/util.glsl"
+#include "../common/push.glsl"
+#include "../common/atomic.glsl"
+#include "../common/CollimageIndex.glsl"
+#include "../common/Lockimage.glsl"
+#include "../common/particle.glsl"
+#include "../common/GetCflg.glsl"
+#include "../common/CalcMomentum.glsl"
+#include "../common/ProcessParticleContact.glsl"
+#include "../common/isParticleContact.glsl"
+
+
+void main()  
+{
+	
+	// Get invocation id which is particle numbner
+	uint index = gl_GlobalInvocationID.x;
+	if(index == 0)
+	{
+	
+		
+		//for(uint ii = 0; ii < NUMPARTS;ii++)
+			//L[ii] = 0;
+		collOut.numParticles = 0;
+		collOut.CollisionCount=0;
+		collOut.holdPidx = 0;
+		collOut.vnumParticles=0;
+		
+		P[0].PosLoc.x  = 0.0;
+		P[0].PosLoc.y  = 0.0;
+		 //P[0].PosLoc.z   = 0.0; holds actual frame
+		// Use to stop everybody on boundary violation
+		P[0].PosLoc.w  = 0.0;
+		return;
+	}
+	
+#ifdef DEBUG
+		atomicAdd(collOut.holdPidx,1);	
+#endif	
+
+	if (index >= NUMPARTS)
+	{
+		return;	
+	}
+	
+#ifdef DEBUG
+	float(atomicAdd(collOut.numParticles,1));	
+#endif
+	
+		
+	vec3 totVel = vec3(0.0,0.0,0.0);
+	uint Findex = index;
+	uint Tindex = 0;
+	boundStruct colQ;	
+	uint duplst[256]; 	
+	uint dupcnt = 0;
+	bool dupflg = false;
+	vec3 OutVel = vec3(0.0,0.0,0.0);;		
+	uint flg=0;
+	
+	uint cc = 0;	
+	//uint ii = gl_GlobalInvocationID.y;
+	for(uint ii = 0; ii < 8; ii++)
+	{
+		// Set location to local variable.
+		uint loc = P[Findex].zlink[ii].ploc;
+		#if 0
+			if(uint(ShaderFlags.frameNum) == 2 && index == 2)
+					debugPrintfEXT("loc:%d",loc);
+				
+		#endif
+		// If the lcation is not zero..
+		if (loc != 0)
+		{
+			// Use the linked particle location to index into the particle-cell hash table 
+			// And compare this particle with all of the paricles at this location.
+			for(uint jj = 0; jj< MAX_ARY;jj++)
+			{
+				
+				Tindex = clink[loc].idx[jj];
+
+				// If the linked particle is zero teminate
+				if(Tindex != 0 && Tindex != Findex)
+				{
+
+#if 0			
+	
+						cc = 0;
+						while(cc <= dupcnt+1 && dupcnt < 32)
+						{
+							if(duplst[cc] == Tindex)
+							{
+								dupflg = true;
+								break;
+							}
+							else if(duplst[cc] == 0)
+							{
+								dupflg = false;
+								duplst[dupcnt] = Tindex;
+						#if 1						
+								if(uint(ShaderFlags.frameNum) == 2 && index == 2)
+									debugPrintfEXT("DUPITM:%d",duplst[dupcnt]);
+						#endif
+								dupcnt++;
+								break;
+							}
+							
+						
+							cc++;
+						}
+					
+	#if 1
+					if(uint(ShaderFlags.frameNum) == 3)
+					{
+						if(dupflg == true)
+							flg = 1;
+						else
+							flg = 0;
+						debugPrintfEXT("F:%d C:%d,Findex:%d,Tindex:%d, DUP:%d,",uint(ShaderFlags.frameNum),uint(collOut.CollisionCount),Findex,Tindex,flg);
+					}
+	#endif
+						
+					
+#endif
+						if(dupflg == false)						
+						{
+							
+							if(isParticleContact(ii,Findex, Tindex, OutVel) > 0)
+							{
+								atomicAdd(collOut.CollisionCount,1);
+								
+							}
+							dupflg = true;
+						
+						}
+					}
+				}
+			}
+		}
+
+	
+	}

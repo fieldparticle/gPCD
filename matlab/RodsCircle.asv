@@ -1,0 +1,15 @@
+clc
+clear all
+close all
+num_parts = 8
+radius = 0.2
+dia = 2*radius
+min_C = 8*dia
+min_R = min_C/(2*pi())
+del_theta = min_C/dia
+theta = linspace(0, 2*pi(),del_theta)
+for ii = 1:8
+    x = min * np.cos(theta(ii));
+    y = R * np.sin(theta(ii));
+    PlotParticleCircle(x,y,radius)
+end

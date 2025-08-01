@@ -1,0 +1,167 @@
+/*******************************************************************
+%***      C PROPRIETARY SOURCE FILE IDENTIFICATION               ***
+%*******************************************************************
+% $Author: jb $
+%
+% $Date: 2023-05-03 15:30:42 -0400 (Wed, 03 May 2023) $
+% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src/vulkan/DescriptorSSBO.cpp $
+% $Id: DescriptorSSBO.cpp 28 2023-05-03 19:30:42Z jb $
+%*******************************************************************
+%***                         DESCRIPTION                         ***
+%*******************************************************************
+@doc
+@module
+			@author: Jackie Michael Bell<nl>
+			COPYRIGHT <cp> Jackie Michael Bell<nl>
+			Property of Jackie Michael Bell<rtm>. All Rights Reserved.<nl>
+			This source code file contains proprietary<nl>
+			and confidential information.<nl>
+
+
+@head3 		Description. |
+@normal
+
+
+********************************************************************
+%***                     SVN CHANGE RECORD                       ***
+%*******************************************************************
+%*$Revision: 28 $
+%*
+%*
+%******************************************************************/
+
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_420pack : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_scalar_block_layout :enable
+#extension GL_KHR_memory_scope_semantics:enable
+#extension GL_EXT_shader_atomic_float:enable
+#extension GL_KHR_shader_subgroup_basic:enable
+
+#include "../cdn/params.glsl"
+#include "../common/constants.glsl"
+#include "../common/util.glsl"
+#include "../common/push.glsl"
+#include "../common/atomic.glsl"
+#include "../common/CollimageIndex.glsl"
+#include "../common/particle.glsl"
+#include "../cdn/GetCflg.glsl"
+#include "../cdn/CalcMomentum.glsl"
+#include "../cdn/ProcessParticleContact.glsl"
+
+
+#include "../cdn/GetCDRadius.glsl"
+#include "../cdn/CalcBoundaryVel.glsl"
+#include "../cdn/ProcessCDBoundary.glsl"
+
+
+
+// Configure workgroups.
+#include "../cdn/workgroups.glsl"
+
+void main()  
+{
+	
+	// Get invocation id which is particle numbner
+	uint index = gl_GlobalInvocationID.x;
+	if(index == 0)
+	{
+	
+		
+		//for(uint ii = 0; ii < NUMPARTS;ii++)
+			//L[ii] = 0;
+		collOut.numParticles = 0;
+		collOut.CollisionCount=0;
+		collOut.holdPidx = 0;
+		collOut.vnumParticles=0;
+		
+		P[0].PosLoc.x  = 0.0;
+		 P[0].PosLoc.y  = 0.0;
+		 //P[0].PosLoc.z   = 0.0; holds actual frame
+		// Use to stop everybody on boundary violation
+		P[0].PosLoc.w  = 0.0;
+		return;
+	}
+	
+#ifdef DEBUG
+		atomicAdd(collOut.holdPidx,1);	
+#endif	
+
+	if (index >= NUMPARTS || index <= bbound)
+	{
+		return;	
+	}
+#ifdef DEBUG
+	float(atomicAdd(collOut.numParticles,1));	
+#endif
+	
+	if(P[0].PosLoc.w == 1.0)
+		return;
+	vec3 totVel = vec3(0.0,0.0,0.0);
+	uint Findex = index;
+	uint Tindex = 0;
+	boundStruct colQ;	
+	uint duplst[256]; 	
+	uint dupcnt = 0;
+	bool dupflg = false;
+	
+	// If the particle is not live return.
+	if(uint(P[Findex].parms.x) > uint(ShaderFlags.actualFrame))
+		return;
+	//if the particle is dead
+	if(uint(P[Findex].prvvel.w) == 1)
+		return;
+	
+	//uint ii = gl_GlobalInvocationID.y;
+	for(uint ii = 0; ii < 8;ii++)
+	{
+		// Set location to local variable.
+		uint loc = P[Findex].zlink[ii].ploc;
+
+		// If the lcation is not zero..
+		if (loc != 0)
+		{
+			// Use the linked particle location to index into the particle-cell hash table 
+			// And compare this particle with all of the paricles at this location.
+			for(uint jj = 0; jj< MAX_ARY;jj++)
+			{
+				Tindex = clink[loc].idx[jj];
+
+				// If the linked particle is zero teminate
+				if(Tindex == 0)
+					break;
+				
+				// Process boundary first.
+				vec3 OutVel = vec3(0.0,0.0,0.0);
+				
+				ProcessCDBoundary(Findex,Tindex,OutVel);
+				
+				for(uint ii = 0; ii <= dupcnt && dupcnt < 256; ii++)
+				{
+					if(duplst[ii] == Tindex)
+					{
+						dupflg = true;
+						break;
+					}
+					if(duplst[ii] == 0)
+					{
+						dupflg = false;
+						duplst[ii] == Tindex;
+						dupcnt = ii;
+						break;
+					}
+				}
+										
+				if(dupflg == false)						
+				{
+					ProcessParticleContact(ii,Findex, Tindex, OutVel);
+					totVel += OutVel;
+				}
+			}
+		}
+	}
+	
+	//P[Findex].VelRad.xyz += totVel;
+	
+}

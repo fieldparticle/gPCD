@@ -1,0 +1,217 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="libconfig">
+      <UniqueIdentifier>{d7723a19-4de4-462c-815b-c8bb562a1841}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ConfigFiles">
+      <UniqueIdentifier>{666a9b01-3480-4a40-84d9-634127a4987a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source">
+      <UniqueIdentifier>{f1ce9b4c-7b13-4cdf-91eb-4efda68ec5eb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{1fb84986-b4c2-4cf3-97d9-74bf66859875}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="logfile">
+      <UniqueIdentifier>{0440b5a9-69b0-438e-9d34-95e0ab29ee3d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\libconfig\grammar.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\libconfig.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\parsectx.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\scanctx.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\scanner.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\strbuf.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\strvec.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\util.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\wincompat.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\BaseObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\ConfigObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\Core.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\VCCNotes.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\VulkanApp.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\mout2_0\mout.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\gendata\GenResourceVertexParticle.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\gendata\csv.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Vulkan3rdpty\VMA\include\vk_mem_alloc.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\Resource.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\ParticleStruct.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\VulkanObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\pdata.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\libconfig\scanctx.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\scanner.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\strbuf.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\strvec.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\util.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\wincompat.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\grammar.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\libconfig.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\BaseObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\ConfigObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\mout2_0\mout.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\gendata\gendata.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\gendata\GenResourceVertexParticle.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\gendata\ConfigGenGetSettings.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\gendata\AddParticlePatternA002.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\Resource.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\gendata\DoParticleBoundary.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\gendata\DupStudy.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\gendata\mpsCountCollisions.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\gendata\FileIO.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\gendata\CFBStudy.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\run\ParticleOnly\shaders\atomicg.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\CalcParticleCollision.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\CollimageIndex.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\constants.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\params.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\particle.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\ParticleOnly.comp">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\ParticleOnly.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\ParticleOnly.geom">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\ParticleOnly.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\push.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\removeDuplicates.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\util.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\workgroups.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\Lockimage.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\ParticleOnlyThreads.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\ParticleOnly.cfg">
+      <Filter>shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\run\ParticleOnly\mps.log">
+      <Filter>shaders</Filter>
+    </Text>
+    <Text Include="..\..\run\GenBenchData\GenDataSets.cfg">
+      <Filter>ConfigFiles</Filter>
+    </Text>
+    <Text Include="..\..\run\GenBenchData\GenDataSets.log">
+      <Filter>logfile</Filter>
+    </Text>
+  </ItemGroup>
+</Project>
