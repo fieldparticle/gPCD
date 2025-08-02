@@ -185,6 +185,24 @@ void  ShaderObj::WriteShaderHeader()
 int ShaderObj::CompileShader(std::string ShaderGLSLName, 
 		std::string ShaderSPVFileName, std::vector<char> &SPVBuffer, uint32_t type)
 {
+		std::string dir = CfgApp->GetString("application.gen_glsl_dir", true);
+	
+		std::string filename = dir + "/" + ShaderSPVFileName;
+		std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+		if (!file.is_open()) 
+		{
+			throw std::runtime_error("failed to open file!");
+		}
+
+
+		size_t fileSize = (size_t)file.tellg();
+		std::vector<char> buffer(fileSize);
+		file.seekg(0);
+		file.read(buffer.data(), fileSize);
+		SPVBuffer = buffer;
+
+	
 #if 0
 	std::vector<std::string> InputArgs;
 

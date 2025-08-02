@@ -145,7 +145,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		//throw std::runtime_error(objtxt.str().c_str());
 	}*/
 
-	m_App->m_SideLength = m_SideLength;
+	m_App->m_SideLength = static_cast<uint32_t>(m_SideLength);
 	size_t styrsz = sizeof(Particle);
 	mout << "Particle Read:" << m_NumParticles << " Side Length =" << m_SideLength << " ParticleStruct Size:" 
 		<< styrsz << ende;

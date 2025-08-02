@@ -36,6 +36,7 @@
 
 void PerfObj::Create()
 {
+	m_AutoSleep = CfgApp->GetUInt("application.auto_sleep", true);
 	m_SeriesLength = CfgApp->GetUInt("application.seriesLength", true);
 	m_TestCFG = CfgApp->GetString("application.perfTest", true);
 	m_testPQBRDir= CfgApp->GetString("application.testdirPQBRandom", true);
@@ -155,7 +156,11 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 			if (QuitEvent == 1)
 				return 0;
 			
-			
+			for (size_t ii = 0; ii < m_AutoSleep; ii++)
+			{
+				std::cout << "Resting:" << ii << " of " << m_AutoSleep << " seconds." << std::endl;
+				Sleep(1000);
+			}
 
 		}
 		if (GetAsyncKeyState(VK_ESCAPE))
@@ -180,8 +185,8 @@ int PerfObj::Doperf(DrawObj* DrawInstance, VulkanObj* VulkanWin, TCPObj* tcp, si
 
 	
 
-		float totFps = 0.0;
-		float totTime = 0.0;
+		double totFps = 0.0;
+		double totTime = 0.0;
 		std::ofstream ostrm(filename);
 		if (!ostrm.is_open())
 		{
@@ -217,11 +222,6 @@ int PerfObj::Doperf(DrawObj* DrawInstance, VulkanObj* VulkanWin, TCPObj* tcp, si
 					<< partErr << ","
 					<< colErr 
 					<< std::endl;
-
-			
-
-
-
 		}
 		
 		ostrm.flush();
@@ -233,6 +233,9 @@ int PerfObj::Doperf(DrawObj* DrawInstance, VulkanObj* VulkanWin, TCPObj* tcp, si
 		}
 		
 	std::cout << "\n\n\n\n================= Done Perf ======================= \n\n\n\n" << std::endl;
+
+	
+
 	return ret;
 
 }

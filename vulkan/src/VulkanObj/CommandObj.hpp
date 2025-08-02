@@ -46,6 +46,7 @@ public:
 	SwapChainObj* m_SCO						= {};
 	FrameBufferObj* m_FBO					= {};
 	RenderPassObj* m_RPO					= {};
+	bool	trace_on_flag = false;
 	
 	std::vector<VkCommandBuffer>    m_CommandBuffers = {};
 

@@ -36,9 +36,9 @@ class PerfObj
 	public:
 		struct ReportType
 		{
-			uint32_t Second;
-			float		FrameRate;
-			float		SecondPerFrame;
+			double		Second;
+			double		FrameRate;
+			double		SecondPerFrame;
 			double		ComputeExecutionTime;
 			double		GraphicsExecutionTime;
 			uint32_t	NumParticlesGenerated;
@@ -63,7 +63,7 @@ class PerfObj
 		std::string					m_testCFBDir;
 		std::string					m_testPCDDir;
 		std::string					m_testDUPDir;
-		
+		uint32_t					m_AutoSleep = 0;
 		uint32_t					m_SeriesLength = 0;
 		std::string					m_AprFile;
 		std::string					m_DataFile;

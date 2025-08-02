@@ -44,7 +44,7 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 	float				lastFrame		= 0.0f;
 	uint32_t			quit_event		= 0;
 	uint32_t			seriesLength	=  CfgApp->GetInt("application.seriesLength", true);;
-	size_t				aprCount		= 0;
+	uint32_t			aprCount		= 0;
 	double				lastTime		= glfwGetTime();
 	double				lastCapTime     = 0;
 	int					nbFrames		= 0;
@@ -133,7 +133,7 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 				lastCapTime = currentTime;
 			}
 
-			
+			double diff_time = currentTime - lastTime;
 			// Load the perf data if less than series length
 			if (currentTime - lastTime >= 1.0 && doAuto == true)
 			{
@@ -141,9 +141,9 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 				//Populate the data
 				if (aprCount < seriesLength )
 				{
-					perfObj->m_ReportBuffer[aprCount].Second = aprCount;
-					perfObj->m_ReportBuffer[aprCount].FrameRate = static_cast<float>(nbFrames);
-					perfObj->m_ReportBuffer[aprCount].SecondPerFrame = static_cast<float>(aprCount);
+					perfObj->m_ReportBuffer[aprCount].Second = diff_time;
+					perfObj->m_ReportBuffer[aprCount].FrameRate = static_cast<double>(nbFrames)/diff_time;
+					perfObj->m_ReportBuffer[aprCount].SecondPerFrame = diff_time / nbFrames;
 					perfObj->m_ReportBuffer[aprCount].ComputeExecutionTime =
 						DrawInstance->m_ComputeCommandObj->m_ExecutionTime;
 					perfObj->m_ReportBuffer[aprCount].GraphicsExecutionTime =

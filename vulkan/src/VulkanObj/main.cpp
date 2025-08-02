@@ -68,7 +68,8 @@ int main() try
 	TCPObj* tcps = nullptr;
 	if(testtype.compare("VerfPerf") == 0)
 	{
-
+		// Need to go to settings->System->Display->Graphics
+		//Down to GPU Prefernce Set to High performance
 		SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
 		if (CfgApp->GetBool("application.doAuto", true) == true)
 		{

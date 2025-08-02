@@ -93,18 +93,23 @@ void CommandParticleCompute::RecordCommands(uint32_t imageIndex, uint32_t curren
 		0,
 		upcosize,
 		sfl);
+	if (trace_on_flag == true)
+	{
+		vkCmdResetQueryPool(m_CommandBuffers[currentBuffer], m_PerfQueryPool,
+			0, static_cast<uint32_t>(mTimeQueryResults.size()));
 
-	vkCmdResetQueryPool(m_CommandBuffers[currentBuffer], m_PerfQueryPool,
-		0, static_cast<uint32_t>(mTimeQueryResults.size()));
-
-	vkCmdWriteTimestamp(m_CommandBuffers[currentBuffer],
-		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_PerfQueryPool, 0);
-	uint32_t vnum = dvo->m_NumElements;
-
+		vkCmdWriteTimestamp(m_CommandBuffers[currentBuffer],
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_PerfQueryPool, 0);
+		uint32_t vnum = dvo->m_NumElements;
+	}
 
 	vkCmdDispatch(m_CommandBuffers[currentBuffer], m_dkx, m_dky, m_dkz);
-	vkCmdWriteTimestamp(m_CommandBuffers[currentBuffer],
-		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_PerfQueryPool, 1);
+	
+	if (trace_on_flag == true)
+	{
+		vkCmdWriteTimestamp(m_CommandBuffers[currentBuffer],
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_PerfQueryPool, 1);
+	}
 	
 	if (vkEndCommandBuffer(m_CommandBuffers[currentBuffer]) != VK_SUCCESS) {
 		throw std::runtime_error("Failed vkEndCommandBuffer Compute Command Buffer.");

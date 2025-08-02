@@ -89,12 +89,13 @@ void CommandParticleGraphics::RecordCommands( uint32_t imageIndex, uint32_t curr
 	VkClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
 	renderPassInfo.clearValueCount = 1;
 	renderPassInfo.pClearValues = &clearColor;
-	
-	vkCmdResetQueryPool(m_CommandBuffers[currentBuffer], m_PerfQueryPool,
-		0, static_cast<uint32_t>(mTimeQueryResults.size()));
-	vkCmdWriteTimestamp(m_CommandBuffers[currentBuffer],
-		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_PerfQueryPool, 0);
-
+	if (trace_on_flag == true)
+	{
+		vkCmdResetQueryPool(m_CommandBuffers[currentBuffer], m_PerfQueryPool,
+			0, static_cast<uint32_t>(mTimeQueryResults.size()));
+		vkCmdWriteTimestamp(m_CommandBuffers[currentBuffer],
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_PerfQueryPool, 0);
+	}
 	
 	// Record render pass parameters tell it where to get memory for shaders.
 	vkCmdBeginRenderPass(m_CommandBuffers[currentBuffer], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -167,9 +168,11 @@ void CommandParticleGraphics::RecordCommands( uint32_t imageIndex, uint32_t curr
 
 		
 	vkCmdEndRenderPass(m_CommandBuffers[currentBuffer]);
-	vkCmdWriteTimestamp(m_CommandBuffers[currentBuffer],
-		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_PerfQueryPool, 1);
-
+	if (trace_on_flag == true)
+	{
+		vkCmdWriteTimestamp(m_CommandBuffers[currentBuffer],
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_PerfQueryPool, 1);
+	}
 	if (vkEndCommandBuffer(m_CommandBuffers[currentBuffer]) != VK_SUCCESS)
 	{
 		throw std::runtime_error("CommandParticleGraphics::RecordCommands at vkEndCommandBuffer");
