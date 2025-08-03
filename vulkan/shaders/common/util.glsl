@@ -123,7 +123,7 @@ uint TestArrayToIndex(uint start,uint stop)
 					debugPrintfEXT("I:%d<%d,%d,%d>",idx,kk,jj,ii);
 				#endif
 				if (count != idx)
-					return 1;
+					return count;
 				if (count == stop)
 					return 0;
 				count++;

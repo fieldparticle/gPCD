@@ -215,8 +215,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 	{
 
 		msgstr = "Process Verbose: ";
-		//if (!debugVerbose)
-			//return VK_FALSE;
+		if (!debugVerbose)
+			return VK_FALSE;
 	}
 	else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
 	{

@@ -392,6 +392,9 @@
     <ClCompile Include="..\..\src\system\WinSys.cpp">
       <Filter>vulkanobj</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\glsl\call_glsl.cpp">
+      <Filter>glslang_custom</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\run\particle\Particle.cfg" />
@@ -418,5 +421,8 @@
     <Text Include="..\..\run\particleOnly\particle.log">
       <Filter>logfiles</Filter>
     </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\shaders\ParticleVerfPerf.bat" />
   </ItemGroup>
 </Project>

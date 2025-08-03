@@ -71,6 +71,7 @@ void VulkanObj::CreateLogicalDevice() {
         VkPhysicalDeviceFeatures deviceFeatures{};
         // For textures
         deviceFeatures.samplerAnisotropy = VK_TRUE;
+        deviceFeatures.vertexPipelineStoresAndAtomics = VK_TRUE;
 		deviceFeatures.fragmentStoresAndAtomics = VK_TRUE;
 		deviceFeatures.sampleRateShading = VK_TRUE;
 		deviceFeatures.geometryShader = VK_TRUE;

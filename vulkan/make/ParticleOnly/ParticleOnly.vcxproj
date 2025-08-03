@@ -76,10 +76,11 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>../../../../gPCD3rdParty\VulkanMemoryAllocator\include;../../../../gPCD3rdParty/glfw/include/;..\..\src_app;..\..\src;..\..\..\..\FPIBG3rdPty\stb;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc_util\include;..\..\..\..\FPIBG3rdPty\shaderc\glslc\src;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc\include;..\..\..\..\FPIBG3rdPty\shaderc\third_party\SPIRV-Tools\include;..\..\..\..\FPIBG3rdPty\shaderc\build_vcc;..\..\..\..\FPIBG3rdPty\shaderc;..\..\..\..\gPCD3rdParty\VulkanSDK\Include;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc_util;..\..\..\..\FPIBG3rdPty\glm;..\..\src\libconfig;$(VK_SDK_PATH)\include;$(IncludePath)</IncludePath>
+    <IncludePath>../../../../gPCD3rdParty\VulkanMemoryAllocator\include;../../../../gPCD3rdParty/glfw/include/;..\..\src_app;..\..\src;..\..\..\..\gPCD3rdParty\stb;..\..\..\..\gPCD3rdParty\shaderc\libshaderc_util\include;..\..\..\..\gPCD3rdParty\shaderc\glslc\src;..\..\..\..\gPCD3rdParty\shaderc\libshaderc\include;..\..\..\..\gPCD3rdParty\shaderc\third_party\SPIRV-Tools\include;..\..\..\..\gPCD3rdParty\shaderc\build_vcc;..\..\..\..\gPCD3rdParty\shaderc;..\..\..\..\gPCD3rdParty\VulkanSDK\Include;..\..\..\..\gPCD3rdParty\shaderc\libshaderc_util;..\..\..\..\gPCD3rdParty\glm;..\..\src\libconfig;$(VK_SDK_PATH)\include;$(IncludePath)</IncludePath>
     <OutDir>..\..\run\ParticleOnly\</OutDir>
     <LibraryPath>$(LibraryPath)</LibraryPath>
     <TargetName>ParticleD</TargetName>
+    <CustomBuildBeforeTargets>Run</CustomBuildBeforeTargets>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>..\..\..\..\FPIBG3rdPty\shaderc\third_party\glslang;../../../../FPIBG3rdPty/glfw/include/;..\..\..\..\FPIBG3rdPty\VMA\include;..\..\..\..\FPIBG3rdPty\tinyobjloader-release;..\..\src_app;..\..\src;..\..\..\..\FPIBG3rdPty\stb;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc_util\include;..\..\..\..\FPIBG3rdPty\shaderc\glslc\src;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc\include;..\..\..\..\FPIBG3rdPty\shaderc\third_party\SPIRV-Tools\include;..\..\..\..\FPIBG3rdPty\shaderc\build_vcc;..\..\..\..\FPIBG3rdPty\shaderc;..\..\..\..\FPIBG3rdPty\VulkanSDK\Include;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc_util;..\..\..\..\FPIBG3rdPty\glm;..\..\src\libconfig;$(VK_SDK_PATH)\include;$(IncludePath)</IncludePath>
@@ -126,19 +127,25 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>VulkanObj/VulkanApp.hpp</PrecompiledHeaderFile>
       <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <DisableSpecificWarnings>4800</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Shlwapi.lib;$(VULKAN_SDK)\Lib\vulkan-1.lib;..\..\..\..\gPCD3rdParty\glfw\dbugout\src\Debug\glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Shlwapi.lib;$(VULKAN_SDK)\Lib\vulkan-1.lib;..\..\..\..\gPCD3rdParty\glfw\dbugout\src\Debug\glfw3.lib;..\..\..\..\gPCD3rdParty\shaderc\build\glslc\Debug\glslc.lib;..\..\..\..\gPCD3rdParty\shaderc\build\libshaderc_util\Debug\shaderc_util.lib;..\..\..\..\gPCD3rdParty\shaderc\build\libshaderc\Debug\shaderc.lib;..\..\..\..\gPCD3rdParty\shaderc\build\third_party\glslang\glslang\Debug\glslangd.lib;..\..\..\..\gPCD3rdParty\shaderc\build\third_party\glslang\SPIRV\Debug\SPIRVd.lib;..\..\..\..\gPCD3rdParty\shaderc\build\third_party\spirv-tools\source\opt\Debug\SPIRV-Tools-opt.lib;..\..\..\..\gPCD3rdParty\shaderc\build\third_party\spirv-tools\source\Debug\SPIRV-Tools.lib;..\..\..\..\gPCD3rdParty\shaderc\build\third_party\glslang\glslang\Debug\MachineIndependentd.lib;..\..\..\..\gPCD3rdParty\shaderc\build\third_party\glslang\glslang\OSDependent\Windows\Debug\OSDependentd.lib;..\..\..\..\gPCD3rdParty\shaderc\build\third_party\glslang\glslang\Debug\GenericCodeGend.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <StackReserveSize>10000000</StackReserveSize>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
     </Link>
+    <CustomBuildStep>
+      <Command>call ParticleVerfPerf.bat</Command>
+      <RootFolder>..\..\shaders</RootFolder>
+      <Outputs>ParticleVerfPerf.log</Outputs>
+      <TreatOutputAsContent>true</TreatOutputAsContent>
+    </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -225,6 +232,7 @@
     <ClInclude Include="..\..\src_app\particleOnly\SyncObjParticleOnly.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\glsl\call_glsl.cpp" />
     <ClCompile Include="..\..\src\libconfig\grammar.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -322,6 +330,15 @@
     <None Include="..\..\shaders\NoThreads\ParticleNoThreads.comp" />
     <None Include="..\..\shaders\NoThreads\ParticleNoThreads.frag" />
     <None Include="..\..\shaders\NoThreads\ParticleNoThreads.vert" />
+    <CustomBuild Include="..\..\shaders\ParticleVerfPerf.bat">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call ParticleVerfPerf.bat &lt;&lt; ParticleVerfPerf.log</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ParticleVerfPerf.log</Outputs>
+      <RootFolder Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </RootFolder>
+      <TreatOutputAsContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</TreatOutputAsContent>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\..\run\particleOnly\particle.log" />

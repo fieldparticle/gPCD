@@ -120,8 +120,8 @@ void  ShaderObj::WriteShaderHeaderCDNOZ()
 void  ShaderObj::WriteShaderHeader()
 {
 	// Dont compile shaders if using nsight.
-	if(CfgApp->GetBool("application.nsight", true) == true)
-		return;
+//if(CfgApp->GetBool("application.nsight", true) == true)
+//		return;
 	uint32_t compflag=0;
 	uint32_t motion_str = 0;
 	if(CfgApp->GetBool("application.doMotion", true) == true)
@@ -180,30 +180,87 @@ void  ShaderObj::WriteShaderHeader()
 		ostrm.flush();
 		ostrm.close();
     }
+	
 }
 
-int ShaderObj::CompileShader(std::string ShaderGLSLName, 
-		std::string ShaderSPVFileName, std::vector<char> &SPVBuffer, uint32_t type)
+int ShaderObj::CompileShader(std::string ShaderGLSLName,
+	std::string ShaderSPVFileName, std::vector<char>& SPVBuffer, uint32_t type)
 {
-		std::string dir = CfgApp->GetString("application.gen_glsl_dir", true);
-	
-		std::string filename = dir + "/" + ShaderSPVFileName;
-		std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
-		if (!file.is_open()) 
+	std::vector<std::string> InputArgs;
+
+	//std::cout << cfg->m_CompileShaders << std::endl;
+	if (CfgApp->GetBool("application.compileShaders", true) == true)
+	{
+		InputArgs.push_back("ParticleOnly.exe");
+		InputArgs.push_back("--target-env=vulkan1.3");
+		InputArgs.push_back("-g");
+		if (type == SH_FRAG)
 		{
-			throw std::runtime_error("failed to open file!");
+			InputArgs.push_back("-fshader-stage=fragment");
+		}
+		else if (type == SH_VERT)
+		{
+			InputArgs.push_back("-fshader-stage=vertex");
+		}
+		else if (type == SH_COMP)
+		{
+			InputArgs.push_back("-fshader-stage=compute");
 		}
 
+		std::string infl = ShaderGLSLName;
+		InputArgs.push_back(infl);
+		InputArgs.push_back("-o");
+		InputArgs.push_back(ShaderSPVFileName);
+		int ret = glsl(InputArgs, SPVBuffer);
+		if (ret != 0 || SPVBuffer.empty())
+		{
+			std::ostringstream  objtxt;
+			objtxt << "Error from glsl in:" << m_Name
+				<< " Returns:" << ret << " for:" << ShaderGLSLName << std::ends;
+			throw std::runtime_error(objtxt.str());
+		}
+		else
+		{
+			mout << "glsl success :" << m_Name
+				<< " Returns:" << ret << " for:" << ShaderGLSLName
+				<< " Size:" << SPVBuffer.size() << ende;
 
-		size_t fileSize = (size_t)file.tellg();
-		std::vector<char> buffer(fileSize);
-		file.seekg(0);
-		file.read(buffer.data(), fileSize);
-		SPVBuffer = buffer;
+		}
+		std::string fname = ShaderGLSLName + ".bin";
+		//WriteBinaryFile(fname, SPVBuffer);
+		return ret;
+	}
+	return 0;
 
-	
+}
+
 #if 0
+int ShaderObj::CompileShader(std::string ShaderGLSLName,
+	std::string ShaderSPVFileName, std::vector<char>& SPVBuffer, uint32_t type)
+{
+
+
+
+	std::string dir = CfgApp->GetString("application.gen_glsl_dir", true);
+
+	std::string filename = dir + "/" + ShaderSPVFileName;
+	std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+	if (!file.is_open())
+	{
+		throw std::runtime_error("failed to open file!");
+	}
+
+
+	size_t fileSize = (size_t)file.tellg();
+	std::vector<char> buffer(fileSize);
+	file.seekg(0);
+	file.read(buffer.data(), fileSize);
+	SPVBuffer = buffer;
+
+
+
 	std::vector<std::string> InputArgs;
 
 	//std::cout << cfg->m_CompileShaders << std::endl;
@@ -234,25 +291,26 @@ int ShaderObj::CompileShader(std::string ShaderGLSLName,
 		if (ret != 0 || SPVBuffer.empty())
 		{
 			std::ostringstream  objtxt;
-			objtxt << "Error from glsl in:" << m_Name 
+			objtxt << "Error from glsl in:" << m_Name
 				<< " Returns:" << ret << " for:" << ShaderGLSLName << std::ends;
 			throw std::runtime_error(objtxt.str());
 		}
 		else
 		{
 			mout << "glsl success :" << m_Name
-				<< " Returns:" << ret << " for:" << ShaderGLSLName 
+				<< " Returns:" << ret << " for:" << ShaderGLSLName
 				<< " Size:" << SPVBuffer.size() << ende;
-			
+
 		}
 		std::string fname = ShaderGLSLName + ".bin";
 		//WriteBinaryFile(fname, SPVBuffer);
 		return ret;
 	}
-#endif
-	return 0;
-
 }
+#endif
+	
+
+
 int ShaderObj::WriteBinaryFile(std::string fileName, std::vector<char> buffer)
 {
 	std::ofstream fout(fileName, std::ios::out | std::ios::binary);

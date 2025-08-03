@@ -51,13 +51,20 @@ void main(){
 	
 	int index 		= gl_VertexIndex;
 	
-#if 0
+#if defined(DEBUG)
 	if(uint(ShaderFlags.frameNum) == 0 && index == 0)
 	{
+		//debugPrintfEXT("Testing Indexing H:%d,W:%d,CMEM %d, ACTMEM %d",HEIGHT,WIDTH,HEIGHT*HEIGHT*HEIGHT,);
 		P[index].parms.w = 0;
 		uint ret = TestArrayToIndex(0,10);
+		
 		if (ret != 0)
+		{
+			debugPrintfEXT("Indexing Failed H:%d,W:%d at #:%d",HEIGHT,WIDTH,ret);
 			P[0].ColFlg = 1;
+		}
+		else
+			debugPrintfEXT("Indexing passed H:%d,W:%d at #:%d",HEIGHT,WIDTH,ret);
 	}
 #endif
 
@@ -238,7 +245,7 @@ void main(){
 		
 		if(sltidx > MAX_CELL_ARRAY_LOCATIONS)
 		{
-			#if 0
+			#if 1
 				debugPrintfEXT("ParticleVerfPerf sltidx > MaxLocation:P=%d,sltidx=%d,MaxLocation=%d",index,sltidx,MAX_CELL_ARRAY_LOCATIONS);
 			#endif	
 			collIn.ExcessSlots = sltidx;
@@ -252,8 +259,6 @@ void main(){
 		// atomic add increments the value in the lock array and returns the 
 		// *previous value*.
 		slot = atomicAdd(L[sltidx],1);
-		
-		
 		
 		// If the array at this index of the particle-cell hash 
 		// does not have enough slots to handle the particle density
