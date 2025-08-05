@@ -538,7 +538,7 @@ class TabGenData(QTabWidget):
         for ii in self.plot_obj.views:
             self.ViewList.addItem(str(ii))
         self.log.log(self,"TabFormLatex finished Create.")        
-        self.load_item_cfg("C:/_DJ/gPCDUtil/ParticleUtility/cfg_gendata/GenPQBSequential.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
    
     def valueChange(self,listObj):  
         selected_items = listObj.selectedItems()

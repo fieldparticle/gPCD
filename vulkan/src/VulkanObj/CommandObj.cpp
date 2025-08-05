@@ -48,7 +48,7 @@ void CommandObj::Create(SwapChainObj* SCO,
     m_SCO = SCO;
     m_FBO = FBO;
     m_RPO = RPO;
-    trace_on_flag = CfgApp->GetBool("application.trace_on_flag", true);
+    trace_on_flag = CfgApp->GetBool("device_timers_on", true);
     m_CommandBuffers.resize(m_thisFramesBuffered);
     
 
@@ -105,6 +105,9 @@ void CommandObj::SetTimeStamp(uint32_t currentBuffer)
 }
 void CommandObj::CreateQueryPool()
 {
+    if(!trace_on_flag )
+        return;
+
     VkQueryPoolCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
     createInfo.pNext = nullptr; // Optional
@@ -130,32 +133,32 @@ void CommandObj::CreateQueryPool()
 }
 void CommandObj::FetchRenderTimeResults(uint32_t CurrentBuffer)
 {
+
+    if (!trace_on_flag)
+        return;
     uint64_t buffer[2];
-    if (trace_on_flag == true)
+    
+    VkResult result = vkGetQueryPoolResults(m_App->GetLogicalDevice(), m_PerfQueryPool,
+        0, 2, sizeof(uint64_t) * m_QueryCount, buffer, sizeof(uint64_t),
+        VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+    if (result == VK_NOT_READY)
     {
-
-        VkResult result = vkGetQueryPoolResults(m_App->GetLogicalDevice(), m_PerfQueryPool,
-            0, 2, sizeof(uint64_t) * m_QueryCount, buffer, sizeof(uint64_t),
-            VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
-        if (result == VK_NOT_READY)
-        {
-            return;
-        }
-        else if (result == VK_SUCCESS)
-        {
-            mTimeQueryResults[CurrentBuffer] = (buffer[1] - buffer[0]);
-            m_ExecutionTime = static_cast<double>(mTimeQueryResults[CurrentBuffer]
-                * m_App->m_DevProp.limits.timestampPeriod) / 1000000000.0;
-        }
-        else
-        {
-            throw std::runtime_error("Failed to receive query results!");
-        }
-
-
-        // Queries must be reset after each individual use.
-        vkResetQueryPool(m_App->GetLogicalDevice(), m_PerfQueryPool, 0, m_QueryCount);
+        return;
     }
+    else if (result == VK_SUCCESS)
+    {
+        mTimeQueryResults[CurrentBuffer] = (buffer[1] - buffer[0]);
+        m_ExecutionTime = static_cast<double>(mTimeQueryResults[CurrentBuffer]
+            * m_App->m_DevProp.limits.timestampPeriod) / 1000000000.0;
+    }
+    else
+    {
+        throw std::runtime_error("Failed to receive query results!");
+    }
+
+
+    // Queries must be reset after each individual use.
+    vkResetQueryPool(m_App->GetLogicalDevice(), m_PerfQueryPool, 0, m_QueryCount);
 
 }
 

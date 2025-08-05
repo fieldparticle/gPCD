@@ -1,4 +1,4 @@
-#define DEBUG 
+#define RELEASE 
 #define VERPONLY 
 const uint WIDTH=112;
 const uint HEIGHT=112;

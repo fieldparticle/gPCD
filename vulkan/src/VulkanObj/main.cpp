@@ -39,29 +39,40 @@ ConfigObj*			CfgTst;
 ConfigObj*			MpsApp;
 ConfigObj*			CfgApp;
 #include "windows.h"
+int ParseCommandLine(int argc, const char* argv[], ConfigObj* cfg_file);
 #include "tcpip/TCPSObj.hpp"
 #include "tcpip/TCPCObj.hpp"
-int CompileShaders();
+
 void LaunchExecutable(std::string path, std::string cmd) ;
-int main() try
+int main(int argc, const char* argv[]) try
 {
-	
+	std::filesystem::path cwd = std::filesystem::current_path();
 	mout.Init("particle.log", "Particle");
-	mout << "Starting FPIBG\r\n" << ende;
+	mout << "Starting gPCD\r\n" << ende;
 	MpsApp = new ConfigObj;
 	MpsApp->Create("mps.cfg");
 	CfgApp = new ConfigObj;
 	CfgApp->Create(MpsApp->GetString("studyFile", true));
-	std::string app = CfgApp->GetString("application.app",true);
-	//std::cout << "Byte Size:" << sizeof(uint32_t) << std::endl;
-	//return 0;
+	// If the are command line options replace items ithe config file
+	bool test = true;
+	if (argc > 1)
+	{
+		
+		if (ParseCommandLine(argc, argv, CfgApp) > 0)
+		{
+			mout << "Parse command line failed." << ende;
+			return 1;
+		}
+	}
+	mout << "Working Directory :" << cwd.string().c_str() << ende;
+	//std::string app = CfgApp->GetString("application.app",true);
 	CfgTst = new ConfigObj;
-	
+		
 	PerfObj* pf = new PerfObj();
 	pf->Create();
 	
 	// Check working directory
-	std::filesystem::path cwd = std::filesystem::current_path();
+	
 	mout << "Working Directory :" << cwd.string().c_str() << ende;
 
 	// Get test type
@@ -116,46 +127,79 @@ catch (const std::exception& e)
 	exit(1);
 }
 #endif
-
-int ExecuteShader(std::string CommandLine)
+int ParseCommandLine(int argc, const char* argv[], ConfigObj* cfg_file)
 {
-	STARTUPINFO startinfo = { 0 };
-	PROCESS_INFORMATION processinfo = { 0 };
-	BOOL bsuccess = CreateProcess(TEXT(CommandLine.c_str()), NULL, NULL, NULL, FALSE, NULL, NULL,
-		NULL, &startinfo, &processinfo);
-
-	if (bsuccess)
+	config_setting_t* setting;
+	int count = 0;
+	int key_type = 0;
+	int ret = 1;
+	mout << "Size of argc:" << argc << ende;
+#if 1
+	for (size_t ii = 1; ii < argc; ii++)
 	{
-		std::cout << "Process Injected" << std::endl
-			<< "Process ID:\t" << processinfo.dwProcessId << std::endl;
+		mout << "arg:" << ii << " is :" << argv[ii] << ende;
 
 	}
-	else
-	{
-		std::cout << "Error to start the injected process" << GetLastError() << std::endl;
-	}
-	//std::cin.get();
-	return(0);
-
-}
-
-#if 0
-int CompileShaders()
-{
-
-		//const std::string begin = "C:\\_DJ\\gPCD\\vulkan\\shaders\\glslc.exe";
-		const std::string begin = "..\\..\\shaders\\ParticleVerfPerf.bat";
-		const std::string end = " --target-env=vulkan1.3 -fshader-stage=vertex -g";
-		const std::string src = "C:\\_DJ\\gPCD\\vulkan\\shaders\\VerfPerf\\ParticleVerfPerf.vert";
-		const std::string dst = "-o C:\\_DJ\\gPCD\\vulkan\\shaders\\VerfPerf\\vert2.spv";
-		const std::string command = begin; // + end + src + dst;
-		mout << "Executing shader compile:" << command.c_str() << ende;
-		std::cout << "Compiling file using " << command << '\n';
-		size_t ret = 0;
-		if ((ret = std::system((const char*)command.c_str())) != 0)
-			std::cout << "Failed " << ret << "Compiling file using " << command << '\n';
-		else
-			return 0;
-	
-}
 #endif
+	for (size_t ii = 1; ii < argc; )
+	{
+		std::string key = argv[ii];
+		key.erase(0, 1);
+		ii++;
+		std::string value = argv[ii];
+		mout << "Processed key:" << key.c_str() << " at " << ii << ende;
+		
+		if ((setting = config_lookup(&(cfg_file->m_cfg), key.c_str())) != NULL)
+		{
+			count = config_setting_length(setting);
+			key_type = config_setting_type(setting);
+		}
+		else
+		{
+			mout << "Could not find setting for :" << key.c_str() << ende;
+			return 1;
+		}
+		float fval = 0.0;
+		bool bval = true;
+		int new_int = 0;
+		switch (key_type)
+		{
+			case CONFIG_TYPE_INT:
+				new_int = std::stoi(value,nullptr);
+				ret = config_setting_set_int(setting, new_int);
+				break;
+			case CONFIG_TYPE_FLOAT:
+				fval = std::stof(value);
+				ret = config_setting_set_float(setting, fval);
+				break;
+			case CONFIG_TYPE_STRING:
+				ret = config_setting_set_string(setting, value.c_str());
+				break;
+			case CONFIG_TYPE_BOOL:
+				if (!value.compare("true"))
+					bval = true;
+				else if (!value.compare("false"))
+					bval = false;
+				else
+				{
+					mout << "Could not find bool type for :" << key.c_str() << ende;
+					ret = 4;
+					break;
+				}
+				ret = config_setting_set_bool(setting, bval);
+				break;
+			default:
+			{
+				mout << "Could not find key type for :" << key.c_str() << ende;
+				return 1;
+			}
+		};
+	if (ret == 0)
+		return 3;
+	
+	ii++;
+
+	}
+
+	return 0;
+}

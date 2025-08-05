@@ -38,11 +38,16 @@ class TabFormReport(QTabWidget):
         control.setMaximumHeight(H)
         control.setMaximumWidth(W)
 
+    #******************************************************************
+    # Save the confiruation file
+    #
     def SaveConfigurationFile(self):
         self.ltxObj.updateCfgData()
         
         #self.ltxObj.clearConfigGrp()
-
+    #******************************************************************
+    # Load the confiruation file
+    #
     def load_item_cfg(self,file):
             self.CfgFile = file
             self.texFolder = os.path.dirname(self.CfgFile)
@@ -61,7 +66,6 @@ class TabFormReport(QTabWidget):
                 return 
             
             self.data_container = DataContainer(self,self.itemcfg)
-            self.data_container.get_particle_data_fields()
             self.VerifyButton.setEnabled(True)
 
     def browseFolder(self):
@@ -74,7 +78,9 @@ class TabFormReport(QTabWidget):
         if folder[0]:
            self.load_item_cfg(folder[0])
 
-
+    #******************************************************************
+    # GP message box
+    #
     def msg_box(self,text):
         msgBox = QMessageBox()
         msgBox.setText(text)
@@ -83,8 +89,31 @@ class TabFormReport(QTabWidget):
     def preview(self):
         pass    
 
+    #******************************************************************
+    # Build the data by analysing and saving summery files
+    #   
+    def build_data(self):
+        if "V" in self.itemcfg.mode:
+            self.verify()
+        elif "P" in self.itemcfg.mode:
+            self.performance()
+    #******************************************************************
+    # Build the data by performance
+    #   
+    def performance(self):
+        try :
+            self.data_container.get_particle_data_fields()
+            self.data_container.get_data()
+            self.data_container.do_performance()
+        except BaseException as e:
+            print(f"Performance Failed:{e}")
+    
+    #******************************************************************
+    # Test all of the files to verify counts
+    #   
     def verify(self):
         try :
+            self.data_container.get_particle_data_fields()
             self.data_container.get_data()
             ret = self.data_container.do_verify()
             if ret > 0:
@@ -96,7 +125,9 @@ class TabFormReport(QTabWidget):
             print(f"Verify Failed:{e}")
 
         pass
-
+    #******************************************************************
+    # Greate the GUI
+    #   
     def Create(self,FPIBGBase):
         
         self.bobj = FPIBGBase
@@ -114,7 +145,7 @@ class TabFormReport(QTabWidget):
             ## -------------------------------------------------------------
             ## Set parent directory
             LatexcfgFile = QGroupBox("Report Configuraiton")
-            self.setSize(LatexcfgFile,600,600)
+            self.setSize(LatexcfgFile,150,600)
             self.tab_layout.addWidget(LatexcfgFile,0,0,2,2,alignment= Qt.AlignmentFlag.AlignLeft)
             
             dirgrid = QGridLayout()
@@ -144,10 +175,10 @@ class TabFormReport(QTabWidget):
            # self.newButton.clicked.connect(self.browseNewItem)
             dirgrid.addWidget(self.newButton,2,1)
 
-            self.VerifyButton = QPushButton("Verify")
+            self.VerifyButton = QPushButton("Build Data")
             self.setSize(self.VerifyButton,30,100)
             self.VerifyButton.setStyleSheet("background-color:  #dddddd")
-            self.VerifyButton.clicked.connect(self.verify)
+            self.VerifyButton.clicked.connect(self.build_data)
             self.VerifyButton.setEnabled(False)
             dirgrid.addWidget(self.VerifyButton,2,3)
 
@@ -159,6 +190,7 @@ class TabFormReport(QTabWidget):
             self.PreviewButton.setEnabled(False)
             dirgrid.addWidget(self.PreviewButton,2,2)
 
+            '''
             self.ListObj =  QListWidget()
             #self.ListObj.setFont(self.font)
             self.ListObj.setStyleSheet("background-color:  #FFFFFF")
@@ -169,7 +201,7 @@ class TabFormReport(QTabWidget):
             self.ListObj.insertItem(3, "multiimage")
             self.ListObj.itemSelectionChanged.connect(lambda: self.valueChangeArray(self.ListObj))
             dirgrid.addWidget(self.ListObj,3,0,1,2)
-            
+            '''
 
             ## -------------------------------------------------------------
             ## Comunications Interface
@@ -180,7 +212,7 @@ class TabFormReport(QTabWidget):
         except BaseException as e:
             self.log.log(self,e)
         try:
-            self.load_item_cfg("C:/_DJ/gPCDUtil/ParticleUtility/cfg_reports/PQBOnly.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBOnly.cfg")
         except BaseException as e1:
             print(f"Cannot open cfg file:{e1}")
    

@@ -65,6 +65,13 @@ class DataContainer():
         return data_obj.do_verify(field_dict)
 
     #******************************************************************
+    # Call the first data base and verify
+    #
+    def do_performance(self):
+        field_dict= self.fields_list[0]
+        data_obj = field_dict.data_object
+        return data_obj.do_performance(field_dict)
+    #******************************************************************
     # Return data of summary files
     #   
     def get_data(self):
@@ -83,6 +90,7 @@ class DataContainer():
             ii["source_dir"] = self.itemcfg.data_dir
             ii["data_object"] = gPCDData(self,self.itemcfg)
             ii["mode"] = self.itemcfg.mode
+            ii["compute_type"] = self.itemcfg.compute_type
         return 
 
 

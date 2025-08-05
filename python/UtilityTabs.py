@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import QApplication, QWidget,  QFormLayout, QGridLayout, QT
 from PyQt6.QtCore import Qt
 from TabFormReport import *
 from TabFormGenData import *
+from TabFormRun import *
 ## Add all tabs
 class UtilityTabs(QTabWidget):
     def __init__(self, *args, **kwargs):
@@ -14,9 +15,12 @@ class UtilityTabs(QTabWidget):
         self.bobj = FPIBGBase
         ## Create the tabs
         self.tabFormGenData = TabGenData()        
-        self.tabFormLatex = TabFormReport()
-        self.addTab(self.tabFormLatex, 'Reports')
+        self.tabFormRun = TabFormRun()        
+        self.tabFormReport = TabFormReport()
+        self.addTab(self.tabFormRun, 'Run')
+        self.addTab(self.tabFormReport, 'Reports')
         self.addTab(self.tabFormGenData, 'Generate Data')
-        self.tabFormLatex.Create(self.bobj)
+        self.tabFormReport.Create(self.bobj)
         self.tabFormGenData.Create(self.bobj)
+        self.tabFormRun.Create(self.bobj)
       

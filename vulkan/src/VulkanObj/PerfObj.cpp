@@ -40,8 +40,8 @@ void PerfObj::Create()
 	m_SeriesLength = CfgApp->GetUInt("application.seriesLength", true);
 	m_TestCFG = CfgApp->GetString("application.perfTest", true);
 	m_testPQBRDir= CfgApp->GetString("application.testdirPQBRandom", true);
-	m_testPQBSDir= CfgApp->GetString("application.testdirPQBScale", true);
-	m_testPQBDir= CfgApp->GetString("application.testdirPQB", true);
+	m_testPQBSDir= CfgApp->GetString("application.testdirPQBS", true);
+	m_testPQBSTDir = CfgApp->GetString("application.testdirPQBST", true);
 	m_testCFBDir= CfgApp->GetString("application.testdirCFB", true);
 	m_testPCDDir= CfgApp->GetString("application.testdirPCD", true);
 	m_testDUPDir= CfgApp->GetString("application.testdirDUP", true);
@@ -50,13 +50,31 @@ void PerfObj::Create()
 	{
 		m_TestDir = m_testPQBRDir;
 	}
-	if(!m_TestCFG.compare("testdirPQBScale"))
+	if(!m_TestCFG.compare("testdirPQBS"))
 	{
+		config_setting_t* root_set = config_root_setting(&CfgApp->m_cfg);
+		config_setting_t *boolset =  config_setting_add(root_set, "device_timers_on", CONFIG_TYPE_BOOL);
+		int ret = config_setting_set_bool(boolset, false);
+		if (ret == 0)
+		{
+			std::string rpt = "Failed to set 'device_timers_on' in PerfObject";
+			throw std::runtime_error(rpt.c_str());
+		}
+		m_timers_on = false;
 		m_TestDir = m_testPQBSDir;
 	}
-	if(!m_TestCFG.compare("testdirPQB"))
+	if(!m_TestCFG.compare("testdirPQBST"))
 	{
-		m_TestDir = m_testPQBDir;
+		config_setting_t* root_set = config_root_setting(&CfgApp->m_cfg);
+		config_setting_t* boolset = config_setting_add(root_set, "device_timers_on", CONFIG_TYPE_BOOL);
+		int ret = config_setting_set_bool(boolset, true);
+		if (ret == 0)
+		{
+			std::string rpt = "Failed to set 'device_timers_on' in PerfObject";
+			throw std::runtime_error(rpt.c_str());
+		}
+		m_TestDir = m_testPQBSDir;
+		m_timers_on = true;
 	}
 	if(!m_TestCFG.compare("testdirCFB"))
 	{
@@ -175,62 +193,85 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 int PerfObj::Doperf(DrawObj* DrawInstance, VulkanObj* VulkanWin, TCPObj* tcp, size_t aprCount)
 {
 	int ret = 0;
-	std::string filename =m_AprFile;
+	std::string filename = m_AprFile;
 	
 #ifndef NDEBUG
 	filename = filename + "D.csv";
+	std::filesystem::path path(filename);
+	std::string dir = path.parent_path().string(); // "/home/dir1/dir2/dir3/dir4"
+	std::string file = path.filename().string(); // "file"
+	std::string newdir = dir
 #else
 	filename = filename + "R.csv";
+	std::filesystem::path path(filename);
+	std::string dir = path.parent_path().string(); // "/home/dir1/dir2/dir3/dir4"
+	std::string file = path.filename().string(); // "file"
+	std::string newdir = dir + "T";
+
+	if(m_timers_on == true)
+		filename = dir + "T" + "\\" + file;
+	else
+		filename = dir + "\\" + file;
 #endif
 
 	
-
-		double totFps = 0.0;
-		double totTime = 0.0;
-		std::ofstream ostrm(filename);
-		if (!ostrm.is_open())
-		{
-			std::string rpt = "Failed to open report file:" + filename;
-			throw std::runtime_error(rpt.c_str());
-		}
+	
+	// Attempt to create the directories
+	if (std::filesystem::create_directories(newdir)) {
+		std::cout << "Successfully created directory: " << newdir << std::endl;
+	}
+	else {
+		// This branch is reached if the directory already existed
+		std::cout << "Directory already exists: " << newdir << std::endl;
+	}
+	
+	
+	double totFps = 0.0;
+	double totTime = 0.0;
+	std::ofstream ostrm(filename);
+	if (!ostrm.is_open())
+	{
+		std::string rpt = "Failed to open report file:" + filename;
+		throw std::runtime_error(rpt.c_str());
+	}
 		
-		//
-		ostrm << "time,fps,cpums,cms,gms,expectedp,loadedp,shaderp_comp,shaderp_grph,expectedc,shaderc,threadcount,sidelen,density,PERR,CERR" << std::endl;
-		for (size_t ii = 0; ii < aprCount-1; ii++)
-		{
+	//
+	ostrm << "time,fps,cpums,cms,gms,expectedp,loadedp,shaderp_comp,shaderp_grph,expectedc,shaderc,threadcount,sidelen,density,PERR,CERR" << std::endl;
+	for (size_t ii = 0; ii < aprCount-1; ii++)
+	{
 			
-			totFps += m_ReportBuffer[ii].FrameRate;
-			totTime +=m_ReportBuffer[ii].Second;
-			uint32_t partErr = 0;
-			uint32_t colErr = 0;
+		totFps += m_ReportBuffer[ii].FrameRate;
+		totTime +=m_ReportBuffer[ii].Second;
+		uint32_t partErr = 0;
+		uint32_t colErr = 0;
 
 		
-			ostrm	<< m_ReportBuffer[ii].Second << ","				// time
-					<< m_ReportBuffer[ii].FrameRate << ","			// fps
-					<< 1.0f/m_ReportBuffer[ii].FrameRate << ","		 // cpums: cpu time
-					<< m_ReportBuffer[ii].ComputeExecutionTime << ","	// cms: compute ms
-					<< m_ReportBuffer[ii].GraphicsExecutionTime << ","	// gms: graphics ms				
-					<< m_partcount << ","										// expectedp: frm tst - generated
-					<< VulkanWin->m_Numparticles-1 << ","							// loadedp: loaded into rccdApp
-					<< m_ReportBuffer[ii].NumParticlesComputeCount << ","// shaderp_comp: counted from compute
-					<< m_ReportBuffer[ii].NumParticlesGraphicsCount << ","			// shaderp_grp: counted from graphics
-					<< m_colcount << ","										// expectedc: expected collisions
-					<< m_ReportBuffer[ii].NumCollisionsComputeCount << ","							// shaderc: compute counted collisions
-					<< m_ReportBuffer[ii].ThreadCountComp << ","									// threadcount: number of threads compute
-					<< VulkanWin->m_SideLength << ","								// sidelen
-					<< m_density << ","										// density
-					<< partErr << ","
-					<< colErr 
-					<< std::endl;
-		}
+		ostrm	<< m_ReportBuffer[ii].Second << ","				// time
+				<< m_ReportBuffer[ii].FrameRate << ","			// fps
+				<< 1.0f/m_ReportBuffer[ii].FrameRate << ","		 // cpums: cpu time
+				<< m_ReportBuffer[ii].ComputeExecutionTime << ","	// cms: compute ms
+				<< m_ReportBuffer[ii].GraphicsExecutionTime << ","	// gms: graphics ms				
+				<< m_partcount << ","										// expectedp: frm tst - generated
+				<< VulkanWin->m_Numparticles-1 << ","							// loadedp: loaded into rccdApp
+				<< m_ReportBuffer[ii].NumParticlesComputeCount << ","// shaderp_comp: counted from compute
+				<< m_ReportBuffer[ii].NumParticlesGraphicsCount << ","			// shaderp_grp: counted from graphics
+				<< m_colcount << ","										// expectedc: expected collisions
+				<< m_ReportBuffer[ii].NumCollisionsComputeCount << ","							// shaderc: compute counted collisions
+				<< m_ReportBuffer[ii].ThreadCountComp << ","									// threadcount: number of threads compute
+				<< VulkanWin->m_SideLength << ","								// sidelen
+				<< m_density << ","										// density
+				<< partErr << ","
+				<< colErr 
+				<< std::endl;
+	}
 		
-		ostrm.flush();
-		ostrm.close();
-		if(tcp != nullptr)
-		{
-			tcp->WritePort("csvfile");
-			tcp->SendPerfFile(filename.c_str(),1);
-		}
+	ostrm.flush();
+	ostrm.close();
+	if(tcp != nullptr)
+	{
+		tcp->WritePort("csvfile");
+		tcp->SendPerfFile(filename.c_str(),1);
+	}
 		
 	std::cout << "\n\n\n\n================= Done Perf ======================= \n\n\n\n" << std::endl;
 

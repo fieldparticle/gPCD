@@ -54,6 +54,7 @@ class VulkanObj
 		uint32_t			m_FrameNumber = 0;
 		bool				m_FramebufferResized = false;
 		uint32_t			m_Numparticles=0;
+		bool				m_DeviceTimersOn = true;
 		uint32_t			m_Collisons=0;
 		uint32_t			m_SideLength = 0;
 		PhysDevObj*			m_QA = nullptr;

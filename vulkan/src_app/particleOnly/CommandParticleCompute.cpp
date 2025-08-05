@@ -93,6 +93,7 @@ void CommandParticleCompute::RecordCommands(uint32_t imageIndex, uint32_t curren
 		0,
 		upcosize,
 		sfl);
+
 	if (trace_on_flag == true)
 	{
 		vkCmdResetQueryPool(m_CommandBuffers[currentBuffer], m_PerfQueryPool,

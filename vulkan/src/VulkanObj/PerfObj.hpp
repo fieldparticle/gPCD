@@ -63,6 +63,7 @@ class PerfObj
 		std::string					m_testCFBDir;
 		std::string					m_testPCDDir;
 		std::string					m_testDUPDir;
+		std::string					m_testPQBSTDir;
 		uint32_t					m_AutoSleep = 0;
 		uint32_t					m_SeriesLength = 0;
 		std::string					m_AprFile;
@@ -72,7 +73,7 @@ class PerfObj
 		uint32_t					m_colcount = 0;
 		float						m_density = 0;
 		int							m_partcount = 0;
-
+		bool						m_timers_on=false;
 
 	void Create();
 	PerfObj(){};
