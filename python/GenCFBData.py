@@ -11,7 +11,7 @@ class GenPQBData(GenDataBase):
 
     def gen_data(self):
         self.gen_data_base()
-        self.open_bin_file()
+        self.create_bin_file()
         
     def plot_particle_cell(self,file_name):
         self.plot_particle_cell_base(file_name)

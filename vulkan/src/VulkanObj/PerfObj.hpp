@@ -59,6 +59,7 @@ class PerfObj
 		std::string					m_TestCFG;
 		std::string					m_testPQBSDir;
 		std::string					m_testPQBRDir;
+		std::string					m_testPQBRTDir;
 		std::string					m_testPQBDir;
 		std::string					m_testCFBDir;
 		std::string					m_testPCDDir;

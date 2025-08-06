@@ -14,7 +14,7 @@ class GenPQBData(GenDataBase):
     def sort_write_random(self):
         plist = self.read_all_particle_data(self.test_bin_name)
         plist.sort(key=lambda x: x.pnum)
-        self.open_bin_file()
+        self.create_bin_file()
         self.write_bin_file(plist)
         self.close_bin_file()
 
@@ -181,6 +181,7 @@ class GenPQBData(GenDataBase):
     #******************************************************************
     def gen_data_base(self,index,progress_callback=None):
         self.index = index
+        ret = 0
         if(self.calculate_test_properties() != 0):
             return
         if self.itemcfg.test_files_only == False:
@@ -191,13 +192,15 @@ class GenPQBData(GenDataBase):
         
         self.write_test_file()
         col_ary_size = self.cell_occupancy_list_size
-        if self.itemcfg.particle_enumeration == 'random':
-            self.sort_write_random()
-        pu = ParticleUtilities(self.side_length,col_ary_size)
         print("=========================================================\n")
-        print(f"max_cell_location = <{self.max_cell_location[0]},{self.max_cell_location[0]},{self.max_cell_location[0]}>")
-        cell_index = pu.ArrayToIndex(self.max_cell_location)
-        print(f"max_cell_index = <{cell_index}> total particles ")
+        if self.itemcfg.test_files_only == False:
+            if self.itemcfg.particle_enumeration == 'random':
+                self.sort_write_random()
+            pu = ParticleUtilities(self.side_length,col_ary_size)
+
+            print(f"max_cell_location = <{self.max_cell_location[0]},{self.max_cell_location[0]},{self.max_cell_location[0]}>")
+            cell_index = pu.ArrayToIndex(self.max_cell_location)
+            print(f"max_cell_index = <{cell_index}> total particles ")
         print(f"Total Particles: {self.particle_count} Colliding Particles:{self.num_collisions_per_cell}. Collsion pairs:{self.num_collisions_per_cell/2}")
         print("=========================================================\n")
         return ret    

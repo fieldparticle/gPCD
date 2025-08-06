@@ -17,9 +17,6 @@ class TabFormReport(QTabWidget):
     texFileName = ""
     hasConfig = False
     itemcfg = ConfigUtility("Latex Class")
-    startDir = "J:/MOD/FPIBGUtility/Latex"
-    startDir = "J:/FPIBGJournalStaticV2/rpt"
-    startDir = "J:/FPIBGJournalStaticV2/cfg"
     data_container = None
     latex_container = None
     interpeter = None
@@ -72,7 +69,7 @@ class TabFormReport(QTabWidget):
         """ Opens a dialog window for the user to select a folder in the file system. """
         #folder = QFileDialog.getExistingDirectory(self, "Select Folder")
         folder = QFileDialog.getOpenFileName(self, ("Open File"),
-                                       self.startDir,
+                                       self.cfg.report_start_dir,
                                        ("Configuration File (*.cfg)"))
         
         if folder[0]:
@@ -212,7 +209,7 @@ class TabFormReport(QTabWidget):
         except BaseException as e:
             self.log.log(self,e)
         try:
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBOnly.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBSTOnly.cfg")
         except BaseException as e1:
             print(f"Cannot open cfg file:{e1}")
    

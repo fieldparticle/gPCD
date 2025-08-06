@@ -124,7 +124,8 @@ class TabGenData(QTabWidget):
                 return 
             try:
                 # Import the class named in generate_class
-                self.gen_class = self.load_class(self.itemcfg.generate_class)()    
+                self.gen_class = self.load_class(self.itemcfg.generate_class)()  
+                self.gen_class.create(self,self.itemcfg) 
             except BaseException as e:
                 self.log.log(self,f"Unable to import data generation file: {self.itemcfg.generate_class} error:{e}")
                 return 
@@ -169,28 +170,49 @@ class TabGenData(QTabWidget):
     #******************************************************************
     # Start the data threaded generaton process
     #
-    def gen_data(self):
+    def gen_tst_files(self):
          # Pass the function to execute
         index = 0
         self.current_test_file = 0
-        self.gen_class.create(self,self.itemcfg) 
+        
         # Create the data directory if it does not exist
         try:
             if not os.path.exists(self.itemcfg.data_dir):
                 os.makedirs(self.itemcfg.data_dir)
         except BaseException as e1:
             self.log.log(self,f"Error creating data directory:{self.itemcfg.data_dir}, err: {e1}")
+            return
         # Open the selections file
         self.gen_class.clear_selections()
         try :
             self.gen_class.open_selections_file()
         except BaseException as e2:
-            self.log.log(self,f"Error opening:{self.itemcfg.selections_file_text}, err: {e2}")
-        
+            self.log.log(self,f"Error opening:{self.itemcfg.selections_file}, err: {e2}")
+            return
         self.clear_files()
         self.do_all_files_dbg()
         #self.start_thread()
-
+    def gen_data(self):
+         # Pass the function to execute
+        index = 0
+        self.current_test_file = 0
+        
+        # Create the data directory if it does not exist
+        try:
+            if not os.path.exists(self.itemcfg.data_dir):
+                os.makedirs(self.itemcfg.data_dir)
+        except BaseException as e1:
+            self.log.log(self,f"Error creating data directory:{self.itemcfg.data_dir}, err: {e1}")
+            return
+        # Open the selections file
+        self.gen_class.clear_selections()
+        try :
+            self.gen_class.open_selections_file()
+        except BaseException as e2:
+            self.log.log(self,f"Error opening:{self.itemcfg.selections_file}, err: {e2}")
+            return
+        self.clear_files()
+        self.do_all_files_dbg()
     #******************************************************************
     # Update the list widget
     #
@@ -217,11 +239,12 @@ class TabGenData(QTabWidget):
             self.threadpool.start(worker)
         except BaseException as e:
             print(f"Start Thread Failed:{e}")
-   
+
+    #******************************************************************
     # Thread that does one file set
     #
     def do_one_file(self,progress_callback):
-        
+
         index = self.current_test_file
         try:
             self.gen_class.gen_data_base(index,progress_callback)
@@ -232,7 +255,7 @@ class TabGenData(QTabWidget):
         return ""
 
     #******************************************************************
-    # Thread that does one file set
+    # Thread that does all filed without threads (for testing)
     #
     #     
     #******************************************************************
@@ -240,7 +263,7 @@ class TabGenData(QTabWidget):
         index = 0
         try:
             for ii in range(len(self.gen_class.select_list)):
-                print(f"{ii}")
+                #print(f"{ii}")
                 self.gen_class.gen_data_base(ii)
 
         except BaseException as e:
@@ -291,23 +314,20 @@ class TabGenData(QTabWidget):
     # Read the data from a file and return os as 
     #
     def read_particle_data(self,file_name):
-        struct_fmt = 'dddddddddddddd'
-        struct_len = struct.calcsize(struct_fmt)
-        #print(struct_len)
-        struct_unpack = struct.Struct(struct_fmt).unpack_from
-        count = 0
-        results = []
-        
-        with open(file_name, "rb") as f:
-            
-            while True:
-                record = pdata()
-                ret = f.readinto(record)
-                if ret == 0:
-                    break
-                results.append(record)
-        p_lst = []
-        return results
+        return self.gen_class.read_particle_data(file_name)
+    
+    #******************************************************************
+    # List a subset of particles to chgeck location and numers
+    #
+    def list_particles(self):
+        selected_item = self.ListObj.selectedItems()
+        self.selected_item = selected_item
+        if self.selected_item:
+           #print(selected_item[0].text())
+           self.gen_class.list_particles(selected_item[0].text())
+
+        else:
+            self.no_selection()
     ##############################################################################
     # Testing
     # 
@@ -316,11 +336,14 @@ class TabGenData(QTabWidget):
         selected_item = self.ListObj.selectedItems()
         self.selected_item = selected_item
         if self.selected_item:
-           print(selected_item[0].text())
+           #print(selected_item[0].text())
            self.test_array_to_index(selected_item[0].text())
         else:
             self.no_selection()
 
+    #******************************************************************
+    # Test that the array indexing is consecutive addresses
+    #
     def test_array_to_index(self,test_file_name):
         try :
             file_name = f"{self.itemcfg.data_dir}/{self.itemcfg.test_indexing_log}"
@@ -506,6 +529,13 @@ class TabGenData(QTabWidget):
             #self.VerfPCountBtn.clicked.connect(self.toggle_cell_faces)
             dirgrid.addWidget(self.VerfPCountBtn,3,3)
 
+            self.ListParticleBtn = QPushButton("List Particcles")
+            self.setSize(self.ListParticleBtn,30,120)
+            self.ListParticleBtn.setStyleSheet("background-color:  #dddddd")
+            self.ListParticleBtn.clicked.connect(self.list_particles)
+            dirgrid.addWidget(self.ListParticleBtn,3,3)
+
+
             list_label = QLabel("Data Set")
             dirgrid.addWidget(list_label,4,0,1,2)
 
@@ -538,7 +568,7 @@ class TabGenData(QTabWidget):
         for ii in self.plot_obj.views:
             self.ViewList.addItem(str(ii))
         self.log.log(self,"TabFormLatex finished Create.")        
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
    
     def valueChange(self,listObj):  
         selected_items = listObj.selectedItems()

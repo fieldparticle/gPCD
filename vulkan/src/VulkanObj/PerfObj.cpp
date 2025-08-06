@@ -39,17 +39,45 @@ void PerfObj::Create()
 	m_AutoSleep = CfgApp->GetUInt("application.auto_sleep", true);
 	m_SeriesLength = CfgApp->GetUInt("application.seriesLength", true);
 	m_TestCFG = CfgApp->GetString("application.perfTest", true);
-	m_testPQBRDir= CfgApp->GetString("application.testdirPQBRandom", true);
+
+	m_testPQBRDir= CfgApp->GetString("application.testdirPQBR", true);
+	m_testPQBRTDir = CfgApp->GetString("application.testdirPQBRT", true);
+
 	m_testPQBSDir= CfgApp->GetString("application.testdirPQBS", true);
 	m_testPQBSTDir = CfgApp->GetString("application.testdirPQBST", true);
+	
 	m_testCFBDir= CfgApp->GetString("application.testdirCFB", true);
 	m_testPCDDir= CfgApp->GetString("application.testdirPCD", true);
 	m_testDUPDir= CfgApp->GetString("application.testdirDUP", true);
 	m_SingleFileTest= CfgApp->GetBool("application.doAutoSingleFile", true);
-	if(!m_TestCFG.compare("testdirPQBRandom"))
+
+	if(!m_TestCFG.compare("testdirPQBR"))
 	{
+		config_setting_t* root_set = config_root_setting(&CfgApp->m_cfg);
+		config_setting_t* boolset = config_setting_add(root_set, "device_timers_on", CONFIG_TYPE_BOOL);
+		int ret = config_setting_set_bool(boolset, false);
+		if (ret == 0)
+		{
+			std::string rpt = "Failed to set 'device_timers_on' in PerfObject";
+			throw std::runtime_error(rpt.c_str());
+		}
 		m_TestDir = m_testPQBRDir;
+		m_timers_on = false;
 	}
+	if (!m_TestCFG.compare("testdirPQBRT"))
+	{
+		config_setting_t* root_set = config_root_setting(&CfgApp->m_cfg);
+		config_setting_t* boolset = config_setting_add(root_set, "device_timers_on", CONFIG_TYPE_BOOL);
+		int ret = config_setting_set_bool(boolset, true);
+		if (ret == 0)
+		{
+			std::string rpt = "Failed to set 'device_timers_on' in PerfObject";
+			throw std::runtime_error(rpt.c_str());
+		}
+		m_TestDir = m_testPQBRTDir;
+		m_timers_on = true;
+	}
+
 	if(!m_TestCFG.compare("testdirPQBS"))
 	{
 		config_setting_t* root_set = config_root_setting(&CfgApp->m_cfg);
@@ -76,6 +104,7 @@ void PerfObj::Create()
 		m_TestDir = m_testPQBSDir;
 		m_timers_on = true;
 	}
+
 	if(!m_TestCFG.compare("testdirCFB"))
 	{
 		m_TestDir = m_testCFBDir;
@@ -200,18 +229,36 @@ int PerfObj::Doperf(DrawObj* DrawInstance, VulkanObj* VulkanWin, TCPObj* tcp, si
 	std::filesystem::path path(filename);
 	std::string dir = path.parent_path().string(); // "/home/dir1/dir2/dir3/dir4"
 	std::string file = path.filename().string(); // "file"
-	std::string newdir = dir
+	std::string newdir = "";
+
+	if (m_timers_on == true)
+	{
+		newdir = dir + "T";
+		filename = dir + "T" + "\\" + file;
+	}
+	else
+	{
+		newdir = dir;
+		filename = dir + "\\" + file;
+	}
 #else
 	filename = filename + "R.csv";
 	std::filesystem::path path(filename);
 	std::string dir = path.parent_path().string(); // "/home/dir1/dir2/dir3/dir4"
 	std::string file = path.filename().string(); // "file"
-	std::string newdir = dir + "T";
+	std::string newdir = "";
 
-	if(m_timers_on == true)
+
+	if (m_timers_on == true)
+	{
+		newdir = dir + "T";
 		filename = dir + "T" + "\\" + file;
+	}
 	else
+	{
+		newdir = dir;
 		filename = dir + "\\" + file;
+	}
 #endif
 
 	

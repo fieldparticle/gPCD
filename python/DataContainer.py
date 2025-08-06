@@ -78,7 +78,7 @@ class DataContainer():
         for ii in self.fields_list:
             data_obj = ii.data_object
             data_obj.check_data_files(ii)
-            data_obj.create_summary(ii)
+            
 
     #******************************************************************
     # load the data into the fields
@@ -87,7 +87,10 @@ class DataContainer():
         matches = ["pqb","pcd","cfb","dup","pqbrandom"]    
         for ii in self.fields_list:
             test_fld = ii["data_base"].upper()
-            ii["source_dir"] = self.itemcfg.data_dir
+            ii["source_dir"] = self.itemcfg.input_data_dir
+            self.out_folder = os.path.dirname(self.itemcfg.input_data_dir)
+            target = self.out_folder + '/' + "perfData" + ii.data_base
+            ii["target_dir"] = target
             ii["data_object"] = gPCDData(self,self.itemcfg)
             ii["mode"] = self.itemcfg.mode
             ii["compute_type"] = self.itemcfg.compute_type

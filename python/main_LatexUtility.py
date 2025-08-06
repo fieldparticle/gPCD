@@ -31,7 +31,7 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     screens = app.screens()
     window = UtilityMainWin(bc,"UtilMainWin")
-    screen = screens[3]
+    screen = screens[2]
     qr = screen.geometry()
     window.move(qr.left(), qr.top())
     window.Create(bc)

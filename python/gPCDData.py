@@ -74,12 +74,12 @@ class gPCDData():
         tst_files = [i for i in os.listdir(file_dict.source_dir) if i.endswith(".tst")]
         # If its verifcation
         if "V" in file_dict.mode:
-            file_dict["summary_file_name"] = file_dict.source_dir + "/" + "perfdataVerificationSummary.csv"
-            file_dict["err_file_name"] = file_dict.source_dir + "/" + "perfdataVerificationSummaryErrors.csv"
-            self.data_files = [i[:-5] for i in os.listdir(file_dict.source_dir) if i.endswith("D.csv")]
+            file_dict["summary_file_name"] = file_dict.target_dir + "/" + "perfdataVerificationSummary.csv"
+            file_dict["err_file_name"] = file_dict.target_dir + "/" + "perfdataVerificationSummaryErrors.csv"
+            self.data_files = [i[:-5] for i in os.listdir(file_dict.target_dir) if i.endswith("D.csv")]
         elif "P" in file_dict.mode:
-            file_dict["summary_file_name"] = file_dict.source_dir + "/" + "perfdataPerformanceSummary.csv"
-            self.data_files = [i[:-5] for i in os.listdir(file_dict.source_dir) if i.endswith("R.csv")]
+            file_dict["summary_file_name"] = file_dict.target_dir + "/" + "perfdataPerformanceSummary.csv"
+            self.data_files = [i[:-5] for i in os.listdir(file_dict.target_dir) if i.endswith("R.csv")]
       
 
         self.hasData = len(tst_files) == len(self.data_files)
@@ -116,7 +116,13 @@ class gPCDData():
     def do_verify(self,file_dict):
         file_count = 0
         error_count = 0
-      
+        header = ['Name', 'expectedp', 'loadedp',
+                'shaderp_comp', 'shaderp_grph', 'expectedc', 'shaderc']
+        with open(file_dict.summary_file_name, 'w', newline='') as sfile:
+                    writer = csv.writer(sfile)
+                    writer.writerow(header)
+
+        
         for ii in self.data_files:
             average_list = []
             try:
@@ -146,8 +152,8 @@ class gPCDData():
 
                 if loaded_err or grphp_err or compp_err or coll_err:
                     error_count+=1
-                avg_list = [file_count, line_count, expectedp, loadedp, shaderp_comp,
-                    shaderp_grph, expectedc, shaderc, loaded_err, compp_err, grphp_err, coll_err]
+                avg_list = [data_file, expectedp, loadedp, shaderp_comp,
+                    shaderp_grph, expectedc, shaderc]
                 average_list.append(avg_list)            
                 line_count += 1
             except BaseException as e:
@@ -169,9 +175,8 @@ class gPCDData():
     #******************************************************************
     # Get averages
     #
-    def get_averages(self):
-        if(self.hasData == False):
-            return
+    def get_averages(self,file_dict):
+        self.create_summary(file_dict)
         print("Performing Averages")
         self.average_list = []
         for i in self.data_files:
@@ -215,13 +220,14 @@ class gPCDData():
     # Get maximuns write then to summary file
     #
     def get_maxes(self,file_dict):
+        self.create_summary(file_dict)
         for ii in self.data_files:
             fps_old = 0
             cpums_old = 0.0
             cms_old = 0.0
             gms_old = 0.0
             
-            data_file = file_dict.source_dir + "/" + ii + "R.csv"
+            data_file = file_dict.target_dir + "/" + ii + "R.csv"
             mean = stddev = fps = cpums = cms = gms = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = 0
             fps_list = []
           

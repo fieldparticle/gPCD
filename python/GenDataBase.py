@@ -68,18 +68,39 @@ class GenDataBase:
     def __init__(self):
        pass
 
-
+    #******************************************************************
+    # Standrd create
+    #
     def create(self,parent,itemcfg):
         self.parent = parent
         self.bobj = parent.bobj
         self.cfg = self.bobj.cfg.config
         self.log = self.bobj.log
         self.itemcfg = itemcfg
-    
-    # Impliment in subclass
+
+    ##############################################################################
+    # Abstrict members
+    # 
+    ##############################################################################
+    #******************************************************************
+    # Abstrct place_particles
+    #
     def place_particles(self,xx,yy,zz,row,col,layer,w_list):
         pass
+    #******************************************************************
+    # Abstrct do_cells
+    #
+    def do_cells(self):
+        pass
 
+    ##############################################################################
+    # Partice calcualtions
+    # 
+    ##############################################################################    
+    #******************************************************************
+    # Caluate side length based on number of particles and particle per 
+    # cell
+    #
     def calc_side_length(self,num_parts,num_parts_per_cels):
         side_len = 0
         while True:
@@ -88,21 +109,40 @@ class GenDataBase:
                 break
         ## Add on since particle locations are zero based
         return side_len+1
-    # Impliment in subclass
-    def do_cells(self):
-        pass
 
-    def on_close(self,event):
-        pass
-
+    ##############################################################################
+    # File I/O
+    # 
+    ##############################################################################    
+    #******************************************************************
+    # Create the binary particles file
+    # 
+    #
     def create_bin_file(self):
         try:
             self.bin_file = open(self.test_bin_name,"wb")
         except BaseException as e:
             self.log.log(self,e)
+            return
         self.count = 0
-
     
+    
+    #******************************************************************
+    #  List the particles
+    # 
+    #
+    
+    def list_particles(self,file_name):
+        p_count = 0
+        p_list = self.read_particle_data(file_name)
+        index = 0
+        for ii in p_list:
+            print(f"P:{ii.pnum} R:{ii.radius} I:{index}<{ii.rx:.2f},{ii.ry:.2f},{ii.rz:.2f}>[{round(ii.rx)},{round(ii.ry)},{round(ii.rz)}]")
+            index +=1
+    #******************************************************************
+    # Caluate side length based on number of particles and particle per 
+    # cell
+    #
     def write_bin_file(self,w_lst):
         try:
             for ii in w_lst:
@@ -110,22 +150,87 @@ class GenDataBase:
                 self.count+=1
         except BaseException as e:
             self.log.log(self,e)
-        
+
+    #******************************************************************
+    # Close the binary prticle file after its filled
+    # cell
+    #
     def close_bin_file(self):
         self.bin_file.flush()
         self.bin_file.close()
         if(self.bin_file.closed != True):
             self.bobj.log.log("File:{self.test_bin_name} not closed")
 
+    #******************************************************************
+    # Read particle data in range
+    # 
+    #
+    def read_particle_data(self,file_name):
+        struct_fmt = 'dddddddddddddd'
+        struct_len = struct.calcsize(struct_fmt)
+        #print(struct_len)
+        struct_unpack = struct.Struct(struct_fmt).unpack_from
+        count = 0
+        results = []
+        counter = 0
+        slist = self.itemcfg.particle_range
+        start_it = int(slist[0])
+        end_it = int(slist[1])
+        with open(file_name, "rb") as f:
+            
+            while True:
+                if counter >= start_it: 
+                    record = pdata()
+                    ret = f.readinto(record)
+                    if ret == 0:
+                        break
+                    #print(record.pnum)
+                    results.append(record)
+                    if counter > end_it:
+                        break
+                counter += 1
+                
+        p_lst = []
+        return results
+        
+    #******************************************************************
+    # Reead all of the particle data
+    # 
+    #
+    def read_all_particle_data(self,file_name):
+        struct_fmt = 'dddddddddddddd'
+        struct_len = struct.calcsize(struct_fmt)
+        #print(struct_len)
+        struct_unpack = struct.Struct(struct_fmt).unpack_from
+        count = 0
+        results = []
+        with open(file_name, "rb") as f:
+            while True:
+                record = pdata()
+                ret = f.readinto(record)
+                if ret == 0:
+                    break
+                results.append(record)
+        p_lst = []
+        return results
+    
     def calc_test_parms(self):
         pass
 
+    #******************************************************************
+    # Always add a null particle to the beginging of the particles
+    # bnary file. The particle.exe code ignores 0 so that it can be used
+    # to indeicvate an emply ellement of an array.
+    #
     def add_null_particle(self,w_list):
         particle_struct = pdata()
         particle_struct.pnum = 0
         w_list.append(particle_struct)
     
+    #******************************************************************
     # load all lines from the particle selections file into selections list
+    # 
+    #
     def open_selections_file(self):
         with open(self.itemcfg.selections_file,"r",newline='') as csvfl:
             reader = csv.DictReader(csvfl, delimiter=',',dialect='excel')
@@ -133,10 +238,17 @@ class GenDataBase:
                 if row["sel"] == 's':
                     self.select_list.append(row)
     
+    #******************************************************************
+    # Clear selections file list
+    # 
+    #
     def clear_selections(self):
         self.select_list.clear()
        
-   
+    #******************************************************************
+    # Write the tst files taht are read by particle.exe for tests
+    # 
+    #
     def write_test_file(self):
 
         try:
