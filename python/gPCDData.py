@@ -122,11 +122,12 @@ class gPCDData():
                     writer = csv.writer(sfile)
                     writer.writerow(header)
 
-        
+        err_list = []
+        average_list = []
         for ii in self.data_files:
-            average_list = []
+            
             try:
-                data_file = file_dict.source_dir + "/" + ii + "D.csv"
+                data_file = file_dict.target_dir + "/" + ii + "D.csv"
                 with open(data_file, 'r') as filename:
                     file = csv.DictReader(filename)
                     loaded_err = grphp_err = compp_err = coll_err = expectedp = loadedp = shaderp_comp = shaderp_grph = shaderc = 0
@@ -154,22 +155,23 @@ class gPCDData():
                     error_count+=1
                 avg_list = [data_file, expectedp, loadedp, shaderp_comp,
                     shaderp_grph, expectedc, shaderc]
-                average_list.append(avg_list)            
+                err_list.append(avg_list)            
                 line_count += 1
             except BaseException as e:
                 raise BaseException(f"do_verify - summary file open error:{e}")
+            
             file_count += 1
             with open(file_dict.summary_file_name, 'a', newline='') as sfile:
                     writer = csv.writer(sfile)
-                    writer.writerows(average_list)
+                    writer.writerow(avg_list)
 
         with open(file_dict.err_file_name, 'w', newline='\n') as efile:
             writer = csv.writer(efile)
             writer.writerow( ['file_count', 'line_count', 'expectedp', 'loadedp', 'shaderp_comp',
                         'shaderp_grph','expectedc', 'shaderc', 'loaded_err', 'compp_err', 'grphp_err', 'coll_err'])
             if error_count > 0:
-                for ii in range(len(average_list)):
-                    writer.writerows(average_list[ii])
+                #//for jj in range(len(average_list)):
+                 writer.writerows(err_list)
         return error_count
             
     #******************************************************************

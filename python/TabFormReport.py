@@ -114,7 +114,6 @@ class TabFormReport(QTabWidget):
             self.data_container.get_data()
             ret = self.data_container.do_verify()
             if ret > 0:
-                field_dict = self.data_container.get_feilds_dict()
                 self.msg_box(f"Verify failed: Number of errors:{ret}. See ")
             else:
                 self.msg_box(f"Verify Passed!")
@@ -209,7 +208,7 @@ class TabFormReport(QTabWidget):
         except BaseException as e:
             self.log.log(self,e)
         try:
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBSTOnly.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/CFBOnly.cfg")
         except BaseException as e1:
             print(f"Cannot open cfg file:{e1}")
    

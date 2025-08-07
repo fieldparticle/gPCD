@@ -9,6 +9,7 @@ import numpy as np
 import ctypes
 import math
 from ConfigUtility import *
+from utilities import *
 from abc import ABC, abstractmethod
 
 
@@ -56,8 +57,9 @@ class GenDataBase:
     bin_file = None
     particle_separation = 0.0
     flg_stop = False
+    do_max_scale = False
     collsion_count_check = 0
-    
+    base_name = "GenDataBase"
     views = [('XY',   (90, -90, 0)),
         ('XZ',    (0, -90, 0)),
         ('YZ',    (0,   0, 0)),
@@ -304,3 +306,182 @@ class GenDataBase:
 
 
   
+    def place_particles(self,xx,yy,zz,row,col,layer,w_list):
+
+        
+        # If particle cont is greater than the required numbe of particles return 3 to end the
+        if (self.particle_count >= self.number_particles):
+            return 3
+
+        # IF number collsions met return 2
+        if(self.particles_in_cell_count > self.particles_in_cell ):
+            return 2
+        
+        # Switch for the range function
+        if(self.do_max_scale == True):
+            self.do_max_scale = False
+        else:
+            self.do_max_scale = True
+
+
+        particle_struct = pdata()
+        #print(f"particle: {self.particle_count}, xx={xx}, yy= {yy}, zz={zz}, layer= {layer}, row= {row} col= {col}")
+        #                         |offset so no particle is in a cell with a zero in it|
+       
+        subcell = 1.0/self.particles_in_row
+        dist =(subcell-2.0*self.radius) 
+        sep = dist/2.0
+
+        self.center_line_length     = 2.0*sep+2.0*self.radius
+        self.switch_col = False
+        odd_colum = 0
+        if col == 0:
+            odd_colum = 0
+            self.switch_col = False
+        else:
+            odd_column = col%2
+            self.switch_col  = True
+
+        # If more colsions are needed
+        if(self.collsions_in_cell_count < self.num_collisions_per_cell):
+            if col%2:
+                rx = 0.5 + sep + 0.25*self.radius + self.center_line_length*col+xx
+                self.collsions_in_cell_count+=1
+                self.collision_count+=1
+                particle_struct.ptype = 1
+                self.switch_col = False
+            else:
+                rx = 0.5 + sep + self.radius + self.center_line_length*col+xx
+                self.collsions_in_cell_count+=1
+                self.collision_count+=1
+                particle_struct.ptype = 1
+                self.switch_col = True
+        else:
+            particle_struct.ptype = 0
+            rx = 0.5 + sep + self.radius + self.center_line_length*col+xx
+
+
+        ry = 0.5 + sep + self.radius + self.center_line_length*row+yy        
+        rz = 0.5 + sep + self.radius + self.center_line_length*layer+zz
+    
+        if round(rx) == 1 and round(ry) == 1 and round(rz) == 1:
+            self.collsion_count_check = self.collsions_in_cell_count
+        
+
+
+        #print(f"row{row}:col{col} <{rx},{ry},{rz}> Cell:<{round(rx)},{round(ry)},{round(rz)}>")
+        if self.itemcfg.particle_enumeration == 'random':
+            particle_struct.pnum = self.rand_data[self.particle_count]
+
+        elif self.itemcfg.particle_enumeration == 'scale':
+            if self.do_max_scale == True:
+                self.last_max_scale-=1
+                particle_struct.pnum = self.last_max_scale
+            else:
+                self.last_min_scale+=1
+                particle_struct.pnum = self.last_min_scale
+            
+        elif self.itemcfg.particle_enumeration == 'sequential':    
+            particle_struct.pnum = self.particle_count + 1    
+
+        particle_struct.rx = rx
+        particle_struct.ry = ry
+        particle_struct.rz = rz
+        particle_struct.radius = self.radius
+        w_list.append(particle_struct)
+        self.particle_count+=1
+        self.particles_in_cell_count +=1
+
+        if self.old_rx < rx:
+            self.old_rx = rx
+        if self.old_ry < ry:
+            self.old_ry = ry
+        if self.old_rz < rz:
+            self.old_rz = rz
+        self.max_cell_location = [round(self.old_rx),round(self.old_ry),round(self.old_rz)]
+        return 0
+    #******************************************************************
+    # Calulate the cell and particle propeties of the study
+    #
+    #     
+    #******************************************************************
+    def gen_data_base(self,index,progress_callback=None):
+        self.index = index
+        ret = 0
+        if(self.calculate_test_properties() != 0):
+            return
+        if self.itemcfg.test_files_only == False:
+            self.create_bin_file()  
+            self.collsion_count_check = 0
+            ret = self.do_cells(progress_callback)
+            self.close_bin_file()
+        
+        self.write_test_file()
+        col_ary_size = self.cell_occupancy_list_size
+        self.log.log(self,f"========================{self.test_file_name}=================================\n")
+        if self.itemcfg.test_files_only == False:
+            if self.itemcfg.particle_enumeration == 'random':
+                self.sort_write_random()
+            pu = ParticleUtilities(self.side_length,col_ary_size)
+
+            self.log.log(self,f"max_cell_location = <{self.max_cell_location[0]},{self.max_cell_location[0]},{self.max_cell_location[0]}>")
+            cell_index = pu.ArrayToIndex(self.max_cell_location)
+            self.log.log(self,f"max_cell_index = <{cell_index}> total cells ")
+        self.log.log(self,f"Collisions per cell:{self.num_collisions_per_cell}. Collsion pairs per cell:{self.num_collisions_per_cell/2}")
+        self.log.log(self,f"Total Particles: {self.particle_count},Calculated Collisions:{self.tot_num_collsions}, Counted Collsions:{self.collision_count}")
+        self.log.log(self,"=========================================================\n")
+        return ret    
+    
+    #******************************************************************
+    # Iterate though the cells and place partiucles 
+    #
+    #     
+    #******************************************************************
+    def do_cells(self,progress_callback):
+        self.old_rx = 0.0
+        self.old_ry = 0.0
+        self.old_rz = 0.0
+        if self.itemcfg.particle_enumeration == 'random':
+            self.rand_data = self.gen_random_numbers_in_range(1, self.number_particles+1, self.number_particles)    
+        if self.itemcfg.particle_enumeration == 'scale':
+            self.last_max_scale = self.number_particles+1
+        self.collision_count = 0
+        ret = 0
+        self.w_list = []
+        self.particle_count = 0
+        self.add_null_particle(self.w_list)
+        ########################################################
+        # This only happens here. The side_length is n
+        # but since cells start at zero they go from 0 to n-1
+        z_range = self.cell_z_len-1
+        y_range = self.cell_y_len-1
+        z_range = self.cell_x_len-1
+        
+        ########################################################
+        for zz in range(z_range):
+            ppc = float(self.particle_count/self.number_particles)*100.0
+            if progress_callback!= None:
+                progress_callback.emit(ppc)
+            else:
+                print(f"{ppc:.2f}")
+            for yy in range(y_range):
+                for xx in range(z_range):
+                    self.collsions_in_cell_count = 0
+                    self.particles_in_cell_count = 0
+                    # Inside a single cell. Process single cell
+                    for layer in range(self.particles_in_layers):
+                        for row in range(self.particles_in_row): 
+                            for col in range(self.particles_in_col):        
+                                if self.flg_stop == True:
+                                    return 1
+                                ret = self.place_particles(xx,yy,zz,row,col,layer,self.w_list)
+                                if ret == 3:
+                                    if len(self.w_list) > 0:
+                                        self.write_bin_file(self.w_list)
+                                        #print(f"{self.collsion_count_check}")
+                                    return 0
+                                if len(self.w_list) >= self.itemcfg.write_block_len:
+                                    self.write_bin_file(self.w_list)
+                                    self.w_list.clear()
+        self.write_bin_file(self.w_list)
+        return 0

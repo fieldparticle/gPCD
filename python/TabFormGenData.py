@@ -158,9 +158,9 @@ class TabGenData(QTabWidget):
     #           
     def load_class(self,class_name):
         module_name, class_name = class_name.rsplit('.', 1)
-        #module = importlib.import_module(module_name)
-        #return getattr(module, class_name)
-        return GenPQBData
+        module = importlib.import_module(module_name)
+        return getattr(module, class_name)
+        #return GenPQBData
 
    
     ##############################################################################
@@ -192,6 +192,10 @@ class TabGenData(QTabWidget):
         self.clear_files()
         self.do_all_files_dbg()
         #self.start_thread()
+
+    #******************************************************************
+    # Generate the data
+    #
     def gen_data(self):
          # Pass the function to execute
         index = 0
@@ -317,6 +321,12 @@ class TabGenData(QTabWidget):
         return self.gen_class.read_particle_data(file_name)
     
     #******************************************************************
+    # Read the data from a file and return os as 
+    #
+    def read_all_particle_data(self,file_name):
+        return self.gen_class.read_all_particle_data(file_name)
+    
+    #******************************************************************
     # List a subset of particles to chgeck location and numers
     #
     def list_particles(self):
@@ -340,6 +350,36 @@ class TabGenData(QTabWidget):
            self.test_array_to_index(selected_item[0].text())
         else:
             self.no_selection()
+
+    #******************************************************************
+    # Count collisions
+    #
+    def count_collisions(self):
+        selected_item = self.ListObj.selectedItems()
+        self.selected_item = selected_item
+        if self.selected_item:
+           #print(selected_item[0].text())
+           test_file_name = selected_item[0].text()
+        else:
+            self.no_selection()
+            return 
+        try :
+            self.particle_data = self.read_all_particle_data(self.selected_item[0].text())
+            
+            tst_prefix = os.path.splitext(test_file_name)[0]
+            tst_file = tst_prefix + '.tst'
+            tst_file_obj = ConfigUtility(tst_file)
+            tst_file_obj.Create(self.bobj.log,tst_file)
+            tst_file_cfg = tst_file_obj.config
+            pu = ParticleUtilities(tst_file_cfg.CellAryW,tst_file_cfg.cell_occupancy_list_size)
+        except BaseException as e:
+            print(f"Verify indexing error:{e}")
+            return
+        file_name = f"{self.itemcfg.data_dir}/{self.itemcfg.test_collisions_log}"
+        count = pu.detect_collsions(self.particle_data,file_name)
+        print(f"Number collsions Counted:{count}. Number expected {tst_file_cfg.num_particle_colliding}")
+   
+        
 
     #******************************************************************
     # Test that the array indexing is consecutive addresses
@@ -368,23 +408,7 @@ class TabGenData(QTabWidget):
                     col_file.write(f"Index:{index} at <{xx},{yy},{zz}>\n")
 
         col_file.close()
-    """
-    #******************************************************************
-    # Read the test file and list the index addressing
-    # Needs to be consequtive not ,issing numbers
-    def verify_particle_count(self,file_name):
-        counter = 0
-        with open(file_name, "rb") as f:
-            while True:
-                record = pdata()
-                ret = f.readinto(record)
-                if ret == 0:
-                    break
-                counter += 1
-            
-        print(f"Verify counted :{counter} against {self.number_particles}")
-    """ 
-
+    
     ##############################################################################
     # Plot stuff
     # 
@@ -535,6 +559,12 @@ class TabGenData(QTabWidget):
             self.ListParticleBtn.clicked.connect(self.list_particles)
             dirgrid.addWidget(self.ListParticleBtn,3,3)
 
+            self.CountCollBtn = QPushButton("Count Collisions")
+            self.setSize(self.CountCollBtn,30,120)
+            self.CountCollBtn.setStyleSheet("background-color:  #dddddd")
+            self.CountCollBtn.clicked.connect(self.count_collisions)
+            dirgrid.addWidget(self.CountCollBtn,3,4)
+
 
             list_label = QLabel("Data Set")
             dirgrid.addWidget(list_label,4,0,1,2)
@@ -568,7 +598,7 @@ class TabGenData(QTabWidget):
         for ii in self.plot_obj.views:
             self.ViewList.addItem(str(ii))
         self.log.log(self,"TabFormLatex finished Create.")        
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPCD.cfg")
    
     def valueChange(self,listObj):  
         selected_items = listObj.selectedItems()

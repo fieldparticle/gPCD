@@ -101,14 +101,42 @@ void PerfObj::Create()
 			std::string rpt = "Failed to set 'device_timers_on' in PerfObject";
 			throw std::runtime_error(rpt.c_str());
 		}
-		m_TestDir = m_testPQBSDir;
+
 		m_timers_on = true;
+		m_TestDir = m_testPQBSDir;
+		
 	}
 
-	if(!m_TestCFG.compare("testdirCFB"))
+	if(!m_TestCFG.compare("testdirCFBT"))
 	{
+
+		config_setting_t* root_set = config_root_setting(&CfgApp->m_cfg);
+		config_setting_t* boolset = config_setting_add(root_set, "device_timers_on", CONFIG_TYPE_BOOL);
+		int ret = config_setting_set_bool(boolset, true);
+		if (ret == 0)
+		{
+			std::string rpt = "Failed to set 'device_timers_on' in PerfObject";
+			throw std::runtime_error(rpt.c_str());
+		}
+
+		m_timers_on = true;
 		m_TestDir = m_testCFBDir;
 		
+	}
+
+	if (!m_TestCFG.compare("testdirCFB"))
+	{
+		config_setting_t* root_set = config_root_setting(&CfgApp->m_cfg);
+		config_setting_t* boolset = config_setting_add(root_set, "device_timers_on", CONFIG_TYPE_BOOL);
+		int ret = config_setting_set_bool(boolset, false);
+		if (ret == 0)
+		{
+			std::string rpt = "Failed to set 'device_timers_on' in PerfObject";
+			throw std::runtime_error(rpt.c_str());
+		}
+		m_timers_on = false;
+		m_TestDir = m_testCFBDir;
+
 	}
 	if(!m_TestCFG.compare("testdirPCD"))
 	{
