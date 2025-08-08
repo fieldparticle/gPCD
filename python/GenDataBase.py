@@ -60,6 +60,9 @@ class GenDataBase:
     do_max_scale = False
     collsion_count_check = 0
     base_name = "GenDataBase"
+    max_cell_location= []
+
+
     views = [('XY',   (90, -90, 0)),
         ('XZ',    (0, -90, 0)),
         ('YZ',    (0,   0, 0)),
@@ -305,7 +308,10 @@ class GenDataBase:
         f.close()
 
 
-  
+    #******************************************************************
+    # Write the tst files taht are read by particle.exe for tests
+    # 
+    #
     def place_particles(self,xx,yy,zz,row,col,layer,w_list):
 
         
@@ -418,7 +424,7 @@ class GenDataBase:
         
         self.write_test_file()
         col_ary_size = self.cell_occupancy_list_size
-        self.log.log(self,f"========================{self.test_file_name}=================================\n")
+        
         if self.itemcfg.test_files_only == False:
             if self.itemcfg.particle_enumeration == 'random':
                 self.sort_write_random()

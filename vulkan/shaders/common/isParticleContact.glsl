@@ -62,7 +62,7 @@ uint isParticleContact(uint crnr, uint Findex, uint Tindex)
 #endif	
 	float rddiff = dsq-rsq;	
 	//if (dsq <= rsq )
-	if(rddiff < 0.0001 || rddiff < 0.0)
+	if(rddiff < 0.00001 || rddiff < 0.0)
     {
 	
 #if 0

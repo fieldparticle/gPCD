@@ -43,6 +43,8 @@ class UtilityMainWin(QWidget):
         #self.f.close()
         #plt.close("all")        
 
+
+    
     def on_clicked(self) :
         exit()
         

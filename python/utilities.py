@@ -82,27 +82,27 @@ class ParticleUtilities():
         self.col_count = 0
         ary = [int(round(plist[1].rx)),int(round(plist[1].ry)),int(round(plist[1].rz))]
         old_cnr_idx = self.ArrayToIndex(ary)
-        cell_parts = plist
-        """
         cell_parts = []
+        count = 0
         cell_parts.append(plist[1])
         for Findex in range(2,len(plist)):
             ary = [int(round(plist[Findex].rx)),int(round(plist[Findex].ry)),int(round(plist[Findex].rz))]
             cnr_idx = self.ArrayToIndex(ary)
             if old_cnr_idx == cnr_idx:
+                count+=1
                 cell_parts.append(plist[Findex])
                 print(f"{Findex}")
             else:
                 break
-        """
         duplist = [0]*self.max_location
+
         for ii in cell_parts:
             for jj in cell_parts:
                 if ii.pnum == jj.pnum:
                     continue
                 ret = self.particle_contact(ii,jj,duplist)    
        
-        return self.col_count
+        return [count,self.col_count]
 
     def detect_collions_all(self,plist):
         Tindex = 0

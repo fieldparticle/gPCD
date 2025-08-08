@@ -215,7 +215,8 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 				{
 					vkDeviceWaitIdle(VulkanWin->GetLogicalDevice());
 					aprCount++;
-					perfObj->Doperf(DrawInstance, VulkanWin, tcp, aprCount);
+					if (perfObj->Doperf(DrawInstance, VulkanWin, tcp, aprCount) != 0)
+						return 0;
 
 					if(ret == 1 && stopOnError == true)
 						return 1;

@@ -22,7 +22,7 @@ class GenPQBData(GenDataBase):
 
     def calculate_test_properties(self):
         try :
-            print(self.index)
+           #print(self.index)
             self.collision_density      = float(self.select_list[self.index]["cdens"])
             self.number_particles       =  int(self.select_list[self.index]["tot"])
             self.radius                 = float(self.select_list[self.index]["radius"])

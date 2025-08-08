@@ -18,7 +18,7 @@ class PlotParticles():
     flg_plot_cell_faces = False
     flg_plot_cells = False
     particle_data = None
-    item_cfg = None
+    #item_cfg = None
 
     views = [('XY',   (90, -90, 0)),
         ('XZ',    (0, -90, 0)),
@@ -50,7 +50,7 @@ class PlotParticles():
     # Do the plot
     #    
     def do_plot(self,view_num=None):
-        self.plot_particles(aspoints=False)
+        self.plot_particles()
         if self.flg_plot_cells == True:
             for ii in range(1,self.tst_side_length+1):
                 for jj in range(1,self.tst_side_length+1):
@@ -73,7 +73,7 @@ class PlotParticles():
     #******************************************************************
     # plot the particles
     #
-    def plot_particles(self,aspoints=True,scolor=None):
+    def plot_particles(self):
         
         p_count = 0
         # Get the number facets for smoothness
@@ -89,8 +89,12 @@ class PlotParticles():
         # Set the default color
         pcolor = self.itemcfg.particle_color
         # If plotting as points just do a scatter
-        if aspoints == True:    
-            self.ax.scatter(self.particle_data[:,1],self.particle_data[:,2],self.particle_data[:,3])
+        if self.itemcfg.as_points == True:    
+            px = [[dic.rx] for dic in self.particle_data]
+            py= [[dic.ry] for dic in self.particle_data]
+            pz = [[dic.rz] for dic in self.particle_data]
+            #px = self.particle_data[:]
+            self.ax.scatter(px,py,pz)
         # If doing spheres 
         else:
             # Traverse particle data
@@ -102,10 +106,16 @@ class PlotParticles():
                     z = ii.rz + ii.radius * np.cos(phi)
                     # If the particle is in collision use a different color
                     if ii.ptype == 1:
-                        self.ax.plot_surface(x, y, z, color='blue',alpha=0.8)
+                        if self.itemcfg.vary_color == False:
+                            self.ax.plot_surface(x, y, z, color='blue',alpha=0.8)
+                        else:
+                            self.ax.plot_surface(x, y, z,alpha=0.8)
                     # Else uese standar color
                     else:
-                        self.ax.plot_surface(x, y, z, color=pcolor,alpha=0.8)
+                        if self.itemcfg.vary_color == False:
+                            self.ax.plot_surface(x, y, z, color=pcolor,alpha=0.8)
+                        else:
+                            self.ax.plot_surface(x, y, z,alpha=0.8)
                     #print(f"Particle {p_count} Loc: <{ii.rx:2f},{ii.ry:2f},{ii.rz:2f})>")
                     
                 p_count +=1
@@ -150,16 +160,13 @@ class PlotParticles():
         self.ax.set_xlabel('X')
         self.ax.set_ylabel('Y')
         self.ax.set_zlabel('Z')
+        lims = self.itemcfg.axis_lims
         if sidelen != None:
             lims = [0,sidelen+1]
             self.ax.set_xlim(lims)
             self.ax.set_ylim(lims)
             self.ax.set_zlim(lims)
         else:
-            mxlims =[0,4]
-            #ylims = max(npplist[:,2])
-            #mzlims = max(npplist[:,3])
-            lims = [0,5]
             self.ax.set_xlim(lims)
             self.ax.set_ylim(lims)
             self.ax.set_zlim(lims)

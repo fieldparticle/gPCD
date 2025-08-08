@@ -6,8 +6,9 @@ from sys import stderr, stdout
 from PyQt6.QtWidgets import QFileDialog, QGroupBox,QMessageBox,QLabel
 from PyQt6.QtWidgets import QGridLayout, QTabWidget, QLineEdit,QListWidget
 from PyQt6.QtWidgets import QPushButton, QGroupBox,QTextEdit
+from PyQt6.QtGui import QFocusEvent
 from PyQt6 import QtCore
-from PyQt6.QtCore import Qt,QThread,QTimer, pyqtSignal,pyqtSlot,QObject,QRunnable,QThreadPool
+from PyQt6.QtCore import Qt,QThread,QEvent, pyqtSignal,pyqtSlot,QObject,QRunnable,QThreadPool
 from ConfigUtility import *
 import tkinter as tk
 from tkinter import * 
@@ -65,6 +66,8 @@ class Worker(QRunnable):
         finally:
             self.signals.finished.emit()
 
+
+
 class TabGenData(QTabWidget):
     
     texFolder = ""
@@ -82,12 +85,18 @@ class TabGenData(QTabWidget):
     #******************************************************************
     # Init
     #
-    def __init__(self, *args, **kwargs ):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs )
         self.threadpool = QThreadPool()
+        self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
         thread_count = self.threadpool.maxThreadCount()
         #print(f"Multithreading with maximum {thread_count} threads")
-        
+        #self.installEventFilter(self)
+
+
+    def focusInEvent(self, event):
+        super().event(event)
+        print("MyTabWidget gained focus via focusInEvent!")
 
     def no_selection(self):
         msgBox = QMessageBox()
@@ -107,6 +116,7 @@ class TabGenData(QTabWidget):
     # Load the configuration data
     #
     def load_item_cfg(self,file):
+            self.setFocus()
             self.CfgFile = file
             self.texFolder = os.path.dirname(self.CfgFile)
             self.texFileName = os.path.splitext(os.path.basename(self.CfgFile))[0]
@@ -364,8 +374,7 @@ class TabGenData(QTabWidget):
             self.no_selection()
             return 
         try :
-            self.particle_data = self.read_all_particle_data(self.selected_item[0].text())
-            
+            self.particle_data = self.read_particle_data(self.selected_item[0].text())
             tst_prefix = os.path.splitext(test_file_name)[0]
             tst_file = tst_prefix + '.tst'
             tst_file_obj = ConfigUtility(tst_file)
@@ -376,8 +385,12 @@ class TabGenData(QTabWidget):
             print(f"Verify indexing error:{e}")
             return
         file_name = f"{self.itemcfg.data_dir}/{self.itemcfg.test_collisions_log}"
-        count = pu.detect_collsions(self.particle_data,file_name)
-        print(f"Number collsions Counted:{count}. Number expected {tst_file_cfg.num_particle_colliding}")
+        [pcount,ccount] = pu.detect_collsions(self.particle_data,file_name)
+        totcol = int(tst_file_cfg.particles_per_cell* tst_file_cfg.CellAryW**3)
+        totcells = int(tst_file_cfg.num_particles/tst_file_cfg.particles_per_cell)
+        totcol = int(totcells*ccount)
+        self.log.log(self,f"Number collsions per cell counted:{ccount}. Times number of cells {totcells} = {totcol}. Number expected {tst_file_cfg.num_particle_colliding}")
+        self.log.log(self,f"Number particles per cell:{pcount}. Number expected {tst_file_cfg.num_particle_colliding}")
    
         
 
@@ -420,10 +433,10 @@ class TabGenData(QTabWidget):
         
         selected_item = self.ListObj.selectedItems()
         if selected_item ==self.selected_item:
-             self.plot_obj.plot(self.particle_data)
+            self.plot_obj.close_plot()
         else:
             self.selected_item = selected_item
-            self.plot_obj.close_plot()
+
         if self.selected_item:
             try:
                 self.particle_data = self.read_particle_data(self.selected_item[0].text())
@@ -460,6 +473,8 @@ class TabGenData(QTabWidget):
         control.setMinimumWidth(W)
         control.setMaximumHeight(H)
         control.setMaximumWidth(W)
+
+   
     #******************************************************************
     # Creatwe the tab
     #

@@ -4,6 +4,7 @@ from PyQt6.QtCore import Qt
 from TabFormReport import *
 from TabFormGenData import *
 from TabFormRun import *
+from FocusEvent import *
 ## Add all tabs
 class UtilityTabs(QTabWidget):
     def __init__(self, *args, **kwargs):
@@ -23,4 +24,5 @@ class UtilityTabs(QTabWidget):
         self.tabFormReport.Create(self.bobj)
         self.tabFormGenData.Create(self.bobj)
         self.tabFormRun.Create(self.bobj)
+     
       

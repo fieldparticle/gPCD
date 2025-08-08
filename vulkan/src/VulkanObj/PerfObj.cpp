@@ -47,7 +47,9 @@ void PerfObj::Create()
 	m_testPQBSTDir = CfgApp->GetString("application.testdirPQBST", true);
 	
 	m_testCFBDir= CfgApp->GetString("application.testdirCFB", true);
+
 	m_testPCDDir= CfgApp->GetString("application.testdirPCD", true);
+
 	m_testDUPDir= CfgApp->GetString("application.testdirDUP", true);
 	m_SingleFileTest= CfgApp->GetBool("application.doAutoSingleFile", true);
 
@@ -140,6 +142,28 @@ void PerfObj::Create()
 	}
 	if(!m_TestCFG.compare("testdirPCD"))
 	{
+		config_setting_t* root_set = config_root_setting(&CfgApp->m_cfg);
+		config_setting_t* boolset = config_setting_add(root_set, "device_timers_on", CONFIG_TYPE_BOOL);
+		int ret = config_setting_set_bool(boolset, false);
+		if (ret == 0)
+		{
+			std::string rpt = "Failed to set 'device_timers_on' in PerfObject";
+			throw std::runtime_error(rpt.c_str());
+		}
+		m_timers_on = false;
+		m_TestDir = m_testPCDDir;
+	}
+	if (!m_TestCFG.compare("testdirPCDT"))
+	{
+		config_setting_t* root_set = config_root_setting(&CfgApp->m_cfg);
+		config_setting_t* boolset = config_setting_add(root_set, "device_timers_on", CONFIG_TYPE_BOOL);
+		int ret = config_setting_set_bool(boolset, true);
+		if (ret == 0)
+		{
+			std::string rpt = "Failed to set 'device_timers_on' in PerfObject";
+			throw std::runtime_error(rpt.c_str());
+		}
+		m_timers_on = true;
 		m_TestDir = m_testPCDDir;
 	}
 	if(!m_TestCFG.compare("testdirDUP"))
@@ -300,7 +324,7 @@ int PerfObj::Doperf(DrawObj* DrawInstance, VulkanObj* VulkanWin, TCPObj* tcp, si
 		std::cout << "Directory already exists: " << newdir << std::endl;
 	}
 	
-	
+	double stop_frame_rate = 0;
 	double totFps = 0.0;
 	double totTime = 0.0;
 	std::ofstream ostrm(filename);
@@ -319,7 +343,9 @@ int PerfObj::Doperf(DrawObj* DrawInstance, VulkanObj* VulkanWin, TCPObj* tcp, si
 		totTime +=m_ReportBuffer[ii].Second;
 		uint32_t partErr = 0;
 		uint32_t colErr = 0;
-
+		
+		if (stop_frame_rate < m_ReportBuffer[ii].FrameRate)
+			stop_frame_rate = m_ReportBuffer[ii].FrameRate;
 		
 		ostrm	<< m_ReportBuffer[ii].Second << ","				// time
 				<< m_ReportBuffer[ii].FrameRate << ","			// fps
@@ -338,15 +364,21 @@ int PerfObj::Doperf(DrawObj* DrawInstance, VulkanObj* VulkanWin, TCPObj* tcp, si
 				<< partErr << ","
 				<< colErr 
 				<< std::endl;
+		
 	}
 		
 	ostrm.flush();
 	ostrm.close();
+	
+	if (stop_frame_rate < 2.0)
+		return 1;
+		
 	if(tcp != nullptr)
 	{
 		tcp->WritePort("csvfile");
 		tcp->SendPerfFile(filename.c_str(),1);
 	}
+
 		
 	std::cout << "\n\n\n\n================= Done Perf ======================= \n\n\n\n" << std::endl;
 
