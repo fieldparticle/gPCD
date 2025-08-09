@@ -374,7 +374,7 @@ class TabGenData(QTabWidget):
             self.no_selection()
             return 
         try :
-            self.particle_data = self.read_particle_data(self.selected_item[0].text())
+            self.particle_data = self.read_all_particle_data(self.selected_item[0].text())
             tst_prefix = os.path.splitext(test_file_name)[0]
             tst_file = tst_prefix + '.tst'
             tst_file_obj = ConfigUtility(tst_file)
@@ -389,8 +389,8 @@ class TabGenData(QTabWidget):
         totcol = int(tst_file_cfg.particles_per_cell* tst_file_cfg.CellAryW**3)
         totcells = int(tst_file_cfg.num_particles/tst_file_cfg.particles_per_cell)
         totcol = int(totcells*ccount)
-        self.log.log(self,f"Number collsions per cell counted:{ccount}. Times number of cells {totcells} = {totcol}. Number expected {tst_file_cfg.num_particle_colliding}")
-        self.log.log(self,f"Number particles per cell:{pcount}. Number expected {tst_file_cfg.num_particle_colliding}")
+        self.log.log(self,f"Number collsions per cell counted:{ccount}. Processed during generation {tst_file_cfg.num_particle_colliding}")
+        self.log.log(self,f"Number particles per cell:{pcount}. Paricles in row :{tst_file_cfg.particles_in_row}")
    
         
 
@@ -613,7 +613,7 @@ class TabGenData(QTabWidget):
         for ii in self.plot_obj.views:
             self.ViewList.addItem(str(ii))
         self.log.log(self,"TabFormLatex finished Create.")        
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPCD.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenDUP.cfg")
    
     def valueChange(self,listObj):  
         selected_items = listObj.selectedItems()

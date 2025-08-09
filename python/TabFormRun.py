@@ -61,9 +61,9 @@ class TabFormRun(QTabWidget):
             self.msg_box("Select an item to run in list box.")
 
 
-    def Create(self,FPIBGBase):
+    def Create(self,Base):
         
-        self.bobj = FPIBGBase
+        self.bobj = Base
         self.cfg = self.bobj.cfg.config
         self.log = self.bobj.log
         self.log.log(self,"TabFormLatex finished init.")

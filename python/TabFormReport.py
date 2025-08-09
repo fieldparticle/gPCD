@@ -124,9 +124,9 @@ class TabFormReport(QTabWidget):
     #******************************************************************
     # Greate the GUI
     #   
-    def Create(self,FPIBGBase):
+    def Create(self,Base):
         
-        self.bobj = FPIBGBase
+        self.bobj = Base
         self.cfg = self.bobj.cfg.config
         self.log = self.bobj.log
         self.log.log(self,"TabFormLatex finished init.")

@@ -87,10 +87,13 @@ int main(int argc, const char* argv[]) try
 		if (CfgApp->GetBool("application.doAuto", true) == true)
 		{
 			mout << "Do study :" << ende;
-			if (pf->DoStudy(nullptr,nullptr,false))
+			int ret = pf->DoStudy(nullptr, nullptr, false);
+			if (ret == 3 || ret == 0)
 			{
-				return 1;
+				return 0;
 			}
+			else
+				return ret;
 
 		}
 		else

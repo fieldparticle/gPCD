@@ -74,6 +74,7 @@ class PerfObj
 		uint32_t					m_colcount = 0;
 		float						m_density = 0;
 		int							m_partcount = 0;
+		int							m_cell_count = 0;
 		bool						m_timers_on=false;
 
 	void Create();

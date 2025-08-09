@@ -2,11 +2,11 @@ from datetime import datetime
 import inspect
 import os
 
-## FPIBGLog class perfomrs formmated logging for all other classes
+## gPCDLog class perfomrs formmated logging for all other classes
 class LogUtility:
         
     
-    ##  FPIBGLog Constructor.
+    ##  gPCDLog Constructor.
     # @param   ApplicationName --  (string) Passes the name of the calling application.
     def __init__ (self,ApplicationName):
         self.appName = ApplicationName
@@ -47,21 +47,7 @@ class LogUtility:
                                                                     "min",
                                                                     "errText",
                                                                     "eString")
-        """
-        logstring = "{},{}_{}_{}:{}:{},{},{},{},{},{},{},{}\n".format("lvl",
-                                                                    "yy",
-                                                                   "mm",
-                                                                   "dd",
-                                                                   "hr",
-                                                                   "min",
-                                                                   "Application Name",
-                                                                   "ClassName",
-                                                                   "Function Name",
-                                                                   "ObjName",
-                                                                   "Line Number",
-                                                                   "ErrCode",
-                                                                   "ErrString")
-        """
+       
         self.fileObj.write(str(logstring))  
         self.log(self,f"Opened Log File for {self.logName}")
 
@@ -83,7 +69,7 @@ class LogUtility:
     # @param The error text.
     def log(self,parent,ErrString,LogOnly=False,LineNumber=0,ClassName=None,Function=None,ObjName=None):
         current_time = datetime.now()       
-        logstring = "{}_{}_{}:{}:{} {} {}".format(current_time.year, current_time.month, current_time.day, current_time.hour, current_time.minute,type(parent),ErrString)
+        logstring = "{}_{}_{}:{}:{} {}".format(current_time.year, current_time.month, current_time.day, current_time.hour, current_time.minute,ErrString)
         if LogOnly == False:
             if self.widget != None:
                 self.widget.append(logstring)

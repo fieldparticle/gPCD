@@ -17,7 +17,7 @@ class ParticleUtilities():
         self.col_ary_size = col_ary_size
         self.cell_array = np.array([[0]*col_ary_size]*(self.width**3))
         self.lock_array = np.array([0]*(self.width**3))
-        print(f"Cell arry rows:{self.width**3} by cols:{col_ary_size}")
+        #print(f"Cell arry rows:{self.width**3} by cols:{col_ary_size}")
         self.sizeof_int = 32
         
     def get_cell_array_len(self):
@@ -83,7 +83,7 @@ class ParticleUtilities():
         ary = [int(round(plist[1].rx)),int(round(plist[1].ry)),int(round(plist[1].rz))]
         old_cnr_idx = self.ArrayToIndex(ary)
         cell_parts = []
-        count = 0
+        count = 1
         cell_parts.append(plist[1])
         for Findex in range(2,len(plist)):
             ary = [int(round(plist[Findex].rx)),int(round(plist[Findex].ry)),int(round(plist[Findex].rz))]
@@ -91,7 +91,7 @@ class ParticleUtilities():
             if old_cnr_idx == cnr_idx:
                 count+=1
                 cell_parts.append(plist[Findex])
-                print(f"{Findex}")
+                #print(f"{Findex}")
             else:
                 break
         duplist = [0]*self.max_location

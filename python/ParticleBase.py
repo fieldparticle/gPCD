@@ -10,7 +10,7 @@ class ParticleBase:
     This class is the global class for all other classes
 
     Attributes:
-        log (FPIBGLog): FPIBGLog for loogin information and errors
+        log (gPCDLog): gPCDLog for loogin information and errors
     """
     
     def __init__ (self,ObjName):

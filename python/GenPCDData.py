@@ -116,37 +116,23 @@ class GenPCDData(GenDataBase):
 
         self.center_line_length     = 2.0*sep+2.0*self.radius
         self.switch_col = False
-        odd_colum = 0
-        if col == 0:
-            odd_colum = 0
-            self.switch_col = False
-        else:
-            odd_column = col%2
-            self.switch_col  = True
-        pleft = row - self.particles_in_row
-        pleft = self.particles_in_col - col
+        
+       
+        break_flag = False
         rx = 0
-        if self.collsions_in_cell_count < self.num_collisions_per_cell :
-            if( (pleft % 2 == 0) or (pleft > 0 and self.switch_col == False)):
-                if col%2:
-                        rx = 0.5 + sep + 0.25*self.radius + self.center_line_length*col+xx
-                        self.collsions_in_cell_count+=1
-                        self.collision_count+=1
-                        particle_struct.ptype = 1
-                        self.switch_col = False
-                else:
-                        rx = 0.5 + sep + self.radius + self.center_line_length*col+xx
-                        self.collsions_in_cell_count+=1
-                        self.collision_count+=1
-                        particle_struct.ptype = 1
-                        self.switch_col = True
-            else:
-                particle_struct.ptype = 0
-                rx = 0.5 + sep + self.radius + self.center_line_length*col+xx
-        else:
-            particle_struct.ptype = 0
-            rx = 0.5 + sep + self.radius + self.center_line_length*col+xx
+        num_left = self.number_particles - self.particle_count 
+        if self.particles_in_cell_count == 0 :
+            if (num_left <= self.particles_in_cell):
+                break_flag = True
 
+        
+        if (break_flag == False):
+            if (self.particles_in_row %2) != 0:
+                rx = self.odd_columns(particle_struct,row,col,layer,xx,yy,zz,sep)
+            else:
+                rx = self.even_columns(particle_struct,row,col,layer,xx,yy,zz,sep)
+        else:
+            rx = 0.5 + sep + self.radius + self.center_line_length*col+xx
 
         ry = 0.5 + sep + self.radius + self.center_line_length*row+yy        
         rz = 0.5 + sep + self.radius + self.center_line_length*layer+zz
@@ -166,6 +152,11 @@ class GenPCDData(GenDataBase):
         self.particle_count+=1
         self.particles_in_cell_count +=1
 
+        
+        if self.last_cell != [round(rx),round(ry),round(rz)]:
+            self.num_cells += 1
+            self.last_cell = [round(rx),round(ry),round(rz)]
+
         if self.old_rx < rx:
             self.old_rx = rx
         if self.old_ry < ry:
@@ -174,3 +165,65 @@ class GenPCDData(GenDataBase):
             self.old_rz = rz
         self.max_cell_location = [round(self.old_rx),round(self.old_ry),round(self.old_rz)]
         return 0
+
+    #******************************************************************
+    # Place particles in even column layout
+    # 
+    #
+    def even_columns(self,particle_struct,row,col,layer,xx,yy,zz,sep):
+       
+        rx = 0
+        if col == 0:
+            self.switch_col = False
+        else:
+            self.switch_col  = True
+        if(self.collsions_in_cell_count < self.num_collisions_per_cell):
+            if col%2:
+                rx = 0.5 + sep + 0.25*self.radius + self.center_line_length*col+xx
+                self.collsions_in_cell_count+=1
+                self.collision_count += 1
+                particle_struct.ptype = 1
+                self.switch_col = False
+            else:
+                rx = 0.5 + sep + self.radius + self.center_line_length*col+xx
+                self.collsions_in_cell_count += 1
+                self.collision_count += 1
+                particle_struct.ptype = 1
+                self.switch_col = True
+
+        else:
+            particle_struct.ptype = 0
+            rx = 0.5 + sep + self.radius + self.center_line_length*col+xx
+        return rx
+    #******************************************************************
+    # Place particles in odd column layout
+    # 
+    #
+    def odd_columns(self,particle_struct,row,col,layer,xx,yy,zz,sep):
+        if col == 0:
+            self.switch_col = False
+        else:
+            self.switch_col  = True
+        pleft = self.particles_in_col - col
+        rx = 0
+        if self.collsions_in_cell_count < self.num_collisions_per_cell :
+            if( (pleft % 2 == 0) or (pleft > 0 and self.switch_col == True)):
+                if col%2:
+                        rx = 0.5 + sep + 0.25*self.radius + self.center_line_length*col+xx
+                        self.collsions_in_cell_count+=1
+                        self.collision_count+=1
+                        particle_struct.ptype = 1
+                        self.switch_col = False
+                else:
+                        rx = 0.5 + sep + self.radius + self.center_line_length*col+xx
+                        self.collsions_in_cell_count+=1
+                        self.collision_count+=1
+                        particle_struct.ptype = 1
+                        self.switch_col = True
+            else:
+                particle_struct.ptype = 0
+                rx = 0.5 + sep + self.radius + self.center_line_length*col+xx
+        else:
+            particle_struct.ptype = 0
+            rx = 0.5 + sep + self.radius + self.center_line_length*col+xx
+        return rx

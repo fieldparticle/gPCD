@@ -10,10 +10,10 @@ import inspect
 ## The main window object that contains the tabs for the utility
 class UtilityMainWin(QWidget):
     
-    def __init__(self, FPIBGBase, ObjName,*args, **kwargs):
+    def __init__(self, Base, ObjName,*args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ObjName = ObjName
-        self.bs = FPIBGBase
+        self.bs = Base
         self.log = self.bs.log
         self.log.log(self,"Logging system initialized")
         self.ObjName = ObjName
@@ -23,7 +23,7 @@ class UtilityMainWin(QWidget):
         main_layout = QGridLayout(self)
         ## Create a tab widget
         self.tabSetup = UtilityTabs(self)
-        self.tabSetup.Create(FPIBGBase)
+        self.tabSetup.Create(Base)
         main_layout.addWidget(self.tabSetup, 0, 0, 2, 1)
         self.quitBtn = QPushButton('Quit')
         main_layout.addWidget(self.quitBtn, 2, 0,
@@ -48,9 +48,9 @@ class UtilityMainWin(QWidget):
     def on_clicked(self) :
         exit()
         
-    def Create(self,FPIBGBase):
+    def Create(self,Base):
         
-        self.bs = FPIBGBase
-        self.bs.log.log(self, "FPIBGLatexWin.Created")
+        self.bs = Base
+        self.bs.log.log(self, "MainWin.Created")
 
    

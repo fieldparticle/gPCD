@@ -8,8 +8,8 @@ class DataContainer():
     #******************************************************************
     # init
     #
-    def __init__(self, FPIBGBase, itemcfg):
-        self.bobj = FPIBGBase
+    def __init__(self, Base, itemcfg):
+        self.bobj = Base
         self.cfg = self.bobj.cfg
         self.log = self.bobj.log
         self.data_base = None

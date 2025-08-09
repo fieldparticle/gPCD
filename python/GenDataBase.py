@@ -61,6 +61,12 @@ class GenDataBase:
     collsion_count_check = 0
     base_name = "GenDataBase"
     max_cell_location= []
+    particles_in_row = 0
+    last_cell = [0,0,0]
+    num_cells = 0
+    old_rx = 0
+    old_ry = 0
+    old_rz = 0
 
 
     views = [('XY',   (90, -90, 0)),
@@ -131,7 +137,15 @@ class GenDataBase:
             return
         self.count = 0
     
-    
+      
+    def sort_write_random(self):
+        plist = self.read_all_particle_data(self.test_bin_name)
+        plist.sort(key=lambda x: x.pnum)
+        self.create_bin_file()
+        self.write_bin_file(plist)
+        self.close_bin_file()
+
+
     #******************************************************************
     #  List the particles
     # 
@@ -161,6 +175,7 @@ class GenDataBase:
     # cell
     #
     def close_bin_file(self):
+        self.tot_num_collsions = self.collision_count
         self.bin_file.flush()
         self.bin_file.close()
         if(self.bin_file.closed != True):
@@ -281,6 +296,8 @@ class GenDataBase:
         fstr = f"exp_collisions_per_cell = {self.num_collisions_per_cell};\n"
         f.write(fstr)
         fstr = f"act_collisions_per_cell = {self.collsion_count_check};\n"
+        f.write(fstr)
+        fstr = f"particles_in_row = {self.particles_in_row};\n"
         f.write(fstr)
         fstr = f"particle_data_bin_file = \"{self.test_bin_name}\";\n"
         f.write(fstr)
@@ -430,10 +447,12 @@ class GenDataBase:
                 self.sort_write_random()
             pu = ParticleUtilities(self.side_length,col_ary_size)
 
-            self.log.log(self,f"max_cell_location = <{self.max_cell_location[0]},{self.max_cell_location[0]},{self.max_cell_location[0]}>")
+            self.log.log(self,f"num_cells={self.num_cells},max_cell_location = <{self.max_cell_location[0]},{self.max_cell_location[0]},{self.max_cell_location[0]}>")
             cell_index = pu.ArrayToIndex(self.max_cell_location)
             self.log.log(self,f"max_cell_index = <{cell_index}> total cells ")
         self.log.log(self,f"Collisions per cell:{self.num_collisions_per_cell}. Collsion pairs per cell:{self.num_collisions_per_cell/2}")
+        
+        
         self.log.log(self,f"Total Particles: {self.particle_count},Calculated Collisions:{self.tot_num_collsions}, Counted Collsions:{self.collision_count}")
         self.log.log(self,"=========================================================\n")
         return ret    
@@ -447,6 +466,7 @@ class GenDataBase:
         self.old_rx = 0.0
         self.old_ry = 0.0
         self.old_rz = 0.0
+        self.num_cells = 0
         if self.itemcfg.particle_enumeration == 'random':
             self.rand_data = self.gen_random_numbers_in_range(1, self.number_particles+1, self.number_particles)    
         if self.itemcfg.particle_enumeration == 'scale':

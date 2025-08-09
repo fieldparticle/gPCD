@@ -11,12 +11,12 @@ class ConfigUtility:
     lvl = 100
     def Create(self,LogObj,CfgFileName):
         self.log = LogObj
-        self.log.log(self,"FPIBG into Create.");
+        #self.log.log(self,"gPCD into Create.");
         self.CfgFileName = CfgFileName
         self.configPath = self.CfgFileName
         try:
             with io.open(self.configPath) as f:
-                self.log.log(self,"FPIBG into Open config file.")
+                #self.log.log(self,"gPCD into Open config file.")
                 self.config = libconf.load(f)
         except IOError as e:
             self.log.log(self,f"Config File Open error {e}")
@@ -37,7 +37,7 @@ class ConfigUtility:
      
     def __init__(self,ObjName):
         """
-        Constructor for the FPIBGConfig object.
+        Constructor for the gPCDConfig object.
         Saves the path of the config as a variable.
         Saves the configuration information as a dictionary.
         """

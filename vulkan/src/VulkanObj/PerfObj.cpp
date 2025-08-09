@@ -168,6 +168,15 @@ void PerfObj::Create()
 	}
 	if(!m_TestCFG.compare("testdirDUP"))
 	{
+		config_setting_t* root_set = config_root_setting(&CfgApp->m_cfg);
+		config_setting_t* boolset = config_setting_add(root_set, "device_timers_on", CONFIG_TYPE_BOOL);
+		int ret = config_setting_set_bool(boolset, true);
+		if (ret == 0)
+		{
+			std::string rpt = "Failed to set 'device_timers_on' in PerfObject";
+			throw std::runtime_error(rpt.c_str());
+		}
+		m_timers_on = true;
 		m_TestDir = m_testDUPDir;
 	}
 
@@ -230,6 +239,7 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 			m_colcount = CfgTst->GetInt("num_particle_colliding", true);
 			m_density = CfgTst->GetFloat("collsion_density", true);
 			m_partcount = CfgTst->GetInt("num_particles", true);
+			m_cell_count = CfgTst->GetInt("particles_per_cell", true);
 
 			std::string hold = filename[ii].substr(0, pt);
 			//config->m_AprFile = hold;
@@ -251,7 +261,12 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 				mout << "Auto - ParticleOnly failed" << ende;
 				return 2;
 			}
-			
+			//Stop command
+			if (ret == 3)
+			{
+				mout << "Auto - ParticleOnly dropped below 2 fps - ok exit" << ende;
+				return 3;
+			}
 			if (QuitEvent == 1)
 				return 0;
 			
@@ -335,7 +350,7 @@ int PerfObj::Doperf(DrawObj* DrawInstance, VulkanObj* VulkanWin, TCPObj* tcp, si
 	}
 		
 	//
-	ostrm << "time,fps,cpums,cms,gms,expectedp,loadedp,shaderp_comp,shaderp_grph,expectedc,shaderc,threadcount,sidelen,density,PERR,CERR" << std::endl;
+	ostrm << "time,fps,cpums,cms,gms,expectedp,loadedp,shaderp_comp,shaderp_grph,expectedc,shaderc,threadcount,sidelen,cell_count,density,PERR,CERR" << std::endl;
 	for (size_t ii = 0; ii < aprCount-1; ii++)
 	{
 			
@@ -360,6 +375,7 @@ int PerfObj::Doperf(DrawObj* DrawInstance, VulkanObj* VulkanWin, TCPObj* tcp, si
 				<< m_ReportBuffer[ii].NumCollisionsComputeCount << ","							// shaderc: compute counted collisions
 				<< m_ReportBuffer[ii].ThreadCountComp << ","									// threadcount: number of threads compute
 				<< VulkanWin->m_SideLength << ","								// sidelen
+				<< m_cell_count << ","
 				<< m_density << ","										// density
 				<< partErr << ","
 				<< colErr 

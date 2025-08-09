@@ -17,8 +17,8 @@ class gPCDData():
     data_files = None    
     lines_return = pd.DataFrame()
     
-    def __init__(self, FPIBGBase, itemcfg):
-        self.bobj = FPIBGBase
+    def __init__(self,Base, itemcfg):
+        self.bobj = Base
         self.cfg = self.bobj.cfg
         self.log = self.bobj.log
         self.itemcfg = itemcfg
@@ -102,7 +102,7 @@ class gPCDData():
     #
     def create_summary(self,file_dict):
         data = ['Name', 'fps', 'cpums', 'cms', 'gms', 'expectedp', 'loadedp',
-                'shaderp_comp', 'shaderp_grph', 'expectedc', 'shaderc', 'sidelen','mean','stddev']
+                'shaderp_comp', 'shaderp_grph', 'expectedc', 'shaderc', 'sidelen','cell_count','mean','stddev']
         try :
             with open(file_dict.summary_file_name, mode= 'w', newline='') as file:
                 writer = csv.writer(file)
@@ -151,12 +151,14 @@ class gPCDData():
                         if expectedc != shaderc:
                             coll_err = 1
 
-                if loaded_err or grphp_err or compp_err or coll_err:
-                    error_count+=1
                 avg_list = [data_file, expectedp, loadedp, shaderp_comp,
                     shaderp_grph, expectedc, shaderc]
-                err_list.append(avg_list)            
-                line_count += 1
+                if loaded_err or grphp_err or compp_err or coll_err:
+                    error_count+=1
+                    line_count += 1
+                    err_row = [data_file,file_count,line_count, expectedp, loadedp, shaderp_comp, shaderp_grph, expectedc, shaderc, loaded_err,compp_err,grphp_err,coll_err]
+                    err_list.append(err_row)            
+                    
             except BaseException as e:
                 raise BaseException(f"do_verify - summary file open error:{e}")
             
@@ -167,7 +169,7 @@ class gPCDData():
 
         with open(file_dict.err_file_name, 'w', newline='\n') as efile:
             writer = csv.writer(efile)
-            writer.writerow( ['file_count', 'line_count', 'expectedp', 'loadedp', 'shaderp_comp',
+            writer.writerow( ['file_name','file_count', 'line_count', 'expectedp', 'loadedp', 'shaderp_comp',
                         'shaderp_grph','expectedc', 'shaderc', 'loaded_err', 'compp_err', 'grphp_err', 'coll_err'])
             if error_count > 0:
                 #//for jj in range(len(average_list)):
@@ -230,7 +232,7 @@ class gPCDData():
             gms_old = 0.0
             
             data_file = file_dict.target_dir + "/" + ii + "R.csv"
-            mean = stddev = fps = cpums = cms = gms = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = 0
+            mean = stddev = fps = cpums = cms = gms = cell_count = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = 0
             fps_list = []
           
             try:
@@ -256,6 +258,7 @@ class gPCDData():
                             loadedp = float(col['loadedp'])
                             expectedc = int(col['expectedc'])
                             sidelen = int(col['sidelen'])
+                            cell_count = int(col['cell_count'])
             except BaseException as e:
                 print("LatexDataParticle get_averages line 282:",e)
 
@@ -263,7 +266,7 @@ class gPCDData():
             stddev = statistics.stdev(fps_list)
            
             max_list = [ii, fps_old, cpums_old, cms_old, gms_old, expectedp, loadedp, shaderp_comp,
-                        shaderp_grph, expectedc, shaderc, sidelen,mean,stddev]
+                        shaderp_grph, expectedc, shaderc, sidelen,cell_count,mean,stddev]
             with open( file_dict.summary_file_name, 'a', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(max_list)

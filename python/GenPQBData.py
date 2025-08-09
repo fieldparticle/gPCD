@@ -11,15 +11,7 @@ class GenPQBData(GenDataBase):
 
     def gen_random_numbers_in_range(self,low, high, n):
         return random.sample(range(low, high), n)
-    
-    def sort_write_random(self):
-        plist = self.read_all_particle_data(self.test_bin_name)
-        plist.sort(key=lambda x: x.pnum)
-        self.create_bin_file()
-        self.write_bin_file(plist)
-        self.close_bin_file()
-
-
+  
     def calculate_test_properties(self):
         try :
            #print(self.index)
