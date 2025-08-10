@@ -385,7 +385,9 @@ class TabGenData(QTabWidget):
             print(f"Verify indexing error:{e}")
             return
         file_name = f"{self.itemcfg.data_dir}/{self.itemcfg.test_collisions_log}"
+
         [pcount,ccount] = pu.detect_collsions(self.particle_data,file_name)
+        
         totcol = int(tst_file_cfg.particles_per_cell* tst_file_cfg.CellAryW**3)
         totcells = int(tst_file_cfg.num_particles/tst_file_cfg.particles_per_cell)
         totcol = int(totcells*ccount)

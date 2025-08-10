@@ -137,6 +137,7 @@ class gPCDData():
                         loadedp = int(col['loadedp'])
                         shaderp_comp = int(col['shaderp_comp'])
                         shaderp_grph= int(col['shaderp_grph'])
+                        
 
                         if loadedp != expectedp:
                             loaded_err = 1

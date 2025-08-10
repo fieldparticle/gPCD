@@ -82,8 +82,9 @@ class ParticleUtilities():
         self.col_count = 0
         ary = [int(round(plist[1].rx)),int(round(plist[1].ry)),int(round(plist[1].rz))]
         old_cnr_idx = self.ArrayToIndex(ary)
-        cell_parts = []
+        cell_parts = plist
         count = 1
+        '''
         cell_parts.append(plist[1])
         for Findex in range(2,len(plist)):
             ary = [int(round(plist[Findex].rx)),int(round(plist[Findex].ry)),int(round(plist[Findex].rz))]
@@ -94,8 +95,9 @@ class ParticleUtilities():
                 #print(f"{Findex}")
             else:
                 break
+        '''
         duplist = [0]*self.max_location
-
+        
         for ii in cell_parts:
             for jj in cell_parts:
                 if ii.pnum == jj.pnum:

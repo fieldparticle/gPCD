@@ -154,9 +154,16 @@ class GenDataBase:
     def list_particles(self,file_name):
         p_count = 0
         p_list = self.read_particle_data(file_name)
+        tst_prefix = os.path.splitext(file_name)[0]
+        tst_file = tst_prefix + '.tst'
+        tst_file_obj = ConfigUtility(tst_file)
+        tst_file_obj.Create(self.bobj.log,tst_file)
+        tst_file_cfg = tst_file_obj.config
+        pu = ParticleUtilities(tst_file_cfg.CellAryW,tst_file_cfg.cell_occupancy_list_size)
         index = 0
         for ii in p_list:
-            print(f"P:{ii.pnum} R:{ii.radius} I:{index}<{ii.rx:.2f},{ii.ry:.2f},{ii.rz:.2f}>[{round(ii.rx)},{round(ii.ry)},{round(ii.rz)}]")
+            cell_index = pu.ArrayToIndex([round(ii.rx),round(ii.ry),round(ii.rz)])
+            print(f"P:{ii.pnum} R:{ii.radius} #:{index} I:{cell_index} L:<{ii.rx:.2f},{ii.ry:.2f},{ii.rz:.2f}>CELL:[{round(ii.rx)},{round(ii.ry)},{round(ii.rz)}]")
             index +=1
     #******************************************************************
     # Caluate side length based on number of particles and particle per 

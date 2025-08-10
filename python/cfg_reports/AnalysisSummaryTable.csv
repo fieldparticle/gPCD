@@ -1,0 +1,8 @@
+Test,Theoretical,Polynomial,Poly R2,Linear,lin R2,Power,Pwr R2,Comment
+PQBS ,O(n^2),t = -4E-18n^2 + 6E-09n,0.9999,t = 6E-09n,0.9999,t = 5E-06n^0.549*,0.9327,* Up to 2.5E6
+PQBST Compute,O(n^2),y = -4E-20x^2 + 6E-09x,0.9999,t = 5E-09n,0.9999,y = 1E-07x^0.7718,0.9879,* Up to 2.5E6
+PQBST Graphics,O(n^2),y = -9E-18x^2 + 1E-09x,0.9941,t = 9E-10n,0.9976,y = 2E-07x^0.6412*,0.9772,* Up to 2.5E6
+PQBR,O(n^2),y = 7E-17x^2 + 7E-09x,0.9999,y = 8E-09x,0.9995,y = 5E-06x^0.5632,0.9258,* Up to 2.5E6
+PQBRT Compute,O(n^2),y = 4E-19x^2 + 6E-09x,0.9997,t = 6E-09n,0.9999,y = 1E-07x^0.7998,0.9899,* Up to 2.5E6
+PQBRT Graphics,O(n^2),y = 4E-18x^2 + 1E-09x,0.9759,y = 1E-09x,0.9916,y = 2E-07x^0.6702,0.9426,* Up to 2.0E6
+PBQS - PBQR,N/A,y = 7E-17x^2 + 2E-09x,0.9976,,,,,
