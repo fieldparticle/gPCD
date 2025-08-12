@@ -2,40 +2,54 @@
 from ReportClass import *
 import os
 import inspect
+from TrendLine import *
 
 class ReportLatexPlot(ReportClass):
 
     def __init__(self, fields_list,itemcfg):
         super().__init__(fields_list,itemcfg)
 
-    def get_line_format_dict(self,plot_command,line_num):
+    def get_line_format_dict(self,plot_command_string):
         format_dict = {}
-        for vv in range(len(plot_command)):
-                plot_format_string = f"plot_format{line_num}{vv+1}"
-                plot_format = self.itemcfg[plot_format_string]
-                for kk in plot_format:
-                    all_item = kk.split("=")
-                    format_dict[all_item[0]]=all_item[1]
+        plot_format = self.itemcfg[plot_command_string]
+        for kk in plot_format:
+            all_item = kk.split("=")
+            format_dict[all_item[0]]=all_item[1]
         return format_dict            
 
     def do_report(self):
-            
-        for ii in range(1,len(self.fields_list)):
-            self.fig = plt.figure(ii)
+        td = TrendLine()
+        td.add_trend_line(self.fields_list)        
+                
+        for plt_num in range(1,self.itemcfg.num_plots+1):
+            self.fig = plt.figure(plt_num)
             ax = self.fig.gca()
-            plot_command_string = f"PlotCommands{ii}"
-            plot_command = self.itemcfg[plot_command_string]
-            format_dict = self.get_line_format_dict(plot_command,ii)
-            for jj in range(len(plot_command)):
-                plt_eval_string = f"{plot_command[jj]}(self.fields_list[ii].data['{self.fields_list[0]['field']}'],self.fields_list[ii].data['{self.fields_list[ii]['field']}'],**format_dict)"
-                #print(plt_eval_string)
-                eval(plt_eval_string)
-                plt.show()
-
-
-            plt_commands_string = f"commands{ii}"
-            plt_commands = self.itemcfg[plt_commands_string]
+            for ii in range(1,len(self.fields_list)):
+                if self.fields_list[ii].plot_num != plt_num:
+                    continue
+                # get the list of plot commands
+                plot_command_string = f"PlotCommands{plt_num}"
+                plot_command = self.itemcfg[plot_command_string]
+                # Go thourgh the lines in the cfg file and plot them
+                
+                plot_format_string = f"plot_format{plt_num}{ii}"
+                format_dict = self.get_line_format_dict(plot_format_string)
+                print("----------------------------------------------")
+                
+               # print(self.fields_list[ii].data['loadedp'])
+                print(type(self.fields_list[ii].data['cpums']))
+                print("----------------------------------------------")
+                #plt_eval_string = f"{plot_command[ii-1]}(self.fields_list[ii].data['{self.fields_list[0]['field']}'],self.fields_list[ii].data['{self.fields_list[ii]['field']}'],**format_dict)"
+                plt_eval_string = f"{plot_command[ii-1]}(self.fields_list[ii].data['{self.fields_list[0]['field']}'],self.fields_list[ii].data['{self.fields_list[ii]['field']}'],**format_dict)"
+                try:
+                    eval(plt_eval_string)
+                except BaseException as e:
+                    raise BaseException(f"Plot type:{plot_command[ii-1]} failed.")
             
+            
+            plt.show()
+            plt_commands_string = f"commands{ii-1}"
+            plt_commands = self.itemcfg[plt_commands_string]
             for pp in plt_commands:
                 eval(pp)
 

@@ -20,18 +20,20 @@ class DataContainer():
     #
     def get_particle_data_fields(self):
         more_fields = True
-        counter = 1
+        plot_num = 1
         self.raw_fields_list.clear()
         while more_fields == True:
-            cfg_DataFields = f"DataFields{counter}"
+            cfg_DataFields = f"DataFields{plot_num}"
             if cfg_DataFields in self.itemcfg:
-                self.raw_fields_list.append(self.itemcfg[cfg_DataFields])
-                counter += 1
+                data_fields = self.itemcfg[cfg_DataFields]
+                for jj in data_fields:
+                    self.raw_fields_list.append([jj,plot_num])
             else:
                 break
+            plot_num += 1    
         self.parse_fields_list()
         self.resolve_data_files()
-        return
+        return 
     
     #******************************************************************
     # parse the fields from the list and add to a dictionary 
@@ -39,14 +41,17 @@ class DataContainer():
     def parse_fields_list(self):
         count = 0
         for data_lines in self.raw_fields_list:
-            for field in data_lines:
-                sep_semi_colon = field.split(':')
-                sep_period = sep_semi_colon[0].split('.')
-                fields_dict = AttrDictFields()
-                fields_dict["field"] = sep_semi_colon[1]
-                fields_dict["data_base"] = sep_period[1]
-                fields_dict["test_type"] = self.itemcfg.mode
-                self.fields_list.append(fields_dict)
+            print(data_lines)
+            sep_semi_colon = data_lines[0].split(':')
+            comma_split = sep_semi_colon[1].split(',')
+            sep_period = sep_semi_colon[0].split('.')
+            fields_dict = AttrDictFields()
+            fields_dict["field"] = comma_split[0]
+            fields_dict["data_base"] = sep_period[1]
+            fields_dict["line_type"] = comma_split[1]
+            fields_dict["plot_num"] = data_lines[1]
+            fields_dict["test_type"] = self.itemcfg.mode
+            self.fields_list.append(fields_dict)
 
         return
     #******************************************************************
