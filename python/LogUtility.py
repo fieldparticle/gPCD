@@ -1,17 +1,21 @@
 from datetime import datetime
 import inspect
 import os
+from PyQt6.QtWidgets import QTabWidget
 
 ## gPCDLog class perfomrs formmated logging for all other classes
 class LogUtility:
-        
+    
+    tab_object = None
     
     ##  gPCDLog Constructor.
     # @param   ApplicationName --  (string) Passes the name of the calling application.
     def __init__ (self,ApplicationName):
         self.appName = ApplicationName
         #print(type(self))
-        
+    
+    def set_tab_object(self,tab_object):
+        self.tab_object= tab_object
 
     def CheckLogFile(self,ErrString)-> bool:
         self.Close()
@@ -71,8 +75,10 @@ class LogUtility:
         current_time = datetime.now()       
         logstring = "{}_{}_{}:{}:{} {}".format(current_time.year, current_time.month, current_time.day, current_time.hour, current_time.minute,ErrString)
         if LogOnly == False:
-            if self.widget != None:
-                self.widget.append(logstring)
+            if self.tab_object != None:
+                cur_tab = self.tab_object.currentWidget()
+                if cur_tab != None and cur_tab.terminal != None:
+                    cur_tab.terminal.append(logstring)
             print(logstring)
         self.fileObj.write(str(logstring)+"\n")  
         self.fileObj.flush()

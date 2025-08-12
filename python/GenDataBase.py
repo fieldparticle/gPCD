@@ -163,6 +163,7 @@ class GenDataBase:
         index = 0
         for ii in p_list:
             cell_index = pu.ArrayToIndex([round(ii.rx),round(ii.ry),round(ii.rz)])
+            self.log.log(self,f"P:{ii.pnum} R:{ii.radius} #:{index} I:{cell_index} L:<{ii.rx:.2f},{ii.ry:.2f},{ii.rz:.2f}>CELL:[{round(ii.rx)},{round(ii.ry)},{round(ii.rz)}]")
             print(f"P:{ii.pnum} R:{ii.radius} #:{index} I:{cell_index} L:<{ii.rx:.2f},{ii.ry:.2f},{ii.rz:.2f}>CELL:[{round(ii.rx)},{round(ii.ry)},{round(ii.rz)}]")
             index +=1
     #******************************************************************

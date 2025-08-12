@@ -10,6 +10,9 @@ from PyQt6 import QtCore
 from _thread import *
 from ConfigUtility import *
 from DataContainer import *
+from ReportClass import *
+from ReportLatexPlot import *
+from LatexPreview import *
 class TabFormReport(QTabWidget):
     
     texFolder = ""
@@ -20,7 +23,8 @@ class TabFormReport(QTabWidget):
     data_container = None
     latex_container = None
     interpeter = None
-
+    report_class = None
+    prv = None
     ObjName = ""
     ltxObj = None
 
@@ -35,13 +39,7 @@ class TabFormReport(QTabWidget):
         control.setMaximumHeight(H)
         control.setMaximumWidth(W)
 
-    #******************************************************************
-    # Save the confiruation file
-    #
-    def SaveConfigurationFile(self):
-        self.ltxObj.updateCfgData()
-        
-        #self.ltxObj.clearConfigGrp()
+    
     #******************************************************************
     # Load the confiruation file
     #
@@ -62,8 +60,12 @@ class TabFormReport(QTabWidget):
                 self.hasConfig = False
                 return 
             
+            
             self.data_container = DataContainer(self,self.itemcfg)
             self.VerifyButton.setEnabled(True)
+            self.PreviewButton.setEnabled(True)
+
+
 
     def browseFolder(self):
         """ Opens a dialog window for the user to select a folder in the file system. """
@@ -84,8 +86,46 @@ class TabFormReport(QTabWidget):
         msgBox.exec()
 
     def preview(self):
-        pass    
+        try :
+            self.data_container.get_particle_data_fields()
+            fields_list = self.data_container.do_preview()
+        except BaseException as e:
+            print(f"preview failed:{e}")
 
+        match self.itemcfg.type:
+            case "plot":
+                self.report_obj = ReportLatexPlot(fields_list,self.itemcfg)
+            case _:
+                print(f"Report type : {self.itemcfg.type} not found.")
+
+        self.report_obj.do_report()
+        self.report_obj.save_latex()
+
+        self.preview_dialog(self.report_obj.tex_output_name)
+
+    def preview_dialog(self,text_file_name):
+        if self.prv != None:
+            if (self.prv.flg_isopen):
+                self.prv.close()
+        previewFile = f"{self.itemcfg.tex_dir}/preview.tex"
+        previewPdf =  f"{self.itemcfg.tex_dir}/preview.pdf"
+        
+        prviewWorkingDir = self.itemcfg.tex_dir
+        valFile = f"{self.itemcfg.tex_dir}/_vals_{self.itemcfg.name}.tex"
+        prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,valFile)
+        prvCls.ProcessLatxCode()
+        prvCls.Run()
+        with open('termPreview.log', "r") as infile:  
+            txt_line = infile.readline().strip("\n")
+            self.terminal.append(txt_line)
+            while txt_line:
+                txt_line = infile.readline().strip("\n")
+                self.terminal.append(txt_line)
+        self.prv = PreviewDialog(previewPdf)
+        self.prv.exec()
+        
+
+    
     #******************************************************************
     # Build the data by analysing and saving summery files
     #   
@@ -100,7 +140,6 @@ class TabFormReport(QTabWidget):
     def performance(self):
         try :
             self.data_container.get_particle_data_fields()
-            self.data_container.get_data()
             self.data_container.do_performance()
         except BaseException as e:
             print(f"Performance Failed:{e}")
@@ -161,7 +200,7 @@ class TabFormReport(QTabWidget):
             self.SaveButton = QPushButton("Save")
             self.setSize(self.SaveButton,30,100)
             self.SaveButton.setStyleSheet("background-color:  #dddddd")
-            self.SaveButton.clicked.connect(self.SaveConfigurationFile)
+            #self.SaveButton.clicked.connect(self.SaveConfigurationFile)
             self.SaveButton.setEnabled(False)
             dirgrid.addWidget(self.SaveButton,2,0)
 
@@ -208,7 +247,7 @@ class TabFormReport(QTabWidget):
         except BaseException as e:
             self.log.log(self,e)
         try:
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/DUPOnly.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBSOnly.cfg")
         except BaseException as e1:
             print(f"Cannot open cfg file:{e1}")
    

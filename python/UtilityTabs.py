@@ -1,5 +1,5 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QWidget,  QFormLayout, QGridLayout, QTabWidget, QLineEdit, QDateEdit, QPushButton
+from PyQt6.QtWidgets import QTabWidget
 from PyQt6.QtCore import Qt
 from TabFormReport import *
 from TabFormGenData import *
@@ -14,6 +14,7 @@ class UtilityTabs(QTabWidget):
     ## Add all tabs to this tab form (parent)
     def Create(self,Base):
         self.bobj = Base
+        self.bobj.set_tab_object(self)
         ## Create the tabs
         self.tabFormGenData = TabGenData()        
         self.tabFormRun = TabFormRun()        

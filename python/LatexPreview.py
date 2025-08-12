@@ -1,0 +1,90 @@
+import subprocess, os
+
+from PyQt6.QtWidgets import QGridLayout, QLineEdit,QDialog,QLabel,QPushButton,QWidget
+from PyQt6.QtPdf import QPdfDocument
+from PyQt6.QtPdfWidgets import QPdfView
+import time
+class LatexPreview():
+    fileName = ''
+    def __init__(self,fileName,texname,wkdir,valsFile):
+        self.fileName = fileName
+        self.texname = texname
+        self.wkdir = wkdir
+        self.valsFile = valsFile
+        pass
+
+    def ProcessLatxCode(self):
+        if not os.path.exists(self.valsFile):
+            vl = open(self.valsFile,'w')            
+            vl.write("% Values file.")
+            vl.close()
+        dirname = os.path.dirname(self.fileName)
+        hdr_file = dirname + "/LatexUtilityBaseHeader.tex"
+        hdr_lst = []
+        with open(hdr_file,"r") as hfile:
+            hdr_lst.append(hfile.readlines())
+
+        fl = open(self.fileName,'w')
+        for ii in range(len(hdr_lst)):
+            res = ' '.join(hdr_lst[ii])
+            fl.write(res)    
+        fl.write('\\usepackage{graphicx}\n')
+        fl.write('\\usepackage{subcaption}\n')
+        fl.write('\\usepackage{makecell}\n')
+        fl.write('\\newcommand{\\mmrr}{\\textit{\\textbf{$mmrr$}}}\n')
+        fl.write('\\newcommand{\\arr}{\\textit{\\textbf{$arr$}}}\n')
+        fl.write('\\newcommand{\\arrg}{\\textit{\\textbf{$arr_G$}}}\n')
+        fl.write('\\newcommand{\\arrc}{\\textit{\\textbf{$arr_C$}}}\n')
+        fl.write('\\newcommand{\\arrt}{\\textit{\\textbf{$arr_T$}}}\n')
+
+        fl.write('\\begin{document}\n')
+        #fl.write("\\input{"  +  self.valsFile  + "}\n")
+        
+        texname = "\\input {" + self.texname + "}\n" 
+        fl.write(texname)
+        fl.write('\\end{document}\n')
+        fl.flush()
+        fl.close()
+    
+    def Run(self):
+        with open("termPreview.log","w") as outFile:
+            x = subprocess.call(f"pdflatex -halt-on-error -interaction=batchmode {self.fileName}",cwd= self.wkdir,stdout=outFile)
+            if x != 0:
+                print('Exit-code not 0, check result!')
+
+class PreviewDialog(QDialog):
+	
+	flg_isopen = False
+	def __init__(self,pdfName):
+		super().__init__()
+		self.pdfName = pdfName
+		self.setWindowTitle('Data Passing Dialog')
+		self.setGeometry(100, 100, 1000, 800)
+		layout = QGridLayout()
+		document = QPdfDocument(self)
+		try:
+			document.load(pdfName)
+		except BaseException as e:
+			self.log.log(self,e)
+		view = QPdfView(self)
+		#view.setPageMode(QPdfView.PageMode.MultiPage)
+		view.setDocument(document)
+		layout.addWidget(view)
+
+		self.submit_button = QPushButton('Done')
+		self.submit_button.clicked.connect(self.submit_data)
+		layout.addWidget(self.submit_button)
+		widget = QWidget()
+		widget.setLayout(layout)
+		self.setLayout(layout)
+		self.flg_isopen = True
+		self.show()
+    
+	def closeEvent(self,event):
+		flg_isopen = False
+		event.accept()
+
+		
+
+	def submit_data(self):
+		self.accept()

@@ -19,7 +19,6 @@ class DataContainer():
     # Save the DataFields<data_num> configuraton item in a list
     #
     def get_particle_data_fields(self):
-        
         more_fields = True
         counter = 1
         self.raw_fields_list.clear()
@@ -43,11 +42,11 @@ class DataContainer():
             for field in data_lines:
                 sep_semi_colon = field.split(':')
                 sep_period = sep_semi_colon[0].split('.')
-            fields_dict = AttrDictFields()
-            fields_dict["field"] = sep_semi_colon[1]
-            fields_dict["data_base"] = sep_period[1]
-            fields_dict["test_type"] = self.itemcfg.mode
-            self.fields_list.append(fields_dict)
+                fields_dict = AttrDictFields()
+                fields_dict["field"] = sep_semi_colon[1]
+                fields_dict["data_base"] = sep_period[1]
+                fields_dict["test_type"] = self.itemcfg.mode
+                self.fields_list.append(fields_dict)
 
         return
     #******************************************************************
@@ -67,18 +66,25 @@ class DataContainer():
     #******************************************************************
     # Call the first data base and verify
     #
-    def do_performance(self):
-        field_dict= self.fields_list[0]
-        data_obj = field_dict.data_object
-        return data_obj.do_performance(field_dict)
-    #******************************************************************
-    # Return data of summary files
-    #   
-    def get_data(self):
+    def do_preview(self):
         for ii in self.fields_list:
             data_obj = ii.data_object
             data_obj.check_data_files(ii)
-            
+            data_obj.do_performance(ii)
+            data_obj.read_summary_file(ii)
+        
+        return self.fields_list
+        
+
+    #******************************************************************
+    # Call the first data base and verify
+    #
+    def do_performance(self):
+        for ii in self.fields_list:
+            data_obj = ii.data_object
+            data_obj.check_data_files(ii)
+            data_obj.do_performance(ii)
+            data_obj.read_summary_file(ii)
 
     #******************************************************************
     # load the data into the fields

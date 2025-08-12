@@ -18,6 +18,7 @@ class TabFormRun(QTabWidget):
 
     run_items = []
     run_obj = None
+    terminal = None
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
        

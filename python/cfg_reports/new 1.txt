@@ -1,0 +1,28 @@
+
+
+# self.data_container.get_particle_data_fields()
+#  Read the DataFields<data_num> configuraton item and put it in a temprary list
+#  format example [fld.PQB:loadedp][fld.PQB:fps]
+
+# self.data_container.parse_fields_list(self):
+# 	parse the field data into parts
+
+	[0]['field'] = loadedp
+	[1]['field'] = fps
+	
+	[0]['data_base'] = PQB
+	[1]['data_base'] = PQB
+	
+	[0]['test_type'] = P or V
+	[1]['test_type'] = P or V
+	
+	
+# def self.data_container.resolve_data_files(self):
+# Add the following field to the fields_list
+	[0]['source_dir'] from self.itemcfg.input_data_dir
+	[0]['target_dir'] get directory from source_dir and add append 
+		[0]['data_base'] = PQB
+# 	An object that holds the data
+	[0]['data_object'] = gPCDData(self,self.itemcfg)
+	[0]['mode'] a repeat of 'test_type''
+	

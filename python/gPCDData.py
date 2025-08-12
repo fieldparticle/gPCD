@@ -3,6 +3,7 @@ import os
 import csv
 import re
 import statistics
+import pandas as pd
 from AttrDictFields import *
 class gPCDData():
 
@@ -34,8 +35,26 @@ class gPCDData():
         except ValueError:
             return False
         return True
-    
 
+
+
+    #******************************************************************
+    # Create thr mmrr summary file
+    #  
+    def read_summary_file(self,file_dict):
+        file_dict.data = AttrDictFields()
+        data = None
+        try :
+            data = pd.read_csv(file_dict.summary_file_name)
+        except BaseException as e:
+            raise BaseException(f"read_summary_file fail:{e}")
+        for ii in data.columns:
+            #print(data['fps'])
+            #print(ii)
+            file_dict.data[ii] = data[ii]
+        return
+            
+    
     #******************************************************************
     # Create thr mmrr summary file
     #
@@ -97,6 +116,7 @@ class gPCDData():
         elif 'avg' in file_dict.compute_type:
             self.get_averages(file_dict)
         return 0
+    
     #******************************************************************
     # Create the summary file wqith headers
     #
@@ -109,6 +129,11 @@ class gPCDData():
                 writer.writerow(data)
         except BaseException as e:
             raise BaseException(f"create_summary file failed{e}:")
+
+    #******************************************************************
+    # Create the summary file wqith headers
+    #
+    # 
             
     #******************************************************************
     # Run thoruogh the verification files and check counts
@@ -259,9 +284,9 @@ class gPCDData():
                             loadedp = float(col['loadedp'])
                             expectedc = int(col['expectedc'])
                             sidelen = int(col['sidelen'])
-                            cell_count = int(col['cell_count'])
+                            #cell_count = int(col['cell_count'])
             except BaseException as e:
-                print("LatexDataParticle get_averages line 282:",e)
+                raise BaseException(f"LatexDataParticle get_max failed: {e}")
 
             mean = statistics.mean(fps_list)
             stddev = statistics.stdev(fps_list)
@@ -272,4 +297,5 @@ class gPCDData():
                 writer = csv.writer(file)
                 writer.writerow(max_list)
             self.average_list.append(max_list)
+        print("REMEMBER CELL_COUNT is new and needs to be uncommented after new tests.")
         file.close()

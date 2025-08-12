@@ -46,7 +46,10 @@ class ParticleBase:
         self.cfgname = CfgFileName
         
     
-    #Added by Ben
+    
+    def set_tab_object(self,tab_object):
+        self.log.set_tab_object(tab_object)
+
     def WriteConfig(self, dict):
         self.cfg.WriteConfig(dict)
         return
