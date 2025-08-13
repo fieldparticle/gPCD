@@ -1,28 +1,31 @@
+ "linewidths=1",
+    "marker=^",
+    "facecolors=none"
+	
+	def newDoc(self):
+        if self.document() is not None:
+            self.setPageMode(QPdfView.PageMode.SinglePage)
+            self.setZoomMode(QPdfView.ZoomMode.Custom)
+            self.show()
 
+            page_width: float = self.document().pagePointSize(0).width()
+            view_width = self.width()
+            zoom_factor = view_width / page_width
+            self.pageNavigator().jump(0, QPoint(), zoom_factor)
+            self.setZoomFactor(zoom_factor)
+        else:
+            self.hide()
+			
+			'C:/_DJ/gPCDPaper/rpt/preview.pdf'
+			
+			
+			variables = re.findall('\{(.*?)\}', ll)
+                leg_str = f""
+                # Escape delimiters if they might contain special regex characters
+                escaped_start = re.escape('{')
+                escaped_end = re.escape('}')
+                # Construct the regex pattern
+                pattern = f"{escaped_start}.*?{escaped_end}"
 
-# self.data_container.get_particle_data_fields()
-#  Read the DataFields<data_num> configuraton item and put it in a temprary list
-#  format example [fld.PQB:loadedp][fld.PQB:fps]
-
-# self.data_container.parse_fields_list(self):
-# 	parse the field data into parts
-
-	[0]['field'] = loadedp
-	[1]['field'] = fps
-	
-	[0]['data_base'] = PQB
-	[1]['data_base'] = PQB
-	
-	[0]['test_type'] = P or V
-	[1]['test_type'] = P or V
-	
-	
-# def self.data_container.resolve_data_files(self):
-# Add the following field to the fields_list
-	[0]['source_dir'] from self.itemcfg.input_data_dir
-	[0]['target_dir'] get directory from source_dir and add append 
-		[0]['data_base'] = PQB
-# 	An object that holds the data
-	[0]['data_object'] = gPCDData(self,self.itemcfg)
-	[0]['mode'] a repeat of 'test_type''
-	
+                # Use re.sub to remove the matched substring
+                cleaned_text = re.sub(pattern, "", ll)

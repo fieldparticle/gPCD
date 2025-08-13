@@ -3,6 +3,7 @@ import subprocess, os
 from PyQt6.QtWidgets import QGridLayout, QLineEdit,QDialog,QLabel,QPushButton,QWidget
 from PyQt6.QtPdf import QPdfDocument
 from PyQt6.QtPdfWidgets import QPdfView
+from PyQt6.QtCore import QPoint
 import time
 class LatexPreview():
     fileName = ''
@@ -54,37 +55,43 @@ class LatexPreview():
 
 class PreviewDialog(QDialog):
 	
-	flg_isopen = False
-	def __init__(self,pdfName):
-		super().__init__()
-		self.pdfName = pdfName
-		self.setWindowTitle('Data Passing Dialog')
-		self.setGeometry(100, 100, 1000, 800)
-		layout = QGridLayout()
-		document = QPdfDocument(self)
-		try:
-			document.load(pdfName)
-		except BaseException as e:
-			self.log.log(self,e)
-		view = QPdfView(self)
-		#view.setPageMode(QPdfView.PageMode.MultiPage)
-		view.setDocument(document)
-		layout.addWidget(view)
+    flg_isopen = False
+    def __init__(self,pdfName):
+        super().__init__()
+        self.pdfName = pdfName
+        self.setWindowTitle('Data Passing Dialog')
+        self.setGeometry(100, 100, 1000, 800)
+        layout = QGridLayout()
+        self.document = QPdfDocument(self)
+        try:
+            self.document.load(pdfName)
+        except BaseException as e:
+            self.log.log(self,e)
 
-		self.submit_button = QPushButton('Done')
-		self.submit_button.clicked.connect(self.submit_data)
-		layout.addWidget(self.submit_button)
-		widget = QWidget()
-		widget.setLayout(layout)
-		self.setLayout(layout)
-		self.flg_isopen = True
-		self.show()
+        view = QPdfView(self)
+        view.setZoomMode(QPdfView.ZoomMode.FitToWidth)
+        #view.setPageMode(QPdfView.PageMode.MultiPage)
+        view.setDocument(self.document)
+        layout.addWidget(view)
+        self.submit_button = QPushButton('Done')
+        self.submit_button.clicked.connect(self.submit_data)
+        layout.addWidget(self.submit_button)
+        widget = QWidget()
+        widget.setLayout(layout)
+        self.setLayout(layout)
+        self.flg_isopen = True
+        self.show()
     
-	def closeEvent(self,event):
-		flg_isopen = False
-		event.accept()
+    def closeEvent(self,event):
+        flg_isopen = False
+        event.accept()
 
-		
+    
+  
 
-	def submit_data(self):
-		self.accept()
+
+    def submit_data(self):
+        self.accept()
+
+    def new_doc(self):
+      pass

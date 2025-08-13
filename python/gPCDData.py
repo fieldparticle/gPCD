@@ -207,7 +207,7 @@ class gPCDData():
     #
     def get_averages(self,file_dict):
         self.create_summary(file_dict)
-        print("Performing Averages")
+        #print("Performing Averages")
         self.average_list = []
         for i in self.data_files:
             file_path_release = self.topdir + "/" + i + "R.csv"

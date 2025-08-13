@@ -15,6 +15,13 @@ class DataContainer():
         self.data_base = None
         self.itemcfg = itemcfg
     
+    
+    #******************************************************************
+    # Save the DataFields<data_num> configuraton item in a list
+    #
+    def clear(self):
+        self.fields_list = []
+
     #******************************************************************
     # Save the DataFields<data_num> configuraton item in a list
     #
@@ -41,7 +48,7 @@ class DataContainer():
     def parse_fields_list(self):
         count = 0
         for data_lines in self.raw_fields_list:
-            print(data_lines)
+            #print(data_lines)
             sep_semi_colon = data_lines[0].split(':')
             comma_split = sep_semi_colon[1].split(',')
             sep_period = sep_semi_colon[0].split('.')

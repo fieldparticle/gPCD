@@ -8,13 +8,12 @@ from matplotlib.ticker import (MultipleLocator,
 
 class ReportClass():
     
-      fields_list = None
-      itemcfg = None
-      tex_output_name = None
-      
-      def __init__(self, fields_list,itemcfg):
-          self.fields_list = fields_list
-          self.itemcfg = itemcfg
+    fields_list = None
+    itemcfg = None
+    tex_output_name = None
     
+    def __init__(self, fields_list,itemcfg):
+        self.fields_list = fields_list
+        self.itemcfg = itemcfg
     
       
