@@ -21,6 +21,10 @@ class TrendLine():
     def add_trend_line(self,fields_list):
         self.fields_list = fields_list 
         for ii in range(1,len(self.fields_list)):
+            try:
+                print(self.fields_list[ii].line_type)
+            except BaseException as e:
+                print(e)
             if "linear_trend" in self.fields_list[ii].line_type:
                 self.xvalue = self.fields_list[ii].data[self.fields_list[0]['field']]
                 self.yvalue = self.fields_list[ii].data[self.fields_list[ii]['field']]

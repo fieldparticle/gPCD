@@ -15,11 +15,11 @@ class ReportClass():
     tex_output_name = None
     cap_file = ""
     caption = ""
-    
-    def __init__(self, parent,fields_list,itemcfg):
-        self.fields_list = fields_list
+    range = 0
+    images = []
+
+    def __init__(self, parent,itemcfg):
         self.itemcfg = itemcfg
-        self.itemcfg_main = itemcfg
         self.bobj = parent
         self.log = self.bobj.log
 
@@ -45,7 +45,7 @@ class ReportClass():
             f.write(w)
             w = "\\begin{figure*}[" + self.itemcfg.placement + "]\n"
             f.write(w)
-            previewTex = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}{ii}.png"
+            previewTex = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}.png"
             gdir = "".join(previewTex.rsplit(self.itemcfg.tex_dir))
             sgdir = ''.join( c for c in gdir if  c not in '/' )
     #                print(sgdir)    
@@ -70,7 +70,7 @@ class ReportClass():
             return
         f.close()
 
-    def save_multi_image(self):
+    def save_multi_image(self,img_list):
         self.read_caption()
         cfg = self.itemcfg
         self.tex_output_name = self.itemcfg.tex_dir + "/" + self.itemcfg.name + ".tex"
@@ -90,11 +90,11 @@ class ReportClass():
             w = "\\centering\n"
             f.write(w)
         try:
-            for ii in range(0,len(self.itemcfg.input_images)):
+            for ii in range(0,len(img_list)):
                 #w = "\t\\begin{subfigure}[b]{" + cfg.plot_width_array[ii] + "in}\n"
                 w = "\t\\begin{subfigure}[b]{" + str(cfg.plot_scale[ii]) + "\\textwidth}\n"
                 f.write(w)
-                previewTex = f"{cfg.plots_dir}/{cfg.input_images[ii]}"
+                previewTex = f"{cfg.plots_dir}/{img_list[ii]}"
                 gdir = "".join(previewTex.rsplit(cfg.tex_dir))
                 sgdir = ''.join( c for c in gdir if  c not in '/' )
                 print(sgdir)    

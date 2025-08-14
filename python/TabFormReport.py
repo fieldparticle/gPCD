@@ -115,9 +115,8 @@ class TabFormReport(QTabWidget):
             self.data_container.clear()
             self.data_container.get_particle_data_fields()
             fields_list = None
-            fields_list = self.data_container.do_preview()
-            self.report_obj = ReportLatexPlot(self,fields_list,self.itemcfg_main)
-            self.report_obj.do_report()
+            self.data_container.build_fields_list()
+            self.data_container.do_report()
         except BaseException as e:
             print(f"preview failed:{e}")
 
@@ -138,6 +137,8 @@ class TabFormReport(QTabWidget):
                 self.do_image()
             case _:
                 print(f"Report type : {self.itemcfg.type} not found.")
+
+        self.report_obj = ReportLatexPlot(self,self.itemcfg)
         self.report_obj.save_latex()
         self.preview_dialog(self.report_obj.tex_output_name)
     
@@ -296,6 +297,7 @@ class TabFormReport(QTabWidget):
         except BaseException as e:
             self.log.log(self,e)
         try:
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
             self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_OVR_GRPH_COMP_SPF.cfg")
         except BaseException as e1:
             print(f"Cannot open cfg file:{e1}")

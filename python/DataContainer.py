@@ -61,11 +61,17 @@ class DataContainer():
             self.fields_list.append(fields_dict)
 
         return
+    
     #******************************************************************
     # Get the field list
     #
     def get_feilds_list(self):
         return self.fields_list
+
+    def do_report(self):
+        field_dict= self.fields_list[0]
+        data_obj = field_dict.data_object
+        return data_obj.do_report(self.fields_list)
     
     #******************************************************************
     # Call the first data base and verify
@@ -75,10 +81,11 @@ class DataContainer():
         data_obj = field_dict.data_object
         return data_obj.do_verify(field_dict)
 
+    
     #******************************************************************
     # Call the first data base and verify
     #
-    def do_preview(self):
+    def build_fields_list(self):
         for ii in self.fields_list:
             data_obj = ii.data_object
             data_obj.check_data_files(ii)
