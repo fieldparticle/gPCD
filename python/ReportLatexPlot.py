@@ -5,10 +5,11 @@ import inspect
 from TrendLine import *
 import re
 from AttrDictFields import *
+from ConfigUtility import *
 class ReportLatexPlot(ReportClass):
 
-    def __init__(self, fields_list,itemcfg):
-        super().__init__(fields_list,itemcfg)
+    def __init__(self,parent, fields_list,itemcfg):
+        super().__init__(parent,fields_list,itemcfg)
 
     def is_integer(self,s):
         try:
@@ -42,8 +43,12 @@ class ReportLatexPlot(ReportClass):
             
         return format_dict            
 
-
-
+    def do_reports(self):
+        for ii in self.itemcfg_main.include:
+            self.itemcfg = ConfigUtility(ii)
+            self.itemcfg.Create(self.bobj.log,ii)
+            self.do_report()
+            
     def do_report(self):
         td = TrendLine()
         td.add_trend_line(self.fields_list)        
@@ -121,6 +126,7 @@ class ReportLatexPlot(ReportClass):
     def save_latex(self):
         
         for ii in range(1,len(self.fields_list)):
+            self.read_caption()
             self.tex_output_name = self.itemcfg.tex_dir + "/" + self.itemcfg.name + ".tex"
             try:
                 f = open(self.tex_output_name , "w")
@@ -148,7 +154,7 @@ class ReportLatexPlot(ReportClass):
                 f.write(w)
                 w = "\\hspace{" + str(self.itemcfg.hspace) + "in}\n"
                 f.write(w)
-                w = "\\caption[TITLE:" + self.itemcfg.title + "]{\\textit{" + self.itemcfg.caption + "}}\n"
+                w = "\\caption[TITLE:" + self.itemcfg.title + "]{\\textit{" + self.caption + "}}\n"
                 f.write(w)
                 w = "\t\t\\label{fig:" + self.itemcfg.name + "}\n"
                 f.write(w)

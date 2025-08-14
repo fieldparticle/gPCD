@@ -88,32 +88,57 @@ class TabFormReport(QTabWidget):
         msgBox.setText(text)
         msgBox.exec()
 
-    #******************************************************************
-    # Preview the latex genberated pdf
-    #
-    def preview(self):
+
+    def do_image(self):
         try :
             self.data_container.clear()
             self.data_container.get_particle_data_fields()
             fields_list = None
             fields_list = self.data_container.do_preview()
+            self.report_obj = ReportClass(self,fields_list,self.itemcfg)
+            
         except BaseException as e:
             print(f"preview failed:{e}")
 
-        match self.itemcfg.type:
-            case "plot":
-                self.report_obj = ReportLatexPlot(fields_list,self.itemcfg)
-            case _:
-                print(f"Report type : {self.itemcfg.type} not found.")
-
-        try:
+    
+    def do_plots(self):
+        for ii in self.itemcfg.include:
+            self.itemcfg_obj = ConfigUtility(ii)
+            self.itemcfg_obj.Create(self.bobj.log,ii)
+            self.itemcfg_main = self.itemcfg_obj.config
+            self.do_plot()
+    
+    def do_plot(self):
+        try :
+            self.data_container = None 
+            self.data_container = DataContainer(self,self.itemcfg_main)
+            self.data_container.clear()
+            self.data_container.get_particle_data_fields()
+            fields_list = None
+            fields_list = self.data_container.do_preview()
+            self.report_obj = ReportLatexPlot(self,fields_list,self.itemcfg_main)
             self.report_obj.do_report()
         except BaseException as e:
-            self.msg_box(f"Error plotting {e} ")
-            
+            print(f"preview failed:{e}")
 
+    #******************************************************************
+    # Preview the latex genberated pdf
+    #
+    def preview(self):
+        self.reload()
+        match self.itemcfg.type:
+            case "plot":
+                if len(self.itemcfg.include) == 0:
+                    self.itemcfg_main = self.itemcfg
+                    self.do_plot()
+                else:
+                    self.do_plots()
+
+            case "image":
+                self.do_image()
+            case _:
+                print(f"Report type : {self.itemcfg.type} not found.")
         self.report_obj.save_latex()
-
         self.preview_dialog(self.report_obj.tex_output_name)
     
     #******************************************************************
@@ -271,7 +296,7 @@ class TabFormReport(QTabWidget):
         except BaseException as e:
             self.log.log(self,e)
         try:
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_SPF.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_OVR_GRPH_COMP_SPF.cfg")
         except BaseException as e1:
             print(f"Cannot open cfg file:{e1}")
    

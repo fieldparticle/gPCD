@@ -29,3 +29,31 @@
 
                 # Use re.sub to remove the matched substring
                 cleaned_text = re.sub(pattern, "", ll)
+plot_format11 =
+[
+    "edgecolor=red",
+	"alpha=0.7",
+	"marker=o",
+	"facecolors=none"
+];
+plot_format12 =
+[
+	"linestyle=dotted",
+    "linewidth=3",
+    "color=tab:green",
+    "label=graphics"
+];
+plot_format13 =
+[
+	"linestyle=dotted",
+    "linewidth=3",
+    "color=tab:blue",
+    "label=graphics"
+];
+plot_format14 =
+[
+	"linestyle=dotted",
+    "linewidth=3",
+    "color=tab:orange",
+    "label=graphics"
+];caption = "Results of PQBS with the overall frame-rate performance. The linear performance data is presented in green. The linear fit has a base cost of 8.5E-12 s while the quadrtaic fit   ";

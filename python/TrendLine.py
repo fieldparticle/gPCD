@@ -33,10 +33,10 @@ class TrendLine():
             if "quadratic_trend" in self.fields_list[ii].line_type:
                 self.xvalue = self.fields_list[ii].data[self.fields_list[0]['field']]
                 self.yvalue = self.fields_list[ii].data[self.fields_list[ii]['field']]
-                intercept, slope = self.do_poly_fit(ii)
+                a,b,c = self.do_poly_fit(ii)
                 #print(self.fields_list[ii]['field'] )
-                data = quadratic_model(self.xvalue,intercept,slope).tolist()
-                self.fields_list[ii].data[self.fields_list[ii]['field']] = pd.Series(quadratic_model(self.xvalue,intercept,slope))
+                data = quadratic_model(self.xvalue,a,b,c).tolist()
+                self.fields_list[ii].data[self.fields_list[ii]['field']] = pd.Series(quadratic_model(self.xvalue,a,b,c))
             
             if "power_trend" in self.fields_list[ii].line_type:
                 self.xvalue = self.fields_list[ii].data[self.fields_list[0]['field']]
@@ -94,8 +94,9 @@ class TrendLine():
         # The next four lines define variables for the slope, intercept, and
         # there associated uncertainties d_slope and d_inter. The uncertainties
         # are computed from elements of the covariance matrix.
-        inter = popt[0]
-        slope = popt[1]
+        a = popt[0]
+        b = popt[1]
+        c = popt[2]
         self.intersect = np.sqrt(cov[0][0])
         self.slope = np.sqrt(cov[1][1])
         y_predicted = quadratic_model(self.xvalue, *popt)
@@ -103,12 +104,14 @@ class TrendLine():
         ss_residual = np.sum((self.yvalue - y_predicted)**2)
         r_squared = 1 - (ss_residual / ss_total)
        
-        self.fields_list[line_num]['K'] = self.slope
+        self.fields_list[line_num]['K'] = a
+        self.fields_list[line_num]['b'] = b
+        self.fields_list[line_num]['c'] = c
         self.fields_list[line_num]['isec'] = self.intersect
         self.fields_list[line_num]['covarance'] = self.covariance
         self.fields_list[line_num]['r_squared'] = r_squared
 
-        return inter,slope
+        return a,b,c
   
     
     def exponential_model(self, x, a, b):
