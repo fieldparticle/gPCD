@@ -93,7 +93,6 @@ class DataContainer():
             else:
                 #print(data_lines)
                 dl = DataLine()
-                
                 fields_dict = AttrDictFields()
                 comma_split = data_lines.split(',')
                 dot_split = comma_split[0].split('.') 
@@ -199,10 +198,13 @@ class DataContainer():
                 plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
                 format_dict = self.get_line_format_dict(plot_format_string)
                 self.do_equation(nm,self.lines_list[0],self.lines_list[nm],fig,ax,format_dict)
-            elif self.lines_list[nm].line_type == "trend_line":
+            elif 'trend' in self.lines_list[nm].line_type:
                 td = TrendLine()
-                td.add_trend_line(self.lines_list[nm])
-                line_num+=1
+                td.add_trend_line(self.lines_list[0],self.lines_list[nm])
+                plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
+                format_dict = self.get_line_format_dict(plot_format_string)
+                self.run_plot(self.lines_list[0],self.lines_list[nm],format_dict)
+
         
         # Do plot commands
         plt_commands = self.itemcfg.plot_commands
@@ -228,7 +230,6 @@ class DataContainer():
     # Do the legend
     #
     def do_legend(self):
-    
         leg_list = []
         leg_str = ""
         legend_commands = self.itemcfg.plot_legend 
@@ -269,7 +270,11 @@ class DataContainer():
             data_obj = self.lines_list[nm].data_object
             data_obj.check_data_files(self.lines_list[nm])
             data_obj.do_performance(self.lines_list[nm])
-            data_obj.read_summary_file(self.lines_list[nm])
+            data = data_obj.read_summary_file(self.lines_list[nm])
+            for ii in self.lines_list[nm].data_lines:
+                print(ii.field)
+                print(data[ii.field])
+                self.lines_list[nm].data[ii.field] = data[ii.field]
         
         return 
         

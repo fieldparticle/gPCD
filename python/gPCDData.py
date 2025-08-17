@@ -59,10 +59,7 @@ class gPCDData():
             data = pd.read_csv(file_dict.summary_file_name)
         except BaseException as e:
             raise BaseException(f"read_summary_file fail:{e}")
-        for ii in file_dict.data_lines:
-            print(ii['field'])
-            file_dict.data[ii.field] = data[ii.field]
-        return
+        return data
             
     
     #******************************************************************

@@ -298,7 +298,7 @@ class TabFormReport(QTabWidget):
             self.log.log(self,e)
         try:
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_LIN.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
         except BaseException as e1:
             print(f"Cannot open cfg file:{e1}")
    

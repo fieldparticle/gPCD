@@ -8,50 +8,42 @@ def quadratic_model(x, a, b, c):
 def quadratic_funct(x, a, b, c):
     return a * x**2 + b * x + c
 
-def power_func(x, a, b):
-    return a * (x**b)
+def power_func(x, a, b,c):
+    return a * (x**b)+c
 
 
 class TrendLine():
 
-    lines_list = None
+    
     def __init__(self):
         pass        
     
-    def add_trend_line(self,lines_list):
-        self.lines_list = lines_list 
-        for jj in self.lines_list:
-            for ii in range(1,len(jj)):
-                try:
-                    print(jj[ii].line_type)
-                except BaseException as e:
-                    print(e)
-                if "linear_trend" in jj[ii].line_type:
-                    self.xvalue = jj[ii].data[jjt[0]['field']]
-                    self.yvalue = jj[ii].data[jj[ii]['field']]
-                    intercept, slope = self.do_fit(ii,self.linearFunc)
-                    #print(self.lines_list[ii]['field'] )
-                    data = self.linearFunc(self.xvalue,intercept,slope).tolist()
-                    jj[ii].data[jj[ii]['field']] = pd.Series(self.linearFunc(self.xvalue,intercept,slope))
-                    
-                
-                if "quadratic_trend" in jj[ii].line_type:
-                    self.xvalue = jj[ii].data[jj[0]['field']]
-                    self.yvalue = jj[ii].data[jj[ii]['field']]
-                    a,b,c = self.do_poly_fit(ii)
-                    #print(jj[ii]['field'] )
-                    data = quadratic_model(self.xvalue,a,b,c).tolist()
-                    jj[ii].data[jj[ii]['field']] = pd.Series(quadratic_model(self.xvalue,a,b,c))
-                
-                if "power_trend" in jj[ii].line_type:
-                    self.xvalue = jj[ii].data[jj[0]['field']]
-                    self.yvalue = jj[ii].data[jj[ii]['field']]
-                    k_val, exponent = self.do_power_fit(ii)
-                    #print(jj[ii]['field'] )
-                    data = power_func(self.xvalue,intercept,slope).tolist()
-                    jj[ii].data[jj[ii]['field']] = pd.Series(power_func(self.xvalue,k_val,exponent))
+    def add_trend_line(self,lines_listx,lines_listy):
+        self.lines_listx = lines_listx
+        self.lines_listy = lines_listy
+        #print(lines_listx.data_lines[0].field)    
+        #print(lines_listy.data_lines[0].field)
+        self.xvalue = lines_listx.data[lines_listx.data_lines[0].field]
+        self.yvalue = lines_listy.data[lines_listy.data_lines[0].field]
+        #print(lines_listy.line_type)
+        if "linear_trend" in lines_listy.line_type:
+            intercept, slope = self.do_fit(self.linearFunc)
+            data = self.linearFunc(self.xvalue,intercept,slope).tolist()
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(self.linearFunc(self.xvalue,intercept,slope))
             
-    def do_power_fit(self,line_num):
+        if "quadratic_trend" in lines_listy.line_type:
+            a,b,c = self.do_poly_fit()
+            data = quadratic_model(self.xvalue,a,b,c).tolist()
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(quadratic_model(self.xvalue,a,b,c))
+        
+        if "power_trend" in lines_listy.line_type:
+            k_val, exponent, intercept = self.do_power_fit()
+            data = power_func(self.xvalue,k_val,exponent,intercept).tolist()
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
+    
+        return
+         
+    def do_power_fit(self):
         #self.params, self.covariance = curve_fit(self.linearFunc, self.xvalue, self.yvalue)                          
         # This line calls the curve_fit function. It returns two arrays.
         # 'a_fit' contains the best fit parameters and 'cov' contains
@@ -68,21 +60,22 @@ class TrendLine():
         # are computed from elements of the covariance matrix.
         K_value = popt[0]
         exponent = popt[1]
+        intercept = popt[2]
         y_predicted = power_func(self.xvalue, *popt)
         ss_total = np.sum((self.yvalue - np.mean(self.yvalue))**2)
         ss_residual = np.sum((self.yvalue - y_predicted)**2)
         r_squared = 1 - (ss_residual / ss_total)
        
-        self.lines_list[line_num]['K'] = K_value
-        self.lines_list[line_num]['exponent'] = exponent
+        self.lines_listy['K'] = K_value
+        self.lines_listy['exponent'] = exponent
         #self.lines_list[line_num]['covarance'] = cov
-        self.lines_list[line_num]['r_squared'] = r_squared
-        return K_value,exponent
+        self.lines_listy['r_squared'] = r_squared
+        return K_value,exponent,intercept
 
   
     
 
-    def do_poly_fit(self,line_num):
+    def do_poly_fit(self):
         #self.params, self.covariance = curve_fit(self.linearFunc, self.xvalue, self.yvalue)                          
             # This line calls the curve_fit function. It returns two arrays.
         # 'a_fit' contains the best fit parameters and 'cov' contains
@@ -109,12 +102,12 @@ class TrendLine():
         ss_residual = np.sum((self.yvalue - y_predicted)**2)
         r_squared = 1 - (ss_residual / ss_total)
        
-        self.lines_list[line_num]['K'] = a
-        self.lines_list[line_num]['b'] = b
-        self.lines_list[line_num]['c'] = c
-        self.lines_list[line_num]['isec'] = self.intersect
-        self.lines_list[line_num]['covarance'] = self.covariance
-        self.lines_list[line_num]['r_squared'] = r_squared
+        self.lines_listy['K'] = a
+        self.lines_listy['b'] = b
+        self.lines_listy['c'] = c
+        self.lines_listy['isec'] = self.intersect
+        self.lines_listy['covarance'] = self.covariance
+        self.lines_listy['r_squared'] = r_squared
 
         return a,b,c
   
@@ -123,7 +116,7 @@ class TrendLine():
         return a * np.exp(b*x)
     
     
-    def do_fit(self,line_num,fit_func):
+    def do_fit(self,fit_func):
         #self.params, self.covariance = curve_fit(self.linearFunc, self.xvalue, self.yvalue)                          
             # This line calls the curve_fit function. It returns two arrays.
         # 'a_fit' contains the best fit parameters and 'cov' contains
@@ -146,10 +139,10 @@ class TrendLine():
         ss_residual = np.sum((self.yvalue - y_predicted)**2)
         r_squared = 1 - (ss_residual / ss_total)
        
-        self.lines_list[line_num]['K'] = self.slope
-        self.lines_list[line_num]['isec'] = self.intersect
-        self.lines_list[line_num]['covarance'] = self.covariance
-        self.lines_list[line_num]['r_squared'] = r_squared
+        self.lines_listy['K'] = self.slope
+        self.lines_listy['isec'] = self.intersect
+        self.lines_listy['covarance'] = self.covariance
+        self.lines_listy['r_squared'] = r_squared
 
         return inter,slope
   
