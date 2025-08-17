@@ -9,7 +9,7 @@ from matplotlib.ticker import (MultipleLocator,
 
 class ReportClass():
     
-    fields_list = None
+    lines_list = None
     itemcfg = None
     itemcfg_main = None
     tex_output_name = None

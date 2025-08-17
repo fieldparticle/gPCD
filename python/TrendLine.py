@@ -14,41 +14,42 @@ def power_func(x, a, b):
 
 class TrendLine():
 
-    fields_list = None
+    lines_list = None
     def __init__(self):
         pass        
     
-    def add_trend_line(self,fields_list):
-        self.fields_list = fields_list 
-        for ii in range(1,len(self.fields_list)):
-            try:
-                print(self.fields_list[ii].line_type)
-            except BaseException as e:
-                print(e)
-            if "linear_trend" in self.fields_list[ii].line_type:
-                self.xvalue = self.fields_list[ii].data[self.fields_list[0]['field']]
-                self.yvalue = self.fields_list[ii].data[self.fields_list[ii]['field']]
-                intercept, slope = self.do_fit(ii,self.linearFunc)
-                #print(self.fields_list[ii]['field'] )
-                data = self.linearFunc(self.xvalue,intercept,slope).tolist()
-                self.fields_list[ii].data[self.fields_list[ii]['field']] = pd.Series(self.linearFunc(self.xvalue,intercept,slope))
+    def add_trend_line(self,lines_list):
+        self.lines_list = lines_list 
+        for jj in self.lines_list:
+            for ii in range(1,len(jj)):
+                try:
+                    print(jj[ii].line_type)
+                except BaseException as e:
+                    print(e)
+                if "linear_trend" in jj[ii].line_type:
+                    self.xvalue = jj[ii].data[jjt[0]['field']]
+                    self.yvalue = jj[ii].data[jj[ii]['field']]
+                    intercept, slope = self.do_fit(ii,self.linearFunc)
+                    #print(self.lines_list[ii]['field'] )
+                    data = self.linearFunc(self.xvalue,intercept,slope).tolist()
+                    jj[ii].data[jj[ii]['field']] = pd.Series(self.linearFunc(self.xvalue,intercept,slope))
+                    
                 
-            
-            if "quadratic_trend" in self.fields_list[ii].line_type:
-                self.xvalue = self.fields_list[ii].data[self.fields_list[0]['field']]
-                self.yvalue = self.fields_list[ii].data[self.fields_list[ii]['field']]
-                a,b,c = self.do_poly_fit(ii)
-                #print(self.fields_list[ii]['field'] )
-                data = quadratic_model(self.xvalue,a,b,c).tolist()
-                self.fields_list[ii].data[self.fields_list[ii]['field']] = pd.Series(quadratic_model(self.xvalue,a,b,c))
-            
-            if "power_trend" in self.fields_list[ii].line_type:
-                self.xvalue = self.fields_list[ii].data[self.fields_list[0]['field']]
-                self.yvalue = self.fields_list[ii].data[self.fields_list[ii]['field']]
-                k_val, exponent = self.do_power_fit(ii)
-                #print(self.fields_list[ii]['field'] )
-                data = power_func(self.xvalue,intercept,slope).tolist()
-                self.fields_list[ii].data[self.fields_list[ii]['field']] = pd.Series(power_func(self.xvalue,k_val,exponent))
+                if "quadratic_trend" in jj[ii].line_type:
+                    self.xvalue = jj[ii].data[jj[0]['field']]
+                    self.yvalue = jj[ii].data[jj[ii]['field']]
+                    a,b,c = self.do_poly_fit(ii)
+                    #print(jj[ii]['field'] )
+                    data = quadratic_model(self.xvalue,a,b,c).tolist()
+                    jj[ii].data[jj[ii]['field']] = pd.Series(quadratic_model(self.xvalue,a,b,c))
+                
+                if "power_trend" in jj[ii].line_type:
+                    self.xvalue = jj[ii].data[jj[0]['field']]
+                    self.yvalue = jj[ii].data[jj[ii]['field']]
+                    k_val, exponent = self.do_power_fit(ii)
+                    #print(jj[ii]['field'] )
+                    data = power_func(self.xvalue,intercept,slope).tolist()
+                    jj[ii].data[jj[ii]['field']] = pd.Series(power_func(self.xvalue,k_val,exponent))
             
     def do_power_fit(self,line_num):
         #self.params, self.covariance = curve_fit(self.linearFunc, self.xvalue, self.yvalue)                          
@@ -72,10 +73,10 @@ class TrendLine():
         ss_residual = np.sum((self.yvalue - y_predicted)**2)
         r_squared = 1 - (ss_residual / ss_total)
        
-        self.fields_list[line_num]['K'] = K_value
-        self.fields_list[line_num]['exponent'] = exponent
-        #self.fields_list[line_num]['covarance'] = cov
-        self.fields_list[line_num]['r_squared'] = r_squared
+        self.lines_list[line_num]['K'] = K_value
+        self.lines_list[line_num]['exponent'] = exponent
+        #self.lines_list[line_num]['covarance'] = cov
+        self.lines_list[line_num]['r_squared'] = r_squared
         return K_value,exponent
 
   
@@ -108,12 +109,12 @@ class TrendLine():
         ss_residual = np.sum((self.yvalue - y_predicted)**2)
         r_squared = 1 - (ss_residual / ss_total)
        
-        self.fields_list[line_num]['K'] = a
-        self.fields_list[line_num]['b'] = b
-        self.fields_list[line_num]['c'] = c
-        self.fields_list[line_num]['isec'] = self.intersect
-        self.fields_list[line_num]['covarance'] = self.covariance
-        self.fields_list[line_num]['r_squared'] = r_squared
+        self.lines_list[line_num]['K'] = a
+        self.lines_list[line_num]['b'] = b
+        self.lines_list[line_num]['c'] = c
+        self.lines_list[line_num]['isec'] = self.intersect
+        self.lines_list[line_num]['covarance'] = self.covariance
+        self.lines_list[line_num]['r_squared'] = r_squared
 
         return a,b,c
   
@@ -145,10 +146,10 @@ class TrendLine():
         ss_residual = np.sum((self.yvalue - y_predicted)**2)
         r_squared = 1 - (ss_residual / ss_total)
        
-        self.fields_list[line_num]['K'] = self.slope
-        self.fields_list[line_num]['isec'] = self.intersect
-        self.fields_list[line_num]['covarance'] = self.covariance
-        self.fields_list[line_num]['r_squared'] = r_squared
+        self.lines_list[line_num]['K'] = self.slope
+        self.lines_list[line_num]['isec'] = self.intersect
+        self.lines_list[line_num]['covarance'] = self.covariance
+        self.lines_list[line_num]['r_squared'] = r_squared
 
         return inter,slope
   

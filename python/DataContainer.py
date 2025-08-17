@@ -1,10 +1,11 @@
 from gPCDData import *
 from AttrDictFields import *
+from DataLine import *
 
 class DataContainer():
 
-    raw_fields_list = []
-    fields_list = []
+    raw_lines_list = []
+    lines_list = []
     #******************************************************************
     # init
     #
@@ -16,68 +17,246 @@ class DataContainer():
         self.itemcfg = itemcfg
     
     
+    def is_integer(self,s):
+        try:
+            int(s)
+            return True
+        except ValueError:
+            return False
+    
+    def is_number(self,s):
+        try:
+            float(s)
+            return True
+        except ValueError:
+            return False
     #******************************************************************
     # Save the DataFields<data_num> configuraton item in a list
     #
     def clear(self):
-        self.fields_list = []
+        self.lines_list = []
 
     #******************************************************************
     # Save the DataFields<data_num> configuraton item in a list
     #
     def get_particle_data_fields(self):
         more_fields = True
-        plot_num = 1
-        self.raw_fields_list.clear()
-        while more_fields == True:
-            cfg_DataFields = f"DataFields{plot_num}"
-            if cfg_DataFields in self.itemcfg:
-                data_fields = self.itemcfg[cfg_DataFields]
-                for jj in data_fields:
-                    self.raw_fields_list.append([jj,plot_num])
-            else:
-                break
-            plot_num += 1    
-        self.parse_fields_list()
+        self.raw_lines_list.clear()
+        data_fields = self.itemcfg['data_fields']
+        for jj in data_fields:
+            self.raw_lines_list.append(jj)
+        self.parse_lines_list()
         self.resolve_data_files()
         return 
     
+    
+    def split_equation(self,string):
+        char_remove = ["(",")"]
+        for char in char_remove:
+            string = string.replace(char, "")                
+        char_remove = ["+","-","/","*"]
+        for char in char_remove:
+            string = string.replace(char, "?")       
+        all_fields = string.split(',')
+        fields = all_fields[0].split('?')
+        return fields
+
     #******************************************************************
     # parse the fields from the list and add to a dictionary 
     #
-    def parse_fields_list(self):
-        count = 0
-        for data_lines in self.raw_fields_list:
-            #print(data_lines)
-            sep_semi_colon = data_lines[0].split(':')
-            comma_split = sep_semi_colon[1].split(',')
-            sep_period = sep_semi_colon[0].split('.')
-            fields_dict = AttrDictFields()
-            fields_dict["field"] = comma_split[0]
-            fields_dict["data_base"] = sep_period[1]
-            fields_dict["line_type"] = comma_split[1]
-            fields_dict["plot_num"] = data_lines[1]
-            fields_dict["test_type"] = self.itemcfg.mode
-            self.fields_list.append(fields_dict)
-
+    def parse_lines_list(self):
+        line = 0
+        data_type = self.itemcfg.data_type
+        data_source = self.itemcfg.data_source
+        for data_lines in self.raw_lines_list:
+           #print(any(map(lambda char: char in data_lines, "+-/*")))
+            if any(map(lambda char: char in data_lines, "+-/*")):
+                dl = DataLine()
+                data_type = data_lines.split(',')
+                equation_splt = data_lines.split(',')
+                equation = data_type[0]
+                dl['equation']= equation
+                dl['line_type'] = data_type[1]
+                dl["line_num"] = line
+                lines_list = self.split_equation(equation)
+                for eq_item in lines_list:
+                    fields_dict = AttrDictFields()
+                    fields_dict['whole_field'] = eq_item.strip(" ") 
+                    field_name = eq_item.split('.')  
+                    fields_dict["field"] = field_name[1].strip(" ") 
+                    fields_dict["data_source"] = data_source[line]
+                    fields_dict["test_type"] = self.itemcfg.mode
+                    
+                    dl.data_lines.append(fields_dict)  
+                self.lines_list.append(dl)
+                line +=1    
+            else:
+                #print(data_lines)
+                dl = DataLine()
+                
+                fields_dict = AttrDictFields()
+                comma_split = data_lines.split(',')
+                dot_split = comma_split[0].split('.') 
+                dl['line_type'] = data_type[line]
+                fields_dict['line_type'] = data_type[line]
+                fields_dict['field'] = dot_split[1].strip(" ")
+                fields_dict['whole_field'] = comma_split[0].strip(" ")
+                fields_dict['data_source'] =  data_source[line]
+                dl['line_num'] = line
+                dl.data_lines.append(fields_dict)  
+                line +=1
+                self.lines_list.append(dl)
+       # self.print_field_list()
         return
-    
+
+    #******************************************************************
+    # Diagnostic print fields list
+    # 
+    def print_field_list(self):
+        print(f"Length of print_field_list is : {len(self.lines_list)}.")
+        for lines in self.lines_list:
+            print(f"Length of line: {len(lines)}.")
+            for items in lines:
+                item = items[1]
+                record = items[0]
+                print(f"line_type:{item.line_type},field :{item.field}")
+
     #******************************************************************
     # Get the field list
     #
     def get_feilds_list(self):
-        return self.fields_list
+        return self.lines_list
+
+    def get_line_format_dict(self,plot_command_string):
+        format_dict = {}
+        plot_format = self.itemcfg[plot_command_string]
+        out_int = 0
+        out_float = 0.0
+        out_string = ""
+        for kk in plot_format:
+            all_item = kk.split("=")
+            if self.is_integer(all_item[1]):
+                format_dict[all_item[0]]=int(all_item[1])
+            elif  self.is_number(all_item[1]):
+                format_dict[all_item[0]]=float(all_item[1])
+            else:
+                 format_dict[all_item[0]]=all_item[1]
+        return format_dict        
+        
+    def do_equation(self,line_num,plot_linex,plot_liney,figure, axes,format_dict):
+        print(len(plot_liney.data_lines))
+        fld = AttrDictFields()
+        for nm in range(len(plot_liney.data_lines)):
+            print(plot_liney.data_lines[nm])    
+            print(plot_liney.data_lines[nm].field)
+            fld[plot_liney.data_lines[nm].field] = plot_liney.data[plot_liney.data_lines[nm].field]
+            #print(plot_liney.data[plot_liney])
+        try:
+            ydata = eval(plot_liney.equation)    
+        except BaseException as e:
+             print(f"eval equaiton error {e}")
+        pn = plot_liney.line_num - 1
+        plot_command = self.itemcfg.line_commands
+        # Go thourgh the lines in the cfg file and plot them
+        plt_eval_string = f"{plot_command[pn]}(plot_linex.data[plot_linex.data_lines[0].field],ydata,**format_dict)"
+        #print(plt_eval_string)
+        try:
+            eval(plt_eval_string)
+        except BaseException as e:
+            print(e)
+
+
+        return
+
+     ############################################
+    # Do a single line of ydata
+    def run_plot(self,lines_listx,lines_listy,format_dict) :
+        # get the list of plot commands
+        pn = lines_listy.line_num - 1
+        plot_command = self.itemcfg.line_commands
+        # Go thourgh the lines in the cfg file and plot them
+        plt_eval_string = f"{plot_command[pn]}(lines_listx.data[lines_listx.data_lines[0].field],lines_listy.data[lines_listy.data_lines[0].field],**format_dict)"
+        #print(plt_eval_string)
+        try:
+            eval(plt_eval_string)
+        except BaseException as e:
+            print(e)
 
     def do_report(self):
-        field_dict= self.fields_list[0]
-        data_obj = field_dict.data_object
-        return data_obj.do_report(self.fields_list)
+
+        # get plot fig and axes 
+        fig = plt.figure(figsize=(6.5,6.5))
+        ax = fig.gca()
+        xdata = None
+        for nm in range(len(self.lines_list)):
+            if self.lines_list[nm].line_type == "ydata":
+                plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
+                format_dict = self.get_line_format_dict(plot_format_string)
+                self.run_plot(self.lines_list[0],self.lines_list[nm],format_dict)
+            elif self.lines_list[nm].line_type == "xdata":
+                continue
+            elif self.lines_list[nm].line_type == "equation":
+                plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
+                format_dict = self.get_line_format_dict(plot_format_string)
+                self.do_equation(nm,self.lines_list[0],self.lines_list[nm],fig,ax,format_dict)
+            elif self.lines_list[nm].line_type == "trend_line":
+                td = TrendLine()
+                td.add_trend_line(self.lines_list[nm])
+                line_num+=1
+        
+        # Do plot commands
+        plt_commands = self.itemcfg.plot_commands
+        for pp in plt_commands:
+            eval(pp)
+        
+        leg_list = self.do_legend()
+        ax.legend(leg_list)
+        
+       # plt.show()
+        pltTempImg = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}.png"
+        try: 
+            os.remove(pltTempImg)
+            print(f"File '{pltTempImg}' deleted successfully.")
+        except FileNotFoundError:
+            print(f"File '{pltTempImg}' does notexist yet")
+    
+        plt.savefig(pltTempImg, bbox_inches='tight')
+        plt.close("all") 
+    
+
+    #******************************************************************
+    # Do the legend
+    #
+    def do_legend(self):
+    
+        leg_list = []
+        leg_str = ""
+        legend_commands = self.itemcfg.plot_legend 
+        for ll in range(len(legend_commands)):
+            if '{' in legend_commands[ll]:
+                variable_string = re.findall('\((.*?)\)', legend_commands[ll])
+                variables = variable_string[0].split(',')
+                fld = AttrDictFields()
+                for var in variables:
+                    new_var_text = var.split('.')
+                    self.lines_list[ll+1][new_var_text[1]]
+                    fld[new_var_text[1]] = self.lines_list[ll+1][new_var_text[1]]
+                   # print(fld.K)    
+                    
+                    #val = self.lines_list[ll+1][var]
+                
+                new_str = eval(legend_commands[ll] )
+                leg_list.append(new_str)
+            else:
+                leg_list.append(legend_commands[ll])
+               # print(new_str)
+        return leg_list
     
     #******************************************************************
     # Call the first data base and verify
     #
     def do_verify(self):
-        field_dict= self.fields_list[0]
+        field_dict= self.lines_list[0]
         data_obj = field_dict.data_object
         return data_obj.do_verify(field_dict)
 
@@ -85,21 +264,21 @@ class DataContainer():
     #******************************************************************
     # Call the first data base and verify
     #
-    def build_fields_list(self):
-        for ii in self.fields_list:
-            data_obj = ii.data_object
-            data_obj.check_data_files(ii)
-            data_obj.do_performance(ii)
-            data_obj.read_summary_file(ii)
+    def apply_data_to_fields(self):
+        for nm in range(len(self.lines_list)):
+            data_obj = self.lines_list[nm].data_object
+            data_obj.check_data_files(self.lines_list[nm])
+            data_obj.do_performance(self.lines_list[nm])
+            data_obj.read_summary_file(self.lines_list[nm])
         
-        return self.fields_list
+        return 
         
 
     #******************************************************************
     # Call the first data base and verify
     #
     def do_performance(self):
-        for ii in self.fields_list:
+        for ii in self.lines_list:
             data_obj = ii.data_object
             data_obj.check_data_files(ii)
             data_obj.do_performance(ii)
@@ -109,16 +288,17 @@ class DataContainer():
     # load the data into the fields
     #
     def resolve_data_files(self):
-        matches = ["pqb","pcd","cfb","dup","pqbrandom"]    
-        for ii in self.fields_list:
-            test_fld = ii["data_base"].upper()
-            ii["source_dir"] = self.itemcfg.input_data_dir
-            self.out_folder = os.path.dirname(self.itemcfg.input_data_dir)
-            target = self.out_folder + '/' + "perfData" + ii.data_base
-            ii["target_dir"] = target
-            ii["data_object"] = gPCDData(self,self.itemcfg)
-            ii["mode"] = self.itemcfg.mode
-            ii["compute_type"] = self.itemcfg.compute_type
+        
+        for ln in range(len(self.lines_list)):
+                #print(jj)
+                self.lines_list[ln]["source_dir"] = self.itemcfg.input_data_dir
+                self.out_folder = os.path.dirname(self.itemcfg.input_data_dir)
+                target = self.out_folder + '/' + "perfData" + self.itemcfg.data_source[ln]
+                self.lines_list[ln]["target_dir"] = target
+                self.lines_list[ln]["data_object"] = gPCDData(self,self.itemcfg)
+                self.lines_list[ln]["mode"] = self.itemcfg.mode
+                self.lines_list[ln]["compute_type"] = self.itemcfg.compute_type
+            
         return 
 
 

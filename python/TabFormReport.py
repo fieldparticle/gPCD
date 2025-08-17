@@ -93,9 +93,9 @@ class TabFormReport(QTabWidget):
         try :
             self.data_container.clear()
             self.data_container.get_particle_data_fields()
-            fields_list = None
-            fields_list = self.data_container.do_preview()
-            self.report_obj = ReportClass(self,fields_list,self.itemcfg)
+            lines_list = None
+            lines_list = self.data_container.do_preview()
+            self.report_obj = ReportClass(self,lines_list,self.itemcfg)
             
         except BaseException as e:
             print(f"preview failed:{e}")
@@ -114,8 +114,8 @@ class TabFormReport(QTabWidget):
             self.data_container = DataContainer(self,self.itemcfg_main)
             self.data_container.clear()
             self.data_container.get_particle_data_fields()
-            fields_list = None
-            self.data_container.build_fields_list()
+            lines_list = None
+            self.data_container.apply_data_to_fields()
             self.data_container.do_report()
         except BaseException as e:
             print(f"preview failed:{e}")
@@ -298,7 +298,7 @@ class TabFormReport(QTabWidget):
             self.log.log(self,e)
         try:
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_OVR_GRPH_COMP_SPF.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_LIN.cfg")
         except BaseException as e1:
             print(f"Cannot open cfg file:{e1}")
    
