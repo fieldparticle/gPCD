@@ -53,7 +53,7 @@ class DataContainer():
     def split_equation(self,string):
         char_remove = ["(",")"]
         for char in char_remove:
-            string = string.replace(char, "")                
+            string = string.replace(char, " ")                
         char_remove = ["+","-","/","*"]
         for char in char_remove:
             string = string.replace(char, "?")       
@@ -70,13 +70,13 @@ class DataContainer():
         data_source = self.itemcfg.data_source
         for data_lines in self.raw_lines_list:
            #print(any(map(lambda char: char in data_lines, "+-/*")))
-            if any(map(lambda char: char in data_lines, "+-/*")):
+            if any(map(lambda char: char in data_lines, "+-/*)(")) :
                 dl = DataLine()
-                data_type = data_lines.split(',')
-                equation_splt = data_lines.split(',')
-                equation = data_type[0]
+                #data_type = data_lines.split(',')
+                equation = data_lines
+                dl['is_equation'] = True
                 dl['equation']= equation
-                dl['line_type'] = data_type[1]
+                dl['line_type'] = data_type[line]
                 dl["line_num"] = line
                 lines_list = self.split_equation(equation)
                 for eq_item in lines_list:
@@ -96,6 +96,7 @@ class DataContainer():
                 fields_dict = AttrDictFields()
                 comma_split = data_lines.split(',')
                 dot_split = comma_split[0].split('.') 
+                dl['is_equation'] = False
                 dl['line_type'] = data_type[line]
                 fields_dict['line_type'] = data_type[line]
                 fields_dict['field'] = dot_split[1].strip(" ")
@@ -142,30 +143,20 @@ class DataContainer():
                  format_dict[all_item[0]]=all_item[1]
         return format_dict        
         
-    def do_equation(self,line_num,plot_linex,plot_liney,figure, axes,format_dict):
-        print(len(plot_liney.data_lines))
+    def do_equation(self,plot_liney):
+        #print(len(plot_liney.data_lines))
         fld = AttrDictFields()
         for nm in range(len(plot_liney.data_lines)):
-            print(plot_liney.data_lines[nm])    
-            print(plot_liney.data_lines[nm].field)
+            #print(plot_liney.data_lines[nm])    
+            #print(plot_liney.data_lines[nm].field)
             fld[plot_liney.data_lines[nm].field] = plot_liney.data[plot_liney.data_lines[nm].field]
             #print(plot_liney.data[plot_liney])
         try:
-            ydata = eval(plot_liney.equation)    
+            ydata = eval(plot_liney.equation)  
         except BaseException as e:
              print(f"eval equaiton error {e}")
-        pn = plot_liney.line_num - 1
-        plot_command = self.itemcfg.line_commands
-        # Go thourgh the lines in the cfg file and plot them
-        plt_eval_string = f"{plot_command[pn]}(plot_linex.data[plot_linex.data_lines[0].field],ydata,**format_dict)"
-        #print(plt_eval_string)
-        try:
-            eval(plt_eval_string)
-        except BaseException as e:
-            print(e)
 
-
-        return
+        return ydata
 
      ############################################
     # Do a single line of ydata
@@ -187,18 +178,24 @@ class DataContainer():
         fig = plt.figure(figsize=(6.5,6.5))
         ax = fig.gca()
         xdata = None
+
+        # Ru thru plot lines
         for nm in range(len(self.lines_list)):
+            # If the line contains an equation then perform the math before anyhtin else
+            if self.lines_list[nm].is_equation == True:
+                ydata = self.do_equation(self.lines_list[nm])
+                self.lines_list[nm].data[self.lines_list[nm].equation] = ydata
+                self.lines_list[nm].data_lines[0].field = self.lines_list[nm].equation
+            # Just ydata
             if self.lines_list[nm].line_type == "ydata":
                 plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
                 format_dict = self.get_line_format_dict(plot_format_string)
                 self.run_plot(self.lines_list[0],self.lines_list[nm],format_dict)
+            # Skip this we already got the xdata
             elif self.lines_list[nm].line_type == "xdata":
                 continue
-            elif self.lines_list[nm].line_type == "equation":
-                plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
-                format_dict = self.get_line_format_dict(plot_format_string)
-                self.do_equation(nm,self.lines_list[0],self.lines_list[nm],fig,ax,format_dict)
-            elif 'trend' in self.lines_list[nm].line_type:
+            # If its a treandline the perform the fit
+            elif 'trend' in self.lines_list[nm].line_type or 'residual' in self.lines_list[nm].line_type :
                 td = TrendLine()
                 td.add_trend_line(self.lines_list[0],self.lines_list[nm])
                 plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
@@ -237,11 +234,17 @@ class DataContainer():
             if '{' in legend_commands[ll]:
                 variable_string = re.findall('\((.*?)\)', legend_commands[ll])
                 variables = variable_string[0].split(',')
+                print(variables)
                 fld = AttrDictFields()
                 for var in variables:
                     new_var_text = var.split('.')
-                    self.lines_list[ll+1][new_var_text[1]]
-                    fld[new_var_text[1]] = self.lines_list[ll+1][new_var_text[1]]
+                    print(new_var_text[1])
+                    print(self.lines_list[ll+1].line_type,"  :  ",legend_commands[ll])
+                    #self.lines_list[ll+1][new_var_text[1]]
+                    try:
+                        fld[new_var_text[1]] = self.lines_list[ll+1][new_var_text[1]]
+                    except BaseException as e:
+                        print(e)
                    # print(fld.K)    
                     
                     #val = self.lines_list[ll+1][var]

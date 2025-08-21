@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy.stats import linregress
 from scipy.optimize import curve_fit
 
 def quadratic_model(x, a, b, c):
@@ -11,6 +12,25 @@ def quadratic_funct(x, a, b, c):
 def power_func(x, a, b,c):
     return a * (x**b)+c
 
+def exponential_model(self, x, a, b):
+    return a * np.exp(b*x)
+    
+def linearFunc(x,intercept,slope):
+        """This function defines the function to be fit. In this case a linear
+        function.
+        
+        Parameters
+        ----------
+        x : independent variable
+        slope : slope
+        intercept : intercept
+        
+        Returns
+        -------
+        y : dependent variable
+        """
+        y = intercept + slope * x
+        return y
 
 class TrendLine():
 
@@ -27,20 +47,39 @@ class TrendLine():
         self.yvalue = lines_listy.data[lines_listy.data_lines[0].field]
         #print(lines_listy.line_type)
         if "linear_trend" in lines_listy.line_type:
-            intercept, slope = self.do_fit(self.linearFunc)
-            data = self.linearFunc(self.xvalue,intercept,slope).tolist()
-            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(self.linearFunc(self.xvalue,intercept,slope))
+            intercept, slope = self.do_linear_fit(linearFunc)
+            #intercept, slope = self.do_linear_fit_regress()
+            data = linearFunc(self.xvalue,intercept,slope).tolist()
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(linearFunc(self.xvalue,intercept,slope))
             
-        if "quadratic_trend" in lines_listy.line_type:
+        elif "quadratic_trend" in lines_listy.line_type:
             a,b,c = self.do_poly_fit()
             data = quadratic_model(self.xvalue,a,b,c).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(quadratic_model(self.xvalue,a,b,c))
         
-        if "power_trend" in lines_listy.line_type:
+        elif "power_trend" in lines_listy.line_type:
             k_val, exponent, intercept = self.do_power_fit()
             data = power_func(self.xvalue,k_val,exponent,intercept).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
     
+        if "linear_residual" in lines_listy.line_type:
+            y_data = lines_listy.data[lines_listy.data_lines[0].field]
+            intercept, slope = self.do_linear_fit(linearFunc)
+            data = linearFunc(self.xvalue,intercept,slope).tolist()
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(linearFunc(self.xvalue,intercept,slope))
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(y_data - data)
+            
+        elif "quadratic_residual" in lines_listy.line_type:
+            a,b,c = self.do_poly_fit()
+            data = quadratic_model(self.xvalue,a,b,c).tolist()
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(quadratic_model(self.xvalue,a,b,c))
+        
+        elif "power__residual" in lines_listy.line_type:
+            k_val, exponent, intercept = self.do_power_fit()
+            data = power_func(self.xvalue,k_val,exponent,intercept).tolist()
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
+
+
         return
          
     def do_power_fit(self):
@@ -112,11 +151,36 @@ class TrendLine():
         return a,b,c
   
     
-    def exponential_model(self, x, a, b):
-        return a * np.exp(b*x)
+    def do_linear_fit_regress(self):
+        #self.params, self.covariance = curve_fit(self.linearFunc, self.xvalue, self.yvalue)                          
+            # This line calls the curve_fit function. It returns two arrays.
+        # 'a_fit' contains the best fit parameters and 'cov' contains
+        # the covariance matrix.
+        if self.xvalue.size == 0 or  self.yvalue.size == 0 :
+            print("TrendLine: no data")
+            return
+        fit1 = linregress(self.xvalue, self.yvalue)
+        # The next four lines define variables for the slope, intercept, and
+        # there associated uncertainties d_slope and d_inter. The uncertainties
+        # are computed from elements of the covariance matrix.
+        self.intersect = fit1.intercept
+        self.slope = fit1.slope
+        y_predicted =  fit1.intercept + fit1.slope * self.xvalue
+        ss_total = np.sum((self.yvalue - np.mean(self.yvalue))**2)
+        ss_residual = np.sum((self.yvalue - y_predicted)**2)
+        r_squared = 1 - (ss_residual / ss_total)
+       
+        self.lines_listy['K'] = self.slope
+        self.lines_listy['isec'] = self.intersect
+        self.lines_listy['covarance'] = self.covariance
+        self.lines_listy['r_squared'] = r_squared
+
+        return self.intersect,self.slope
+  
+
     
-    
-    def do_fit(self,fit_func):
+
+    def do_linear_fit(self,fit_func):
         #self.params, self.covariance = curve_fit(self.linearFunc, self.xvalue, self.yvalue)                          
             # This line calls the curve_fit function. It returns two arrays.
         # 'a_fit' contains the best fit parameters and 'cov' contains
@@ -130,10 +194,9 @@ class TrendLine():
         # The next four lines define variables for the slope, intercept, and
         # there associated uncertainties d_slope and d_inter. The uncertainties
         # are computed from elements of the covariance matrix.
-        inter = popt[0]
-        slope = popt[1]
-        self.intersect = np.sqrt(cov[0][0])
-        self.slope = np.sqrt(cov[1][1])
+       
+        self.intersect = popt[0]
+        self.slope = popt[1]
         y_predicted = fit_func(self.xvalue, *popt)
         ss_total = np.sum((self.yvalue - np.mean(self.yvalue))**2)
         ss_residual = np.sum((self.yvalue - y_predicted)**2)
@@ -144,7 +207,7 @@ class TrendLine():
         self.lines_listy['covarance'] = self.covariance
         self.lines_listy['r_squared'] = r_squared
 
-        return inter,slope
+        return self.intersect,self.slope
   
 
     def calculate_r_squared(y_true, y_pred):
@@ -158,22 +221,6 @@ class TrendLine():
         r_squared = 1 - (ss_residual / ss_total)
         return r_squared
 
-    def linearFunc(self,x,intercept,slope):
-        """This function defines the function to be fit. In this case a linear
-        function.
-        
-        Parameters
-        ----------
-        x : independent variable
-        slope : slope
-        intercept : intercept
-        
-        Returns
-        -------
-        y : dependent variable
-        """
-        y = intercept + slope * x
-        return y
-
+   
 
    

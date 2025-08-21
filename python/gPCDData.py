@@ -110,7 +110,7 @@ class gPCDData():
 
         self.hasData = len(tst_files) == len(self.data_files)
         if(self.hasData == False):
-            raise ValueError(f"Data set mismatch. Number *.tst files:{len(tst_files)}, Number data files:{ len(self.data_files)}")
+            print(f"Warning - Data set mismatch. Number *.tst files:{len(tst_files)}, Number data files:{ len(self.data_files)}")
         
 
     #******************************************************************
