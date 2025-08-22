@@ -297,8 +297,17 @@ class TabFormReport(QTabWidget):
         except BaseException as e:
             self.log.log(self,e)
         try:
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
+            # Need data
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_SPF.cfg")
+            # Working
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_TOTAL_SPF.cfg")            
             self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LIN_RESIDUAL.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_ALL.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_QUAD_RESIDUAL.cfg")
+            
         except BaseException as e1:
             print(f"Cannot open cfg file:{e1}")
    

@@ -11,7 +11,8 @@ import inspect
 from TrendLine import *
 import re
 from ConfigUtility import *
-
+from PyQt6.QtWidgets import QFileDialog, QGroupBox,QMessageBox
+from  msg_box import *
 class gPCDData():
 
     sumFile = ""
@@ -87,7 +88,14 @@ class gPCDData():
         self.mmrr_fps = fps / count
         self.mmrr_cpums = cpums / count
         self.mmrr_gms = gms / count    
-       
+     #******************************************************************
+    # GP message box
+    #
+    def msg_box(self,text):
+        msgBox = QMessageBox()
+        msgBox.setText(text)
+        msgBox.exec()
+
     #******************************************************************
     # Check the data counts
     #
@@ -109,6 +117,15 @@ class gPCDData():
       
 
         self.hasData = len(tst_files) == len(self.data_files)
+
+        if len(tst_files) == 0:
+            showdialog("In gPCDData.py check_data_files","The test files (*.tst) were not found. Check cfg.input_data_dir")
+            raise BaseException("In gPCDData.py check_data_files","The test files (*.tst) were not found. Check cfg.input_data_dir")
+        if len(self.data_files) == 0:
+            showdialog("In gPCDData.py check_data_files","The results files (*.R.csv or *.D.csv) were not found. Check cfg.data_source")
+            raise BaseException("In gPCDData.py check_data_files","The results files (*.R.csv or *.D.csv) were not found. Check cfg.data_source")
+            return
+        
         if(self.hasData == False):
             print(f"Warning - Data set mismatch. Number *.tst files:{len(tst_files)}, Number data files:{ len(self.data_files)}")
         

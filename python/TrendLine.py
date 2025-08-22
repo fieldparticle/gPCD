@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import math
 from scipy.stats import linregress
 from scipy.optimize import curve_fit
 
@@ -11,6 +12,13 @@ def quadratic_funct(x, a, b, c):
 
 def power_func(x, a, b,c):
     return a * (x**b)+c
+
+#def log10_func(x, a, b ):
+ #   return a * np.log(x) + b
+    #return a*x*np.log(x-c)+b
+
+def log10_func(x, a, b): # x-shifted log
+    return a*np.log(x)+b
 
 def exponential_model(self, x, a, b):
     return a * np.exp(b*x)
@@ -57,10 +65,20 @@ class TrendLine():
             data = quadratic_model(self.xvalue,a,b,c).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(quadratic_model(self.xvalue,a,b,c))
         
+        elif "quadratic_trend" in lines_listy.line_type:
+            a,b,c = self.do_poly_fit()
+            data = quadratic_model(self.xvalue,a,b,c).tolist()
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(quadratic_model(self.xvalue,a,b,c))
+
         elif "power_trend" in lines_listy.line_type:
             k_val, exponent, intercept = self.do_power_fit()
             data = power_func(self.xvalue,k_val,exponent,intercept).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
+
+        elif "log10_trend" in lines_listy.line_type:
+            a,b = self.do_log10_fit()
+            data = log10_func(self.xvalue,a,b).tolist()
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(log10_func(self.xvalue,a,b))
     
         if "linear_residual" in lines_listy.line_type:
             y_data = lines_listy.data[lines_listy.data_lines[0].field]
@@ -70,15 +88,22 @@ class TrendLine():
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(y_data - data)
             
         elif "quadratic_residual" in lines_listy.line_type:
+            y_data = lines_listy.data[lines_listy.data_lines[0].field]
             a,b,c = self.do_poly_fit()
             data = quadratic_model(self.xvalue,a,b,c).tolist()
-            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(quadratic_model(self.xvalue,a,b,c))
+            #lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(linearFunc(self.xvalue,intercept,slope))
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(y_data - data)
         
-        elif "power__residual" in lines_listy.line_type:
+        elif "power_residual" in lines_listy.line_type:
             k_val, exponent, intercept = self.do_power_fit()
-            data = power_func(self.xvalue,k_val,exponent,intercept).tolist()
+            data = lines_listy.data[lines_listy.data_lines[0].field]
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
 
+        elif "log10_residual" in lines_listy.line_type:
+            
+            k_val, exponent, intercept = self.do_power_fit()
+            ydata = np.log10(lines_listy.data[lines_listy.data_lines[0].field] )
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(np.log10((self.xvalue,a,b)))
 
         return
          
@@ -112,7 +137,45 @@ class TrendLine():
         return K_value,exponent,intercept
 
   
-    
+
+
+    def do_log10_fit(self):
+        #self.params, self.covariance = curve_fit(self.linearFunc, self.xvalue, self.yvalue)                          
+            # This line calls the curve_fit function. It returns two arrays.
+        # 'a_fit' contains the best fit parameters and 'cov' contains
+        # the covariance matrix.
+        if self.xvalue.size == 0 or  self.yvalue.size == 0 :
+            print("TrendLine: no data")
+            return
+        x = np.array(self.xvalue)
+        y = np.array(self.yvalue)
+        initialParameters = np.array([0.0000010, 0.0000010, 0.0000010])
+        p0_guess = [3.6E-1, 7] 
+        #popt = np.polyfit(x, np.log10(y), 1)
+        
+        cov =[1,1]
+        popt,cov=curve_fit(log10_func,x,y)
+        #z = np.polyfit(x, np.log10(y), 1)
+        self.params = popt
+        self.covariance = cov
+        # The next four lines define variables for the slope, intercept, and
+        # there associated uncertainties d_slope and d_inter. The uncertainties
+        # are computed from elements of the covariance matrix.
+        a = popt[0]
+        b = popt[1]
+        self.intersect = np.sqrt(cov[0][0])
+        self.slope = np.sqrt(cov[1][1])
+        y_predicted = log10_func(self.xvalue, a,b)
+        ss_total = np.sum((self.yvalue - np.mean(self.yvalue))**2)
+        ss_residual = np.sum((self.yvalue - y_predicted)**2)
+        r_squared = 1 - (ss_residual / ss_total)
+       
+        self.lines_listy['a'] = a
+        self.lines_listy['b'] = b
+        self.lines_listy['covarance'] = self.covariance
+        self.lines_listy['r_squared'] = r_squared
+
+        return a,b
 
     def do_poly_fit(self):
         #self.params, self.covariance = curve_fit(self.linearFunc, self.xvalue, self.yvalue)                          

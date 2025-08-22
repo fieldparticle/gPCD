@@ -1,11 +1,22 @@
 from gPCDData import *
 from AttrDictFields import *
 from DataLine import *
+import math
+import numpy as np
+import pandas as pd
+from PyQt6.QtWidgets import QMessageBox
 
 class DataContainer():
 
     raw_lines_list = []
     lines_list = []
+     #******************************************************************
+    # GP message box
+    #
+    def msg_box(self,text):
+        msgBox = QMessageBox()
+        msgBox.setText(text)
+        msgBox.exec()
     #******************************************************************
     # init
     #
@@ -35,6 +46,14 @@ class DataContainer():
     #
     def clear(self):
         self.lines_list = []
+        pltTempImg = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}.png"
+        try: 
+            os.remove(pltTempImg)
+            print(f"File '{pltTempImg}' deleted successfully.")
+        except FileNotFoundError:
+            print(f"File '{pltTempImg}' does notexist yet")
+            
+       
 
     #******************************************************************
     # Save the DataFields<data_num> configuraton item in a list
@@ -49,8 +68,19 @@ class DataContainer():
         self.resolve_data_files()
         return 
     
+    def split_transendential(self,string):
+        fields= []
+        char_remove = ["(",")"]
+        for char in char_remove:
+            string = string.replace(char, " ") 
+        all_fields = string.split(" ") 
+        fields.append(all_fields[1])
+        #fields.append(all_fields[0])
+        return fields
     
     def split_equation(self,string):
+        if 'log10' in string or 'log' in string:
+            return self.split_transendential(string)
         char_remove = ["(",")"]
         for char in char_remove:
             string = string.replace(char, " ")                
@@ -70,7 +100,8 @@ class DataContainer():
         data_source = self.itemcfg.data_source
         for data_lines in self.raw_lines_list:
            #print(any(map(lambda char: char in data_lines, "+-/*")))
-            if any(map(lambda char: char in data_lines, "+-/*)(")) :
+            if any(map(lambda char: char in data_lines, "+-/*()")) :
+
                 dl = DataLine()
                 #data_type = data_lines.split(',')
                 equation = data_lines
@@ -153,6 +184,7 @@ class DataContainer():
             #print(plot_liney.data[plot_liney])
         try:
             ydata = eval(plot_liney.equation)  
+            #
         except BaseException as e:
              print(f"eval equaiton error {e}")
 
@@ -230,16 +262,21 @@ class DataContainer():
         leg_list = []
         leg_str = ""
         legend_commands = self.itemcfg.plot_legend 
+        legend_string =legend_commands[0]
+        stripped_leg = re.sub('$.*?', '', legend_string)
         for ll in range(len(legend_commands)):
             if '{' in legend_commands[ll]:
                 variable_string = re.findall('\((.*?)\)', legend_commands[ll])
+                if len(variable_string) == 0:
+                    leg_list.append(legend_commands[ll])
+                    continue
                 variables = variable_string[0].split(',')
-                print(variables)
+                
                 fld = AttrDictFields()
                 for var in variables:
                     new_var_text = var.split('.')
-                    print(new_var_text[1])
-                    print(self.lines_list[ll+1].line_type,"  :  ",legend_commands[ll])
+                    #print(new_var_text[1])
+                    #print(self.lines_list[ll+1].line_type,"  :  ",legend_commands[ll])
                     #self.lines_list[ll+1][new_var_text[1]]
                     try:
                         fld[new_var_text[1]] = self.lines_list[ll+1][new_var_text[1]]
@@ -275,8 +312,8 @@ class DataContainer():
             data_obj.do_performance(self.lines_list[nm])
             data = data_obj.read_summary_file(self.lines_list[nm])
             for ii in self.lines_list[nm].data_lines:
-                print(ii.field)
-                print(data[ii.field])
+                #print(ii.field)
+                #print(data[ii.field])
                 self.lines_list[nm].data[ii.field] = data[ii.field]
         
         return 
