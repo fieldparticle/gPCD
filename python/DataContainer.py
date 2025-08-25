@@ -21,6 +21,7 @@ class DataContainer():
     # init
     #
     def __init__(self, Base, itemcfg):
+        self.active_lines = []
         self.bobj = Base
         self.cfg = self.bobj.cfg
         self.log = self.bobj.log
@@ -62,8 +63,21 @@ class DataContainer():
         more_fields = True
         self.raw_lines_list.clear()
         data_fields = self.itemcfg['data_fields']
+        self.itemcfg
+        switch_fields = []
         for jj in data_fields:
-            self.raw_lines_list.append(jj)
+            field_ary = jj.split(',')
+            if len(field_ary) > 1:
+                if 'true' in field_ary[1]: 
+                    self.raw_lines_list.append(field_ary[0])
+                    self.active_lines.append(1)
+                    continue
+                else:
+                    self.raw_lines_list.append(field_ary[0])
+                    self.active_lines.append(0)
+            else:
+                self.raw_lines_list.append(jj)
+                self.active_lines.append(1)
         self.parse_lines_list()
         self.resolve_data_files()
         return 
@@ -99,10 +113,15 @@ class DataContainer():
         data_type = self.itemcfg.data_type
         data_source = self.itemcfg.data_source
         for data_lines in self.raw_lines_list:
+    
            #print(any(map(lambda char: char in data_lines, "+-/*")))
             if any(map(lambda char: char in data_lines, "+-/*()")) :
 
                 dl = DataLine()
+                if self.active_lines[line] == 0:
+                    dl['is_active'] = False
+                else:
+                    dl['is_active'] = True
                 #data_type = data_lines.split(',')
                 equation = data_lines
                 dl['is_equation'] = True
@@ -124,6 +143,10 @@ class DataContainer():
             else:
                 #print(data_lines)
                 dl = DataLine()
+                if self.active_lines[line] == 0:
+                    dl['is_active'] = False
+                else:
+                    dl['is_active'] = True
                 fields_dict = AttrDictFields()
                 comma_split = data_lines.split(',')
                 dot_split = comma_split[0].split('.') 
@@ -213,26 +236,28 @@ class DataContainer():
 
         # Ru thru plot lines
         for nm in range(len(self.lines_list)):
-            # If the line contains an equation then perform the math before anyhtin else
-            if self.lines_list[nm].is_equation == True:
-                ydata = self.do_equation(self.lines_list[nm])
-                self.lines_list[nm].data[self.lines_list[nm].equation] = ydata
-                self.lines_list[nm].data_lines[0].field = self.lines_list[nm].equation
-            # Just ydata
-            if self.lines_list[nm].line_type == "ydata":
-                plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
-                format_dict = self.get_line_format_dict(plot_format_string)
-                self.run_plot(self.lines_list[0],self.lines_list[nm],format_dict)
-            # Skip this we already got the xdata
-            elif self.lines_list[nm].line_type == "xdata":
-                continue
-            # If its a treandline the perform the fit
-            elif 'trend' in self.lines_list[nm].line_type or 'residual' in self.lines_list[nm].line_type :
-                td = TrendLine()
-                td.add_trend_line(self.lines_list[0],self.lines_list[nm])
-                plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
-                format_dict = self.get_line_format_dict(plot_format_string)
-                self.run_plot(self.lines_list[0],self.lines_list[nm],format_dict)
+            if self.lines_list[nm]['is_active'] == True:
+                print(self.lines_list[nm].data)
+                # If the line contains an equation then perform the math before anyhtin else
+                if self.lines_list[nm].is_equation == True:
+                    ydata = self.do_equation(self.lines_list[nm])
+                    self.lines_list[nm].data[self.lines_list[nm].equation] = ydata
+                    self.lines_list[nm].data_lines[0].field = self.lines_list[nm].equation
+                # Just ydata
+                if self.lines_list[nm].line_type == "ydata":
+                    plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
+                    format_dict = self.get_line_format_dict(plot_format_string)
+                    self.run_plot(self.lines_list[0],self.lines_list[nm],format_dict)
+                # Skip this we already got the xdata
+                elif self.lines_list[nm].line_type == "xdata":
+                    continue
+                # If its a treandline the perform the fit
+                elif 'trend' in self.lines_list[nm].line_type or 'residual' in self.lines_list[nm].line_type :
+                    td = TrendLine()
+                    td.add_trend_line(self.lines_list[0],self.lines_list[nm])
+                    plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
+                    format_dict = self.get_line_format_dict(plot_format_string)
+                    self.run_plot(self.lines_list[0],self.lines_list[nm],format_dict)
 
         
         # Do plot commands
@@ -265,32 +290,33 @@ class DataContainer():
         legend_string =legend_commands[0]
         stripped_leg = re.sub('$.*?', '', legend_string)
         for ll in range(len(legend_commands)):
-            if '{' in legend_commands[ll]:
-                variable_string = re.findall('\((.*?)\)', legend_commands[ll])
-                if len(variable_string) == 0:
-                    leg_list.append(legend_commands[ll])
-                    continue
-                variables = variable_string[0].split(',')
-                
-                fld = AttrDictFields()
-                for var in variables:
-                    new_var_text = var.split('.')
-                    #print(new_var_text[1])
-                    #print(self.lines_list[ll+1].line_type,"  :  ",legend_commands[ll])
-                    #self.lines_list[ll+1][new_var_text[1]]
-                    try:
-                        fld[new_var_text[1]] = self.lines_list[ll+1][new_var_text[1]]
-                    except BaseException as e:
-                        print(e)
-                   # print(fld.K)    
+            if self.active_lines[ll+1] == 1:
+                if '{' in legend_commands[ll]:
+                    variable_string = re.findall('\((.*?)\)', legend_commands[ll])
+                    if len(variable_string) == 0:
+                        leg_list.append(legend_commands[ll])
+                        continue
+                    variables = variable_string[0].split(',')
                     
-                    #val = self.lines_list[ll+1][var]
-                
-                new_str = eval(legend_commands[ll] )
-                leg_list.append(new_str)
-            else:
-                leg_list.append(legend_commands[ll])
-               # print(new_str)
+                    fld = AttrDictFields()
+                    for var in variables:
+                        new_var_text = var.split('.')
+                        #print(new_var_text[1])
+                        #print(self.lines_list[ll+1].line_type,"  :  ",legend_commands[ll])
+                        #self.lines_list[ll+1][new_var_text[1]]
+                        try:
+                            fld[new_var_text[1]] = self.lines_list[ll+1][new_var_text[1]]
+                        except BaseException as e:
+                            print(e)
+                    # print(fld.K)    
+                        
+                        #val = self.lines_list[ll+1][var]
+                    
+                    new_str = eval(legend_commands[ll] )
+                    leg_list.append(new_str)
+                else:
+                    leg_list.append(legend_commands[ll])
+                # print(new_str)
         return leg_list
     
     #******************************************************************

@@ -52,6 +52,7 @@ void PerfObj::Create()
 
 	m_testDUPDir= CfgApp->GetString("application.testdirDUP", true);
 	m_SingleFileTest= CfgApp->GetBool("application.doAutoSingleFile", true);
+	m_DoOnlyMissingData = CfgApp->GetBool("application.do_only_missing_data", true);
 
 	if(!m_TestCFG.compare("testdirPQBR"))
 	{
@@ -181,6 +182,60 @@ void PerfObj::Create()
 	}
 
 }
+std::string PerfObj::SetOutputFile(size_t fileNumber)
+{
+
+	std::string filename = m_AprFile;
+	m_InputBinFile = filename + ".bin";
+#ifndef NDEBUG
+	filename = filename + "D.csv";
+	std::filesystem::path path(filename);
+	std::string dir = path.parent_path().string(); // "/home/dir1/dir2/dir3/dir4"
+	std::string file = path.filename().string(); // "file"
+	std::string newdir = "";
+
+	if (m_timers_on == true)
+	{
+		newdir = dir + "T";
+		m_OutputFile = dir + "T" + "\\" + file;
+	}
+	else
+	{
+		newdir = dir;
+		m_OutputFile = dir + "\\" + file;
+	}
+#else
+	filename = filename + "R.csv";
+	std::filesystem::path path(filename);
+	std::string dir = path.parent_path().string(); // "/home/dir1/dir2/dir3/dir4"
+	std::string file = path.filename().string(); // "file"
+	std::string newdir = "";
+
+
+	if (m_timers_on == true)
+	{
+		newdir = dir + "T";
+		m_OutputFile = dir + "T" + "\\" + file;
+	}
+	else
+	{
+		newdir = dir;
+		m_OutputFile = dir + "\\" + file;
+	}
+#endif
+
+	// Attempt to create the directories
+	if (std::filesystem::create_directories(newdir)) {
+		std::cout << "Successfully created directory: " << newdir << std::endl;
+	}
+	else {
+		// This branch is reached if the directory already existed
+		std::cout << "Directory already exists: " << newdir << std::endl;
+	}
+
+	return m_OutputFile;
+
+}
 uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 {
 	
@@ -190,7 +245,7 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 
 	if(m_SingleFileTest == false)
 	{
-		
+		// Get the source directory for he tst amd bin files
 		std::string path = m_TestDir;
 		for (auto& entry : fs::directory_iterator(path))
 		{
@@ -201,6 +256,7 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 	#if 1
 		for (const auto& entry : sorted_by_name)
 		{
+			//Go thru the bin and tsts files and store only the tst files.
 			if ((entry.string().find("tst")) != std::string::npos)
 				filename.push_back(entry.string());
 		}
@@ -227,7 +283,7 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 
 		std::filesystem::path cwd = std::filesystem::current_path();
 		
-		if ((pt= pathtest.find("tst")) != std::string::npos)
+		if ( (pt= pathtest.find("tst")) != std::string::npos)
 		{
 			std::cout	<< "=======================" 
 						<< filename[ii] 
@@ -240,15 +296,25 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 			m_density = CfgTst->GetFloat("collsion_density", true);
 			m_partcount = CfgTst->GetInt("num_particles", true);
 			m_cell_count = CfgTst->GetInt("particles_per_cell", true);
-
 			std::string hold = filename[ii].substr(0, pt);
-			//config->m_AprFile = hold;
 			m_DataFile = hold + "bin";
 			m_AprFile =  CfgTst->GetString("report_file", true);
 			m_DataFile = CfgTst->GetString("particle_data_bin_file", true);
 			mout << "Auto DataFile : " << m_DataFile << ende;
-
-			uint32_t ret = ParticleOnly(this,tcps,tcpcapp,false);
+			std::string outfile = SetOutputFile(1);
+			bool mistfile = false;
+			uint32_t ret = 0;
+			bool exst = fs::exists(outfile);
+			if (m_DoOnlyMissingData && exst == false)
+			{
+				uint32_t ret = ParticleOnly(this, tcps, tcpcapp, false);
+				mistfile = true;
+			}
+			else if(m_DoOnlyMissingData == false)
+			{
+				uint32_t ret = ParticleOnly(this, tcps, tcpcapp, false);
+			}
+				
 			//Fail
 			if (ret == 1)
 			{
@@ -269,13 +335,13 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 			}
 			if (QuitEvent == 1)
 				return 0;
-			
-			for (size_t ii = 0; ii < m_AutoSleep; ii++)
-			{
-				std::cout << "Resting:" << ii << " of " << m_AutoSleep << " seconds." << std::endl;
-				Sleep(1000);
-			}
-
+			if (mistfile == true)
+				for (size_t ii = 0; ii < m_AutoSleep; ii++)
+				{
+					std::cout << "Resting:" << ii << " of " << m_AutoSleep << " seconds." << std::endl;
+					Sleep(1000);
+				}
+			mistfile = false;
 		}
 		if (GetAsyncKeyState(VK_ESCAPE))
 		{
@@ -284,61 +350,17 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 	}
 	return 0;
 }
- 
+
+
 
 int PerfObj::Doperf(DrawObj* DrawInstance, VulkanObj* VulkanWin, TCPObj* tcp, size_t aprCount)
 {
 	int ret = 0;
-	std::string filename = m_AprFile;
 	
-#ifndef NDEBUG
-	filename = filename + "D.csv";
-	std::filesystem::path path(filename);
-	std::string dir = path.parent_path().string(); // "/home/dir1/dir2/dir3/dir4"
-	std::string file = path.filename().string(); // "file"
-	std::string newdir = "";
 
-	if (m_timers_on == true)
-	{
-		newdir = dir + "T";
-		filename = dir + "T" + "\\" + file;
-	}
-	else
-	{
-		newdir = dir;
-		filename = dir + "\\" + file;
-	}
-#else
-	filename = filename + "R.csv";
-	std::filesystem::path path(filename);
-	std::string dir = path.parent_path().string(); // "/home/dir1/dir2/dir3/dir4"
-	std::string file = path.filename().string(); // "file"
-	std::string newdir = "";
+	//SetOutputFile(1);
+	std::string filename = m_OutputFile;
 
-
-	if (m_timers_on == true)
-	{
-		newdir = dir + "T";
-		filename = dir + "T" + "\\" + file;
-	}
-	else
-	{
-		newdir = dir;
-		filename = dir + "\\" + file;
-	}
-#endif
-
-	
-	
-	// Attempt to create the directories
-	if (std::filesystem::create_directories(newdir)) {
-		std::cout << "Successfully created directory: " << newdir << std::endl;
-	}
-	else {
-		// This branch is reached if the directory already existed
-		std::cout << "Directory already exists: " << newdir << std::endl;
-	}
-	
 	double stop_frame_rate = 0;
 	double totFps = 0.0;
 	double totTime = 0.0;

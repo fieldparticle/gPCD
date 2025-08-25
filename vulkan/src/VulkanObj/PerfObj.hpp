@@ -69,6 +69,8 @@ class PerfObj
 		uint32_t					m_SeriesLength = 0;
 		std::string					m_AprFile;
 		std::string					m_DataFile;
+		std::string					m_OutputFile;
+		std::string					m_InputBinFile;
 
 		// From specific test file
 		uint32_t					m_colcount = 0;
@@ -76,9 +78,12 @@ class PerfObj
 		int							m_partcount = 0;
 		int							m_cell_count = 0;
 		bool						m_timers_on=false;
+		bool						m_DoOnlyMissingData = false;
 
 	void Create();
 	PerfObj(){};
+	std::string  SetOutputFile(size_t fileNumber);
+
 	std::ostringstream AssembleRow(uint32_t rowNum);
 	uint32_t DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag);
 	int Doperf(DrawObj* DrawInstance, VulkanObj* VulkanWin,TCPObj* tcp, size_t aprCount);

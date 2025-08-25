@@ -298,10 +298,19 @@ class TabFormReport(QTabWidget):
             self.log.log(self,e)
         try:
             # Need data
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_SPF.cfg")
-            # Working
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_TOTAL_SPF.cfg")            
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_GRPH_SPF.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_COMP_SPF.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_SPF.cfg")        
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_ALL.cfg")
+
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_ALL.cfg")
+            #
+            #     
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_TOTAL_FPS.cfg")            
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10_RESIDUALS.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LIN_RESIDUAL.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")

@@ -308,7 +308,7 @@ class gPCDData():
                             loadedp = float(col['loadedp'])
                             expectedc = int(col['expectedc'])
                             sidelen = int(col['sidelen'])
-                            #cell_count = int(col['cell_count'])
+                            cell_count = int(col['cell_count'])
             except BaseException as e:
                 raise BaseException(f"LatexDataParticle get_max failed: {e}")
 
@@ -321,5 +321,5 @@ class gPCDData():
                 writer = csv.writer(file)
                 writer.writerow(max_list)
             self.average_list.append(max_list)
-        print("REMEMBER CELL_COUNT is new and needs to be uncommented after new tests.")
+        #print("REMEMBER CELL_COUNT is new and needs to be uncommented after new tests.")
         file.close()

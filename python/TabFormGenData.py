@@ -309,7 +309,7 @@ class TabGenData(QTabWidget):
     # Clear the files in the data directory
     #
     def clear_files(self):
-        if self.itemcfg.test_files_only == False:
+        if self.itemcfg.test_files_only == False or self.itemcfg.replace_all == False:
             clr_path = self.itemcfg.data_dir + "/*.csv"
             files = glob.glob(clr_path)
             for f in files:

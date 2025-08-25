@@ -81,10 +81,15 @@ class TrendLine():
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(log10_func(self.xvalue,a,b))
     
         if "linear_residual" in lines_listy.line_type:
+            # The data here is already linear
             y_data = lines_listy.data[lines_listy.data_lines[0].field]
+            # Get fit params
             intercept, slope = self.do_linear_fit(linearFunc)
+            # Get trendline data
             data = linearFunc(self.xvalue,intercept,slope).tolist()
+
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(linearFunc(self.xvalue,intercept,slope))
+            # Subtract linear from fit
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(y_data - data)
             
         elif "quadratic_residual" in lines_listy.line_type:
@@ -100,10 +105,10 @@ class TrendLine():
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
 
         elif "log10_residual" in lines_listy.line_type:
-            
-            k_val, exponent, intercept = self.do_power_fit()
-            ydata = np.log10(lines_listy.data[lines_listy.data_lines[0].field] )
-            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(np.log10((self.xvalue,a,b)))
+            y_data = lines_listy.data[lines_listy.data_lines[0].field]
+            a,b = self.do_log10_fit()
+            data = log10_func(self.xvalue,a,b).tolist()
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(y_data - data)
 
         return
          

@@ -225,8 +225,8 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 				}
 			
 				std::cout << "Seconds:" << aprCount << " FrameNumber:" << VulkanWin->m_FrameNumber << " FRate:" << 1000.0 / double(nbFrames) << " ms/F, " << " FPS:" << nbFrames << " F/s." << std::endl;
-				if (nbFrames < 2)
-					return 3;
+				//if (nbFrames < 2)
+//					return 3;
 				nbFrames = 0;
 				lastTime += 1.0;
 			}

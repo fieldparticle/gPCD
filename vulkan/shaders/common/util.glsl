@@ -30,6 +30,10 @@
 %*
 %*
 %******************************************************************/
+
+#if defined(DEBUG)
+	#extension GL_EXT_debug_printf : enable
+#endif
 // Transform a space vector to the origin, usually to calulate angle.
 vec2 spc2pt(vec4 SpcVec)
 {
@@ -107,7 +111,9 @@ uint TestArrayToIndex(uint start,uint stop)
 	uvec3 ary = uvec3(0,0,0);
 	uint idx = 0;
 	uint count = 0;
-	debugPrintfEXT("W:%d H:%d",WIDTH,HEIGHT);
+	#if defined(DEBUG)
+		debugPrintfEXT("W:%d H:%d",WIDTH,HEIGHT);
+	#endif
 	for (uint ii=start;ii<WIDTH;ii++)
 	{
 		for (uint jj=0;jj<WIDTH;jj++)
@@ -118,8 +124,9 @@ uint TestArrayToIndex(uint start,uint stop)
 				ary[1] = jj;
 				ary[2] = ii;
 				idx = ArrayToIndex(ary);
-				#if 0
+				#if defined(DEBUG)
 				if (stop != 0)
+				
 					debugPrintfEXT("I:%d<%d,%d,%d>",idx,kk,jj,ii);
 				#endif
 				if (count != idx)

@@ -34,7 +34,7 @@ struct colmat
 {
 	uint idx[MAX_CELL_OCCUPANY];
 };
-layout(scalar, binding = 3) coherent buffer CollMatrixIndex 
+layout(binding = 3) coherent buffer CollMatrixIndex 
 {
    colmat clink[WIDTH*WIDTH*WIDTH];
 };

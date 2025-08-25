@@ -263,6 +263,8 @@ class GenDataBase:
         with open(self.itemcfg.selections_file,"r",newline='') as csvfl:
             reader = csv.DictReader(csvfl, delimiter=',',dialect='excel')
             for row in reader:
+                if self.itemcfg.replace_all == False:
+                    if os.is
                 if row["sel"] == 's':
                     self.select_list.append(row)
     

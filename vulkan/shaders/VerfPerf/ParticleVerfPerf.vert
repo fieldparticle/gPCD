@@ -1,8 +1,10 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
-#extension GL_EXT_debug_printf : enable
-#extension GL_EXT_scalar_block_layout :enable
+#if defined(DEBUG)
+	#extension GL_EXT_debug_printf : enable
+#endif
+//#extension GL_EXT_scalar_block_layout :enable
 
 
 #include "../VerfPerf/params.glsl"
@@ -245,7 +247,7 @@ void main(){
 		
 		if(sltidx > MAX_CELL_ARRAY_LOCATIONS)
 		{
-			#if 1
+			#if defined(DEBUG)
 				debugPrintfEXT("ParticleVerfPerf sltidx > MaxLocation:P=%d,sltidx=%d,MaxLocation=%d",index,sltidx,MAX_CELL_ARRAY_LOCATIONS);
 			#endif	
 			collIn.ExcessSlots = sltidx;
@@ -303,7 +305,8 @@ void main(){
 		// NOTE: particle 0 is a dummy particle so that the particle 0-based index matches
 		// the particle number
 		clink[sltidx].idx[slot] = index;
-	#if 0
+	
+	#if defined(DEBUG)
 		if(uint(ShaderFlags.frameNum) == 8 && index == 1)
 		{
 			debugPrintfEXT("P:%u,CNRIDX:%u,CELLARYVAL:%u ",index,ii,clink[sltidx].idx[slot]);

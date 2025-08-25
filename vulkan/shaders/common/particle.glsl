@@ -65,7 +65,7 @@ struct boundStruct
 };
 // Layout for the particle Array - this is dynamic right now -
 // chnage to static so the GPU can preallocate memory.
-layout(scalar, binding = 4) buffer ParticleSSBOOut 
+layout(binding = 4) buffer ParticleSSBOOut 
 {
    Particle P[NUMPARTS];
 };
