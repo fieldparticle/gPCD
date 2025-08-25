@@ -14,6 +14,7 @@ from ReportClass import *
 from ReportLatexPlot import *
 from LatexPreview import *
 from PdfViewer import *
+from CheckCfg import *
 class TabFormReport(QTabWidget):
     
     texFolder = ""
@@ -46,6 +47,7 @@ class TabFormReport(QTabWidget):
     # Load the confiruation file
     #
     def load_item_cfg(self,file):
+            
             self.CfgFile = file
             self.texFolder = os.path.dirname(self.CfgFile)
             self.texFileName = os.path.splitext(os.path.basename(self.CfgFile))[0]
@@ -56,13 +58,17 @@ class TabFormReport(QTabWidget):
                 self.itemcfgFile = ConfigUtility(self.CfgFile)
                 self.itemcfgFile.Create(self.bobj.log,self.CfgFile)
                 self.itemcfg = self.itemcfgFile.config
-                
             except BaseException as e:
                 self.msg_box(f"Config File syntax - line number of config file:{e}")
                 self.log.log(self,f"Config File syntax - line number of config file:{e}")
                 self.hasConfig = False
                 return 
-            
+            chk = CheckCfg(self.itemcfg,)
+            msg = chk.check_rpt_files()
+            if (msg) != 'ok':
+                self.msg_box(msg)
+                self.log.log(self,msg)
+                return
             self.data_container = None 
             self.data_container = DataContainer(self,self.itemcfg)
             self.VerifyButton.setEnabled(True)
@@ -297,17 +303,17 @@ class TabFormReport(QTabWidget):
         except BaseException as e:
             self.log.log(self,e)
         try:
-            # Need data
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_GRPH_SPF.cfg")
+            # PQBS
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_GRPH_SPF.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_COMP_SPF.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_SPF.cfg")        
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_ALL.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_GRPH_SPF_LIN_RESIDUAL.cfg")
 
+            # PQBR
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_ALL.cfg")
-            #
-            #     
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_TOTAL_FPS.cfg")            
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10_RESIDUALS.cfg")

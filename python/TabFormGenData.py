@@ -309,7 +309,7 @@ class TabGenData(QTabWidget):
     # Clear the files in the data directory
     #
     def clear_files(self):
-        if self.itemcfg.test_files_only == False or self.itemcfg.replace_all == False:
+        if self.itemcfg.test_files_only == False and self.itemcfg.replace_all == True:
             clr_path = self.itemcfg.data_dir + "/*.csv"
             files = glob.glob(clr_path)
             for f in files:
@@ -324,6 +324,7 @@ class TabGenData(QTabWidget):
             files = glob.glob(clr_path)
             for f in files:
                 os.remove(f)
+        return
     #******************************************************************
     # Read the data from a file and return os as 
     #
@@ -615,8 +616,8 @@ class TabGenData(QTabWidget):
         for ii in self.plot_obj.views:
             self.ViewList.addItem(str(ii))
         self.log.log(self,"TabFormLatex finished Create.")        
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenDUP.cfg")
-   
+        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenDUP.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
     def valueChange(self,listObj):  
         selected_items = listObj.selectedItems()
         if selected_items:

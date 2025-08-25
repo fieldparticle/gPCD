@@ -4,8 +4,8 @@ echo %2
 echo off
 SET dsk=%1
 set /p input=Type any input:
-SET "target=J:\FPIBG"
-SET "bkdir=E:\FPIBG
+SET "target=."
+SET "bkdir=E:\gPCD
 echo %bkdir%
 set "d=vulkan\make"
 

@@ -68,6 +68,10 @@ class GenPQBData(GenDataBase):
         self.set_file_name = "{:03d}CollisionDataSet{:d}X{:d}X{:d}".format(self.index,self.number_particles,self.tot_num_collsions,self.side_length)
         self.test_file_name = self.itemcfg.data_dir + '/' + self.set_file_name + '.tst'
         self.test_bin_name = self.itemcfg.data_dir + '/' + self.set_file_name + '.bin'
+        if os.path.exists(self.test_bin_name) and self.itemcfg.replace_all == False:
+            print(f"File {self.test_bin_name} won't be replaced.")
+            return 1
+        
         self.report_file = self.itemcfg.data_dir + '/' + self.set_file_name 
 
         self.log.log(self,f"Collsion Density: { self.collision_density},Number particles:{self.number_particles},Radius: {self.radius}, Separation Dist: {self.sepdist:.4f}, Center line length: {self.center_line_length:.2f}")
