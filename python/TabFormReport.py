@@ -144,7 +144,9 @@ class TabFormReport(QTabWidget):
             case _:
                 print(f"Report type : {self.itemcfg.type} not found.")
 
+
         self.report_obj = ReportLatexPlot(self,self.itemcfg)
+        self.data_container.write_latex_values()
         self.report_obj.save_latex()
         self.preview_dialog(self.report_obj.tex_output_name)
     
@@ -156,7 +158,7 @@ class TabFormReport(QTabWidget):
         previewPdf =  f"{self.itemcfg.tex_dir}/preview.pdf"
         
         prviewWorkingDir = self.itemcfg.tex_dir
-        valFile = f"{self.itemcfg.tex_dir}/_vals_{self.itemcfg.name}.tex"
+        valFile = self.itemcfg.values_file
         prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,valFile)
         prvCls.ProcessLatxCode()
         prvCls.Run()
@@ -305,9 +307,9 @@ class TabFormReport(QTabWidget):
         try:
 
                         # PQBR
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_ALL.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_ALL.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LIN_RESIDUAL.cfg") 
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10_RESIDUAL.cfg")

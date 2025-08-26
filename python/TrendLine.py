@@ -40,11 +40,16 @@ def linearFunc(x,intercept,slope):
         y = intercept + slope * x
         return y
 
+
+
+
 class TrendLine():
 
     
     def __init__(self):
+        
         pass        
+
     
     def add_trend_line(self,lines_listx,lines_listy):
         self.lines_listx = lines_listx
@@ -139,6 +144,7 @@ class TrendLine():
         self.lines_listy['exponent'] = exponent
         #self.lines_list[line_num]['covarance'] = cov
         self.lines_listy['r_squared'] = r_squared
+       
         return K_value,exponent,intercept
 
   
@@ -179,7 +185,7 @@ class TrendLine():
         self.lines_listy['b'] = b
         self.lines_listy['covarance'] = self.covariance
         self.lines_listy['r_squared'] = r_squared
-
+       
         return a,b
 
     def do_poly_fit(self):
@@ -215,7 +221,7 @@ class TrendLine():
         self.lines_listy['isec'] = self.intersect
         self.lines_listy['covarance'] = self.covariance
         self.lines_listy['r_squared'] = r_squared
-
+       
         return a,b,c
   
     
@@ -240,9 +246,9 @@ class TrendLine():
        
         self.lines_listy['K'] = self.slope
         self.lines_listy['isec'] = self.intersect
-        self.lines_listy['covarance'] = self.covariance
+        self.lines_listy['covariance'] = self.covariance
         self.lines_listy['r_squared'] = r_squared
-
+       
         return self.intersect,self.slope
   
 
@@ -272,9 +278,9 @@ class TrendLine():
        
         self.lines_listy['K'] = self.slope
         self.lines_listy['isec'] = self.intersect
-        self.lines_listy['covarance'] = self.covariance
+        self.lines_listy['covariance'] = self.covariance
         self.lines_listy['r_squared'] = r_squared
-
+       
         return self.intersect,self.slope
   
 

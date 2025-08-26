@@ -1,0 +1,4 @@
+Results of PQB random, with the overall frame-rate performance represented by the black +, 
+the compute performance in the red squares, and graphics in the blue circles. 
+The compute pipeline accounts for most of the preocessing time and grows disproportianlally 
+with the graphics perfromance.

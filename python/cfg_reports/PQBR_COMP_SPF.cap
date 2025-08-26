@@ -1,0 +1,4 @@
+Results of PQB compute pipline random order. The overall frame-rate performance represented by the green dotted line. 
+The linear fit, represented by the red squares, has a base cost of \PQBRCOMPSPFLinearTrendK{} s. The quadratic fit, 
+represented by the blue circles, has a base cost of \PQBRCOMPSPFQuadraticTrendK{}s. 
+The line exhibits strong linear features. 

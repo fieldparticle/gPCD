@@ -37,9 +37,9 @@ class LatexPreview():
         fl.write('\\newcommand{\\arrg}{\\textit{\\textbf{$arr_G$}}}\n')
         fl.write('\\newcommand{\\arrc}{\\textit{\\textbf{$arr_C$}}}\n')
         fl.write('\\newcommand{\\arrt}{\\textit{\\textbf{$arr_T$}}}\n')
-
+        fl.write("\\include{"  +  self.valsFile  + "}\n")
         fl.write('\\begin{document}\n')
-        #fl.write("\\input{"  +  self.valsFile  + "}\n")
+        
         
         texname = "\\input {" + self.texname + "}\n" 
         fl.write(texname)

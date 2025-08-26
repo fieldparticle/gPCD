@@ -53,8 +53,41 @@ class DataContainer():
             print(f"File '{pltTempImg}' deleted successfully.")
         except FileNotFoundError:
             print(f"File '{pltTempImg}' does notexist yet")
-            
-       
+    
+    #******************************************************************
+    # Write trendline data to the values file
+    #       
+    def write_latex_values(self):
+        try:
+            file_handle = open(self.itemcfg.values_file, 'w')
+        except BaseException as e:
+            print("LatexDataParticle line 159:",e)
+            return
+        for nm in self.lines_list:
+            if nm.line_type == 'linear_trend':
+                name = self.itemcfg.name.replace('_','')
+                val_string = "\\newcommand{" + "\\" + name + "LinearTrendK" + "}{" + f"${nm.K:.4E}$" + "}\n"
+                file_handle.write(val_string)
+                val_string = "\\newcommand{" + "\\" + name + "LinearTrendIsec" + "}{" + f"${nm.isec:.4E}$" + "}\n"
+                file_handle.write(val_string)
+                #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
+                val_string = "\\newcommand{" + "\\" + name + "LinearTrendRSquared" + "}{" + f"${nm.r_squared:.4E}$" + "}\n"
+                file_handle.write(val_string)
+            elif nm.line_type == 'quadratic_trend':
+                name = self.itemcfg.name.replace('_','')
+                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendK" + "}{" + f"${nm.K:.4E}$" + "}\n"
+                file_handle.write(val_string)
+                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendb" + "}{" + f"${nm.b:.4E}$" + "}\n"
+                file_handle.write(val_string)
+                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendc" + "}{" + f"${nm.c:.4E}$" + "}\n"
+                file_handle.write(val_string)
+                #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
+                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendRSquared" + "}{" + f"${nm.r_squared:.4E}$" + "}\n"
+                file_handle.write(val_string)
+        file_handle.close()
+        return
+    
+
 
     #******************************************************************
     # Save the DataFields<data_num> configuraton item in a list
@@ -369,6 +402,7 @@ class DataContainer():
                     self.lines_list[ln]["data_object"] = gPCDData(self,self.itemcfg)
                     self.lines_list[ln]["mode"] = self.itemcfg.mode
                     self.lines_list[ln]["compute_type"] = self.itemcfg.compute_type
+                    
             
         return 
 
