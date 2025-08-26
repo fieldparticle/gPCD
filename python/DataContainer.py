@@ -63,21 +63,16 @@ class DataContainer():
         more_fields = True
         self.raw_lines_list.clear()
         data_fields = self.itemcfg['data_fields']
-        self.itemcfg
-        switch_fields = []
-        for jj in data_fields:
-            field_ary = jj.split(',')
-            if len(field_ary) > 1:
-                if 'true' in field_ary[1]: 
-                    self.raw_lines_list.append(field_ary[0])
-                    self.active_lines.append(1)
-                    continue
-                else:
-                    self.raw_lines_list.append(field_ary[0])
-                    self.active_lines.append(0)
-            else:
-                self.raw_lines_list.append(jj)
+        for jj in range(len(data_fields)):
+            if self.itemcfg.data_type == 'xdata':
+                self.raw_lines_list.append(data_fields[jj])
                 self.active_lines.append(1)
+            if self.itemcfg.plot_switch[jj] == 'true':
+                self.raw_lines_list.append(data_fields[jj])
+                self.active_lines.append(1)
+            else:
+                self.raw_lines_list.append(data_fields[jj])
+                self.active_lines.append(0)
         self.parse_lines_list()
         self.resolve_data_files()
         return 
@@ -112,10 +107,10 @@ class DataContainer():
         line = 0
         data_type = self.itemcfg.data_type
         data_source = self.itemcfg.data_source
-        for data_lines in self.raw_lines_list:
+        for fnum in range(len(self.raw_lines_list)):
     
            #print(any(map(lambda char: char in data_lines, "+-/*")))
-            if any(map(lambda char: char in data_lines, "+-/*()")) :
+            if any(map(lambda char: char in self.raw_lines_list[fnum], "+-/*()")) :
 
                 dl = DataLine()
                 if self.active_lines[line] == 0:
@@ -123,18 +118,22 @@ class DataContainer():
                 else:
                     dl['is_active'] = True
                 #data_type = data_lines.split(',')
-                equation = data_lines
+                equation = self.raw_lines_list[fnum]
                 dl['is_equation'] = True
                 dl['equation']= equation
                 dl['line_type'] = data_type[line]
                 dl["line_num"] = line
                 lines_list = self.split_equation(equation)
-                for eq_item in lines_list:
+                data_sources = data_source[fnum].split(',')
+                if len(data_sources) != len(lines_list):
+                    raise BaseException("data_source length mismatch") 
+                for jj in range(len(lines_list)):
                     fields_dict = AttrDictFields()
-                    fields_dict['whole_field'] = eq_item.strip(" ") 
-                    field_name = eq_item.split('.')  
+                    fields_dict["data_source"] = data_sources[jj]
+                    fields_dict['whole_field'] = lines_list[jj].strip(" ") 
+                    field_name = lines_list[jj].split('.')  
                     fields_dict["field"] = field_name[1].strip(" ") 
-                    fields_dict["data_source"] = data_source[line]
+                    
                     fields_dict["test_type"] = self.itemcfg.mode
                     
                     dl.data_lines.append(fields_dict)  
@@ -148,7 +147,7 @@ class DataContainer():
                 else:
                     dl['is_active'] = True
                 fields_dict = AttrDictFields()
-                comma_split = data_lines.split(',')
+                comma_split = self.raw_lines_list[fnum].split(',')
                 dot_split = comma_split[0].split('.') 
                 dl['is_equation'] = False
                 dl['line_type'] = data_type[line]
@@ -364,11 +363,12 @@ class DataContainer():
                 #print(jj)
                 self.lines_list[ln]["source_dir"] = self.itemcfg.input_data_dir
                 self.out_folder = os.path.dirname(self.itemcfg.input_data_dir)
-                target = self.out_folder + '/' + "perfData" + self.itemcfg.data_source[ln]
-                self.lines_list[ln]["target_dir"] = target
-                self.lines_list[ln]["data_object"] = gPCDData(self,self.itemcfg)
-                self.lines_list[ln]["mode"] = self.itemcfg.mode
-                self.lines_list[ln]["compute_type"] = self.itemcfg.compute_type
+                for ii in range(len(self.lines_list[ln].data_lines)):
+                    target = self.out_folder + '/' + "perfData" + self.lines_list[ln].data_lines[ii].data_source
+                    self.lines_list[ln]["target_dir"] = target
+                    self.lines_list[ln]["data_object"] = gPCDData(self,self.itemcfg)
+                    self.lines_list[ln]["mode"] = self.itemcfg.mode
+                    self.lines_list[ln]["compute_type"] = self.itemcfg.compute_type
             
         return 
 

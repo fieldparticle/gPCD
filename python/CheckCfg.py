@@ -50,17 +50,15 @@ class CheckCfg():
         #data_fields
         dfl_list = ["true", "false"]
         if 'data_fields' not in self.cfg:
-            
             return "Config file missing 'data_fields'"
         elif len(self.cfg.data_fields) < 2:
             return f"Not enough fields in data_fields. Length is {len(self.cfg.data_fields)}."
+        if 'plot_switch' not in self.cfg:
+                return "Config file missing 'plot_switch'"
         else:
-            for ii in self.cfg.data_fields:
-                iisplit = ii.split(',')
-                if len(iisplit)!=2:
-                    return f"Syntax in data_fields. Field = {ii}. Forgot true/false."
-                elif iisplit[1] not in dfl_list:
-                    return f"Second parameter in data_fields Field = {ii} is not true or false." 
+            for ii in self.cfg.plot_switch:
+                if ii not in dfl_list:
+                    return f"plot_switch  {ii} is not true or false." 
 
         
 

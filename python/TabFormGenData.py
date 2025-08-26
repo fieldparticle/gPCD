@@ -617,7 +617,8 @@ class TabGenData(QTabWidget):
             self.ViewList.addItem(str(ii))
         self.log.log(self,"TabFormLatex finished Create.")        
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenDUP.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
+        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
     def valueChange(self,listObj):  
         selected_items = listObj.selectedItems()
         if selected_items:

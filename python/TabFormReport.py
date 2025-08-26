@@ -303,25 +303,31 @@ class TabFormReport(QTabWidget):
         except BaseException as e:
             self.log.log(self,e)
         try:
-            # PQBS
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_GRPH_SPF.cfg")
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_COMP_SPF.cfg")
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_SPF.cfg")        
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_ALL.cfg")
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_GRPH_SPF_LIN_RESIDUAL.cfg")
 
-            # PQBR
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
+                        # PQBR
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_ALL.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_ALL.cfg")
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_TOTAL_FPS.cfg")            
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LIN_RESIDUAL.cfg") 
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10.cfg")
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10_RESIDUALS.cfg")
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LIN_RESIDUAL.cfg")
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_ALL.cfg")
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_QUAD_RESIDUAL.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10_RESIDUAL.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_QUAD_RESIDUAL.cfg")       
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_TOTAL_FPS.cfg")   
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_TOTAL_SPF.cfg")    
+            
+            # PQBS
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_ALL.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_COMP_SPF.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_GRPH_SPF.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_GRPH_SPF_LIN_RESIDUAL.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_SPF.cfg") 
+            
+            # Other
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/TriangleJoins.cfg
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/
+
+            
             
         except BaseException as e1:
             print(f"Cannot open cfg file:{e1}")
