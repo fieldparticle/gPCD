@@ -1,10 +1,12 @@
 from gPCDData import *
+
 from AttrDictFields import *
 from DataLine import *
 import math
 import numpy as np
 import pandas as pd
 from PyQt6.QtWidgets import QMessageBox
+from CSVData import *
 
 class DataContainer():
 
@@ -61,7 +63,7 @@ class DataContainer():
         try:
             file_handle = open(self.itemcfg.values_file, 'w')
         except BaseException as e:
-            print("LatexDataParticle line 159:",e)
+            print("Values file does not exist:",e)
             return
         for nm in self.lines_list:
             if nm.line_type == 'linear_trend':
@@ -88,6 +90,13 @@ class DataContainer():
         return
     
 
+    def get_particle_data_fields_table(self):
+        self.raw_lines_list.clear()
+        data_fields = self.itemcfg['data_fields']
+        for jj in range(len(data_fields)):
+            self.raw_lines_list.append(data_fields[jj])
+            self.active_lines.append(1)
+        
 
     #******************************************************************
     # Save the DataFields<data_num> configuraton item in a list
@@ -106,8 +115,7 @@ class DataContainer():
             else:
                 self.raw_lines_list.append(data_fields[jj])
                 self.active_lines.append(0)
-        self.parse_lines_list()
-        self.resolve_data_files()
+        
         return 
     
     def split_transendential(self,string):
@@ -159,7 +167,7 @@ class DataContainer():
                 lines_list = self.split_equation(equation)
                 data_sources = data_source[fnum].split(',')
                 if len(data_sources) != len(lines_list):
-                    raise BaseException("data_source length mismatch") 
+                    raise BaseException("cfg.data_source number of items do not match number of fields in cfg.data_fields (is it an equation?)") 
                 for jj in range(len(lines_list)):
                     fields_dict = AttrDictFields()
                     fields_dict["data_source"] = data_sources[jj]
@@ -184,6 +192,8 @@ class DataContainer():
                 dot_split = comma_split[0].split('.') 
                 dl['is_equation'] = False
                 dl['line_type'] = data_type[line]
+                if 'csvplot' in self.itemcfg.type:
+                    dl['data_file'] = self.itemcfg.data_files[line]
                 fields_dict['line_type'] = data_type[line]
                 fields_dict['field'] = dot_split[1].strip(" ")
                 fields_dict['whole_field'] = comma_split[0].strip(" ")
@@ -269,7 +279,7 @@ class DataContainer():
         # Ru thru plot lines
         for nm in range(len(self.lines_list)):
             if self.lines_list[nm]['is_active'] == True:
-                print(self.lines_list[nm].data)
+                #print(self.lines_list[nm].data)
                 # If the line contains an equation then perform the math before anyhtin else
                 if self.lines_list[nm].is_equation == True:
                     ydata = self.do_equation(self.lines_list[nm])
@@ -366,9 +376,11 @@ class DataContainer():
     def apply_data_to_fields(self):
         for nm in range(len(self.lines_list)):
             data_obj = self.lines_list[nm].data_object
-            data_obj.check_data_files(self.lines_list[nm])
-            data_obj.do_performance(self.lines_list[nm])
-            data = data_obj.read_summary_file(self.lines_list[nm])
+            try:
+                data = data_obj.assign_data(self.lines_list[nm])
+            except BaseException as e:
+                print(e)
+                return
             for ii in self.lines_list[nm].data_lines:
                 #print(ii.field)
                 #print(data[ii.field])
@@ -397,13 +409,15 @@ class DataContainer():
                 self.lines_list[ln]["source_dir"] = self.itemcfg.input_data_dir
                 self.out_folder = os.path.dirname(self.itemcfg.input_data_dir)
                 for ii in range(len(self.lines_list[ln].data_lines)):
-                    target = self.out_folder + '/' + "perfData" + self.lines_list[ln].data_lines[ii].data_source
-                    self.lines_list[ln]["target_dir"] = target
-                    self.lines_list[ln]["data_object"] = gPCDData(self,self.itemcfg)
-                    self.lines_list[ln]["mode"] = self.itemcfg.mode
-                    self.lines_list[ln]["compute_type"] = self.itemcfg.compute_type
                     
-            
+                    if self.itemcfg.type == 'plot' or self.itemcfg.type == 'gpcd_table':
+                        self.lines_list[ln]["data_object"] = gPCDData(self,self.itemcfg)
+                        self.lines_list[ln]["target_dir"]  = self.out_folder + '/' + "perfData" + self.lines_list[ln].data_lines[ii].data_source    
+                        self.lines_list[ln]["mode"] = self.itemcfg.mode
+                        self.lines_list[ln]["compute_type"] = self.itemcfg.compute_type
+                    else:
+                        self.lines_list[ln]["data_object"] = CSVData(self,self.itemcfg)
+                        self.lines_list[ln]["target_dir"]  = self.itemcfg.input_data_dir
         return 
 
 

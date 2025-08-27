@@ -15,10 +15,6 @@ class LatexPreview():
         pass
 
     def ProcessLatxCode(self):
-        if not os.path.exists(self.valsFile):
-            vl = open(self.valsFile,'w')            
-            vl.write("% Values file.")
-            vl.close()
         dirname = os.path.dirname(self.fileName)
         hdr_file = dirname + "/LatexUtilityBaseHeader.tex"
         hdr_lst = []
@@ -37,7 +33,8 @@ class LatexPreview():
         fl.write('\\newcommand{\\arrg}{\\textit{\\textbf{$arr_G$}}}\n')
         fl.write('\\newcommand{\\arrc}{\\textit{\\textbf{$arr_C$}}}\n')
         fl.write('\\newcommand{\\arrt}{\\textit{\\textbf{$arr_T$}}}\n')
-        fl.write("\\include{"  +  self.valsFile  + "}\n")
+        if self.valsFile != None:
+            fl.write("\\include{"  +  self.valsFile  + "}\n")
         fl.write('\\begin{document}\n')
         
         

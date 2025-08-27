@@ -12,6 +12,7 @@ from ConfigUtility import *
 from DataContainer import *
 from ReportClass import *
 from ReportLatexPlot import *
+from ReportTable import *
 from LatexPreview import *
 from PdfViewer import *
 from CheckCfg import *
@@ -63,7 +64,7 @@ class TabFormReport(QTabWidget):
                 self.log.log(self,f"Config File syntax - line number of config file:{e}")
                 self.hasConfig = False
                 return 
-            chk = CheckCfg(self.itemcfg,)
+            chk = CheckCfg(self.itemcfg)
             msg = chk.check_rpt_files()
             if (msg) != 'ok':
                 self.msg_box(msg)
@@ -96,15 +97,7 @@ class TabFormReport(QTabWidget):
 
 
     def do_image(self):
-        try :
-            self.data_container.clear()
-            self.data_container.get_particle_data_fields()
-            lines_list = None
-            lines_list = self.data_container.do_preview()
-            self.report_obj = ReportClass(self,lines_list,self.itemcfg)
-            
-        except BaseException as e:
-            print(f"preview failed:{e}")
+        return
 
     
     def do_plots(self):
@@ -114,6 +107,29 @@ class TabFormReport(QTabWidget):
             self.itemcfg_main = self.itemcfg_obj.config
             self.do_plot()
     
+    def do_csv_plot(self):
+        self.data_container = None 
+        self.data_container = DataContainer(self,self.itemcfg_main)
+        self.data_container.clear()
+        self.data_container.get_particle_data_fields()
+        self.data_container.parse_lines_list()
+        self.data_container.resolve_data_files()
+        lines_list = None
+
+    def do_table(self):
+        try :
+            self.data_container = None 
+            self.data_container = DataContainer(self,self.itemcfg_main)
+            self.data_container.clear()
+            self.data_container.get_particle_data_fields()
+            self.data_container.parse_lines_list()
+            self.data_container.resolve_data_files()
+            lines_list = None
+            self.data_container.apply_data_to_fields()
+        except BaseException as e:
+            print(f"preview failed:{e}")
+        return self.data_container.lines_list
+
     def do_plot(self):
         try :
             self.data_container = None 
@@ -132,21 +148,28 @@ class TabFormReport(QTabWidget):
     def preview(self):
         self.reload()
         match self.itemcfg.type:
+            case "csvplot":
+                self.report_obj = ReportLatexPlot(self,self.itemcfg)
+                self.itemcfg_main = self.itemcfg
+                self.do_plot()
             case "plot":
+                self.report_obj = ReportLatexPlot(self,self.itemcfg)
                 if len(self.itemcfg.include) == 0:
                     self.itemcfg_main = self.itemcfg
                     self.do_plot()
                 else:
                     self.do_plots()
-
+                self.data_container.write_latex_values()
             case "image":
-                self.do_image()
+                self.report_obj = ReportClass(self,self.itemcfg)
+                
+            case "gpcd_table":
+                self.itemcfg_main = self.itemcfg
+                lines_list = self.do_table()
+                self.report_obj = ReportLatexTable(self,self.itemcfg,lines_list)
             case _:
                 print(f"Report type : {self.itemcfg.type} not found.")
 
-
-        self.report_obj = ReportLatexPlot(self,self.itemcfg)
-        self.data_container.write_latex_values()
         self.report_obj.save_latex()
         self.preview_dialog(self.report_obj.tex_output_name)
     
@@ -158,8 +181,11 @@ class TabFormReport(QTabWidget):
         previewPdf =  f"{self.itemcfg.tex_dir}/preview.pdf"
         
         prviewWorkingDir = self.itemcfg.tex_dir
-        valFile = self.itemcfg.values_file
-        prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,valFile)
+        if self.itemcfg.type == 'plot':
+            valFile = self.itemcfg.values_file
+            prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,valFile)
+        else:
+            prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,None)
         prvCls.ProcessLatxCode()
         prvCls.Run()
         with open('termPreview.log', "r") as infile:  
@@ -309,7 +335,7 @@ class TabFormReport(QTabWidget):
                         # PQBR
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_ALL.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LIN_RESIDUAL.cfg") 
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10_RESIDUAL.cfg")
@@ -326,8 +352,10 @@ class TabFormReport(QTabWidget):
             
             # Other
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/TriangleJoins.cfg
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/NumberPapersParticle_zhu2007.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/GraphicsProcess.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/ComputeProcess.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBRTablePerfAll.cfg")
 
             
             

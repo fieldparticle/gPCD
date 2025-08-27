@@ -13,55 +13,57 @@ class CheckCfg():
         if 'type' not in self.cfg:
             return "Config file missing 'type'"
         else:
-            my_list = ["plot", "table"]
+            my_list = ["plot", "table", "image", "csvplot", "gpcd_table"]
             if self.cfg.type not in my_list:
-                return "Invalid type. type=<plot,table>'"
-        if 'name' not in self.cfg:
-            return "Config file missing 'name'"
-        if 'plots_dir' not in self.cfg:
-            return "Config file missing 'plots_dir'"
-        else:
-            if not os.path.isdir(self.cfg.plots_dir):
-                return f"Invalid direcoty plots_dir = {self.cfg.plot_dir}"
-        if 'tex_dir' not in self.cfg:
-            return "Config file missing 'tex_dir'"
-        else:
-            if not os.path.isdir(self.cfg.tex_dir):
-                return f"Invalid direcoty tex_dir = {self.cfg.tex_dir}"
-            
-        if 'tex_image_dir' not in self.cfg:
-                return "Config file missing 'tex_image_dir'"
+                return "Invalid type. Valid types are plot or table, or image or csvplot'"
+        if self.cfg.type == 'plot':
+            if 'name' not in self.cfg:
+                return "Config file missing 'name'"
+            if 'plots_dir' not in self.cfg:
+                return "Config file missing 'plots_dir'"
+            else:
+                if not os.path.isdir(self.cfg.plots_dir):
+                    return f"Invalid direcoty plots_dir = {self.cfg.plot_dir}"
+            if 'tex_dir' not in self.cfg:
+                return "Config file missing 'tex_dir'"
+            else:
+                if not os.path.isdir(self.cfg.tex_dir):
+                    return f"Invalid direcoty tex_dir = {self.cfg.tex_dir}"
+                
+            if 'tex_image_dir' not in self.cfg:
+                    return "Config file missing 'tex_image_dir'"
 
-        if 'input_data_dir' not in self.cfg:
-                return "Config file missing 'input_data_dir'"
-        else:
-            if not os.path.isdir(self.cfg.input_data_dir):
-                return f"Invalid direcoty input_data_dir = {self.cfg.input_data_dir}"
-        #caption_file
-        #mode
-        #compute_type
-        #hspace
-        #font_size
-        #floating
-        #placement
-        #title
-        #plot_width
-        #include
-        #data_fields
-        dfl_list = ["true", "false"]
-        if 'data_fields' not in self.cfg:
-            return "Config file missing 'data_fields'"
-        elif len(self.cfg.data_fields) < 2:
-            return f"Not enough fields in data_fields. Length is {len(self.cfg.data_fields)}."
-        if 'plot_switch' not in self.cfg:
-                return "Config file missing 'plot_switch'"
-        else:
-            for ii in self.cfg.plot_switch:
-                if ii not in dfl_list:
-                    return f"plot_switch  {ii} is not true or false." 
+            if 'input_data_dir' not in self.cfg:
+                    return "Config file missing 'input_data_dir'"
+            else:
+                if not os.path.isdir(self.cfg.input_data_dir):
+                    return f"Invalid direcoty input_data_dir = {self.cfg.input_data_dir}"
+            #caption_file
+            #mode
+            #compute_type
+            #hspace
+            #font_size
+            #floating
+            #placement
+            #title
+            #plot_width
+            #include
+            #data_fields
+            dfl_list = ["true", "false"]
+            if 'data_fields' not in self.cfg:
+                return "Config file missing 'data_fields'"
+            elif len(self.cfg.data_fields) < 2:
+                return f"Not enough fields in data_fields. Length is {len(self.cfg.data_fields)}."
+            if 'plot_switch' not in self.cfg:
+                    return "Config file missing 'plot_switch'"
+            else:
+                for ii in self.cfg.plot_switch:
+                    if ii not in dfl_list:
+                        return f"plot_switch  {ii} is not true or false." 
 
         
-
+        if 'centering' not in self.cfg:
+            return "Config file missing 'centering'"
 
         return 'ok'            
         #return "fail ok"

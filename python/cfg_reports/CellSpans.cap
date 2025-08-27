@@ -1,0 +1,1 @@
+2-d rounded cell illustrating cell and particle locations. In (A) particle 1 spans cell $<1,1>$ and $<2,1>$ while particle 2 is completely contained in cell $<2,2>$. In (B) particle 1 and 2 are in contact in both cells $<1,1>$ and $<2,1>$.

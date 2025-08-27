@@ -44,6 +44,11 @@ class gPCDData():
             return False
         return True
    
+    def assign_data(self,lines_list):
+        self.check_data_files(lines_list)
+        self.do_performance(lines_list)
+        data = self.read_summary_file(lines_list)
+        return data
 
     def do_reports(self):
         for ii in self.itemcfg_main.include:
@@ -129,7 +134,7 @@ class gPCDData():
         if(self.hasData == False):
             print(f"Warning - Data set mismatch. Number *.tst files:{len(tst_files)}, Number data files:{ len(self.data_files)}")
         
-
+        return 
     #******************************************************************
     # Do the performnce tests
     #

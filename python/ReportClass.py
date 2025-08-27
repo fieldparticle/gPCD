@@ -38,13 +38,13 @@ class ReportClass():
             raise IOError(f"Couldn't write to file ({e})")
         tex_output_name = self.tex_output_name 
         try:
-            
             w ="\\begingroup\n"
-            f.write(w)
-            w = "\\centering\n"
             f.write(w)
             w = "\\begin{figure*}[" + self.itemcfg.placement + "]\n"
             f.write(w)
+            if self.itemcfg.centering == True:
+                w = "\\centering\n"
+                f.write(w)
             previewTex = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}.png"
             gdir = "".join(previewTex.rsplit(self.itemcfg.tex_dir))
             sgdir = ''.join( c for c in gdir if  c not in '/' )
@@ -70,7 +70,7 @@ class ReportClass():
             return
         f.close()
 
-    def save_multi_image(self,img_list):
+    def save_multi_image(self):
         self.read_caption()
         cfg = self.itemcfg
         self.tex_output_name = self.itemcfg.tex_dir + "/" + self.itemcfg.name + ".tex"
@@ -90,14 +90,14 @@ class ReportClass():
             w = "\\centering\n"
             f.write(w)
         try:
-            for ii in range(0,len(img_list)):
+            for ii in range(0,len(self.itemcfg.input_images)):
                 #w = "\t\\begin{subfigure}[b]{" + cfg.plot_width_array[ii] + "in}\n"
                 w = "\t\\begin{subfigure}[b]{" + str(cfg.plot_scale[ii]) + "\\textwidth}\n"
                 f.write(w)
-                previewTex = f"{cfg.plots_dir}/{img_list[ii]}"
-                gdir = "".join(previewTex.rsplit(cfg.tex_dir))
+                previewTex = f"{self.itemcfg.input_images[ii]}"
+                gdir = "".join(previewTex.rsplit(self.itemcfg.tex_dir))
                 sgdir = ''.join( c for c in gdir if  c not in '/' )
-                print(sgdir)    
+                #print(sgdir)    
                 w = "\t\t\\includegraphics[width=\\textwidth]{" + sgdir + "}\n"
                 f.write(w)
                 w = "\t\t\\subcaption[" + "" +"]{" + cfg.sub_caption[ii] + "}\n"
