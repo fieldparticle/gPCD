@@ -73,7 +73,7 @@ class gPCDData():
     #
     def do_mmrr(self):
         fps = cpums = cms = gms = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = 0
-        mmr_path = f"{self.itemcfg.config.data_dir}/mmrr.csv"
+        mmr_path = f"{self.itemcfg.mmrr_dir}/mmrr.csv"
         if(os.path.exists(mmr_path) == False):
             print ("MMRR Directories not available" )
             return False
@@ -86,6 +86,7 @@ class gPCDData():
                     fps += float(col['fps'])
                     cpums += float(col['cpums'])
                     gms += float(col['gms'])
+                    #print(float(col['gms']))
         except BaseException as e:
             print("LatexDataParticle line 159:",e)
             return
@@ -151,7 +152,7 @@ class gPCDData():
     #
     def create_summary(self,file_dict):
         data = ['Name', 'fps', 'cpums', 'cms', 'gms', 'expectedp', 'loadedp',
-                'shaderp_comp', 'shaderp_grph', 'expectedc', 'shaderc', 'sidelen','cell_count','mean','stddev']
+                'shaderp_comp', 'shaderp_grph', 'expectedc', 'shaderc', 'sidelen','cell_count','mean','stddev','mmrr']
         try :
             with open(file_dict.summary_file_name, mode= 'w', newline='') as file:
                 writer = csv.writer(file)
@@ -285,9 +286,9 @@ class gPCDData():
             cpums_old = 0.0
             cms_old = 0.0
             gms_old = 0.0
-            
+            self.do_mmrr()
             data_file = file_dict.target_dir + "/" + ii + "R.csv"
-            mean = stddev = fps = cpums = cms = gms = cell_count = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = 0
+            mean = stddev = fps = cpums = cms = gms = cell_count = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = mmrr = 0
             fps_list = []
           
             try:
@@ -319,9 +320,9 @@ class gPCDData():
 
             mean = statistics.mean(fps_list)
             stddev = statistics.stdev(fps_list)
-           
+            mmrr = self.mmrr_gms 
             max_list = [ii, fps_old, cpums_old, cms_old, gms_old, expectedp, loadedp, shaderp_comp,
-                        shaderp_grph, expectedc, shaderc, sidelen,cell_count,mean,stddev]
+                        shaderp_grph, expectedc, shaderc, sidelen,cell_count,mean,stddev,mmrr]
             with open( file_dict.summary_file_name, 'a', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(max_list)

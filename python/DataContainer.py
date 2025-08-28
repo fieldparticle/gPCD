@@ -139,6 +139,9 @@ class DataContainer():
             string = string.replace(char, "?")       
         all_fields = string.split(',')
         fields = all_fields[0].split('?')
+        for nn in fields:
+            if 'fld' not in nn:
+                fields.remove(nn)
         return fields
 
     #******************************************************************
@@ -239,6 +242,12 @@ class DataContainer():
                  format_dict[all_item[0]]=all_item[1]
         return format_dict        
         
+    def do_equations(self):
+        for line in self.lines_list:
+            if line.is_equation == True:
+                ydata = self.do_equation(line)
+                line.data[line.data_lines[0].field] = ydata
+
     def do_equation(self,plot_liney):
         #print(len(plot_liney.data_lines))
         fld = AttrDictFields()
@@ -369,7 +378,6 @@ class DataContainer():
         data_obj = field_dict.data_object
         return data_obj.do_verify(field_dict)
 
-    
     #******************************************************************
     # Call the first data base and verify
     #

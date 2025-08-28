@@ -116,6 +116,7 @@ class TabFormReport(QTabWidget):
         self.data_container.resolve_data_files()
         lines_list = None
 
+    
     def do_table(self):
         try :
             self.data_container = None 
@@ -126,6 +127,8 @@ class TabFormReport(QTabWidget):
             self.data_container.resolve_data_files()
             lines_list = None
             self.data_container.apply_data_to_fields()
+            self.data_container.do_equations()
+            
         except BaseException as e:
             print(f"preview failed:{e}")
         return self.data_container.lines_list
