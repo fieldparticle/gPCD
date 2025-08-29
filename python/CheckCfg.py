@@ -12,8 +12,10 @@ class CheckCfg():
     def check_rpt_files(self):
         if 'type' not in self.cfg:
             return "Config file missing 'type'"
+        if 'batch' in self.cfg.type:
+            return 'ok'
         else:
-            my_list = ["plot", "table", "image", "csvplot", "gpcd_table"]
+            my_list = ["plot", "csvtable", "image", "csvplot", "gpcd_table"]
             if self.cfg.type not in my_list:
                 return "Invalid type. Valid types are plot or table, or image or csvplot'"
         if self.cfg.type == 'plot':

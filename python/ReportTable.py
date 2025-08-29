@@ -101,8 +101,6 @@ class ReportLatexTable(ReportClass):
         if cc > len(self.itemcfg[f"format_array"]):
             print("Mismatch between colums of data and the format of that data.")
             return
-        if (cc == 3):
-            print('here')
         val = self.Table[cc][rr]
         fmt_txt = self.itemcfg[f"format_array"][cc]
         if 'd' in fmt_txt:

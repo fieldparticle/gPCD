@@ -116,7 +116,6 @@ class TabFormReport(QTabWidget):
         self.data_container.resolve_data_files()
         lines_list = None
 
-    
     def do_table(self):
         try :
             self.data_container = None 
@@ -133,6 +132,23 @@ class TabFormReport(QTabWidget):
             print(f"preview failed:{e}")
         return self.data_container.lines_list
 
+    def do_gpcd_table(self):
+        try :
+            self.data_container = None 
+            self.data_container = DataContainer(self,self.itemcfg_main)
+            self.data_container.clear()
+            self.data_container.get_particle_data_fields()
+            self.data_container.parse_lines_list()
+            self.data_container.resolve_data_files()
+            lines_list = None
+            self.data_container.apply_data_to_fields()
+            self.data_container.do_equations()
+            
+        except BaseException as e:
+            print(f"preview failed:{e}")
+        return self.data_container.lines_list
+
+
     def do_plot(self):
         try :
             self.data_container = None 
@@ -140,10 +156,46 @@ class TabFormReport(QTabWidget):
             self.data_container.clear()
             self.data_container.get_particle_data_fields()
             lines_list = None
+            self.data_container.parse_lines_list()
+            self.data_container.resolve_data_files()
             self.data_container.apply_data_to_fields()
             self.data_container.do_report()
         except BaseException as e:
             print(f"preview failed:{e}")
+
+
+    def do_batch(self):
+        batch_files = self.itemcfg.include
+        for ii in batch_files:
+            print(f'======================== Working: {ii} =====================')
+            self.load_item_cfg(ii)
+            match self.itemcfg.type:
+                case 'csvtable':
+                    self.itemcfg_main = self.itemcfg
+                    lines_list = self.do_table()
+                    self.report_obj = ReportLatexTable(self,self.itemcfg,lines_list)
+                case "csvplot":
+                    self.report_obj = ReportLatexPlot(self,self.itemcfg)
+                    self.itemcfg_main = self.itemcfg
+                    self.do_plot()
+                case "plot":
+                    self.report_obj = ReportLatexPlot(self,self.itemcfg)
+                    if len(self.itemcfg.include) == 0:
+                        self.itemcfg_main = self.itemcfg
+                        self.do_plot()
+                    else:
+                        self.do_plots()
+                    self.data_container.write_latex_values()
+                case "image":
+                    self.report_obj = ReportClass(self,self.itemcfg)
+                case "gpcd_table":
+                    self.itemcfg_main = self.itemcfg
+                    lines_list = self.do_gpcd_table()
+                    self.report_obj = ReportLatexTable(self,self.itemcfg,lines_list)
+                case _:
+                    print(f"Report type : {self.itemcfg.type} not found.")
+            self.report_obj.save_latex()
+
 
     #******************************************************************
     # Preview the latex genberated pdf
@@ -151,6 +203,12 @@ class TabFormReport(QTabWidget):
     def preview(self):
         self.reload()
         match self.itemcfg.type:
+            case "batch":
+                return self.do_batch()
+            case 'csvtable':
+                self.itemcfg_main = self.itemcfg
+                lines_list = self.do_table()
+                self.report_obj = ReportLatexTable(self,self.itemcfg,lines_list)
             case "csvplot":
                 self.report_obj = ReportLatexPlot(self,self.itemcfg)
                 self.itemcfg_main = self.itemcfg
@@ -165,10 +223,9 @@ class TabFormReport(QTabWidget):
                 self.data_container.write_latex_values()
             case "image":
                 self.report_obj = ReportClass(self,self.itemcfg)
-                
             case "gpcd_table":
                 self.itemcfg_main = self.itemcfg
-                lines_list = self.do_table()
+                lines_list = self.do_gpcd_table()
                 self.report_obj = ReportLatexTable(self,self.itemcfg,lines_list)
             case _:
                 print(f"Report type : {self.itemcfg.type} not found.")
@@ -333,8 +390,10 @@ class TabFormReport(QTabWidget):
             self.tab_layout.addWidget(self.terminal,4,0,1,3,alignment= Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
         except BaseException as e:
             self.log.log(self,e)
+        '''
         try:
-
+            
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_V_PQBR.cfg")
                         # PQBR
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_ALL.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")
@@ -358,13 +417,13 @@ class TabFormReport(QTabWidget):
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/NumberPapersParticle_zhu2007.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/GraphicsProcess.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/ComputeProcess.cfg")
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBRTablePerfAll.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBRTablePerfAll.cfg")
 
             
             
         except BaseException as e1:
             print(f"Cannot open cfg file:{e1}")
-   
+        '''
     def valueChangeArray(self,listObj):  
         selected_items = listObj.selectedItems()
         if selected_items:

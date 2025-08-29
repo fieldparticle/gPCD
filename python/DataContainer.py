@@ -195,7 +195,7 @@ class DataContainer():
                 dot_split = comma_split[0].split('.') 
                 dl['is_equation'] = False
                 dl['line_type'] = data_type[line]
-                if 'csvplot' in self.itemcfg.type:
+                if 'csvplot' in self.itemcfg.type or 'csvtable' in self.itemcfg.type:
                     dl['data_file'] = self.itemcfg.data_files[line]
                 fields_dict['line_type'] = data_type[line]
                 fields_dict['field'] = dot_split[1].strip(" ")
