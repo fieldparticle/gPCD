@@ -1,0 +1,4 @@
+The total PQBR performance which is the sum of the graphics and compute processing times.
+Three trend-lines have been fit to the data for comparison with sequential algorithms having the 
+same parameters. For a quadratic fit the base cost, 
+K = \PQBRTOTALSPFQuadraticTrendK{} and a linear fit has a K=\PQBRTOTALSPFLinearTrendK{}.

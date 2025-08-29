@@ -129,15 +129,17 @@ class DataContainer():
         return fields
     
     def split_equation(self,string):
+        new_str =string
         if 'log10' in string or 'log' in string:
-            return self.split_transendential(string)
+            fields = self.split_transendential(string)
+            new_str =  " ".join(fields)
         char_remove = ["(",")"]
         for char in char_remove:
-            string = string.replace(char, " ")                
+            new_str = new_str.replace(char, " ")                
         char_remove = ["+","-","/","*"]
         for char in char_remove:
-            string = string.replace(char, "?")       
-        all_fields = string.split(',')
+            new_str = new_str.replace(char, "?")       
+        all_fields = new_str.split(',')
         fields = all_fields[0].split('?')
         for nn in fields:
             if 'fld' not in nn:

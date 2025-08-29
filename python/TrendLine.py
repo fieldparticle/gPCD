@@ -109,12 +109,19 @@ class TrendLine():
             data = lines_listy.data[lines_listy.data_lines[0].field]
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
 
+        elif "log10_residual_percent" in lines_listy.line_type:
+            y_data = lines_listy.data[lines_listy.data_lines[0].field]
+            a,b = self.do_log10_fit()
+            data = log10_func(self.xvalue,a,b).tolist()
+            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(abs((y_data - data)/y_data))
+       
         elif "log10_residual" in lines_listy.line_type:
             y_data = lines_listy.data[lines_listy.data_lines[0].field]
             a,b = self.do_log10_fit()
             data = log10_func(self.xvalue,a,b).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(y_data - data)
 
+       
         return
          
     def do_power_fit(self):
@@ -187,6 +194,7 @@ class TrendLine():
         self.lines_listy['r_squared'] = r_squared
        
         return a,b
+    
 
     def do_poly_fit(self):
         #self.params, self.covariance = curve_fit(self.linearFunc, self.xvalue, self.yvalue)                          
