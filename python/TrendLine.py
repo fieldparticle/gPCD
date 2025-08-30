@@ -70,11 +70,6 @@ class TrendLine():
             data = quadratic_model(self.xvalue,a,b,c).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(quadratic_model(self.xvalue,a,b,c))
         
-        elif "quadratic_trend" in lines_listy.line_type:
-            a,b,c = self.do_poly_fit()
-            data = quadratic_model(self.xvalue,a,b,c).tolist()
-            lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(quadratic_model(self.xvalue,a,b,c))
-
         elif "power_trend" in lines_listy.line_type:
             k_val, exponent, intercept = self.do_power_fit()
             data = power_func(self.xvalue,k_val,exponent,intercept).tolist()

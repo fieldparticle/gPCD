@@ -45,6 +45,7 @@ class ReportLatexTable(ReportClass):
         
     header_arry = []
     def save_latex(self):
+       
         self.tex_output_name = self.itemcfg.tex_dir + "/" + self.itemcfg.name + ".tex"
         self.Table = []
         num_rows = 0
@@ -58,7 +59,11 @@ class ReportLatexTable(ReportClass):
             elif l_itm != num_rows:
                 print("number of rows do not match in save_latex()")
                 return
+            
             self.Table.append(self.lines_list[ii].data[fld_str])
+
+
+                
             #self.table[self.lines_list[ii].field] = self.lines_list[ii].data_lines.field]            #self.cols = self.data.shape[0]
             #self.rows = self.data.shape[1]
             #self.table_array  = [[0 for x in range(self.cols)] for y in range(self.rows)] 
@@ -70,8 +75,22 @@ class ReportLatexTable(ReportClass):
         table_array = np.array(self.table_array)
         table_arrayT = table_array.T
         self.table_array = table_arrayT
+        self.save_export_vals()
         self.cleve_data()
         self.Write()
+    
+    def save_export_vals(self):
+        save_lines_vals = 0
+        vals_list = []
+        if 'save_lines_vals' in self.itemcfg:
+            save_lines_vals = self.itemcfg.save_lines_vals
+            for rr in range(self.rows) :
+                for cc in range(self.cols) :
+                    if rr in save_lines_vals:
+                        vals_list.append([rr,cc,self.table_array[rr][cc]])
+                        # put vals in line item one always
+        self.lines_list[0][f'export_vals'] = vals_list                        
+        return
           
     def cleve_data(self):
         if 'row_select_array' not in self.itemcfg:

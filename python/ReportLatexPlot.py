@@ -23,7 +23,8 @@ class ReportLatexPlot(ReportClass):
                 self.itemcfg_obj.Create(self.bobj.log,ii)
                 self.itemcfg_tmp = self.itemcfg_obj.config
                 image_list.append(f"{self.itemcfg.plots_dir}/{self.itemcfg_tmp.name}.png")
-            self.save_multi_image(image_list)
+            self.itemcfg['input_images'] = image_list
+            self.save_multi_image()
 
       
 

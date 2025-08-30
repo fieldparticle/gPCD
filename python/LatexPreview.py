@@ -36,8 +36,6 @@ class LatexPreview():
         if self.valsFile != None:
             fl.write("\\include{"  +  self.valsFile  + "}\n")
         fl.write('\\begin{document}\n')
-        
-        
         texname = "\\input {" + self.texname + "}\n" 
         fl.write(texname)
         fl.write('\\end{document}\n')

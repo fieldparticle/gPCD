@@ -64,12 +64,14 @@ class TabFormReport(QTabWidget):
                 self.log.log(self,f"Config File syntax - line number of config file:{e}")
                 self.hasConfig = False
                 return 
+            '''
             chk = CheckCfg(self.itemcfg)
             msg = chk.check_rpt_files()
             if (msg) != 'ok':
                 self.msg_box(msg)
                 self.log.log(self,msg)
                 return
+            '''
             self.data_container = None 
             self.data_container = DataContainer(self,self.itemcfg)
             self.VerifyButton.setEnabled(True)
@@ -106,6 +108,7 @@ class TabFormReport(QTabWidget):
             self.itemcfg_obj.Create(self.bobj.log,ii)
             self.itemcfg_main = self.itemcfg_obj.config
             self.do_plot()
+            self.data_container.write_latex_values()
     
     def do_csv_plot(self):
         self.data_container = None 
@@ -209,28 +212,37 @@ class TabFormReport(QTabWidget):
                 self.itemcfg_main = self.itemcfg
                 lines_list = self.do_table()
                 self.report_obj = ReportLatexTable(self,self.itemcfg,lines_list)
+                self.report_obj.save_latex()
             case "csvplot":
                 self.report_obj = ReportLatexPlot(self,self.itemcfg)
                 self.itemcfg_main = self.itemcfg
                 self.do_plot()
+                self.report_obj.save_latex()
             case "plot":
                 self.report_obj = ReportLatexPlot(self,self.itemcfg)
                 if len(self.itemcfg.include) == 0:
                     self.itemcfg_main = self.itemcfg
                     self.do_plot()
+                    self.data_container.write_latex_values()
                 else:
                     self.do_plots()
-                self.data_container.write_latex_values()
+
+                
+                self.report_obj.save_latex()
             case "image":
                 self.report_obj = ReportClass(self,self.itemcfg)
+                self.report_obj.save_latex()
             case "gpcd_table":
                 self.itemcfg_main = self.itemcfg
                 lines_list = self.do_gpcd_table()
                 self.report_obj = ReportLatexTable(self,self.itemcfg,lines_list)
+                self.report_obj.save_latex()
+                self.data_container.write_latex_values()
             case _:
                 print(f"Report type : {self.itemcfg.type} not found.")
 
-        self.report_obj.save_latex()
+        
+        
         self.preview_dialog(self.report_obj.tex_output_name)
     
     #******************************************************************
@@ -242,10 +254,11 @@ class TabFormReport(QTabWidget):
         
         prviewWorkingDir = self.itemcfg.tex_dir
         if self.itemcfg.type == 'plot':
-            valFile = self.itemcfg.values_file
-            prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,valFile)
-        else:
-            prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,None)
+            if 'values_file' in self.itemcfg:
+                valFile = self.itemcfg.values_file
+                prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,valFile)
+            else:
+                prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,None)
         prvCls.ProcessLatxCode()
         prvCls.Run()
         with open('termPreview.log', "r") as infile:  
@@ -392,8 +405,10 @@ class TabFormReport(QTabWidget):
             self.log.log(self,e)
         '''
         try:
-            
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_V_PQBR.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF_LOG10_BOTH.cfg")             
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10_BOTH.cfg")             
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_OVR_GRPH_COMP_SPF.cfg") 
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_V_PQBR.cfg")
                         # PQBR
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_ALL.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")
@@ -418,12 +433,10 @@ class TabFormReport(QTabWidget):
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/GraphicsProcess.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/ComputeProcess.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBRTablePerfAll.cfg")
-
-            
-            
         except BaseException as e1:
             print(f"Cannot open cfg file:{e1}")
         '''
+        
     def valueChangeArray(self,listObj):  
         selected_items = listObj.selectedItems()
         if selected_items:

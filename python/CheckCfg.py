@@ -5,11 +5,9 @@ class CheckCfg():
     def __init__(self,cfg):
         self.cfg = cfg
         
-        
-        
-        
 
     def check_rpt_files(self):
+
         if 'type' not in self.cfg:
             return "Config file missing 'type'"
         if 'batch' in self.cfg.type:
@@ -17,7 +15,7 @@ class CheckCfg():
         else:
             my_list = ["plot", "csvtable", "image", "csvplot", "gpcd_table"]
             if self.cfg.type not in my_list:
-                return "Invalid type. Valid types are plot or table, or image or csvplot'"
+                return f"Invalid type:'{self.cfg.type}'. Valid types are plot or table, or image or csvplot"
         if self.cfg.type == 'plot':
             if 'name' not in self.cfg:
                 return "Config file missing 'name'"

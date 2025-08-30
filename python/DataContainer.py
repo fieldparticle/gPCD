@@ -65,31 +65,47 @@ class DataContainer():
         except BaseException as e:
             print("Values file does not exist:",e)
             return
-        for nm in self.lines_list:
-            if nm.line_type == 'linear_trend':
-                name = self.itemcfg.name.replace('_','')
-                val_string = "\\newcommand{" + "\\" + name + "LinearTrendK" + "}{" + f"${nm.K:.4E}$" + "}\n"
-                file_handle.write(val_string)
-                val_string = "\\newcommand{" + "\\" + name + "LinearTrendIsec" + "}{" + f"${nm.isec:.4E}$" + "}\n"
-                file_handle.write(val_string)
-                #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
-                val_string = "\\newcommand{" + "\\" + name + "LinearTrendRSquared" + "}{" + f"${nm.r_squared:.4E}$" + "}\n"
-                file_handle.write(val_string)
-            elif nm.line_type == 'quadratic_trend':
-                name = self.itemcfg.name.replace('_','')
-                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendK" + "}{" + f"${nm.K:.4E}$" + "}\n"
-                file_handle.write(val_string)
-                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendb" + "}{" + f"${nm.b:.4E}$" + "}\n"
-                file_handle.write(val_string)
-                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendc" + "}{" + f"${nm.c:.4E}$" + "}\n"
-                file_handle.write(val_string)
-                #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
-                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendRSquared" + "}{" + f"${nm.r_squared:.4E}$" + "}\n"
+        if 'gpcd_table' not in self.itemcfg.type:
+            for nm in self.lines_list:
+                ltr = self.alph(nm.line_num)
+            
+                if nm.line_type == 'linear_trend':
+                    name = self.itemcfg.name.replace('_','')
+                    val_string = "\\newcommand{" + "\\" + name + "LinearTrendK" + f"{ltr}" + "}{" + f"${nm.K:.4E}$" + "}\n"
+                    file_handle.write(val_string)
+                    val_string = "\\newcommand{" + "\\" + name + "LinearTrendIsec" + f"{ltr}" + "}{" + f"${nm.isec:.4E}$" + "}\n"
+                    file_handle.write(val_string)
+                    #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
+                    val_string = "\\newcommand{" + "\\" + name + "LinearTrendRSquared" + f"{ltr}" + "}{" + f"${nm.r_squared:.4E}$" + "}\n"
+                    file_handle.write(val_string)
+                elif nm.line_type == 'quadratic_trend':
+                    name = self.itemcfg.name.replace('_','')
+                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendK" + f"{ltr}" + "}{" + f"${nm.K:.4E}$" + "}\n"
+                    file_handle.write(val_string)
+                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendb"  + f"{ltr}" +"}{" + f"${nm.b:.4E}$" + "}\n"
+                    file_handle.write(val_string)
+                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendc" + f"{ltr}" +"}{" + f"${nm.c:.4E}$" + "}\n"
+                    file_handle.write(val_string)
+                    #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
+                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendRSquared" + f"{ltr}" + "}{" + f"${nm.r_squared:.4E}$" + "}\n"
+                    file_handle.write(val_string)
+        elif 'gpcd_table' in self.itemcfg.type:
+            counter = 0
+            for val in self.lines_list[0].export_vals:
+                if val[1] == 0:
+                    counter+=1
+                val_string = "\\newcommand{" + "\\" + self.itemcfg.name + "row" + f"{self.alph(counter-1)}" + f"col{self.alph(val[1])}" + "}{" + f"${val[2]}$" + "}\n"
                 file_handle.write(val_string)
         file_handle.close()
         return
     
-
+    def alph(self,num):
+        aph = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O']
+        if num < len(aph):
+            return aph[num].upper()
+        else:
+            return 'INF'
+        
     def get_particle_data_fields_table(self):
         self.raw_lines_list.clear()
         data_fields = self.itemcfg['data_fields']
