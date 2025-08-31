@@ -67,8 +67,17 @@ class DataContainer():
             return
         if 'gpcd_table' not in self.itemcfg.type:
             for nm in self.lines_list:
+                if 'start_val' in nm:
+                    name = self.itemcfg.name.replace('_','')
+                    name = re.sub(r'\d+', '', name)
+                    val_string = "\\newcommand{" + "\\" + name + "StartNum" + "}{" + f"${nm.start_val}$" + "}\n"
+                    file_handle.write(val_string)
+                    start_val = nm.data[nm.data_lines[0].field][nm.start_val]
+                    val_string = "\\newcommand{" + "\\" + name + "StartVal" + "}{" + f"${start_val}$" + "}\n"
+                    file_handle.write(val_string)
+                    val_string = "\\newcommand{" + "\\" + name + "EndNum" + "}{" + f"${nm.end_val}$" + "}\n"
+                    file_handle.write(val_string)
                 ltr = self.alph(nm.line_num)
-            
                 if nm.line_type == 'linear_trend':
                     name = self.itemcfg.name.replace('_','')
                     val_string = "\\newcommand{" + "\\" + name + "LinearTrendK" + f"{ltr}" + "}{" + f"${nm.K:.4E}$" + "}\n"
@@ -400,6 +409,19 @@ class DataContainer():
     # Call the first data base and verify
     #
     def apply_data_to_fields(self):
+        start_num = 0
+        if 'line_slices' in self.itemcfg:
+            start_str  = self.itemcfg.line_slices
+            start_ary = start_str.split(':')
+            start_num = int(start_ary[0])
+            end_num = -1
+            if 'end' in start_ary[1]:
+                end_num = -1
+            else:
+                end_num = int(start_ary[1])
+        else:
+            end_num = -2
+
         for nm in range(len(self.lines_list)):
             data_obj = self.lines_list[nm].data_object
             try:
@@ -407,11 +429,20 @@ class DataContainer():
             except BaseException as e:
                 print(e)
                 return
+            end_item = 0
+            self.lines_list[0]['start_val'] = start_num
             for ii in self.lines_list[nm].data_lines:
-                #print(ii.field)
-                #print(data[ii.field])
-                self.lines_list[nm].data[ii.field] = data[ii.field]
-        
+                if end_num == -1:
+                    end_item = len(data[ii.field])
+                    self.lines_list[0]['end_val'] = end_item
+                    self.lines_list[nm].data[ii.field] = data[ii.field][start_num:end_item]
+                elif(end_num == -2):
+                    end_item = len(data[ii.field])
+                    self.lines_list[0]['end_val'] = end_item
+                    self.lines_list[nm].data[ii.field] = data[ii.field]
+                else:
+                    self.lines_list[0]['end_val'] = end_num
+                    self.lines_list[nm].data[ii.field] = data[ii.field][start_num:end_num]
         return 
         
 

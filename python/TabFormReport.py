@@ -262,15 +262,16 @@ class TabFormReport(QTabWidget):
             prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,None)
 
         prvCls.ProcessLatxCode()
-        prvCls.Run()
-        with open('termPreview.log', "r") as infile:  
-            txt_line = infile.readline().strip("\n")
-            self.terminal.append(txt_line)
-            while txt_line:
+        if 'BATCH_ALL' != self.itemcfg.name:
+            prvCls.Run()
+            with open('termPreview.log', "r") as infile:  
                 txt_line = infile.readline().strip("\n")
                 self.terminal.append(txt_line)
-        self.prv = PdfViewer(previewPdf)
-        self.prv.show()
+                while txt_line:
+                    txt_line = infile.readline().strip("\n")
+                    self.terminal.append(txt_line)
+            self.prv = PdfViewer(previewPdf)
+            self.prv.show()
         
     #******************************************************************
     # Reload the current cfg file after its been updates outside app
