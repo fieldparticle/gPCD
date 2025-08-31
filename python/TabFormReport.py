@@ -249,16 +249,18 @@ class TabFormReport(QTabWidget):
     # Open a preview dialog
     #
     def preview_dialog(self,text_file_name):
-        previewFile = f"{self.itemcfg.tex_dir}/preview.tex"
-        previewPdf =  f"{self.itemcfg.tex_dir}/preview.pdf"
+        prviewWorkingDir = self.cfg.default_preview_dir
+        previewFile = f"{prviewWorkingDir}/preview.tex"
+        previewPdf =  f"{prviewWorkingDir}/preview.pdf"
         
-        prviewWorkingDir = self.itemcfg.tex_dir
-        if self.itemcfg.type == 'plot':
-            if 'values_file' in self.itemcfg:
-                valFile = self.itemcfg.values_file
-                prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,valFile)
-            else:
-                prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,None)
+        
+        #if self.itemcfg.type == 'plot':
+        if 'values_file' in self.itemcfg:
+            valFile = self.itemcfg.values_file
+            prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,valFile)
+        else:
+            prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,None)
+
         prvCls.ProcessLatxCode()
         prvCls.Run()
         with open('termPreview.log', "r") as infile:  
@@ -405,13 +407,13 @@ class TabFormReport(QTabWidget):
             self.log.log(self,e)
         '''
         try:
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF_LOG10_BOTH.cfg")             
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF_LOG10_BOTH.cfg")             
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10_BOTH.cfg")             
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_OVR_GRPH_COMP_SPF.cfg") 
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_V_PQBR.cfg")
                         # PQBR
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_ALL.cfg")
-            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LIN_RESIDUAL.cfg") 
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10.cfg")
