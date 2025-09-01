@@ -1,1 +1,1 @@
-(a) shows a $log10$ fit for the compute pipeline which appears to diverge near 2 million particles which is verified by (b). 
+(a) shows a $log_{10}$ trend for the compute pipline. (b) shows the residuals as a percentage from the real. On the interval in question, the errors do not exceed 5 percent.

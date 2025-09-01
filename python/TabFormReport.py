@@ -317,13 +317,32 @@ class TabFormReport(QTabWidget):
         cfg_item = ""
         if current_item:
             cfg_item = f"{self.cfg.report_start_dir}/{current_item.text()}"
+            raw_name = os.path.basename(current_item.text())
+            filename_without_ext = os.path.splitext(raw_name)[0]
+            self.cap_file = f"{self.cfg.report_start_dir}/{filename_without_ext}.cap"
+            caption = ""
+            if os.path.exists(self.cap_file):
+                with open(self.cap_file, 'r') as file:
+                    caption = file.read()
+            else:
+                file = open(self.cap_file, 'w') 
+                file.close()
+            self.CapEdit.clear()
+            self.CapEdit.append(caption)
+ 
             print(f"Current item selected: {current_item.text()}")
         else:
             print("No item currently selected.")
             return
         self.CfgFile = cfg_item
         self.load_item_cfg(self.CfgFile)
-        
+        vals_file = f"{self.itemcfg.tex_dir}/{filename_without_ext}.vals"
+        self.ValsListObj.clear()
+        if os.path.exists(vals_file):
+            with open(vals_file, 'r') as file:
+                line = file.read()
+            self.ValsListObj.append(line)           
+                
         file_to_open = "path/to/your/file.txt"
         notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
 
@@ -332,33 +351,11 @@ class TabFormReport(QTabWidget):
 
     def save_cap(self):
         txt = self.CapEdit.toPlainText()
-        with open(self.cur_cap_file, "w") as file:
+        with open(self.cap_file, "w") as file:
             file.write(txt)
 
 
-        
-    def cap_on_current_item_changed(self, current_item, previous_item):
-        cfg_item = ""
-        if current_item:
-            cfg_item = f"{self.cfg.report_start_dir}/{current_item.text()}"
-            
-            print(f"Current item selected: {current_item.text()}")
-        else:
-            print("No item currently selected.")
-            return
-        content = ""
-        try:
-            with open(cfg_item, 'r') as file:
-                content = file.read()
-                print(content)
-                self.cur_cap_file = cfg_item
-                self.CapEdit.clear()
-                self.CapEdit.append(content)
-        except FileNotFoundError:
-            print(f"Error: The file '{cfg_item}' was not found.")
-        except Exception as e:
-            print(f"An error occurred: {e}")
-        
+  
     #******************************************************************
     # Greate the GUI
     #   
@@ -459,7 +456,7 @@ class TabFormReport(QTabWidget):
             #self.ListObj.setFont(self.font)
             self.CfgListObj.setStyleSheet("background-color:  #FFFFFF")
             self.vcnt = 0  
-            self.setSize(self.CfgListObj,225,300)
+            self.setSize(self.CfgListObj,225,450)
 
             for ii in range(len(self.cfg_files)):
                 self.CfgListObj.insertItem(ii,self.cfg_files[ii]) 
@@ -471,16 +468,15 @@ class TabFormReport(QTabWidget):
 
             ## -------------------------------------------------------------
             ## Cap Select Interface
-            self.CapListObj =  QListWidget()
+            
+            self.ValsListObj =  QTextEdit()
             #self.ListObj.setFont(self.font)
-            self.CapListObj.setStyleSheet("background-color:  #FFFFFF ")
+            self.ValsListObj.setStyleSheet("background-color:  #FFFFFF ")
             self.vcnt = 0  
-            self.setSize(self.CapListObj,225,300)
-            for ii in range(len(self.cap_files)):
-                self.CapListObj.insertItem(ii,self.cap_files[ii]) 
-            self.CapListObj.currentItemChanged.connect(self.cap_on_current_item_changed)
-            self.tab_layout.addWidget(self.CapListObj,5,1,1,1)
-
+            self.setSize(self.ValsListObj,225,450)
+            #self.CapListObj.currentItemChanged.connect(self.cap_on_current_item_changed)
+            self.tab_layout.addWidget(self.ValsListObj,5,1,1,1)
+            
              ## -------------------------------------------------------------
             ## Cap edit Interface
             

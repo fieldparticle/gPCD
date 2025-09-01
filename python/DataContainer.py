@@ -70,40 +70,40 @@ class DataContainer():
                 if 'start_val' in nm:
                     name = self.itemcfg.name.replace('_','')
                     name = re.sub(r'\d+', '', name)
-                    val_string = "\\newcommand{" + "\\" + name + "StartNum" + "}{" + f"${nm.start_val}$" + "}\n"
+                    val_string = "\\newcommand{" + "\\" + name + "StartNum" + "}{" + f"{nm.start_val}" + "}\n"
                     file_handle.write(val_string)
                     start_val = int(nm.data[nm.data_lines[0].field][nm.start_val])
-                    val_string = "\\newcommand{" + "\\" + name + "StartVal" + "}{" + f"${start_val}$" + "}\n"
+                    val_string = "\\newcommand{" + "\\" + name + "StartVal" + "}{" + f"{start_val}" + "}\n"
                     file_handle.write(val_string)
-                    val_string = "\\newcommand{" + "\\" + name + "EndNum" + "}{" + f"${nm.end_val}$" + "}\n"
+                    val_string = "\\newcommand{" + "\\" + name + "EndNum" + "}{" + f"{nm.end_val}" + "}\n"
                     file_handle.write(val_string)
                 ltr = self.alph(nm.line_num)
                 if nm.line_type == 'linear_trend':
                     name = self.itemcfg.name.replace('_','')
-                    val_string = "\\newcommand{" + "\\" + name + "LinearTrendK" + f"{ltr}" + "}{" + f"${nm.K:.4E}$" + "}\n"
+                    val_string = "\\newcommand{" + "\\" + name + "LinearTrendK" + f"{ltr}" + "}{" + f"{nm.K:.4E}" + "}\n"
                     file_handle.write(val_string)
-                    val_string = "\\newcommand{" + "\\" + name + "LinearTrendIsec" + f"{ltr}" + "}{" + f"${nm.isec:.4E}$" + "}\n"
+                    val_string = "\\newcommand{" + "\\" + name + "LinearTrendIsec" + f"{ltr}" + "}{" + f"{nm.isec:.4E}" + "}\n"
                     file_handle.write(val_string)
                     #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
-                    val_string = "\\newcommand{" + "\\" + name + "LinearTrendRSquared" + f"{ltr}" + "}{" + f"${nm.r_squared:.4E}$" + "}\n"
+                    val_string = "\\newcommand{" + "\\" + name + "LinearTrendRSquared" + f"{ltr}" + "}{" + f"{nm.r_squared:.4E}" + "}\n"
                     file_handle.write(val_string)
                 elif nm.line_type == 'quadratic_trend':
                     name = self.itemcfg.name.replace('_','')
-                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendK" + f"{ltr}" + "}{" + f"${nm.K:.4E}$" + "}\n"
+                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendK" + f"{ltr}" + "}{" + f"{nm.K:.4E}" + "}\n"
                     file_handle.write(val_string)
-                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendb"  + f"{ltr}" +"}{" + f"${nm.b:.4E}$" + "}\n"
+                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendb"  + f"{ltr}" +"}{" + f"{nm.b:.4E}" + "}\n"
                     file_handle.write(val_string)
-                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendc" + f"{ltr}" +"}{" + f"${nm.c:.4E}$" + "}\n"
+                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendc" + f"{ltr}" +"}{" + f"{nm.c:.4E}" + "}\n"
                     file_handle.write(val_string)
                     #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
-                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendRSquared" + f"{ltr}" + "}{" + f"${nm.r_squared:.4E}$" + "}\n"
+                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendRSquared" + f"{ltr}" + "}{" + f"{nm.r_squared:.4E}" + "}\n"
                     file_handle.write(val_string)
         elif 'gpcd_table' in self.itemcfg.type:
             counter = 0
             for val in self.lines_list[0].export_vals:
                 if val[1] == 0:
                     counter+=1
-                val_string = "\\newcommand{" + "\\" + self.itemcfg.name + "row" + f"{self.alph(counter-1)}" + f"col{self.alph(val[1])}" + "}{" + f"${val[2]}$" + "}\n"
+                val_string = "\\newcommand{" + "\\" + self.itemcfg.name + "row" + f"{self.alph(counter-1)}" + f"col{self.alph(val[1])}" + "}{" + f"{val[2]}" + "}\n"
                 file_handle.write(val_string)
         file_handle.close()
         return

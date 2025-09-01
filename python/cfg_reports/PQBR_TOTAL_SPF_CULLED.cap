@@ -1,0 +1,1 @@
+Plot of frame rate \textit{fps} versus number of particles. The performance drops precipitously from 32 particles to about \numprint{\PQBRTablePerfAllrowBcolA{}}
