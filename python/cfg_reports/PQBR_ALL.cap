@@ -1,4 +1,2 @@
-Results of PQB random, with the overall frame-rate performance represented by the black +, 
-the compute performance in the red squares, and graphics in the blue circles. 
-The compute pipeline accounts for most of the processing time and grows disproportionately 
+Results of PQB random particle positions, with the overall frame-rate performance represented by the black +, the compute performance in the red squares, and graphics in the blue circles. The compute pipeline accounts for most of the processing time and grows disproportionately 
 with the graphics performance.

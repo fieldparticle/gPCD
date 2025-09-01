@@ -72,7 +72,7 @@ class DataContainer():
                     name = re.sub(r'\d+', '', name)
                     val_string = "\\newcommand{" + "\\" + name + "StartNum" + "}{" + f"${nm.start_val}$" + "}\n"
                     file_handle.write(val_string)
-                    start_val = nm.data[nm.data_lines[0].field][nm.start_val]
+                    start_val = int(nm.data[nm.data_lines[0].field][nm.start_val])
                     val_string = "\\newcommand{" + "\\" + name + "StartVal" + "}{" + f"${start_val}$" + "}\n"
                     file_handle.write(val_string)
                     val_string = "\\newcommand{" + "\\" + name + "EndNum" + "}{" + f"${nm.end_val}$" + "}\n"

@@ -312,6 +312,53 @@ class TabFormReport(QTabWidget):
             print(f"Verify Failed:{e}")
 
         pass
+    
+    def cfg_on_current_item_changed(self, current_item, previous_item):
+        cfg_item = ""
+        if current_item:
+            cfg_item = f"{self.cfg.report_start_dir}/{current_item.text()}"
+            print(f"Current item selected: {current_item.text()}")
+        else:
+            print("No item currently selected.")
+            return
+        self.CfgFile = cfg_item
+        self.load_item_cfg(self.CfgFile)
+        
+        file_to_open = "path/to/your/file.txt"
+        notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
+
+        subprocess.Popen([notepad_plus_plus_path, self.CfgFile])
+
+
+    def save_cap(self):
+        txt = self.CapEdit.toPlainText()
+        with open(self.cur_cap_file, "w") as file:
+            file.write(txt)
+
+
+        
+    def cap_on_current_item_changed(self, current_item, previous_item):
+        cfg_item = ""
+        if current_item:
+            cfg_item = f"{self.cfg.report_start_dir}/{current_item.text()}"
+            
+            print(f"Current item selected: {current_item.text()}")
+        else:
+            print("No item currently selected.")
+            return
+        content = ""
+        try:
+            with open(cfg_item, 'r') as file:
+                content = file.read()
+                print(content)
+                self.cur_cap_file = cfg_item
+                self.CapEdit.clear()
+                self.CapEdit.append(content)
+        except FileNotFoundError:
+            print(f"Error: The file '{cfg_item}' was not found.")
+        except Exception as e:
+            print(f"An error occurred: {e}")
+        
     #******************************************************************
     # Greate the GUI
     #   
@@ -384,26 +431,68 @@ class TabFormReport(QTabWidget):
             self.ReloadButton.clicked.connect(self.reload)
             self.ReloadButton.setEnabled(True)
             dirgrid.addWidget(self.ReloadButton,2,3)
+             ## -------------------------------------------------------------
+            ## Cap edit Interface
+            self.SaveTxtButton = QPushButton("Save Cap")
+            self.setSize(self.SaveTxtButton,30,100)
+            self.SaveTxtButton.setStyleSheet("background-color:  #dddddd")
+            self.SaveTxtButton.clicked.connect(self.save_cap)
+            self.SaveTxtButton.setEnabled(True)
+            dirgrid.addWidget(self.SaveTxtButton,2,4)
 
-            '''
-            self.ListObj =  QListWidget()
-            #self.ListObj.setFont(self.font)
-            self.ListObj.setStyleSheet("background-color:  #FFFFFF")
-            self.vcnt = 0            
-            self.ListObj.insertItem(0, "image")
-            self.ListObj.insertItem(1, "plot")
-            self.ListObj.insertItem(2, "multiplot")
-            self.ListObj.insertItem(3, "multiimage")
-            self.ListObj.itemSelectionChanged.connect(lambda: self.valueChangeArray(self.ListObj))
-            dirgrid.addWidget(self.ListObj,3,0,1,2)
-            '''
 
             ## -------------------------------------------------------------
             ## Comunications Interface
             self.terminal =  QTextEdit(self)
             self.terminal.setStyleSheet("background-color:  #ffffff; color: green")
             self.setSize(self.terminal,225,900)
-            self.tab_layout.addWidget(self.terminal,4,0,1,3,alignment= Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+            self.tab_layout.addWidget(self.terminal,3,0,2,1,alignment= Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+
+
+
+            self.cfg_files = [i for i in os.listdir(self.cfg.report_start_dir) if i.endswith("cfg")]
+            self.cap_files = [i for i in os.listdir(self.cfg.report_start_dir) if i.endswith("cap")]
+            
+            ## -------------------------------------------------------------
+            ## CFg Select Interface
+            self.CfgListObj =  QListWidget()
+            #self.ListObj.setFont(self.font)
+            self.CfgListObj.setStyleSheet("background-color:  #FFFFFF")
+            self.vcnt = 0  
+            self.setSize(self.CfgListObj,225,300)
+
+            for ii in range(len(self.cfg_files)):
+                self.CfgListObj.insertItem(ii,self.cfg_files[ii]) 
+         
+            self.CfgListObj.insertItem(3, "multiimage")
+            self.CfgListObj.currentItemChanged.connect(self.cfg_on_current_item_changed)
+            #self.CfgListObj.itemSelectionChanged.connect(lambda: self.CfgChange())
+            self.tab_layout.addWidget(self.CfgListObj,5,0,1,1)
+
+            ## -------------------------------------------------------------
+            ## Cap Select Interface
+            self.CapListObj =  QListWidget()
+            #self.ListObj.setFont(self.font)
+            self.CapListObj.setStyleSheet("background-color:  #FFFFFF ")
+            self.vcnt = 0  
+            self.setSize(self.CapListObj,225,300)
+            for ii in range(len(self.cap_files)):
+                self.CapListObj.insertItem(ii,self.cap_files[ii]) 
+            self.CapListObj.currentItemChanged.connect(self.cap_on_current_item_changed)
+            self.tab_layout.addWidget(self.CapListObj,5,1,1,1)
+
+             ## -------------------------------------------------------------
+            ## Cap edit Interface
+            
+            self.CapEdit =  QTextEdit(self)
+            self.CapEdit.setStyleSheet("background-color:  #ffffff ")
+            font = QFont()
+            font.setPointSize(16)
+            self.CapEdit.setFont(font)
+            self.setSize(self.CapEdit,225,900)
+            self.tab_layout.addWidget(self.CapEdit,7,0,1,1,alignment= Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+            
+           
         except BaseException as e:
             self.log.log(self,e)
         '''
