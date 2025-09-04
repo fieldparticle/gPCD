@@ -51,19 +51,19 @@ class TrendLine():
         pass        
 
     
-    def add_trend_line(self,lines_listx,lines_listy):
-        self.lines_listx = lines_listx
+    def add_trend_line(self,xdata,ydata,lines_listy):
         self.lines_listy = lines_listy
         #print(lines_listx.data_lines[0].field)    
         #print(lines_listy.data_lines[0].field)
-        self.xvalue = lines_listx.data[lines_listx.data_lines[0].field]
-        self.yvalue = lines_listy.data[lines_listy.data_lines[0].field]
+        self.xvalue = xdata
+        self.yvalue = ydata
         #print(lines_listy.line_type)
         if "linear_trend" in lines_listy.line_type:
             intercept, slope = self.do_linear_fit(linearFunc)
             #intercept, slope = self.do_linear_fit_regress()
             data = linearFunc(self.xvalue,intercept,slope).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(linearFunc(self.xvalue,intercept,slope))
+            return pd.Series(linearFunc(self.xvalue,intercept,slope))
             
         elif "quadratic_trend" in lines_listy.line_type:
             a,b,c = self.do_poly_fit()
@@ -74,12 +74,14 @@ class TrendLine():
             k_val, exponent, intercept = self.do_power_fit()
             data = power_func(self.xvalue,k_val,exponent,intercept).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
+            return  pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
 
         elif "log10_trend" in lines_listy.line_type:
             a,b = self.do_log10_fit()
             data = log10_func(self.xvalue,a,b).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(log10_func(self.xvalue,a,b))
-    
+            return pd.Series(log10_func(self.xvalue,a,b))
+        
         if "linear_residual" in lines_listy.line_type:
             # The data here is already linear
             y_data = lines_listy.data[lines_listy.data_lines[0].field]
@@ -91,33 +93,37 @@ class TrendLine():
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(linearFunc(self.xvalue,intercept,slope))
             # Subtract linear from fit
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(y_data - data)
-            
+            return pd.Series(y_data - data)
+        
         elif "quadratic_residual" in lines_listy.line_type:
             y_data = lines_listy.data[lines_listy.data_lines[0].field]
             a,b,c = self.do_poly_fit()
             data = quadratic_model(self.xvalue,a,b,c).tolist()
             #lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(linearFunc(self.xvalue,intercept,slope))
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(y_data - data)
+            return pd.Series(y_data - data)
         
         elif "power_residual" in lines_listy.line_type:
             k_val, exponent, intercept = self.do_power_fit()
             data = lines_listy.data[lines_listy.data_lines[0].field]
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
+            return pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
 
         elif "log10_residual_percent" in lines_listy.line_type:
             y_data = lines_listy.data[lines_listy.data_lines[0].field]
             a,b = self.do_log10_fit()
             data = log10_func(self.xvalue,a,b).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(abs((y_data - data)/y_data))
+            return pd.Series(abs((y_data - data)/y_data))
        
         elif "log10_residual" in lines_listy.line_type:
             y_data = lines_listy.data[lines_listy.data_lines[0].field]
             a,b = self.do_log10_fit()
             data = log10_func(self.xvalue,a,b).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(y_data - data)
-
+            return pd.Series(y_data - data)
        
-        return
+        return None
          
     def do_power_fit(self):
         #self.params, self.covariance = curve_fit(self.linearFunc, self.xvalue, self.yvalue)                          

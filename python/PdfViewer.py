@@ -10,7 +10,7 @@ class PdfViewer(QMainWindow):
         super().__init__()
         self.pdf_file = pdf_file
         self.setWindowTitle('Preview PDF Viewer')
-        self.setGeometry(100, 100, 1000, 1000)
+        self.setGeometry(100, 100, 1500, 1000)
 
         self.pdf_document = QPdfDocument(self)
         self.pdf_view = QPdfView(self)
@@ -24,9 +24,11 @@ class PdfViewer(QMainWindow):
         except Exception as e:
             print(f"Error loading PDF: {e}. Please ensure 'sample.pdf' exists.")
 
-        self.current_zoom_factor = 1.0  # Initial zoom factor
+        self.current_zoom_factor = 1.5  # Initial zoom factor
 
         self.init_ui()
+    #def wheelEvent(self,event):
+     #   print('wheel')
 
     def init_ui(self):
         central_widget = QWidget()

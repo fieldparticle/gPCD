@@ -67,7 +67,7 @@ class DataContainer():
             return
         if 'gpcd_table' not in self.itemcfg.type:
             for nm in self.lines_list:
-                if 'start_val' in nm:
+                if 'CaptureVals' in nm:
                     name = self.itemcfg.name.replace('_','')
                     name = re.sub(r'\d+', '', name)
                     val_string = "\\newcommand{" + "\\" + name + "StartNum" + "}{" + f"{nm.start_val}" + "}\n"
@@ -78,26 +78,26 @@ class DataContainer():
                     val_string = "\\newcommand{" + "\\" + name + "EndNum" + "}{" + f"{nm.end_val}" + "}\n"
                     file_handle.write(val_string)
                 ltr = self.alph(nm.line_num)
-                if nm.line_type == 'linear_trend':
-                    name = self.itemcfg.name.replace('_','')
-                    val_string = "\\newcommand{" + "\\" + name + "LinearTrendK" + f"{ltr}" + "}{" + f"{nm.K:.4E}" + "}\n"
-                    file_handle.write(val_string)
-                    val_string = "\\newcommand{" + "\\" + name + "LinearTrendIsec" + f"{ltr}" + "}{" + f"{nm.isec:.4E}" + "}\n"
-                    file_handle.write(val_string)
-                    #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
-                    val_string = "\\newcommand{" + "\\" + name + "LinearTrendRSquared" + f"{ltr}" + "}{" + f"{nm.r_squared:.4E}" + "}\n"
-                    file_handle.write(val_string)
-                elif nm.line_type == 'quadratic_trend':
-                    name = self.itemcfg.name.replace('_','')
-                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendK" + f"{ltr}" + "}{" + f"{nm.K:.4E}" + "}\n"
-                    file_handle.write(val_string)
-                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendb"  + f"{ltr}" +"}{" + f"{nm.b:.4E}" + "}\n"
-                    file_handle.write(val_string)
-                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendc" + f"{ltr}" +"}{" + f"{nm.c:.4E}" + "}\n"
-                    file_handle.write(val_string)
-                    #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
-                    val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendRSquared" + f"{ltr}" + "}{" + f"{nm.r_squared:.4E}" + "}\n"
-                    file_handle.write(val_string)
+            if nm.line_type == 'linear_trend':
+                name = self.itemcfg.name.replace('_','')
+                val_string = "\\newcommand{" + "\\" + name + "LinearTrendK" + f"{ltr}" + "}{" + f"{nm.K:.4E}" + "}\n"
+                file_handle.write(val_string)
+                val_string = "\\newcommand{" + "\\" + name + "LinearTrendIsec" + f"{ltr}" + "}{" + f"{nm.isec:.4E}" + "}\n"
+                file_handle.write(val_string)
+                #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
+                val_string = "\\newcommand{" + "\\" + name + "LinearTrendRSquared" + f"{ltr}" + "}{" + f"{nm.r_squared:.4E}" + "}\n"
+                file_handle.write(val_string)
+            elif nm.line_type == 'quadratic_trend':
+                name = self.itemcfg.name.replace('_','')
+                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendK" + f"{ltr}" + "}{" + f"{nm.K:.4E}" + "}\n"
+                file_handle.write(val_string)
+                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendb"  + f"{ltr}" +"}{" + f"{nm.b:.4E}" + "}\n"
+                file_handle.write(val_string)
+                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendc" + f"{ltr}" +"}{" + f"{nm.c:.4E}" + "}\n"
+                file_handle.write(val_string)
+                #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
+                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendRSquared" + f"{ltr}" + "}{" + f"{nm.r_squared:.4E}" + "}\n"
+                file_handle.write(val_string)
         elif 'gpcd_table' in self.itemcfg.type:
             counter = 0
             for val in self.lines_list[0].export_vals:
@@ -293,12 +293,11 @@ class DataContainer():
 
      ############################################
     # Do a single line of ydata
-    def run_plot(self,lines_listx,lines_listy,format_dict) :
+    def run_plot(self,xdata,ydata,plot_command,format_dict) :
         # get the list of plot commands
-        pn = lines_listy.line_num - 1
-        plot_command = self.itemcfg.line_commands
+       
         # Go thourgh the lines in the cfg file and plot them
-        plt_eval_string = f"{plot_command[pn]}(lines_listx.data[lines_listx.data_lines[0].field],lines_listy.data[lines_listy.data_lines[0].field],**format_dict)"
+        plt_eval_string = f"{plot_command}(xdata,ydata,**format_dict)"
         #print(plt_eval_string)
         try:
             eval(plt_eval_string)
@@ -325,17 +324,33 @@ class DataContainer():
                 if self.lines_list[nm].line_type == "ydata":
                     plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
                     format_dict = self.get_line_format_dict(plot_format_string)
-                    self.run_plot(self.lines_list[0],self.lines_list[nm],format_dict)
+                    start = self.lines_list[nm].start_val
+                    last =  self.lines_list[nm].end_val
+                    #print(self.lines_list[0].data_lines[0].field)
+                    #print(self.lines_list[0].data[self.lines_list[0].data_lines[0].field])
+                    xdata = self.lines_list[0].data[self.lines_list[0].data_lines[0].field]
+                    xdata = xdata[start:last]
+                    ydata = self.lines_list[nm].data[self.lines_list[nm].data_lines[0].field]
+                    ydata = ydata[start:last]
+                    pn = self.lines_list[nm].line_num - 1
+                    plot_command = self.itemcfg.line_commands[pn]
+                    self.run_plot(xdata,ydata,plot_command,format_dict)
                 # Skip this we already got the xdata
                 elif self.lines_list[nm].line_type == "xdata":
                     continue
                 # If its a treandline the perform the fit
                 elif 'trend' in self.lines_list[nm].line_type or 'residual' in self.lines_list[nm].line_type :
                     td = TrendLine()
-                    td.add_trend_line(self.lines_list[0],self.lines_list[nm])
+                    xdata = self.lines_list[0].data[self.lines_list[0].data_lines[0].field]
+                    xdata = xdata[start:last]
+                    ydata = self.lines_list[nm].data[self.lines_list[nm].data_lines[0].field]
+                    ydata = ydata[start:last]
+                    ydata = td.add_trend_line(xdata,ydata,self.lines_list[nm])
                     plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
                     format_dict = self.get_line_format_dict(plot_format_string)
-                    self.run_plot(self.lines_list[0],self.lines_list[nm],format_dict)
+                    pn = self.lines_list[nm].line_num - 1
+                    plot_command = self.itemcfg.line_commands[pn]
+                    self.run_plot(xdata,ydata,plot_command,format_dict)
 
         
         # Do plot commands
@@ -410,39 +425,43 @@ class DataContainer():
     #
     def apply_data_to_fields(self):
         start_num = 0
-        if 'line_slices' in self.itemcfg:
-            start_str  = self.itemcfg.line_slices
-            start_ary = start_str.split(':')
-            start_num = int(start_ary[0])
-            end_num = -1
-            if 'end' in start_ary[1]:
-                end_num = -1
-            else:
-                end_num = int(start_ary[1])
-        else:
-            end_num = -2
-
         for nm in range(len(self.lines_list)):
+            if 'line_slices' in self.itemcfg:
+                start_str  = self.itemcfg.line_slices[nm-1]
+                start_ary = start_str.split(':')
+                start_num = int(start_ary[0])
+                end_num = -1
+                if 'end' in start_ary[1]:
+                    end_num = -1
+                else:
+                    end_num = int(start_ary[1])
+            else:
+                end_num = -2
             data_obj = self.lines_list[nm].data_object
             try:
                 data = data_obj.assign_data(self.lines_list[nm])
             except BaseException as e:
-                print(e)
+                print(f"Could not assign data in apply_data_to_fields:{e}")
                 return
             end_item = 0
-            self.lines_list[0]['start_val'] = start_num
+            #self.lines_list[0]['start_val'] = start_num
+            self.lines_list[nm]['start_val'] = start_num
+
             for ii in self.lines_list[nm].data_lines:
                 if end_num == -1:
                     end_item = len(data[ii.field])
                     self.lines_list[0]['end_val'] = end_item
-                    self.lines_list[nm].data[ii.field] = data[ii.field][start_num:end_item]
+                    self.lines_list[nm].data[ii.field] = data[ii.field]
+                    self.lines_list[nm]['end_val'] = end_item
                 elif(end_num == -2):
                     end_item = len(data[ii.field])
                     self.lines_list[0]['end_val'] = end_item
                     self.lines_list[nm].data[ii.field] = data[ii.field]
+                    self.lines_list[nm]['end_val'] = end_item
                 else:
                     self.lines_list[0]['end_val'] = end_num
-                    self.lines_list[nm].data[ii.field] = data[ii.field][start_num:end_num]
+                    self.lines_list[nm].data[ii.field] = data[ii.field]
+                    self.lines_list[nm]['end_val'] = end_num
         return 
         
 
