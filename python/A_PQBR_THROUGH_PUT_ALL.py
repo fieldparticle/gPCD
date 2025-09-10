@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""
+Make graphics_vs_compute_throughput.png from a CSV with columns:
+  N   : number of particles (int)
+  gms : graphics time per frame (seconds)  # if in ms, see note below
+  cms : compute time per frame (seconds)   # if in ms, see note below
+
+Usage:
+  python make_throughput_plot.py CHATGP_Data.csv
+
+Output:
+  graphics_vs_compute_throughput.png
+"""
+
+import sys
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import csv
+import math
+from ValuesDataBase import *
+from AttrDictFields import *
+from PlotterClass import *
+
+class A_PQBR_THROUGH_PUT_ALL(PlotterClass):
+    
+  def run(self):
+      if not os.path.exists(self.itemcfg.input_data_file):
+          raise FileNotFoundError(f"CSV not found: {self.itemcfg.input_data_file}")
+
+      # Load data
+      df = pd.read_csv(self.itemcfg.input_data_file)
+
+      # Ensure required columns exist
+      required = {"loadedp", "gms", "cms"}
+      missing = required - set(df.columns)
+      if missing:
+          raise ValueError(f"CSV is missing required columns: {sorted(missing)}")
+
+      # ---- If your times are in MILLISECONDS, uncomment the next two lines ----
+      # df["gms"] = df["gms"] / 1000.0
+      # df["cms"] = df["cms"] / 1000.0
+
+      # Throughput (million particles per second, Mpps)
+      df["graphics_throughput_mpps"] = (df["loadedp"] / df["gms"]) / 1e6
+      df["compute_throughput_mpps"]  = (df["loadedp"] / df["cms"]) / 1e6
+      gms = np.array(df["gms"]).astype(float)
+      cms = np.array(df["cms"]).astype(float)
+      both = np.add(gms,cms)
+      df["total_throughput_mpps"]  = (df["loadedp"] / both)/ 1e6
+
+      # Plot (log–log)
+      plt.figure(figsize=(8, 6))
+      plt.loglog(df["loadedp"], df["graphics_throughput_mpps"], "o-", label="Graphics throughput")
+      plt.loglog(df["loadedp"], df["compute_throughput_mpps"],  "s-", label="Compute throughput")
+      plt.loglog(df["loadedp"], df["total_throughput_mpps"],  "s-", label="Total throughput")
+
+      plt.xlabel("Number of particles (N)")
+      plt.ylabel("Throughput (Mpps)")
+      plt.title("Graphics vs Compute Throughput (log–log)")
+      plt.legend()
+      plt.grid(True, which="both", ls="--", alpha=0.6)
+      plt.tight_layout()
+      filename = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}.png"
+      plt.savefig(filename, dpi=300)
+      plt.close()
+      self.include.append(filename)
+      print(f"Saved: {filename}")
+

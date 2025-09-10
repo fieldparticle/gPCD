@@ -81,10 +81,6 @@ class PreviewDialog(QDialog):
         flg_isopen = False
         event.accept()
 
-    
-  
-
-
     def submit_data(self):
         self.accept()
 

@@ -56,65 +56,7 @@ class DataContainer():
         except FileNotFoundError:
             print(f"File '{pltTempImg}' does notexist yet")
     
-    #******************************************************************
-    # Write trendline data to the values file
-    #       
-    def write_latex_values(self):
-        try:
-            file_handle = open(self.itemcfg.values_file, 'w')
-        except BaseException as e:
-            print("Values file does not exist:",e)
-            return
-        if 'gpcd_table' not in self.itemcfg.type:
-            for nm in self.lines_list:
-                if 'CaptureVals' in nm:
-                    name = self.itemcfg.name.replace('_','')
-                    name = re.sub(r'\d+', '', name)
-                    val_string = "\\newcommand{" + "\\" + name + "StartNum" + "}{" + f"{nm.start_val}" + "}\n"
-                    file_handle.write(val_string)
-                    start_val = int(nm.data[nm.data_lines[0].field][nm.start_val])
-                    val_string = "\\newcommand{" + "\\" + name + "StartVal" + "}{" + f"{start_val}" + "}\n"
-                    file_handle.write(val_string)
-                    val_string = "\\newcommand{" + "\\" + name + "EndNum" + "}{" + f"{nm.end_val}" + "}\n"
-                    file_handle.write(val_string)
-                ltr = self.alph(nm.line_num)
-            if nm.line_type == 'linear_trend':
-                name = self.itemcfg.name.replace('_','')
-                val_string = "\\newcommand{" + "\\" + name + "LinearTrendK" + f"{ltr}" + "}{" + f"{nm.K:.4E}" + "}\n"
-                file_handle.write(val_string)
-                val_string = "\\newcommand{" + "\\" + name + "LinearTrendIsec" + f"{ltr}" + "}{" + f"{nm.isec:.4E}" + "}\n"
-                file_handle.write(val_string)
-                #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
-                val_string = "\\newcommand{" + "\\" + name + "LinearTrendRSquared" + f"{ltr}" + "}{" + f"{nm.r_squared:.4E}" + "}\n"
-                file_handle.write(val_string)
-            elif nm.line_type == 'quadratic_trend':
-                name = self.itemcfg.name.replace('_','')
-                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendK" + f"{ltr}" + "}{" + f"{nm.K:.4E}" + "}\n"
-                file_handle.write(val_string)
-                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendb"  + f"{ltr}" +"}{" + f"{nm.b:.4E}" + "}\n"
-                file_handle.write(val_string)
-                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendc" + f"{ltr}" +"}{" + f"{nm.c:.4E}" + "}\n"
-                file_handle.write(val_string)
-                #val_string = "\\newcommand{" + "\\" + name + "Covarance" + "}{" + f"${nm.covariance:.4E}$" + "}"
-                val_string = "\\newcommand{" + "\\" + name + "QuadraticTrendRSquared" + f"{ltr}" + "}{" + f"{nm.r_squared:.4E}" + "}\n"
-                file_handle.write(val_string)
-        elif 'gpcd_table' in self.itemcfg.type:
-            counter = 0
-            for val in self.lines_list[0].export_vals:
-                if val[1] == 0:
-                    counter+=1
-                val_string = "\\newcommand{" + "\\" + self.itemcfg.name + "row" + f"{self.alph(counter-1)}" + f"col{self.alph(val[1])}" + "}{" + f"{val[2]}" + "}\n"
-                file_handle.write(val_string)
-        file_handle.close()
-        return
-    
-    def alph(self,num):
-        aph = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O']
-        if num < len(aph):
-            return aph[num].upper()
-        else:
-            return 'INF'
-        
+   
     def get_particle_data_fields_table(self):
         self.raw_lines_list.clear()
         data_fields = self.itemcfg['data_fields']
@@ -145,6 +87,7 @@ class DataContainer():
     
     def split_transendential(self,string):
         fields= []
+        string = string.replace('np.log',"")
         char_remove = ["(",")"]
         for char in char_remove:
             string = string.replace(char, " ") 
@@ -171,6 +114,37 @@ class DataContainer():
                 fields.remove(nn)
         return fields
 
+    def extract_fields(self,string):
+        #string = "np.log((fld.gms+fld.cms)/fld.loadedp)"
+        if "np.log" in string:
+            string = string.replace('np.log',"")
+        if "np.log10" in string:
+            string = string.replace('np.log10',"")
+        str_len = len(string)
+        nn = 0
+        bld_fld = []
+        out_list = []
+        while (nn < str_len):
+            jj = string.find('fld.',nn)
+            if jj > -1:
+                bld_fld.clear()
+                stop_len = str_len
+                start_len = jj
+                for ii in range(start_len,stop_len):
+                    if string[ii] not in "()/+-*":
+                        #print(string[ii])
+                        bld_fld.append(string[ii])
+                    else:
+                        break
+                new_str = "".join(bld_fld)
+                out_list.append(new_str)
+                nn = jj +1 #print(new_str)                
+            else:
+                break
+        return out_list        
+
+            #print(nn)
+
     #******************************************************************
     # parse the fields from the list and add to a dictionary 
     #
@@ -194,7 +168,7 @@ class DataContainer():
                 dl['equation']= equation
                 dl['line_type'] = data_type[line]
                 dl["line_num"] = line
-                lines_list = self.split_equation(equation)
+                lines_list = self.extract_fields(equation)
                 data_sources = data_source[fnum].split(',')
                 if len(data_sources) != len(lines_list):
                     raise BaseException("cfg.data_source number of items do not match number of fields in cfg.data_fields (is it an equation?)") 
@@ -275,16 +249,17 @@ class DataContainer():
                 ydata = self.do_equation(line)
                 line.data[line.data_lines[0].field] = ydata
 
-    def do_equation(self,plot_liney):
+    def do_equation(self,liney):
         #print(len(plot_liney.data_lines))
         fld = AttrDictFields()
-        for nm in range(len(plot_liney.data_lines)):
+        for nm in range(len(liney.data_lines)):
             #print(plot_liney.data_lines[nm])    
             #print(plot_liney.data_lines[nm].field)
-            fld[plot_liney.data_lines[nm].field] = plot_liney.data[plot_liney.data_lines[nm].field]
+            fld[liney.data_lines[nm].field] = liney.data[liney.data_lines[nm].field]
             #print(plot_liney.data[plot_liney])
+        
         try:
-            ydata = eval(plot_liney.equation)  
+            ydata = eval(liney.equation)  
             #
         except BaseException as e:
              print(f"eval equaiton error {e}")
@@ -295,9 +270,9 @@ class DataContainer():
     # Do a single line of ydata
     def run_plot(self,xdata,ydata,plot_command,format_dict) :
         # get the list of plot commands
-       
+        print(xdata.data.line_data)
         # Go thourgh the lines in the cfg file and plot them
-        plt_eval_string = f"{plot_command}(xdata,ydata,**format_dict)"
+        plt_eval_string = f"{plot_command}(xdata.data.line_data,ydata.data.line_data,**format_dict)"
         #print(plt_eval_string)
         try:
             eval(plt_eval_string)
@@ -316,41 +291,34 @@ class DataContainer():
             if self.lines_list[nm]['is_active'] == True:
                 #print(self.lines_list[nm].data)
                 # If the line contains an equation then perform the math before anyhtin else
+                
                 if self.lines_list[nm].is_equation == True:
                     ydata = self.do_equation(self.lines_list[nm])
-                    self.lines_list[nm].data[self.lines_list[nm].equation] = ydata
-                    self.lines_list[nm].data_lines[0].field = self.lines_list[nm].equation
+                    self.lines_list[nm].data['line_data'] = ydata
+                    #self.lines_list[nm].data_lines[0].field = self.lines_list[nm].equation
+                else:
+                   print(self.lines_list[nm].data_lines[0].field)
+                   self.lines_list[nm].data['line_data'] = self.lines_list[nm].data[self.lines_list[nm].data_lines[0].field] 
                 # Just ydata
                 if self.lines_list[nm].line_type == "ydata":
                     plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
                     format_dict = self.get_line_format_dict(plot_format_string)
-                    start = self.lines_list[nm].start_val
-                    last =  self.lines_list[nm].end_val
-                    #print(self.lines_list[0].data_lines[0].field)
-                    #print(self.lines_list[0].data[self.lines_list[0].data_lines[0].field])
-                    xdata = self.lines_list[0].data[self.lines_list[0].data_lines[0].field]
-                    xdata = xdata[start:last]
-                    ydata = self.lines_list[nm].data[self.lines_list[nm].data_lines[0].field]
-                    ydata = ydata[start:last]
                     pn = self.lines_list[nm].line_num - 1
                     plot_command = self.itemcfg.line_commands[pn]
-                    self.run_plot(xdata,ydata,plot_command,format_dict)
+                    self.run_plot(self.lines_list[0],self.lines_list[nm],plot_command,format_dict)
                 # Skip this we already got the xdata
                 elif self.lines_list[nm].line_type == "xdata":
                     continue
                 # If its a treandline the perform the fit
                 elif 'trend' in self.lines_list[nm].line_type or 'residual' in self.lines_list[nm].line_type :
                     td = TrendLine()
-                    xdata = self.lines_list[0].data[self.lines_list[0].data_lines[0].field]
-                    xdata = xdata[start:last]
-                    ydata = self.lines_list[nm].data[self.lines_list[nm].data_lines[0].field]
-                    ydata = ydata[start:last]
-                    ydata = td.add_trend_line(xdata,ydata,self.lines_list[nm])
+                    ydata = td.add_trend_line(self.lines_list[0],self.lines_list[nm])
+                    self.lines_list[nm].data['line_data'] = ydata
                     plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
                     format_dict = self.get_line_format_dict(plot_format_string)
                     pn = self.lines_list[nm].line_num - 1
                     plot_command = self.itemcfg.line_commands[pn]
-                    self.run_plot(xdata,ydata,plot_command,format_dict)
+                    self.run_plot(self.lines_list[0],self.lines_list[nm],plot_command,format_dict)
 
         
         # Do plot commands
@@ -425,40 +393,44 @@ class DataContainer():
     #
     def apply_data_to_fields(self):
         start_num = 0
+        slice_flag = 0
         for nm in range(len(self.lines_list)):
             if 'line_slices' in self.itemcfg:
                 start_str  = self.itemcfg.line_slices[nm-1]
                 start_ary = start_str.split(':')
                 start_num = int(start_ary[0])
-                end_num = -1
+                # if end in the field need to get lentgh
                 if 'end' in start_ary[1]:
-                    end_num = -1
+                    slice_flag = 1
                 else:
+                    #if length is fed
+                    slice_flag = 2
                     end_num = int(start_ary[1])
             else:
-                end_num = -2
+                # No Slice
+                slice_flag = 3
             data_obj = self.lines_list[nm].data_object
             try:
                 data = data_obj.assign_data(self.lines_list[nm])
             except BaseException as e:
                 print(f"Could not assign data in apply_data_to_fields:{e}")
                 return
-            end_item = 0
+            
             #self.lines_list[0]['start_val'] = start_num
             self.lines_list[nm]['start_val'] = start_num
 
             for ii in self.lines_list[nm].data_lines:
-                if end_num == -1:
-                    end_item = len(data[ii.field])
-                    self.lines_list[0]['end_val'] = end_item
-                    self.lines_list[nm].data[ii.field] = data[ii.field]
-                    self.lines_list[nm]['end_val'] = end_item
-                elif(end_num == -2):
-                    end_item = len(data[ii.field])
-                    self.lines_list[0]['end_val'] = end_item
-                    self.lines_list[nm].data[ii.field] = data[ii.field]
-                    self.lines_list[nm]['end_val'] = end_item
-                else:
+                if slice_flag == 1:
+                    end_num = len(data[ii.field])
+                    self.lines_list[0]['end_val'] = end_num
+                    self.lines_list[nm].data[ii.field] = data[ii.field][start_num:end_num]
+                    self.lines_list[nm]['end_val'] = end_num
+                elif(slice_flag == 2):
+                    self.lines_list[0]['end_val'] = end_num
+                    self.lines_list[nm].data[ii.field] = data[ii.field,start_num:end_num]
+                    self.lines_list[nm]['end_val'] = end_num
+                elif(slice_flag == 3):
+                    end_num = len(data[ii.field])
                     self.lines_list[0]['end_val'] = end_num
                     self.lines_list[nm].data[ii.field] = data[ii.field]
                     self.lines_list[nm]['end_val'] = end_num

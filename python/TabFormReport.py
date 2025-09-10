@@ -1,4 +1,5 @@
 import sys
+import importlib
 from contextlib import redirect_stdout
 from io import StringIO
 from sys import stderr, stdout
@@ -34,7 +35,7 @@ class TabFormReport(QTabWidget):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-       
+        self.prv = None
         
     
     def setSize(self,control,H,W):
@@ -199,15 +200,26 @@ class TabFormReport(QTabWidget):
                     print(f"Report type : {self.itemcfg.type} not found.")
             self.report_obj.save_latex()
 
-
+    def load_class(self,class_name):
+        module_name, class_name = class_name.rsplit('.', 1)
+        module = importlib.import_module(module_name)
+        return getattr(module, class_name)
     #******************************************************************
     # Preview the latex genberated pdf
     #
     def preview(self):
+        if (self.prv != None):
+            self.prv.close()    
         self.reload()
         match self.itemcfg.type:
             case "batch":
                 return self.do_batch()
+            case 'plot_code':
+                obj_name = f"{self.itemcfg.name}.{self.itemcfg.name}"
+                self.plot_code_class = self.load_class(obj_name)(self.itemcfg,self.bobj)  
+                self.plot_code_class.run() 
+                self.report_obj = ReportLatexPlot(self,self.itemcfg)
+                self.report_obj.save_latex()
             case 'csvtable':
                 self.itemcfg_main = self.itemcfg
                 lines_list = self.do_table()
@@ -499,7 +511,8 @@ class TabFormReport(QTabWidget):
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBS_V_PQBR.cfg")
                         # PQBR
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_ALL.cfg")
-            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")
+            #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_COMP_SPF.cfg")
+            self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_THROUGH_PUT_ALL.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF.cfg")
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LIN_RESIDUAL.cfg") 
             #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_reports/PQBR_GRPH_SPF_LOG10.cfg")

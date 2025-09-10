@@ -5,7 +5,8 @@ from matplotlib.ticker import (MultipleLocator,
                                FormatStrFormatter,
                                AutoMinorLocator,
                                FuncFormatter,
-                               EngFormatter)
+                               EngFormatter,
+                               ScalarFormatter)
 
 class ReportClass():
     

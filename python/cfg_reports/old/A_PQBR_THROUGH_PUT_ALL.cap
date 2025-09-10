@@ -1,0 +1,10 @@
+Graphics versus compute throughput measured on the NVIDIA RTX~3500 Ada 
+Generation Laptop GPU. Throughput is reported in million particles per 
+second (Mpps) on a log--log scale. The graphics pipeline (broad-phase 
+collision detection and rendering) achieves slightly higher throughput 
+than the compute pipeline (narrow-phase collision detection), reflecting 
+the highly optimized rasterization hardware. Both pipelines exhibit 
+reduced throughput for $N < 10^{4}$ due to fixed launch and synchronization 
+overheads, but beyond this threshold the GPU reaches full occupancy and 
+sustains nanosecond-level per-particle costs at multi-million particle 
+scales.

@@ -14,7 +14,9 @@ class ReportLatexPlot(ReportClass):
    
 
     def save_latex(self):
-        if len(self.itemcfg.include) == 0:
+        if 'input_images' in self.itemcfg:
+            self.save_multi_image()
+        elif len(self.itemcfg.include) == 0:
             self.save_single_image()
         else:
             image_list = []

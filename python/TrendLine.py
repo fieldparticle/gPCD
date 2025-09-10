@@ -51,12 +51,12 @@ class TrendLine():
         pass        
 
     
-    def add_trend_line(self,xdata,ydata,lines_listy):
+    def add_trend_line(self,lines_listx,lines_listy):
         self.lines_listy = lines_listy
         #print(lines_listx.data_lines[0].field)    
         #print(lines_listy.data_lines[0].field)
-        self.xvalue = xdata
-        self.yvalue = ydata
+        self.xvalue = lines_listx.data.line_data
+        self.yvalue = lines_listy.data.line_data
         #print(lines_listy.line_type)
         if "linear_trend" in lines_listy.line_type:
             intercept, slope = self.do_linear_fit(linearFunc)
@@ -64,6 +64,18 @@ class TrendLine():
             data = linearFunc(self.xvalue,intercept,slope).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(linearFunc(self.xvalue,intercept,slope))
             return pd.Series(linearFunc(self.xvalue,intercept,slope))
+        
+        if 'linear_regression_trend' in lines_listy.line_type:
+            logN = np.log10(self.xvalue)
+            logT = np.log10(self.yvalue)
+            slope, intercept, r_value, p_value, std_err = linregress(logN, logT)
+            self.lines_listy['K'] = slope
+            self.lines_listy['isec'] = intercept
+            #self.lines_listy['covariance'] = self.covariance
+            self.lines_listy['r_squared'] = r_value
+            linr_line = 10**(intercept + slope * logN)
+            #linr_line = linearFunc(self.xvalue,intercept,slope)
+            return linr_line
             
         elif "quadratic_trend" in lines_listy.line_type:
             a,b,c = self.do_poly_fit()
