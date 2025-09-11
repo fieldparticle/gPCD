@@ -5,6 +5,7 @@ from TrendLine import *
 import re
 from AttrDictFields import *
 from ConfigUtility import *
+from ValuesDataBase import *
 class ReportLatexTable(ReportClass):
 
     def __init__(self,parent,itemcfg,lines_list):
@@ -80,16 +81,17 @@ class ReportLatexTable(ReportClass):
         self.Write()
     
     def save_export_vals(self):
+        vdb = ValuesDataBase(self.bobj)
         save_lines_vals = 0
-        vals_list = []
+        prefix_name = self.itemcfg.name.replace('_','')
         if 'save_lines_vals' in self.itemcfg:
             save_lines_vals = self.itemcfg.save_lines_vals
             for rr in range(self.rows) :
                 for cc in range(self.cols) :
                     if rr in save_lines_vals:
-                        vals_list.append([rr,cc,self.table_array[rr][cc]])
-                        # put vals in line item one always
-        self.lines_list[0][f'export_vals'] = vals_list                        
+                        self.vals_list[f"{prefix_name}{vdb.alph(rr)}{vdb.alph(cc)}"] = self.table_array[rr][cc]
+                    
+        vdb.write_values(self.vals_list)
         return
           
     def cleve_data(self):

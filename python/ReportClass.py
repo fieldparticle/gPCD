@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker
 import os
+from AttrDictFields import *
 from matplotlib.ticker import (MultipleLocator,
                                FormatStrFormatter,
                                AutoMinorLocator,
@@ -18,11 +19,13 @@ class ReportClass():
     caption = ""
     range = 0
     images = []
-
+    
     def __init__(self, parent,itemcfg):
         self.itemcfg = itemcfg
-        self.bobj = parent
+        self.bobj = parent.bobj
         self.log = self.bobj.log
+        self.vals_list = AttrDictFields()
+    
 
     def do_report(self):
         pass
@@ -70,6 +73,38 @@ class ReportClass():
             f.close()
             return
         f.close()
+
+    def extract_field(self,string):
+        nn = 0
+        new_str = ""
+        fmt_str = ""
+        str_len = len(string)
+        out_list = []
+        bld_fld = []
+        ss = 0
+        while (nn < str_len):
+            jj = string.find('fld.',nn)
+            if jj > -1:
+                
+                stop_len = str_len
+                start_len = jj+4
+                ss+= start_len
+                for ii in range(start_len,stop_len):
+                    if string[ii] not in "()/+-:{}*":
+                        #print(string[ii])
+                        bld_fld.append(string[ii])
+                        ss +=1
+                    else:
+                        break
+                new_str = "".join(bld_fld)
+                
+                nn = jj +1 #print(new_str)                
+            else:
+                fmt_str = string[ss:-1]
+                break
+        out_list = []
+
+        return new_str,fmt_str        
 
     def save_multi_image(self):
         self.read_caption()

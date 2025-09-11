@@ -1,7 +1,0 @@
-"plt.grid('on')",
-    "plt.ylabel('Time $log_{10}$ t,(ms)')",
-    "plt.xlabel('$log_{10}$ particles, n (millions)')",
-    "ax.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: '{0:g}'.format(x)))",
-	"ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: '{0:g}'.format(x)))",
-    "ax.xaxis.set_minor_formatter('%d')",
-    "ax.yaxis.set_minor_formatter('%d')",

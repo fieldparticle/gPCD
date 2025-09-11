@@ -1,5 +1,6 @@
 from AttrDictFields import *
 from ConfigUtility import *
+import num2alpha as n2a
 class ValuesDataBase():
 
     def __init__(self, Base):
@@ -7,14 +8,21 @@ class ValuesDataBase():
         self.cfg = self.bobj.cfg.config
         self.log = self.bobj.log
         
-        
-
     
-    def write_values(self,val_dict):
+
+    def get_vals(self):
         self.vals_cfg_obj = ConfigUtility(self.cfg.values_data_base)
         self.vals_cfg_obj.Create(self.bobj.log,self.cfg.values_data_base)
         self.vals_cfg = self.vals_cfg_obj.config
-        for k,v in val_dict.items():
+        return self.vals_cfg
+
+    def write_values(self,vals_list):
+        self.vals_cfg_obj = ConfigUtility(self.cfg.values_data_base)
+        self.vals_cfg_obj.Create(self.bobj.log,self.cfg.values_data_base)
+        self.vals_cfg = self.vals_cfg_obj.config
+        for k,v in self.vals_cfg.items():
+            self.vals_cfg[k]=v
+        for k,v in vals_list.items():
             self.vals_cfg[k]=v
         self.vals_cfg_obj.updateCfg()
         try:
@@ -22,7 +30,7 @@ class ValuesDataBase():
         except BaseException as e:
             print("Values file does not exist:",e)
             return
-        for k,v in val_dict.items():
+        for k,v in self.vals_cfg.items():
             val_string = "\\newcommand{" + "\\" + k + "}{" + f"{v}" + "}\n"
             file_handle.write(val_string)
         file_handle.close()
@@ -83,9 +91,5 @@ class ValuesDataBase():
         return
 
     def alph(self,num):
-        aph = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O']
-        if num < len(aph):
-            return aph[num].upper()
-        else:
-            return 'INF'
-    
+        return n2a.number_to_alpha(num)
+        

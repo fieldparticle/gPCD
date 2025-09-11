@@ -13,6 +13,7 @@ from ConfigUtility import *
 from DataContainer import *
 from ReportClass import *
 from ReportLatexPlot import *
+from ReportLatexEquation import *
 from ReportTable import *
 from LatexPreview import *
 from PdfViewer import *
@@ -214,6 +215,9 @@ class TabFormReport(QTabWidget):
         match self.itemcfg.type:
             case "batch":
                 return self.do_batch()
+            case 'equation':
+                self.report_obj = ReportLatexEquation(self,self.itemcfg)
+                self.report_obj.save_latex()
             case 'plot_code':
                 obj_name = f"{self.itemcfg.name}.{self.itemcfg.name}"
                 self.plot_code_class = self.load_class(obj_name)(self.itemcfg,self.bobj)  
@@ -235,7 +239,7 @@ class TabFormReport(QTabWidget):
                 if len(self.itemcfg.include) == 0:
                     self.itemcfg_main = self.itemcfg
                     self.do_plot()
-                    self.data_container.write_latex_values()
+                    #self.data_container.write_latex_values()
                 else:
                     self.do_plots()
 
@@ -249,7 +253,7 @@ class TabFormReport(QTabWidget):
                 lines_list = self.do_gpcd_table()
                 self.report_obj = ReportLatexTable(self,self.itemcfg,lines_list)
                 self.report_obj.save_latex()
-                self.data_container.write_latex_values()
+                #self.data_container.write_latex_values()
             case _:
                 print(f"Report type : {self.itemcfg.type} not found.")
 
@@ -329,33 +333,36 @@ class TabFormReport(QTabWidget):
         cfg_item = ""
         if current_item:
             cfg_item = f"{self.cfg.report_start_dir}/{current_item.text()}"
-            raw_name = os.path.basename(current_item.text())
-            filename_without_ext = os.path.splitext(raw_name)[0]
-            self.cap_file = f"{self.cfg.report_start_dir}/{filename_without_ext}.cap"
-            caption = ""
-            if os.path.exists(self.cap_file):
-                with open(self.cap_file, 'r') as file:
-                    caption = file.read()
+            self.CfgFile = cfg_item
+            self.load_item_cfg(self.CfgFile)
+            if 'equation' in self.itemcfg.type:
+                print("equation")
             else:
-                file = open(self.cap_file, 'w') 
-                file.close()
-            self.CapEdit.clear()
-            self.CapEdit.append(caption)
- 
+                raw_name = os.path.basename(current_item.text())
+                filename_without_ext = os.path.splitext(raw_name)[0]
+                self.cap_file = f"{self.cfg.report_start_dir}/{filename_without_ext}.cap"
+                caption = ""
+                if os.path.exists(self.cap_file):
+                    with open(self.cap_file, 'r') as file:
+                        caption = file.read()
+                else:
+                    file = open(self.cap_file, 'w') 
+                    file.close()
+           
+                vals_file = f"{self.itemcfg.tex_dir}/{filename_without_ext}.vals"
+                self.ValsListObj.clear()
+                if os.path.exists(vals_file):
+                    with open(vals_file, 'r') as file:
+                        line = file.read()
+                        self.ValsListObj.append(line)           
+                self.CapEdit.clear()
+                self.CapEdit.append(caption)
             print(f"Current item selected: {current_item.text()}")
         else:
             print("No item currently selected.")
             return
-        self.CfgFile = cfg_item
-        self.load_item_cfg(self.CfgFile)
-        vals_file = f"{self.itemcfg.tex_dir}/{filename_without_ext}.vals"
-        self.ValsListObj.clear()
-        if os.path.exists(vals_file):
-            with open(vals_file, 'r') as file:
-                line = file.read()
-            self.ValsListObj.append(line)           
-                
-        file_to_open = "path/to/your/file.txt"
+        
+        
         notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
 
         subprocess.Popen([notepad_plus_plus_path, self.CfgFile])

@@ -11,6 +11,7 @@ class PlotterClass():
         self.itemcfg = itemcfg
         self.bobj = base
         self.include = []
+        self.vals_list = AttrDictFields()
 
     def get_line_slices(self,line_num,line_len):
         start_num = 0
