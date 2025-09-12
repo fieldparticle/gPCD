@@ -271,12 +271,10 @@ class TabFormReport(QTabWidget):
         
         
         #if self.itemcfg.type == 'plot':
-        if 'values_file' in self.itemcfg:
-            valFile = self.itemcfg.values_file
-            prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,valFile)
-        else:
-            prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,None)
-
+    
+        valFile = self.cfg.export_latex_values
+        prvCls = LatexPreview(previewFile,text_file_name,prviewWorkingDir,valFile)
+    
         prvCls.ProcessLatxCode()
         if 'BATCH_ALL' != self.itemcfg.name:
             prvCls.Run()

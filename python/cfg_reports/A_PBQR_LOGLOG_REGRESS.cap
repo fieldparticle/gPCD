@@ -1,0 +1,9 @@
+og--log regression of total execution time $T(N)$ versus particle count $N$ 
+on the NVIDIA RTX~3500 Ada Generation Laptop GPU. The measured data (circles) 
+are fit by a straight line (solid), corresponding to a power-law model 
+$T(N) = \alpha N^{b}$. The fitted slope of $b \approx 1$ confirms near-linear 
+scaling in practice, despite the $O(N^{2})$ theoretical bound of collision 
+detection. The regression achieved $R^{2} > 0.99$, indicating that the 
+throughput follows a consistent scaling law, with deviations only at small 
+$N$ due to fixed overheads before GPU saturation is reached at 
+$N \approx 10^{4}$.

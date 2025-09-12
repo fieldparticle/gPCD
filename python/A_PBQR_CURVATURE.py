@@ -39,7 +39,7 @@ class A_PBQR_CURVATURE(PlotterClass):
         val_time = np.max(timings_ms)
         max_val =an/(np.max(timings_ms))
         print(f"Total t:{val_time} contribution:{max_val}")
-        one_percent_error = 0.01*val_time
+        one_percent_error = 0.01*val_time*1000
         max_n = math.sqrt(one_percent_error/a2)
         print(f"Estimated noticable value:{max_n}")
 
@@ -56,6 +56,8 @@ class A_PBQR_CURVATURE(PlotterClass):
         upper_band = T_fit + curvature_band
         lower_band = T_fit - curvature_band
 
+        one_percent =  0.01 *val_time*1000    
+        quad_effect = math.sqrt(one_percent/a)
         # === Plot ===
         fig = plt.figure(figsize=(10, 6))
         ax = fig.gca()
@@ -83,7 +85,14 @@ class A_PBQR_CURVATURE(PlotterClass):
         del_t2 = del_t1*xmaN
         del_t2_frc = del_t2/(val_time*1000)
         del_t2_pct = del_t2_frc*100
-
+        if 'tot' in name:
+            self.vals_list[f"{prefix_name}{name}"] = 'Total'
+        elif 'gms' in name:
+            self.vals_list[f"{prefix_name}{name}"] = 'Graphics'
+        elif 'cms' in name:
+            self.vals_list[f"{prefix_name}{name}"] = 'Compute'
+        
+                       
         self.vals_list[f"{prefix_name}{name}StartRow"] = 10
         self.vals_list[f"{prefix_name}{name}StartRowParticlesVal"] = int(float(data_list[0][6]))
         self.vals_list[f"{prefix_name}{name}MaxParticles"] = f"{xmaN}"
@@ -96,10 +105,12 @@ class A_PBQR_CURVATURE(PlotterClass):
         self.vals_list[f"{prefix_name}{name}QuadraticContributiontb"] = f"{del_t2:0.4e}"
         self.vals_list[f"{prefix_name}{name}QuadraticContributionfrc"] = f"{del_t2_frc:0.6f}"
         self.vals_list[f"{prefix_name}{name}QuadraticContributionpct"] = f"{del_t2_pct:0.6f}"
-        self.vals_list[f"{prefix_name}{name}TotalTime"] = f"{val_time:0.4f}"
+        self.vals_list[f"{prefix_name}{name}TotalTime"] = f"{val_time*1000:0.4f}"
         self.vals_list[f"{prefix_name}{name}TotalTimeCont"] = f"{delt*1000:0.4f}"
         max_as_int = int(float(max_n))
-        self.vals_list[f"{prefix_name}{name}EstimateNoticeableN"] = max_as_int
+        self.vals_list[f"{prefix_name}{name}EstimateNoticeableN"] = f"{max_as_int:,}"
+        rescale = 2*a*1E7*1E6 
+        self.vals_list[f"{prefix_name}{name}Rescale"] = f"{rescale:0.4e}"
         
         
 

@@ -22,7 +22,7 @@ from ValuesDataBase import *
 from AttrDictFields import *
 
 data_list = []
-
+N0 = 10_0000   
 from PlotterClass import *
 
 class A_PQBR_LOGLOG_REGRESS(PlotterClass):
@@ -31,6 +31,11 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
     def __init__(self,itemcfg,base):
         super().__init__(itemcfg,base)
         self.df = None
+
+    def fit_range(self,mask):
+      x, y = self.logN[mask], self.logT[mask]
+      slope, intercept, r, p, se = linregress(x, y)
+      return slope, intercept, r**2
     
     def run(self):
       
@@ -47,50 +52,54 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       if missing:
           raise ValueError(f"CSV is missing required columns: {sorted(missing)}")
 
-      # Throughput (million particles per second, Mpps)
-      self.df["graphics_time"] = (self.df["loadedp"] / self.df["gms"]) / 1e6
-      self.df["compute_time"]  = (self.df["loadedp"] / self.df["cms"]) / 1e6
-      gms = np.array(self.df["gms"]).astype(float)
-      cms = np.array(self.df["cms"]).astype(float)
-      both = np.add(gms,cms)
-      self.df["total_time"]  = (self.df["loadedp"] / both)/ 1e6
-      # Adjust units if times are in ms (uncomment if needed)
-      # self.df["gms"] = self.df["gms"] / 1000.0
-      # self.df["cms"] = self.df["cms"] / 1000.0
 
-      raw_n = np.array(self.df["loadedp"])
-      raw_t = np.array(self.df["total_time"])
-      self.start_num0,self.end_num0 = self.get_line_slices(0,len(raw_n))
-      self.start_num1,self.end_num1 = self.get_line_slices(1,len(raw_n))
-      logN = np.log10(self.df["loadedp"])
-      logT = np.log10(self.df["total_time"])
-      print(f"Starting at {raw_n[self.start_num0]} value of:{raw_t[0]}")
-
-      self.do_plot('TotalTime',logN,logT)
+      # === Log–log regression ===
+      self.logN = np.log10(self.df["loadedp"])
+      self.logT = np.log10(self.df["gms"])
+      self.do_plot('gms')  
+      self.logN = np.log10(self.df["loadedp"])
+      self.logT = np.log10(self.df["cms"])
+      self.do_plot('cms')  
+      self.logN = np.log10(self.df["loadedp"])
+      self.df['tot'] = self.df["cms"]+self.df["gms"]
+      self.logT = np.log10(self.df['tot'])
+      self.do_plot('tot')  
+      
+      #elf.do_plot('TotalTime',self.logN,self.logT)
       self.itemcfg['input_images'] = self.include
+      vdb = ValuesDataBase(self.bobj)
+      vdb.write_values(self.vals_list)
       
 
-    def do_plot(self,name,logN,logT):
+    def do_plot(self,name):
       # Log–log regression
-      
-      slope, intercept, r_value, p_value, std_err = linregress(logN[self.start_num0:], logT[self.start_num0:])
-      print(f"Slope (complexity exponent): {slope:.3f}")
-      print(f"Intercept (log10 scale): {intercept:.3f}")
-      print(f"R^2: {r_value**2:.4f}")
+      # Full fit
+      a_all, b_all, r2_all = self.fit_range(np.ones(len(self.df), dtype=bool))
+      # Saturated fit
+      mask_sat = self.df["loadedp"] >= N0
+      a_sat, b_sat, r2_sat = self.fit_range(mask_sat)
 
-      # Regression line
-      fit_line = intercept + slope * logN[self.start_num1:]
-
-      # Plot
-      plt.figure(figsize=(8,6))
-      plt.loglog(self.df["loadedp"][self.start_num0:], self.df["total_time"][self.start_num0:], 'o', label="Measured total time")
-      plt.loglog(self.df["loadedp"][self.start_num1:], 10**fit_line, '-', label=f"Fit: slope={slope:.3f}")
-      plt.xlabel("Number of particles (N)")
-      plt.ylabel("Total time (s)")
-      plt.title("Log–Log Regression of Total Time vs. N")
-      plt.legend()
-      plt.grid(True, which="both", ls="--")
-      plt.tight_layout()
+      # Quadratic fit for curvature (t1 vs k)
+      self.df["t1"] = self.df[name] / self.df["loadedp"]
+      def quadratic(k, a, b, c):
+          return a + b*k + c*(k**2)
+      params_q, _ = curve_fit(quadratic, self.df["loadedp"], self.df["t1"])
+      a_q, b_q, c_q = params_q
+      curvature_upper = 2*c_q
+      fig = plt.figure(figsize=(10, 6))
+      axs = fig.gca()
+       # (3) Log–log regression
+      axs.loglog(self.df["loadedp"], self.df[name], 'o', label="Measured")
+      xx = np.linspace(self.logN.min(), self.logN.max(), 200)
+      axs.loglog(10**xx, 10**(a_all+b_all*xx), '-', label=f"Full fit b={b_all:.2f}")
+      axs.loglog(10**xx, 10**(a_sat+b_sat*xx), '--', label=f"Saturated fit b={b_sat:.2f}")
+      axs.axvline(N0, color='gray', ls=':', label=f"N0={N0}")
+      axs.set_xlabel("Particles (N)")
+      axs.set_ylabel("Total time (s)")
+      #axs.set_title("Log–log regression fits")
+      axs.legend()
+      axs.grid(True, which="both", ls="--")
+      prefix_name = self.itemcfg.name.replace('_','')
       filename = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}{name}.png"
       plt.savefig(filename, dpi=300)
       self.include.append(filename)
@@ -98,5 +107,23 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       prefix_name = self.itemcfg.name.replace('_','')
       vdb = ValuesDataBase(self.bobj)
       vals_list = AttrDictFields()
-
+      if 'tot' in name:
+        self.vals_list[f"{prefix_name}{name}"] = 'Total'
+      elif 'gms' in name:
+        self.vals_list[f"{prefix_name}{name}"] = 'Graphics'
+      elif 'cms' in name:
+        self.vals_list[f"{prefix_name}{name}"] = 'Compute'
+        
+      self.vals_list[f"{prefix_name}{name}satval"] = f"{N0}"
+      self.vals_list[f"{prefix_name}{name}ball"] = f"{b_all:0.2f}"
+      self.vals_list[f"{prefix_name}{name}aall"] = f"{a_all:0.2f}"
+      self.vals_list[f"{prefix_name}{name}rtwoall"] = f"{r2_all:0.2f}"
+      self.vals_list[f"{prefix_name}{name}bsat"] = f"{b_sat:0.2f}"
+      self.vals_list[f"{prefix_name}{name}asat"] = f"{a_sat:0.2f}"
+      self.vals_list[f"{prefix_name}{name}rtwosat"] = f"{r2_all:0.2f}"
+      self.vals_list[f"{prefix_name}{name}aq"] = f"{a_q:0.4e}"
+      self.vals_list[f"{prefix_name}{name}bq"] = f"{b_q:0.4e}"
+      self.vals_list[f"{prefix_name}{name}cq"] = f"{c_q:0.4e}"
+      self.vals_list[f"{prefix_name}{name}curvatureupper"] = f"{curvature_upper:0.4e}"
+      
 
