@@ -1,0 +1,1 @@
+A log-log plot of throughput for graphics, compute, and total. The saturated point plateau's after $N=$\numprint{\APQBRTIMEPERPALLstartval{}} particles shown in the plot as a black vertical dashed line.

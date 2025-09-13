@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import csv
 import math
 data_list = []
-with open('test_data.csv', mode='r') as file:
+with open('CHATGP_Data.csv', mode='r') as file:
     csv_reader = csv.reader(file)
     for ii in range(0,10):
         next(csv_reader)  # Skip the header
@@ -20,6 +20,10 @@ timings_ms = [float(numeric_string) for numeric_string in gms]
 # === Example data (replace with your real measurements) ===
 #particle_counts = np.array([1e5, 2e6, 5e6, 1e7])
 #timings_ms = np.array([1.0, 10.5, 26.0, 70.0])  # measured timings in ms
+
+
+print("Min N in dataset:", np.min(particle_counts))
+print("All N values:", particle_counts)
 
 # === Fit quadratic: T(k) = a*k^2 + b*k + c ===
 coeffs = np.polyfit(particle_counts, timings_ms, deg=2)
@@ -52,6 +56,8 @@ lower_band = T_fit - curvature_band
 
 # === Plot ===
 plt.figure(figsize=(10, 6))
+print(particle_counts)
+print(timings_ms)
 plt.scatter(particle_counts, timings_ms, color="black", label="Measured Data")
 plt.plot(k_space, T_fit, color="blue", label="Quadratic Fit")
 plt.fill_between(k_space, lower_band, upper_band, color="blue", alpha=0.2,

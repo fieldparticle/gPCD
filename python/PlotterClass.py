@@ -1,9 +1,10 @@
-
+from ValuesDataBase import *
 from AttrDictFields import *
 from DataLine import *
 import math
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 class PlotterClass():
     
@@ -12,6 +13,63 @@ class PlotterClass():
         self.bobj = base
         self.include = []
         self.vals_list = AttrDictFields()
+       
+        self.prefix_name = self.itemcfg.name.replace('_','')
+
+    def __open_data_file__(self):
+        if not os.path.exists(self.itemcfg.input_data_file):
+          raise FileNotFoundError(f"CSV not found: {self.itemcfg.input_data_file}")
+        
+      # Load data
+        dfr = pd.read_csv(self.itemcfg.input_data_file)
+        ee = dfr.shape
+        beg,last = self.get_line_slices(1,ee[0])
+        df = dfr.iloc[beg:last]
+        return df
+
+
+
+    def __new_figure__(self):
+        self.plt = plt
+        self.fig = self.plt.figure(figsize=(10,6))
+        self.ax = self.fig.gca()
+        return self.plt,self.fig,self.ax
+    
+    def is_integer(self,s):
+        try:
+            int(s)
+            return True
+        except ValueError:
+            return False
+    
+    def is_number(self,s):
+        try:
+            float(s)
+            return True
+        except ValueError:
+            return False
+        
+    def __write_vals__(self):
+        vdb = ValuesDataBase(self.bobj)
+        vdb.write_values(self.vals_list)
+    
+    def __get_line_format_dict__(self,nm):
+        plot_format_string = f"plot_format{nm}"
+        format_dict = {}
+        plot_format = self.itemcfg[plot_format_string]
+        out_int = 0
+        out_float = 0.0
+        out_string = ""
+        for kk in plot_format:
+            all_item = kk.split("=")
+            if self.is_integer(all_item[1]):
+                format_dict[all_item[0]]=int(all_item[1])
+            elif  self.is_number(all_item[1]):
+                format_dict[all_item[0]]=float(all_item[1])
+            else:
+                 format_dict[all_item[0]]=all_item[1]
+        return format_dict        
+        
 
     def get_line_slices(self,line_num,line_len):
         start_num = 0
@@ -27,17 +85,29 @@ class PlotterClass():
                 end_num = int(start_ary[1])
         return start_num,end_num
     
+    def __clean_files__(self,filename):
+        try:
+            os.unlink(filename)
+            print(f"File '{filename}' deleted successfully.")
+        except FileNotFoundError:
+            print(f"File '{filename}' does notexist yet")
+    
     def run(self):
         pass
-    def do_commands(self,plt,fig,ax):
+
+    def __do_commands__(self,plt,fig,ax):
         plt_commands = self.itemcfg.plot_commands
         for pp in plt_commands:
-            eval(pp)
+            try:
+                eval(pp)
+            except BaseException:
+                print(f"Command:{pp} Failed.")
+        
         
      #******************************************************************
     # Do the legend
     #
-    def do_legend(self):
+    def __do_legend__(self):
         leg_list = []
         leg_str = ""
         legend_commands = self.itemcfg.plot_legend 

@@ -31,7 +31,7 @@ class ValuesDataBase():
             print("Values file does not exist:",e)
             return
         for k,v in self.vals_cfg.items():
-            val_string = "\\newcommand{" + "\\" + k + "}{" + f"{v}" + "}\n"
+            val_string = "\\providecommand{" + "\\" + k + "}{" + f"{v}" + "}\n"
             file_handle.write(val_string)
         file_handle.close()
 

@@ -104,8 +104,6 @@ class ReportLatexTable(ReportClass):
         self.table_array = self.table_array[sel_ary]
         self.rows = len(self.table_array)
         
-        
-        
     def setLatexHeaderArray(self, header):
         self.header_arry = header
 

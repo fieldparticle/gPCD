@@ -15,7 +15,7 @@ Output:
 import sys
 import os
 import pandas as pd
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as mplt
 import numpy as np
 import csv
 import math
@@ -26,12 +26,8 @@ from PlotterClass import *
 class A_PQBR_THROUGH_PUT_ALL(PlotterClass):
     
   def run(self):
-      if not os.path.exists(self.itemcfg.input_data_file):
-          raise FileNotFoundError(f"CSV not found: {self.itemcfg.input_data_file}")
 
-      # Load data
-      df = pd.read_csv(self.itemcfg.input_data_file)
-
+      df = self.__open_data_file__()
       # Ensure required columns exist
       required = {"loadedp", "gms", "cms"}
       missing = required - set(df.columns)
@@ -50,21 +46,29 @@ class A_PQBR_THROUGH_PUT_ALL(PlotterClass):
       both = np.add(gms,cms)
       df["total_throughput_mpps"]  = (df["loadedp"] / both)/ 1e6
 
-      # Plot (log–log)
-      plt.figure(figsize=(8, 6))
-      plt.loglog(df["loadedp"], df["graphics_throughput_mpps"], "o-", label="Graphics throughput")
-      plt.loglog(df["loadedp"], df["compute_throughput_mpps"],  "s-", label="Compute throughput")
-      plt.loglog(df["loadedp"], df["total_throughput_mpps"],  "s-", label="Total throughput")
-
-      plt.xlabel("Number of particles (N)")
-      plt.ylabel("Throughput (Mpps)")
-      plt.title("Graphics vs Compute Throughput (log–log)")
-      plt.legend()
-      plt.grid(True, which="both", ls="--", alpha=0.6)
-      plt.tight_layout()
+      # === Plot ===
+      ##------------------------------------------
+      plt,fig,ax = self.__new_figure__()
+      ##-------------------------------------------
+      fdct = self.__get_line_format_dict__(1)
+      plt.loglog(df["loadedp"], df["graphics_throughput_mpps"],**fdct)
+      fdct = self.__get_line_format_dict__(2)
+      plt.loglog(df["loadedp"], df["compute_throughput_mpps"],**fdct)
+      fdct = self.__get_line_format_dict__(3)
+      plt.loglog(df["loadedp"], df["total_throughput_mpps"],**fdct)
+      fdct = self.__get_line_format_dict__(4)
+      plt.axvline(x=2245632,**fdct)
+      self.__do_commands__(plt,fig,ax)
+      leg_list = self.__do_legend__()
+      plt.legend(leg_list)
+      
+      #plt.tight_layout()
       filename = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}.png"
+      self.__clean_files__(filename)
+      plt.pause(0.01)
       plt.savefig(filename, dpi=300)
       plt.close()
+      #self.__write_vals__()
       self.include.append(filename)
-      print(f"Saved: {filename}")
+      
 

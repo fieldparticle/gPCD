@@ -9,7 +9,7 @@ data_list = []
 
 from PlotterClass import *
 
-class A_PBQR_CURVATURE(PlotterClass):
+class <Same-Name-as-cfg-file>(PlotterClass):
     
         
     def __init__(self,itemcfg,base):
@@ -60,12 +60,12 @@ class A_PBQR_CURVATURE(PlotterClass):
         quad_effect = math.sqrt(one_percent/a)
         # === Plot ===
         ##------------------------------------------
-        plt,fig,ax = self.__new_figure__()
+        plt,fig,ax = self.new_figure()
         ##-------------------------------------------
         plt.scatter(particle_counts, timings_ms, color="black")
         plt.plot(k_space, T_fit, color="blue")
         plt.fill_between(k_space, lower_band, upper_band, color="blue", alpha=0.2)
-        plt.pause(0.01)
+        
         ##-------------------------------------------
         leg_list = self.__do_legend__()
         plt.legend(leg_list)

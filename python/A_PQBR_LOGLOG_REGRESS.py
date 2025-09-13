@@ -67,17 +67,16 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       
       #elf.do_plot('TotalTime',self.logN,self.logT)
       self.itemcfg['input_images'] = self.include
-      vdb = ValuesDataBase(self.bobj)
-      vdb.write_values(self.vals_list)
+      self.__write_vals__()
       
 
     def do_plot(self,name):
       # Log–log regression
       # Full fit
-      a_all, b_all, r2_all = self.fit_range(np.ones(len(self.df), dtype=bool))
+      b_all, a_all, r2_all = self.fit_range(np.ones(len(self.df), dtype=bool))
       # Saturated fit
       mask_sat = self.df["loadedp"] >= N0
-      a_sat, b_sat, r2_sat = self.fit_range(mask_sat)
+      b_sat, a_sat, r2_sat = self.fit_range(mask_sat)
 
       # Quadratic fit for curvature (t1 vs k)
       self.df["t1"] = self.df[name] / self.df["loadedp"]
@@ -115,11 +114,11 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
         self.vals_list[f"{prefix_name}{name}"] = 'Compute'
         
       self.vals_list[f"{prefix_name}{name}satval"] = f"{N0}"
-      self.vals_list[f"{prefix_name}{name}ball"] = f"{b_all:0.2f}"
-      self.vals_list[f"{prefix_name}{name}aall"] = f"{a_all:0.2f}"
+      self.vals_list[f"{prefix_name}{name}ball"] = f"{a_all:0.2f}"
+      self.vals_list[f"{prefix_name}{name}aall"] = f"{b_all:0.2f}"
       self.vals_list[f"{prefix_name}{name}rtwoall"] = f"{r2_all:0.2f}"
-      self.vals_list[f"{prefix_name}{name}bsat"] = f"{b_sat:0.2f}"
-      self.vals_list[f"{prefix_name}{name}asat"] = f"{a_sat:0.2f}"
+      self.vals_list[f"{prefix_name}{name}bsat"] = f"{a_sat:0.2f}"
+      self.vals_list[f"{prefix_name}{name}asat"] = f"{b_sat:0.2f}"
       self.vals_list[f"{prefix_name}{name}rtwosat"] = f"{r2_all:0.2f}"
       self.vals_list[f"{prefix_name}{name}aq"] = f"{a_q:0.4e}"
       self.vals_list[f"{prefix_name}{name}bq"] = f"{b_q:0.4e}"
