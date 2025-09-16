@@ -24,19 +24,22 @@ def s_per_obj_from_point(p):
         return p["time_s"] / p["N"]
     if "fps" in p and p["N"] is not None:
         return (1.0 / p["fps"]) / p["N"]
+    if "ns_pre_obj" in p and p["N"] is not None:
+        return (1.0 / p["ns_pre_obj"]) / p["N"]
     raise ValueError(f"Point missing required timing fields: {p}")
+
 
 # -----------------------------
 # Curated sample points (edit me)
 # -----------------------------
 points = [
     # name, N, timing (choose one of time_s, fps, ns_per_obj)
-    {"name": "Govender 2015 (DEM polyhedra)", "N": 34_000_000, "time_s": 1.0},     # "<1 s" → ~1 s
-    {"name": "Govender 2016 (Blaze-DEMGPU)",  "N": 4_000_000,  "fps": 20.0},       # 20 FPS
-    {"name": "Latta 2004",                    "N": 1_000_000,  "fps": 30.0},       # ~30 FPS
-    {"name": "Franklin 2017 (ParCube)",       "N": 10_000_000, "time_s": 0.33},    # 0.33 s
-    {"name": "Liu 2010 (GPU SaP)",            "N": 1_000_000,  "fps": 20.0},       # ~20 FPS
-    {"name": "Coming & Staadt 2006 (Kinetic SaP)", "N": 600_000, "fps": 15.0},     # ~15 FPS
+    {"name": "Govender 2015 (DEM polyhedra)", "N": 34_000_000, "time_s": 1.0,"note": "$<1 s \arrow 1 s"},     # "<1 s" → ~1 s
+    {"name": "Govender 2016 (Blaze-DEMGPU)",  "N": 4_000_000,  "fps": 20.0,"note":"20 FPS"},       # 20 FPS
+    {"name": "Latta 2004",                    "N": 1_000_000,  "fps": 30.0,"note":"$\approx$ 30 FPS"},       # ~30 FPS
+    {"name": "Franklin 2017 (ParCube)",       "N": 10_000_000, "time_s": 0.33,"note":"0.33s"},    # 0.33 s
+    {"name": "Liu 2010 (GPU SaP)",            "N": 1_000_000,  "fps": 20.0, "note":"$\approx$ 20 FPS"},       # ~20 FPS
+    {"name": "Coming & Staadt 2006 (Kinetic SaP)", "N": 600_000, "fps": 15.0,"note":"$\approx$ 15 FPS"},     # ~15 FPS
 
     # Your system
     {"name": "Our System 2025",               "N": 11_088_896, "time_s": 0.08417}, # 84.17 ms

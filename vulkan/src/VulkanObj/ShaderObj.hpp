@@ -54,6 +54,7 @@ public:
 	void WriteShaderHeader();
 	void WriteShaderHeaderCDNOZ();
 	int RemoteCompileShaders();
+	std::vector<char> ReadSPVFile(const std::string& filename);
 	int WriteBinaryFile(std::string fileName, std::vector<char> buffer);
 	int CompileShader(std::string ShaderName, 
 		std::string ShaderFileName,

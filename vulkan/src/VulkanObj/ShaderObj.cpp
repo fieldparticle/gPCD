@@ -231,8 +231,12 @@ int ShaderObj::CompileShader(std::string ShaderGLSLName,
 		//WriteBinaryFile(fname, SPVBuffer);
 		return ret;
 	}
+	else
+	{
+		SPVBuffer = ReadSPVFile(ShaderSPVFileName);
+		return 0;
+	}
 	return 0;
-
 }
 
 #if 0
@@ -309,7 +313,22 @@ int ShaderObj::CompileShader(std::string ShaderGLSLName,
 }
 #endif
 	
+std::vector<char> ShaderObj::ReadSPVFile(const std::string& filename) 
+{
+	std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
+	if (!file.is_open()) 
+	{
+		throw std::runtime_error("failed to open file!");
+	}
+	size_t fileSize = (size_t)file.tellg();
+	std::vector<char> buffer(fileSize);
+	file.seekg(0);
+	file.read(buffer.data(), fileSize);
+	file.close();
+
+	return buffer;
+}
 
 int ShaderObj::WriteBinaryFile(std::string fileName, std::vector<char> buffer)
 {

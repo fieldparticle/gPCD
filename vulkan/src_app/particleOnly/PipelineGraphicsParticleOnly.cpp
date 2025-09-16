@@ -51,6 +51,7 @@ void PipelineGraphicsParticleOnly::CreatePipeline()
 
     std::vector<char>  fragShaderCode;
     m_SHO->CompileShader(fshader_glsl, fshader_spv, fragShaderCode, m_SHO->SH_FRAG);
+
     VkShaderModule fragShaderModule = createShaderModule(fragShaderCode,
         fshader_glsl);
    

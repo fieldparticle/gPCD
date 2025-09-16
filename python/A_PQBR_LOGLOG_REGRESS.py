@@ -37,6 +37,18 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       slope, intercept, r, p, se = linregress(x, y)
       return slope, intercept, r**2
     
+    def s_per_obj_from_point(self,p):
+      if "ns_per_obj" in p:
+          return p["ns_per_obj"] * 1e-9
+      if "time_s" in p and p["N"] is not None:
+          return p["time_s"] / p["N"]
+      if "fps" in p and p["N"] is not None:
+          return (1.0 / p["fps"]) / p["N"]
+      if "spf" in p and p["N"] is not None:
+          return (1.0 / p["fps"]) / p["N"]
+      raise ValueError(f"Point missing required timing fields: {p}")
+
+    
     def run(self):
       
       
