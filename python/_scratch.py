@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-Curvature-bound visualization for Graphics, Compute, and Total
-using raw timings (seconds) from CHATGP_Data.csv.
-Plots only linear axes.
+Quadratic fit with curvature analysis, including
+upper bound on curvature and 'noticeable curvature' thresholds.
 """
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
+import math
 
 # --- Load dataset ---
 df = pd.read_csv("CHATGP_Data.csv")
@@ -17,51 +16,58 @@ df = pd.read_csv("CHATGP_Data.csv")
 if "loadedp" in df.columns:
     df = df.rename(columns={"loadedp": "N"})
 
-# Add total stage time (s)
+# Add total stage
 df["total"] = df["gms"] + df["cms"]
 
-# Filter to N >= 98,304
-df = df[df["N"] >= 98304].reset_index(drop=True)
+# --- Helper: compute noticeable curvature thresholds ---
+def noticeable_curvature(a, b, c, eps=0.01, dT=1e-5):
+    if c <= 0:
+        return {"note": "c <= 0, no positive curvature"}
+    N_lin   = eps * b / c
+    N_slope = eps * b / (2*c)
+    N_abs   = math.sqrt(dT / c)
+    return {
+        "N_lin": N_lin,
+        "N_slope": N_slope,
+        "N_abs": N_abs,
+        "N_noticeable": max(N_lin, N_slope, N_abs)
+    }
 
-# Quadratic model
-def quadratic(N, a, b, c):
-    return a + b*N + c*N**2
+# --- Fit and report for each stage ---
+stages = {
+    "Graphics": df["gms"],
+    "Compute": df["cms"],
+    "Total": df["total"]
+}
 
-def fit_and_plot(N, T, name, fname_prefix):
-    # Fit quadratic
-    popt, _ = curve_fit(quadratic, N, T)
-    a, b, c = popt
-    curvature = 2*c  # s/particle^2
+for name, timings in stages.items():
+    N = df["N"].to_numpy()
+    T = timings.to_numpy()
+    coeffs = np.polyfit(N, T, deg=2)
+    a, b, c = coeffs
+    curvature = 2*c
+    thresholds = noticeable_curvature(a, b, c, eps=0.01, dT=1e-5)
 
-    # Smooth curve
-    xx = np.linspace(N.min(), N.max(), 300)
-    T_fit = quadratic(xx, *popt)
+    print(f"\n--- {name} ---")
+    print(f"Quadratic fit: T(N) = {a:.3e} + {b:.3e} N + {c:.3e} N^2 [s]")
+    print(f"Upper bound on curvature (2c): {curvature:.3e} s/particle^2")
+    print("Noticeable curvature thresholds:")
+    print(f"  N_lin   (1% quadratic vs linear): {thresholds['N_lin']:.3e}")
+    print(f"  N_slope (1% slope change):       {thresholds['N_slope']:.3e}")
+    print(f"  N_abs   (deltaT=1e-5s):          {thresholds['N_abs']:.3e}")
+    print(f"  ==> Conservative N_noticeable:   {thresholds['N_noticeable']:.3e}")
 
-    # Curvature band (seconds)
-    mid_k = 0.5 * (N.min() + N.max())
-    delta_slope = curvature * (xx - mid_k)
-    curvature_band = np.abs(delta_slope) * (xx - mid_k) * 0.5
-    upper = T_fit + curvature_band
-    lower = T_fit - curvature_band
-
-    # --- Linear plot ---
-    plt.figure(figsize=(7,5))
-    plt.scatter(N, T, color="black", s=18, label="Measured time")
-    plt.plot(xx, T_fit, color="C0", label="Quadratic fit")
-    plt.fill_between(xx, lower, upper, color="C0", alpha=0.2,
-                     label="Curvature bound region")
+    # Optional: plot with fit
+    k_space = np.linspace(N.min(), N.max(), 200)
+    T_fit = a + b*k_space + c*k_space**2
+    plt.figure(figsize=(8,6))
+    plt.scatter(N, T, label="Measured")
+    plt.plot(k_space, T_fit, label="Quadratic Fit", color="blue")
     plt.xlabel("Particles (N)")
     plt.ylabel("Time (s)")
-    plt.title(f"{name}: Quadratic fit (Linear axes)\n2c={curvature:.2e} s/part²")
-    plt.grid(True, ls="--", alpha=0.6)
+    plt.title(f"{name}: Quadratic Fit with Curvature Analysis")
     plt.legend()
+    plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f"{fname_prefix}_linear.png", dpi=300)
-
-    print(f"{name}: a={a:.3e}, b={b:.3e}, c={c:.3e}, curvature=2c={curvature:.3e} s/part²")
-    print(f"Saved {fname_prefix}_linear.png\n")
-
-# Run for Graphics, Compute, Total
-fit_and_plot(df["N"].values, df["gms"].values,   "Graphics", "curvature_graphics")
-fit_and_plot(df["N"].values, df["cms"].values,   "Compute",  "curvature_compute")
-fit_and_plot(df["N"].values, df["total"].values, "Total",    "curvature_total")
+    plt.savefig(f"curvature_{name.lower()}.png", dpi=300)
+    plt.close()

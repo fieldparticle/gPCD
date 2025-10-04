@@ -14,7 +14,27 @@ class A_PBQR_CURVATURE(PlotterClass):
         
     def __init__(self,itemcfg,base):
         super().__init__(itemcfg,base)
-        
+
+    def curvature_thresholds(self,a, b, c, eps=0.01, dT=1e-5):
+    
+        cabs, babs = abs(c), abs(b)
+        # 1) Relative to linear (large-N approx and exact with 'a')
+        N_eps_lin = eps*babs/cabs if cabs>0 else float('inf')
+        disc = (eps*b)**2 + 4*eps*cabs*a
+        N_eps_exact = ((eps*b) + math.sqrt(max(disc, 0.0))) / (2*cabs) if cabs>0 else float('inf')
+        # 2) Slope criterion
+        N_eps_slope = eps*babs/(2*cabs) if cabs>0 else float('inf')
+        # 3) Absolute timing resolution
+        N_dT = math.sqrt(dT/cabs) if cabs>0 else float('inf')
+        return {
+            "N_eps_lin_approx": N_eps_lin,
+            "N_eps_exact": N_eps_exact,
+            "N_eps_slope": N_eps_slope,
+            "N_dT": N_dT,
+            "N_noticeable": max(N_eps_exact, N_eps_slope, N_dT)
+        }
+
+
         
 
     def do_plot(self,name,particle_counts,timings_ms):
@@ -27,25 +47,26 @@ class A_PBQR_CURVATURE(PlotterClass):
         coeffs = np.polyfit(particle_counts, timings_ms, deg=2)
         a2, b, c = coeffs
         curvature = 2 * a2  # second derivative (constant for quadratic)
-        
-        print(f"Quadratic fit: T(k) = {a2:.3e} k^2 + {b:.3e} k + {c:.3e}")
-        print(f"Upper bound on curvature (2a): {curvature:.3e} ms / particle^2")
+
+        print(f"Quadratic fit: T(k) = {a2:.3e} k^2 + {b:.3e} k + {c:.3e}\n")
+        print(f"Upper bound on curvature (2a): {curvature:.3e} ms / particle^2\n")
         a = a2
         xmaN = particle_counts[-1]
         maxT = timings_ms[-1]
         an = a2*(xmaN**2)
         delt= curvature*xmaN*xmaN
-        print(f"a={a} quadratic contribution:{an}")
+        #print(f"a={a} quadratic contribution:{an}")
         val_time = np.max(timings_ms)
         max_val =an/(np.max(timings_ms))
-        print(f"Total t:{val_time} contribution:{max_val}")
-        one_percent_error = 0.01*val_time*1000
+        print(f"Total t:{val_time} contribution:{max_val}\n")
+        one_percent_error = 0.01*val_time
         max_n = math.sqrt(one_percent_error/a2)
-        print(f"Estimated noticable value:{max_n}")
+        print(f"Estimated noticable value:{max_n}\n")
 
         # === Compute fitted curve and curvature band ===
         k_space = np.linspace(np.min(particle_counts), np.max(particle_counts), 200)
         T_fit = a * k_space**2 + b * k_space + c
+        
 
         # The curvature bound: how much the slope could change from the mid-range
         mid_k = 0.5 * (np.min(particle_counts) + np.max(particle_counts))
@@ -56,7 +77,7 @@ class A_PBQR_CURVATURE(PlotterClass):
         upper_band = T_fit + curvature_band
         lower_band = T_fit - curvature_band
 
-        one_percent =  0.01 *val_time*1000    
+        one_percent =  0.01*val_time
         quad_effect = math.sqrt(one_percent/a)
         # === Plot ===
         ##------------------------------------------
@@ -83,7 +104,7 @@ class A_PBQR_CURVATURE(PlotterClass):
         
         del_t1 = curvature*xmaN
         del_t2 = del_t1*xmaN
-        del_t2_frc = del_t2/(val_time*1000)
+        del_t2_frc = del_t2/(val_time)
         del_t2_pct = del_t2_frc*100
         if 'tot' in name:
             self.vals_list[f"{self.prefix_name}{name}"] = 'Total'
@@ -105,8 +126,8 @@ class A_PBQR_CURVATURE(PlotterClass):
         self.vals_list[f"{self.prefix_name}{name}QuadraticContributiontb"] = f"{del_t2:0.4e}"
         self.vals_list[f"{self.prefix_name}{name}QuadraticContributionfrc"] = f"{del_t2_frc:0.6f}"
         self.vals_list[f"{self.prefix_name}{name}QuadraticContributionpct"] = f"{del_t2_pct:0.6f}"
-        self.vals_list[f"{self.prefix_name}{name}TotalTime"] = f"{val_time*1000:0.4f}"
-        self.vals_list[f"{self.prefix_name}{name}TotalTimeCont"] = f"{delt*1000:0.4f}"
+        self.vals_list[f"{self.prefix_name}{name}TotalTime"] = f"{val_time:0.4f}"
+        self.vals_list[f"{self.prefix_name}{name}TotalTimeCont"] = f"{delt:0.4f}"
         max_as_int = int(float(max_n))
         self.vals_list[f"{self.prefix_name}{name}EstimateNoticeableN"] = f"{max_as_int:,}"
         rescale = 2*a*1E7*1E6 
@@ -142,3 +163,5 @@ class A_PBQR_CURVATURE(PlotterClass):
 
         self.__write_vals__()
         return
+
+

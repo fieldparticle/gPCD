@@ -42,7 +42,8 @@ class ReportLatexEquation(ReportClass):
         equat = "f\""
         eqtxt = ""
         for ii in self.itemcfg.equation:
-            if '{' in ii:
+            
+            if 'fld' in ii:
                 field,fmt = self.extract_field(ii)
                 if field in fld:
                     val = fld[field]
@@ -53,11 +54,14 @@ class ReportLatexEquation(ReportClass):
                     except BaseException as e:
                         print(e)
                         raise ValueError
+            
             else:
+            
                 eqtxt+= ii
        
+        #f.write('$')
         f.write(eqtxt)
-        
+        #f.write('\n')
         w ="\\label{eqn:" + self.itemcfg.name + "}\n"
         f.write(w)   
         w = "\\end{aligned}\n"

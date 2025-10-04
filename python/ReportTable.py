@@ -81,16 +81,18 @@ class ReportLatexTable(ReportClass):
         self.Write()
     
     def save_export_vals(self):
+        g = self.lines_list[0]
         vdb = ValuesDataBase(self.bobj)
         save_lines_vals = 0
         prefix_name = self.itemcfg.name.replace('_','')
         if 'save_lines_vals' in self.itemcfg:
             save_lines_vals = self.itemcfg.save_lines_vals
             for rr in range(self.rows) :
-                for cc in range(self.cols) :
-                    if rr in save_lines_vals:
-                        self.vals_list[f"{prefix_name}{vdb.alph(rr)}{vdb.alph(cc)}"] = self.table_array[rr][cc]
-                    
+                if rr in save_lines_vals:
+                    for cc in range(self.cols) :
+                       print(f"row{rr} col {cc} row {vdb.alph(rr+1)} col {vdb.alph(cc+1)}")
+                       self.vals_list[f"{prefix_name}{vdb.alph(rr+1)}{vdb.alph(cc+1)}"] = self.table_array[rr][cc]
+                            
         vdb.write_values(self.vals_list)
         return
           

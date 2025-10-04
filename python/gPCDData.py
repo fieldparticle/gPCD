@@ -145,6 +145,8 @@ class gPCDData():
             self.get_maxes(file_dict)
         elif 'avg' in file_dict.compute_type:
             self.get_averages(file_dict)
+        elif 'min' in file_dict.compute_type:
+            self.get_mins(file_dict)
         return 0
     
     #******************************************************************
@@ -239,8 +241,8 @@ class gPCDData():
         self.create_summary(file_dict)
         #print("Performing Averages")
         self.average_list = []
-        for i in self.data_files:
-            file_path_release = self.topdir + "/" + i + "R.csv"
+        for ii in self.data_files:
+            file_path_release = file_dict.target_dir + "/" + ii + "R.csv"
             fps = cpums = cms = gms = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = 0
         
             try:
@@ -268,9 +270,9 @@ class gPCDData():
             shaderp_comp = shaderp_comp / count
             shaderp_grph = shaderp_grph / count
             shaderc = shaderc / count
-            avg_list = [i, fps, cpums, cms, gms, expectedp, loadedp, shaderp_comp,
+            avg_list = [ii, fps, cpums, cms, gms, expectedp, loadedp, shaderp_comp,
                         shaderp_grph, expectedc, shaderc, sidelen]
-            with open(self.sumFile, 'a', newline='') as file:
+            with open( file_dict.summary_file_name, 'a', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(avg_list)
             self.average_list.append(avg_list)
@@ -314,7 +316,63 @@ class gPCDData():
                             loadedp = float(col['loadedp'])
                             expectedc = int(col['expectedc'])
                             sidelen = int(col['sidelen'])
-                            cell_count = int(col['cell_count'])
+                            if 'cell_count' in col:
+                                cell_count = int(col['cell_count'])
+            except BaseException as e:
+                raise BaseException(f"LatexDataParticle get_max failed: {e}")
+
+            mean = statistics.mean(fps_list)
+            stddev = statistics.stdev(fps_list)
+            mmrr = self.mmrr_gms 
+            max_list = [ii, fps_old, cpums_old, cms_old, gms_old, expectedp, loadedp, shaderp_comp,
+                        shaderp_grph, expectedc, shaderc, sidelen,cell_count,mean,stddev,mmrr]
+            with open( file_dict.summary_file_name, 'a', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(max_list)
+            self.average_list.append(max_list)
+        #print("REMEMBER CELL_COUNT is new and needs to be uncommented after new tests.")
+        file.close()
+
+         #******************************************************************
+    # Get maximuns write then to summary file
+    #
+    def get_mins(self,file_dict):
+        self.create_summary(file_dict)
+        for ii in self.data_files:
+            fps_old = 0
+            cpums_old = 1000.0
+            cms_old = 1000.0
+            gms_old = 1000.0
+            self.do_mmrr()
+            data_file = file_dict.target_dir + "/" + ii + "R.csv"
+            mean = stddev = fps = cpums = cms = gms = cell_count = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = mmrr = 0
+            fps_list = []
+          
+            try:
+                with open(data_file, 'r') as filename:
+                    file = csv.DictReader(filename)
+                    for col in file:
+                        
+                        count += 1
+                        fps = float(col['fps'])
+                        fps_list.append(fps)
+                        if fps > fps_old:
+                            fps_old = fps
+                        cpums = float(col['cpums'])
+                        if cpums < cpums_old:
+                            cpums_old = cpums
+                        cms = float(col['cms'])
+                        if cms < cms_old:
+                            cms_old = cms
+                        gms = float(col['gms'])
+                        if gms < gms_old:
+                            gms_old = gms
+                        if count == 1:
+                            loadedp = float(col['loadedp'])
+                            expectedc = int(col['expectedc'])
+                            sidelen = int(col['sidelen'])
+                            if 'cell_count' in col:
+                                cell_count = int(col['cell_count'])
             except BaseException as e:
                 raise BaseException(f"LatexDataParticle get_max failed: {e}")
 

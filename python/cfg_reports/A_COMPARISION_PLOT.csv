@@ -1,8 +1,8 @@
-name,N,time_s,fps,ns_pre_obj,quote
-Govender 2015 (DEM polyhedra),34_000_000,1,1,,<1 s $\arrow$ 1 s
-Govender 2016 (Blaze-DEMGPU),4_000_000,,20,,20 FPS
-Latta 2004,1_000_000,,30,,$\approx$ 30 FPS
-Franklin 2017 (ParCube),10_000_000,0.33,,,0.33s
-Liu 2010 (GPU SaP),1_000_000,,20,,$\approx$ 20 FPS
-Coming & Staadt 2006 (Kinetic SaP), 600_000,,15,,$\approx$ 15 FPS
-gPCD,11_088_896,,,,
+name,N,time_s,fps,quote
+Govender 2015 (DEM polyhedra),34000000,1,1,<1 s $\arrow$ 1 s
+Govender 2016 (Blaze-DEMGPU),4000000,,20,20 FPS
+Latta 2004,1000000,,30,$\approx$ 30 FPS
+Franklin 2017 (ParCube),10000000,0.33,,0.33s
+Liu 2010 (GPU SaP),1000000,,20,$\approx$ 20 FPS
+Coming & Staadt 2006 (Kinetic SaP),600000,,15,$\approx$ 15 FPS
+BELL (gPCD),11088896,0.08417,,

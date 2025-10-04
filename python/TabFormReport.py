@@ -75,7 +75,7 @@ class TabFormReport(QTabWidget):
                 return
             '''
             self.data_container = None 
-            self.data_container = DataContainer(self,self.itemcfg)
+            self.data_container = DataContainer(self.bobj,self.itemcfg)
             self.VerifyButton.setEnabled(True)
             self.PreviewButton.setEnabled(True)
 
@@ -140,7 +140,7 @@ class TabFormReport(QTabWidget):
     def do_gpcd_table(self):
         try :
             self.data_container = None 
-            self.data_container = DataContainer(self,self.itemcfg_main)
+            self.data_container = DataContainer(self.bobj,self.itemcfg_main)
             self.data_container.clear()
             self.data_container.get_particle_data_fields()
             self.data_container.parse_lines_list()
@@ -148,6 +148,7 @@ class TabFormReport(QTabWidget):
             lines_list = None
             self.data_container.apply_data_to_fields()
             self.data_container.do_equations()
+            #self.data_container.save_vals()
             
         except BaseException as e:
             print(f"preview failed:{e}")
@@ -157,7 +158,7 @@ class TabFormReport(QTabWidget):
     def do_plot(self):
         try :
             self.data_container = None 
-            self.data_container = DataContainer(self,self.itemcfg_main)
+            self.data_container = DataContainer(self.bobj,self.itemcfg_main)
             self.data_container.clear()
             self.data_container.get_particle_data_fields()
             lines_list = None

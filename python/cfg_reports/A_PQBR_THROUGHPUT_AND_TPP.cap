@@ -1,0 +1,6 @@
+
+(a) A plot of randomly ordered particles performance (red squares) versus
+sequentiall ordered particles (blue circles). The random performance 
+increases disproportionately with sequential performance as the number of 
+particles increase.
+(b) A log-log plot of throughput for graphics, compute, and total. The saturated point plateau's after $N=$\numprint{\APQBRTIMEPERPALLstartval{}} particles shown in the plot as a black vertical dashed line. (c) time per particle for graphics, compute, total starting at, N=\numprint{\APQBRTIMEPERPALLstartval{}}, for the start of the heavily saturated range. Graphics stabilizes at $\APQBRTIMEPERPALLGraphicsstabilzes{}  \pm \APQBRTIMEPERPALLGraphicsstdval{} $ $\sfrac{ns}{particle}$, compute at $\APQBRTIMEPERPALLComputestabilzes{} \pm \APQBRTIMEPERPALLComputestdval{}$ $\sfrac{ns}{particle}$ for a total stabilization at $\APQBRTIMEPERPALLTotalstabilzes{} \pm \APQBRTIMEPERPALLTotalstdval{}$ $\sfrac{ns}{particle}$. 

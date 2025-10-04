@@ -56,8 +56,6 @@ class ReportClass():
             w = "\t\t\\includegraphics[width=" +  str(self.itemcfg.plot_width) +  "in]{" + sgdir + "}\n"
             f.write(w)
             refname = os.path.splitext(os.path.basename(gdir))[0]
-            w = "\t\t\\label{fig:" + refname + "}\n"
-            f.write(w)
             w = "\\hspace{" + str(self.itemcfg.hspace) + "in}\n"
             f.write(w)
             w = "\\caption[TITLE:" + self.itemcfg.title + "]{\\textit{" + self.caption + "}}\n"
@@ -139,15 +137,13 @@ class ReportClass():
                 w = "\t\t\\subcaption[" + "" +"]{" + cfg.sub_caption[ii] + "}\n"
                 f.write(w)
                 refname = os.path.splitext(os.path.basename(sgdir))[0]
-                w = "\t\t\\label{fig:" + refname + "}\n"
-                f.write(w)
                 w = "\t\\end{subfigure}\n"
                 f.write(w)
                 w = "\\hspace{" + cfg.hspace + "in}\n"
                 f.write(w)
             w = "\\caption[TITLE:" + cfg.title + "]{\\textit{" + self.caption + "}}\n"
             f.write(w)
-            w = "\t\t\\label{fig:" + cfg.name + "}\n"
+            w = "\\label{fig:" + cfg.name + "}\n"
             f.write(w)
             w = "\\end{figure*}\n"
             f.write(w)

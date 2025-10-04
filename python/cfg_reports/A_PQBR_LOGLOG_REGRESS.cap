@@ -6,4 +6,4 @@ scaling in practice, despite the $O(N^{2})$ theoretical bound of collision
 detection. The regression achieved $R^{2} > 0.99$, indicating that the 
 throughput follows a consistent scaling law, with deviations only at small 
 $N$ due to fixed overheads before GPU saturation is reached at 
-$N \approx 10^{4}$.
+$N \approx 10^{6}$.

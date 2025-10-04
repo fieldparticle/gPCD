@@ -102,9 +102,9 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
        # (3) Log–log regression
       axs.loglog(self.df["loadedp"], self.df[name], 'o', label="Measured")
       xx = np.linspace(self.logN.min(), self.logN.max(), 200)
-      axs.loglog(10**xx, 10**(a_all+b_all*xx), '-', label=f"Full fit b={b_all:.2f}")
+      #axs.loglog(10**xx, 10**(a_all+b_all*xx), '-', label=f"Full fit b={b_all:.2f}")
       axs.loglog(10**xx, 10**(a_sat+b_sat*xx), '--', label=f"Saturated fit b={b_sat:.2f}")
-      axs.axvline(N0, color='gray', ls=':', label=f"N0={N0}")
+      axs.axvline(N0*10, color='gray', ls=':', label=f"N0={N0*10:.1e}")
       axs.set_xlabel("Particles (N)")
       axs.set_ylabel("Total time (s)")
       #axs.set_title("Log–log regression fits")
@@ -112,7 +112,7 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       axs.grid(True, which="both", ls="--")
       prefix_name = self.itemcfg.name.replace('_','')
       filename = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}{name}.png"
-      plt.savefig(filename, dpi=300)
+      plt.savefig(filename, dpi=600)
       self.include.append(filename)
       plt.close()
       prefix_name = self.itemcfg.name.replace('_','')

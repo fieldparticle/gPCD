@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from PyQt6.QtWidgets import QMessageBox
 from CSVData import *
+from ValuesDataBase import *
 
 class DataContainer():
 
@@ -144,7 +145,7 @@ class DataContainer():
         return out_list        
 
             #print(nn)
-
+    
     #******************************************************************
     # parse the fields from the list and add to a dictionary 
     #
@@ -311,7 +312,8 @@ class DataContainer():
                     continue
                 # If its a treandline the perform the fit
                 elif 'trend' in self.lines_list[nm].line_type or 'residual' in self.lines_list[nm].line_type :
-                    td = TrendLine()
+                    td = TrendLine(self.bobj)
+                    self.lines_list[nm]
                     ydata = td.add_trend_line(self.lines_list[0],self.lines_list[nm])
                     self.lines_list[nm].data['line_data'] = ydata
                     plot_format_string = f"plot_format{self.lines_list[nm].line_num}"
@@ -415,11 +417,25 @@ class DataContainer():
             except BaseException as e:
                 print(f"Could not assign data in apply_data_to_fields:{e}")
                 return
-            
+            if nm == 0:
+                if('save_vals') in self.itemcfg:
+                    vdb = ValuesDataBase(self.bobj)
+                    prefix_name = self.itemcfg.name.replace('_','')
+                    vals_list = AttrDictFields()
+                    
+                    for vals in self.itemcfg.save_vals:
+                        fld = vals.split('=')
+                        row = int(fld[1])
+                        line_data = float(data[fld[0]].values[0])
+                        vals_list[f"{prefix_name}{fld[0]}"] = int(line_data)
+                        vdb.write_values(vals_list)
+                        
+
             #self.lines_list[0]['start_val'] = start_num
             self.lines_list[nm]['start_val'] = start_num
 
             for ii in self.lines_list[nm].data_lines:
+                self.lines_list[nm]['latex_data_base'] = self.itemcfg.latex_data_base
                 if slice_flag == 1:
                     end_num = len(data[ii.field])
                     self.lines_list[0]['end_val'] = end_num
@@ -434,6 +450,8 @@ class DataContainer():
                     self.lines_list[0]['end_val'] = end_num
                     self.lines_list[nm].data[ii.field] = data[ii.field]
                     self.lines_list[nm]['end_val'] = end_num
+
+        
         return 
         
 
@@ -466,6 +484,7 @@ class DataContainer():
                     else:
                         self.lines_list[ln]["data_object"] = CSVData(self,self.itemcfg)
                         self.lines_list[ln]["target_dir"]  = self.itemcfg.input_data_dir
+        
         return 
 
 

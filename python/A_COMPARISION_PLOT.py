@@ -19,20 +19,20 @@ class A_COMPARISION_PLOT(PlotterClass):
     def s_per_obj_from_point(self,p):
         if "ns_per_obj" in p:
             return p["ns_per_obj"] * 1e-9
-        if "time_s" in p and p["N"] is not None:
-            return p["time_s"] / p["N"]
+        if "time_s" in p and p["N"] is not None and len(p['time_s']) != 0:
+            return float(p["time_s"]) / float(p["N"])
         if "fps" in p and p["N"] is not None:
-            return (1.0 / p["fps"]) / p["N"]
+            return (1.0 / float(p["fps"])) / float(p["N"])
         if "ns_pre_obj" in p and p["N"] is not None:
-            return (1.0 / p["ns_pre_obj"]) / p["N"]
+            return (1.0 / float(p["ns_pre_obj"])) / int(p["N"])
         raise ValueError(f"Point missing required timing fields: {p}")
     
-    def plot_item(self):
+    def plot_item(self,plt,fig,ax):
         # Compute (N, time_per_obj_s) arrays
         N_vals = []
         tpo_vals = []
         labels = []
-
+        
         for p in self.data_list:
             try:
                 tpo = self.s_per_obj_from_point(p)
@@ -43,7 +43,6 @@ class A_COMPARISION_PLOT(PlotterClass):
                 print("Skipping point due to error:", p, e)
 
         # Plot (log–log)
-        plt.figure(figsize=(8, 6))
         plt.loglog(N_vals, tpo_vals, "o", markersize=7)
 
         # Connect points in an arbitrary order (optional)
@@ -53,14 +52,16 @@ class A_COMPARISION_PLOT(PlotterClass):
         for x, y, lbl in zip(N_vals, tpo_vals, labels):
             plt.text(x*1.08, y*1.10, lbl, fontsize=8)        
 
+        
+
     def do_plot(self):
         # === Plot ===
         ##------------------------------------------
         plt,fig,ax = self.__new_figure__()
         ##-------------------------------------------
-        
-        #plt.plot(k_space, T_fit, color="blue")
-        
+        ## DO PLOT HERE
+        # Pass values a class varialbes
+        self.plot_item(plt,fig,ax) 
         ##-------------------------------------------
         leg_list = self.__do_legend__()
         plt.legend(leg_list)
@@ -68,9 +69,7 @@ class A_COMPARISION_PLOT(PlotterClass):
         self.__do_commands__(plt,fig,ax)
         
         ##-------------------------------------------
-        ## DO PLOT HERE
-        # Pass values a class varialbes
-        self.plot_item()
+       
         filename = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}.png"
         self.__clean_files__(filename)
         plt.savefig(filename, dpi=self.itemcfg.dpi)
@@ -127,7 +126,7 @@ class A_COMPARISION_PLOT(PlotterClass):
         # Do one or many plots
         for ii in range(1):
             self.do_plot()
-            self.itemcfg['input_images'] = self.include
+            #self.itemcfg['input_images'] = self.include
         
         #Write all vals
         self.__write_vals__()

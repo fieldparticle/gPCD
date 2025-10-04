@@ -13,7 +13,6 @@ class PlotterClass():
         self.bobj = base
         self.include = []
         self.vals_list = AttrDictFields()
-       
         self.prefix_name = self.itemcfg.name.replace('_','')
 
     def __open_data_file__(self):

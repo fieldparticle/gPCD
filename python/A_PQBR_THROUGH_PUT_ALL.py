@@ -58,17 +58,23 @@ class A_PQBR_THROUGH_PUT_ALL(PlotterClass):
       plt.loglog(df["loadedp"], df["total_throughput_mpps"],**fdct)
       fdct = self.__get_line_format_dict__(4)
       plt.axvline(x=2245632,**fdct)
+      fdct = self.__get_line_format_dict__(5)
+      plt.axvline(x=100000,**fdct)
       self.__do_commands__(plt,fig,ax)
       leg_list = self.__do_legend__()
       plt.legend(leg_list)
-      
+      plt.tight_layout()
       #plt.tight_layout()
       filename = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}.png"
       self.__clean_files__(filename)
       plt.pause(0.01)
-      plt.savefig(filename, dpi=300)
+      plt.savefig(filename, dpi=self.itemcfg.dpi)
       plt.close()
       #self.__write_vals__()
       self.include.append(filename)
-      
 
+      prefix_name = self.itemcfg.name.replace('_','')
+      vdb = ValuesDataBase(self.bobj)
+      vals_list = AttrDictFields()
+      name = "tot"
+      

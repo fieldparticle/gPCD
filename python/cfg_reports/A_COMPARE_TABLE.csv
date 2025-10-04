@@ -1,0 +1,9 @@
+author,year,method,scale,notes
+Govender et al. ,2017, DEM (BlazeDEM3D-GPU) , $>10^7$ spheres; $10^6$ polyhedra , Single-GPU DEM; scalable to tens of millions 
+Govender et al. ,2015, DEM (Industrial mill) , $\sim 4\times 10^6$ , Practical industrial DEM on one GPU 
+Tian et al. ,2017, DEM (Linked-cell/ multi-GPU) , up to $1.28\times 10^8$, Strong scaling-async comms across GPUs 
+Gan et al. ,2016, DEM (Multi-GPU) , $>10^7$ , $18\times$ faster on 32 GPUs vs single-GPU 
+Lauterbach et al. ,2010, gProximity (GPU broad-phase) , N/A (collision queries) , $>10\times$ faster than earlier GPU methods 
+Lehe et al. ,2025, PIC (binary collisions) , N/A (plasma PIC collisions) , Up to $4\times$ faster vs. baseline threading 
+Kipfer et al. ,2004, UberFlow (GPU particle engine) , $\sim 10^6$ , Early GPU particle framework (sorting/rendering) 
+Skorych et al. ,2022, DEM (CPU-GPU hybrid) , $\sim 10^6$ , Hybrid scheduling improved efficiency 

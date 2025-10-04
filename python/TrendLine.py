@@ -3,6 +3,7 @@ import pandas as pd
 import math
 from scipy.stats import linregress
 from scipy.optimize import curve_fit
+from ValuesDataBase import *
 
 def quadratic_model(x, a, b, c):
     return a * x**2 + b * x + c
@@ -46,8 +47,10 @@ def linearFunc(x,intercept,slope):
 class TrendLine():
 
     
-    def __init__(self):
-        
+    def __init__(self,Base):
+        self.bobj = Base
+        self.cfg = self.bobj.cfg
+        self.log = self.bobj.log
         pass        
 
     
@@ -57,12 +60,16 @@ class TrendLine():
         #print(lines_listy.data_lines[0].field)
         self.xvalue = lines_listx.data.line_data
         self.yvalue = lines_listy.data.line_data
+        vdb = ValuesDataBase(self.bobj)
+        self.vals_list = AttrDictFields()
+        
         #print(lines_listy.line_type)
         if "linear_trend" in lines_listy.line_type:
             intercept, slope = self.do_linear_fit(linearFunc)
-            #intercept, slope = self.do_linear_fit_regress()
+            vdb.write_values(self.vals_list)
             data = linearFunc(self.xvalue,intercept,slope).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(linearFunc(self.xvalue,intercept,slope))
+            vdb.write_values(self.vals_list)
             return pd.Series(linearFunc(self.xvalue,intercept,slope))
         
         if 'linear_regression_trend' in lines_listy.line_type:
@@ -75,23 +82,27 @@ class TrendLine():
             self.lines_listy['r_squared'] = r_value
             linr_line = 10**(intercept + slope * logN)
             #linr_line = linearFunc(self.xvalue,intercept,slope)
+            vdb.write_values(self.vals_list)
             return linr_line
             
         elif "quadratic_trend" in lines_listy.line_type:
             a,b,c = self.do_poly_fit()
             data = quadratic_model(self.xvalue,a,b,c).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(quadratic_model(self.xvalue,a,b,c))
+            vdb.write_values(self.vals_list)
         
         elif "power_trend" in lines_listy.line_type:
             k_val, exponent, intercept = self.do_power_fit()
             data = power_func(self.xvalue,k_val,exponent,intercept).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
+            vdb.write_values(self.vals_list)
             return  pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
 
         elif "log10_trend" in lines_listy.line_type:
             a,b = self.do_log10_fit()
             data = log10_func(self.xvalue,a,b).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(log10_func(self.xvalue,a,b))
+            vdb.write_values(self.vals_list)
             return pd.Series(log10_func(self.xvalue,a,b))
         
         if "linear_residual" in lines_listy.line_type:
@@ -105,6 +116,7 @@ class TrendLine():
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(linearFunc(self.xvalue,intercept,slope))
             # Subtract linear from fit
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(y_data - data)
+            vdb.write_values(self.vals_list)
             return pd.Series(y_data - data)
         
         elif "quadratic_residual" in lines_listy.line_type:
@@ -113,12 +125,14 @@ class TrendLine():
             data = quadratic_model(self.xvalue,a,b,c).tolist()
             #lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(linearFunc(self.xvalue,intercept,slope))
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(y_data - data)
+            vdb.write_values(self.vals_list)
             return pd.Series(y_data - data)
         
         elif "power_residual" in lines_listy.line_type:
             k_val, exponent, intercept = self.do_power_fit()
             data = lines_listy.data[lines_listy.data_lines[0].field]
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
+            vdb.write_values(self.vals_list)
             return pd.Series(power_func(self.xvalue,k_val,exponent,intercept))
 
         elif "log10_residual_percent" in lines_listy.line_type:
@@ -126,6 +140,7 @@ class TrendLine():
             a,b = self.do_log10_fit()
             data = log10_func(self.xvalue,a,b).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(abs((y_data - data)/y_data))
+            vdb.write_values(self.vals_list)
             return pd.Series(abs((y_data - data)/y_data))
        
         elif "log10_residual" in lines_listy.line_type:
@@ -133,6 +148,7 @@ class TrendLine():
             a,b = self.do_log10_fit()
             data = log10_func(self.xvalue,a,b).tolist()
             lines_listy.data[lines_listy.data_lines[0].field] = pd.Series(y_data - data)
+            vdb.write_values(self.vals_list)
             return pd.Series(y_data - data)
        
         return None
@@ -301,6 +317,15 @@ class TrendLine():
         self.lines_listy['isec'] = self.intersect
         self.lines_listy['covariance'] = self.covariance
         self.lines_listy['r_squared'] = r_squared
+
+
+
+        self.vals_list['K'] = self.slope
+        self.vals_list['isec'] = self.intersect
+        #self.vals_list['covariance'] = self.covariance
+        self.vals_list['r_squared'] = r_squared
+
+       
        
         return self.intersect,self.slope
   

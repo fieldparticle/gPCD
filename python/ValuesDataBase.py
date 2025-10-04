@@ -3,12 +3,13 @@ from ConfigUtility import *
 import num2alpha as n2a
 class ValuesDataBase():
 
-    def __init__(self, Base):
-        self.bobj = Base
-        self.cfg = self.bobj.cfg.config
-        self.log = self.bobj.log
+    def __init__(self,Base,item_cfg=None):   
+            self.bobj = Base
+            self.cfg = self.bobj.cfg.config
+            self.log = self.bobj.log
+            self.itemcfg = item_cfg
+      
         
-    
 
     def get_vals(self):
         self.vals_cfg_obj = ConfigUtility(self.cfg.values_data_base)
@@ -16,7 +17,9 @@ class ValuesDataBase():
         self.vals_cfg = self.vals_cfg_obj.config
         return self.vals_cfg
 
-    def write_values(self,vals_list):
+    def write_values(self,vals_list,prefix=""):
+        if len(vals_list) == 0:
+            return
         self.vals_cfg_obj = ConfigUtility(self.cfg.values_data_base)
         self.vals_cfg_obj.Create(self.bobj.log,self.cfg.values_data_base)
         self.vals_cfg = self.vals_cfg_obj.config
