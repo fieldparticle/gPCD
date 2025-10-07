@@ -435,7 +435,6 @@ class DataContainer():
             self.lines_list[nm]['start_val'] = start_num
 
             for ii in self.lines_list[nm].data_lines:
-                self.lines_list[nm]['latex_data_base'] = self.itemcfg.latex_data_base
                 if slice_flag == 1:
                     end_num = len(data[ii.field])
                     self.lines_list[0]['end_val'] = end_num

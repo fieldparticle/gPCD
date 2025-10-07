@@ -23,6 +23,7 @@ class ReportClass():
     def __init__(self, parent,itemcfg):
         self.itemcfg = itemcfg
         self.bobj = parent.bobj
+        self.cfg = self.bobj.cfg.config
         self.log = self.bobj.log
         self.vals_list = AttrDictFields()
     
@@ -33,6 +34,7 @@ class ReportClass():
     def save_single_image(self):
         
         self.read_caption()
+        self.read_description()
         self.tex_output_name = self.itemcfg.tex_dir + "/" + self.itemcfg.name + ".tex"
         try:
             f = open(self.tex_output_name , "w")
@@ -58,7 +60,9 @@ class ReportClass():
             refname = os.path.splitext(os.path.basename(gdir))[0]
             w = "\\hspace{" + str(self.itemcfg.hspace) + "in}\n"
             f.write(w)
-            w = "\\caption[TITLE:" + self.itemcfg.title + "]{\\textit{" + self.caption + "}}\n"
+            w = "\\caption[TITLE:" + self.itemcfg.title + "]{" + self.caption + "}\n"
+            f.write(w)
+            w = "\\Description[TITLE:" + self.itemcfg.title + "]{" + self.description + "}\n"
             f.write(w)
             w = "\t\t\\label{fig:" + self.itemcfg.name + "}\n"
             f.write(w)
@@ -106,6 +110,7 @@ class ReportClass():
 
     def save_multi_image(self):
         self.read_caption()
+        self.read_description()
         cfg = self.itemcfg
         self.tex_output_name = self.itemcfg.tex_dir + "/" + self.itemcfg.name + ".tex"
         try:
@@ -123,6 +128,8 @@ class ReportClass():
         if cfg.centering == True:
             w = "\\centering\n"
             f.write(w)
+            w = "\\hspace{" + cfg.hspace + "in}\n"
+            f.write(w)
         try:
             for ii in range(0,len(self.itemcfg.input_images)):
                 #w = "\t\\begin{subfigure}[b]{" + cfg.plot_width_array[ii] + "in}\n"
@@ -137,11 +144,16 @@ class ReportClass():
                 w = "\t\t\\subcaption[" + "" +"]{" + cfg.sub_caption[ii] + "}\n"
                 f.write(w)
                 refname = os.path.splitext(os.path.basename(sgdir))[0]
+                w = "\t\t\\label{fig:" + refname + "}\n"
+                f.write(w)
                 w = "\t\\end{subfigure}\n"
                 f.write(w)
                 w = "\\hspace{" + cfg.hspace + "in}\n"
                 f.write(w)
-            w = "\\caption[TITLE:" + cfg.title + "]{\\textit{" + self.caption + "}}\n"
+               
+            w = "\\caption[TITLE:" + cfg.title + "]{" + self.caption + "}\n"
+            f.write(w)
+            w = "\\Description[TITLE:" + cfg.title + "]{" + self.description + "}\n"
             f.write(w)
             w = "\\label{fig:" + cfg.name + "}\n"
             f.write(w)
@@ -163,13 +175,15 @@ class ReportClass():
             self.save_single_image()
         else:
             self.save_multi_image()
-            print("multiimage")
+            #print("multiimage")
         return
         
 
 
     def read_caption(self):
-        self.cap_file = self.itemcfg.caption_file
+        raw_name = os.path.basename(self.itemcfg.caption_file)
+        filename_without_ext = os.path.splitext(raw_name)[0]
+        self.cap_file = f"{self.cfg.report_start_dir}/{filename_without_ext}.cap"
         if os.path.exists(self.cap_file):
             with open(self.cap_file, 'r') as file:
                 self.caption = file.read()
@@ -177,6 +191,18 @@ class ReportClass():
             file = open(self.cap_file, 'w') 
             file.close()
         pass
+
+    def read_description(self):
+        raw_name = os.path.basename(self.itemcfg.caption_file)
+        filename_without_ext = os.path.splitext(raw_name)[0]
+        self.des_file= f"{self.cfg.report_start_dir}/{filename_without_ext}.des"
+        if os.path.exists(self.des_file):
+            with open(self.des_file, 'r') as file:
+                self.description = file.read()
+        else:
+            file = open(self.des_file, 'w') 
+            file.close()
+        pass    
 
     def write_captions(self):
       pass

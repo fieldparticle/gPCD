@@ -1,0 +1,4 @@
+A plot of randomly ordered particles performance (red squares) versus
+sequentiall ordered particles (blue circles). The random performance 
+increases disproportionately with sequential performance as the number of 
+particles increase.

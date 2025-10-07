@@ -5,7 +5,7 @@ import math
 from ValuesDataBase import *
 from AttrDictFields import *
 
-data_list = []
+
 
 from PlotterClass import *
 
@@ -60,8 +60,11 @@ class A_PBQR_CURVATURE(PlotterClass):
         max_val =an/(np.max(timings_ms))
         print(f"Total t:{val_time} contribution:{max_val}\n")
         one_percent_error = 0.01*val_time
-        max_n = math.sqrt(one_percent_error/a2)
-        print(f"Estimated noticable value:{max_n}\n")
+        max_n = 0
+        if a2 > 0:
+            a2 = abs(a2)
+            max_n = -math.sqrt(one_percent_error/a2)
+            print(f"Estimated noticable value:{max_n}\n")
 
         # === Compute fitted curve and curvature band ===
         k_space = np.linspace(np.min(particle_counts), np.max(particle_counts), 200)
@@ -78,7 +81,7 @@ class A_PBQR_CURVATURE(PlotterClass):
         lower_band = T_fit - curvature_band
 
         one_percent =  0.01*val_time
-        quad_effect = math.sqrt(one_percent/a)
+        #quad_effect = math.sqrt(one_percent/a)
         # === Plot ===
         ##------------------------------------------
         plt,fig,ax = self.__new_figure__()
@@ -115,7 +118,6 @@ class A_PBQR_CURVATURE(PlotterClass):
         
                        
         self.vals_list[f"{self.prefix_name}{name}StartRow"] = 10
-        self.vals_list[f"{self.prefix_name}{name}StartRowParticlesVal"] = int(float(data_list[0][6]))
         self.vals_list[f"{self.prefix_name}{name}MaxParticles"] = f"{xmaN}"
         self.vals_list[f"{self.prefix_name}{name}a"] = f"{a2:0.3e}"
         self.vals_list[f"{self.prefix_name}{name}b"] = f"{b:0.3e}"
@@ -125,7 +127,7 @@ class A_PBQR_CURVATURE(PlotterClass):
         self.vals_list[f"{self.prefix_name}{name}QuadraticContributionta"] = f"{del_t1:0.4e}"
         self.vals_list[f"{self.prefix_name}{name}QuadraticContributiontb"] = f"{del_t2:0.4e}"
         self.vals_list[f"{self.prefix_name}{name}QuadraticContributionfrc"] = f"{del_t2_frc:0.6f}"
-        self.vals_list[f"{self.prefix_name}{name}QuadraticContributionpct"] = f"{del_t2_pct:0.6f}"
+        self.vals_list[f"{self.prefix_name}{name}QuadraticContributionpct"] = f"{del_t2_pct:0.2f}"
         self.vals_list[f"{self.prefix_name}{name}TotalTime"] = f"{val_time:0.4f}"
         self.vals_list[f"{self.prefix_name}{name}TotalTimeCont"] = f"{delt:0.4f}"
         max_as_int = int(float(max_n))
@@ -136,6 +138,7 @@ class A_PBQR_CURVATURE(PlotterClass):
         
 
     def run(self):
+        data_list = []
         with open(self.itemcfg.input_data_file, mode='r') as file:
             csv_reader = csv.reader(file)
             for ii in range(0,28):
@@ -160,7 +163,7 @@ class A_PBQR_CURVATURE(PlotterClass):
         self.do_plot('cms',particle_counts,cms)
 
         self.itemcfg['input_images'] = self.include
-
+        self.vals_list[f"{self.prefix_name}StartRowParticlesVal"] = int(float(data_list[0][6]))
         self.__write_vals__()
         return
 

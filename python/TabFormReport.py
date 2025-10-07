@@ -213,12 +213,20 @@ class TabFormReport(QTabWidget):
         if (self.prv != None):
             self.prv.close()    
         self.reload()
+        self.save_cap()
         match self.itemcfg.type:
             case "batch":
                 return self.do_batch()
             case 'equation':
                 self.report_obj = ReportLatexEquation(self,self.itemcfg)
                 self.report_obj.save_latex()
+            case 'table_code':
+                obj_name = f"{self.itemcfg.name}.{self.itemcfg.name}"
+                self.table_code_class = self.load_class(obj_name)(self.itemcfg,self.bobj)  
+                table = self.table_code_class.run() 
+                self.report_obj = ReportLatexTable(self,self.itemcfg)
+                self.report_obj.save_latex(table)
+            
             case 'plot_code':
                 obj_name = f"{self.itemcfg.name}.{self.itemcfg.name}"
                 self.plot_code_class = self.load_class(obj_name)(self.itemcfg,self.bobj)  
@@ -229,7 +237,7 @@ class TabFormReport(QTabWidget):
                 self.itemcfg_main = self.itemcfg
                 lines_list = self.do_table()
                 self.report_obj = ReportLatexTable(self,self.itemcfg,lines_list)
-                self.report_obj.save_latex()
+                self.report_obj.save_latex_csv()
             case "csvplot":
                 self.report_obj = ReportLatexPlot(self,self.itemcfg)
                 self.itemcfg_main = self.itemcfg
@@ -340,20 +348,26 @@ class TabFormReport(QTabWidget):
                 raw_name = os.path.basename(current_item.text())
                 filename_without_ext = os.path.splitext(raw_name)[0]
                 self.cap_file = f"{self.cfg.report_start_dir}/{filename_without_ext}.cap"
+                self.des_file= f"{self.cfg.report_start_dir}/{filename_without_ext}.des"
                 caption = ""
+                des = ""
                 if os.path.exists(self.cap_file):
                     with open(self.cap_file, 'r') as file:
                         caption = file.read()
                 else:
                     file = open(self.cap_file, 'w') 
                     file.close()
-           
-                vals_file = f"{self.itemcfg.tex_dir}/{filename_without_ext}.vals"
-                self.ValsListObj.clear()
-                if os.path.exists(vals_file):
-                    with open(vals_file, 'r') as file:
-                        line = file.read()
-                        self.ValsListObj.append(line)           
+
+                if os.path.exists(self.des_file):
+                    with open(self.des_file, 'r') as file:
+                        des = file.read()
+                else:
+                    file = open(self.des_file, 'w') 
+                    file.close()
+                
+                self.DesEdit.clear()
+                self.DesEdit.append(des)
+        
                 self.CapEdit.clear()
                 self.CapEdit.append(caption)
             print(f"Current item selected: {current_item.text()}")
@@ -371,7 +385,9 @@ class TabFormReport(QTabWidget):
         txt = self.CapEdit.toPlainText()
         with open(self.cap_file, "w") as file:
             file.write(txt)
-
+        dtxt = self.DesEdit.toPlainText()
+        with open(self.des_file, "w") as file:
+            file.write(dtxt)
 
   
     #******************************************************************
@@ -455,21 +471,12 @@ class TabFormReport(QTabWidget):
             self.SaveTxtButton.setEnabled(True)
             dirgrid.addWidget(self.SaveTxtButton,2,4)
 
-
             ## -------------------------------------------------------------
-            ## Comunications Interface
-            self.terminal =  QTextEdit(self)
-            self.terminal.setStyleSheet("background-color:  #ffffff; color: green")
-            self.setSize(self.terminal,225,900)
-            self.tab_layout.addWidget(self.terminal,3,0,2,1,alignment= Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
-
-
-
+            ## CFg Files Select Interface
             self.cfg_files = [i for i in os.listdir(self.cfg.report_start_dir) if i.endswith("cfg")]
             self.cap_files = [i for i in os.listdir(self.cfg.report_start_dir) if i.endswith("cap")]
             
-            ## -------------------------------------------------------------
-            ## CFg Select Interface
+
             self.CfgListObj =  QListWidget()
             #self.ListObj.setFont(self.font)
             self.CfgListObj.setStyleSheet("background-color:  #FFFFFF")
@@ -479,32 +486,56 @@ class TabFormReport(QTabWidget):
             for ii in range(len(self.cfg_files)):
                 self.CfgListObj.insertItem(ii,self.cfg_files[ii]) 
          
-            self.CfgListObj.insertItem(3, "multiimage")
+            #self.CfgListObj.insertItem(3, "multiimage")
             self.CfgListObj.currentItemChanged.connect(self.cfg_on_current_item_changed)
             #self.CfgListObj.itemSelectionChanged.connect(lambda: self.CfgChange())
-            self.tab_layout.addWidget(self.CfgListObj,5,0,1,1)
+            self.tab_layout.addWidget(self.CfgListObj,3,0,1,1)
+
+
+            ## -------------------------------------------------------------
+            ## Comunications Interface
+            self.terminal =  QTextEdit(self)
+            self.terminal.setStyleSheet("background-color:  #ffffff; color: green")
+            self.setSize(self.terminal,225,900)
+            self.tab_layout.addWidget(self.terminal,3,1,1,1,alignment= Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+
+
 
             ## -------------------------------------------------------------
             ## Cap Select Interface
-            
-            self.ValsListObj =  QTextEdit()
+            #self.ValsListObj =  QTextEdit()
             #self.ListObj.setFont(self.font)
-            self.ValsListObj.setStyleSheet("background-color:  #FFFFFF ")
-            self.vcnt = 0  
-            self.setSize(self.ValsListObj,225,450)
+            ##self.ValsListObj.setStyleSheet("background-color:  #FFFFFF ")
+            ##self.vcnt = 0  
+            #self.setSize(self.ValsListObj,225,450)
             #self.CapListObj.currentItemChanged.connect(self.cap_on_current_item_changed)
-            self.tab_layout.addWidget(self.ValsListObj,5,1,1,1)
+            #self.tab_layout.addWidget(self.ValsListObj,5,1,1,1)
             
              ## -------------------------------------------------------------
             ## Cap edit Interface
-            
+            cap_label = QLabel('Caption Edit')
+            self.tab_layout.addWidget(cap_label,4,0,1,1)
+
             self.CapEdit =  QTextEdit(self)
             self.CapEdit.setStyleSheet("background-color:  #ffffff ")
             font = QFont()
             font.setPointSize(16)
             self.CapEdit.setFont(font)
             self.setSize(self.CapEdit,225,900)
-            self.tab_layout.addWidget(self.CapEdit,7,0,1,1,alignment= Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+            self.tab_layout.addWidget(self.CapEdit,5,0,1,1,alignment= Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+            
+             ## -------------------------------------------------------------
+            ## Descritpion edit Interface
+             ## Cap edit Interface
+            des_label = QLabel('Description Edit')
+            self.tab_layout.addWidget(des_label,6,0,1,1)
+            self.DesEdit =  QTextEdit(self)
+            self.DesEdit.setStyleSheet("background-color:  #ffffff ")
+            font = QFont()
+            font.setPointSize(16)
+            self.DesEdit.setFont(font)
+            self.setSize(self.DesEdit,225,900)
+            self.tab_layout.addWidget(self.DesEdit,7,0,1,1,alignment= Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
             
            
         except BaseException as e:

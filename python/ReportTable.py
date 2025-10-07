@@ -8,15 +8,10 @@ from ConfigUtility import *
 from ValuesDataBase import *
 class ReportLatexTable(ReportClass):
 
-    def __init__(self,parent,itemcfg,lines_list):
+    def __init__(self,parent,itemcfg,lines_list=None):
         super().__init__(parent,itemcfg)
         self.lines_list = lines_list
        
-   
-
-   
-
-        
     def replace_between_delimiters(self,text, start_delimiter, end_delimiter, replacement_string):
         """
         Replaces the substring between specified start and end delimiters with a new string.
@@ -45,7 +40,7 @@ class ReportLatexTable(ReportClass):
     
         
     header_arry = []
-    def save_latex(self):
+    def save_latex_csv(self):
        
         self.tex_output_name = self.itemcfg.tex_dir + "/" + self.itemcfg.name + ".tex"
         self.Table = []
@@ -68,9 +63,9 @@ class ReportLatexTable(ReportClass):
             #self.table[self.lines_list[ii].field] = self.lines_list[ii].data_lines.field]            #self.cols = self.data.shape[0]
             #self.rows = self.data.shape[1]
             #self.table_array  = [[0 for x in range(self.cols)] for y in range(self.rows)] 
-        self.rows = num_rows
-        self.cols = len(self.Table)
-        self.table_array = ([[0 for x in range(self.rows)] for y in range(self.cols)] )
+        self.rows = len(self.Table)
+        self.cols = len(self.Table[0])
+        self.table_array = ([[0 for x in range(self.cols)] for y in range(self.rows)] )
        
         self.setLatexData()
         table_array = np.array(self.table_array)
@@ -80,6 +75,18 @@ class ReportLatexTable(ReportClass):
         self.cleve_data()
         self.Write()
     
+    def save_latex(self,Table):
+        self.tex_output_name = self.itemcfg.tex_dir + "/" + self.itemcfg.name + ".tex"
+        self.Table = Table
+        self.rows = len(Table)
+        self.cols = len(Table[0])
+        self.table_array = ([[0 for x in range(self.cols)] for y in range(self.rows)] )
+       
+        self.setLatexData()
+        self.cleve_data()
+        self.Write()   
+
+
     def save_export_vals(self):
         g = self.lines_list[0]
         vdb = ValuesDataBase(self.bobj)
@@ -101,28 +108,35 @@ class ReportLatexTable(ReportClass):
             return
         if len(self.itemcfg.row_select_array) == 0:
             return
-        sel_ary = np.array(self.itemcfg.row_select_array)
+        new_tab = []
+        sel_ary = self.itemcfg.row_select_array
+        for ii in range(len(self.table_array)):
+            if ii in sel_ary:
+                new_tab.append(self.table_array[ii])
+
         len_ary = len(self.table_array)
-        self.table_array = self.table_array[sel_ary]
+        self.table_array = new_tab
         self.rows = len(self.table_array)
         
     def setLatexHeaderArray(self, header):
         self.header_arry = header
 
     def setTableItemArray(self, cellstr,rr,cc):
-            self.table_array[cc][rr] = cellstr
+            self.table_array[rr][cc] = cellstr
 
     def setLatexData(self):
-        for cc in range(self.cols):
-            for rr in range(self.rows):
-                self.loadItem(cc,rr)
+        #The table 
+        for rr in range(self.rows):
+            for cc in range(self.cols):
+                self.loadItem(rr,cc)
 
-    def loadItem(self,cc,rr):
+    def loadItem(self,rr,cc):
         cellstr = ""
         if cc > len(self.itemcfg[f"format_array"]):
             print("Mismatch between colums of data and the format of that data.")
             return
-        val = self.Table[cc][rr]
+        #print(f"cc{cc}, rr{rr}")
+        val = self.Table[rr][cc]
         fmt_txt = self.itemcfg[f"format_array"][cc]
         if 'd' in fmt_txt:
             pval = int(val)
@@ -139,15 +153,16 @@ class ReportLatexTable(ReportClass):
         return out_val
                     
     def MultiTable(self,f):
-        tbl = self.table_array.T
         num_tables = 0    
         split_at = 0
         end_row = 0
+        tbnum = 0
         self.read_caption()
         if 'split_table_array' in self.itemcfg:
             num_tables = int(self.itemcfg.split_table_array[0])
             split_at = int(self.itemcfg.split_table_array[1])
             end_row = split_at-1
+            
         else:
             num_tables = 1
             split_at = 0
@@ -156,14 +171,18 @@ class ReportLatexTable(ReportClass):
         start_row = 0
         end_row = self.rows
         f.write("\\begin{table}[%s]\n" % self.itemcfg.placement)
-        f.write("\\caption{\\textit{")
+        f.write("\\caption{")
         f.write(self.caption)
-        f.write("}}\n")
+        f.write("}\n")
         f.write("\\label{tab:%s}\n"%self.itemcfg.name)
             
         for i in range(num_tables):
             if num_tables > 1:
-                f.write("\\begin{minipage}{.5\\linewidth}\n")
+                if 'mini_page_len' in self.itemcfg:
+                    min_pg_str = "\\begin{minipage}{" + str(self.itemcfg.mini_page_len[i]) + "\\linewidth}\n"
+                    f.write(min_pg_str)
+                else:
+                    f.write("\\begin{minipage}{.5\\linewidth}\n")
                 if i > 0:
                     start_row = split_at
                     end_row = self.rows
@@ -173,8 +192,8 @@ class ReportLatexTable(ReportClass):
 
             f.write("\\fontsize{%s}{%s}\\selectfont\n" % (self.itemcfg.font_size,self.itemcfg.font_size))
             f.write("\\renewcommand{\\arraystretch}{%f}\n" % (self.itemcfg.array_stretch))
-            
-            f.write("\\begin{center}\n")
+            if self.itemcfg.centering == True:
+                f.write("\\begin{center}\n")
             f.write("\\begin{tabular}\n{")
             for k in range(self.cols):
                 f.write("l ")
@@ -208,10 +227,100 @@ class ReportLatexTable(ReportClass):
                     else:
                         txt = str(self.table_array[rr][cc]) + "\\\\ \n"
                         f.write(txt)
-            f.write("\\hline\n\\end{tabular}\n\\end{center}\n")
+            f.write("\\hline\n\\end{tabular}\n")
+            if self.itemcfg.centering == True:
+                f.write("\\end{center}\n")
             if num_tables > 1:
                 f.write("\\end{minipage}\n")
 
+        f.write("\\end{table}\n")
+        f.close()
+        #self.WritePre("pre_tables")
+
+    def MultiTableR1(self,f):
+        num_tables = 0    
+        split_at = 0
+        end_row = 0
+        self.read_caption()
+        self.read_description()
+        if 'split_table_array' in self.itemcfg:
+            num_tables = int(self.itemcfg.split_table_array[0])
+            split_at = int(self.itemcfg.split_table_array[1])
+            end_row = split_at-1
+        else:
+            num_tables = 1
+            split_at = 0
+        
+
+        start_row = 0
+        end_row = self.rows
+        f.write("\\begin{table}[%s]\n" % self.itemcfg.placement)
+        sep_txt = "\\addtolength{\\tabcolsep}{"+ str(self.itemcfg.column_sep) + "em}\n"
+        f.write(sep_txt)
+        f.write("\\caption{")
+        f.write(self.caption)
+        f.write("}\n")
+        f.write("\\label{tab:%s}\n"%self.itemcfg.name)
+
+            
+        for i in range(num_tables):
+            if num_tables > 1:
+                if 'mini_page_len' in self.itemcfg:
+                    min_pg_str = "\\begin{subtable}[b]{" + str(self.itemcfg.mini_page_len[i]) + "\\linewidth}\n"
+                    f.write(min_pg_str)
+                else:
+                    f.write("\\begin{minipage}{.5\\linewidth}\n")
+                if i > 0:
+                    start_row = split_at
+                    end_row = self.rows
+                else:
+                    start_row = 0
+                    end_row = start_row+split_at
+
+            f.write("\\fontsize{%s}{%s}\\selectfont\n" % (self.itemcfg.font_size,self.itemcfg.font_size))
+            f.write("\\renewcommand{\\arraystretch}{%f}\n" % (self.itemcfg.array_stretch))
+            if self.itemcfg.centering == True:
+                f.write("\\begin{center}\n")
+            f.write("\\begin{tabular}\n{")
+            for k in range(self.cols):
+                f.write("l ")
+            f.write("}\n")
+            f.write("\\hline \\\\ \n")
+            header_key = f"header_array"
+            lsz = len(self.itemcfg[header_key])
+            headers = self.itemcfg[header_key]
+            if (self.cols != lsz):
+                f.close()
+                print("In LatexTableWriter columns of data do not match column headings")   
+                return 
+            for k in range(lsz):
+                if(k < lsz-1):
+                    txt = ""
+                    txt = "\\makecell{" + headers[k] + "}&"
+                else:
+                    txt = "\\makecell{" + headers[k] + "}"
+                f.write(txt)
+            
+            f.write("\\\\ \\hline\n")
+
+            for rr in range(start_row,end_row): #,skip):
+                for cc in range(self.cols):
+                    #
+                    if(cc < self.cols-1):
+                        
+                        #txt = self.format_cell(self.table_array[i][j],j,1) + "&"
+                        txt = str(self.table_array[rr][cc]) + " & "
+                        f.write(txt)
+                    else:
+                        txt = str(self.table_array[rr][cc]) + "\\\\ \n"
+                        f.write(txt)
+            f.write("\\hline\n\\end{tabular}\n")
+            if self.itemcfg.centering == True:
+                f.write("\\end{center}\n")
+            if num_tables > 1:
+                f.write("\\end{subtable}\n")
+        w = "\\Description[TITLE:" + self.itemcfg.title + "]{" + self.description + "}\n"
+        f.write(w)
         f.write("\\end{table}\n")
         f.close()
         #self.WritePre("pre_tables")
@@ -222,13 +331,13 @@ class ReportLatexTable(ReportClass):
         except IOError as e:
             self.log.log(self,f"Couldn't write to file ({e})")
             return
-        self.MultiTable(f)
+        self.MultiTableR1(f)
 
-        
 
     def SingleTable(self):
         cfg = self.itemcfg
         self.read_caption()
+        self.read_description()
         outfile = cfg.tex_dir + "/" + cfg.name + ".tex"
         try:
             f = open(outfile, "w")
@@ -239,8 +348,9 @@ class ReportLatexTable(ReportClass):
         try:
             w ="\\begingroup\n"
             f.write(w)
-            w = "\\centering\n"
-            f.write(w)
+            if self.itemcfg.centering == True:
+                w = "\\centering\n"
+                f.write(w)
             w = "\\begin{figure*}[" + cfg.placement + "]\n"
             f.write(w)
             previewTex = f"{cfg.plots_dir}"
@@ -254,7 +364,9 @@ class ReportLatexTable(ReportClass):
             f.write(w)
             w = "\\hspace{" + cfg.hspace + "in}\n"
             f.write(w)
-            w = "\\caption[TITLE:" + cfg.title + "]{\\textit{" + self.caption + "}}\n"
+            w = "\\caption[TITLE:" + cfg.title + "]{" + self.caption + "}\n"
+            f.write(w)
+            w = "\\Description[TITLE:" + cfg.title + "]{" + self.description + "}\n"
             f.write(w)
             w = "\t\t\\label{fig:" + cfg.name + "}\n"
             f.write(w)

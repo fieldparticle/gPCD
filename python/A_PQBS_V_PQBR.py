@@ -26,7 +26,7 @@ def linearFunc(x,intercept,slope):
         y = intercept + slope * x
         return y
 
-class A_CFB(PlotterClass):
+class A_PQBS_V_PQBR(PlotterClass):
     
 
     # Allocates prefix_name
@@ -55,39 +55,14 @@ class A_CFB(PlotterClass):
         r_squared = 1 - (ss_residual / ss_total)
         return intersect,slope,r_squared,mean,std
 
-    def do_plot(self,N,cms,gms):
-        
-        cms_intercept, cms_slope,cms_r_squared,cms_mean,cms_std, = self.do_linear_fit(N,cms)
-        cms_ydata = linearFunc(N,cms_intercept,cms_slope).tolist()
-        part_count = self.df['loadedp'][0]
-        self.vals_list[f'{self.prefix_name}N'] = f"{int(part_count)}"
-        self.vals_list[f'{self.prefix_name}cmsK'] = f"{cms_slope:0.2g}"
-        self.vals_list[f'{self.prefix_name}cmsIsec'] = f"{cms_intercept:0.2g}"
-        self.vals_list[f'{self.prefix_name}cmsRSquared'] = f"{cms_r_squared:0.2g}"
-        self.vals_list[f'{self.prefix_name}cmsMean'] = f"{cms_mean:0.2g}"
-        self.vals_list[f'{self.prefix_name}cmsmstd'] = f"{cms_std:0.2g}"
-        self.vals_list[f'{self.prefix_name}cmserr'] = f"{cms_std/cms_mean:0.2g}"
-        gms_intercept, gms_slope,gms_r_squared,gms_mean,gms_std, = self.do_linear_fit(N,gms)
-        self.vals_list[f'{self.prefix_name}gmsK'] = f"{gms_slope:0.2g}"
-        self.vals_list[f'{self.prefix_name}gmsIsec'] = f"{gms_intercept:0.2g}"
-        self.vals_list[f'{self.prefix_name}gmsRSquared'] = f"{gms_r_squared:0.2g}"
-        self.vals_list[f'{self.prefix_name}gmsMean'] = f"{gms_mean:0.2g}"
-        self.vals_list[f'{self.prefix_name}gmsmstd'] = f"{gms_std:0.2g}"
-        self.vals_list[f'{self.prefix_name}gmserr'] = f"{gms_std/gms_mean:0.2g}"
-        
-        gms_ydata = linearFunc(N,gms_intercept,gms_slope).tolist()
-
+    def do_plot(self,N,rboth,both):
         # === Plot ===
         ##------------------------------------------
         plt,fig,ax = self.__new_figure__()
         fdct = self.__get_line_format_dict__(1)
-        plt.plot(N,cms,**fdct)
+        plt.plot(N,rboth,**fdct)
         fdct = self.__get_line_format_dict__(2)
-        plt.plot(N,gms,**fdct)
-        fdct = self.__get_line_format_dict__(3)
-        plt.plot(N,cms_ydata,**fdct)
-        fdct = self.__get_line_format_dict__(4)
-        plt.plot(N,gms_ydata,**fdct)
+        plt.plot(N,both,**fdct)
         ##-------------------------------------------
         plt.pause(0.01)
         ##-------------------------------------------
@@ -95,6 +70,7 @@ class A_CFB(PlotterClass):
         plt.legend(leg_list)
         ##-------------------------------------------
         self.__do_commands__(plt,fig,ax)
+        plt.tight_layout()
         ##-------------------------------------------
         #self.plt.tight_layout()
         filename = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}.png"
@@ -109,23 +85,21 @@ class A_CFB(PlotterClass):
         
 
     def run(self):
-        # Load data
-        self.df = pd.read_csv(self.itemcfg.input_data_file)
-        N = self.df['expectedc']
-        cms = self.df['cms']
-        gms = self.df['gms']
-        
-        '''
-        N = np.array(transposed[6]).astype(float)
-
-        pc = np.array(transposed[6]).astype(float)
-        particle_counts = [int(numeric_string) for numeric_string in pc]
-        gms = np.array(transposed[4]).astype(float)
-        cms = np.array(transposed[3]).astype(float)
-        both = np.add(gms,cms)
-        '''
+        data_source = self.itemcfg.data_source
+        for ii in data_source:
+             file_name = self.itemcfg.input_data_dir + "/" + f"perfData{ii}/perfdataPerformanceSummary.csv"
+             self.df = pd.read_csv(file_name)
+             if "PQBRT" in ii:
+                N = self.df['loadedp']
+                rcms = self.df['cms']
+                rgms = self.df['gms']            
+                rboth = np.add(rcms,rgms)
+             if "PQBT" in ii:
+                cms = self.df['cms']
+                gms = self.df['gms']            
+                both = np.add(cms,gms)
         print("-------------------------- TOT ----------------------------")
-        self.do_plot(N,cms,gms)
+        self.do_plot(N,rboth,both)
         #self.itemcfg['input_images'] = self.include
         
         self.__write_vals__()

@@ -1,5 +1,0 @@
-\[
-\Delta T \;\approx\; \Delta t_{1}\,N \;=\; \kappa\,N^{2}
-\;=\; (3.062\times 10^{-17})\cdot(1.1088896\times 10^{7})^{2}
-\;\approx\; 3.76\times 10^{-3}\ \text{ms}.
-\]

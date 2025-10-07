@@ -1,0 +1,2 @@
+Collision fraction benchmark. The average time to process increasing collision fraction while holding the number of particles constant. The mean time for the compute pipline is 2.5e-10 ms, with a standard deviation of 2.9e-05 ms, which is an error of 0.014. The mean time for the graphics pipline is -7.3e-12 ms, with a standard 
+deviation of 5e-07 ms, which is an error of 0.0064.
