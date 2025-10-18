@@ -1,8 +1,11 @@
-name,N,time_s,fps,quote
-Govender 2015 (DEM polyhedra),34000000,1,1,<1 s $\arrow$ 1 s
-Govender 2016 (Blaze-DEMGPU),4000000,,20,20 FPS
-Latta 2004,1000000,,30,$\approx$ 30 FPS
-Franklin 2017 (ParCube),10000000,0.33,,0.33s
-Liu 2010 (GPU SaP),1000000,,20,$\approx$ 20 FPS
-Coming & Staadt 2006 (Kinetic SaP),600000,,15,$\approx$ 15 FPS
-BELL (gPCD),11088896,0.08417,,
+name,yr,N,tpp,GPU,part,e2e
+Morvan ,2012,10000000,10,GPU,,
+Govender,2015,34000000,1,CPU,,
+Govender,2016,4000000,10,CPU,,
+Latta,2004,1000000,10,GPU,,
+Franklin,2017,10000000,0.33,GPU,,
+Liu,2010,1000000,10,GPU,,
+Coming-KSAP,2006,64000,15625,CPU,,
+Coming-SAP,2006,64000,17187,CPU,,
+gPCD,2025,11088896,0.08417,GPU,,
+Cohen,1995,,57500,GPU,,

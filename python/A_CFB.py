@@ -66,14 +66,14 @@ class A_CFB(PlotterClass):
         self.vals_list[f'{self.prefix_name}cmsRSquared'] = f"{cms_r_squared:0.2g}"
         self.vals_list[f'{self.prefix_name}cmsMean'] = f"{cms_mean:0.2g}"
         self.vals_list[f'{self.prefix_name}cmsmstd'] = f"{cms_std:0.2g}"
-        self.vals_list[f'{self.prefix_name}cmserr'] = f"{cms_std/cms_mean:0.2g}"
+        self.vals_list[f'{self.prefix_name}cmserr'] = f"{(cms_std/cms_mean)*100:0.2g}"
         gms_intercept, gms_slope,gms_r_squared,gms_mean,gms_std, = self.do_linear_fit(N,gms)
         self.vals_list[f'{self.prefix_name}gmsK'] = f"{gms_slope:0.2g}"
         self.vals_list[f'{self.prefix_name}gmsIsec'] = f"{gms_intercept:0.2g}"
         self.vals_list[f'{self.prefix_name}gmsRSquared'] = f"{gms_r_squared:0.2g}"
         self.vals_list[f'{self.prefix_name}gmsMean'] = f"{gms_mean:0.2g}"
         self.vals_list[f'{self.prefix_name}gmsmstd'] = f"{gms_std:0.2g}"
-        self.vals_list[f'{self.prefix_name}gmserr'] = f"{gms_std/gms_mean:0.2g}"
+        self.vals_list[f'{self.prefix_name}gmserr'] = f"{(gms_std/gms_mean)*100:0.2g}"
         
         gms_ydata = linearFunc(N,gms_intercept,gms_slope).tolist()
 

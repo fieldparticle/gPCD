@@ -350,6 +350,8 @@ class DataContainer():
         leg_list = []
         leg_str = ""
         legend_commands = self.itemcfg.plot_legend 
+        if len(legend_commands) == 0:
+            return []
         legend_string =legend_commands[0]
         stripped_leg = re.sub('$.*?', '', legend_string)
         for ll in range(len(legend_commands)):

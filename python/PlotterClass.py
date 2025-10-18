@@ -29,6 +29,9 @@ class PlotterClass():
 
 
     def __new_figure__(self):
+        plt.cla()
+        plt.clf()
+        plt.close()
         self.plt = plt
         self.fig = self.plt.figure(figsize=(10,6))
         self.ax = self.fig.gca()

@@ -64,7 +64,7 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       if missing:
           raise ValueError(f"CSV is missing required columns: {sorted(missing)}")
 
-
+      
       # === Log–log regression ===
       self.logN = np.log10(self.df["loadedp"])
       self.logT = np.log10(self.df["gms"])
@@ -83,6 +83,7 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       
 
     def do_plot(self,name):
+      plt,fig,ax = self.__new_figure__()
       # Log–log regression
       # Full fit
       b_all, a_all, r2_all = self.fit_range(np.ones(len(self.df), dtype=bool))
@@ -97,19 +98,21 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       params_q, _ = curve_fit(quadratic, self.df["loadedp"], self.df["t1"])
       a_q, b_q, c_q = params_q
       curvature_upper = 2*c_q
-      fig = plt.figure(figsize=(10, 6))
-      axs = fig.gca()
+    
        # (3) Log–log regression
-      axs.loglog(self.df["loadedp"], self.df[name], 'o', label="Measured")
+      ax.loglog(self.df["loadedp"], self.df[name], 'o', label="Measured")
       xx = np.linspace(self.logN.min(), self.logN.max(), 200)
       #axs.loglog(10**xx, 10**(a_all+b_all*xx), '-', label=f"Full fit b={b_all:.2f}")
-      axs.loglog(10**xx, 10**(a_sat+b_sat*xx), '--', label=f"Saturated fit b={b_sat:.2f}")
-      axs.axvline(N0*10, color='gray', ls=':', label=f"N0={N0*10:.1e}")
-      axs.set_xlabel("Particles (N)")
-      axs.set_ylabel("Total time (s)")
+      ax.loglog(10**xx, 10**(a_sat+b_sat*xx), '--', label=f"Saturated fit b={b_sat:.2f}")
+      ax.axvline(N0*10, color='gray', ls=':', label=f"N0={N0*10:.1e}")
+      #axs.set_xlabel("Particles (N)")
+      #axs.set_ylabel("Total time (s)")
       #axs.set_title("Log–log regression fits")
-      axs.legend()
-      axs.grid(True, which="both", ls="--")
+      leg_list = self.__do_legend__()
+      plt.legend(leg_list)
+        ##-------------------------------------------
+      self.__do_commands__(plt,fig,ax)
+      plt.tight_layout()
       prefix_name = self.itemcfg.name.replace('_','')
       filename = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}{name}.png"
       plt.savefig(filename, dpi=600)
