@@ -27,22 +27,38 @@ class A_COMPARE_TABLE():
         
     header_arry = []
     def run(self):
-        
+        numscvt = []
         self.df = pd.read_csv(self.itemcfg.input_data_file)
-        auth = self.df['author']
-        year = self.df['year']
-        meth = self.df['method']
-        scal = self.df['scale']
-        notes = self.df['notes']
+        auth = self.df['name']
+        nump = self.df['N']
+        ii = 0
+        for k,v in nump.items():
+            val = int(v)
+            valstr = f"{val:,}"
+            numscvt.append(valstr)
+            ii+=1
+        tpp = self.df['tpp']
+        e2e = self.df['e2e']
+        year = self.df['yr']
+        gpu = self.df['gpu']
+        typ = self.df['typ']
+        equip = self.df['equip']
+        desc = self.df['desc']
+        notes = self.df['note']
         
         self.Table = []
         num_rows = 0
         
-        self.Table.append(self.df['author'])
-        self.Table.append(self.df['year'])
-        self.Table.append(self.df['method'])
-        self.Table.append(self.df['scale'])
-        self.Table.append( self.df['notes'])
+        self.Table.append(auth)
+        self.Table.append(year)
+        self.Table.append(numscvt)
+
+        self.Table.append(tpp)
+        self.Table.append(e2e)
+        self.Table.append(gpu)
+        self.Table.append(typ)
+        self.Table.append(equip)
+        self.Table.append(desc)
         self.Table = [list(row) for row in zip(*self.Table)]
         return self.Table
     

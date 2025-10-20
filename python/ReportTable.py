@@ -300,9 +300,12 @@ class ReportLatexTable(ReportClass):
                 else:
                     txt = "\\makecell{" + headers[k] + "}"
                 f.write(txt)
-            
-            f.write("\\\\ \\hline\n")
 
+            f.write("\\\\ \\hline \\\\ \n")
+            rw = ""
+            if "row_height" in self.itemcfg:
+                rw = self.itemcfg.row_height
+           
             for rr in range(start_row,end_row): #,skip):
                 for cc in range(self.cols):
                     #
@@ -312,7 +315,11 @@ class ReportLatexTable(ReportClass):
                         txt = str(self.table_array[rr][cc]) + " & "
                         f.write(txt)
                     else:
-                        txt = str(self.table_array[rr][cc]) + "\\\\ \n"
+                        txt = str(self.table_array[rr][cc]) + "\\\\"
+                        if len(rw) != 0:
+                            txt = txt + "[" + rw + "] \n"
+                        else:
+                            txt = txt + "\n"
                         f.write(txt)
             f.write("\\hline\n\\end{tabular}\n")
             if self.itemcfg.centering == True:
