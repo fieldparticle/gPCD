@@ -18,6 +18,7 @@ from ReportTable import *
 from LatexPreview import *
 from PdfViewer import *
 from CheckCfg import *
+from AttrDictFields import *
 class TabFormReport(QTabWidget):
     
     texFolder = ""
@@ -213,8 +214,20 @@ class TabFormReport(QTabWidget):
         if (self.prv != None):
             self.prv.close()    
         self.reload()
-        self.save_cap()
+        #self.save_cap()
         match self.itemcfg.type:
+            case "data_update":
+                gpcddata = gPCDData(self.bobj,self.itemcfg)
+                file_dict = AttrDictFields()
+                file_dict["source_dir"] = self.itemcfg.input_data_dir + "/perfData" + self.itemcfg.data_source[0]
+                file_dict["target_dir"] = self.itemcfg.input_data_dir + "/perfData" + self.itemcfg.data_source[1]
+                file_dict["mode"] = self.itemcfg.mode
+                file_dict["compute_type"] = self.itemcfg.compute_type
+                gpcddata.check_data_files(file_dict)
+                gpcddata.do_performance(file_dict)
+                return
+                #gpcddata.read_summary_file(file_dict)
+                
             case "batch":
                 return self.do_batch()
             case 'equation':
@@ -301,6 +314,11 @@ class TabFormReport(QTabWidget):
     #   
     def reload(self):
         self.load_item_cfg(self.CfgFile)
+       
+        
+
+        
+
     #******************************************************************
     # Build the data by analysing and saving summery files
     #   

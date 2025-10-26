@@ -41,8 +41,7 @@ class A_TABLE_CURVATURE():
         self.Table.append( self.df['delT'])
         self.Table.append( self.df['delTFrac'])
         self.Table.append( self.df['delTPRC'])
-        self.Table.append( self.df['qeft'])
-        self.Table.append( self.df['rescale'])
+ 
 
         self.Table = [list(row) for row in zip(*self.Table)]
         return self.Table

@@ -165,6 +165,20 @@ class gPCDData():
     #******************************************************************
     # Create the summary file wqith headers
     #
+    def create_summary_r(self,file_name):
+        
+        data = ['Name', 'fps', 'cpums', 'cms', 'gms', 'expectedp', 'loadedp',
+                'shaderp_comp', 'shaderp_grph', 'expectedc', 'shaderc', 'sidelen','cell_count','mean','stddev','mmrr']
+        try :
+            with open(file_name, mode= 'w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(data)
+        except BaseException as e:
+            raise BaseException(f"create_summary file failed{e}:")
+
+    #******************************************************************
+    # Create the summary file wqith headers
+    #
     # 
             
     #******************************************************************
@@ -333,7 +347,9 @@ class gPCDData():
         #print("REMEMBER CELL_COUNT is new and needs to be uncommented after new tests.")
         file.close()
 
-         #******************************************************************
+
+
+    #******************************************************************
     # Get maximuns write then to summary file
     #
     def get_mins(self,file_dict):

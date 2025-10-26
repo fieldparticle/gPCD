@@ -108,10 +108,15 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       #axs.set_xlabel("Particles (N)")
       #axs.set_ylabel("Total time (s)")
       #axs.set_title("Log–log regression fits")
-      leg_list = self.__do_legend__()
+      plt.rcParams.update({ "text.usetex": True})
+      self.__do_commands__(plt,fig,ax)
+      leg_list = []
+      leg_list.append(f"$Measured \quad data$")
+      leg_list.append(f"$Trendline, b={b_sat:.3f}$")
+      leg_list.append("$N_{sat}=1E6$")
       plt.legend(leg_list)
         ##-------------------------------------------
-      self.__do_commands__(plt,fig,ax)
+
       plt.tight_layout()
       prefix_name = self.itemcfg.name.replace('_','')
       filename = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}{name}.png"
@@ -134,7 +139,7 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       self.vals_list[f"{prefix_name}{name}rtwoall"] = f"{r2_all:0.2f}"
       self.vals_list[f"{prefix_name}{name}bsat"] = f"{a_sat:0.2f}"
       self.vals_list[f"{prefix_name}{name}asat"] = f"{b_sat:0.2f}"
-      self.vals_list[f"{prefix_name}{name}rtwosat"] = f"{r2_all:0.2f}"
+      self.vals_list[f"{prefix_name}{name}rtwosat"] = f"{r2_sat:0.4f}"
       self.vals_list[f"{prefix_name}{name}aq"] = f"{a_q:0.4e}"
       self.vals_list[f"{prefix_name}{name}bq"] = f"{b_q:0.4e}"
       self.vals_list[f"{prefix_name}{name}cq"] = f"{c_q:0.4e}"

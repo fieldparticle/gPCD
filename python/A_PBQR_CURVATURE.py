@@ -46,18 +46,26 @@ class A_PBQR_CURVATURE(PlotterClass):
         # === Fit quadratic: T(k) = a*k^2 + b*k + c ===
         coeffs = np.polyfit(particle_counts, timings_ms, deg=2)
         a2, b, c = coeffs
+
+        ##### Curvature is second derivative of tendline ###############
         curvature = 2 * a2  # second derivative (constant for quadratic)
 
         print(f"Quadratic fit: T(k) = {a2:.3e} k^2 + {b:.3e} k + {c:.3e}\n")
         print(f"Upper bound on curvature (2a): {curvature:.3e} ms / particle^2\n")
         a = a2
         xmaN = particle_counts[-1]
-        maxT = timings_ms[-1]
+        ###### quadratic contribution to per-particle #################
+        del_little_t =  a2*xmaN
+
+        ###### delta big T total quadratic contribution ########################
         an = a2*(xmaN**2)
         delt= curvature*xmaN*xmaN
-        #print(f"a={a} quadratic contribution:{an}")
+
+        maxT = timings_ms[-1]
+        ###### total time quadratic contribution divided by time is the fraction of Curavture to the max time ########################
         val_time = np.max(timings_ms)
         max_val =an/(np.max(timings_ms))
+
         print(f"Total t:{val_time} contribution:{max_val}\n")
         one_percent_error = 0.01*val_time
         max_n = 0
@@ -85,6 +93,7 @@ class A_PBQR_CURVATURE(PlotterClass):
         # === Plot ===
         ##------------------------------------------
         plt,fig,ax = self.__new_figure__()
+        self.__do_commands__(plt,fig,ax)
         ##-------------------------------------------
         plt.scatter(particle_counts, timings_ms, color="black")
         plt.plot(k_space, T_fit, color="blue")
@@ -94,7 +103,7 @@ class A_PBQR_CURVATURE(PlotterClass):
         leg_list = self.__do_legend__()
         plt.legend(leg_list)
         ##-------------------------------------------
-        self.__do_commands__(plt,fig,ax)
+        
         
         ##-------------------------------------------
         #self.plt.tight_layout()
@@ -123,13 +132,13 @@ class A_PBQR_CURVATURE(PlotterClass):
         self.vals_list[f"{self.prefix_name}{name}b"] = f"{b:0.3e}"
         self.vals_list[f"{self.prefix_name}{name}c"] = f"{c:0.3e}"
         self.vals_list[f"{self.prefix_name}{name}twoa"] = f"{2*a:0.3e}"
-        self.vals_list[f"{self.prefix_name}{name}UpperBoundCurvature"] = f"{curvature:0.3e}"
-        self.vals_list[f"{self.prefix_name}{name}QuadraticContributionta"] = f"{del_t1:0.4e}"
-        self.vals_list[f"{self.prefix_name}{name}QuadraticContributiontb"] = f"{del_t2:0.4e}"
-        self.vals_list[f"{self.prefix_name}{name}QuadraticContributionfrc"] = f"{del_t2_frc:0.6f}"
-        self.vals_list[f"{self.prefix_name}{name}QuadraticContributionpct"] = f"{del_t2_pct:0.2f}"
-        self.vals_list[f"{self.prefix_name}{name}TotalTime"] = f"{val_time:0.4f}"
-        self.vals_list[f"{self.prefix_name}{name}TotalTimeCont"] = f"{delt:0.4f}"
+        self.vals_list[f"{self.prefix_name}{name}UpperBoundCurvature"] = f"{abs(curvature):0.3e}"
+        self.vals_list[f"{self.prefix_name}{name}QuadraticContributionta"] = f"{abs(del_t1):0.4e}"
+        self.vals_list[f"{self.prefix_name}{name}QuadraticContributiontb"] = f"{abs(del_t2):0.4e}"
+        self.vals_list[f"{self.prefix_name}{name}QuadraticContributionfrc"] = f"{abs(max_val):0.6f}"
+        self.vals_list[f"{self.prefix_name}{name}QuadraticContributionpct"] = f"{abs(max_val*100):0.2f}"
+        self.vals_list[f"{self.prefix_name}{name}TotalTime"] = f"{abs(val_time):0.6f}"
+        self.vals_list[f"{self.prefix_name}{name}TotalTimeCont"] = f"{abs(delt):0.4f}"
         max_as_int = int(float(max_n))
         self.vals_list[f"{self.prefix_name}{name}EstimateNoticeableN"] = f"{max_as_int:,}"
         rescale = 2*a*1E7*1E6 
@@ -155,12 +164,13 @@ class A_PBQR_CURVATURE(PlotterClass):
         cms = np.array(transposed[3]).astype(float)
         both = np.add(gms,cms)
 
-        print("-------------------------- TOT ----------------------------")
-        self.do_plot('tot',particle_counts,both)
+        
         print("-------------------------- gms ----------------------------")
         self.do_plot('gms',particle_counts,gms)
         print("-------------------------- cms ----------------------------")
         self.do_plot('cms',particle_counts,cms)
+        print("-------------------------- TOT ----------------------------")
+        self.do_plot('tot',particle_counts,both)
 
         self.itemcfg['input_images'] = self.include
         self.vals_list[f"{self.prefix_name}StartRowParticlesVal"] = int(float(data_list[0][6]))

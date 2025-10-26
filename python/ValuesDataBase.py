@@ -21,6 +21,9 @@ class ValuesDataBase():
         if len(vals_list) == 0:
             return
         self.vals_cfg_obj = ConfigUtility(self.cfg.values_data_base)
+        if(os.path.exists(self.cfg.values_data_base) == False):
+            open(self.cfg.values_data_base, mode= 'w', newline='')
+            
         self.vals_cfg_obj.Create(self.bobj.log,self.cfg.values_data_base)
         self.vals_cfg = self.vals_cfg_obj.config
         for k,v in self.vals_cfg.items():

@@ -62,12 +62,7 @@ class A_FPS_GMS_CMS(PlotterClass):
         plt.savefig(filename, dpi=self.itemcfg.dpi)
         self.include.append(filename)
         plt.close()
-                       
-        #self.vals_list[f"{self.prefix_name}{name}StartRow"] = 10
-        #self.vals_list[f"{self.prefix_name}{name}StartRowParticlesVal"] = int(float(data_list[0][6]))
-        #self.vals_list[f"{self.prefix_name}{name}MaxParticles"] = f"{xmaN}"
-        
-
+       
     def run(self):
         data_source = self.itemcfg.data_source
         for ii in data_source:

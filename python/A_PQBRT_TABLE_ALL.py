@@ -28,10 +28,12 @@ class A_PQBRT_TABLE_ALL():
     header_arry = []
     def run(self):
         self.mdf = pd.read_csv(self.itemcfg.mmrr_dir)
-        mmrr = np.mean(self.mdf['gms'])
+        mmrr = np.min(self.mdf['gms'])
 
 
         self.df = pd.read_csv(self.itemcfg.input_data_file)
+        self.df["loadedp"] = pd.to_numeric(self.df['loadedp'], downcast='integer', errors='coerce')
+
         N = self.df['loadedp']
         M = self.df['expectedc']
         cms = self.df['cms']
@@ -39,31 +41,35 @@ class A_PQBRT_TABLE_ALL():
         fps = self.df['fps']
         both = np.add(gms,cms)
         self.Table = []
-        num_rows = 0
-        
         self.Table.append(N)
         self.Table.append(M)
         self.Table.append(fps)
         self.Table.append(cms*1000)
         self.Table.append(gms*1000)
         self.Table.append(both*1000)
-        self.Table.append((both/mmrr)/100)
+        self.Table.append((both/mmrr)/1000)
         self.Table = [list(row) for row in zip(*self.Table)]
+        self.save_export_vals(mmrr)
         return self.Table
     
-    def save_export_vals(self):
-        pass
-        g = self.lines_list[0]
+    def save_export_vals(self,mmrr):
         vdb = ValuesDataBase(self.bobj)
         save_lines_vals = 0
+        
         prefix_name = self.itemcfg.name.replace('_','')
+        self.vals_list[f"{prefix_name}mmrr"] = mmrr
+        self.vals_list[f"{prefix_name}mmrrns"] = mmrr*1E9
         if 'save_lines_vals' in self.itemcfg:
             save_lines_vals = self.itemcfg.save_lines_vals
+            self.rows = len(self.Table)
+            self.cols = len(self.Table[0])
             for rr in range(self.rows) :
                 if rr in save_lines_vals:
                     for cc in range(self.cols) :
-                       print(f"row{rr} col {cc} row {vdb.alph(rr+1)} col {vdb.alph(cc+1)}")
-                       self.vals_list[f"{prefix_name}{vdb.alph(rr+1)}{vdb.alph(cc+1)}"] = self.table_array[rr][cc]
+                        if cc == 0 or cc == 1:
+                            self.vals_list[f"{prefix_name}{vdb.alph(rr+1)}{vdb.alph(cc+1)}"] = self.Table[rr][cc]
+                        else:
+                            self.vals_list[f"{prefix_name}{vdb.alph(rr+1)}{vdb.alph(cc+1)}"] = f"{self.Table[rr][cc]:.2f}"
                             
         vdb.write_values(self.vals_list)
         return

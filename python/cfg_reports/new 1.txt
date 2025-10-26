@@ -1,0 +1,1 @@
+Also, the graphics pipeline may be more optimized than the compute suggesting improvements that might be carried over. 
