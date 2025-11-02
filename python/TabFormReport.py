@@ -1,5 +1,6 @@
 import sys
 import importlib
+import importlib.util
 from contextlib import redirect_stdout
 from io import StringIO
 from sys import stderr, stdout
@@ -204,9 +205,18 @@ class TabFormReport(QTabWidget):
             self.report_obj.save_latex()
 
     def load_class(self,class_name):
-        module_name, class_name = class_name.rsplit('.', 1)
-        module = importlib.import_module(module_name)
-        return getattr(module, class_name)
+        module_name, class_nm = class_name.rsplit('.', 1)
+        full_path = self.cfg.report_start_dir + "/" + class_nm + ".py"
+        
+        try :
+            spec = importlib.util.spec_from_file_location(module_name, full_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        except BaseException as e:
+            print(f"Load_Class failed:{e}")
+        #module = importlib.import_module(module_name)
+        attr_ret = getattr(module, class_nm)
+        return attr_ret
     #******************************************************************
     # Preview the latex genberated pdf
     #

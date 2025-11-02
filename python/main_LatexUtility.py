@@ -22,7 +22,7 @@ import matplotlib
 ## Create a base class.
 bc = ParticleBase("FrontEnd")
 #print("Hello World\n", file=sys.stdout)
-bc.Create("ParticleUtil.cfg",'ParicleUtil.log')
+bc.Create("ParticleUtilFP.cfg",'ParicleUtil.log')
 
 if __name__ == '__main__':
     #f = matplotlib.matplotclslib_fname()

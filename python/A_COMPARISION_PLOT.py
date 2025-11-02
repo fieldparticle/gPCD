@@ -51,7 +51,8 @@ class A_COMPARISION_PLOT(PlotterClass):
             if "ksap" in labels[ii].lower():
                 plt.text(yr[ii]+hspace,tpo_vals[ii],labels[ii],size=22)
             elif "bell" in labels[ii].lower():
-                plt.text(yr[ii]+hspace,tpo_vals[ii],labels[ii],size=22,color='firebrick')
+                #plt.text(yr[ii]+hspace,tpo_vals[ii],labels[ii],size=22,color='firebrick')
+                plt.text(yr[ii]+hspace,tpo_vals[ii],"Anonymized",size=22,color='firebrick')
             elif "liu" in labels[ii].lower():
                 plt.text(yr[ii]+hspace,tpo_vals[ii]-50,labels[ii],size=22)
             elif "zhang" in labels[ii].lower():

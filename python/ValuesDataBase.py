@@ -12,6 +12,8 @@ class ValuesDataBase():
         
 
     def get_vals(self):
+        if(os.path.exists(self.cfg.values_data_base) == False):
+            open(self.cfg.values_data_base, mode= 'w', newline='')
         self.vals_cfg_obj = ConfigUtility(self.cfg.values_data_base)
         self.vals_cfg_obj.Create(self.bobj.log,self.cfg.values_data_base)
         self.vals_cfg = self.vals_cfg_obj.config

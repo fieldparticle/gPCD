@@ -85,6 +85,9 @@ class PlotterClass():
                 end_num = line_len
             else:
                 end_num = int(start_ary[1])
+        else:
+            return start_num,line_len
+            
         return start_num,end_num
     
     def __clean_files__(self,filename):
