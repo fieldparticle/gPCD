@@ -325,8 +325,18 @@ class TabFormReport(QTabWidget):
     def reload(self):
         self.load_item_cfg(self.CfgFile)
        
-        
 
+    def refresh_dir(self):
+        ## -------------------------------------------------------------
+        ## CFg Files Select Interface
+        self.cfg_files = [i for i in os.listdir(self.cfg.report_start_dir) if i.endswith("cfg")]
+        self.cap_files = [i for i in os.listdir(self.cfg.report_start_dir) if i.endswith("cap")]
+        self.vcnt = 0  
+        self.CfgListObj.clear()
+
+        for ii in range(len(self.cfg_files)):
+            self.CfgListObj.insertItem(ii,self.cfg_files[ii]) 
+        
         
 
     #******************************************************************
@@ -487,7 +497,7 @@ class TabFormReport(QTabWidget):
             self.ReloadButton = QPushButton("Reload")
             self.setSize(self.ReloadButton,30,100)
             self.ReloadButton.setStyleSheet("background-color:  #dddddd")
-            self.ReloadButton.clicked.connect(self.reload)
+            self.ReloadButton.clicked.connect(self.refresh_dir)
             self.ReloadButton.setEnabled(True)
             dirgrid.addWidget(self.ReloadButton,2,3)
              ## -------------------------------------------------------------
