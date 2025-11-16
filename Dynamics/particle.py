@@ -36,5 +36,9 @@ class particle():
         self.col_pointA = None
         self.col_pointB = None
         self.isec_vect = []
+        self.orient_vec_print = []
         self.orient_vec = []
+        self.orient_ang = 0.0
+        self.prox_len = 0.0
+        self.prox_vec = []
         self.plot_vectors = plt_vec_flg

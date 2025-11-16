@@ -40,14 +40,17 @@ class PlotCanvas(FigureCanvas):
         for ii in self.pa.pary:
             cc = Circle((ii.rx,ii.ry),ii.radius,color='blue',alpha=0.8,fill=False)
             self.ax.add_patch(cc)
+            self.ax.text(ii.rx,ii.ry,f"{ii.pnum}")
             if ii.col_flag == True:
                 if ii.plot_vectors == True:
                     self.ax.plot(ii.col_pointA[0],ii.col_pointA[1],'ro')
                     self.ax.plot(ii.col_pointB[0],ii.col_pointB[1],'ro')
                     self.ax.plot([ii.rx,ii.col_pointA[0]],[ii.ry,ii.col_pointA[1]],'r-')
                     self.ax.plot([ii.rx,ii.col_pointB[0]],[ii.ry,ii.col_pointB[1]],'r-')
-                    self.ax.plot(ii.orient_vec[0],ii.orient_vec[1],'b-')
-            self.ax.text(1.0,self.ylim[1]+0.02,"text")
+                    self.ax.plot(ii.orient_vec_print[0],ii.orient_vec_print[1],'y-')
+                    self.ax.plot(ii.prox_vec[0],ii.prox_vec[1],'k-')
+                    self.ax.text(1.0,self.ylim[1]+0.02,f"P:{ii.pnum} orient angle:{ii.orient_ang:.4f}")        
+            #self.ax.text(1.0,self.ylim[1]+0.02,"text")
         
         ratio = 1.0
         #x_left, x_right = self.ax.get_xlim()
