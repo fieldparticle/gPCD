@@ -126,12 +126,18 @@ class TabFormDyn(QTabWidget):
         self.load_item_cfg(self.CfgFile)
         self.particle_array = ParticleArray(self.itemcfg)
         pnum = 0
-        
+        # do everything relative to 1 instead of actual values
+       
         ptxt = f"p{pnum}"
         pop = True
         plot_vectors = self.itemcfg.plot_vectors
         while pop == True:
             if ptxt in self.itemcfg:
+                if self.itemcfg.rel_one == True:
+                    self.itemcfg[ptxt].molar_mass = 1.0
+                    self.itemcfg[ptxt].temp_vel = 1.0
+                    self.itemcfg[ptxt].attr_accel = 0.0
+                    self.itemcfg[ptxt].rpls_accel = 1.0
                 p = particle()
                 p.set(self.itemcfg[ptxt].rx,
                     self.itemcfg[ptxt].ry,
@@ -143,6 +149,11 @@ class TabFormDyn(QTabWidget):
                     self.itemcfg[ptxt].ptype,
                     self.itemcfg[ptxt].molar_mass,
                     self.itemcfg[ptxt].temp_vel,
+                    self.itemcfg[ptxt].gas_const,
+                    self.itemcfg[ptxt].vap_temp,
+                    self.itemcfg[ptxt].attr_accel,
+                    self.itemcfg[ptxt].rpls_accel,
+                    self.itemcfg[ptxt].cmprs,
                     plot_vectors[pnum])
                 self.particle_array.add(p)
                 pnum+=1

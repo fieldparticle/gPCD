@@ -76,6 +76,10 @@ class ParticleArray():
             proxvec = [[self.pary[src].rx,self.pary[src].prox_len*np.cos(self.pary[src].orient_ang)+self.pary[src].rx], [self.pary[src].ry,
                         self.pary[src].prox_len*np.sin(self.pary[src].orient_ang)+self.pary[src].ry]]
             self.pary[src].prox_vec = proxvec
+            self.pary[src].pen_factor = (1.0-self.pary[src].prox_len/self.pary[src].radius)
+            #self.pary[src].pen_factor = (self.pary[src].prox_len/self.pary[src].radius)
+
+            return
             
 
         except BaseException as e:
@@ -84,6 +88,7 @@ class ParticleArray():
 
     def check_collision(self):
         col_flg = False
+        
         for ii in range(len( self.pary)):
             for jj in range(len(self.pary)):
                 if ii != jj:
@@ -94,9 +99,29 @@ class ParticleArray():
                         self.pary[ii].col_flag = True
                         col_flg = True
                         self.process_collision(ii,jj)
+                    else:
+                        self.pary[ii].col_flag = False
+        
         return col_flg
 
+    def tol(self,val):
+        tol = 0.001
+        if val < tol and val > -tol:
+            return True
+        return False
 
     def move(self):
+
         for ii in self.pary:
+            if (ii.pen_factor != 0):
+                if ii.pnum == 0:
+                    ii.vx = -(ii.cmprs*ii.pen_factor)*ii.temp_vel+ii.vx
+                else:
+                    ii.vx = (ii.cmprs*ii.pen_factor)*ii.temp_vel+ii.vx
+                
+                
+            
             ii.rx = ii.rx+ii.vx*self.itemcfg.dt
+        
+            
+            

@@ -49,13 +49,22 @@ class PlotCanvas(FigureCanvas):
                     self.ax.plot([ii.rx,ii.col_pointB[0]],[ii.ry,ii.col_pointB[1]],'r-')
                     self.ax.plot(ii.orient_vec_print[0],ii.orient_vec_print[1],'y-')
                     self.ax.plot(ii.prox_vec[0],ii.prox_vec[1],'k-')
-                    self.ax.text(1.0,self.ylim[1]+0.02,f"P:{ii.pnum} orient angle:{ii.orient_ang:.4f}")        
-            #self.ax.text(1.0,self.ylim[1]+0.02,"text")
+                    self.ax.text(0.0,self.ylim[1]+0.14,f"P:{ii.pnum} orient angle:{ii.orient_ang:.4f}")   
+                    self.ax.text(0.0,self.ylim[1]+0.08,f"P:{ii.pnum} penetration factor :{ii.pen_factor:.4f}")  
+                    self.ax.text(0.0,self.ylim[1]+0.02,f"P:{ii.pnum} velocity :{ii.vx:.4f}")  
+            else:
+                self.col_pointA = None
+                self.col_pointB = None
+                self.isec_vect = []
+                self.orient_vec_print = []
+                self.orient_vec = []
+                self.orient_ang = 0.0
+                self.prox_len = 0.0
+                self.prox_vec = []
+                self.pen_factor =0.0
+            
         
         ratio = 1.0
-        #x_left, x_right = self.ax.get_xlim()
-        #y_low, y_high = self.ax.get_ylim()
-        #self.ax.set_aspect(abs((x_right-x_left)/(y_low-y_high))*ratio)
         self.ax.set_xlim(self.xlim)
         self.ax.set_ylim(self.ylim)
         self.ax.set_xlabel('X-axis')
