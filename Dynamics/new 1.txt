@@ -1,0 +1,12 @@
+   # Process wall collsions
+            if (self.check_wall_collision(ii) == True):
+                if(self.pary[ii].wcol_flag == False):
+                    self.pary[ii].cvx = abs(self.pary[ii].vx)
+                    wall_col = collsion()
+                    self.process_collision(self.pary[ii],self.pary[ii].wall_list[0],wall_col)
+                    self.pary[ii].wcol_flag = True
+                else:
+                    if(self.pary[ii].col_flag == True):
+                        self.pary[ii].vx = self.pary[ii].cvx*math.cos(self.pary[ii].vel_ang)
+                        self.pary[ii].wcol_flag = False
+                        self.pary[ii].wall_list.clear

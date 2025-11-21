@@ -8,22 +8,73 @@ from matplotlib.backends.backend_qtagg import FigureCanvas
 from matplotlib.figure import Figure
 import time
 from particle import *
-
+from WallRayIntersect import *
+def atan360(x,y,z):
+        angle = math.atan2(y,x)%(2*math.pi)
+        return (angle)
 class ParticleArray():
 
     def __init__(self,itemcfg):
         self.pary = []
         self.pnum = 0
         self.itemcfg = itemcfg
-    
+        self.wall_xmin = 0.0
+        self.wall_xmax = 0.0
+        self.wall_ymin = 0.0
+        self.wall_ymax = 0.0
+
+    def start(self):
+        pnum = 0
+        # do everything relative to 1 instead of actual values
+       
+        ptxt = f"p{pnum}"
+        pop = True
+        plot_vectors = self.itemcfg.plot_vectors
+        while pop == True:
+            if ptxt in self.itemcfg:
+                if self.itemcfg.rel_one == True:
+                    self.itemcfg[ptxt].molar_mass = 1.0
+                    self.itemcfg[ptxt].temp_vel = 1.0
+                    self.itemcfg[ptxt].attr_accel = 0.0
+                    self.itemcfg[ptxt].rpls_accel = 1.0
+                p = particle()
+                p.set(pnum,
+                    self.itemcfg[ptxt].rx,
+                    self.itemcfg[ptxt].ry,
+                    self.itemcfg[ptxt].rz,
+                    self.itemcfg[ptxt].vx,
+                    self.itemcfg[ptxt].vy,
+                    self.itemcfg[ptxt].vz,
+                    self.itemcfg[ptxt].radius,
+                    self.itemcfg[ptxt].ptype,
+                    self.itemcfg[ptxt].molar_mass,
+                    self.itemcfg[ptxt].temp_vel,
+                    self.itemcfg[ptxt].gas_const,
+                    self.itemcfg[ptxt].vap_temp,
+                    self.itemcfg[ptxt].attr_accel,
+                    self.itemcfg[ptxt].rpls_accel,
+                    self.itemcfg[ptxt].cmprs,
+                    plot_vectors[pnum])
+                self.add(p)
+                pnum+=1
+                ptxt = f"p{pnum}"
+            else:
+                pop = False
+        self.addWalls()
+
     def origin_vector(self,X,Y):
         outvec = [X[1]-X[0],Y[1]-Y[0]]
         return outvec
     
-    def atan360(self,x,y,z):
-        angle = math.atan2(y,x)%(2*math.pi)
-        return (angle)
-    
+    def addWalls(self):
+        if "walls" in self.itemcfg:
+            if self.itemcfg.walls == True:
+                walls = self.itemcfg.wall_dim
+                self.wall_xmin = walls[0]
+                self.wall_xmax = walls[1]
+                self.wall_ymin = walls[2]
+                self.wall_ymax = walls[3]
+
     def add(self,p):
         p.pnum = self.pnum
         self.pary.append(p)
@@ -33,95 +84,309 @@ class ParticleArray():
         for ii in self.pary:
             print(f"#:{ii.pnum},radius:{ii.radius},rx:{ii.rx},ry:{ii.ry},rz:{ii.rz},rx:{ii.rx},vx:{ii.rx},vy:{ii.rx},vz:{ii.rx}")
 
-    def process_collision(self,src,trg):
+    def do_iteration(self):
+        for ii in range(len(self.pary)):
+            self.pary[ii].collision_list.clear()
+            for jj in range(len(self.pary)):
+                if ii != jj:
+                    # Is there a collsion?
+                    if (self.check_collision(ii,jj) == True):
+                        # If the collision is new save the absolute value of the incomeing velocity
+                        if(self.pary[ii].col_flag == False):
+                            self.pary[ii].cvx = abs(self.pary[ii].vx)
+                            self.pary[ii].cvy = abs(self.pary[ii].vy)
+                        # Create a new collision structure
+                        new_col = collsion()
+                        self.process_collision(self.pary[ii],self.pary[jj],new_col)
+                        self.pary[ii].col_flag = True
+                    else:
+                        if(self.pary[ii].col_flag == True):
+                            self.pary[ii].vx = self.pary[ii].cvx*math.cos(self.pary[ii].vel_ang)
+                            self.pary[ii].vy = self.pary[ii].cvy*math.sin(self.pary[ii].vel_ang)
+                        self.pary[ii].col_flag = False
+                    
+
+            # Process wall collsions
+            self.check_wall_collision(ii)
+            self.calculate_collision_acceleration(ii)
+
+    ##############################################################################################
+    # Check for wall collsions
+    #
+    #
+    #
+    ##############################################################################################
+    def check_wall_collision(self,ii):
+        # ---------------------East Wall ---------------------------------------------------------
+        if self.pary[ii].rx > self.wall_xmax-self.pary[ii].radius:
+            if self.pary[ii].wcol_flag[0]  == False:
+                self.pary[ii].cvx = abs(self.pary[ii].vx)
+                self.pary[ii].cvy = abs(self.pary[ii].vy)
+                # Center point of particle
+                P = (self.pary[ii].rx, self.pary[ii].ry)
+                # unit vector pointing in the direction of the wall
+                v = (1, 0)
+                # A point in the wall
+                A = (self.itemcfg.wall_dim[1], self.itemcfg.wall_dim[3])
+                # Direction of wall
+                d = (0, 1)
+                t,s,ipoint = intersect_ray_line_2d(P, v, A, d)
+                #print(f"t:{t},s:{s},ipoint:{ipoint}")
+                faux_center = P+2*t*np.array(v)
+                
+                # Create a pseudo particle
+                wp = particle()
+                wp.make_copy(self.pary[ii])
+                wp.rx = faux_center[0]
+                wp.ry = faux_center[1]
+                wp.vx = 0.0
+                wp.vy = 0.0
+                self.pary[ii].wall_list[0]= wp
+                self.pary[ii].wcol_flag[0] = True
+            else:
+                wall_col = collsion()
+                self.process_collision(self.pary[ii],self.pary[ii].wall_list[0],wall_col)
+        elif self.pary[ii].wcol_flag[0]  == True:
+            self.pary[ii].vx = self.pary[ii].cvx*math.cos(self.pary[ii].vel_ang)
+            self.pary[ii].vy = self.pary[ii].cvy*math.sin(self.pary[ii].vel_ang)
+            self.pary[ii].wcol_flag[0] = False
+                
+        # West Wall ###############################################
+        if self.pary[ii].rx < self.wall_xmin+self.pary[ii].radius:
+            if self.pary[ii].wcol_flag[1]  == False:
+                self.pary[ii].cvx = abs(self.pary[ii].vx)
+                self.pary[ii].cvy = abs(self.pary[ii].vy)
+                # Center point of particle
+                P = (self.pary[ii].rx, self.pary[ii].ry)
+                # unit vector pointing in the direction of the wall
+                v = (-1, 0)
+                # A point in the wall
+                A = (self.itemcfg.wall_dim[0], self.itemcfg.wall_dim[3])
+                # Direction of wall
+                d = (0, 1)
+                t,s,ipoint = intersect_ray_line_2d(P, v, A, d)
+                #print(f"t:{t},s:{s},ipoint:{ipoint}")
+                faux_center = P+2*t*np.array(v)
+                # Create a pseudo particle
+                wp = particle()
+                wp.make_copy(self.pary[ii])
+                wp.rx = faux_center[0]
+                wp.ry = faux_center[1]
+                wp.vx = 0.0
+                wp.vy = 0.0
+                self.pary[ii].wall_list[1] = wp
+                self.pary[ii].wcol_flag[1] = True
+            else:
+                wall_col = collsion()
+                self.process_collision(self.pary[ii],self.pary[ii].wall_list[1],wall_col)
+        elif self.pary[ii].wcol_flag[1]  == True:
+            self.pary[ii].vx = self.pary[ii].cvx*math.cos(self.pary[ii].vel_ang)
+            self.pary[ii].wcol_flag[1] = False
+            return True
+    
+        # Top Wall ###############################################
+        if self.pary[ii].ry > self.wall_ymax-self.pary[ii].radius:
+            if self.pary[ii].wcol_flag[2]  == False:
+
+                self.pary[ii].cvx = abs(self.pary[ii].vx)
+                self.pary[ii].cvy = abs(self.pary[ii].vy)
+                P = (self.pary[ii].rx, self.pary[ii].ry)
+                v = (0, 1)
+                A = (self.itemcfg.wall_dim[1], self.itemcfg.wall_dim[3])
+                d = (1, 0)
+                t,s,ipoint = intersect_ray_line_2d(P, v, A, d)
+                #print(f"t:{t},s:{s},ipoint:{ipoint}")
+                faux_center = P+2*t*np.array(v)
+                # Create a pseudo particle
+                wp = particle()
+                wp.make_copy(self.pary[ii])
+                wp.rx = faux_center[0]
+                wp.ry = faux_center[1]
+                wp.vx = 0.0
+                wp.vy = 0.0
+                self.pary[ii].wall_list[2] = wp
+                self.pary[ii].wcol_flag[2] = True
+            else:
+                wall_col = collsion()
+                if self.process_collision(self.pary[ii],self.pary[ii].wall_list[2],wall_col) == False:
+                    self.pary[ii].vx = self.pary[ii].cvx*math.cos(self.pary[ii].vel_ang)
+                    self.pary[ii].vy = self.pary[ii].cvy*math.sin(self.pary[ii].vel_ang)
+                    self.pary[ii].wcol_flag[2] = False
+                    return False
+
+        elif self.pary[ii].wcol_flag[2]  == True:
+            self.pary[ii].vx = self.pary[ii].cvx*math.cos(self.pary[ii].vel_ang)
+            self.pary[ii].vy = self.pary[ii].cvy*math.sin(self.pary[ii].vel_ang)
+            self.pary[ii].wcol_flag[2] = False
+            return True
+        '''
+         # Bottom Wall ###############################################
+        if self.pary[ii].ry > self.wall_ymax-self.pary[ii].radius:
+            if self.pary[ii].wcol_flag[2]  == False:
+                self.pary[ii].cvx = abs(self.pary[ii].vx)
+                self.pary[ii].cvy = abs(self.pary[ii].vy)
+                 # Center point of particle
+                P = (self.pary[ii].rx, self.pary[ii].ry)
+                # unit vector pointing in the direction of the wall
+                v = (0, -1)
+                # A point in the wall
+                A = (self.itemcfg.wall_dim[1], self.itemcfg.wall_dim[2])
+                # Direction of wall
+                d = (1, 0)
+                t,s,ipoint = intersect_ray_line_2d(P, v, A, d)
+                #print(f"t:{t},s:{s},ipoint:{ipoint}")
+                faux_center = P+2*t*np.array(v)
+                # Create a pseudo particle
+                wp = particle()
+                wp.make_copy(self.pary[ii])
+                wp.rx = faux_center[0]
+                wp.ry = faux_center[1]
+                wp.vx = 0.0
+                wp.vy = 0.0
+                self.pary[ii].wall_list[2] = wp
+                self.pary[ii].wcol_flag[2] = True
+            else:
+                wall_col = collsion()
+                if self.process_collision(self.pary[ii],self.pary[ii].wall_list[2],wall_col) == False:
+                    self.pary[ii].vx = self.pary[ii].cvx*math.cos(self.pary[ii].vel_ang)
+                    self.pary[ii].vy = self.pary[ii].cvy*math.sin(self.pary[ii].vel_ang)
+                    self.pary[ii].wcol_flag[2] = False
+                    return False
+
+        elif self.pary[ii].wcol_flag[2]  == True:
+            self.pary[ii].vx = self.pary[ii].cvx*math.cos(self.pary[ii].vel_ang)
+            self.pary[ii].vy = self.pary[ii].cvy*math.sin(self.pary[ii].vel_ang)
+            self.pary[ii].wcol_flag[2] = False
+            return True
+        '''    
+        # Bottom Wall ###############################################
+        if self.pary[ii].ry < self.wall_ymin+self.pary[ii].radius:
+            if self.pary[ii].wcol_flag[3]  == False:
+                self.pary[ii].cvx = abs(self.pary[ii].vx)
+                self.pary[ii].cvy = abs(self.pary[ii].vy)
+                  # Center point of particle
+                P = (self.pary[ii].rx, self.pary[ii].ry)
+                # unit vector pointing in the direction of the wall
+                v = (0, -1)
+                # A point in the wall
+                A = (self.itemcfg.wall_dim[1], self.itemcfg.wall_dim[2])
+                # Direction of wall
+                d = (1, 0)
+                t,s,ipoint = intersect_ray_line_2d(P, v, A, d)
+                #print(f"t:{t},s:{s},ipoint:{ipoint}")
+                faux_center = P+2*t*np.array(v)
+                # Create a pseudo particle
+                wp = particle()
+                wp.make_copy(self.pary[ii])
+                wp.rx = faux_center[0]
+                wp.ry = faux_center[1]
+                wp.vx = 0.0
+                wp.vy = 0.0
+                self.pary[ii].wall_list[3] = wp
+                self.pary[ii].wcol_flag[3] = True
+            else:
+                wall_col = collsion()
+                if self.process_collision(self.pary[ii],self.pary[ii].wall_list[3],wall_col) == False:
+                    self.pary[ii].vx = self.pary[ii].cvx*math.cos(self.pary[ii].vel_ang)
+                    self.pary[ii].vy = self.pary[ii].cvy*math.sin(self.pary[ii].vel_ang)
+                    self.pary[ii].wcol_flag[3] = False
+                    return False
+        elif self.pary[ii].wcol_flag[3]  == True:
+            self.pary[ii].vx = self.pary[ii].cvx*math.cos(self.pary[ii].vel_ang)
+            self.pary[ii].vy = self.pary[ii].cvy*math.sin(self.pary[ii].vel_ang)
+            self.pary[ii].wcol_flag[3] = False
+            return True
+        
+        return False
+
+    def check_collision(self,ii,jj):
+        col_flg = False
+        dsq = ((self.pary[ii].rx-self.pary[jj].rx)**2+(self.pary[ii].ry-self.pary[jj].ry)**2+(self.pary[ii].rz-self.pary[jj].rz)**2)
+        rsq = (self.pary[ii].radius + self.pary[jj].radius)**2
+        #print(f"dsq:{dsq},rsq:{rsq}")
+        if (dsq<rsq):
+            col_flg = True
+        return col_flg
+
+    def process_collision(self,src,trg,col_struct):
+        
         try:
-            A = np.array((self.pary[src].rx, self.pary[src].ry))
-            B = np.array((self.pary[trg].rx, self.pary[trg].ry))
+            A = np.array((src.rx, src.ry))
+            B = np.array((trg.rx, trg.ry))
             c =  np.linalg.norm(A-B)
-            a = self.pary[src].radius
-            b = self.pary[trg].radius
+            a = src.radius
+            b = trg.radius
             cosAlpha = (b**2+c**2-a**2)/(2*b*c)
             # Unit vector pointing to centers
             u_AB = (B - A)/c
             # Normal vector
             pu_AB = np.array((u_AB[1], -u_AB[0])); 
-            r = (b*(1-cosAlpha**2))
+            r = ((1-cosAlpha**2))
+            #print(r)
+            if r < 0.0:
+                return False
             # The intersection points.
-            self.pary[src].col_pointA = A + u_AB * (b*cosAlpha) + pu_AB * (b*np.sqrt(1-cosAlpha**2))
-            self.pary[src].col_pointB = A + u_AB * (b*cosAlpha) - pu_AB * (b*np.sqrt(1-cosAlpha**2))
+            col_struct.col_pointA = A + u_AB * (b*cosAlpha) + pu_AB * (b*np.sqrt(1-cosAlpha**2))
+            col_struct.col_pointB = A + u_AB * (b*cosAlpha) - pu_AB * (b*np.sqrt(1-cosAlpha**2))
             # Vector from center opf particle
-            self.pary[src].isec_vect = [[self.pary[src].rx,self.pary[src].col_pointA[0]],
-                                        [self.pary[src].ry,self.pary[src].col_pointA[0]]]
+            col_struct.isec_vect = [[src.rx,col_struct.col_pointA[0]],
+                                [src.ry,col_struct.col_pointA[0]]]
             # Bisector of line between intersection points
-            O1 = (self.pary[src].col_pointA[0]+self.pary[src].col_pointB[0])/2.0
-            O2 = (self.pary[src].col_pointA[1]+self.pary[src].col_pointB[1])/2.0
+            O1 = (col_struct.col_pointA[0]+col_struct.col_pointB[0])/2.0
+            O2 = (col_struct.col_pointA[1]+col_struct.col_pointB[1])/2.0
 
             # Print orientation vector from center of particle to bisector
-            self.pary[src].orient_vec_print = [[self.pary[src].rx,O1],[self.pary[src].ry,O2]]
+            col_struct.orient_vec_print = [[src.rx,O1],[src.ry,O2]]
             # Orient vector
-            self.orient_vec = np.array([[self.pary[src].rx,self.pary[src].ry],[O1,O2]])
+            col_struct.orient_vec = np.array([[src.rx,src.ry],[O1,O2]])
              # Get length of orient vector.
-            ol =  np.linalg.norm(self.pary[src].orient_vec) # this does not work
-            ol1 = (self.pary[src].rx-O1)**2
-            ol2 = (self.pary[src].ry-O2)**2
+            ol =  np.linalg.norm(col_struct.orient_vec) # this does not work
+            ol1 = (src.rx-O1)**2
+            ol2 = (src.ry-O2)**2
             ol = np.sqrt(ol1+ol2)
             # Find r1 
-            r1 =abs(self.pary[src].radius - ol)
+            r1 =abs(src.radius - ol)
             # Subtract from ol
-            self.pary[src].prox_len = self.pary[src].radius-2*r1
+            col_struct.prox_len = src.radius-2*r1
             # Convert to origin vector to get angle.
-            ovec2 = self.origin_vector([self.pary[src].rx,O1],[self.pary[src].ry,O2])
+            ovec2 = self.origin_vector([src.rx,O1],[src.ry,O2])
             # Get orietn vector 360 degree angle.
-            self.pary[src].orient_ang = self.atan360(ovec2[0],ovec2[1],0.0)
-            proxvec = [[self.pary[src].rx,self.pary[src].prox_len*np.cos(self.pary[src].orient_ang)+self.pary[src].rx], [self.pary[src].ry,
-                        self.pary[src].prox_len*np.sin(self.pary[src].orient_ang)+self.pary[src].ry]]
-            self.pary[src].prox_vec = proxvec
-            self.pary[src].pen_factor = (1.0-self.pary[src].prox_len/self.pary[src].radius)
+            col_struct.orient_ang = atan360(ovec2[0],ovec2[1],0.0)
+            proxvec = [[src.rx,col_struct.prox_len*np.cos(col_struct.orient_ang)+src.rx], 
+                       [src.ry,col_struct.prox_len*np.sin(col_struct.orient_ang)+src.ry]]
+            col_struct.prox_vec = proxvec
+            col_struct.pen_factor = (1.0-col_struct.prox_len/src.radius)
             #self.pary[src].pen_factor = (self.pary[src].prox_len/self.pary[src].radius)
-
-            return
+            src.collision_list.append(col_struct)
+            return True
             
 
         except BaseException as e:
             print(e)
-        return
-
-    def check_collision(self):
-        col_flg = False
-        
-        for ii in range(len( self.pary)):
-            for jj in range(len(self.pary)):
-                if ii != jj:
-                    dsq = ((self.pary[ii].rx-self.pary[jj].rx)**2+(self.pary[ii].ry-self.pary[jj].ry)**2+(self.pary[ii].rz-self.pary[jj].rz)**2)
-                    rsq = (self.pary[ii].radius + self.pary[jj].radius)**2
-                    #print(f"dsq:{dsq},rsq:{rsq}")
-                    if (dsq<rsq):
-                        self.pary[ii].col_flag = True
-                        col_flg = True
-                        self.process_collision(ii,jj)
-                    else:
-                        self.pary[ii].col_flag = False
-        
-        return col_flg
-
-    def tol(self,val):
-        tol = 0.001
-        if val < tol and val > -tol:
-            return True
         return False
 
+    def calculate_collision_acceleration(self,pnum):
+        if self.pary[pnum].col_flag == True or any(self.pary[pnum].wcol_flag):
+            for ii in self.pary:
+                #print(f"P{ii.pnum} Oritent angle {ii.or}")
+                for cc in ii.collision_list:
+                    pf = ii.cmprs*cc.pen_factor
+                    vmag = pf*ii.temp_vel
+                    ii.tot_collision_x_acc = -vmag*math.cos(cc.orient_ang)
+                    ii.tot_collision_y_acc = -vmag*math.sin(cc.orient_ang)
+    
     def move(self):
-
         for ii in self.pary:
-            if (ii.pen_factor != 0):
-                if ii.pnum == 0:
-                    ii.vx = -(ii.cmprs*ii.pen_factor)*ii.temp_vel+ii.vx
-                else:
-                    ii.vx = (ii.cmprs*ii.pen_factor)*ii.temp_vel+ii.vx
-                
-                
-            
+            ii.vx = ii.vx + ii.tot_collision_x_acc
+            ii.vy = ii.vy + ii.tot_collision_y_acc
+            ii.vel_ang = atan360(ii.vx,ii.vy,0.0)
             ii.rx = ii.rx+ii.vx*self.itemcfg.dt
+            ii.ry = ii.ry+ii.vy*self.itemcfg.dt
+            ii.tot_collision_x_acc = 0.0
+            ii.tot_collision_y_acc = 0.0
+            if len(ii.collision_list) > 0:
+                ii.collision_list.clear()
+            ii.vel_vec = [[ii.rx,ii.rx+ii.vx*ii.radius],[ii.ry,ii.ry+ii.vy*ii.radius]]   
         
             
             
