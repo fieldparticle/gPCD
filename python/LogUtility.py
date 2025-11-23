@@ -12,6 +12,7 @@ class LogUtility:
     # @param   ApplicationName --  (string) Passes the name of the calling application.
     def __init__ (self,ApplicationName):
         self.appName = ApplicationName
+        self.tab_object = None
         #print(type(self))
     
     def set_tab_object(self,tab_object):
@@ -19,7 +20,7 @@ class LogUtility:
 
     def CheckLogFile(self,ErrString)-> bool:
         self.Close()
-        ret = 0;
+        ret = 0
         self.FileObj = open(self.logName, "r")
         for line in self.FileObj:
             if ErrString in line:

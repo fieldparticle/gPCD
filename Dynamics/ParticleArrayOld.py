@@ -9,7 +9,6 @@ from matplotlib.figure import Figure
 import time
 from particle import *
 from WallRayIntersect import *
-from Utility import *
 
 class ParticleArray():
 
@@ -21,8 +20,6 @@ class ParticleArray():
         self.wall_xmax = 0.0
         self.wall_ymin = 0.0
         self.wall_ymax = 0.0
-        self.current_time = 0.0
-        self.iteration = 0
 
     def start(self):
         pnum = 0
@@ -63,9 +60,7 @@ class ParticleArray():
                 pop = False
         self.addWalls()
 
-    def origin_vector(self,X,Y):
-        outvec = [X[1]-X[0],Y[1]-Y[0]]
-        return outvec
+  
     
     def addWalls(self):
         if "walls" in self.itemcfg:
@@ -80,144 +75,53 @@ class ParticleArray():
         p.pnum = self.pnum
         self.pary.append(p)
         self.pnum += 1
- 
+
     def print_p(self):
         for ii in self.pary:
             print(f"#:{ii.pnum},radius:{ii.radius},rx:{ii.rx},ry:{ii.ry},rz:{ii.rz},rx:{ii.rx},vx:{ii.rx},vy:{ii.rx},vz:{ii.rx}")
 
-    ##################################################################
-    #
-    # Calulate the change in acceleration due to collisionm
-    #
-    ##################################################################
-    def calculate_collision_acceleration(self,pnum):
-        # If the collision flag is true then we are leaving collsions
-        if(len(self.pary[pnum].collision_list) == 0 and self.pary[pnum].col_flag == True):    
-            self.pary[pnum].post_coll_mag = np.linalg.norm([self.pary[pnum].vx,self.pary[pnum].vy])
-            self.pary[pnum].col_flag = False
-            self.pary[pnum].vel_ang = atan360(self.pary[pnum].vx,self.pary[pnum].vy,0.0)
-            self.pary[pnum].vx = self.pary[pnum].cvmag*math.cos(self.pary[pnum].vel_ang)
-            self.pary[pnum].vy = self.pary[pnum].cvmag*math.sin(self.pary[pnum].vel_ang)
-            return
-
-        for cc in self.pary[pnum].collision_list:
-            srcvx = self.pary[pnum].vx
-            srcvy = self.pary[pnum].vy
-            srcv = [srcvx,srcvy]
-            v_mag = np.linalg.norm(srcv)
-            v_ang = atan360(srcvx,srcvy,0.0)
-            v_comp = v_mag*math.cos(v_ang-cc.orient_ang)
-            #print(f"v_comp:{v_comp}, temp_vel:{self.pary[pnum].temp_vel}")
-            pf = self.pary[pnum].cmprs*cc.pen_factor
-            v_rel = pf*self.pary[pnum].temp_vel
-            self.pary[pnum].tot_collision_x_acc = -v_rel*math.cos(cc.orient_ang)
-            self.pary[pnum].tot_collision_y_acc = -v_rel*math.sin(cc.orient_ang)
-
-    def set_storage_variables(self,src):
-        self.current_time  = self.current_time + self.itemcfg.dt
-        if self.iteration > 3:
-            src.stor_t.append(self.current_time) 
-            src.stor_vx.append(src.vx)
-            src.stor_vy.append(src.vy)
-            src.stor_v_mag.append(src.vel_mag)
-            src.stor_v_ang.append(src.vel_ang)
-            src.stor_cvmag.append(src.cvmag)
-        self.iteration = self.iteration+1
-
-    def clear_storage_variables(self,src):
-            self.iteration = 0
-            self.current_time = 0.0
-            src.stor_t.clear()
-            src.stor_vx.clear()
-            src.stor_vy.clear()
-            src.stor_v_mag.clear()
-            src.stor_v_ang.clear()
-            src.stor_cvmag.clear()
-    ##################################################################
-    #
-    # Move particles
-    #
-    ##################################################################
-    def move(self):
-
-        for ii in self.pary:
-            self.set_storage_variables(ii)
-            # Add collision acceleration vectors to velcoity vectors
-            ii.vx = ii.vx + ii.tot_collision_x_acc
-            ii.vy = ii.vy + ii.tot_collision_y_acc
-
-            # Get the new angle
-            ii.vel_ang = atan360(ii.vx,ii.vy,0.0)
-            ii.vel_mag = np.linalg.norm([ii.vx,ii.vy])
-
-            # Move the particles
-            ii.rx = ii.rx+ii.vx*self.itemcfg.dt
-            ii.ry = ii.ry+ii.vy*self.itemcfg.dt
-
-            # Clear everything
-            ii.tot_collision_x_acc = 0.0
-            ii.tot_collision_y_acc = 0.0
-            if len(ii.collision_list) > 0:
-                ii.collision_list.clear()
-
-            # Make a velocity vector for plotting
-            ii.vel_vec = [[ii.rx,ii.rx+ii.vx*ii.radius],[ii.ry,ii.ry+ii.vy*ii.radius]]   
-
-    ##################################################################
-    #
-    # Main loop
-    #
-    ##################################################################
     def do_iteration(self):
-        col_num = 0
-        # For each particle
         for src in range(len(self.pary)):
-            # Clear src particle collison array
             self.pary[src].collision_list.clear()
-            # Run thorugh all other target particles 
             for trg in range(len(self.pary)):
-                # If source not equal to target particle.    
-                if src!= trg:
-                    # Check for a collsion between src and target
+                if src != trg:
+                    # Is there a collsion between src and target
                     if (self.check_collision(src,trg) == True):
-                        # If this is a new collsion
-                        if(self.pary[src].col_flag == False):    
-                            self.pary[src].col_flag = True
-                            # Remember the incoming velocity magnitude
-                            self.pary[src].cvmag = np.linalg.norm([self.pary[src].vx,self.pary[src].vy])
-
-                        # If there is a collision create a new struct for
-                        # each target particle
-                        col_struct = collision()        
-                        # Get intersection, orient and prox vectors. And
-                        # DOP (Depth of Penetration factor)
-                        self.get_orient_prox_vec(self.pary[src],self.pary[trg],col_struct)
-                        # Add the collision structure to the src particles container
-                        self.pary[src].collision_list.append(col_struct)
-            # Iterate thorugh the collisions and calulate collision accelerations
+                        # Set the collision flag as true so the vectors will plot
+                        self.pary[src].col_flag = True
+                        # Create a new collision structure
+                        new_col = collsion()
+                        new_col.psource = src
+                        new_col.ptarget = trg
+                        new_col.col_flag = True
+                        # Save off the current velocity magnitudes 
+                        # to enuse the momentum is conserved in self.move(..)
+                        self.pary[src].cvx = abs(self.pary[src].vx)
+                        self.pary[src].cvy = abs(self.pary[src].vy)
+                        self.process_collision(self.pary[src],self.pary[trg],new_col)
+            self.check_wall_collision(src)
             self.calculate_collision_acceleration(src)
 
-    
+    def find_collsion_item(seld,col_struct,target):
+        for cc in range(len(col_struct)):
+            if col_struct[cc].ptarget == target:
+                return cc
+        return -1
 
-    ##################################################################
-    #
-    # Do collsion test
-    #
-    ##################################################################
+
+    
+    
     def check_collision(self,ii,jj):
         col_flg = False
         dsq = ((self.pary[ii].rx-self.pary[jj].rx)**2+(self.pary[ii].ry-self.pary[jj].ry)**2+(self.pary[ii].rz-self.pary[jj].rz)**2)
         rsq = (self.pary[ii].radius + self.pary[jj].radius)**2
         #print(f"dsq:{dsq},rsq:{rsq}")
         if (dsq<rsq):
-            return True
-        return False
-    ##################################################################
-    #
-    # Get orient, proximity vectors and depth of penetration
-    #
-    ##################################################################
-    def get_orient_prox_vec(self,src,trg,col_struct):
+            col_flg = True
+        return col_flg
+
+    def process_collision(self,src,trg,col_struct):
+        
         try:
             A = np.array((src.rx, src.ry))
             B = np.array((trg.rx, trg.ry))
@@ -265,16 +169,54 @@ class ParticleArray():
             col_struct.prox_vec = proxvec
             col_struct.pen_factor = (1.0-col_struct.prox_len/src.radius)
             #self.pary[src].pen_factor = (self.pary[src].prox_len/self.pary[src].radius)
+            src.collision_list.append(col_struct)
             return True
+            
+
         except BaseException as e:
             print(e)
         return False
 
+    def calculate_collision_acceleration(self,pnum):
+        for ii in self.pary:
+            ii.tot_collision_x_acc = 0.0
+            ii.tot_collision_y_acc = 0.0
+            #print(f"P{ii.pnum} Oritent angle {ii.or}")
+            for cc in ii.collision_list:
+                pf = ii.cmprs*cc.pen_factor
+                vmag = pf*ii.temp_vel
+                ii.tot_collision_x_acc = ii.tot_collision_x_acc-vmag*math.cos(cc.orient_ang)
+                ii.tot_collision_y_acc = ii.tot_collision_y_acc-vmag*math.sin(cc.orient_ang)
     
-    
-    
+    def move(self):
+        for ii in self.pary:
             
-    ##############################################################################################
+            ii.vx = ii.vx + ii.tot_collision_x_acc
+            ii.vy = ii.vy + ii.tot_collision_y_acc
+            ii.vel_ang = atan360(ii.vx,ii.vy,0.0)
+            
+            if ii.col_flag == True:
+                mag_cv = self.vmag(ii.cvx,ii.cvy)
+                mag_v = self.vmag(ii.vx,ii.vy)
+                #if mag_v != mag_cv:
+                    #ii.vx = mag_cv*math.cos(ii.vel_ang)   
+                    #ii.vy = mag_cv*math.sin(ii.vel_ang) 
+                ii.col_flag = False  
+                #print(f"mag.vx{self.vmag(ii.vx,ii.vy)}")
+                #print(f"mag.cvx{self.vmag(ii.cvx,ii.cvy)}")
+            
+            ii.rx = ii.rx+ii.vx*self.itemcfg.dt
+            ii.ry = ii.ry+ii.vy*self.itemcfg.dt
+            ii.tot_collision_x_acc = 0.0
+            ii.tot_collision_y_acc = 0.0
+            
+            if len(ii.collision_list) > 0:
+                ii.collision_list.clear()
+            ii.vel_vec = [[ii.rx,ii.rx+ii.vx*ii.radius],[ii.ry,ii.ry+ii.vy*ii.radius]]   
+        
+            
+            
+##############################################################################################
     # Check for wall collsions
     #
     #

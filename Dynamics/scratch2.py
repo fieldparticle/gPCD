@@ -1,28 +1,67 @@
+import sys
 
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QDateEdit,
+    QDateTimeEdit,
+    QDial,
+    QDoubleSpinBox,
+    QFontComboBox,
+    QLabel,
+    QLCDNumber,
+    QLineEdit,
+    QMainWindow,
+    QProgressBar,
+    QPushButton,
+    QRadioButton,
+    QSlider,
+    QSpinBox,
+    QTimeEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
-fig, ax = plt.subplots()
-xdata, y1data, y2data = [], [], []
-ln1, = plt.plot([], [], 'r', animated=True)
-ln2, = plt.plot([], [], 'g', animated=True)
+# Subclass QMainWindow to customize your application's main window
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
 
-def init():
-    ax.set_xlim(0, 2*np.pi)
-    ax.set_ylim(-2, 2)
-    return ln1, ln2
+        self.setWindowTitle("Widgets App")
 
-def update(frame):
-    xdata.append(frame)
-    y1data.append(np.sin(frame))
-    y2data.append(np.cos(frame))
-    ln1.set_data(xdata, y1data)
-    ln2.set_data(xdata, y2data)
-    return ln1, ln2
+        layout = QVBoxLayout()
+        widgets = [
+            QCheckBox,
+            QComboBox,
+            QDateEdit,
+            QDateTimeEdit,
+            QDial,
+            QDoubleSpinBox,
+            QFontComboBox,
+            QLCDNumber,
+            QLabel,
+            QLineEdit,
+            QProgressBar,
+            QPushButton,
+            QRadioButton,
+            QSlider,
+            QSpinBox,
+            QTimeEdit,
+        ]
 
-ani = FuncAnimation(fig, update, frames=np.linspace(0, 2*np.pi, 128),
-                    init_func=init, blit=True)
+        for w in widgets:
+            layout.addWidget(w())
 
-plt.title("Animating Multiple Lines - how2matplotlib.com")
-plt.show()
+        widget = QWidget()
+        widget.setLayout(layout)
+
+        # Set the central widget of the Window. Widget will expand
+        # to take up all the space in the window by default.
+        self.setCentralWidget(widget)
+
+app = QApplication(sys.argv)
+window = MainWindow()
+window.show()
+app.exec()

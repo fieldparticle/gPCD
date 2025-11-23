@@ -18,7 +18,7 @@ class DynamicsMainWin(QWidget):
         self.log.log(self,"Logging system initialized")
         self.ObjName = ObjName
         self.setWindowTitle('Dynamics Main Window')
-        self.setGeometry(100, 100, 1200, 1000)
+        self.setGeometry(100, 100, 1600, 1000)
         self.setWindowIcon(QIcon("Logo.png"))
         main_layout = QGridLayout(self)
         ## Create a tab widget

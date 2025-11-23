@@ -1,16 +1,26 @@
 import subprocess, os
 from _thread import *
-from PyQt6.QtWidgets import QFileDialog, QGroupBox,QMessageBox,QLabel
-from PyQt6.QtWidgets import QGridLayout, QTabWidget, QLineEdit,QListWidget
-from PyQt6.QtWidgets import QPushButton, QGroupBox,QTextEdit
+from PyQt6.QtWidgets import (QFileDialog, 
+                             QGroupBox,
+                             QLabel,
+                             QGridLayout, 
+                             QTabWidget, 
+                             QCheckBox,
+                             QListWidget,
+                             QPushButton, 
+                             QGroupBox,
+                             QComboBox,
+                             QRadioButton)
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 from PyQt6.QtCore import Qt,QTimer
+from QToggle import *
 from ConfigUtility import *
 import ctypes
 from particle import *
 from ParticleArray import *
 from Sim import *
-from Canvas import *
+from ParticleCanvas import *
+from ReportCanvas import *
 
 class pdata(ctypes.Structure):
     _fields_ = [("pnum", ctypes.c_double),
@@ -37,6 +47,8 @@ class TabFormDyn(QTabWidget):
     #
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs )
+        self.CheckOn = False
+        self.CheckOff = True
         
    
     def setSize(self,control,H,W):
@@ -70,12 +82,19 @@ class TabFormDyn(QTabWidget):
         self.texFolder = os.path.dirname(self.CfgFile)
         self.texFileName = os.path.splitext(os.path.basename(self.CfgFile))[0]
         #self.dirEdit.setText(self.CfgFile)
-
+        self.pselect.clear()
         # Open the item configuration filke
         try :
             self.itemcfgFile = ConfigUtility(self.CfgFile)
             self.itemcfgFile.Create(self.bobj.log,self.CfgFile)
             self.itemcfg = self.itemcfgFile.config
+            self.pselect.addItem("none")
+            for pp in range(len(self.itemcfg.plt_vel_mag)):
+                self.pselect.addItem(f"{pp}")
+            self.pselect.setCurrentIndex(self.itemcfg.select_particle+1)
+            #self.vel_mag_chk.setChecked(self.itemcfg.plt_vel_mag[self.itemcfg.select_particle])  
+            self.vel_mag_chk.setChecked(self.CheckOff)
+
         except BaseException as e:
             self.msg_box(f"Config File syntax - line number of config file:{e}")
             self.log.log(self,f"Config File syntax - line number of config file:{e}")
@@ -126,8 +145,8 @@ class TabFormDyn(QTabWidget):
         self.load_item_cfg(self.CfgFile)
         self.particle_array = ParticleArray(self.itemcfg)
         self.particle_array.start()
-        self.canvas.initialize(self.itemcfg,self.particle_array)
-        self.canvas.plot()
+        self.ParticleCanvas.initialize(self.itemcfg,self.particle_array)
+        self.ReportCanvas.initialize(self.itemcfg,self.particle_array)
         self.StopButton.setEnabled(True)
         self.timer = QTimer(self)
         self.timer.setInterval(self.itemcfg.timer_interval)  # Set interval to 1 second
@@ -135,7 +154,13 @@ class TabFormDyn(QTabWidget):
         self.timer.start()
         
     def update_plot(self):
-        self.canvas.update_plot()
+        if (self.ParticleCanvas.update_plot() == False):
+            self.timer.stop()
+            self.StopButton.setEnabled(False)
+            for ii in self.particle_array.pary:
+                self.particle_array.clear_storage_variables(ii)
+        self.ReportCanvas.update_plot()
+
     #******************************************************************
     # Create the tab
     #
@@ -153,11 +178,12 @@ class TabFormDyn(QTabWidget):
             self.tab_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
             self.setLayout(self.tab_layout)
 
+           
             ## -------------------------------------------------------------
             ## Set parent directory
             LatexcfgFile = QGroupBox("Start Dynamics")
             self.setSize(LatexcfgFile,120,450)
-            self.tab_layout.addWidget(LatexcfgFile,0,0,2,2,alignment= Qt.AlignmentFlag.AlignLeft)
+            self.tab_layout.addWidget(LatexcfgFile,0,0,alignment=Qt.AlignmentFlag.AlignLeft)
             
             dirgrid = QGridLayout()
             LatexcfgFile.setLayout(dirgrid)
@@ -188,6 +214,8 @@ class TabFormDyn(QTabWidget):
             self.StopButton.setEnabled(False)
             dirgrid.addWidget(self.StopButton,0,3)
 
+            
+
             ### COnfig File List
             self.cfg_files = [i for i in os.listdir(self.cfg.report_start_dir) if i.endswith("cfg")]
             self.CfgListObj =  QListWidget()
@@ -197,24 +225,70 @@ class TabFormDyn(QTabWidget):
             for ii in range(len(self.cfg_files)):
                 self.CfgListObj.insertItem(ii,self.cfg_files[ii]) 
             self.CfgListObj.currentItemChanged.connect(self.cfg_on_current_item_changed)
-            self.tab_layout.addWidget(self.CfgListObj,0,2,1,1)
+            self.tab_layout.addWidget(self.CfgListObj,0,1,1,1)
 
             ## -------------------------------------------------------------
             ## Comunications Interface
-            self.canvas = PlotCanvas()
-            self.setSize(self.canvas,450,1000)
-            self.tab_layout.addWidget(self.canvas)
+            self.ParticleCanvas = ParticleCanvas()
+            self.setSize(self.ParticleCanvas,400,1000)
+            self.tab_layout.addWidget(self.ParticleCanvas,1,0,2,3)
 
+             ## -------------------------------------------------------------
+            ## Comunications Interface
+            self.ReportCanvas = ReportCanvas()
+            self.setSize(self.ReportCanvas,400,1000)
+            self.tab_layout.addWidget(self.ReportCanvas,3,0,2,3)
             
             ## -------------------------------------------------------------
-            ## Comunications Interface
-            self.terminal =  QTextEdit(self)
-            self.terminal.setStyleSheet("background-color:  #ffffff; color: green")
-            self.setSize(self.terminal,225,900)
-            self.tab_layout.addWidget(self.terminal,5,0,3,3,alignment= Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+            ## Set parent directory
+            SelectionGroup = QGroupBox("Plot Selection")
+            self.setSize(SelectionGroup,150,450)
+            
+            
+            SelGrid = QGridLayout()
+            SelectionGroup.setLayout(SelGrid)
+
+            self.psel_lbl = QLabel("Select particle to plot")
+            SelGrid.addWidget(self.psel_lbl,0,0)
+            
+            self.pselect = QComboBox()
+            self.pselect.setStyleSheet("background-color:  #FFFFFF")
+            SelGrid.addWidget(self.pselect,1,0)
+
+            self.vel_mag_chk = QToggle("Plot Velocity Magnitude")
+            self.vel_mag_chk.toggled.connect(self.plot_vel_mag)
+            self.vel_mag_chk.setStyleSheet("QCheckBox::indicator { background-color: lightgreen; }")
+            self.vel_mag_chk.setChecked(False)
+            SelGrid.addWidget(self.vel_mag_chk)
+
+            self.vel_pmag_chk =  QToggle("Plot Post Collsion Velocity Magnitude")
+            self.vel_pmag_chk.setChecked(False)
+            SelGrid.addWidget(self.vel_pmag_chk,5,0)
+
+            self.tab_layout.addWidget(SelectionGroup,0,3,alignment=Qt.AlignmentFlag.AlignLeft)
+
+            
+            self.CheckOn = False
+            self.CheckOff = True
         except BaseException as e:
             self.log.log(self,f"Error in Create:{e}", LogOnly=True)
             return 
         
-        self.bobj.connect_to_output(self.terminal)
+    def plot_vel_mag(self):
+        pass
+        '''
+        if self.vel_mag_chk.isChecked():
+            self.vel_mag_chk.setChecked(False)
+        else:
+            self.vel_mag_chk.setChecked(True)
+        '''        
+
+    def plot_vel_pmag(self):
+        pass
+        '''
+        if self.vel_pmag_chk.isChecked():
+            self.vel_pmag_chk.setChecked(False)
+        else:
+            self.vel_pmag_chk.setChecked(True)
+        '''    
     

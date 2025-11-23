@@ -13,7 +13,7 @@ class DynamicsTabs(QTabWidget):
     ## Add all tabs to this tab form (parent)
     def Create(self,Base):
         self.bobj = Base
-        self.bobj.set_tab_object(self)
+        #self.bobj.set_tab_object(self)
         ## Create the tabs
         self.tabFormDyn = TabFormDyn()        
         self.addTab(self.tabFormDyn, 'Particle Dynamics')

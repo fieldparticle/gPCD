@@ -8,7 +8,7 @@ from matplotlib.patches import Circle
 from particle import *
 
 
-class PlotCanvas(FigureCanvas):
+class ParticleCanvas(FigureCanvas):
     def __init__(self, parent=None):
         self.fig = Figure()
         self.ax = self.fig.add_subplot(111)
@@ -18,6 +18,8 @@ class PlotCanvas(FigureCanvas):
         self.ypos = 2.5
         self.pa = None
         self.itemcfg = None
+        self.stor_time = []
+        self.curr_time = 0.0
 
         
     def initialize(self,itemcfg,particle_arry):
@@ -30,6 +32,13 @@ class PlotCanvas(FigureCanvas):
         pass
 
     def update_plot(self):
+        # Set the current time
+        self.curr_time = self.curr_time+self.itemcfg.dt
+        if self.curr_time >= self.itemcfg.end_time:
+            self.curr_time = 0.0
+            return False
+        print(f"{self.curr_time:.4f}")
+
         #print("update")
         self.ax.clear()
         self.pa.do_iteration()
@@ -54,8 +63,8 @@ class PlotCanvas(FigureCanvas):
                         self.ax.plot([ii.rx,ii.collision_list[cc].col_pointB[0]],[ii.ry,ii.collision_list[cc].col_pointB[1]],'r-')
                         self.ax.plot(ii.collision_list[cc].orient_vec_print[0],ii.collision_list[cc].orient_vec_print[1],'y-')
                         self.ax.plot(ii.collision_list[cc].prox_vec[0],ii.collision_list[cc].prox_vec[1],'k-')
-                        self.ax.text(ii.pnum+self.xlim[0],self.ylim[1]+0.10,f"P:{ii.pnum} orient angle:{ii.collision_list[cc].orient_ang:.4f}")   
-                        self.ax.text(ii.pnum+self.xlim[0],self.ylim[1]+0.04,f"P:{ii.pnum} penetration factor :{ii.collision_list[cc].pen_factor:.4f}")  
+                        self.ax.text(ii.pnum+self.xlim[0],self.ylim[1]+0.14,f"P:{ii.pnum} orient angle:{ii.collision_list[cc].orient_ang:.4f}")   
+                        self.ax.text(ii.pnum+self.xlim[0],self.ylim[1]+0.08,f"P:{ii.pnum} penetration factor :{ii.collision_list[cc].pen_factor:.4f}")  
                         
             else:
                 ii.col_pointA = None
@@ -68,7 +77,8 @@ class PlotCanvas(FigureCanvas):
                 ii.prox_vec = []
                 ii.pen_factor =0.0
             if ii.plot_vectors == True:
-                self.ax.text(ii.pnum+self.xlim[0],self.ylim[1]+0.00,f"P:{ii.pnum} velocity x:{ii.vx:.4f},y:{ii.vy:.4f}")
+                self.ax.text(ii.pnum+self.xlim[0],self.ylim[1]+0.01,f"P:{ii.pnum} vx:{ii.vx:.4f},xy:{ii.vy:.4f}")
+                self.ax.text(ii.pnum+self.xlim[0],self.ylim[1]-0.04,f"P:{ii.pnum} vmag:{ii.vel_mag:.4f},pvmag:{ii.post_coll_mag:.4f}")
                 self.ax.plot(ii.vel_vec[0],ii.vel_vec[1],'g-')     
             
         self.pa.move()
@@ -79,5 +89,5 @@ class PlotCanvas(FigureCanvas):
         self.ax.set_aspect('equal', 'box')
         self.ax.grid(True)
         self.draw()
-  
+        return True
   

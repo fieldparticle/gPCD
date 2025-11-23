@@ -2,8 +2,12 @@
 
 import struct
 import ctypes
-class collsion:
+class collision:
     def __init__(self):
+        self.psource = 0
+        self.ptarget = 0
+        self.col_flag = False
+        self.col_phase = 0 # 0 no collsion, 1 in collsions, 2 out of collsion
         self.col_pointA = None
         self.col_pointB = None
         self.isec_vect = []
@@ -15,6 +19,13 @@ class collsion:
         self.pen_factor =0.0
         self.wall_x = 0
         self.wall_y = 0
+        self.srcvx = 0.0
+        self.srcvy = 0.0
+        self.trgvx = 0.0
+        self.trgvy = 0.0
+        self.AComp = 0.0
+        self.BComp = 0.0
+        self.vel_ang = 0.0
         
 
 
@@ -63,12 +74,11 @@ class particle():
         self.ry = ry
         self.rz = rz
         self.vx = vx
-        self.cvx = 0.0
         self.vy = vy
-        self.cvy = 0.0
         self.vz = vz
-        self.cvz = 0.0
+        self.vel_mag = 0.0
         self.vel_ang = 0.0
+        self.post_coll_mag = 0.0
         self.radius  = radius
         self.vel_vec = [[self.rx,self.rx+self.vx*self.radius],[self.ry,self.ry+self.vy*self.radius]]   
         self.ptype = ptype
@@ -83,11 +93,28 @@ class particle():
         self.wcol_flag = [False,False,False,False]
         self.plot_vectors = plt_vec_flg
         self.collision_list = []
+        self.collision_flags = []
         self.collision_count = 0
         self.tot_collision_y_acc = 0.0
         self.tot_collision_x_acc = 0.0    
         self.wall_list = []
+
+        # A list of collsion
+        self.col_flag = False
+        self.cvmag = 0.0
+        # Store the incoming velocity to a collsions
+        self.cvx = 0.0
+        self.cvy = 0.0
+        self.cvz = 0.0
         
+        self.stor_t     = []
+        self.stor_vx    = []
+        self.stor_vy    = []
+        self.stor_v_mag = []
+        self.stor_v_ang = []
+        self.stor_cvmag = []
+
+
         for ii in range(4):
             self.wall_list.append('Any')
         
