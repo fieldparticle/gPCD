@@ -28,14 +28,20 @@ class ReportCanvas(FigureCanvas):
    
     def update_plot(self):
         self.ax.cla()
+        color_list = ["green","red"]
         for ii in self.pa.pary:
-            if ii.plot_vectors == True and len(ii.stor_t) > 0:
-                self.ax.plot(ii.stor_t,ii.stor_v_mag,color='green', 
-                             marker='o', linestyle='dashed', linewidth=0.5, markersize=2)
-                self.ax.plot(ii.stor_t,ii.stor_cvmag,color='red', 
-                             marker='o', linestyle='dashed', linewidth=0.5, markersize=2)
+            
+            if self.itemcfg.plt_vel_mag[ii.pnum] == True:
+                self.ax.plot(ii.stor_t,ii.stor_v_mag,color=color_list[ii.pnum], 
+                             marker='o', linewidth=1.0, markersize=2)
+                
+            if self.itemcfg.plot_pred_mom[ii.pnum] == True:
+                print([0.0,ii.stor_t[-1]])
+                print([ii.pred_mom_out,ii.pred_mom_out])
+                self.ax.plot([0.0,ii.stor_t[-1]],[ii.pred_mom_out,ii.pred_mom_out],color=color_list[ii.pnum], 
+                             linestyle='dashed', linewidth=1.0, markersize=2)
 
-        self.ax.legend("Velocity Magnitude","Out og Collsion Mag",)
+        #self.ax.legend("Velocity Magnitude","Out og Collsion Mag")
 
         self.ax.grid(True)
         self.draw()

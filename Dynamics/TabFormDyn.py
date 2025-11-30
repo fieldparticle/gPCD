@@ -1,4 +1,5 @@
 import subprocess, os
+import csv
 from _thread import *
 from PyQt6.QtWidgets import (QFileDialog, 
                              QGroupBox,
@@ -10,6 +11,7 @@ from PyQt6.QtWidgets import (QFileDialog,
                              QPushButton, 
                              QGroupBox,
                              QComboBox,
+                             QTextEdit,
                              QRadioButton)
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 from PyQt6.QtCore import Qt,QTimer
@@ -18,7 +20,7 @@ from ConfigUtility import *
 import ctypes
 from particle import *
 from ParticleArray import *
-from Sim import *
+#from Sim import *
 from ParticleCanvas import *
 from ReportCanvas import *
 
@@ -94,6 +96,7 @@ class TabFormDyn(QTabWidget):
             self.pselect.setCurrentIndex(self.itemcfg.select_particle+1)
             #self.vel_mag_chk.setChecked(self.itemcfg.plt_vel_mag[self.itemcfg.select_particle])  
             self.vel_mag_chk.setChecked(self.CheckOff)
+            self.desc_edit.setText(self.itemcfg.description)
 
         except BaseException as e:
             self.msg_box(f"Config File syntax - line number of config file:{e}")
@@ -101,6 +104,7 @@ class TabFormDyn(QTabWidget):
             self.hasConfig = False
             return 
         self.StartButton.setEnabled(True) 
+        self.SaveButton.setEnabled(True)
           
     def cfg_on_current_item_changed(self, current_item, previous_item):
         cfg_item = ""
@@ -110,8 +114,10 @@ class TabFormDyn(QTabWidget):
             self.load_item_cfg(self.CfgFile)
             raw_name = os.path.basename(current_item.text())
             filename_without_ext = os.path.splitext(raw_name)[0]
-            self.cap_file = f"{self.cfg.report_start_dir}/{filename_without_ext}.cap"
-            self.des_file= f"{self.cfg.report_start_dir}/{filename_without_ext}.des"
+            self.data_file_name = f"{self.cfg.report_start_dir}/{filename_without_ext}"
+            '''
+            #self.cap_file = f"{self.cfg.report_start_dir}/{filename_without_ext}.cap"
+            #self.des_file= f"{self.cfg.report_start_dir}/{filename_without_ext}.des"
             caption = ""
             des = ""
             if os.path.exists(self.cap_file):
@@ -128,14 +134,18 @@ class TabFormDyn(QTabWidget):
                 file = open(self.des_file, 'w') 
                 file.close()
             print(f"Current item selected: {current_item.text()}")
+            '''
         else:
             print("No item currently selected.")
             return
-        
+
         
         notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
 
         subprocess.Popen([notepad_plus_plus_path, self.CfgFile])
+
+    def save_data(self):
+            self.particle_array.save_data(self.data_file_name)
 
     def stop(self):
         self.timer.stop()
@@ -214,6 +224,12 @@ class TabFormDyn(QTabWidget):
             self.StopButton.setEnabled(False)
             dirgrid.addWidget(self.StopButton,0,3)
 
+            self.SaveButton = QPushButton("Save Data")
+            self.setSize(self.SaveButton,30,100)
+            self.SaveButton.setStyleSheet("background-color:  #dddddd")
+            self.SaveButton.clicked.connect(self.save_data)
+            self.SaveButton.setEnabled(False)
+            dirgrid.addWidget(self.SaveButton,1,0)
             
 
             ### COnfig File List
@@ -227,14 +243,20 @@ class TabFormDyn(QTabWidget):
             self.CfgListObj.currentItemChanged.connect(self.cfg_on_current_item_changed)
             self.tab_layout.addWidget(self.CfgListObj,0,1,1,1)
 
+            self.desc_edit = QTextEdit()
+            self.setSize(self.desc_edit,150,450)
+            self.desc_edit.setStyleSheet("background-color:  #FFFFFF")
+            self.desc_edit.setText("hello")
+            self.tab_layout.addWidget(self.desc_edit,0,3,1,1)
+
             ## -------------------------------------------------------------
-            ## Comunications Interface
+            ## Particle plot canvas
             self.ParticleCanvas = ParticleCanvas()
             self.setSize(self.ParticleCanvas,400,1000)
             self.tab_layout.addWidget(self.ParticleCanvas,1,0,2,3)
 
              ## -------------------------------------------------------------
-            ## Comunications Interface
+            ## Report plot canvas
             self.ReportCanvas = ReportCanvas()
             self.setSize(self.ReportCanvas,400,1000)
             self.tab_layout.addWidget(self.ReportCanvas,3,0,2,3)
@@ -265,7 +287,7 @@ class TabFormDyn(QTabWidget):
             self.vel_pmag_chk.setChecked(False)
             SelGrid.addWidget(self.vel_pmag_chk,5,0)
 
-            self.tab_layout.addWidget(SelectionGroup,0,3,alignment=Qt.AlignmentFlag.AlignLeft)
+            self.tab_layout.addWidget(SelectionGroup,1,3,alignment=Qt.AlignmentFlag.AlignLeft)
 
             
             self.CheckOn = False

@@ -13,7 +13,114 @@ from Utility import *
 
 class ParticleArray():
 
+    def __init__(self,itemcfg):
+        self.pary = []
+        self.pnum = 0
+        self.itemcfg = itemcfg
+        self.wall_xmin = 0.0
+        self.wall_xmax = 0.0
+        self.wall_ymin = 0.0
+        self.wall_ymax = 0.0
+        self.current_time = 0.0
+        self.iteration = 0
+
+    def start(self):
+        pnum = 0
+        # do everything relative to 1 instead of actual values
+       
+        ptxt = f"p{pnum}"
+        pop = True
+        plot_vectors = self.itemcfg.plot_vectors
+        while pop == True:
+            if ptxt in self.itemcfg:
+                if self.itemcfg.rel_one == True:
+                    self.itemcfg[ptxt].molar_mass = 1.0
+                    self.itemcfg[ptxt].temp_vel = 1.0
+                    self.itemcfg[ptxt].attr_accel = 0.0
+                    self.itemcfg[ptxt].rpls_accel = 1.0
+                p = particle()
+                p.set(pnum,
+                    self.itemcfg[ptxt].rx,
+                    self.itemcfg[ptxt].ry,
+                    self.itemcfg[ptxt].rz,
+                    self.itemcfg[ptxt].vx,
+                    self.itemcfg[ptxt].vy,
+                    self.itemcfg[ptxt].vz,
+                    self.itemcfg[ptxt].radius,
+                    self.itemcfg[ptxt].ptype,
+                    self.itemcfg[ptxt].molar_mass,
+                    self.itemcfg[ptxt].temp_vel,
+                    self.itemcfg[ptxt].gas_const,
+                    self.itemcfg[ptxt].vap_temp,
+                    self.itemcfg[ptxt].attr_accel,
+                    self.itemcfg[ptxt].rpls_accel,
+                    self.itemcfg[ptxt].cmprs,
+                    plot_vectors[pnum])
+                self.add(p)
+                pnum+=1
+                ptxt = f"p{pnum}"
+            else:
+                pop = False
+        self.addWalls()
+
+    def origin_vector(self,X,Y):
+        outvec = [X[1]-X[0],Y[1]-Y[0]]
+        return outvec
     
+    def addWalls(self):
+        if "walls" in self.itemcfg:
+            if self.itemcfg.walls == True:
+                walls = self.itemcfg.wall_dim
+                self.wall_xmin = walls[0]
+                self.wall_xmax = walls[1]
+                self.wall_ymin = walls[2]
+                self.wall_ymax = walls[3]
+    
+    ##################################################################
+    #
+    # Stor storge values
+    #
+    ##################################################################
+    def save_data(self,data_file_name):
+        try:
+            src = self.pary[self.itemcfg.select_particle]
+            with open(data_file_name, 'w', newline='') as csvfile:
+                csvfile.write("P,t,vx,vy,pen_factor,v_mag,cvmag,v_ang,vrel,v_collx,vcolly\r\n")
+                for ii in range(len(src.stor_t)):
+                    line = f"{src.stor_pnum[ii]},{src.stor_t[ii]:0.4f},{src.stor_vx[ii]:0.4f},{src.stor_vy[ii]:0.4f},"
+                    line += f"{src.stor_pen_factor[ii]:0.4f},{src.stor_v_mag[ii]:0.4f},"
+                    line += f"{src.stor_cvmag[ii]:0.4f},{src.stor_v_ang[ii]:0.4f},{src.stor_vx_rel[ii]:0.4f},"
+                    line += f"{src.stor_tot_collision_x_acc[ii]:0.4f}\r\n"
+                    csvfile.write(line)
+        except BaseException as e:
+            print(e)
+    ##################################################################
+    #
+    # Stor storge values
+    #
+    ##################################################################
+    def set_storage_variables(self,src):
+        self.current_time  = self.current_time + self.itemcfg.dt
+        #if self.iteration > 3:
+        src.stor_t.append(self.current_time) 
+        src.stor_vx.append(src.vx)
+        src.stor_vy.append(src.vy)
+        src.stor_v_mag.append(src.vel_mag)
+        src.stor_v_ang.append(src.vel_ang)
+        src.stor_cvmag.append(src.cvmag)
+        src.stor_pnum.append(src.pnum)
+        
+        if len(src.collision_list) > 0:
+            src.stor_pen_factor.append(src.collision_list[0].pen_factor)
+            src.stor_vx_rel.append(src.cvx_rel)    
+            src.stor_tot_collision_x_acc.append(src.tot_collision_x_acc)
+            src.stor_tot_collision_y_acc.append(src.tot_collision_y_acc)
+        else:
+            src.stor_tot_collision_x_acc.append(0.0)
+            src.stor_tot_collision_y_acc.append(0.0)
+            src.stor_pen_factor.append(0.0)
+            src.stor_vx_rel.append(0.0)
+        self.iteration = self.iteration+1
     ##################################################################
     #
     # Main loop
@@ -31,49 +138,95 @@ class ParticleArray():
                 if src != trg:
                     # Check for a collsion between src and target
                     if (self.check_collision(src,trg) == True):
-                        #------------------------------------
-                        # If this is a NEW collsion
-                        #------------------------------------
+                        # If this is a new collsion
                         if(self.pary[src].col_flag == False):    
                             self.pary[src].col_flag = True
-
-                            # Get realitve velocity
-                            self.pary[src].cvx_rel = ((self.pary[trg].vx/self.pary[src].vx))
                             # Remember the incoming velocity magnitude
-                            self.pary[src].cvmag = 0.75 #-self.pary[src].cvx_rel #np.linalg.norm([self.pary[src].vx,self.pary[src].vy])
-                            print(f"P:{src} -cc.vx_rel:{ self.pary[src].cvx_rel:.4f}, pf:{1- self.pary[src].cvx_rel:.4f}")    
-                            vo1,vo2 = self.predict_mom(1,self.pary[src].vx,1,self.pary[trg].vx)
-                            self.pary[src].pred_mom_out = abs(vo1)
-                            print(f"P:{src}, cvmag:{ self.pary[src].cvmag:.4f}")    
-                                                    # If there is a collision create a new struct for
+                            self.pary[src].cvmag = np.linalg.norm([self.pary[src].vx,self.pary[src].vy])
+                            # Get realitve velocity
+                            self.pary[src].cvx_rel = (1-abs(self.pary[src].vx/self.pary[trg].vx))
+                            
+                        # If there is a collision create a new struct for
                         # each target particle
                         col_struct = collision()
                         # Get intersection, orient and prox vectors. And
                         # DOP (Depth of Penetration factor)
                         self.get_orient_prox_vec(self.pary[src],self.pary[trg],col_struct)
+                        # Get realitve velocity
+                        col_struct.trgvx = self.pary[trg].vx
+                        col_struct.trgvy = self.pary[trg].vy
+                        col_struct.vx_rel = self.pary[trg].vx/self.pary[src].vx
+                        #col_struct.vy_rel = self.pary[src].vy/self.pary[trg].vy
+                        col_struct.v_rel =  np.linalg.norm([col_struct.vx_rel,col_struct.vy_rel])
+
                         # Add the collision structure to the src particles container
                         self.pary[src].collision_list.append(col_struct)
-                         # Iterate thorugh the collisions and calulate collision accelerations
-                        self.calculate_collision_acceleration(src)
                     else:
                          if(self.pary[src].col_flag == True):
                              self.pary[src].col_flag = False
                              self.pary[src].cvx_rel = 0.0  
                              
-   
+            # Iterate thorugh the collisions and calulate collision accelerations
+            self.calculate_collision_acceleration(src)
+
+    
+    ##################################################################
+    #
+    # Calulate the change in acceleration due to collisionm
+    #
+    ##################################################################
+    def clear_storage_variables(self,src):
+            self.iteration = 0
+            self.current_time = 0.0
+            src.stor_t.clear()
+            src.stor_vx.clear()
+            src.stor_vy.clear()
+            src.stor_v_mag.clear()
+            src.stor_v_ang.clear()
+            src.stor_cvmag.clear()
+            #src.stor_pen_factor.clear()
+
+    def add(self,p):
+        p.pnum = self.pnum
+        self.pary.append(p)
+        self.pnum += 1
+ 
+    def print_p(self):
+        for ii in self.pary:
+            print(f"#:{ii.pnum},radius:{ii.radius},rx:{ii.rx},ry:{ii.ry},rz:{ii.rz},rx:{ii.rx},vx:{ii.rx},vy:{ii.rx},vz:{ii.rx}")
+
     ##################################################################
     #
     # Calulate the change in acceleration due to collisionm
     #
     ##################################################################
     def calculate_collision_acceleration(self,pnum):
+        # If the collision flag is true then we are leaving collsions
+        if(len(self.pary[pnum].collision_list) == 0 and self.pary[pnum].col_flag == True):    
+            
+            self.pary[pnum].col_flag = False
+            #self.pary[pnum].vel_ang = atan360(self.pary[pnum].vx,self.pary[pnum].vy,0.0)
+            #self.pary[pnum].vx = self.pary[pnum].cvmag*math.cos(self.pary[pnum].vel_ang)
+            #self.pary[pnum].vy = self.pary[pnum].cvmag*math.sin(self.pary[pnum].vel_ang)
+            return
+
         for cc in self.pary[pnum].collision_list:
+            srcvx = self.pary[pnum].vx
+            srcvy = self.pary[pnum].vy
+            srcv = [srcvx,srcvy]
+            v_mag = np.linalg.norm(srcv)
+            v_mag = self.pary[pnum].post_coll_mag 
+            v_ang = atan360(srcvx,srcvy,0.0)
+            v_comp = v_mag*math.cos(v_ang-cc.orient_ang)
             #print(f"v_comp:{v_comp}, temp_vel:{self.pary[pnum].temp_vel}")
             pf = cc.pen_factor
             v_coll =(pf*(self.pary[pnum].cvmag))
+
+            
             self.pary[pnum].tot_collision_x_acc = -(v_coll)*math.cos(cc.orient_ang)
             self.pary[pnum].tot_collision_y_acc = -(v_coll)*math.sin(cc.orient_ang)
-            
+            #self.pary[pnum].tot_collision_x_acc = -(v_coll)*math.cos(cc.orient_ang)
+            #self.pary[pnum].tot_collision_y_acc = -(v_coll)*math.sin(cc.orient_ang)
 
 
     ##################################################################
@@ -89,16 +242,20 @@ class ParticleArray():
             ii.vx = ii.vx + ii.tot_collision_x_acc
             ii.vy = ii.vy + ii.tot_collision_y_acc
 
-            #ii.vx*(1-ii.cvx_rel)
-                
+            
+            #ii.vx = ii.vx*(1-ii.cvx_rel)
 
             # Get the new angle
             ii.vel_ang = atan360(ii.vx,ii.vy,0.0)
             ii.vel_mag = np.linalg.norm([ii.vx,ii.vy])
-                        
-            # Move the particles
-            ii.rx = ii.rx+ii.vx*self.itemcfg.dt
-            ii.ry = ii.ry+ii.vy*self.itemcfg.dt
+
+            if abs(ii.cvx_rel) > 0.0 :
+                print(f"-cc.vx_rel:{ii.cvx_rel:.4f}, pf:{1-ii.cvx_rel:.4f}")
+                ii.rx = ii.rx+ii.vx*(1-ii.cvx_rel)*self.itemcfg.dt
+            else:
+                # Move the particles
+                ii.rx = ii.rx+ii.vx*self.itemcfg.dt
+                ii.ry = ii.ry+ii.vy*self.itemcfg.dt
 
             # Clear everything
             ii.tot_collision_x_acc = 0.0
@@ -108,6 +265,7 @@ class ParticleArray():
 
             # Make a velocity vector for plotting
             ii.vel_vec = [[ii.rx,ii.rx+ii.vx*ii.radius],[ii.ry,ii.ry+ii.vy*ii.radius]]   
+
    
 
     ##################################################################
@@ -181,6 +339,9 @@ class ParticleArray():
             print(e)
         return False
 
+    
+    
+    
             
     ##############################################################################################
     # Check for wall collsions
@@ -325,147 +486,3 @@ class ParticleArray():
             return False
         
         return False
- ##################################################################
-    #
-    # Clear storage variables
-    #
-    ##################################################################
-    def clear_storage_variables(self,src):
-            self.iteration = 0
-            self.current_time = 0.0
-            src.stor_t.clear()
-            src.stor_vx.clear()
-            src.stor_vy.clear()
-            src.stor_v_mag.clear()
-            src.stor_v_ang.clear()
-            src.stor_cvmag.clear()
-            #src.stor_pen_factor.clear()
-    def add(self,p):
-        p.pnum = self.pnum
-        self.pary.append(p)
-        self.pnum += 1
- 
-    def print_p(self):
-        for ii in self.pary:
-            print(f"#:{ii.pnum},radius:{ii.radius},rx:{ii.rx},ry:{ii.ry},rz:{ii.rz},rx:{ii.rx},vx:{ii.rx},vy:{ii.rx},vz:{ii.rx}")
-   
-    def __init__(self,itemcfg):
-        self.pary = []
-        self.pnum = 0
-        self.itemcfg = itemcfg
-        self.wall_xmin = 0.0
-        self.wall_xmax = 0.0
-        self.wall_ymin = 0.0
-        self.wall_ymax = 0.0
-        self.current_time = 0.0
-        self.iteration = 0
-
-    def start(self):
-        pnum = 0
-        # do everything relative to 1 instead of actual values
-       
-        ptxt = f"p{pnum}"
-        pop = True
-        plot_vectors = self.itemcfg.plot_vectors
-        while pop == True:
-            if ptxt in self.itemcfg:
-                if self.itemcfg.rel_one == True:
-                    self.itemcfg[ptxt].molar_mass = 1.0
-                    self.itemcfg[ptxt].temp_vel = 1.0
-                    self.itemcfg[ptxt].attr_accel = 0.0
-                    self.itemcfg[ptxt].rpls_accel = 1.0
-                p = particle()
-                p.set(pnum,
-                    self.itemcfg[ptxt].rx,
-                    self.itemcfg[ptxt].ry,
-                    self.itemcfg[ptxt].rz,
-                    self.itemcfg[ptxt].vx,
-                    self.itemcfg[ptxt].vy,
-                    self.itemcfg[ptxt].vz,
-                    self.itemcfg[ptxt].radius,
-                    self.itemcfg[ptxt].ptype,
-                    self.itemcfg[ptxt].molar_mass,
-                    self.itemcfg[ptxt].temp_vel,
-                    self.itemcfg[ptxt].gas_const,
-                    self.itemcfg[ptxt].vap_temp,
-                    self.itemcfg[ptxt].attr_accel,
-                    self.itemcfg[ptxt].rpls_accel,
-                    self.itemcfg[ptxt].cmprs,
-                    plot_vectors[pnum])
-                self.add(p)
-                pnum+=1
-                ptxt = f"p{pnum}"
-            else:
-                pop = False
-        self.addWalls()
-
-    def origin_vector(self,X,Y):
-        outvec = [X[1]-X[0],Y[1]-Y[0]]
-        return outvec
-    
-    def addWalls(self):
-        if "walls" in self.itemcfg:
-            if self.itemcfg.walls == True:
-                walls = self.itemcfg.wall_dim
-                self.wall_xmin = walls[0]
-                self.wall_xmax = walls[1]
-                self.wall_ymin = walls[2]
-                self.wall_ymax = walls[3]
-
-     ##################################################################
-    #
-    # Stor storge values
-    #
-    ##################################################################
-    def save_data(self,data_file_name):
-        for src in self.pary:
-            file_name = data_file_name+f"{src.pnum}.csv"
-            try:
-                with open(file_name, 'w', newline='') as csvfile:
-                    csvfile.write("P,t,vx,vy,pen_factor,v_mag,cvmag,v_ang,vrel,v_collx,vcolly\r\n")
-                    for ii in range(len(src.stor_t)):
-                        line = f"{src.stor_pnum[ii]},{src.stor_t[ii]:0.4f},{src.stor_vx[ii]:0.4f},{src.stor_vy[ii]:0.4f},"
-                        line += f"{src.stor_pen_factor[ii]:0.4f},{src.stor_v_mag[ii]:0.4f},"
-                        line += f"{src.stor_cvmag[ii]:0.4f},{src.stor_v_ang[ii]:0.4f},{src.stor_vx_rel[ii]:0.4f},"
-                        line += f"{src.stor_tot_collision_x_acc[ii]:0.4f}\r\n"
-                        csvfile.write(line)
-            except BaseException as e:
-                print(e)
-    
- ##################################################################
-    #
-    # Stor storge values
-    #
-    ##################################################################
-    def set_storage_variables(self,src):
-        self.current_time  = self.current_time + self.itemcfg.dt
-        #if self.iteration > 3:
-        src.stor_t.append(self.current_time) 
-        src.stor_vx.append(src.vx)
-        src.stor_vy.append(src.vy)
-        src.stor_v_mag.append(src.vel_mag)
-        src.stor_v_ang.append(src.vel_ang)
-        src.stor_cvmag.append(src.cvmag)
-        src.stor_pnum.append(src.pnum)
-        src.stor_pred_mom_out.append(src.pred_mom_out)
-        
-        if len(src.collision_list) > 0:
-            src.stor_pen_factor.append(src.collision_list[0].pen_factor)
-            src.stor_vx_rel.append(src.cvx_rel)    
-            src.stor_tot_collision_x_acc.append(src.tot_collision_x_acc)
-            src.stor_tot_collision_y_acc.append(src.tot_collision_y_acc)
-        else:
-            src.stor_tot_collision_x_acc.append(0.0)
-            src.stor_tot_collision_y_acc.append(0.0)
-            src.stor_pen_factor.append(0.0)
-            src.stor_vx_rel.append(0.0)
-        self.iteration = self.iteration+1
-
-
-
-    def predict_mom(self,m1,vx1in,m2,vx2in):
-        vx1out = ((m1-m2)/(m1+m2))*vx1in + (2*m2/(m1+m2))*vx2in
-        vx2out = ((m1-m2)/(m1+m2))*vx2in + (2*m1/(m1+m2))*vx1in
-        print(f"vx1out:{vx1out},vx2out{vx2out}")
-        return vx1out,vx2out
-

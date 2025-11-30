@@ -6,6 +6,7 @@ class collision:
     def __init__(self):
         self.psource = 0
         self.ptarget = 0
+        self.vdiff = 0.0
         self.col_flag = False
         self.col_phase = 0 # 0 no collsion, 1 in collsions, 2 out of collsion
         self.col_pointA = None
@@ -26,6 +27,10 @@ class collision:
         self.AComp = 0.0
         self.BComp = 0.0
         self.vel_ang = 0.0
+        self.vx_rel = 0.0
+        self.vy_rel = 0.0
+        self.v_rel = 0.0
+        
         
 
 
@@ -65,6 +70,7 @@ class particle():
         self.tot_collision_y_acc = 0.0
         self.tot_collision_x_acc = 0.0    
         self.wall_list = []
+        self.stor_vx_rel = []
    
 
         
@@ -103,16 +109,22 @@ class particle():
         self.col_flag = False
         self.cvmag = 0.0
         # Store the incoming velocity to a collsions
-        self.cvx = 0.0
+        self.cvx_rel = 0.0
         self.cvy = 0.0
         self.cvz = 0.0
-        
+        self.pred_mom_out = 0.0
         self.stor_t     = []
         self.stor_vx    = []
         self.stor_vy    = []
         self.stor_v_mag = []
         self.stor_v_ang = []
         self.stor_cvmag = []
+        self.stor_pen_factor = []
+        self.stor_vx_rel = []
+        self.stor_tot_collision_x_acc = []
+        self.stor_tot_collision_y_acc = []
+        self.stor_pnum = []
+        self.stor_pred_mom_out = []
 
 
         for ii in range(4):

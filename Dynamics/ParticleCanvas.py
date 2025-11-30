@@ -37,14 +37,15 @@ class ParticleCanvas(FigureCanvas):
         if self.curr_time >= self.itemcfg.end_time:
             self.curr_time = 0.0
             return False
-        print(f"{self.curr_time:.4f}")
+        #print(f"{self.curr_time:.4f}")
 
         #print("update")
         self.ax.clear()
         self.pa.do_iteration()
         
         for ii in self.pa.pary:
-            cc = Circle((ii.rx,ii.ry),ii.radius,color='blue',alpha=0.8,fill=False)
+            color_list = ["green","red"]
+            cc = Circle((ii.rx,ii.ry),ii.radius,color=color_list[ii.pnum],alpha=0.8,fill=False)
             self.ax.add_patch(cc)
             self.ax.text(ii.rx,ii.ry,f"{ii.pnum}")
             if self.itemcfg.walls == True:
