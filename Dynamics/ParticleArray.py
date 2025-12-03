@@ -36,16 +36,17 @@ class ParticleArray():
                         #------------------------------------
                         if(self.pary[src].col_flag == False):    
                             self.pary[src].col_flag = True
-
-                            # Get realitve velocity
-                            self.pary[src].cvx_rel = ((self.pary[trg].vx/self.pary[src].vx))
                             # Remember the incoming velocity magnitude
-                            self.pary[src].cvmag = 0.75 #-self.pary[src].cvx_rel #np.linalg.norm([self.pary[src].vx,self.pary[src].vy])
-                            print(f"P:{src} -cc.vx_rel:{ self.pary[src].cvx_rel:.4f}, pf:{1- self.pary[src].cvx_rel:.4f}")    
-                            vo1,vo2 = self.predict_mom(1,self.pary[src].vx,1,self.pary[trg].vx)
-                            self.pary[src].pred_mom_out = abs(vo1)
-                            print(f"P:{src}, cvmag:{ self.pary[src].cvmag:.4f}")    
-                                                    # If there is a collision create a new struct for
+                            self.pary[src].cvmag = 0.75 
+                            vo1,yo1 = self.predict_mom( self.pary[src].molar_mass,
+                                                        self.pary[src].vx,
+                                                        self.pary[src].vy,
+                                                        self.pary[trg].molar_mass,
+                                                        self.pary[trg].vx,
+                                                        self.pary[trg].vy)
+                            self.pary[src].pred_mom_xout = vo1
+                            self.pary[src].pred_mom_yout = yo1
+                        # If there is a collision create a new struct for
                         # each target particle
                         col_struct = collision()
                         # Get intersection, orient and prox vectors. And
@@ -58,8 +59,8 @@ class ParticleArray():
                     else:
                          if(self.pary[src].col_flag == True):
                              self.pary[src].col_flag = False
-                             self.pary[src].cvx_rel = 0.0  
-                             
+                             self.pary[src].vx = self.pary[src].pred_mom_xout
+                             self.pary[src].vy = self.pary[src].pred_mom_yout
    
     ##################################################################
     #
@@ -88,6 +89,8 @@ class ParticleArray():
             # Add collision acceleration vectors to velcoity vectors
             ii.vx = ii.vx + ii.tot_collision_x_acc
             ii.vy = ii.vy + ii.tot_collision_y_acc
+
+            #print( ii.tot_collision_x_acc)
 
             #ii.vx*(1-ii.cvx_rel)
                 
@@ -447,7 +450,8 @@ class ParticleArray():
         src.stor_v_ang.append(src.vel_ang)
         src.stor_cvmag.append(src.cvmag)
         src.stor_pnum.append(src.pnum)
-        src.stor_pred_mom_out.append(src.pred_mom_out)
+        src.stor_pred_mom_xout.append(src.pred_mom_xout)
+        src.stor_pred_mom_yout.append(src.pred_mom_xout)
         
         if len(src.collision_list) > 0:
             src.stor_pen_factor.append(src.collision_list[0].pen_factor)
@@ -463,9 +467,14 @@ class ParticleArray():
 
 
 
-    def predict_mom(self,m1,vx1in,m2,vx2in):
+    def predict_mom(self,m1,vx1in,v1yin,m2,vx2in,vy2in):
+        t1 = ((m1-m2)/(m1+m2))
+        t2 = (2*m2/(m1+m2))
+        print(f"t1:{t1},t2:{t2}")
         vx1out = ((m1-m2)/(m1+m2))*vx1in + (2*m2/(m1+m2))*vx2in
+        vy1out = ((m1-m2)/(m1+m2))*v1yin + (2*m2/(m1+m2))*vy2in
+        
         vx2out = ((m1-m2)/(m1+m2))*vx2in + (2*m1/(m1+m2))*vx1in
         print(f"vx1out:{vx1out},vx2out{vx2out}")
-        return vx1out,vx2out
+        return vx1out,vy1out
 

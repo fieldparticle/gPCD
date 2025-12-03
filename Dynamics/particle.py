@@ -112,7 +112,10 @@ class particle():
         self.cvx_rel = 0.0
         self.cvy = 0.0
         self.cvz = 0.0
-        self.pred_mom_out = 0.0
+        self.pred_mom_xout = 0.0
+        self.pred_mom_yout = 0.0
+
+        # Storage variables
         self.stor_t     = []
         self.stor_vx    = []
         self.stor_vy    = []
@@ -124,8 +127,8 @@ class particle():
         self.stor_tot_collision_x_acc = []
         self.stor_tot_collision_y_acc = []
         self.stor_pnum = []
-        self.stor_pred_mom_out = []
-
+        self.stor_pred_mom_xout = []
+        self.stor_pred_mom_yout = []
 
         for ii in range(4):
             self.wall_list.append('Any')

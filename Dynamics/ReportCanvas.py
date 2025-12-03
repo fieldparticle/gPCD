@@ -36,9 +36,9 @@ class ReportCanvas(FigureCanvas):
                              marker='o', linewidth=1.0, markersize=2)
                 
             if self.itemcfg.plot_pred_mom[ii.pnum] == True:
-                print([0.0,ii.stor_t[-1]])
-                print([ii.pred_mom_out,ii.pred_mom_out])
-                self.ax.plot([0.0,ii.stor_t[-1]],[ii.pred_mom_out,ii.pred_mom_out],color=color_list[ii.pnum], 
+                #print([0.0,ii.stor_t[-1]])
+                #print([ii.pred_mom_out,ii.pred_mom_out])
+                self.ax.plot([0.0,ii.stor_t[-1]],[abs(ii.pred_mom_xout),abs(ii.pred_mom_xout)],color=color_list[ii.pnum], 
                              linestyle='dashed', linewidth=1.0, markersize=2)
 
         #self.ax.legend("Velocity Magnitude","Out og Collsion Mag")
