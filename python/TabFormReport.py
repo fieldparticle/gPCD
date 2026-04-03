@@ -206,7 +206,7 @@ class TabFormReport(QTabWidget):
 
     def load_class(self,class_name):
         module_name, class_nm = class_name.rsplit('.', 1)
-        full_path = self.cfg.report_start_dir + "/" + class_nm + ".py"
+        full_path =  class_nm + ".py"
         
         try :
             spec = importlib.util.spec_from_file_location(module_name, full_path)

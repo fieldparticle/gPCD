@@ -1,11 +1,11 @@
 import configparser
 import os
-import libconf
+import python.libconf as libconf
 import io
 import inspect
 import shutil
 from collections import OrderedDict
-import libconf
+
 
 class ConfigUtility:
     lvl = 100

@@ -1,0 +1,10 @@
+metric,value
+collision status,no collision
+reason,tangent_or_miss
+particle 00 init pos,"(2.00000000, 0.00000000)"
+particle 01 init pos,"(-2.00000000, 3.20000000)"
+closest approach time,2.00000000
+closest approach distance,3.20000000
+sum turn area,0.00000000
+max turn area,0.00000000
+max turn sweep,0.00000000

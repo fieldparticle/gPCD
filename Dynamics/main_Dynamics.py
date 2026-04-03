@@ -16,11 +16,11 @@ guser = getpass.getuser()                            #
 ###############################################################
 from PyQt6.QtWidgets import QApplication, QWidget,  QFormLayout, QGridLayout, QTabWidget, QLineEdit, QDateEdit, QPushButton
 from PyQt6.QtCore import Qt
-sys.path.append('../python')
+sys.path.append('../python/Dynamics')
 from ParticleBase import *
 from DynamicsMainWin import *
 import matplotlib
-## Create a base class.
+## Create a base class.pip
 bc = ParticleBase("FrontEnd")
 #print("Hello World\n", file=sys.stdout)
 bc.Create("dynamics.cfg",'dyanmics.log')

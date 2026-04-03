@@ -1,0 +1,236 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\title{DynamicsCPT: Dynamics So Far}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Purpose}
+This note summarizes the dynamics model currently implemented in the repository. It is not a final theory document. Instead, it captures the present working formulation, the main numerical choices, and the diagnostics that are being used to evaluate whether the collision logic behaves consistently.
+
+\section{State Variables}
+Each particle $i$ carries
+\begin{align*}
+    \mathbf{x}_i &= (x_i, y_i), \\
+    \mathbf{p}_i &= (p_{x,i}, p_{y,i}), \\
+    m_i &> 0, \\
+    r_i &> 0.
+\end{align*}
+The velocity is recovered from momentum by
+\[
+    \mathbf{v}_i = \frac{\mathbf{p}_i}{m_i}.
+\]
+
+The simulation advances with an outer time step $\Delta t$ and a substep count $N_s$, so the nominal internal step is
+\[
+    \delta t = \frac{\Delta t}{N_s}.
+\]
+At the time of writing, the base configuration uses $\Delta t = 0.005$ and $N_s = 5$, so $\delta t = 0.001$ in the default setup.
+
+\section{Geometric Contact Model}
+For two disks with centers $\mathbf{x}_i$, $\mathbf{x}_j$ and radii $r_i$, $r_j$, let
+\[
+    \mathbf{d}_{ij} = \mathbf{x}_j - \mathbf{x}_i,
+    \qquad
+    d_{ij} = \|\mathbf{d}_{ij}\|.
+\]
+Contact occurs when
+\[
+    d_{ij} < r_i + r_j.
+\]
+When there is contact, the code computes a contact normal
+\[
+    \mathbf{n}_{ij} =
+    \begin{cases}
+        \dfrac{\mathbf{d}_{ij}}{d_{ij}}, & d_{ij} > 0, \\
+        (1,0), & d_{ij} = 0,
+    \end{cases}
+\]
+and an overlap area $A_{ij}$ from the exact two-circle intersection formula. The same general approach is used for wall contact, with a wall normal replacing the pair normal.
+
+The overlap area is the main geometric quantity that drives the collision response. In other words, the current model is not event-based in the hard-sphere sense; it is overlap-driven.
+
+\section{Response Laws}
+\subsection{Force-form and acceleration-form coefficients}
+The code supports two equivalent ways to specify response strength:
+\begin{itemize}[leftmargin=1.5em]
+    \item a force-per-area coefficient $k$, or
+    \item an acceleration-per-area coefficient $a_A$.
+\end{itemize}
+
+For wall contact, the effective force magnitude is
+\[
+    F = k A
+\]
+in force form, or
+\[
+    F = m_i a_A A
+\]
+in acceleration form.
+
+For particle-particle contact, the acceleration-form implementation uses reduced mass
+\[
+    \mu_{ij} = \frac{m_i m_j}{m_i + m_j},
+\]
+so the force magnitude becomes
+\[
+    F = \mu_{ij} a_A A.
+\]
+
+\subsection{Impulse over one substep}
+The response is applied over the substep as an impulse
+\[
+    J = F \, \delta t.
+\]
+For a pair contact, the momentum update has the form
+\begin{align*}
+    \mathbf{p}_i^{\,new} &= \mathbf{p}_i - J \mathbf{n}_{ij}, \\
+    \mathbf{p}_j^{\,new} &= \mathbf{p}_j + J \mathbf{n}_{ij}.
+\end{align*}
+For wall contact, the particle receives the wall-normal impulse directly.
+
+\section{Two Active Dynamics Variants}
+\subsection{Base model}
+The base class contains the common geometry, bookkeeping, momentum and energy diagnostics, and collision trace export. It also supports optional wall contact and optional bonded interactions.
+
+\subsection{FieldBase}
+The currently active scenario builder constructs a \texttt{FieldBase} object. In this formulation, particles are treated as field sources and the overlap area acts as a coupling measure. Important features are:
+\begin{itemize}[leftmargin=1.5em]
+    \item overlap-driven impulses rather than event collisions,
+    \item per-particle or per-pair response coefficients,
+    \item inbound and outbound contact accounting,
+    \item turning-area diagnostics for off-center collisions,
+    \item internal scalar bookkeeping to track changes in the sum of speed magnitudes.
+\end{itemize}
+
+The code distinguishes inbound contact ($v_{rel,n} < 0$) from outbound contact ($v_{rel,n} \ge 0$), where
+\[
+    v_{rel,n} = (\mathbf{v}_j - \mathbf{v}_i)\cdot \mathbf{n}_{ij}.
+\]
+This inbound/outbound split is used in the diagnostics and in the outbound release logic.
+
+\subsection{AccelBase}
+\texttt{AccelBase} is a related variant that also uses overlap-driven dynamics, but its bookkeeping is organized slightly differently. In particular, it keeps a \texttt{bookkeeping\_internal} term and allows free-flight settling steps after contact to push the scalar accounting toward closure.
+
+\section{Position Update}
+Once the momentum updates for a substep are complete, the particle positions are advanced explicitly:
+\[
+    \mathbf{x}_i^{\,new} = \mathbf{x}_i + \mathbf{v}_i^{\,new}\,\delta t.
+\]
+This is therefore an explicit time-marching scheme with contact impulses applied inside each substep.
+
+\section{Adaptive Refinement Near Contact}
+The base integrator can refine a substep when contact is active and the current speed would traverse too much contact span in one step. In effect, the code estimates a required number of refined steps and recursively subdivides the current substep if needed.
+
+The current logic uses a minimum-collision-steps target to bound how much relative motion can occur over one contact span. This is meant to reduce under-resolution during fast impacts and to make the area-driven impulse more stable.
+
+\section{Bonded Interactions}
+Optional bonded interactions are also present in the code. A bonded pair can apply
+\begin{itemize}[leftmargin=1.5em]
+    \item a spring-like contribution proportional to extension, and
+    \item a damping-like contribution proportional to normal relative velocity.
+\end{itemize}
+These act over the same substep interval and are added before the contact position writeback. Bonding is not the main focus of the current two-particle overlap study, but it is already part of the framework.
+
+\section{Diagnostics and Invariants}
+Several diagnostics are exported at the end of a run.
+
+\subsection{Vector momentum}
+The total vector momentum is
+\[
+    \mathbf{P} = \sum_i \mathbf{p}_i.
+\]
+The code tracks the difference between initial and final vector momentum as a direct conservation check.
+
+\subsection{Kinetic energy}
+The kinetic energy is
+\[
+    K = \sum_i \frac{\|\mathbf{p}_i\|^2}{2m_i}.
+\]
+This is not guaranteed to be exactly conserved in the present overlap-driven formulation, so it is monitored as a diagnostic rather than imposed as a strict invariant.
+
+\subsection{Scalar momentum plus internal term}
+An important repository-specific quantity is the scalar total
+\[
+    S = \sum_i \|\mathbf{p}_i\| + P_{\text{internal}},
+\]
+or, in the speed-based variants,
+\[
+    S = \sum_i \|\mathbf{v}_i\| + P_{\text{internal}}.
+\]
+The exact meaning of the internal term is model-dependent, but operationally it is a bookkeeping quantity that compensates for scalar-magnitude changes introduced by the overlap response. The code reports the final scalar error as
+\[
+    S_{\text{final}} - S_{\text{initial}}.
+\]
+This scalar closure metric is currently one of the main health checks for the collision model.
+
+\subsection{Overlap and impulse symmetry}
+The runs also record:
+\begin{itemize}[leftmargin=1.5em]
+    \item maximum inbound and outbound overlap area,
+    \item maximum inbound and outbound impulse,
+    \item cumulative area, area-time, and impulse totals,
+    \item turning-area measures for glancing contacts.
+\end{itemize}
+These diagnostics are intended to show whether the inbound and outbound stages are balanced, and whether off-axis turning correlates with scalar error.
+
+\section{Current Two-Particle OCL Study}
+The main batch study in \texttt{run\_two\_particle\_ocl.py} varies the initial $y$-position of particle 1 while leaving particle 0 on the horizontal axis. This creates a family of central-to-glancing collisions.
+
+In the current sweep:
+\begin{itemize}[leftmargin=1.5em]
+    \item particle 0 starts near $(1.1, 0)$ with leftward velocity,
+    \item particle 1 starts near $(-1.1, y)$ with rightward velocity,
+    \item the particle 1 vertical offset $y$ is stepped across the study set,
+    \item each run exports a full contact trace and a final summary.
+\end{itemize}
+
+This study is being used to answer two practical questions:
+\begin{enumerate}[leftmargin=1.5em]
+    \item How does glancing geometry change overlap, turning, and scalar closure?
+    \item How much extra computation is caused by active collision logic relative to free flight?
+\end{enumerate}
+
+\section{Measured Processing Time}
+The repository now includes frame-timing instrumentation in the visual driver. For each outer simulation frame, the code records:
+\begin{itemize}[leftmargin=1.5em]
+    \item simulation wall time per frame,
+    \item total frame wall time,
+    \item render wall time,
+    \item active contact counts.
+\end{itemize}
+This allows direct comparison between free-flight frames and collision-active frames. The goal is to identify how much the contact logic slows the run when overlaps, turning, or refinement become significant.
+
+\section{Interpretation of the Present Model}
+So far, the project should be understood as an overlap-driven contact dynamics experiment rather than a finished collision theory. The current implementation is trying to achieve three things at once:
+\begin{itemize}[leftmargin=1.5em]
+    \item geometrically meaningful contact response through overlap area,
+    \item numerically stable time marching through substeps and optional refinement,
+    \item near-closure of vector momentum, scalar momentum bookkeeping, and useful symmetry diagnostics.
+\end{itemize}
+
+This makes the code especially useful for comparative studies, because each design change can be tested against the same exported metrics.
+
+\section{Open Questions}
+The most important unresolved questions appear to be:
+\begin{itemize}[leftmargin=1.5em]
+    \item whether the scalar internal bookkeeping has a clean physical interpretation or is mainly a numerical closure device,
+    \item how outbound release should scale for turning collisions,
+    \item how sensitive the results are to $\delta t$, substeps, and contact-refinement settings,
+    \item whether the field-based formulation converges toward a stable continuum or hard-contact limit,
+    \item how strongly collision geometry correlates with both scalar error and runtime cost.
+\end{itemize}
+
+\section{Summary}
+At present, the repository implements a two-dimensional particle dynamics framework with overlap-area contact forces, optional adaptive refinement, optional bonding, and detailed trace export. The main working hypothesis is that overlap geometry can drive a useful collision response while scalar bookkeeping tracks the non-vector part of the exchange. The next phase is to use the exported study metrics and frame-timing data to determine which parts of the collision logic are physically helpful, which are only numerically compensating, and which are the main source of runtime slowdown.
+
+\end{document}

@@ -20,9 +20,10 @@ class ParticleCanvas(FigureCanvas):
         self.itemcfg = None
         self.stor_time = []
         self.curr_time = 0.0
+        self.iter = 0
 
         
-    def initialize(self,itemcfg,particle_arry):
+    def initialize(self,itemcfg,particle_arry,):
         self.pa = particle_arry
         self.itemcfg = itemcfg
         self.xlim = self.itemcfg.xlim
@@ -31,6 +32,10 @@ class ParticleCanvas(FigureCanvas):
     def plot(self):
         pass
 
+
+    #******************************************************************
+    # Update data, and perform iteration calulations
+    #
     def update_plot(self):
         # Set the current time
         self.curr_time = self.curr_time+self.itemcfg.dt
@@ -41,31 +46,47 @@ class ParticleCanvas(FigureCanvas):
 
         #print("update")
         self.ax.clear()
+        # Call the do_iteration of the selected ParticleArray <Basic,Springs,..>
         self.pa.do_iteration()
         
+        # Plot particles
         for ii in self.pa.pary:
-            color_list = ["green","red"]
+            color_list = ["green","red","blue"]
+            # Draw the outer boundary circle
             cc = Circle((ii.rx,ii.ry),ii.radius,color=color_list[ii.pnum],alpha=0.8,fill=False)
             self.ax.add_patch(cc)
+            # Draw the interna attraction circle
+            cr = Circle((ii.rx,ii.ry),ii.bond_rad,color='black',alpha=0.8,fill=False)
+            self.ax.add_patch(cr)
+            # Print the number in the center
             self.ax.text(ii.rx,ii.ry,f"{ii.pnum}")
+            # If there are walls draw them
             if self.itemcfg.walls == True:
                 self.ax.plot([self.pa.wall_xmin,self.pa.wall_xmin ],[self.pa.wall_ymin,self.pa.wall_ymax],"k--")
                 self.ax.plot([self.pa.wall_xmax,self.pa.wall_xmax ],[self.pa.wall_ymin,self.pa.wall_ymax],"k--")
                 self.ax.plot([self.pa.wall_xmin,self.pa.wall_xmax ],[self.pa.wall_ymin,self.pa.wall_ymin],"k--")
                 self.ax.plot([self.pa.wall_xmin,self.pa.wall_xmax ],[self.pa.wall_ymax,self.pa.wall_ymax],"k--")
                 
-
-            if ii.col_flag == True or any(ii.wcol_flag):
-                if ii.plot_vectors == True:
-                    for cc in range(len(ii.collision_list)):
-                        self.ax.plot(ii.collision_list[cc].col_pointA[0],ii.collision_list[cc].col_pointA[1],'ro')
-                        self.ax.plot(ii.collision_list[cc].col_pointB[0],ii.collision_list[cc].col_pointB[1],'ro')
-                        self.ax.plot([ii.rx,ii.collision_list[cc].col_pointA[0]],[ii.ry,ii.collision_list[cc].col_pointA[1]],'r-')
-                        self.ax.plot([ii.rx,ii.collision_list[cc].col_pointB[0]],[ii.ry,ii.collision_list[cc].col_pointB[1]],'r-')
-                        self.ax.plot(ii.collision_list[cc].orient_vec_print[0],ii.collision_list[cc].orient_vec_print[1],'y-')
-                        self.ax.plot(ii.collision_list[cc].prox_vec[0],ii.collision_list[cc].prox_vec[1],'k-')
-                        self.ax.text(ii.pnum+self.xlim[0],self.ylim[1]+0.14,f"P:{ii.pnum} orient angle:{ii.collision_list[cc].orient_ang:.4f}")   
-                        self.ax.text(ii.pnum+self.xlim[0],self.ylim[1]+0.08,f"P:{ii.pnum} penetration factor :{ii.collision_list[cc].pen_factor:.4f}")  
+            # If in collision plot vectors
+        
+            if ii.plot_vectors == True:
+                # For every collision in the collision list plot vectors
+                for cc in ii.collision_list:
+                    if cc.col_flag == True:
+                        if len(cc.col_pointA) != 2:
+                            print("zero")
+                        if len(cc.col_pointB) != 2:
+                            print("zero")
+                        # Plot the pair of intersection points
+                        self.ax.plot(cc.col_pointA[0],cc.col_pointA[1],'ro')
+                        self.ax.plot(cc.col_pointB[0],cc.col_pointB[1],'ro')
+                        # Plot rays between center of the particle to the intesection points
+                        self.ax.plot([ii.rx,cc.col_pointA[0]],[ii.ry,cc.col_pointA[1]],'r-')
+                        self.ax.plot([ii.rx,cc.col_pointB[0]],[ii.ry,cc.col_pointB[1]],'r-')
+                        # Plot the orientation vector
+                        self.ax.plot(cc.orient_vec_print[0],cc.orient_vec_print[1],'k-')
+                        # Plot the proximity vector
+                        self.ax.plot(cc.prox_vec[0],cc.prox_vec[1],'k-')
                         
             else:
                 ii.col_pointA = None
@@ -78,8 +99,6 @@ class ParticleCanvas(FigureCanvas):
                 ii.prox_vec = []
                 ii.pen_factor =0.0
             if ii.plot_vectors == True:
-                self.ax.text(ii.pnum+self.xlim[0],self.ylim[1]+0.01,f"P:{ii.pnum} vx:{ii.vx:.4f},xy:{ii.vy:.4f}")
-                self.ax.text(ii.pnum+self.xlim[0],self.ylim[1]-0.04,f"P:{ii.pnum} vmag:{ii.vel_mag:.4f},pvmag:{ii.post_coll_mag:.4f}")
                 self.ax.plot(ii.vel_vec[0],ii.vel_vec[1],'g-')     
             
         self.pa.move()

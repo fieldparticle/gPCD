@@ -9,8 +9,11 @@ import collections
 import io
 import re
 
+from numpy import long
+
 # Define an isstr() and isint() that work on both Python2 and Python3.
 # See http://stackoverflow.com/questions/11301138
+'''
 try:
     basestring  # attempt to evaluate basestring
 
@@ -19,8 +22,9 @@ try:
 
     def isint(i):
         return isinstance(i, (int, long))
-
-    LONGTYPE = long
+'''
+LONGTYPE = long
+'''
 except NameError:
 
     def isstr(s):
@@ -30,7 +34,7 @@ except NameError:
         return isinstance(i, int)
 
     LONGTYPE = int
-
+'''
 # Bounds to determine when an "L" suffix should be used during dump().
 SMALL_INT_MIN = -2**31
 SMALL_INT_MAX = 2**31 - 1
@@ -527,8 +531,8 @@ class LibconfArray(list):
     pass
 
 
-class LibconfInt64(LONGTYPE):
-    pass
+#class LibconfInt64(LONGTYPE):
+   # pass
 
 
 def is_long_int(i):

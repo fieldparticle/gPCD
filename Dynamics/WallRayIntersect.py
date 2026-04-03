@@ -1,12 +1,16 @@
 import numpy as np
 
+
 def intersect_ray_line_2d(P, v, A, d):
     """
     Ray: R(t) = P + t*v
     Line: L(s) = A + s*d
     Returns (t, s, point) or None if parallel or no intersection.
     """
-
+    # P is the center of the particle
+    # v is a unit vector pointing in the direction of the wall
+    # A is a point on the wall
+    # 
     v = np.array(v, dtype=float)
     d = np.array(d, dtype=float)
     P = np.array(P, dtype=float)
@@ -32,4 +36,4 @@ v = (1, 1)
 A = (1, 0)
 d = (0, 1)
 
-print(intersect_ray_line_2d(P, v, A, d))
+#print(intersect_ray_line_2d(P, v, A, d))

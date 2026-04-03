@@ -1,0 +1,44 @@
+Environment layout for this repo
+
+1. Shared environment
+Path: .venv
+Purpose: pygame runners and matplotlib analysis scripts.
+Expected packages: pygame, matplotlib.
+
+Recommended commands
+
+Run the horizontal pygame test:
+    .\.venv\Scripts\python.exe .\run_two_particle_horizontal.py
+
+Run the bonded horizontal pygame test:
+    .\.venv\Scripts\python.exe .\run_two_particle_horizontal_bonded.py
+
+Run the horizontal pygame test with no post-collision auto-stop:
+    .\.venv\Scripts\python.exe .\run_two_particle_horizontal_no_post_stop.py
+
+Run the horizontal pygame test in the wall box:
+    .\.venv\Scripts\python.exe .\run_two_particle_horizontal_in_box.py
+
+Run the angled pygame test:
+    .\.venv\Scripts\python.exe .\run_two_particle_angled.py
+
+Run the three-particle horizontal pygame test:
+    .\.venv\Scripts\python.exe .\run_three_particle_horizontal.py
+
+Run the three-particle horizontal pygame test in the wall box:
+    .\.venv\Scripts\python.exe .\run_three_particle_horizontal_in_box.py
+
+Run the horizontal analysis plot:
+    .\.venv\Scripts\python.exe .\plot_scalar_momentum_error_vs_penetration.py
+
+Run the three-particle horizontal analysis plot:
+    .\.venv\Scripts\python.exe .\plot_three_particle_horizontal_scalar_momentum_error_vs_penetration.py
+
+Run the binned analysis plot:
+    .\.venv\Scripts\python.exe .\plot_binned_momentum_error_vs_penetration.py
+
+Run the particle momentum history plot:
+    .\.venv\Scripts\python.exe .\plot_particle_momentum_vs_time.py
+
+Export two-particle OCL collision data:
+    .\.venv\Scripts\python.exe .\export_two_particle_ocl_collision_data.py

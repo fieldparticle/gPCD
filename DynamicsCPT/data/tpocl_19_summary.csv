@@ -1,0 +1,50 @@
+metric,value
+,==== FINAL COLLISION REPORT =====
+time,13.54500000
+initial momentum,"(0.00000000, 0.00000000)"
+final momentum,"(0.00000000, 0.00000000)"
+momentum error mag,0.00000000e+00
+initial |p| sum,0.20000000
+final |p| sum,0.20000000
+|p| sum error,-1.11799459e-13
+internal |p| sum,0.00000000
+scalar |p|+internal,0.20000000
+scalar total error,-1.11799459e-13
+initial KE,0.01000000
+final KE,0.01000000
+KE error,-1.11802928e-14
+max area in,0.03771171
+max area out,0.03771170
+max area diff,7.81938669e-09
+max J in,1.88558538e-06
+max J out,1.88558499e-06
+max J diff,3.90969335e-13
+max raw p drift,0.00000000e+00
+max replay mismatch,0.00000000e+00
+active contacts,0
+particle 00 init pos,"(1.10000000, 0.00000000)"
+particle 00 pos,"(-0.25312040, -0.01745267)"
+particle 00 vel,"(-0.09980963, -0.00616741)"
+particle 00 mom,"(-0.09980963, -0.00616741)"
+particle 01 init pos,"(-1.10000000, 1.90000000)"
+particle 01 pos,"(0.25312040, 1.91745267)"
+particle 01 vel,"(0.09980963, 0.00616741)"
+particle 01 mom,"(0.09980963, 0.00616741)"
+field samples in,2834
+field samples out,2833
+sum area in,62.13846362
+sum area out,62.13846362
+sum area*time in,0.06213846
+sum area*time out,0.06213846
+sum J in,3.10692318e-03
+sum J out,3.10692318e-03
+sum turn area,0.26340377
+max turn area,0.00006015
+max turn sweep,0.00010452
+particle 00 area_in/out/diff,"(62.13846362, 62.13846362, 0.00000000)"
+particle 00 samples_in/out,"(2834, 2833)"
+particle 00 avg_area_in/out,"(0.02192606, 0.02193380)"
+particle 01 area_in/out/diff,"(62.13846362, 62.13846362, 0.00000000)"
+particle 01 samples_in/out,"(2834, 2833)"
+particle 01 avg_area_in/out,"(0.02192606, 0.02193380)"
+,=================================

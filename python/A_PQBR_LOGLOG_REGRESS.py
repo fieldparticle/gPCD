@@ -111,7 +111,7 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       plt.rcParams.update({ "text.usetex": True})
       self.__do_commands__(plt,fig,ax)
       leg_list = []
-      leg_list.append(f"$Measured \quad data$")
+      leg_list.append(f"$Measured \\quad data$")
       leg_list.append(f"$Trendline, b={b_sat:.3f}$")
       leg_list.append("$N_{sat}=1E6$")
       plt.legend(leg_list)
@@ -120,7 +120,7 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       plt.tight_layout()
       prefix_name = self.itemcfg.name.replace('_','')
       filename = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}{name}.png"
-      plt.savefig(filename, dpi=600)
+      plt.savefig(filename, dpi=300)
       self.include.append(filename)
       plt.close()
       prefix_name = self.itemcfg.name.replace('_','')

@@ -20,7 +20,7 @@ echo %cmdln%
 
 attrib +A /S /D %target%\*.*
 pause
-xcopy %target%\*.* %Datefolder% > %Datefolder%\buRpt%dtnm%.txt /S /V /R /F /Y /C /E
+xcopy %target%\*.* %Datefolder% > %Datefolder%\buRpt%dtnm%.txt /S /V /R /F /Y /C /E 
 
 start "C:\Program Files (x86)\Notepad++\notepad++.exe" %Datefolder%\buRpt%dtnm%.txt
 
