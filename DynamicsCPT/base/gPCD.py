@@ -7,12 +7,13 @@ import pygame
 from base.scenarios import DEFAULT_WALL_BOX, build_base, configure_two_particle_horizontal
 
 class Demo:
-    def __init__(self, configure_scenario=None, export_data_file=None):
+    def __init__(self, configure_scenario=None, export_data_file=None, base_class=None):
         pygame.init()
         if configure_scenario is None:
             configure_scenario = configure_two_particle_horizontal
         self.configure_scenario = configure_scenario
-        self.base = build_base(self.configure_scenario)
+        self.base_class = base_class
+        self.base = build_base(self.configure_scenario, base_class=self.base_class)
         self.export_data_file = self.resolve_export_data_file(export_data_file)
         self.export_written = False
         self.frame_timing_written = False
@@ -24,6 +25,7 @@ class Demo:
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("consolas", 16)
         self.small_font = pygame.font.SysFont("consolas", 16)
+        self.particle_label_font = pygame.font.SysFont("consolas", 24, bold=True)
 
         self.default_post_collision_frames = 90
         self.post_collision_frames = self.default_post_collision_frames
@@ -61,12 +63,13 @@ class Demo:
 
     def reset(self):
         self.frames_since_collision_end = None
-        self.base = build_base(self.configure_scenario)
+        self.base = build_base(self.configure_scenario, base_class=self.base_class)
         self.momentum_history = []
         self.frame_timing_trace = []
         self.zoom = self.default_zoom
         self.export_written = False
         self.frame_timing_written = False
+        self.particle_label_font = pygame.font.SysFont("consolas", 24, bold=True)
         self.apply_scenario_options()
         self.set_output_object_space(
             x=self.output_object_x,
@@ -418,9 +421,10 @@ class Demo:
             p_error_x = p_total_x - self.base.initial_total_momentum_x
             p_error_y = p_total_y - self.base.initial_total_momentum_y
             p_error = math.hypot(p_error_x, p_error_y)
-            internal_p = self.base.total_internal_momentum()
-            scalar_p_total = self.base.total_scalar_momentum_with_internal()
-            scalar_p_error = scalar_p_total - self.base.initial_abs_momentum_sum()
+            internal_px, internal_py = self.base.total_internal_momentum_vector()
+            net_internal_p = math.hypot(internal_px, internal_py)
+            step_internal_p = getattr(self.base, "step_internal_momentum", 0.0)
+            step_internal_by_particle = getattr(self.base, "step_internal_momentum_by_particle", [])
             ke = self.base.total_kinetic_energy()
             ke_error = ke - self.base.initial_ke
 
@@ -451,24 +455,29 @@ class Demo:
                 )
                 pygame.draw.rect(self.screen, self.base.WHITE, wall_rect, 2)
 
-            for particle in self.base.particles:
+            for index, particle in enumerate(self.base.particles):
+                center_x = self.to_screen_x(particle["x"])
+                center_y = self.to_screen_y(particle["y"])
                 self.draw_alpha_circle(particle["fill"], particle["x"], particle["y"], particle["radius"])
                 pygame.draw.circle(
                     self.screen,
                     particle["edge"],
-                    (self.to_screen_x(particle["x"]), self.to_screen_y(particle["y"])),
+                    (center_x, center_y),
                     int(particle["radius"] * self.pixel_radius_scale),
                     2,
                 )
                 pygame.draw.circle(
                     self.screen,
                     self.base.WHITE,
-                    (self.to_screen_x(particle["x"]), self.to_screen_y(particle["y"])),
+                    (center_x, center_y),
                     4,
                 )
+                label_surface = self.particle_label_font.render(str(index), True, self.base.WHITE)
+                label_rect = label_surface.get_rect(center=(center_x + 12, center_y - 12))
+                self.screen.blit(label_surface, label_rect)
 
-            if contact_pair is not None:
-                i, j, _ = contact_pair
+            for i, j, contact_after in contacts_after:
+                pair_nx, pair_ny, _alpha, _delta, pair_area, _area_pcnt, _proxPercent, _d = contact_after
                 pi = self.base.particles[i]
                 pj = self.base.particles[j]
                 pygame.draw.line(
@@ -479,14 +488,24 @@ class Demo:
                     2,
                 )
 
-            if contact_pair is not None and contact_strength > 0.0:
-                arrow_scale = 0.015
-                fx = nx * contact_strength * arrow_scale
-                fy = ny * contact_strength * arrow_scale
-                pi = self.base.particles[contact_pair[0]]
-                start = (self.to_screen_x(pi["x"]), self.to_screen_y(pi["y"]))
-                end = (self.to_screen_x(pi["x"] + fx), self.to_screen_y(pi["y"] + fy))
-                pygame.draw.line(self.screen, self.base.YELLOW, start, end, 4)
+                if hasattr(self.base, "contact_force_from_area"):
+                    pair_contact_strength = self.base.contact_force_from_area(
+                        pair_area,
+                        pi["mass"],
+                        pj["mass"],
+                    )
+                elif getattr(self.base, "rejection_accel_per_area", None) is not None:
+                    pair_contact_strength = self.base.rejection_accel_per_area * pair_area
+                else:
+                    pair_contact_strength = self.base.k * pair_area
+
+                if pair_contact_strength > 0.0:
+                    arrow_scale = 0.015
+                    fx = pair_nx * pair_contact_strength * arrow_scale
+                    fy = pair_ny * pair_contact_strength * arrow_scale
+                    start = (self.to_screen_x(pi["x"]), self.to_screen_y(pi["y"]))
+                    end = (self.to_screen_x(pi["x"] + fx), self.to_screen_y(pi["y"] + fy))
+                    pygame.draw.line(self.screen, self.base.YELLOW, start, end, 4)
 
             area_diff = abs(self.base.max_area_in - self.base.max_area_out)
             J_diff = abs(self.base.max_J_in - self.base.max_J_out)
@@ -500,9 +519,11 @@ class Demo:
                 #f"object view size     = ({self.object_width:.4f}, {self.object_height:.4f})",
                 #f"object scale         = {self.object_scale:.4f}",
                 #f"viewport padding     = ({self.viewport_offset_x:.1f}, {self.viewport_offset_y:.1f})",
-                f"internal dt          = {self.base.dt / self.base.substeps:.8f}",
-                f"internal |p|         = {internal_p:.8f}",
-                f"scalar total error   = {scalar_p_error:.8e}",
+                #f"internal dt          = {self.base.dt / self.base.substeps:.8f}",
+                f"step internal |p|    = {step_internal_p:.8f}",
+                #f"net internal p       = ({internal_px:.8f}, {internal_py:.8f})",
+                #f"net internal |p|     = {net_internal_p:.8f}",
+                f"vector momentum err  = {p_error:.8e}",
                 #f"collision started    = {self.collision_started}",
                 #f"rebound mode         = {self.rebound_mode}",
                 #f"final reported       = {self.final_report_printed}",
@@ -524,6 +545,8 @@ class Demo:
                 #f"kinetic energy       = {ke:.8f}",
                 f"KE error             = {ke_error:.8e}",
             ]
+            for index, value in enumerate(step_internal_by_particle):
+                lines.append(f"step int |p| p{index}   = {value:.8f}")
 
             ytxt = 16
             for line in lines:

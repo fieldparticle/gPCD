@@ -5,10 +5,11 @@ import matplotlib.pyplot as plt
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = PROJECT_ROOT / "data"
+DATA_DIR_NAME = "data005"
+DATA_DIR = PROJECT_ROOT / DATA_DIR_NAME
 PLOTS_DIR = PROJECT_ROOT / "plots"
 OUTPUT_FILE = PLOTS_DIR / "late_glancing_diagnostics.png"
-STUDIES = [16, 17, 18, 19]
+STUDIES = [34,35, 36, 37, 38,39]
 
 
 def trace_path(study_index: int) -> Path:

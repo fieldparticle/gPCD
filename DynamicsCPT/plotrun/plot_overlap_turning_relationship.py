@@ -8,10 +8,12 @@ import matplotlib.pyplot as plt
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = PROJECT_ROOT / "data"
+DATA_DIR_NAME = "data005"
+DATA_DIR = PROJECT_ROOT / DATA_DIR_NAME
 PLOTS_DIR = PROJECT_ROOT / "plots"
 OUTPUT_FILE = PLOTS_DIR / "overlap_turning_relationship.png"
 PARTICLE_RADIUS = 1.0
+ANNOTATION_FONT_SIZE = 6
 
 
 def summary_paths() -> list[Path]:
@@ -76,6 +78,11 @@ def turning_geometry_kernel(area: float, radius: float = PARTICLE_RADIUS) -> flo
     return distance * math.sqrt(chord_half_sq)
 
 
+def parse_study_index(path: Path) -> int:
+    stem = path.stem.replace("_summary", "")
+    return int(stem.split("_")[-1])
+
+
 def main() -> None:
     studies: list[dict[str, float | str]] = []
 
@@ -93,7 +100,7 @@ def main() -> None:
 
         studies.append(
             {
-                "label": path.stem.replace("_summary", ""),
+                "label": parse_study_index(path),
                 "y_init": parse_y_from_init_pos(init_pos),
                 "overlap_total": area_in + area_out,
                 "overlap_balanced": 0.5 * (area_in + area_out),
@@ -131,7 +138,7 @@ def main() -> None:
         color="#dc2626",
         linewidth=2,
         linestyle="--",
-        label="Scaled geometry kernel",
+        label="Geometry-only reference (scaled)",
     )
     for study in studies:
         axes[0].annotate(
@@ -140,6 +147,7 @@ def main() -> None:
             textcoords="offset points",
             xytext=(0, 8),
             ha="center",
+            fontsize=ANNOTATION_FONT_SIZE,
         )
     axes[0].set_title("Total Turning Area vs Balanced Overlap Area")
     axes[0].set_xlabel("Balanced Overlap Area")
@@ -165,7 +173,7 @@ def main() -> None:
         linewidth=2,
         color="#dc2626",
         linestyle="--",
-        label=f"Scaled Geometry Kernel (x{(max_overlap / max_kernel) if max_kernel > 0.0 else 1.0:.1f})",
+        label=f"Geometry-only Reference (scaled x{(max_overlap / max_kernel) if max_kernel > 0.0 else 1.0:.1f})",
     )
     for study in studies:
         axes[1].annotate(
@@ -174,6 +182,7 @@ def main() -> None:
             textcoords="offset points",
             xytext=(0, 8),
             ha="center",
+            fontsize=ANNOTATION_FONT_SIZE,
         )
     axes[1].set_title("Competing Effects Across Study Offset")
     axes[1].set_xlabel("Initial Particle 1 Y")

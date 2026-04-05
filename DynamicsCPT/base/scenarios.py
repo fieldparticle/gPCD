@@ -1,4 +1,5 @@
 from base.FieldBase import FieldBase
+from base.MomBase import MomBase
 
 DEFAULT_WALL_BOX = (-4.0, 4.0, -5.0, 6.0)
 
@@ -72,8 +73,12 @@ def configure_two_particle_horizontal_bonded(base):
     )
 
 
-def build_base(configure_scenario):
-    base = FieldBase()
+def build_base(configure_scenario, base_class=FieldBase):
+    base = base_class()
     configure_scenario(base)
     base.reset()
     return base
+
+
+def build_momentum_base(configure_scenario):
+    return build_base(configure_scenario, base_class=MomBase)

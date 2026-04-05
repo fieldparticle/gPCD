@@ -37,6 +37,8 @@ class Base:
         self.collision_trace = []
         self.trace_sim_time = 0.0
         self.trace_contact_active = False
+        self.step_internal_momentum = 0.0
+        self.step_internal_momentum_by_particle = []
 
     def load_default_particles(self):
         raise NotImplementedError(
@@ -162,10 +164,18 @@ class Base:
             total_abs_p += math.hypot(particle["px"], particle["py"])
         return total_abs_p
 
+    def total_internal_momentum_vector(self):
+        total_internal_px = 0.0
+        total_internal_py = 0.0
+        for particle in self.particles:
+            total_internal_px += particle.get("internal_momentum_x", 0.0)
+            total_internal_py += particle.get("internal_momentum_y", 0.0)
+        return total_internal_px, total_internal_py
+
     def total_internal_momentum(self):
         total_internal_p = 0.0
         for particle in self.particles:
-            total_internal_p += particle["internal_momentum"]
+            total_internal_p += particle.get("internal_momentum", 0.0)
         return total_internal_p
 
     def total_scalar_momentum_with_internal(self):
@@ -528,6 +538,8 @@ class Base:
                 row[f"{prefix}vy"] = particle["py"] / particle["mass"]
                 row[f"{prefix}px"] = particle["px"]
                 row[f"{prefix}py"] = particle["py"]
+                row[f"{prefix}internal_px"] = particle.get("internal_momentum_x", 0.0)
+                row[f"{prefix}internal_py"] = particle.get("internal_momentum_y", 0.0)
                 row[f"{prefix}internal_p"] = particle.get("internal_momentum", 0.0)
                 row[f"{prefix}radius"] = particle["radius"]
                 row[f"{prefix}mass"] = particle["mass"]
@@ -538,6 +550,8 @@ class Base:
                 row[f"{prefix}vy"] = ""
                 row[f"{prefix}px"] = ""
                 row[f"{prefix}py"] = ""
+                row[f"{prefix}internal_px"] = ""
+                row[f"{prefix}internal_py"] = ""
                 row[f"{prefix}internal_p"] = ""
                 row[f"{prefix}radius"] = ""
                 row[f"{prefix}mass"] = ""
@@ -564,10 +578,16 @@ class Base:
             return self.k * area_geom * sub_dt
         return mass * self.rejection_accel_per_area * area_geom * sub_dt
 
-    def update_internal_momentum(self, particle, abs_p_before):
-        abs_p_after = math.hypot(particle["px"], particle["py"])
-        particle["internal_momentum"] += abs_p_before - abs_p_after
+    def update_internal_momentum(self, particle, px_before, py_before):
+        particle["internal_momentum_x"] = particle.get("internal_momentum_x", 0.0) + (px_before - particle["px"])
+        particle["internal_momentum_y"] = particle.get("internal_momentum_y", 0.0) + (py_before - particle["py"])
+        particle["internal_momentum"] = math.hypot(
+            particle["internal_momentum_x"],
+            particle["internal_momentum_y"],
+        )
         if abs(particle["internal_momentum"]) <= self.internal_momentum_tolerance:
+            particle["internal_momentum_x"] = 0.0
+            particle["internal_momentum_y"] = 0.0
             particle["internal_momentum"] = 0.0
 
     def pair_scalar_change_for_impulse(self, particle_i, particle_j, nx, ny, J):
@@ -708,17 +728,8 @@ class Base:
         p_error_x = p_total_x - self.initial_total_momentum_x
         p_error_y = p_total_y - self.initial_total_momentum_y
         p_error_mag = math.hypot(p_error_x, p_error_y)
-        abs_p_total = self.total_abs_momentum_sum()
-        initial_abs_p_total = self.initial_abs_momentum_sum()
-        abs_p_error = abs_p_total - initial_abs_p_total
-        internal_p_total = self.total_internal_momentum()
-        scalar_p_total = self.total_scalar_momentum_with_internal()
-        scalar_p_error = scalar_p_total - initial_abs_p_total
         ke = self.total_kinetic_energy()
         ke_error = ke - self.initial_ke
-
-        area_diff = abs(self.max_area_in - self.max_area_out)
-        J_diff = abs(self.max_J_in - self.max_J_out)
 
         lines = [
             "===== FINAL COLLISION REPORT =====",
@@ -726,32 +737,19 @@ class Base:
             f"initial momentum     = ({self.initial_total_momentum_x:.8f}, {self.initial_total_momentum_y:.8f})",
             f"final momentum       = ({p_total_x:.8f}, {p_total_y:.8f})",
             f"momentum error mag   = {p_error_mag:.8e}",
-            f"initial |p| sum      = {initial_abs_p_total:.8f}",
-            f"final |p| sum        = {abs_p_total:.8f}",
-            f"|p| sum error        = {abs_p_error:.8e}",
-            f"internal |p| sum     = {internal_p_total:.8f}",
-            f"scalar |p|+internal  = {scalar_p_total:.8f}",
-            f"scalar total error   = {scalar_p_error:.8e}",
             f"initial KE           = {self.initial_ke:.8f}",
             f"final KE             = {ke:.8f}",
             f"KE error             = {ke_error:.8e}",
-            f"max area in          = {self.max_area_in:.8f}",
-            f"max area out         = {self.max_area_out:.8f}",
-            f"max area diff        = {area_diff:.8e}",
-            f"max J in             = {self.max_J_in:.8e}",
-            f"max J out            = {self.max_J_out:.8e}",
-            f"max J diff           = {J_diff:.8e}",
-            f"max raw p drift      = {self.max_pair_momentum_drift:.8e}",
-            f"max replay mismatch  = {self.max_outbound_replay_mismatch:.8e}",
-            f"active contacts      = {self.active_contact_count}",
         ]
         for index, particle in enumerate(self.particles):
-            vx = particle["px"] / particle["mass"]
-            vy = particle["py"] / particle["mass"]
-            lines.append(f"particle {index:02d} init pos = ({particle['init_x']:.8f}, {particle['init_y']:.8f})")
-            lines.append(f"particle {index:02d} pos   = ({particle['x']:.8f}, {particle['y']:.8f})")
-            lines.append(f"particle {index:02d} vel   = ({vx:.8f}, {vy:.8f})")
-            lines.append(f"particle {index:02d} mom   = ({particle['px']:.8f}, {particle['py']:.8f})")
+            init_px = particle["mass"] * particle["init_vx"]
+            init_py = particle["mass"] * particle["init_vy"]
+            lines.append(
+                f"particle {index:02d} initial momentum = ({init_px:.8f}, {init_py:.8f})"
+            )
+            lines.append(
+                f"particle {index:02d} final momentum   = ({particle['px']:.8f}, {particle['py']:.8f})"
+            )
         lines.append("==================================")
         return lines
 
@@ -840,15 +838,17 @@ class Base:
                 particle_j["px"] -= nx * spring_J
                 particle_j["py"] -= ny * spring_J
 
-                abs_pi_before_damping = math.hypot(particle_i["px"], particle_i["py"])
-                abs_pj_before_damping = math.hypot(particle_j["px"], particle_j["py"])
+                px_i_before_damping = particle_i["px"]
+                py_i_before_damping = particle_i["py"]
+                px_j_before_damping = particle_j["px"]
+                py_j_before_damping = particle_j["py"]
                 damping_J = self.bond_settings["damping"] * rel_vn * sub_dt
                 particle_i["px"] += nx * damping_J
                 particle_i["py"] += ny * damping_J
                 particle_j["px"] -= nx * damping_J
                 particle_j["py"] -= ny * damping_J
-                self.update_internal_momentum(particle_i, abs_pi_before_damping)
-                self.update_internal_momentum(particle_j, abs_pj_before_damping)
+                self.update_internal_momentum(particle_i, px_i_before_damping, py_i_before_damping)
+                self.update_internal_momentum(particle_j, px_j_before_damping, py_j_before_damping)
 
             for i, j, contact in contacts:
                 if self.is_deep_bond_pair(i, j):
@@ -857,8 +857,10 @@ class Base:
                 nx, ny, alpha, delta, area_geom, area_pcnt, proxPercent, d = contact
                 particle_i = self.particles[i]
                 particle_j = self.particles[j]
-                abs_pi_before = math.hypot(particle_i["px"], particle_i["py"])
-                abs_pj_before = math.hypot(particle_j["px"], particle_j["py"])
+                px_i_before = particle_i["px"]
+                py_i_before = particle_i["py"]
+                px_j_before = particle_j["px"]
+                py_j_before = particle_j["py"]
                 vix = particle_i["px"] / particle_i["mass"]
                 viy = particle_i["py"] / particle_i["mass"]
                 vjx = particle_j["px"] / particle_j["mass"]
@@ -902,15 +904,16 @@ class Base:
                 particle_i["py"] -= (particle_i["mass"] / total_mass) * err_y
                 particle_j["px"] -= (particle_j["mass"] / total_mass) * err_x
                 particle_j["py"] -= (particle_j["mass"] / total_mass) * err_y
-                self.update_internal_momentum(particle_i, abs_pi_before)
-                self.update_internal_momentum(particle_j, abs_pj_before)
+                self.update_internal_momentum(particle_i, px_i_before, py_i_before)
+                self.update_internal_momentum(particle_j, px_j_before, py_j_before)
                 if rel_vn >= 0.0:
                     self.transfer_internal_to_pair(i, j, nx, ny)
 
             for i, wall_name, contact in wall_contacts:
                 nx, ny, alpha, delta, area_geom, area_pcnt, proxPercent, d = contact
                 particle = self.particles[i]
-                abs_p_before = math.hypot(particle["px"], particle["py"])
+                px_before = particle["px"]
+                py_before = particle["py"]
                 vx = particle["px"] / particle["mass"]
                 vy = particle["py"] / particle["mass"]
                 rel_vn = vx * nx + vy * ny
@@ -930,7 +933,7 @@ class Base:
 
                 particle["px"] += nx * J
                 particle["py"] += ny * J
-                self.update_internal_momentum(particle, abs_p_before)
+                self.update_internal_momentum(particle, px_before, py_before)
                 if rel_vn >= 0.0:
                     self.transfer_internal_to_wall(i, nx, ny)
 
@@ -962,6 +965,8 @@ class Base:
         self.collision_trace = []
         self.trace_sim_time = 0.0
         self.trace_contact_active = False
+        self.step_internal_momentum = 0.0
+        self.step_internal_momentum_by_particle = []
         self.activated_bond_pairs = set()
         self.deep_bond_pairs = set()
 
@@ -981,6 +986,8 @@ class Base:
                     "init_y": cfg["y"],
                     "init_vx": cfg["vx"],
                     "init_vy": cfg["vy"],
+                    "internal_momentum_x": 0.0,
+                    "internal_momentum_y": 0.0,
                     "internal_momentum": 0.0,
                 }
             )

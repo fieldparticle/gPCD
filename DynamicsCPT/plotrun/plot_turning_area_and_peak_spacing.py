@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = PROJECT_ROOT / "data"
+DATA_DIR_NAME = "data005"
+DATA_DIR = PROJECT_ROOT / DATA_DIR_NAME
 PLOTS_DIR = PROJECT_ROOT / "plots"
 OUTPUT_FILE = PLOTS_DIR / "turning_area_and_peak_spacing.png"
 INCLUDED_STUDIES: list[int] | None = None

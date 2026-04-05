@@ -19,6 +19,8 @@ class FieldBase(_Base):
         self.wall_field_memory = {}
         self.pair_internal_store = {}
         self.bookkeeping_internal = 0.0
+        self.bookkeeping_internal_x = 0.0
+        self.bookkeeping_internal_y = 0.0
         self.reset_contact_sampling_stats()
         self.pair_contact_memory = self.pair_field_memory
         self.wall_contact_memory = self.wall_field_memory
@@ -65,6 +67,8 @@ class FieldBase(_Base):
         self.wall_field_memory = {}
         self.pair_internal_store = {}
         self.bookkeeping_internal = 0.0
+        self.bookkeeping_internal_x = 0.0
+        self.bookkeeping_internal_y = 0.0
         self.sum_turn_area = 0.0
         self.max_turn_area = 0.0
         self.max_turn_sweep = 0.0
@@ -79,6 +83,10 @@ class FieldBase(_Base):
             if force_value is not None and accel_value is not None:
                 accel_value = None
             particle["internal_direct"] = 0.0
+            particle["internal_direct_x"] = 0.0
+            particle["internal_direct_y"] = 0.0
+            particle["internal_momentum_x"] = 0.0
+            particle["internal_momentum_y"] = 0.0
             particle["internal_momentum"] = 0.0
             particle["repulsion_force_per_area"] = force_value
             particle["repulsion_accel_per_area"] = accel_value
@@ -86,6 +94,8 @@ class FieldBase(_Base):
     def build_collision_trace_row(self, sub_dt, extra=None):
         row = super().build_collision_trace_row(sub_dt, extra=extra)
         row["bookkeeping_internal"] = self.bookkeeping_internal
+        row["bookkeeping_internal_x"] = self.bookkeeping_internal_x
+        row["bookkeeping_internal_y"] = self.bookkeeping_internal_y
         return row
 
     def reset_contact_sampling_stats(self):
@@ -126,11 +136,24 @@ class FieldBase(_Base):
 
     def sync_particle_internal_display(self):
         for particle in self.particles:
-            particle["internal_momentum"] = particle.get("internal_direct", 0.0)
+            particle["internal_momentum_x"] = particle.get("internal_direct_x", 0.0)
+            particle["internal_momentum_y"] = particle.get("internal_direct_y", 0.0)
         for (i, j), value in self.pair_internal_store.items():
-            half_value = 0.5 * value
-            self.particles[i]["internal_momentum"] += half_value
-            self.particles[j]["internal_momentum"] += half_value
+            if isinstance(value, tuple):
+                half_px = 0.5 * value[0]
+                half_py = 0.5 * value[1]
+            else:
+                half_px = 0.5 * value
+                half_py = 0.0
+            self.particles[i]["internal_momentum_x"] += half_px
+            self.particles[i]["internal_momentum_y"] += half_py
+            self.particles[j]["internal_momentum_x"] += half_px
+            self.particles[j]["internal_momentum_y"] += half_py
+        for particle in self.particles:
+            particle["internal_momentum"] = math.hypot(
+                particle["internal_momentum_x"],
+                particle["internal_momentum_y"],
+            )
 
     def field_coupling_from_overlap(
         self,
@@ -164,6 +187,39 @@ class FieldBase(_Base):
 
     def contact_force_from_area(self, area_geom, mass_i, mass_j=None):
         return self.field_coupling_from_overlap(area_geom, mass_i, mass_j)
+
+    def field_contact_step_transfer(
+        self,
+        overlap_area,
+        sub_dt,
+        mass_i,
+        mass_j=None,
+        radius_i=None,
+        radius_j=None,
+        source_distance=None,
+        delta=None,
+        force_per_area=None,
+        accel_per_area=None,
+    ):
+        coupling = self.field_coupling_from_overlap(
+            overlap_area,
+            mass_i,
+            mass_j,
+            radius_i=radius_i,
+            radius_j=radius_j,
+            source_distance=source_distance,
+            delta=delta,
+            force_per_area=force_per_area,
+            accel_per_area=accel_per_area,
+        )
+        return coupling * sub_dt
+
+    def pair_contact_request_scale(self, request, pair_requests):
+        del request, pair_requests
+        return 1.0
+
+    def ordered_pair_requests(self, pair_requests):
+        return pair_requests
 
     def get_particle_field_overlaps(self):
         return self.get_contacts()
@@ -244,29 +300,52 @@ class FieldBase(_Base):
             total_abs_v += math.hypot(particle["init_vx"], particle["init_vy"])
         return total_abs_v
 
-    def total_internal_momentum(self):
-        total = sum(self.pair_internal_store.values())
+    def total_internal_momentum_vector(self):
+        total_x = 0.0
+        total_y = 0.0
+        for value in self.pair_internal_store.values():
+            if isinstance(value, tuple):
+                total_x += value[0]
+                total_y += value[1]
+            else:
+                total_x += value
         for particle in self.particles:
-            total += particle.get("internal_direct", 0.0)
+            total_x += particle.get("internal_direct_x", 0.0)
+            total_y += particle.get("internal_direct_y", 0.0)
+        return total_x, total_y
+
+    def total_internal_momentum(self):
+        total = 0.0
+        for particle in self.particles:
+            total += particle.get("internal_momentum", 0.0)
         return total
 
     def normalize_internal_momentum(self):
         for key, value in list(self.pair_internal_store.items()):
-            if abs(value) <= self.internal_momentum_tolerance:
+            magnitude = math.hypot(value[0], value[1]) if isinstance(value, tuple) else abs(value)
+            if magnitude <= self.internal_momentum_tolerance:
                 del self.pair_internal_store[key]
         for particle in self.particles:
-            if abs(particle.get("internal_direct", 0.0)) <= self.internal_momentum_tolerance:
+            if math.hypot(
+                particle.get("internal_direct_x", 0.0),
+                particle.get("internal_direct_y", 0.0),
+            ) <= self.internal_momentum_tolerance:
                 particle["internal_direct"] = 0.0
+                particle["internal_direct_x"] = 0.0
+                particle["internal_direct_y"] = 0.0
         self.sync_particle_internal_display()
 
-    def update_internal_momentum(self, particle, abs_v_before):
-        abs_v_after = math.hypot(
-            particle["px"] / particle["mass"],
-            particle["py"] / particle["mass"],
+    def update_internal_momentum(self, particle, px_before, py_before):
+        particle["internal_direct_x"] = particle.get("internal_direct_x", 0.0) + (px_before - particle["px"])
+        particle["internal_direct_y"] = particle.get("internal_direct_y", 0.0) + (py_before - particle["py"])
+        particle["internal_direct"] = math.hypot(
+            particle["internal_direct_x"],
+            particle["internal_direct_y"],
         )
-        particle["internal_direct"] = particle.get("internal_direct", 0.0) + (abs_v_before - abs_v_after)
         if abs(particle["internal_direct"]) <= self.internal_momentum_tolerance:
             particle["internal_direct"] = 0.0
+            particle["internal_direct_x"] = 0.0
+            particle["internal_direct_y"] = 0.0
         self.sync_particle_internal_display()
 
     def record_field_sample(self, rel_vn, overlap_area, applied_J, sub_dt, particle_indices=None):
@@ -358,6 +437,8 @@ class FieldBase(_Base):
             "mass": particle["mass"],
             "radius": particle["radius"],
             "internal_momentum": particle["internal_momentum"],
+            "internal_momentum_x": particle.get("internal_momentum_x", 0.0),
+            "internal_momentum_y": particle.get("internal_momentum_y", 0.0),
         }
 
     def turn_sweep(self, prev_nx, prev_ny, nx, ny):
@@ -553,6 +634,10 @@ class FieldBase(_Base):
 
         if self.active_contact_count == 0:
             self.bookkeeping_internal = 0.0
+            self.bookkeeping_internal_x = 0.0
+            self.bookkeeping_internal_y = 0.0
+            self.step_internal_momentum = 0.0
+            self.step_internal_momentum_by_particle = [0.0] * len(self.particles)
             self.normalize_internal_momentum()
 
             if self.collision_started and not self.final_report_printed:
@@ -590,6 +675,10 @@ class FieldBase(_Base):
         self.collision_started = True
         self.trace_contact_active = True
         self.bookkeeping_internal = 0.0
+        self.bookkeeping_internal_x = 0.0
+        self.bookkeeping_internal_y = 0.0
+        self.step_internal_momentum = 0.0
+        self.step_internal_momentum_by_particle = [0.0] * len(self.particles)
         self.current_area = 0.0
         self.current_J = 0.0
         self.phase = "outbound"
@@ -624,7 +713,6 @@ class FieldBase(_Base):
 
         pair_requests = []
         wall_requests = []
-        incident_weight_totals = [0.0] * len(self.particles)
         step_turn_area = 0.0
         step_max_turn_area = 0.0
         step_max_turn_sweep = 0.0
@@ -671,8 +759,9 @@ class FieldBase(_Base):
             step_max_turn_area = max(step_max_turn_area, turn_area)
             step_max_turn_sweep = max(step_max_turn_sweep, turn_sweep)
 
-            force_mag = self.field_coupling_from_overlap(
+            equivalent_J = self.field_contact_step_transfer(
                 effective_pair_area,
+                sub_dt,
                 state_i["mass"],
                 state_j["mass"],
                 radius_i=state_i["radius"],
@@ -681,9 +770,7 @@ class FieldBase(_Base):
                 force_per_area=force_per_area,
                 accel_per_area=accel_per_area,
             )
-            equivalent_J = force_mag * sub_dt
 
-            request_weight = max(equivalent_J, 1.0e-12)
             pair_requests.append(
                 {
                     "i": i,
@@ -695,12 +782,9 @@ class FieldBase(_Base):
                     "area_effective": effective_pair_area,
                     "equivalent_J": equivalent_J,
                     "rel_vn": rel_vn,
-                    "weight": request_weight,
                     "turn_sweep": turn_sweep,
                 }
             )
-            incident_weight_totals[i] += request_weight
-            incident_weight_totals[j] += request_weight
 
         for i, wall_name, contact in wall_contacts:
             wall_key = (i, wall_name)
@@ -712,21 +796,20 @@ class FieldBase(_Base):
             rel_vn = vx * nx + vy * ny
 
             force_per_area, accel_per_area = self.resolve_wall_repulsion_coefficients(self.particles[i])
-            force_mag = self.field_coupling_from_overlap(
+            equivalent_J = self.field_contact_step_transfer(
                 area_geom,
+                sub_dt,
                 state["mass"],
                 radius_i=state["radius"],
                 delta=delta,
                 force_per_area=force_per_area,
                 accel_per_area=accel_per_area,
             )
-            equivalent_J = force_mag * sub_dt
 
             prev_contact = self.wall_field_memory.get(wall_key)
             if prev_contact is not None:
                 prev_nx, prev_ny, prev_area, prev_d = prev_contact
             self.wall_field_memory[wall_key] = (nx, ny, area_geom, d)
-            request_weight = max(equivalent_J, 1.0e-12)
             wall_requests.append(
                 {
                     "i": i,
@@ -735,18 +818,13 @@ class FieldBase(_Base):
                     "area_geom": area_geom,
                     "equivalent_J": equivalent_J,
                     "rel_vn": rel_vn,
-                    "weight": request_weight,
                 }
             )
-            incident_weight_totals[i] += request_weight
 
-        for request in pair_requests:
+        for request in self.ordered_pair_requests(pair_requests):
             i = request["i"]
             j = request["j"]
-            share_i = request["weight"] / max(incident_weight_totals[i], request["weight"])
-            share_j = request["weight"] / max(incident_weight_totals[j], request["weight"])
-            contact_scale = 0.5 * (share_i + share_j)
-            scaled_J = request["equivalent_J"] * contact_scale
+            scaled_J = request["equivalent_J"] * self.pair_contact_request_scale(request, pair_requests)
             effective_area = request["area_effective"]
 
             self.current_area = max(self.current_area, request["area_effective"])
@@ -757,22 +835,9 @@ class FieldBase(_Base):
                 self.max_J_in = max(self.max_J_in, scaled_J)
             else:
                 self.rebound_mode = True
-                if request["area_effective"] > 0.0:
-                    remaining_i = self.remaining_outbound_area_budget(i)
-                    remaining_j = self.remaining_outbound_area_budget(j)
-                    outbound_scale = min(
-                        1.0,
-                        remaining_i / request["area_effective"],
-                        remaining_j / request["area_effective"],
-                    )
-                else:
-                    outbound_scale = 0.0
-                effective_area = request["area_effective"] * outbound_scale
-                scaled_J *= outbound_scale
+                effective_area = request["area_effective"]
                 self.max_area_out = max(self.max_area_out, effective_area)
                 self.max_J_out = max(self.max_J_out, scaled_J)
-                if effective_area <= self.internal_momentum_tolerance and abs(scaled_J) <= self.internal_momentum_tolerance:
-                    continue
 
             self.record_contact_sample(
                 request["rel_vn"],
@@ -799,17 +864,9 @@ class FieldBase(_Base):
                 self.max_J_in = max(self.max_J_in, scaled_J)
             else:
                 self.rebound_mode = True
-                if request["area_geom"] > 0.0:
-                    remaining_i = self.remaining_outbound_area_budget(i)
-                    outbound_scale = min(1.0, remaining_i / request["area_geom"])
-                else:
-                    outbound_scale = 0.0
-                effective_area = request["area_geom"] * outbound_scale
-                scaled_J *= outbound_scale
+                effective_area = request["area_geom"]
                 self.max_area_out = max(self.max_area_out, effective_area)
                 self.max_J_out = max(self.max_J_out, scaled_J)
-                if effective_area <= self.internal_momentum_tolerance and abs(scaled_J) <= self.internal_momentum_tolerance:
-                    continue
 
             self.record_contact_sample(
                 request["rel_vn"],
@@ -821,14 +878,24 @@ class FieldBase(_Base):
             delta_px[i] += request["nx"] * scaled_J
             delta_py[i] += request["ny"] * scaled_J
 
+        self.step_internal_momentum_by_particle = [
+            math.hypot(delta_px[index], delta_py[index]) for index in range(len(self.particles))
+        ]
+        self.step_internal_momentum = sum(self.step_internal_momentum_by_particle)
+
         for index, particle in enumerate(self.particles):
+            particle["internal_direct_x"] = particle.get("internal_direct_x", 0.0) + delta_px[index]
+            particle["internal_direct_y"] = particle.get("internal_direct_y", 0.0) + delta_py[index]
+            particle["internal_direct"] = math.hypot(
+                particle["internal_direct_x"],
+                particle["internal_direct_y"],
+            )
             particle["px"] += delta_px[index]
             particle["py"] += delta_py[index]
             vx = particle["px"] / particle["mass"]
             vy = particle["py"] / particle["mass"]
             particle["x"] += vx * sub_dt
             particle["y"] += vy * sub_dt
-            particle["internal_direct"] = 0.0
 
         self.pair_internal_store = {}
 
