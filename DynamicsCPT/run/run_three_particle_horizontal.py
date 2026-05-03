@@ -12,6 +12,9 @@ OUTPUT_DIR_NAME = "ThreeP005_mom_sum"
 
 DT = 0.005
 SUBSTEPS = 5
+POST_COLLISION_FRAMES = None
+ZOOM = None
+WALL_BOX = None  # None = keep scenario default, False = clear walls, tuple = (start_x, end_x, start_y, end_y)
 SWEEP_PARTICLE_INDEX = 2
 SWEEP_AXIS = "y"
 SWEEP_START = 3.0
@@ -57,6 +60,15 @@ PARTICLE_OVERRIDES = {
 }
 
 
+def apply_wall_override(base):
+    if WALL_BOX is None:
+        return
+    if WALL_BOX is False:
+        base.clear_walls()
+        return
+    base.set_walls(*WALL_BOX)
+
+
 def build_study_particle_overrides(study_index: int, sweep_value: float) -> dict[int, dict[str, float]]:
     overrides: dict[int, dict[str, float]] = {
         SWEEP_PARTICLE_INDEX: {SWEEP_AXIS: sweep_value},
@@ -78,6 +90,8 @@ def configure_run(base):
         base.dt = float(DT)
     if SUBSTEPS is not None:
         base.substeps = int(SUBSTEPS)
+    base.set_scenario_options(post_collision_frames=POST_COLLISION_FRAMES)
+    apply_wall_override(base)
     if BASE_MODEL == "mom" and hasattr(base, "set_momentum_response"):
         base.set_momentum_response(REPULSION_FORCE_PER_AREA)
     if BASE_MODEL == "mom" and hasattr(base, "set_multi_contact_mode"):
@@ -118,6 +132,8 @@ if __name__ == "__main__":
                 base.dt = float(DT)
             if SUBSTEPS is not None:
                 base.substeps = int(SUBSTEPS)
+            base.set_scenario_options(post_collision_frames=POST_COLLISION_FRAMES)
+            apply_wall_override(base)
             if BASE_MODEL == "mom" and hasattr(base, "set_momentum_response"):
                 base.set_momentum_response(REPULSION_FORCE_PER_AREA)
             if BASE_MODEL == "mom" and hasattr(base, "set_multi_contact_mode"):
@@ -129,8 +145,11 @@ if __name__ == "__main__":
             for index, overrides in PARTICLE_OVERRIDES.items():
                 base.particle_configs[index].update(overrides)
 
-        Demo(
+        demo = Demo(
             configure_sweep_run,
             export_data_file=export_data_file,
             base_class=base_class,
-        ).run()
+        )
+        if ZOOM is not None:
+            demo.set_zoom(ZOOM)
+        demo.run()

@@ -126,6 +126,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL ReportCallback(VkDebugReportFlagsEXT flags
 		size_t last = msg.find_last_of('|');
 		size_t endof = msg.size();
 		std::string pch = msg.substr(last+1, endof);
+		if (pch.compare("vkQueueSubmit"))
+			pch.erase(0, 42);
 		mout << pch.c_str() << ende;
 	}
 
@@ -253,7 +255,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 	size_t len = strlen(pCallbackData->pMessage)+4096;
 	
 	char* tmp_message = new char[len];
-	memset(tmp_message, 0, sizeof(len));
+	memset(tmp_message, 0, len);
 	//if (strstr(pCallbackData->pMessage, "VkDebugReportCallbackEXT"))
 	//	return VK_FALSE;
 	sprintf(tmp_message, "%s - Message ID Number: %u,Message ID Name: %s Message ID String :\n%s",

@@ -39,6 +39,9 @@ class Base:
         self.trace_contact_active = False
         self.step_internal_momentum = 0.0
         self.step_internal_momentum_by_particle = []
+        self.hidden_wall_momentum_x = 0.0
+        self.hidden_wall_momentum_y = 0.0
+        self.include_wall_momentum_in_totals = False
 
     def load_default_particles(self):
         raise NotImplementedError(
@@ -78,6 +81,62 @@ class Base:
 
     def clear_walls(self):
         self.walls = None
+
+    def clamp_wall_penetration_limit(self, particle):
+        if self.walls is None:
+            return
+        radius = particle["radius"]
+        particle["x"] = min(
+            max(particle["x"], self.walls["start_x"] - radius),
+            self.walls["end_x"] + radius,
+        )
+        particle["y"] = min(
+            max(particle["y"], self.walls["start_y"] - radius),
+            self.walls["end_y"] + radius,
+        )
+
+    def clamp_pair_penetration_limit(self, iterations=3):
+        if len(self.particles) < 2:
+            return
+
+        for _ in range(max(1, int(iterations))):
+            adjusted = False
+            for i in range(len(self.particles)):
+                particle_i = self.particles[i]
+                for j in range(i + 1, len(self.particles)):
+                    particle_j = self.particles[j]
+                    dx = particle_j["x"] - particle_i["x"]
+                    dy = particle_j["y"] - particle_i["y"]
+                    d = math.hypot(dx, dy)
+
+                    target_distance = max(particle_i["radius"], particle_j["radius"])
+                    if d >= target_distance:
+                        continue
+
+                    if d <= 1.0e-12:
+                        nx = 1.0
+                        ny = 0.0
+                    else:
+                        nx = dx / d
+                        ny = dy / d
+
+                    correction = target_distance - d
+                    total_mass = particle_i["mass"] + particle_j["mass"]
+                    if total_mass <= 0.0:
+                        move_i = 0.5 * correction
+                        move_j = 0.5 * correction
+                    else:
+                        move_i = correction * (particle_j["mass"] / total_mass)
+                        move_j = correction * (particle_i["mass"] / total_mass)
+
+                    particle_i["x"] -= nx * move_i
+                    particle_i["y"] -= ny * move_i
+                    particle_j["x"] += nx * move_j
+                    particle_j["y"] += ny * move_j
+                    adjusted = True
+
+            if not adjusted:
+                break
 
     def set_bonding(
         self,
@@ -150,6 +209,9 @@ class Base:
             for particle in self.particles:
                 total_px += particle["px"]
                 total_py += particle["py"]
+            if self.include_wall_momentum_in_totals:
+                total_px += self.hidden_wall_momentum_x
+                total_py += self.hidden_wall_momentum_y
             return total_px, total_py
 
     def total_kinetic_energy(self):
@@ -797,6 +859,8 @@ class Base:
                     vy = particle["py"] / particle["mass"]
                     particle["x"] += vx * sub_dt
                     particle["y"] += vy * sub_dt
+                    self.clamp_wall_penetration_limit(particle)
+                self.clamp_pair_penetration_limit()
                 if self.trace_contact_active:
                     self.record_collision_trace(
                         sub_dt,
@@ -942,12 +1006,14 @@ class Base:
                 vy = particle["py"] / particle["mass"]
                 particle["x"] += vx * sub_dt
                 particle["y"] += vy * sub_dt
+                self.clamp_wall_penetration_limit(particle)
+            self.clamp_pair_penetration_limit()
             self.record_collision_trace(sub_dt)
             self.advance_trace_time(sub_dt)
 
     def reset(self):
-        if len(self.particle_configs) < 2:
-            raise ValueError("Reset requires at least 2 configured particles.")
+        if len(self.particle_configs) < 1:
+            raise ValueError("Reset requires at least 1 configured particle.")
 
         palette = [
             (self.BLUE_FILL, self.BLUE_EDGE),
@@ -967,12 +1033,19 @@ class Base:
         self.trace_contact_active = False
         self.step_internal_momentum = 0.0
         self.step_internal_momentum_by_particle = []
+        self.hidden_wall_momentum_x = 0.0
+        self.hidden_wall_momentum_y = 0.0
         self.activated_bond_pairs = set()
         self.deep_bond_pairs = set()
 
         for index, cfg in enumerate(self.particle_configs):
             fill_color, edge_color = palette[index % len(palette)]
-            self.particles.append(
+            particle_state = {
+                key: value
+                for key, value in cfg.items()
+                if key not in {"x", "y", "vx", "vy", "mass", "radius"}
+            }
+            particle_state.update(
                 {
                     "x": cfg["x"],
                     "y": cfg["y"],
@@ -990,6 +1063,9 @@ class Base:
                     "internal_momentum_y": 0.0,
                     "internal_momentum": 0.0,
                 }
+            )
+            self.particles.append(
+                particle_state
             )
 
         

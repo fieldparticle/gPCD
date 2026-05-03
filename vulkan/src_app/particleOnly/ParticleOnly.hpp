@@ -56,4 +56,7 @@
 #include "particleOnly/SyncObjParticleOnly.hpp"
 
 
+#include "particleOnly/ResourceVertexCube.hpp"
+
+
 

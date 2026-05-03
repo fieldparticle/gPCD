@@ -11,7 +11,7 @@ def configure_default_walls(base):
 def configure_three_particle_horizontal(base):
     base.clear_particles()
     base.clear_walls()
-    base.set_scenario_options(post_collision_frames=90)
+    base.set_scenario_options(post_collision_frames=None)
     base.add_particle(x=-2.0, y=1.5, vx=1.0, vy=0.0, mass=1.0, radius=1.0)
     base.add_particle(x=2.0, y=0.0, vx=-1.0, vy=0.0, mass=1.0, radius=1.0)
     base.add_particle(x=2.0, y=3.0, vx=-1.0, vy=0.0, mass=1.0, radius=1.0)
@@ -25,9 +25,7 @@ def configure_three_particle_horizontal_in_box(base):
 def configure_two_particle_horizontal(base):
     base.clear_particles()
     base.clear_walls()
-    base.set_scenario_options(post_collision_frames=90)
-    base.add_particle(x=-2.0, y=0.0, vx=1.0, vy=0.0, mass=1.0, radius=1.0)
-    base.add_particle(x=2.0, y=0.0, vx=-1.0, vy=0.0, mass=1.0, radius=1.0)
+    
 
 
 def configure_two_particle_horizontal_in_box(base):

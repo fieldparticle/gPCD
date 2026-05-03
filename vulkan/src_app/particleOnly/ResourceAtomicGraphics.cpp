@@ -177,7 +177,7 @@ void ResourceAtomicGraphics::PullMem(uint32_t currentBuffer)
 
 		}
 
-	if (m_App->m_FrameNumber < m_ReportGraphFramesLessThan )
+	if (m_App->m_FrameNumber < m_ReportGraphFramesLessThan)
 	{
 		
 		mout << "Vertex F:" << m_App->m_FrameNumber

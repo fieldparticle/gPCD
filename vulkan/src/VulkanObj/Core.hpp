@@ -34,7 +34,8 @@
 //#define GLFW_INCLUDE_VULKAN
 #define GLFW_EXPOSE_NATIVE_WIN32
 #define VK_USE_PLATFORM_WIN32_KHR 
-#include <GLFW/glfw3.h>
+#include "..\..\..\..\gPCD3rdParty\glfw\include\GLFW\glfw3.h"
+//#include "GLFW/glfw3.h"
 #include <GLFW/glfw3native.h>
 //#include "stb_image.h"
 #define GLM_FORCE_RADIANS

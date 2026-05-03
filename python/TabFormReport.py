@@ -517,7 +517,7 @@ class TabFormReport(QTabWidget):
 
             self.CfgListObj =  QListWidget()
             #self.ListObj.setFont(self.font)
-            self.CfgListObj.setStyleSheet("background-color:  #FFFFFF")
+            #pipself.CfgListObj.setStyleSheet("background-color:  #FFFFFF")
             self.vcnt = 0  
             self.setSize(self.CfgListObj,225,450)
 

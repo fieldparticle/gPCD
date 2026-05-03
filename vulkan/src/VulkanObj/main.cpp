@@ -51,20 +51,35 @@ int main(int argc, const char* argv[]) try
 	mout << "Starting gPCD\r\n" << ende;
 	MpsApp = new ConfigObj;
 	MpsApp->Create("mps.cfg");
-	CfgApp = new ConfigObj;
-	CfgApp->Create(MpsApp->GetString("studyFile", true));
+	mout << "Working Directory :" << cwd.string().c_str() << ende;
+	for (unsigned int ii = 0; ii++; argc)
+		mout << "MPS Command Line:" << ii << " is :" << argv[ii] << ende;
+
 	// If the are command line options replace items ithe config file
 	bool test = true;
+	// Run the mps.cfg file to get the test filw and other global parameters
 	if (argc > 1)
 	{
-		
-		if (ParseCommandLine(argc, argv, CfgApp) > 0)
+		if (ParseCommandLine(argc, argv, MpsApp) > 0)
 		{
-			mout << "Parse command line failed." << ende;
-			return 1;
+			mout << "No Command Line for MpsApp." << ende;
+
 		}
 	}
-	mout << "Working Directory :" << cwd.string().c_str() << ende;
+	// Run the cfgapp.cfg file to get the test filw and other global parameters
+	CfgApp = new ConfigObj;
+	mout << "Opening study file:" << MpsApp->GetString("studyFile", true) << ende;
+	CfgApp->Create(MpsApp->GetString("studyFile", true));
+	if (argc > 1)
+	{
+		if (ParseCommandLine(argc, argv, CfgApp) > 0)
+		{
+			mout << "No Command Line for CfgApp." << ende;
+
+		}
+
+	}
+
 	//std::string app = CfgApp->GetString("application.app",true);
 	CfgTst = new ConfigObj;
 		
@@ -74,53 +89,36 @@ int main(int argc, const char* argv[]) try
 	// Check working directory
 	
 	mout << "Working Directory :" << cwd.string().c_str() << ende;
-
-	// Get test type
-	std::string testtype = CfgApp->GetString("application.testtype", true);
 	TCPObj* tcps = nullptr;
 
-	if(testtype.compare("VerfPerf") == 0)
+	// Need to go to settings->System->Display->Graphics
+	//Down to GPU Prefernce Set to High performance
+	SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
+	if (CfgApp->GetBool("application.doAuto", true) == true)
 	{
-		// Need to go to settings->System->Display->Graphics
-		//Down to GPU Prefernce Set to High performance
-		SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
-		if (CfgApp->GetBool("application.doAuto", true) == true)
+		mout << "Do study :" << ende;
+		int ret = pf->DoStudy(nullptr, nullptr, false);
+		if (ret == 3 || ret == 0)
 		{
-			mout << "Do study :" << ende;
-			int ret = pf->DoStudy(nullptr, nullptr, false);
-			if (ret == 3 || ret == 0)
-			{
-				return 0;
-			}
-			else
-				return ret;
-
+			return 0;
 		}
 		else
-		{
-			std::string testfile = "application." + testtype + ".testfile";
-			CfgTst->Create(CfgApp->GetString(testfile, true));	
-			if (ParticleOnly(pf,nullptr,nullptr,false))
-			{
-				return 1;
-			}
-		}
-		return 0;
-	}
-	if(testtype.compare("cdn") == 0)
-	{
+			return ret;
 
-		mout << "Performing CD Nozzle Simulation :" << ende;
-		std::string testfile = "application." + testtype + ".testfile";
+	}
+	else
+	{
+		std::string testfile = "application.testfile";
 		CfgTst->Create(CfgApp->GetString(testfile, true));	
 		if (ParticleOnly(pf,nullptr,nullptr,false))
 		{
 			return 1;
 		}
-
-		return 0;
 	}
+	return 0;
 }
+	
+
 #if 1
 catch (const std::exception& e)
 {
@@ -138,16 +136,22 @@ int ParseCommandLine(int argc, const char* argv[], ConfigObj* cfg_file)
 	int ret = 1;
 	mout << "Size of argc:" << argc << ende;
 #if 1
-	for (size_t ii = 1; ii < argc; ii++)
+	for (size_t ii = 0; ii < argc; ii++)
 	{
 		mout << "arg:" << ii << " is :" << argv[ii] << ende;
 
 	}
 #endif
+	if (argc <= 1)
+	{
+		mout << "Not enough command line paramerters" << ende;
+		return 1;
+
+	}
 	for (size_t ii = 1; ii < argc; )
 	{
 		std::string key = argv[ii];
-		key.erase(0, 1);
+		//key.erase(0, 1);
 		ii++;
 		std::string value = argv[ii];
 		mout << "Processed key:" << key.c_str() << " at " << ii << ende;

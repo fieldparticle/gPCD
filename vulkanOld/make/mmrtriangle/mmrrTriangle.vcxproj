@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{e6a896f7-f810-45cb-bd29-a3c0cde52e45}</ProjectGuid>
+    <RootNamespace>mmrrTriangle</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>..\..\run\mmrrTriangle\</OutDir>
+    <IncludePath>..\..\..\..\FPIBG3rdPty\shaderc\third_party\glslang;../../../../FPIBG3rdPty/glfw/include/;..\..\..\..\FPIBG3rdPty\VMA\include;..\..\..\..\FPIBG3rdPty\tinyobjloader-release;..\..\src_app;..\..\src;..\..\..\..\FPIBG3rdPty\stb;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc_util\include;..\..\..\..\FPIBG3rdPty\shaderc\glslc\src;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc\include;..\..\..\..\FPIBG3rdPty\shaderc\third_party\SPIRV-Tools\include;..\..\..\..\FPIBG3rdPty\shaderc\build_vcc;..\..\..\..\FPIBG3rdPty\shaderc;..\..\..\..\FPIBG3rdPty\VulkanSDK\Include;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc_util;..\..\..\..\FPIBG3rdPty\glm;..\..\src\libconfig;$(VK_SDK_PATH)\include;$(IncludePath)</IncludePath>
+    <TargetName>mmrrTrangleD</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>..\..\..\..\FPIBG3rdPty\shaderc\third_party\glslang;../../../../FPIBG3rdPty/glfw/include/;..\..\..\..\FPIBG3rdPty\VMA\include;..\..\..\..\FPIBG3rdPty\tinyobjloader-release;..\..\src_app;..\..\src;..\..\..\..\FPIBG3rdPty\stb;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc_util\include;..\..\..\..\FPIBG3rdPty\shaderc\glslc\src;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc\include;..\..\..\..\FPIBG3rdPty\shaderc\third_party\SPIRV-Tools\include;..\..\..\..\FPIBG3rdPty\shaderc\build_vcc;..\..\..\..\FPIBG3rdPty\shaderc;..\..\..\..\FPIBG3rdPty\VulkanSDK\Include;..\..\..\..\FPIBG3rdPty\shaderc\libshaderc_util;..\..\..\..\FPIBG3rdPty\glm;..\..\src\libconfig;$(VK_SDK_PATH)\include;$(IncludePath)</IncludePath>
+    <OutDir>..\..\run\mmrrTriangle\</OutDir>
+    <TargetName>mmrrTriangleR</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>Shlwapi.lib;$(VULKAN_SDK)\Lib\vulkan-1.lib;..\..\..\..\FPIBG3rdPty\glfw\build\src\Debug\glfw3.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\glslc\Debug\glslc.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\libshaderc_util\Debug\shaderc_util.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\libshaderc\Debug\shaderc.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\glslang\Debug\glslangd.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\SPIRV\Debug\SPIRVd.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\spirv-tools\source\opt\Debug\SPIRV-Tools-opt.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\spirv-tools\source\Debug\SPIRV-Tools.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\glslang\Debug\MachineIndependentd.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\glslang\OSDependent\Windows\Debug\OSDependentd.lib;..\..\..\..\FPIBG3rdPty\shaderc\build\third_party\glslang\glslang\Debug\GenericCodeGend.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>Shlwapi.lib;..\..\..\..\RCCD3rdPty\glfw-master\build\src\Debug\glfw3.lib;..\..\..\..\RCCD3rdPty\shaderc-main\build_vcc\glslc\Release\glslc.lib;..\..\..\..\RCCD3rdPty\shaderc-main\build_vcc\libshaderc_util\Release\shaderc_util.lib;..\..\..\..\RCCD3rdPty\shaderc-main\build_vcc\libshaderc\Release\shaderc.lib;..\..\..\..\RCCD3rdPty\shaderc-main\build_vcc\third_party\glslang\glslang\Release\glslang.lib;..\..\..\..\RCCD3rdPty\shaderc-main\build_vcc\third_party\glslang\SPIRV\Release\SPIRV.lib;..\..\..\..\RCCD3rdPty\shaderc-main\build_vcc\third_party\spirv-tools\source\opt\Release\SPIRV-Tools-opt.lib;..\..\..\..\RCCD3rdPty\shaderc-main\build_vcc\third_party\spirv-tools\source\Release\SPIRV-Tools.lib;..\..\..\..\RCCD3rdPty\shaderc-main\build_vcc\third_party\glslang\glslang\Release\MachineIndependent.lib;..\..\..\..\RCCD3rdPty\shaderc-main\build_vcc\third_party\glslang\glslang\OSDependent\Windows\Release\OSDependent.lib;..\..\..\..\RCCD3rdPty\shaderc-main\build_vcc\third_party\glslang\glslang\Release\GenericCodeGen.lib;$(VULKAN_SDK)\Lib\vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\VulkanObj\DoPerf.cpp" />
+    <ClCompile Include="..\..\src_app\mmrrTriangle\mmrr_triangle.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\run\mmrrTriangle\shaders\mmrrTriangle.frag" />
+    <None Include="..\..\run\mmrrTriangle\shaders\mmrrTriangle.vert" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\VulkanObj\DoPerf.hpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

@@ -120,7 +120,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>PARTICLE_ONLY;GLFW_INCLUDE_VULKAN;VK_VERSION_1_3;YY_USE_CONST;WIN32;WIN64;YY_NO_UNISTD_H;LIBCONFIG_EXPORTS;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);</PreprocessorDefinitions>
+      <PreprocessorDefinitions>GLFW_INCLUDE_VULKAN;VK_VERSION_1_3;YY_USE_CONST;WIN32;WIN64;YY_NO_UNISTD_H;LIBCONFIG_EXPORTS;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ShowIncludes>false</ShowIncludes>

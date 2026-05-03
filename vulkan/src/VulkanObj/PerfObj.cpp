@@ -265,7 +265,7 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 	else
 	{
 
-		filename.push_back(CfgApp->GetString("application.VerfPerf.testfile", true));
+		filename.push_back(CfgApp->GetString("application.testfile", true));
 
 
 	}

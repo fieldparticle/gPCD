@@ -111,9 +111,10 @@ void ResourceParticleUBO::createBuffers()
 void ResourceParticleUBO::PushMem(uint32_t currentBuffer)
 {
 	
-	//if(m_done == true)
-	//return;
+	float aspect = m_SCO->GetSwapWidth() / m_SCO->GetSwapHeight();
 	float sidelength = m_Particle->m_SideLength;
+	
+	
 	m_UBO = {};
 	///================================ Subpass 1
 	m_UBO.model = glm::rotate(glm::mat4(1.0f), glm::radians(rRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
@@ -135,6 +136,7 @@ void ResourceParticleUBO::PushMem(uint32_t currentBuffer)
 							static_cast<float>(sidelength) / 1.5f,G_OrthoMin,G_OrthoMax);
 	
 	m_UBO.proj[1][1] *= -1.0f;
+	
 	void* data = nullptr;
 	uint32_t bufsize = sizeof(m_UBO) + m_NumElements * sizeof(uint32_t);
 

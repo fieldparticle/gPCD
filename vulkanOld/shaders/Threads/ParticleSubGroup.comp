@@ -1,0 +1,131 @@
+/*******************************************************************
+%***      C PROPRIETARY SOURCE FILE IDENTIFICATION               ***
+%*******************************************************************
+% $Author: jb $
+%
+% $Date: 2023-05-03 15:30:42 -0400 (Wed, 03 May 2023) $
+% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src/vulkan/DescriptorSSBO.cpp $
+% $Id: DescriptorSSBO.cpp 28 2023-05-03 19:30:42Z jb $
+%*******************************************************************
+%***                         DESCRIPTION                         ***
+%*******************************************************************
+@doc
+@module
+			@author: Jackie Michael Bell<nl>
+			COPYRIGHT <cp> Jackie Michael Bell<nl>
+			Property of Jackie Michael Bell<rtm>. All Rights Reserved.<nl>
+			This source code file contains proprietary<nl>
+			and confidential information.<nl>
+
+
+@head3 		Description. |
+@normal
+
+
+********************************************************************
+%***                     SVN CHANGE RECORD                       ***
+%*******************************************************************
+%*$Revision: 28 $
+%*
+%*
+%******************************************************************/
+
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_420pack : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_scalar_block_layout :enable
+#extension GL_KHR_memory_scope_semantics:enable
+#extension GL_EXT_shader_atomic_float:enable
+#extension GL_KHR_shader_subgroup_basic:enable
+#extension GL_KHR_shader_subgroup_vote:enable
+#extension GL_KHR_shader_subgroup_ballot:enable
+
+#include "../params.glsl"
+#include "../common/constants.glsl"
+#include "../common/util.glsl"
+#include "../common/push.glsl"
+#include "../common/atomic.glsl"
+#include "../common/CollimageIndex.glsl"
+#include "../common/Lockimage.glsl"
+#include "../common/particle.glsl"
+#include "../common/GetCflg.glsl"
+#include "../common/CalcMomentum.glsl"
+
+
+layout(binding = 4) uniform UniformBufferObject{
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+} ubo;
+
+
+// Configure workgroups.
+#include "../workgroups.glsl"
+
+
+shared uint dups[8];	
+layout(set=0, binding=0) buffer BUFFER { uint free; uint data[]; } b;
+void main()  
+{
+	uint slot =0;
+	uint loc  = 0;
+	
+	// Get invocation id which is particle numbner
+	uint index = gl_GlobalInvocationID.x;
+	if(index == 0)
+	{
+		//for(uint ii = 0; ii < NUMPARTS;ii++)
+			//L[ii] = 0;
+		collOut.numParticles = 0;
+		collOut.CollisionCount=0;
+		collOut.holdPidx = 0;
+		collOut.vnumParticles=0;
+		 P[0].PosLoc.x  = 0.0;
+		 P[0].PosLoc.y  = 0.0;
+		 P[0].PosLoc.z   = 0.0;
+		 P[0].PosLoc.w  = 0.0;
+		return;
+	}
+	//slot = atomicAdd(L[gl_SubgroupInvocationID],1);
+	//slot = atomicAdd(L[gl_SubgroupInvocationID],1);
+	//subgroupBroadcast(slot,gl_SubgroupInvocationID);
+	
+	#if 0 && defined(DEBUG)	
+	if(uint(ShaderFlags.frameNum) == 8 && index == 1)
+	{
+		//debugPrintfEXT("gl_NumSubgroups:%u,gl_SubgroupID:%u,gl_SubgroupInvocationID:%u,gl_SubgroupSize:%u",
+		//		gl_NumSubgroups,gl_SubgroupID,gl_SubgroupInvocationID,gl_SubgroupSize);
+		//debugPrintfEXT("gl_GlobalInvocationID <%u,%u,%u>,pcount:%u, tcount:%u",
+				//gl_GlobalInvocationID.x,gl_GlobalInvocationID.y,gl_GlobalInvocationID.z,
+				//particleCount,threadCount);
+		//debugPrintfEXT("gl_SubgroupInvocationID:%u, gl_WorkGroupID:<%u,%u,%u>, slot:%u",
+			//	gl_SubgroupInvocationID,gl_WorkGroupID.x, gl_WorkGroupID.y, gl_WorkGroupID.z,slot);
+
+	}
+	#endif	
+	
+	//if(gl_SubgroupInvocationID == 5)
+	for(uint ii=0;ii<slot;ii++)
+	{
+		if(dups[ii]== 2)
+		{
+			dups[ii] = 0;
+		}
+	}
+	
+	if(gl_SubgroupInvocationID == 3)
+		slot = 2;
+	else
+		slot = gl_SubgroupInvocationID;
+	
+	dups[slot] = gl_SubgroupInvocationID;
+	subgroupMemoryBarrier();
+	if(uint(ShaderFlags.frameNum) == 8 && index == 3)
+		debugPrintfEXT("%u,%u,%u,%u,%u,%u,%u,%u,slot:%u",
+		dups[0],dups[1],dups[2],dups[3],dups[4],dups[5],dups[6],dups[7],slot);
+		
+	
+	
+
+}

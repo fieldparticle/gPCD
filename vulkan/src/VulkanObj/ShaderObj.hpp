@@ -50,7 +50,7 @@ public:
 
 
 	ShaderObj(VulkanObj* App, std::string Name) : BaseObj(Name, 0, App) {};
-	void GenWorkGroups(std::string testType);
+	void GenWorkGroups();
 	void WriteShaderHeader();
 	void WriteShaderHeaderCDNOZ();
 	int RemoteCompileShaders();

@@ -13,8 +13,8 @@ from numpy import long
 
 # Define an isstr() and isint() that work on both Python2 and Python3.
 # See http://stackoverflow.com/questions/11301138
-'''
-try:
+LONGTYPE = long
+''' try:
     basestring  # attempt to evaluate basestring
 
     def isstr(s):
@@ -22,9 +22,9 @@ try:
 
     def isint(i):
         return isinstance(i, (int, long))
-'''
-LONGTYPE = long
-'''
+
+    LONGTYPE = long
+
 except NameError:
 
     def isstr(s):
@@ -531,8 +531,8 @@ class LibconfArray(list):
     pass
 
 
-#class LibconfInt64(LONGTYPE):
-   # pass
+class LibconfInt64(LONGTYPE):
+    pass
 
 
 def is_long_int(i):
@@ -592,14 +592,14 @@ def get_dump_type(value):
     # Test bool before int since isinstance(True, int) == True.
     if isinstance(value, bool):
         return 'b'
-    if isint(value):
+    if isinstance(value, int):
         if is_long_int(value):
             return 'i64'
         else:
             return 'i'
     if isinstance(value, float):
         return 'f'
-    if isstr(value):
+    if isinstance(value, str):
         return 's'
 
     return None
@@ -704,7 +704,7 @@ def dump_dict(cfg, f, indent=0):
     '''Save a dictionary of attributes'''
 
     for key in cfg:
-        if not isstr(key):
+        if not isinstance(key, str):
             raise ConfigSerializeError("Dict keys must be strings: %r" %
                                        (key,))
         dump_value(key, cfg[key], f, indent)

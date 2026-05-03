@@ -35,10 +35,8 @@
 void PipelineComputeParticle::CreatePipeline()
 {
 
-
-    std::string testtype = CfgApp->GetString("application.testtype", true);
-    std::string t_cshader_spv   = "application." + testtype +".comp_kernParticlespv";
-    std::string t_cshader_glsl  = "application." + testtype +".comp_kernParticle";
+    std::string t_cshader_spv   = "application.comp_kernParticlespv";
+    std::string t_cshader_glsl  = "application.comp_kernParticle";
   
 
     std::string cshader_spv = CfgApp->GetString(t_cshader_spv, true);;

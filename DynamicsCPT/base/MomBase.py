@@ -67,8 +67,14 @@ class MomBase(FieldBase):
         force_per_area=None,
         accel_per_area=None,
     ):
-        del mass_i, mass_j, force_per_area, accel_per_area
-        return self.momentum_per_area * overlap_area * self.inverse_square_weight(
+        del mass_i, mass_j
+        if force_per_area is not None:
+            momentum_per_area = float(force_per_area)
+        elif accel_per_area is not None:
+            momentum_per_area = float(accel_per_area)
+        else:
+            momentum_per_area = self.momentum_per_area
+        return momentum_per_area * overlap_area * self.inverse_square_weight(
             source_distance=source_distance,
             radius_i=radius_i,
             radius_j=radius_j,

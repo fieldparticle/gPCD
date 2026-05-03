@@ -36,18 +36,18 @@
 
 void PipelineGraphicsParticleOnly::CreatePipeline()
 {
-    std::string testtype = CfgApp->GetString("application.testtype", true);
-    std::string t_fshader_spv   = "application." + testtype +".frag_kernParticlespv";
-    std::string t_fshader_glsl  = "application." + testtype +".frag_kernParticle";
-    std::string t_vshader_spv     = "application." + testtype +".vert_kernParticlespv";
-    std::string t_vshader_glsl    = "application." + testtype +".vert_kernParticle";
+    
+    std::string fshader_spv   = CfgApp->GetString("application.frag_kernParticlespv", true);
+    std::string fshader_glsl  = CfgApp->GetString("application.frag_kernParticle", true);
+    std::string vshader_spv     = CfgApp->GetString("application.vert_kernParticlespv", true);
+    std::string vshader_glsl    = CfgApp->GetString("application.vert_kernParticle", true);
 
     m_RenderPassName = "SubpassParticle";
-    std::string fshader_spv = CfgApp->GetString(t_fshader_spv, true);
-    std::string fshader_glsl = CfgApp->GetString(t_fshader_glsl, true);
+    //std::string fshader_spv = CfgApp->GetString(t_fshader_spv, true);
+    //td::string fshader_glsl = CfgApp->GetString(t_fshader_glsl, true);
 
-    std::string vshader_spv = CfgApp->GetString(t_vshader_spv, true);
-    std::string vshader_glsl = CfgApp->GetString(t_vshader_glsl, true);
+    //std::string vshader_spv = CfgApp->GetString(t_vshader_spv, true);
+    //std::string vshader_glsl = CfgApp->GetString(t_vshader_glsl, true);
 
     std::vector<char>  fragShaderCode;
     m_SHO->CompileShader(fshader_glsl, fshader_spv, fragShaderCode, m_SHO->SH_FRAG);

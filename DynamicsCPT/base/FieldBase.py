@@ -15,6 +15,7 @@ class FieldBase(_Base):
         self.contact_refine_steps = 1
         self.release_fraction_per_substep = 0.35
         self.release_fraction_non_turning = 0.18
+        self.wall_collision_mode = "plane"
         self.pair_field_memory = {}
         self.wall_field_memory = {}
         self.pair_internal_store = {}
@@ -36,6 +37,15 @@ class FieldBase(_Base):
             self.field_repulsion_accel_per_area = self.default_accel_per_area
             self.field_repulsion_force_per_area = None
 
+    def set_wall_collision_mode(self, mode):
+        mode = str(mode).strip().lower()
+        if mode not in {"plane", "wall_center_on_line", "proxy_equal_particle"}:
+            raise ValueError(
+                "wall_collision_mode must be 'plane', 'wall_center_on_line', or 'proxy_equal_particle'."
+            )
+        self.wall_collision_mode = mode
+        self.include_wall_momentum_in_totals = mode in {"wall_center_on_line", "proxy_equal_particle"}
+
     def add_particle(
         self,
         x,
@@ -46,8 +56,9 @@ class FieldBase(_Base):
         radius,
         repulsion_force_per_area=None,
         repulsion_accel_per_area=None,
+        **extra_config,
     ):
-        super().add_particle(x=x, y=y, vx=vx, vy=vy, mass=mass, radius=radius)
+        super().add_particle(x=x, y=y, vx=vx, vy=vy, mass=mass, radius=radius, **extra_config)
         cfg = self.particle_configs[-1]
         if repulsion_force_per_area is not None and repulsion_accel_per_area is not None:
             raise ValueError("Specify either repulsion_force_per_area or repulsion_accel_per_area, not both.")
@@ -96,6 +107,8 @@ class FieldBase(_Base):
         row["bookkeeping_internal"] = self.bookkeeping_internal
         row["bookkeeping_internal_x"] = self.bookkeeping_internal_x
         row["bookkeeping_internal_y"] = self.bookkeeping_internal_y
+        row["hidden_wall_px"] = self.hidden_wall_momentum_x
+        row["hidden_wall_py"] = self.hidden_wall_momentum_y
         return row
 
     def reset_contact_sampling_stats(self):
@@ -126,6 +139,65 @@ class FieldBase(_Base):
         if not force_values:
             return self.field_repulsion_force_per_area, self.field_repulsion_accel_per_area
         return sum(force_values) / len(force_values), None
+
+    def resolve_pair_attraction_coefficients(self, particle_i, particle_j):
+        force_i = particle_i.get("attraction_force_per_area")
+        force_j = particle_j.get("attraction_force_per_area")
+        force_values = [value for value in (force_i, force_j) if value is not None]
+        if not force_values:
+            return None, None
+        return sum(force_values) / len(force_values), None
+
+    def resolve_pair_attraction_damping(self, particle_i, particle_j):
+        damping_i = particle_i.get("attraction_damping_per_speed")
+        damping_j = particle_j.get("attraction_damping_per_speed")
+        damping_values = [value for value in (damping_i, damping_j) if value is not None]
+        if not damping_values:
+            return 0.0
+        return sum(float(value) for value in damping_values) / len(damping_values)
+
+    def pair_attraction_overlap_metrics(self, state_i, state_j):
+        attraction_i = state_i.get("attraction_radius")
+        attraction_j = state_j.get("attraction_radius")
+        if attraction_i is None or attraction_j is None:
+            return 0.0, 0.0
+        attraction_i = float(attraction_i)
+        attraction_j = float(attraction_j)
+        if attraction_i <= 0.0 or attraction_j <= 0.0:
+            return 0.0, 0.0
+
+        contact_ij = self.particle_contact(
+            state_i["x"],
+            state_i["y"],
+            state_j["x"],
+            state_j["y"],
+            state_i["radius"],
+            attraction_j,
+        )
+        contact_ji = self.particle_contact(
+            state_i["x"],
+            state_i["y"],
+            state_j["x"],
+            state_j["y"],
+            attraction_i,
+            state_j["radius"],
+        )
+
+        areas = []
+        weights = []
+        if contact_ij is not None:
+            areas.append(contact_ij[4])
+            min_radius = max(min(state_i["radius"], attraction_j), 1.0e-12)
+            normalized_depth = max(0.0, min(1.0, contact_ij[3] / min_radius))
+            weights.append(math.sin(math.pi * normalized_depth))
+        if contact_ji is not None:
+            areas.append(contact_ji[4])
+            min_radius = max(min(attraction_i, state_j["radius"]), 1.0e-12)
+            normalized_depth = max(0.0, min(1.0, contact_ji[3] / min_radius))
+            weights.append(math.sin(math.pi * normalized_depth))
+        if not areas:
+            return 0.0, 0.0
+        return sum(areas) / len(areas), sum(weights) / len(weights)
 
     def resolve_wall_repulsion_coefficients(self, particle):
         force_value = particle.get("repulsion_force_per_area")
@@ -225,7 +297,63 @@ class FieldBase(_Base):
         return self.get_contacts()
 
     def get_wall_field_overlaps(self):
-        return self.get_wall_contacts()
+        if self.wall_collision_mode == "plane":
+            return self.get_wall_contacts()
+
+        contacts = []
+        if self.walls is None:
+            return contacts
+
+        for index, particle in enumerate(self.particles):
+            x = particle["x"]
+            y = particle["y"]
+            radius = particle["radius"]
+
+            left_contact = self.particle_contact(
+                self.walls["start_x"],
+                y,
+                x,
+                y,
+                radius,
+                radius,
+            )
+            if left_contact is not None:
+                contacts.append((index, "left", left_contact))
+
+            right_contact = self.particle_contact(
+                self.walls["end_x"],
+                y,
+                x,
+                y,
+                radius,
+                radius,
+            )
+            if right_contact is not None:
+                contacts.append((index, "right", right_contact))
+
+            bottom_contact = self.particle_contact(
+                x,
+                self.walls["start_y"],
+                x,
+                y,
+                radius,
+                radius,
+            )
+            if bottom_contact is not None:
+                contacts.append((index, "bottom", bottom_contact))
+
+            top_contact = self.particle_contact(
+                x,
+                self.walls["end_y"],
+                x,
+                y,
+                radius,
+                radius,
+            )
+            if top_contact is not None:
+                contacts.append((index, "top", top_contact))
+
+        return contacts
 
     def elastic_pair_event_impulse(self, state_i, state_j, nx, ny):
         vix = state_i["px"] / state_i["mass"]
@@ -371,6 +499,13 @@ class FieldBase(_Base):
     def record_contact_sample(self, rel_vn, area_geom, applied_J, sub_dt, particle_indices=None):
         self.record_field_sample(rel_vn, area_geom, applied_J, sub_dt, particle_indices=particle_indices)
 
+    def proxy_equal_particle_wall_area(self, radius, delta):
+        proxy_center_distance = max(0.0, 2.0 * float(radius) - float(delta))
+        contact = self.particle_contact(0.0, 0.0, proxy_center_distance, 0.0, float(radius), float(radius))
+        if contact is None:
+            return 0.0, proxy_center_distance
+        return float(contact[4]), proxy_center_distance
+
     def remaining_outbound_area_budget(self, particle_index):
         return max(
             0.0,
@@ -397,6 +532,10 @@ class FieldBase(_Base):
 
     def build_final_report_lines(self):
         lines = super().build_final_report_lines()
+        if self.include_wall_momentum_in_totals:
+            lines = lines[:-1] + [
+                f"hidden wall momentum = ({self.hidden_wall_momentum_x:.8f}, {self.hidden_wall_momentum_y:.8f})"
+            ] + [lines[-1]]
         extra_lines = [
             f"field samples in      = {self.contact_samples_in}",
             f"field samples out     = {self.contact_samples_out}",
@@ -436,6 +575,9 @@ class FieldBase(_Base):
             "py": particle["py"],
             "mass": particle["mass"],
             "radius": particle["radius"],
+            "attraction_radius": particle.get("attraction_radius"),
+            "attraction_force_per_area": particle.get("attraction_force_per_area"),
+            "repulsion_force_per_area": particle.get("repulsion_force_per_area"),
             "internal_momentum": particle["internal_momentum"],
             "internal_momentum_x": particle.get("internal_momentum_x", 0.0),
             "internal_momentum_y": particle.get("internal_momentum_y", 0.0),
@@ -651,6 +793,8 @@ class FieldBase(_Base):
                 vy = particle["py"] / particle["mass"]
                 particle["x"] += vx * sub_dt
                 particle["y"] += vy * sub_dt
+                self.clamp_wall_penetration_limit(particle)
+            self.clamp_pair_penetration_limit()
             if self.trace_contact_active:
                 self.record_collision_trace(
                     sub_dt,
@@ -679,6 +823,7 @@ class FieldBase(_Base):
         self.bookkeeping_internal_y = 0.0
         self.step_internal_momentum = 0.0
         self.step_internal_momentum_by_particle = [0.0] * len(self.particles)
+        self.step_attraction_momentum = 0.0
         self.current_area = 0.0
         self.current_J = 0.0
         self.phase = "outbound"
@@ -717,74 +862,133 @@ class FieldBase(_Base):
         step_max_turn_area = 0.0
         step_max_turn_sweep = 0.0
 
-        for i, j, contact in contacts:
-            if self.is_deep_bond_pair(i, j):
-                continue
-            pair_key = (min(i, j), max(i, j))
-            self.activated_bond_pairs.add(pair_key)
-            active_pair_keys.add(pair_key)
-            nx, ny, alpha, delta, area_geom, area_pcnt, proxPercent, d = contact
-            state_i = snapshot[i]
-            state_j = snapshot[j]
-            vix = state_i["px"] / state_i["mass"]
-            viy = state_i["py"] / state_i["mass"]
-            vjx = state_j["px"] / state_j["mass"]
-            vjy = state_j["py"] / state_j["mass"]
-            rel_vn = (vjx - vix) * nx + (vjy - viy) * ny
+        contact_map = {(min(i, j), max(i, j)): contact for i, j, contact in contacts}
 
-            force_per_area, accel_per_area = self.resolve_pair_repulsion_coefficients(
-                self.particles[i],
-                self.particles[j],
-            )
+        for i in range(len(snapshot)):
+            for j in range(i + 1, len(snapshot)):
+                if self.is_deep_bond_pair(i, j):
+                    continue
+                pair_key = (i, j)
+                contact = contact_map.get(pair_key)
+                state_i = snapshot[i]
+                state_j = snapshot[j]
 
-            prev_contact = self.pair_field_memory.get(pair_key)
-            turn_sweep = 0.0
-            turn_area = 0.0
-            if prev_contact is not None:
-                prev_nx, prev_ny, prev_area, prev_d = prev_contact
-                turn_sweep = self.turn_sweep(prev_nx, prev_ny, nx, ny)
-                if abs(state_i["radius"] - state_j["radius"]) <= 1.0e-12:
-                    d_mid = 0.5 * (prev_d + d)
-                    turn_area = self.equal_radius_turn_area(
-                        state_i["radius"],
-                        d_mid,
-                        turn_sweep,
+                dx = state_j["x"] - state_i["x"]
+                dy = state_j["y"] - state_i["y"]
+                d = math.hypot(dx, dy)
+                if d <= 1.0e-14:
+                    nx = 1.0
+                    ny = 0.0
+                else:
+                    nx = dx / d
+                    ny = dy / d
+
+                if contact is not None:
+                    nx, ny, alpha, delta, area_geom, area_pcnt, proxPercent, d = contact
+                    self.activated_bond_pairs.add(pair_key)
+                    active_pair_keys.add(pair_key)
+                else:
+                    alpha = (math.atan2(ny, nx) + 2.0 * math.pi) % (2.0 * math.pi)
+                    delta = 0.0
+                    area_geom = 0.0
+                    area_pcnt = 0.0
+                    proxPercent = 1.0
+                vix = state_i["px"] / state_i["mass"]
+                viy = state_i["py"] / state_i["mass"]
+                vjx = state_j["px"] / state_j["mass"]
+                vjy = state_j["py"] / state_j["mass"]
+                rel_vn = (vjx - vix) * nx + (vjy - viy) * ny
+
+                force_per_area, accel_per_area = self.resolve_pair_repulsion_coefficients(
+                    self.particles[i],
+                    self.particles[j],
+                )
+                attraction_force_per_area, attraction_accel_per_area = self.resolve_pair_attraction_coefficients(
+                    self.particles[i],
+                    self.particles[j],
+                )
+                attraction_damping = self.resolve_pair_attraction_damping(
+                    self.particles[i],
+                    self.particles[j],
+                )
+
+                prev_contact = self.pair_field_memory.get(pair_key)
+                turn_sweep = 0.0
+                turn_area = 0.0
+                if contact is not None and prev_contact is not None:
+                    prev_nx, prev_ny, prev_area, prev_d = prev_contact
+                    turn_sweep = self.turn_sweep(prev_nx, prev_ny, nx, ny)
+                    if abs(state_i["radius"] - state_j["radius"]) <= 1.0e-12:
+                        d_mid = 0.5 * (prev_d + d)
+                        turn_area = self.equal_radius_turn_area(
+                            state_i["radius"],
+                            d_mid,
+                            turn_sweep,
+                        )
+                if contact is not None:
+                    self.pair_field_memory[pair_key] = (nx, ny, area_geom, d)
+                effective_pair_area = area_geom
+                self.sum_turn_area += turn_area
+                self.max_turn_area = max(self.max_turn_area, turn_area)
+                self.max_turn_sweep = max(self.max_turn_sweep, turn_sweep)
+                step_turn_area += turn_area
+                step_max_turn_area = max(step_max_turn_area, turn_area)
+                step_max_turn_sweep = max(step_max_turn_sweep, turn_sweep)
+
+                equivalent_J = 0.0
+                if effective_pair_area > 0.0:
+                    equivalent_J += self.field_contact_step_transfer(
+                        effective_pair_area,
+                        sub_dt,
+                        state_i["mass"],
+                        state_j["mass"],
+                        radius_i=state_i["radius"],
+                        radius_j=state_j["radius"],
+                        source_distance=d,
+                        force_per_area=force_per_area,
+                        accel_per_area=accel_per_area,
                     )
-            self.pair_field_memory[pair_key] = (nx, ny, area_geom, d)
-            effective_pair_area = area_geom
-            self.sum_turn_area += turn_area
-            self.max_turn_area = max(self.max_turn_area, turn_area)
-            self.max_turn_sweep = max(self.max_turn_sweep, turn_sweep)
-            step_turn_area += turn_area
-            step_max_turn_area = max(step_max_turn_area, turn_area)
-            step_max_turn_sweep = max(step_max_turn_sweep, turn_sweep)
+                attraction_area, attraction_weight = self.pair_attraction_overlap_metrics(state_i, state_j)
+                attraction_J = 0.0
+                attraction_damping_J = 0.0
+                if attraction_area > 0.0 and attraction_force_per_area is not None:
+                    attraction_J = self.field_contact_step_transfer(
+                        attraction_area * attraction_weight,
+                        sub_dt,
+                        state_i["mass"],
+                        state_j["mass"],
+                        radius_i=state_i.get("attraction_radius", state_i["radius"]),
+                        radius_j=state_j.get("attraction_radius", state_j["radius"]),
+                        source_distance=d,
+                        force_per_area=attraction_force_per_area,
+                        accel_per_area=attraction_accel_per_area,
+                    )
+                    equivalent_J -= attraction_J
+                    if attraction_damping > 0.0:
+                        attraction_damping_J = -attraction_damping * rel_vn * attraction_weight * sub_dt
+                        equivalent_J += attraction_damping_J
 
-            equivalent_J = self.field_contact_step_transfer(
-                effective_pair_area,
-                sub_dt,
-                state_i["mass"],
-                state_j["mass"],
-                radius_i=state_i["radius"],
-                radius_j=state_j["radius"],
-                source_distance=d,
-                force_per_area=force_per_area,
-                accel_per_area=accel_per_area,
-            )
+                if effective_pair_area <= 0.0 and attraction_area <= 0.0:
+                    continue
 
-            pair_requests.append(
-                {
-                    "i": i,
-                    "j": j,
-                    "nx": nx,
-                    "ny": ny,
-                    "area_geom": area_geom,
-                    "turn_area": turn_area,
-                    "area_effective": effective_pair_area,
-                    "equivalent_J": equivalent_J,
-                    "rel_vn": rel_vn,
-                    "turn_sweep": turn_sweep,
-                }
-            )
+                pair_requests.append(
+                    {
+                        "i": i,
+                        "j": j,
+                        "nx": nx,
+                        "ny": ny,
+                        "area_geom": area_geom,
+                        "turn_area": turn_area,
+                        "area_effective": effective_pair_area,
+                        "equivalent_J": equivalent_J,
+                        "attraction_area": attraction_area,
+                        "attraction_weight": attraction_weight,
+                        "attraction_J": attraction_J,
+                        "attraction_damping_J": attraction_damping_J,
+                        "rel_vn": rel_vn,
+                        "turn_sweep": turn_sweep,
+                    }
+                )
 
         for i, wall_name, contact in wall_contacts:
             wall_key = (i, wall_name)
@@ -796,11 +1000,26 @@ class FieldBase(_Base):
             rel_vn = vx * nx + vy * ny
 
             force_per_area, accel_per_area = self.resolve_wall_repulsion_coefficients(self.particles[i])
+            transfer_area = area_geom
+            transfer_source_distance = None
+            transfer_radius_j = None
+            transfer_mass_j = None
+            if self.wall_collision_mode == "wall_center_on_line":
+                transfer_source_distance = d
+                transfer_radius_j = state["radius"]
+                transfer_mass_j = state["mass"]
+            elif self.wall_collision_mode == "proxy_equal_particle":
+                transfer_area, transfer_source_distance = self.proxy_equal_particle_wall_area(state["radius"], delta)
+                transfer_radius_j = state["radius"]
+                transfer_mass_j = state["mass"]
             equivalent_J = self.field_contact_step_transfer(
-                area_geom,
+                transfer_area,
                 sub_dt,
                 state["mass"],
+                mass_j=transfer_mass_j,
                 radius_i=state["radius"],
+                radius_j=transfer_radius_j,
+                source_distance=transfer_source_distance,
                 delta=delta,
                 force_per_area=force_per_area,
                 accel_per_area=accel_per_area,
@@ -815,7 +1034,7 @@ class FieldBase(_Base):
                     "i": i,
                     "nx": nx,
                     "ny": ny,
-                    "area_geom": area_geom,
+                    "area_geom": transfer_area,
                     "equivalent_J": equivalent_J,
                     "rel_vn": rel_vn,
                 }
@@ -824,11 +1043,14 @@ class FieldBase(_Base):
         for request in self.ordered_pair_requests(pair_requests):
             i = request["i"]
             j = request["j"]
-            scaled_J = request["equivalent_J"] * self.pair_contact_request_scale(request, pair_requests)
+            request_scale = self.pair_contact_request_scale(request, pair_requests)
+            scaled_J = request["equivalent_J"] * request_scale
+            scaled_attraction_J = request.get("attraction_J", 0.0) * request_scale
             effective_area = request["area_effective"]
 
             self.current_area = max(self.current_area, request["area_effective"])
             self.current_J = max(self.current_J, scaled_J)
+            self.step_attraction_momentum += abs(scaled_attraction_J)
             if request["rel_vn"] < 0.0:
                 self.phase = "inbound"
                 self.max_area_in = max(self.max_area_in, request["area_effective"])
@@ -877,6 +1099,9 @@ class FieldBase(_Base):
             )
             delta_px[i] += request["nx"] * scaled_J
             delta_py[i] += request["ny"] * scaled_J
+            if self.wall_collision_mode in {"wall_center_on_line", "proxy_equal_particle"}:
+                self.hidden_wall_momentum_x -= request["nx"] * scaled_J
+                self.hidden_wall_momentum_y -= request["ny"] * scaled_J
 
         self.step_internal_momentum_by_particle = [
             math.hypot(delta_px[index], delta_py[index]) for index in range(len(self.particles))
@@ -896,6 +1121,8 @@ class FieldBase(_Base):
             vy = particle["py"] / particle["mass"]
             particle["x"] += vx * sub_dt
             particle["y"] += vy * sub_dt
+            self.clamp_wall_penetration_limit(particle)
+        self.clamp_pair_penetration_limit()
 
         self.pair_internal_store = {}
 

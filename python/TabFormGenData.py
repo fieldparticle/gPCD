@@ -596,8 +596,10 @@ class TabGenData(QTabWidget):
             dirgrid.addWidget(view_label,6,0,1,2)
 
             self.ViewList =  QListWidget()
+            
             self.ViewList.setStyleSheet("background-color:  #FFFFFF")
             self.setSize(self.ViewList,120,450)
+            #self.ViewList.setSpacing(1)
             dirgrid.addWidget(self.ViewList,7,0,1,2)
             
             ## -------------------------------------------------------------

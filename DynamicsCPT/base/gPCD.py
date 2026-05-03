@@ -440,6 +440,11 @@ class Demo:
                 vjy = pj["py"] / pj["mass"]
                 rel_vn = (vjx - vix) * nx + (vjy - viy) * ny
 
+            if hasattr(self.base, "get_wall_field_overlaps"):
+                wall_contacts_after = self.base.get_wall_field_overlaps()
+            else:
+                wall_contacts_after = self.base.get_wall_contacts()
+
             self.screen.fill(self.base.BG)
 
             if self.base.walls is not None:
@@ -458,6 +463,15 @@ class Demo:
             for index, particle in enumerate(self.base.particles):
                 center_x = self.to_screen_x(particle["x"])
                 center_y = self.to_screen_y(particle["y"])
+                attraction_radius = particle.get("attraction_radius")
+                if attraction_radius is not None and attraction_radius > 0.0:
+                    pygame.draw.circle(
+                        self.screen,
+                        (120, 220, 255),
+                        (center_x, center_y),
+                        max(1, int(attraction_radius * self.pixel_radius_scale)),
+                        1,
+                    )
                 self.draw_alpha_circle(particle["fill"], particle["x"], particle["y"], particle["radius"])
                 pygame.draw.circle(
                     self.screen,
@@ -507,6 +521,60 @@ class Demo:
                     end = (self.to_screen_x(pi["x"] + fx), self.to_screen_y(pi["y"] + fy))
                     pygame.draw.line(self.screen, self.base.YELLOW, start, end, 4)
 
+            for i, wall_name, contact_after in wall_contacts_after:
+                wall_nx, wall_ny, _alpha, wall_delta, wall_area, _area_pcnt, _prox_percent, _d = contact_after
+                particle = self.base.particles[i]
+                radius = particle["radius"]
+                wall_mode = getattr(self.base, "wall_collision_mode", "plane")
+
+                if wall_name == "left":
+                    proxy_x = self.base.walls["start_x"] - radius if wall_mode == "proxy_equal_particle" else self.base.walls["start_x"]
+                    proxy_y = particle["y"]
+                elif wall_name == "right":
+                    proxy_x = self.base.walls["end_x"] + radius if wall_mode == "proxy_equal_particle" else self.base.walls["end_x"]
+                    proxy_y = particle["y"]
+                elif wall_name == "bottom":
+                    proxy_x = particle["x"]
+                    proxy_y = self.base.walls["start_y"] - radius if wall_mode == "proxy_equal_particle" else self.base.walls["start_y"]
+                else:
+                    proxy_x = particle["x"]
+                    proxy_y = self.base.walls["end_y"] + radius if wall_mode == "proxy_equal_particle" else self.base.walls["end_y"]
+
+                self.draw_alpha_circle((255, 210, 120, 60), proxy_x, proxy_y, radius)
+                pygame.draw.circle(
+                    self.screen,
+                    self.base.YELLOW,
+                    (self.to_screen_x(proxy_x), self.to_screen_y(proxy_y)),
+                    int(radius * self.pixel_radius_scale),
+                    2,
+                )
+                pygame.draw.line(
+                    self.screen,
+                    self.base.GREEN,
+                    (self.to_screen_x(proxy_x), self.to_screen_y(proxy_y)),
+                    (self.to_screen_x(particle["x"]), self.to_screen_y(particle["y"])),
+                    2,
+                )
+
+                if hasattr(self.base, "contact_force_from_area"):
+                    wall_contact_strength = self.base.contact_force_from_area(
+                        wall_area,
+                        particle["mass"],
+                        particle["mass"],
+                    )
+                elif getattr(self.base, "rejection_accel_per_area", None) is not None:
+                    wall_contact_strength = self.base.rejection_accel_per_area * wall_area
+                else:
+                    wall_contact_strength = self.base.k * wall_area
+
+                if wall_contact_strength > 0.0:
+                    arrow_scale = 0.015
+                    fx = wall_nx * wall_contact_strength * arrow_scale
+                    fy = wall_ny * wall_contact_strength * arrow_scale
+                    start = (self.to_screen_x(particle["x"]), self.to_screen_y(particle["y"]))
+                    end = (self.to_screen_x(particle["x"] + fx), self.to_screen_y(particle["y"] + fy))
+                    pygame.draw.line(self.screen, self.base.YELLOW, start, end, 4)
+
             area_diff = abs(self.base.max_area_in - self.base.max_area_out)
             J_diff = abs(self.base.max_J_in - self.base.max_J_out)
 
@@ -521,6 +589,7 @@ class Demo:
                 #f"viewport padding     = ({self.viewport_offset_x:.1f}, {self.viewport_offset_y:.1f})",
                 #f"internal dt          = {self.base.dt / self.base.substeps:.8f}",
                 f"step internal |p|    = {step_internal_p:.8f}",
+                f"step attract |p|     = {getattr(self.base, 'step_attraction_momentum', 0.0):.8f}",
                 #f"net internal p       = ({internal_px:.8f}, {internal_py:.8f})",
                 #f"net internal |p|     = {net_internal_p:.8f}",
                 f"vector momentum err  = {p_error:.8e}",

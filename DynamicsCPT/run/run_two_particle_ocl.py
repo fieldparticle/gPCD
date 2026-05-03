@@ -6,16 +6,28 @@ from run.output_dirs import export_path_for_dt, resolve_base_class
 BASE_MODEL = "mom"
 MULTI_CONTACT_MODE = "sum"
 OUTPUT_DIR_NAME = None
-DT = 0.005
+DT = 0.05
 SUBSTEPS = 5
+POST_COLLISION_FRAMES = 90
+ZOOM = None
+WALL_BOX = None  # None = keep scenario default, False = clear walls, tuple = (start_x, end_x, start_y, end_y)
 Y_START = 0.0
 Y_STEP = 0.05
 RUN_COUNT = 40
 REPULSION_FORCE_PER_AREA = 0.001
 MIN_COLLISION_STEPS = 24
 ENFORCE_SPEED_LIMIT = True
-particle_list = list(range(40))
-#particle_list = [0,10]
+#particle_list = list(range(40))
+particle_list = [1]
+
+
+def apply_wall_override(base):
+    if WALL_BOX is None:
+        return
+    if WALL_BOX is False:
+        base.clear_walls()
+        return
+    base.set_walls(*WALL_BOX)
 
 def write_no_collision_export(export_data_file, y_value):
     export_path = Path(export_data_file)
@@ -126,6 +138,8 @@ if __name__ == "__main__":
                 base.dt = float(DT)
             if SUBSTEPS is not None:
                 base.substeps = int(SUBSTEPS)
+            base.set_scenario_options(post_collision_frames=POST_COLLISION_FRAMES)
+            apply_wall_override(base)
             if BASE_MODEL == "mom" and hasattr(base, "set_momentum_response"):
                 base.set_momentum_response(REPULSION_FORCE_PER_AREA)
             if BASE_MODEL == "mom" and hasattr(base, "set_multi_contact_mode"):
@@ -135,4 +149,7 @@ if __name__ == "__main__":
             for index, overrides in particle_overrides.items():
                 base.particle_configs[index].update(overrides)
 
-        Demo(configure_run, export_data_file=export_data_file, base_class=base_class).run()
+        demo = Demo(configure_run, export_data_file=export_data_file, base_class=base_class)
+        if ZOOM is not None:
+            demo.set_zoom(ZOOM)
+        demo.run()

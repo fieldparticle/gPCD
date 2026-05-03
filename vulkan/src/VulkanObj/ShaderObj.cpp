@@ -36,18 +36,15 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 		m_CMO = CMO;
 		m_SCO = SCO;
 		m_LMO = LMO;
-		std::string testtype = CfgApp->GetString("application.testtype", true);
-		if(testtype.compare("cdn") == 0)
-			WriteShaderHeaderCDNOZ();
-		if(testtype.compare("VerfPerf") == 0)
-			WriteShaderHeader();
-		GenWorkGroups(testtype);
+
+		WriteShaderHeader();
+		GenWorkGroups();
 }
-void ShaderObj::GenWorkGroups(std::string testType)
+void ShaderObj::GenWorkGroups()
 {
 
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
-	std::string filename = fildir + "/" + testType + "/workgroups.glsl";
+	std::string filename = fildir + "/workgroups.glsl";
 	{
 		std::ofstream ostrm(filename);
 		if (!ostrm.is_open())
@@ -128,7 +125,7 @@ void  ShaderObj::WriteShaderHeader()
 		motion_str = 1;
 
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
-    std::string filename = fildir + "/VerfPerf/params.glsl";
+    std::string filename = fildir + "/params.glsl";
     {
 		std::string dbgflag = {};
 #ifdef NDEBUG
