@@ -32,9 +32,9 @@
 #include "VulkanObj/VulkanApp.hpp"
 void ResourceVertexSphere::Create(ResourceVertexParticle* PartVert)
 {
-	ConfigObj* cfg = m_App->m_CFG;
-	float nside = (float)cfg->m_BoundarySideLength;
-	m_FileName = cfg->m_SphereFile;
+	ConfigObj* cfg = CfgApp;
+	//float nside = (float)CfgTst->GetInt("application.boundary_side_length", true);
+	m_FileName = CfgApp->GetString("application.sphere_file", true);
 	ResourceVertexObj::Create(0, PartVert);
 
 	for (size_t ii = 0; ii < m_vtemp.size(); ii++)

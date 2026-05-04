@@ -87,12 +87,11 @@ int main(int argc, const char* argv[]) try
 	pf->Create();
 	
 	// Check working directory
-	
 	mout << "Working Directory :" << cwd.string().c_str() << ende;
 	TCPObj* tcps = nullptr;
 
 	// Need to go to settings->System->Display->Graphics
-	//Down to GPU Prefernce Set to High performance
+	// Down to GPU Prefernce Set to High performance
 	SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
 	if (CfgApp->GetBool("application.doAuto", true) == true)
 	{
@@ -109,10 +108,24 @@ int main(int argc, const char* argv[]) try
 	else
 	{
 		std::string testfile = "application.testfile";
-		CfgTst->Create(CfgApp->GetString(testfile, true));	
-		if (ParticleOnly(pf,nullptr,nullptr,false))
+		CfgTst->Create(CfgApp->GetString(testfile, true));
+		bool has_boundary = CfgApp->GetBool("application.has_boundary", true);
+
+		if (has_boundary == true)
 		{
-			return 1;
+			
+			if (ParticleBoundaryV2(pf, nullptr, nullptr, false))
+			{
+				return 1;
+			}
+		}
+
+		if (has_boundary == false)
+		{
+			if (ParticleOnly(pf, nullptr, nullptr, false))
+			{
+				return 1;
+			}
 		}
 	}
 	return 0;

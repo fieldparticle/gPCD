@@ -25,6 +25,9 @@
     <Filter Include="logfiles">
       <UniqueIdentifier>{8c12aa8c-eadb-4f20-b59b-d278eae8cfec}</UniqueIdentifier>
     </Filter>
+    <Filter Include="boundary">
+      <UniqueIdentifier>{3fbcbb8c-31b4-4ae3-880c-3c5ecef88c21}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\libconfig\grammar.h">
@@ -203,6 +206,42 @@
     </ClInclude>
     <ClInclude Include="..\..\src\tcpip\TCPCObj.hpp">
       <Filter>vulkanobj</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\particleBoundaryV2.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceVertexCube.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\CommandParticleGraphicsSub.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\DrawParticleBoundary.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\FrameBufferSubPass.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ImageColor.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ImageDepth.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\PipelineGraphicsBoundary.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\RenderPassSubPasses.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceSubpassBoundary.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceSubpassParticle.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceUBOBoundary.hpp">
+      <Filter>boundary</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -395,6 +434,42 @@
     <ClCompile Include="..\..\src\glsl\call_glsl.cpp">
       <Filter>glslang_custom</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\particleBoundaryV2.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceVertexCube.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\CommandParticleGraphicsSub.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\DrawParticleBoundary.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\FrameBufferSubPass.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ImageColor.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ImageDepth.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\PipelineGraphicsBoundary.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\RenderPassSubPasses.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceSubpassBoundary.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceSubpassParticle.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceUBOBoundary.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\run\particle\Particle.cfg" />
@@ -421,8 +496,5 @@
     <Text Include="..\..\run\particleOnly\particle.log">
       <Filter>logfiles</Filter>
     </Text>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="..\..\shaders\ParticleVerfPerf.bat" />
   </ItemGroup>
 </Project>

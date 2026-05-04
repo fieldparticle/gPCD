@@ -32,11 +32,13 @@
 #include "VulkanObj/VulkanApp.hpp"
 void ResourceVertexCube::Create(ResourceVertexParticle* PartVert)
 {
-	ConfigObj* cfg = m_App->m_CFG;
-	float nside = (float)cfg->m_BoundarySideLength;
-	m_FileName = cfg->m_Boundary;
+#if 0
+	ConfigObj* cfg = CfgApp;
+	float nside = (float)CfgTst->GetInt("boundary_side_length", true);
+	m_FileName = CfgApp->GetString("boundary_file_obj", true);
 	ResourceVertexObj::Create(0, PartVert);
-	if (cfg->m_BoundaryFlag != true)
+	bool boundaryFlag = CfgApp->GetBool("boundary_flag", true);
+	if (boundaryFlag != true)
 		for (size_t ii = 0; ii < m_vtemp.size(); ii++)
 		{
 			CartVert tmp = {};
@@ -48,7 +50,8 @@ void ResourceVertexCube::Create(ResourceVertexParticle* PartVert)
 			m_Verts.push_back(tmp);
 		}
 
-	if(cfg->m_BoundaryFlag==true)
+	if(boundaryFlag ==true)
+#endif
 		MakeAxes(PartVert->m_SideLength);
 	
 	ResourceVertexObj::Create(0);

@@ -86,6 +86,7 @@ void CommandPoolObj::CreateCommandBuffers()
 
 void CommandPoolObj::Cleanup()
 {
+   
     vkDestroyCommandPool(m_App->GetLogicalDevice(),m_CommandPool, VK_NULL_HANDLE);
 
 }

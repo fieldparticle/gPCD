@@ -55,11 +55,12 @@ void CommandObj::Create(SwapChainObj* SCO,
 }
 void CommandObj::Cleanup()
 {
-	vkFreeCommandBuffers(m_App->GetLogicalDevice(),
-		m_CPL->m_CommandPool, 1, m_CommandBuffers.data());
+    mout << "Deleteing Query Pool:" << m_Name << " QueryPool:" << ende;
     if(m_PerfQueryPool != VK_NULL_HANDLE)
         vkDestroyQueryPool(m_App->GetLogicalDevice(), m_PerfQueryPool, VK_NULL_HANDLE);
 
+    vkFreeCommandBuffers(m_App->GetLogicalDevice(),
+        m_CPL->m_CommandPool, 1, m_CommandBuffers.data());
 };
 void CommandObj::CreateCommandBuffers(CommandPoolObj* CPL)
 {
@@ -118,6 +119,7 @@ void CommandObj::CreateQueryPool()
     createInfo.queryCount = m_QueryCount;
     mTimeQueryResults.resize(m_QueryCount);
     
+    mout << "Created Query Pool:"<< m_Name << " QueryPool:" << ende;
     VkResult result = vkCreateQueryPool(m_App->GetLogicalDevice(), &createInfo, nullptr, &m_PerfQueryPool);
     if (result != VK_SUCCESS)
     {

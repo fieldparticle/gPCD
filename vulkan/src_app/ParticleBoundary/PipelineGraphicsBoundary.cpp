@@ -35,13 +35,14 @@
 
 void PipelineGraphicsBoundary::CreatePipeline()
 {
-        ConfigObj* cfg = m_App->m_CFG;
+        ConfigObj* cfg = CfgApp;
         m_RenderPassName = "SubpassCube";
-        std::string fshader_spv = m_App->m_CFG->m_fragSPVBoundary;
-        std::string fshader_glsl =m_App->m_CFG->m_fragShaderBoundary;
 
-        std::string vshader_spv = m_App->m_CFG->m_vertSPVBoundary;
-        std::string vshader_glsl =  m_App->m_CFG->m_vertShaderBoundary;
+
+        std::string fshader_spv = CfgApp->GetString("application.frag_boundParticlespv", true);
+        std::string fshader_glsl = CfgApp->GetString("application.frag_boundParticle", true);
+        std::string vshader_spv = CfgApp->GetString("application.vert_boundParticlespv", true);
+        std::string vshader_glsl = CfgApp->GetString("application.vert_boundParticle", true);
 
         std::vector<char>  fragShaderCode;
         m_SHO->CompileShader(fshader_glsl, fshader_spv, fragShaderCode, m_SHO->SH_FRAG);
@@ -89,7 +90,8 @@ void PipelineGraphicsBoundary::CreatePipeline()
 
        // cfg->wireframeB
        VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-       if (cfg->m_WireFlag == false)
+        //       if (CfgApp->m_WireFlag == false)
+       if (CfgApp->GetBool("application.wire_frame", true) == false)
        {
            inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
            inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -137,9 +139,10 @@ void PipelineGraphicsBoundary::CreatePipeline()
         rasterizer.sType 					= VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
         rasterizer.depthClampEnable 		= VK_FALSE;
         rasterizer.rasterizerDiscardEnable 	= VK_FALSE;
-        rasterizer.polygonMode 				= VK_POLYGON_MODE_FILL;
+        //rasterizer.polygonMode 				= VK_POLYGON_MODE_FILL;
+        rasterizer.polygonMode 				= VK_POLYGON_MODE_LINE;
         rasterizer.lineWidth 				= 1.0f;
-        rasterizer.cullMode 				= VK_CULL_MODE_BACK_BIT;
+        rasterizer.cullMode 				= VK_CULL_MODE_NONE;
         rasterizer.frontFace 				= VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterizer.depthBiasEnable 			= VK_FALSE;
         rasterizer.depthBiasConstantFactor  = 0.0f;

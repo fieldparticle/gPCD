@@ -63,7 +63,7 @@ void ResourceVertexObj::Create(uint32_t BindPoint)
 		ii++;
 		m_Verts.push_back(ad);
 	}*/
-	m_thisFramesBuffered = 1;
+	m_thisFramesBuffered = 2;
 	std::ostringstream  objtxt;
 	m_BufSize = sizeof(CartVert) * (uint32_t)m_Verts.size();
 	mout << "MEMALLOC:ResourceVertexObj:" << m_BufSize << ende;
@@ -74,22 +74,34 @@ void ResourceVertexObj::Create(uint32_t BindPoint)
 	m_BufferInfo.resize(m_thisFramesBuffered);
 	m_Allocation.resize(m_thisFramesBuffered);
 	VkBuffer buf = {};
-	for (size_t i = 0; i < m_thisFramesBuffered; i++)
-	{
+	
 
-		objtxt << m_Name << " Number:" << i << std::ends;
-		m_App->VMACreateDeviceBuffer(m_BufSize,
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			m_Buffers[i], m_Allocation[i], objtxt.str());
-	}
-
+	objtxt << m_Name << " Number:" << 0 << std::ends;
+	m_App->VMACreateDeviceBuffer(m_BufSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_Buffers[0], m_Allocation[0], objtxt.str());
+	
 	vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, m_Verts.data(), m_Allocation[0],
 		0, m_BufSize);
+
+	m_BufSize = sizeof(CartVert) * (uint32_t)m_CubeIndices.size();
+	objtxt << m_Name << " Number:" << 0 << std::ends;
+	m_App->VMACreateDeviceBuffer(m_BufSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+		VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_Buffers[1], m_Allocation[1], objtxt.str());
+
+	vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, m_CubeIndices.data(), m_Allocation[1],
+		0, m_BufSize);
+
+
 	m_Verts.clear();
-    
+	m_CubeIndices.clear();
 }
 
 VkVertexInputBindingDescription* 
@@ -128,22 +140,42 @@ std::vector<VkVertexInputAttributeDescription>* ResourceVertexObj::GetAttributeD
 void ResourceVertexObj::MakeAxes(uint32_t sidelen)
 {
 		
+	
+	m_CubeIndices =
+	{
+		0, 2, 1,  2, 0, 3,   // back
+		4, 5, 6,  6, 7, 4,   // front
 
-		//{ {1.0, 0.0, 1.0,1.0},{1.0, 0.0, 1.0} },
-		//{ {0.0, 0.0, 1.0,1.0},{1.0, 0.0, 1.0} },
+		0, 4, 7,  7, 3, 0,   // left
+		1, 2, 6,  6, 5, 1,   // right
 
-#if 1
-	//x			
+		0, 1, 5,  5, 4, 0,   // bottom
+		3, 7, 6,  6, 2, 3    // top
+	};
+	int side = static_cast<int>(sidelen);
+	
+	m_Axes.push_back({ { 0, 0, 0, 1.0 },{1.0,1.0,1.0,1} });
+	m_Axes.push_back({ { side, 0.0, 0.0, 1.0 }, {1.0,1,1.,1} });
+	m_Axes.push_back({ { side,  side, 0.0, 1.0 }, {1.,1.,1,1} });
+	m_Axes.push_back({ {0.0,  side, 0.0, 1.0 }, {1,1,1.,1} });
+
+	m_Axes.push_back({ {0.0, 0.0,  side, 1.0 }, {1,1.,1,1} });
+	m_Axes.push_back({ { side, 0.0,  side, 1.0 }, {1.,1,1,1} });
+	m_Axes.push_back({ { side,  side,  side, 1.0 }, {1,1,1,1} });
+	m_Axes.push_back({ {0.0,  side,  side, 1.0 }, {1.0,1.0,1.0,1} });
+	
+	m_Verts = m_Axes;
+	/*
 	m_Axes.push_back({ {0.0,0.0,0.0,1.0f},{1.0, 0.0, 0.0,1.0} });
 	m_Axes.push_back({ {sidelen,0.0,0.0,1.0f}, {1.0, 0.0, 0.0,1.0} });
 	//y		
-	m_Axes.push_back({{0.0, 0.0, 0.0,1.0f},{0.0, 1.0, 0.0,1.0}});
-	m_Axes.push_back({{0.0, sidelen, 0.0,1.0f}, {0.0, 1.0, 0.0,1.0}});
+	m_Axes.push_back({ {0.0, 0.0, 0.0,1.0f},{0.0, 1.0, 0.0,1.0} });
+	m_Axes.push_back({ {0.0, sidelen, 0.0,1.0f}, {0.0, 1.0, 0.0,1.0} });
 	//z		
-	m_Axes.push_back({{0.0, 0.0, 0.0,1.0},{0.0, 0.0, 1.0,1.0}});
-	m_Axes.push_back({{0.0, 0.0, sidelen,1.0},{0.0, 0.0, 1.0,1.0}});
-	
+	m_Axes.push_back({ {0.0, 0.0, 0.0,1.0},{0.0, 0.0, 1.0,1.0} });
+	m_Axes.push_back({ {0.0, 0.0, sidelen,1.0},{0.0, 0.0, 1.0,1.0} });
 
+#if 0
 	for (size_t ii = 0; ii < sidelen; ii++)
 	{
 		float length = static_cast<float>(ii + 1);
@@ -157,23 +189,15 @@ void ResourceVertexObj::MakeAxes(uint32_t sidelen)
 		m_Axes.push_back({ {0.1,0.0,length,1.0},{0.0,0.0,1.0,1.0} });
 		m_Axes.push_back({ {-0.1,0.0,length,1.0},{0.0,0.0,1.0,1.0} });
 	}
-	
+#endif
 	m_Axes.push_back({ {0.90,-0.5,0.0,1.0},{1.0,0.0,0.0,1.0} });
 	m_Axes.push_back({ {0.90,0.5,0.0,1.0},{1.0,0.0,0.0,1.0} });
 
 	m_Axes.push_back({ {1.10,-0.5,0.0,1.0},{1.0,0.0,0.0,1.0} });
 	m_Axes.push_back({ {1.10,0.5,0.0,1.0},{1.0,0.0,0.0,1.0} });
-	
 
 
-	m_Verts = m_Axes;
-#else
 
-		glm::mat4 myMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.5f,0.5f, 0.55f));
-		for (size_t ii = 0; ii < m_Verts.size(); ii++)
-		{
-			glm::vec4 transformedVector = myMatrix * m_Verts[ii].pos; // guess the result
-			m_Verts[ii].pos = transformedVector;
-		}
-#endif
+	//m_Verts = m_Axes;
+	*/
 }

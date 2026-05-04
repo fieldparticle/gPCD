@@ -1,0 +1,478 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="libconfig">
+      <UniqueIdentifier>{d7723a19-4de4-462c-815b-c8bb562a1841}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ConfigFiles">
+      <UniqueIdentifier>{666a9b01-3480-4a40-84d9-634127a4987a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source">
+      <UniqueIdentifier>{f1ce9b4c-7b13-4cdf-91eb-4efda68ec5eb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{1fb84986-b4c2-4cf3-97d9-74bf66859875}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vma">
+      <UniqueIdentifier>{d6ed12ea-74fa-448c-a74e-8e06875de968}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\libconfig\grammar.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\libconfig.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\parsectx.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\scanctx.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\scanner.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\strbuf.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\strvec.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\util.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libconfig\wincompat.h">
+      <Filter>libconfig</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\VCCNotes.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\VulkanDefines.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Vulkan3rdpty\VMA\include\vk_mem_alloc.h">
+      <Filter>vma</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\ParticleStruct.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\ResourceAtomicGraphics.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\ResourceCollMatrix.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\ResourceLockMatrix.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\ResourcePushParticle.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\ResourceVertexParticle.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\SwapChain.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\mout2_0\mout.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\BaseObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\CommandObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\CommandPoolObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\ConfigObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\Core.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\DrawObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\FrameBufferObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\ImageObject.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\Input.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\InstanceObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\PhysDevObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\PipelineObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\RenderPassObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\Resource.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\ShaderObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\SwapChainObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\SyncObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\VulkanObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\PipelineComputeParticle.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\CommandParticleCompute.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\ResourceAtomicCompute.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\SyncObjParticleOnly.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\PipelineGraphicsParticleOnly.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\glsl\call_glsl.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\CommandParticleGraphicsSub.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ImageDepth.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\PipelineGraphicsBoundary.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\RenderPassSubPasses.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceUBOBoundary.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceSubpassBoundary.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceSubpassParticle.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceVertexCube.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\ResourceVertexObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\ObjLoader.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\FrameBufferSubPass.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ImageColor.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\ContainerGraphics.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\ContainerObj.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\ResourceUBOParticle.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\DrawParticleBoundary.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceVertexSphere.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceUBOSphere.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\VulkanAppBoundary.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\particleBoundaryV2.hpp">
+      <Filter>source</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\libconfig\scanctx.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\scanner.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\strbuf.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\strvec.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\util.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\wincompat.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\grammar.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libconfig\libconfig.c">
+      <Filter>libconfig</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\VulkanDeviceLog.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\VulkanObjDebug.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\VulkanObjMemory.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\ConfigGetSettings.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceAtomicGraphics.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceCollMatrix.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceLockMatrix.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\ResourcePushParticle.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceVertexParticle.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\SwapChain.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\mout2_0\mout.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\BaseObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\CommandObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\CommandPoolObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\ConfigObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\DrawObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\FrameBufferObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\ImageObject.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\Input.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\InstanceObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\loop.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\PhysDevObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\PipelineObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\RenderPassObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\Resource.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\ShaderObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\SwapChainObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\SyncObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\VulkanObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\PipelineComputeParticle.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\CommandParticleCompute.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceAtomicCompute.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\SyncObjParticleOnly.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\PipelineGraphicsParticleOnly.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\glsl\call_glsl.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\CommandParticleGraphicsSub.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ImageDepth.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\PipelineGraphicsBoundary.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\RenderPassSubPasses.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceUBOBoundary.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceSubpassBoundary.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceSubpassParticle.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceVertexCube.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\ResourceVertexObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\ObjLoader.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\FrameBufferSubPass.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceUBOParticle.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ImageColor.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\ContainerGraphics.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\ContainerObj.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\DrawParticleBoundary.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceVertexSphere.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceUBOSphere.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\ResourceLockIndexing.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\VulkanAppBoundary.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\particleBoundaryV2.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\MemStats.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\main.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\run\mps\particleInCube.cfg">
+      <Filter>ConfigFiles</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\atomicg.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\CalcParticleCollision.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\CollimageIndex.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\constants.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\params.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\particle.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\ParticleOnly.comp">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\ParticleOnly.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\ParticleOnly.geom">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\ParticleOnly.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\push.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\removeDuplicates.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\util.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\workgroups.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\Lockimage.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\shaders\ParticleOnlyThreads.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\run\ParticleOnly\ParticleOnly.cfg">
+      <Filter>shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\run\ParticleOnly\mps.log">
+      <Filter>shaders</Filter>
+    </Text>
+    <Text Include="..\..\src\ProjectDefaults.txt">
+      <Filter>source</Filter>
+    </Text>
+  </ItemGroup>
+</Project>

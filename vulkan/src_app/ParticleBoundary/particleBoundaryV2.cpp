@@ -33,7 +33,7 @@
 
 
 
-int ParticleBoundaryV2(ConfigObj* configVCube)
+int ParticleBoundaryV2(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 {
 
 	VulkanObj* vulkanObj 
@@ -44,16 +44,12 @@ int ParticleBoundaryV2(ConfigObj* configVCube)
 		= new InstanceObj(vulkanObj,"InstanceObject");
 	ShaderObj* shaderObj 
 		= new ShaderObj(vulkanObj, "ShaderObj");
-	ResourceVertexSphere* resourceVertexSphere
-		= new ResourceVertexSphere(vulkanObj, "VertexSphere");
 	ResourceVertexCube* resourceVertexCube
 		= new ResourceVertexCube(vulkanObj, "VertexCube");
 	ResourceVertexParticle* resourceVertexParticle
 		= new ResourceVertexParticle(vulkanObj, "VertexParticle");
 	ResourceParticleUBO* resourceParticleUBO
 		= new ResourceParticleUBO(vulkanObj, "ParticleUBO");
-	ResourceUBOSphere* resourceUBOSphere
-		= new ResourceUBOSphere(vulkanObj, "SphereUBO");
 	ResourceBoundaryUBO* resourceBoundaryUBO
 		= new ResourceBoundaryUBO(vulkanObj, "BoundaryUBO");
 	ResourceAtomicCompute* resourceAtomicCompute
@@ -99,13 +95,13 @@ int ParticleBoundaryV2(ConfigObj* configVCube)
 		= new SyncObj(vulkanObj, "cubeSyncObj");
 	DrawParticleBoundary* drawParticleBoundary
 		= new DrawParticleBoundary(vulkanObj, "Draw Instance Particle");
-	return 0;
+	
 
 	//================================= Create =================================
 	
-	vulkanObj->Create(configVCube, physDevObj);
+	vulkanObj->Create(CfgApp, physDevObj);
 	instanceObject->Create();
-	physDevObj->Create(configVCube);
+	physDevObj->Create(CfgApp);
 	swapChain->Create(physDevObj);
 	swapChain->SetSizzorMin(0);
 	swapChain->SetSizzorMax(1);
@@ -119,25 +115,25 @@ int ParticleBoundaryV2(ConfigObj* configVCube)
 	renderPass->Create(swapChain, { imageColor,imageDepth }, { subPassParticle,subPassBoundary });
 	frameBuffer->Create(renderPass, swapChain);
 	resourceVertexParticle->Create(4);
-	resourceVertexSphere->Create(resourceVertexParticle);
+	//resourceVertexSphere->Create(resourceVertexParticle);
 	resourceVertexCube->Create(resourceVertexParticle);
 	resourceCollMatrix->Create(3, resourceVertexParticle);
 	resourceLockMatrix->Create(6, resourceVertexParticle);
 	resourceParticlePush->Create(resourceVertexParticle);
-	resourceAtomicCompute->Create(5);
-	resourceAtomicG->Create(5);
+	resourceAtomicCompute->Create(5, perObj);
+	resourceAtomicG->Create(5,perObj);
 	resourceParticleUBO->Create(2, swapChain, resourceVertexParticle);
 	resourceBoundaryUBO->Create(1, swapChain, resourceVertexParticle);
-	resourceUBOSphere->Create(7, swapChain, resourceVertexParticle);
-	shaderObj->Create(resourceVertexParticle, resourceCollMatrix, swapChain);
+	//resourceUBOSphere->Create(7, swapChain, resourceVertexParticle);
+	shaderObj->Create(resourceVertexParticle, resourceCollMatrix, resourceLockMatrix,swapChain);
 
 	resourceGraphicsContainer->Create({ resourceVertexCube,
-											resourceVertexSphere,
+											//resourceVertexSphere,
 											resourceVertexParticle,
 											resourceParticlePush,
 											resourceParticleUBO,
 											resourceBoundaryUBO,
-											resourceUBOSphere,
+											//resourceUBOSphere,
 											subPassParticle,
 											subPassBoundary,			//#####JMB## fix this
 											resourceCollMatrix,
@@ -177,6 +173,10 @@ int ParticleBoundaryV2(ConfigObj* configVCube)
 	syncObjects->AddWaitSemaphore("computeFinishedSemaphore", VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
 	syncObjects->AddSignalSemaphore("renderFinishedSemaphore");
 
+	MemStats(vulkanObj);
+	Extflg = false;
+	if (Extflg == true)
+		return 1;
 
 	// Draw object needs command pool, swap chain, render pass, frame buffer, and sync ojects
 	drawParticleBoundary->Create(commandPool, swapChain, renderPass, frameBuffer, syncObjects);
@@ -184,13 +184,11 @@ int ParticleBoundaryV2(ConfigObj* configVCube)
 	double		lastTime = glfwGetTime();
 	int			nbFrames = 0;
 	
-	void MemStats(VulkanObj* vulkanObj);
-	//if (configVCube->m_DoAuto)
-//		Sleep(500);
+	
 
 	SetCallBacks(vulkanObj);
 	int ret = 0;
-	ret = Loop(drawParticleBoundary, vulkanObj, resourceGraphicsContainer, resourceComputeContainer);
+	ret = Loop(perObj, tcp, tcpapp, drawParticleBoundary, vulkanObj, resourceGraphicsContainer, resourceComputeContainer);
 	vulkanObj->CleanAll();
 	vulkanObj->Cleanup();
 	return ret;

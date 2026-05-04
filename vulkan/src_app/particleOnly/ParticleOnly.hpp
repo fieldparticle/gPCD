@@ -54,9 +54,21 @@
 #include "particleOnly/ResourceCollMatrix.hpp"
 #include "particleOnly/ResourceLockMatrix.hpp"
 #include "particleOnly/SyncObjParticleOnly.hpp"
-
-
 #include "particleOnly/ResourceVertexCube.hpp"
 
+#include "ParticleBoundary/CommandParticleGraphicsSub.hpp"
 
+#include "ParticleBoundary/DrawParticleBoundary.hpp"
+#include "ParticleBoundary/FrameBufferSubPass.hpp"
 
+#include "ParticleBoundary/ImageColor.hpp"
+#include "ParticleBoundary/ImageDepth.hpp"
+#include "ParticleBoundary/PipelineGraphicsBoundary.hpp"
+#include "ParticleBoundary/ResourceVertexSphere.hpp"
+#include "ParticleBoundary/ResourceUBOSphere.hpp"
+#include "ParticleBoundary/RenderPassSubPasses.hpp"
+#include "ParticleBoundary/ResourceSubpassBoundary.hpp"
+#include "ParticleBoundary/ResourceSubpassParticle.hpp"
+#include "ParticleBoundary/ResourceUBOBoundary.hpp"
+//#include "ParticleBoundary/
+//#include "ParticleBoundary/

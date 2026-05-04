@@ -30,8 +30,8 @@
 %*
 %******************************************************************/
 
-
 #include "VulkanObj/VulkanApp.hpp"
+
 
 void CommandParticleGraphicsSub::Create(SwapChainObj* SCO,
 	FrameBufferObj* FBO,
@@ -59,7 +59,7 @@ void CommandParticleGraphicsSub::Create(SwapChainObj* SCO,
 void CommandParticleGraphicsSub::RecordCommands(uint32_t imageindex, uint32_t currentBuffer)
 {
 	
-	ConfigObj* cfg = m_App->m_CFG;
+	ConfigObj* cfg = CfgApp;
 	std::ostringstream  objtxt;
 	objtxt << m_Name << "Graphics Command Buffer:" << currentBuffer << std::ends;
 	m_App->NameObject(VK_OBJECT_TYPE_COMMAND_BUFFER,
@@ -155,9 +155,13 @@ void CommandParticleGraphicsSub::RecordSubPassCube(uint32_t imageindex, uint32_t
 	unsigned long size = 0;
 	Resource* dvo = (m_RCO->GetResourceName("VertexCube"));
 	VkBuffer* vertexBuffers = static_cast<VkBuffer*>(&dvo->m_Buffers[0]);
+
 	VkDeviceSize offsets[] = { 0 };
 	vkCmdBindVertexBuffers(m_CommandBuffers[currentBuffer], 0, 1, vertexBuffers, offsets);
 	uint16_t inum = 0;
+	VkBuffer* indexBuffers = static_cast<VkBuffer*>(&dvo->m_Buffers[1]);
+
+	vkCmdBindIndexBuffer(m_CommandBuffers[currentBuffer], *indexBuffers, 0, VK_INDEX_TYPE_UINT32);
 
 	// Bind the descriptor set associated with this record.
 	vkCmdBindDescriptorSets(m_CommandBuffers[currentBuffer],
@@ -182,8 +186,8 @@ void CommandParticleGraphicsSub::RecordSubPassCube(uint32_t imageindex, uint32_t
 		upcosize,
 		sfl);
 
-	uint16_t vnum = dvo->m_NumElements;
-	vkCmdDraw(m_CommandBuffers[currentBuffer], vnum, 1, 0, 0);
+	uint16_t vnum = 36;// 2 * dvo->m_NumElements;
+	vkCmdDrawIndexed(m_CommandBuffers[currentBuffer], vnum, 1, 0, 0,0);
 
 	//############################ 2nd Draw ###################################
 	//############################ 2nd Draw ###################################
@@ -193,7 +197,7 @@ void CommandParticleGraphicsSub::RecordSubPassCube(uint32_t imageindex, uint32_t
 	// to command buffer.
 	//--------------------------------------------------------------------------
 	// Bind vertex buffer to command buffer.
-#if 1
+#if 0
 	Resource* dvo2 = (m_RCO->GetResourceName("VertexSphere"));
 	VkBuffer* vertexBuffers2 = static_cast<VkBuffer*>(&dvo2->m_Buffers[0]);
 	VkDeviceSize offsets2[] = { 0 };

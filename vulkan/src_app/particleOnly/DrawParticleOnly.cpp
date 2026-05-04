@@ -30,6 +30,7 @@
 %*
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
+
 ///FIXX THIS
 void DrawParticleOnly::Create(CommandPoolObj* CPL,
 	SwapChainObj* SCO,

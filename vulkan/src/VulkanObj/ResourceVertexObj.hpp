@@ -48,12 +48,13 @@ class ResourceVertexObj : public Resource
 		//vcb::Mesh                                m_Model;
 		ResourceVertexParticle* m_ParticleVert{};
 		std::vector<CartVert> m_Verts{};
+		std::vector<uint32_t> m_CubeIndices;
 		std::vector<glm::vec2> m_UVS{};
 		std::vector<glm::vec3> m_Normals{};
 		ResourceVertexObj(VulkanObj *App, std::string Name):
 					Resource(App, Name,VBW_TYPE_VERTEX_BUFFER)
 				{
-			m_VkType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+					m_VkType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 				};
 		void MakeAxes(uint32_t sidelen);
 	
@@ -69,9 +70,8 @@ class ResourceVertexObj : public Resource
 	virtual void PushMem(uint32_t currentBuffer) {};
 	void Cleanup() {
 
-
-		for (size_t ii = 0; ii < m_Allocation.size(); ii++)
-			vmaDestroyBuffer(m_App->m_vmaAllocator, m_Buffers[0], m_Allocation[ii]);
+		vmaDestroyBuffer(m_App->m_vmaAllocator, m_Buffers[0], m_Allocation[0]);
+		vmaDestroyBuffer(m_App->m_vmaAllocator, m_Buffers[1], m_Allocation[1]);
 	}
 	virtual void UpdateMem() {};
 	

@@ -104,39 +104,51 @@ void ResourceBoundaryUBO::createBuffers()
 
 void ResourceBoundaryUBO::PushMem(uint32_t currentBuffer)
 {
+	float s = m_Particle->m_SideLength;
+	glm::vec3 center(s * 0.5f, s * 0.5f, s * 0.5f);
 
-	ConfigObj* cfg = m_App->m_CFG;
-	float sidelength = static_cast<float>(m_Particle->m_SideLength);
 	m_UBO = {};
-	m_UBO.model = glm::rotate(glm::mat4(1.0f), glm::radians(rRotZ), glm::vec3(0.0f, 0.0f, 1.f));
-	m_UBO.model = glm::rotate(m_UBO.model, glm::radians(rRotY), glm::vec3(0.0f, 1.0f, 0.0f));
-	m_UBO.model = glm::rotate(m_UBO.model, glm::radians(rRotX), glm::vec3(1.0f, 0.0f, 0.0f));
-	
-	m_UBO.model = glm::translate(m_UBO.model,
-									glm::vec3(-sidelength/2.0f, -sidelength / 2.0f, -sidelength / 2.0f));
 
-	//m_UBO.model = glm::scale(m_UBO.model, glm::vec3(sidelength, sidelength, sidelength));
+	m_UBO.model = glm::mat4(1.0f);
 
-	m_UBO.model = glm::scale(m_UBO.model,
-		glm::vec3(ZoomX, ZoomX, ZoomX));
+	// rotate/scale about cube center
+	m_UBO.model = glm::translate(m_UBO.model, center);
 
-	glm::vec3 view = {};
-	if (cfg->m_View == 1)
-		view = glm::vec3(0.0f, 0.0f, sidelength * 4.0f);
-	if (cfg->m_View == 2)
-		view = glm::vec3(0.0f,(sidelength * 4.0f),0.0f);
-	if (cfg->m_View == 3)
-		view= glm::vec3(sidelength * 4.0f,0.0f, 0.0f);
-		
-	m_UBO.view = glm::lookAt(view,
-		glm::vec3(0.0, 0.0, 0.0),
-		glm::vec3(0.0f, 1.0f, 0.0f));
+	m_UBO.model = glm::rotate(m_UBO.model, glm::radians(rRotZ), glm::vec3(0, 0, 1));
+	m_UBO.model = glm::rotate(m_UBO.model, glm::radians(rRotY), glm::vec3(0, 1, 0));
+	m_UBO.model = glm::rotate(m_UBO.model, glm::radians(rRotX), glm::vec3(1, 0, 0));
 
-	m_UBO.proj = glm::ortho(-static_cast<float>(sidelength) / 1.0f,
-		static_cast<float>(sidelength) / 1.0f,
-		-static_cast<float>(sidelength) / 1.0f,
-		static_cast<float>(sidelength) / 1.0f, G_OrthoMin,G_OrthoMax);
-		
+	m_UBO.model = glm::scale(m_UBO.model, glm::vec3(ZoomX));
+
+	m_UBO.model = glm::translate(m_UBO.model, -center);
+
+	// camera looks at cube center
+	m_UBO.view = glm::lookAt(
+		glm::vec3(center.x, center.y, center.z + s * 4.0f),
+		center,
+		glm::vec3(0.0f, 1.0f, 0.0f)
+	);
+
+	// ortho is in VIEW SPACE, so center is 0,0
+	float half = s * 0.75f;
+
+	m_UBO.proj = glm::ortho(
+		-half,
+		half,
+		-half,
+		half,
+		G_OrthoMin,
+		G_OrthoMax
+	);
+
+	m_UBO.proj[1][1] *= -1.0f;
+
+	void* data = nullptr;
+	uint32_t bufsize = sizeof(m_UBO) + m_NumElements * sizeof(uint32_t);
+
 	vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, &m_UBO, m_Allocation[currentBuffer],
 		0, sizeof(m_UBO));
+
+	
+	
 }

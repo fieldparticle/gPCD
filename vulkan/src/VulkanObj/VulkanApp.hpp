@@ -60,6 +60,7 @@ extern ConfigObj* MpsApp;
 
 
 
+
 void MemStats(VulkanObj* vulkanObj);
 
 #include <glm/glm.hpp>
@@ -80,7 +81,7 @@ int Capture(uint32_t ImgNum);
 int SetupCapture();
 int ParticleOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp,bool rmtFlag);
 int ParticleBoundary(ConfigObj* configVCube);
-int ParticleBoundaryV2(ConfigObj* configVCube);
+int ParticleBoundaryV2(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag);
 int glsl(std::vector<std::string>& InputArgs, std::vector<char>& OutPutSPV);
 int ParticleOnlyGraphics(ConfigObj* configVCube);
 void GLFWError(int err, const char* err_str);
