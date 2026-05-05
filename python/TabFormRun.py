@@ -14,6 +14,8 @@ import threading
 from subprocess import Popen, CREATE_NEW_CONSOLE
 import asyncio
 DETACHED_PROCESS = 0x00000008
+        
+
 class TabFormRun(QTabWidget):
 
     run_items = []

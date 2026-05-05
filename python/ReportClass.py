@@ -41,7 +41,7 @@ class ReportClass():
         except IOError as e:
             print(e)
             self.log.log(self,f"Couldn't write to file ({e})")
-            raise IOError(f"Couldn't write to file ({e})")
+            return
         tex_output_name = self.tex_output_name 
         try:
             w ="\\begingroup\n"
@@ -115,10 +115,12 @@ class ReportClass():
         self.tex_output_name = self.itemcfg.tex_dir + "/" + self.itemcfg.name + ".tex"
         try:
             f = open(self.tex_output_name , "w")
-        except IOError as e:
+        except BaseException as e:
             print(e)
             self.log.log(self,f"Couldn't write to file ({e})")
-            raise IOError(f"Couldn't write to file ({e})")
+            return
+            
+            
         tex_output_name = self.tex_output_name 
         w ="\\begingroup\n"
         f.write(w)

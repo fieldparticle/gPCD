@@ -73,7 +73,7 @@ class gPCDData():
     #
     def do_mmrr(self):
         fps = cpums = cms = gms = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = 0
-        mmr_path = f"{self.itemcfg.mmrr_dir}/mmrr.csv"
+        mmr_path = f"{self.itemcfg.mmrr_dir}"
         if(os.path.exists(mmr_path) == False):
             print ("MMRR Directories not available" )
             return False

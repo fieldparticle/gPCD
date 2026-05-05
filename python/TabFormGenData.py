@@ -50,6 +50,7 @@ class Worker(QRunnable):
         self.args = args
         self.kwargs = kwargs
         self.signals = WorkerSignals()
+        
         # Add the callback to our kwargs
         self.kwargs["progress_callback"] = self.signals.progress
 
@@ -81,7 +82,7 @@ class TabGenData(QTabWidget):
     thread = None
     current_test_file = 0
     particle_data = None
-    
+    terminal = None
     #******************************************************************
     # Init
     #

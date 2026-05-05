@@ -20,6 +20,8 @@ from LatexPreview import *
 from PdfViewer import *
 from CheckCfg import *
 from AttrDictFields import *
+import importlib.util
+from pathlib import Path
 class TabFormReport(QTabWidget):
     
     texFolder = ""
@@ -204,19 +206,6 @@ class TabFormReport(QTabWidget):
                     print(f"Report type : {self.itemcfg.type} not found.")
             self.report_obj.save_latex()
 
-    def load_class(self,class_name):
-        module_name, class_nm = class_name.rsplit('.', 1)
-        full_path =  class_nm + ".py"
-        
-        try :
-            spec = importlib.util.spec_from_file_location(module_name, full_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-        except BaseException as e:
-            print(f"Load_Class failed:{e}")
-        #module = importlib.import_module(module_name)
-        attr_ret = getattr(module, class_nm)
-        return attr_ret
     #******************************************************************
     # Preview the latex genberated pdf
     #
@@ -226,66 +215,42 @@ class TabFormReport(QTabWidget):
         self.reload()
         #self.save_cap()
         match self.itemcfg.type:
-            case "data_update":
-                gpcddata = gPCDData(self.bobj,self.itemcfg)
-                file_dict = AttrDictFields()
-                file_dict["source_dir"] = self.itemcfg.input_data_dir + "/perfData" + self.itemcfg.data_source[0]
-                file_dict["target_dir"] = self.itemcfg.input_data_dir + "/perfData" + self.itemcfg.data_source[1]
-                file_dict["mode"] = self.itemcfg.mode
-                file_dict["compute_type"] = self.itemcfg.compute_type
-                gpcddata.check_data_files(file_dict)
-                gpcddata.do_performance(file_dict)
-                return
-                #gpcddata.read_summary_file(file_dict)
-                
-            case "batch":
-                return self.do_batch()
             case 'equation':
                 self.report_obj = ReportLatexEquation(self,self.itemcfg)
                 self.report_obj.save_latex()
             case 'table_code':
-                obj_name = f"{self.itemcfg.name}.{self.itemcfg.name}"
-                self.table_code_class = self.load_class(obj_name)(self.itemcfg,self.bobj)  
-                table = self.table_code_class.run() 
-                self.report_obj = ReportLatexTable(self,self.itemcfg)
-                self.report_obj.save_latex(table)
+                try:
+                    module_name = self.itemcfg.name
+                    file_path = self.itemcfg.code_dir + '/' + self.itemcfg.name + ".py"
+                
+                    CLS = self.load_class_from_file(file_path )
+                except BaseException as e:
+                    print(f"Load plot code class failed:{e}")
+                    return
+                try:
+                    self.table_code_class = CLS(self.itemcfg,self.bobj)
+                    table = self.table_code_class.run() 
+                    self.report_obj = ReportLatexTable(self,self.itemcfg)
+                    self.report_obj.save_latex(table)
+                except BaseException as e:
+                    print(f"Run table code class failed:{e}")
+                    return
             
             case 'plot_code':
-                obj_name = f"{self.itemcfg.name}.{self.itemcfg.name}"
-                self.plot_code_class = self.load_class(obj_name)(self.itemcfg,self.bobj)  
+                try:
+                    module_name = self.itemcfg.name
+                    file_path = self.itemcfg.code_dir + '/' + self.itemcfg.name + ".py"
+                    CLS = self.load_class_from_file(file_path )
+                except BaseException as e:
+                    print(f"Load plot code class failed:{e}")
+                    return
+                self.plot_code_class = CLS(self.itemcfg,self.bobj)
                 self.plot_code_class.run() 
                 self.report_obj = ReportLatexPlot(self,self.itemcfg)
-                self.report_obj.save_latex()
-            case 'csvtable':
-                self.itemcfg_main = self.itemcfg
-                lines_list = self.do_table()
-                self.report_obj = ReportLatexTable(self,self.itemcfg,lines_list)
-                self.report_obj.save_latex_csv()
-            case "csvplot":
-                self.report_obj = ReportLatexPlot(self,self.itemcfg)
-                self.itemcfg_main = self.itemcfg
-                self.do_plot()
-                self.report_obj.save_latex()
-            case "plot":
-                self.report_obj = ReportLatexPlot(self,self.itemcfg)
-                if len(self.itemcfg.include) == 0:
-                    self.itemcfg_main = self.itemcfg
-                    self.do_plot()
-                    #self.data_container.write_latex_values()
-                else:
-                    self.do_plots()
-
-                
                 self.report_obj.save_latex()
             case "image":
                 self.report_obj = ReportClass(self,self.itemcfg)
                 self.report_obj.save_latex()
-            case "gpcd_table":
-                self.itemcfg_main = self.itemcfg
-                lines_list = self.do_gpcd_table()
-                self.report_obj = ReportLatexTable(self,self.itemcfg,lines_list)
-                self.report_obj.save_latex()
-                #self.data_container.write_latex_values()
             case _:
                 print(f"Report type : {self.itemcfg.type} not found.")
 
@@ -618,4 +583,24 @@ class TabFormReport(QTabWidget):
         if selected_items:
             #print("List object Value Changed",selected_items[0].text())
             self.ltxObj.setTypeText(selected_items[0].text())         
-    
+
+
+    def load_class_from_file(self,file_path):
+        file_path = Path(file_path).resolve()
+        class_name = file_path.stem   # filename without .py
+
+        spec = importlib.util.spec_from_file_location(class_name, str(file_path))
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Could not load: {file_path}")
+
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        cls = getattr(module, class_name, None)
+
+        if cls is None:
+            raise AttributeError(
+                f"File loaded, but no class named '{class_name}' exists in {file_path.name}"
+            )
+
+        return cls

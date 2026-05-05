@@ -1,4 +1,0 @@
-Results of PQB total performancd sequential order. The overall frame-rate performance represented by the green dotted line. 
-The linear fit, represented by the red squares, has a base cost of \PQBSSPFLinearTrendK{} s. The quadratic fit, 
-represented by the blue circles, has a base cost of \PQBSSPFQuadraticTrendK{}s. 
-The line exhibits strong quadratic features. 
