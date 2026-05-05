@@ -44,6 +44,8 @@ int ParticleBoundaryV2(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFla
 		= new InstanceObj(vulkanObj,"InstanceObject");
 	ShaderObj* shaderObj 
 		= new ShaderObj(vulkanObj, "ShaderObj");
+	ResourceVertexSphere* resourceVertexSphere
+		= new ResourceVertexSphere(vulkanObj, "VertexSphere");
 	ResourceVertexCube* resourceVertexCube
 		= new ResourceVertexCube(vulkanObj, "VertexCube");
 	ResourceVertexParticle* resourceVertexParticle
@@ -52,6 +54,8 @@ int ParticleBoundaryV2(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFla
 		= new ResourceParticleUBO(vulkanObj, "ParticleUBO");
 	ResourceBoundaryUBO* resourceBoundaryUBO
 		= new ResourceBoundaryUBO(vulkanObj, "BoundaryUBO");
+	ResourceUBOSphere* resourceUBOSphere
+		= new ResourceUBOSphere(vulkanObj, "SphereUBO");
 	ResourceAtomicCompute* resourceAtomicCompute
 		= new ResourceAtomicCompute(vulkanObj, "AtomicCompute");
 	ResourceAtomicGraphics* resourceAtomicG
@@ -115,7 +119,7 @@ int ParticleBoundaryV2(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFla
 	renderPass->Create(swapChain, { imageColor,imageDepth }, { subPassParticle,subPassBoundary });
 	frameBuffer->Create(renderPass, swapChain);
 	resourceVertexParticle->Create(4);
-	//resourceVertexSphere->Create(resourceVertexParticle);
+	resourceVertexSphere->Create(resourceVertexParticle);
 	resourceVertexCube->Create(resourceVertexParticle);
 	resourceCollMatrix->Create(3, resourceVertexParticle);
 	resourceLockMatrix->Create(6, resourceVertexParticle);
@@ -124,16 +128,16 @@ int ParticleBoundaryV2(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFla
 	resourceAtomicG->Create(5,perObj);
 	resourceParticleUBO->Create(2, swapChain, resourceVertexParticle);
 	resourceBoundaryUBO->Create(1, swapChain, resourceVertexParticle);
-	//resourceUBOSphere->Create(7, swapChain, resourceVertexParticle);
+	resourceUBOSphere->Create(7, swapChain, resourceVertexParticle);
 	shaderObj->Create(resourceVertexParticle, resourceCollMatrix, resourceLockMatrix,swapChain);
 
 	resourceGraphicsContainer->Create({ resourceVertexCube,
-											//resourceVertexSphere,
+											resourceVertexSphere,
 											resourceVertexParticle,
 											resourceParticlePush,
 											resourceParticleUBO,
 											resourceBoundaryUBO,
-											//resourceUBOSphere,
+											resourceUBOSphere,
 											subPassParticle,
 											subPassBoundary,			//#####JMB## fix this
 											resourceCollMatrix,

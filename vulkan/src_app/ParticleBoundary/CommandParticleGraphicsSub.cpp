@@ -197,7 +197,7 @@ void CommandParticleGraphicsSub::RecordSubPassCube(uint32_t imageindex, uint32_t
 	// to command buffer.
 	//--------------------------------------------------------------------------
 	// Bind vertex buffer to command buffer.
-#if 0
+#if 1
 	Resource* dvo2 = (m_RCO->GetResourceName("VertexSphere"));
 	VkBuffer* vertexBuffers2 = static_cast<VkBuffer*>(&dvo2->m_Buffers[0]);
 	VkDeviceSize offsets2[] = { 0 };

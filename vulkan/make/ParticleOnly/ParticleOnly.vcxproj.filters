@@ -243,6 +243,12 @@
     <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceUBOBoundary.hpp">
       <Filter>boundary</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceVertexSphere.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceUBOSphere.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\libconfig\scanctx.c">
@@ -468,6 +474,12 @@
       <Filter>boundary</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceUBOBoundary.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceVertexSphere.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceUBOSphere.cpp">
       <Filter>boundary</Filter>
     </ClCompile>
   </ItemGroup>

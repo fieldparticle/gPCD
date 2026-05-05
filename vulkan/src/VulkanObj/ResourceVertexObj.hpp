@@ -71,7 +71,8 @@ class ResourceVertexObj : public Resource
 	void Cleanup() {
 
 		vmaDestroyBuffer(m_App->m_vmaAllocator, m_Buffers[0], m_Allocation[0]);
-		vmaDestroyBuffer(m_App->m_vmaAllocator, m_Buffers[1], m_Allocation[1]);
+		if(m_thisFramesBuffered > 1)
+			vmaDestroyBuffer(m_App->m_vmaAllocator, m_Buffers[1], m_Allocation[1]);
 	}
 	virtual void UpdateMem() {};
 	

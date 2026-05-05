@@ -52,56 +52,8 @@ void ResourceVertexObj::Create(uint32_t BindPoint)
 {
 	
 	
-	Resource::CheckBindPoint(BindPoint);
-
-	/*for (int ii = 0; ii < m_Model.Data.size() / 3;)
-	{
-		Vertex ad;
-		ad.position.x = m_Model.Data[ii];
-		ad.position.y = m_Model.Data[++ii];
-		ad.position.z = m_Model.Data[++ii];
-		ii++;
-		m_Verts.push_back(ad);
-	}*/
-	m_thisFramesBuffered = 2;
-	std::ostringstream  objtxt;
-	m_BufSize = sizeof(CartVert) * (uint32_t)m_Verts.size();
-	mout << "MEMALLOC:ResourceVertexObj:" << m_BufSize << ende;
-	m_NumElements = (uint32_t)m_Verts.size();
-	m_Buffers.resize(m_thisFramesBuffered);
-	m_BuffersMemory.resize(m_thisFramesBuffered);
-	m_BuffersMapped.resize(m_thisFramesBuffered);
-	m_BufferInfo.resize(m_thisFramesBuffered);
-	m_Allocation.resize(m_thisFramesBuffered);
-	VkBuffer buf = {};
 	
 
-	objtxt << m_Name << " Number:" << 0 << std::ends;
-	m_App->VMACreateDeviceBuffer(m_BufSize,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_Buffers[0], m_Allocation[0], objtxt.str());
-	
-	vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, m_Verts.data(), m_Allocation[0],
-		0, m_BufSize);
-
-	m_BufSize = sizeof(CartVert) * (uint32_t)m_CubeIndices.size();
-	objtxt << m_Name << " Number:" << 0 << std::ends;
-	m_App->VMACreateDeviceBuffer(m_BufSize,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-		VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_Buffers[1], m_Allocation[1], objtxt.str());
-
-	vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, m_CubeIndices.data(), m_Allocation[1],
-		0, m_BufSize);
-
-
-	m_Verts.clear();
-	m_CubeIndices.clear();
 }
 
 VkVertexInputBindingDescription* 

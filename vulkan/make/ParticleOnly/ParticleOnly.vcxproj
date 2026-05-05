@@ -220,7 +220,9 @@
     <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceSubpassBoundary.hpp" />
     <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceSubpassParticle.hpp" />
     <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceUBOBoundary.hpp" />
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceUBOSphere.hpp" />
     <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceVertexCube.hpp" />
+    <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceVertexSphere.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\CommandParticleCompute.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\CommandParticleGraphics.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\ContainerCompute.hpp" />
@@ -322,7 +324,9 @@
     <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceSubpassBoundary.cpp" />
     <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceSubpassParticle.cpp" />
     <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceUBOBoundary.cpp" />
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceUBOSphere.cpp" />
     <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceVertexCube.cpp" />
+    <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceVertexSphere.cpp" />
     <ClCompile Include="..\..\src_app\particleOnly\CommandParticleCompute.cpp" />
     <ClCompile Include="..\..\src_app\particleOnly\CommandParticleGraphics.cpp" />
     <ClCompile Include="..\..\src_app\particleOnly\ConfigGetSettings.cpp" />
