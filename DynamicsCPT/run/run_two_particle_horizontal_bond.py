@@ -1,4 +1,3 @@
-from base.scenarios import configure_two_particle_horizontal
 from run.output_dirs import export_path_for_dt, resolve_base_class
 
 BASE_MODEL = "mom"
@@ -79,7 +78,8 @@ def apply_particle_overrides(base):
             **{key: value for key, value in overrides.items() if key not in required_fields},
         )
 def configure_run(base):
-    configure_two_particle_horizontal(base)
+    base.clear_particles()
+    base.clear_walls()
     if DT is not None:
         base.dt = float(DT)
     if SUBSTEPS is not None:

@@ -1,4 +1,3 @@
-from base.scenarios import configure_three_particle_horizontal
 from run.output_dirs import export_path_for_dt, resolve_base_class
 
 BASE_MODEL = "mom"
@@ -60,6 +59,14 @@ PARTICLE_OVERRIDES = {
 }
 
 
+def configure_default_particles(base):
+    base.clear_particles()
+    base.clear_walls()
+    base.add_particle(x=-2.0, y=1.5, vx=1.0, vy=0.0, mass=1.0, radius=1.0)
+    base.add_particle(x=2.0, y=0.0, vx=-1.0, vy=0.0, mass=1.0, radius=1.0)
+    base.add_particle(x=2.0, y=3.0, vx=-1.0, vy=0.0, mass=1.0, radius=1.0)
+
+
 def apply_wall_override(base):
     if WALL_BOX is None:
         return
@@ -85,7 +92,7 @@ def build_study_particle_overrides(study_index: int, sweep_value: float) -> dict
 
 
 def configure_run(base):
-    configure_three_particle_horizontal(base)
+    configure_default_particles(base)
     if DT is not None:
         base.dt = float(DT)
     if SUBSTEPS is not None:
@@ -127,7 +134,7 @@ if __name__ == "__main__":
         export_data_file = export_path_for_dt(f"tph_{ii}.csv", DT, output_dir_name=OUTPUT_DIR_NAME)
 
         def configure_sweep_run(base):
-            configure_three_particle_horizontal(base)
+            configure_default_particles(base)
             if DT is not None:
                 base.dt = float(DT)
             if SUBSTEPS is not None:

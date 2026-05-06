@@ -1,4 +1,3 @@
-from base.scenarios import configure_two_particle_ocl
 import csv
 from pathlib import Path
 from run.output_dirs import export_path_for_dt, resolve_base_class
@@ -19,6 +18,13 @@ MIN_COLLISION_STEPS = 24
 ENFORCE_SPEED_LIMIT = True
 #particle_list = list(range(40))
 particle_list = [1]
+
+
+def configure_default_particles(base):
+    base.clear_particles()
+    base.clear_walls()
+    base.add_particle(x=-2.0, y=1.5, vx=1.0, vy=0.0, mass=1.0, radius=1.0)
+    base.add_particle(x=2.0, y=0.0, vx=-1.0, vy=0.0, mass=1.0, radius=1.0)
 
 
 def apply_wall_override(base):
@@ -133,7 +139,7 @@ if __name__ == "__main__":
             continue
 
         def configure_run(base):
-            configure_two_particle_ocl(base)
+            configure_default_particles(base)
             if DT is not None:
                 base.dt = float(DT)
             if SUBSTEPS is not None:

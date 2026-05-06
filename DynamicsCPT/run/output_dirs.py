@@ -1,8 +1,7 @@
 from decimal import Decimal
 from pathlib import Path
 
-from base.FieldBase import FieldBase
-from base.MomBase import MomBase
+from base.Base import Base
 
 
 def data_dir_name_for_dt(dt: float | None) -> str:
@@ -28,8 +27,6 @@ def export_path_for_dt(filename: str, dt: float | None, output_dir_name: str | N
 
 def resolve_base_class(base_model: str):
     normalized = base_model.strip().lower()
-    if normalized == "field":
-        return FieldBase
-    if normalized == "mom":
-        return MomBase
-    raise ValueError(f"Unsupported BASE_MODEL '{base_model}'. Use 'field' or 'mom'.")
+    if normalized in {"base", "mom", "momentum"}:
+        return Base
+    raise ValueError(f"Unsupported BASE_MODEL '{base_model}'. Use 'base' or 'mom'.")
