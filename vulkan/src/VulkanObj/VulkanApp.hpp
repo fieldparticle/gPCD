@@ -74,15 +74,11 @@ void MemStats(VulkanObj* vulkanObj);
 
 
 extern bool Extflg;
-std::vector<std::string> ReadFileByBlocks(const char* filename, TCPObj* tcps);
 int Loop(PerfObj* pf, TCPObj* tcp, TCPObj* tcpapp,DrawObj* DrawInstance, VulkanObj* VulkanWin, ResourceGraphicsContainer* rgc, ResourceComputeContainer* rcc);
 int NoPerfLoop(PerfObj* perfObj, TCPObj* tcp, TCPObj* tcpsapp,DrawObj* DrawInstance, VulkanObj* VulkanWin, ResourceGraphicsContainer* rgc, ResourceComputeContainer* rcc);
-int Capture(uint32_t ImgNum);
-int SetupCapture();
 int ParticleOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp,bool rmtFlag);
-int ParticleBoundary(ConfigObj* configVCube);
-int ParticleBoundaryV2(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag);
+int ParticleBoundaryOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag);
+int ParticleBoundaryParticle(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag);
 int glsl(std::vector<std::string>& InputArgs, std::vector<char>& OutPutSPV);
-int ParticleOnlyGraphics(ConfigObj* configVCube);
 void GLFWError(int err, const char* err_str);
 void LaunchExecutable(std::string path, std::string cmd) ;

@@ -207,13 +207,13 @@
     <ClInclude Include="..\..\src\tcpip\TCPCObj.hpp">
       <Filter>vulkanobj</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src_app\ParticleBoundary\particleBoundaryV2.hpp">
+    <ClInclude Include="..\..\src_app\ParticleBoundary\particleBoundaryParticle.hpp">
       <Filter>boundary</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceVertexCube.hpp">
       <Filter>boundary</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src_app\ParticleBoundary\CommandParticleGraphicsSub.hpp">
+    <ClInclude Include="..\..\src_app\ParticleBoundary\CommandParticleBoundaryAndSpheres.hpp">
       <Filter>boundary</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src_app\ParticleBoundary\DrawParticleBoundary.hpp">
@@ -247,6 +247,9 @@
       <Filter>boundary</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceUBOSphere.hpp">
+      <Filter>boundary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleBoundary\CommandParticleBoundaryOnly.hpp">
       <Filter>boundary</Filter>
     </ClInclude>
   </ItemGroup>
@@ -440,13 +443,13 @@
     <ClCompile Include="..\..\src\glsl\call_glsl.cpp">
       <Filter>glslang_custom</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src_app\ParticleBoundary\particleBoundaryV2.cpp">
+    <ClCompile Include="..\..\src_app\ParticleBoundary\particleBoundaryParticle.cpp">
       <Filter>boundary</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceVertexCube.cpp">
       <Filter>boundary</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src_app\ParticleBoundary\CommandParticleGraphicsSub.cpp">
+    <ClCompile Include="..\..\src_app\ParticleBoundary\CommandParticleBoundaryAndSpheres.cpp">
       <Filter>boundary</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src_app\ParticleBoundary\DrawParticleBoundary.cpp">
@@ -480,6 +483,12 @@
       <Filter>boundary</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceUBOSphere.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\particleBoundaryOnly.cpp">
+      <Filter>boundary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleBoundary\CommandParticleBoundaryOnly.cpp">
       <Filter>boundary</Filter>
     </ClCompile>
   </ItemGroup>

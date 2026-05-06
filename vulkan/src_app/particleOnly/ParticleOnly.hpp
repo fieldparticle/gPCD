@@ -56,8 +56,8 @@
 #include "particleOnly/SyncObjParticleOnly.hpp"
 #include "particleOnly/ResourceVertexCube.hpp"
 
-#include "ParticleBoundary/CommandParticleGraphicsSub.hpp"
-
+#include "ParticleBoundary/CommandParticleBoundaryAndSpheres.hpp"
+#include "ParticleBoundary/CommandParticleBoundaryOnly.hpp"
 #include "ParticleBoundary/DrawParticleBoundary.hpp"
 #include "ParticleBoundary/FrameBufferSubPass.hpp"
 

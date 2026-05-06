@@ -1,0 +1,56 @@
+1. clone shaderc to gPCD3rdParty https://github.com/google/shaderc.git
+2. cd to C:\_DJ\gPCD3rdParty\shaderc\utils and run "python3 git-sync-deps" it will pull everyhting down
+	if you try manual it will miss gmaock for some reason
+
+Manually
+2a.. go to C:\_DJ\gPCD3rdParty\shaderc\third_party
+2b. clone SPIRVTools here https://github.com/KhronosGroup/SPIRV-Tools.git
+2c  clone Stateful pattern matcher inspired by LLVM's FileCheck https://github.com/google/effcee.git
+2d. clone googletest here https://github.com/google/googletest.git
+2e. clone Common basic utilities in C++ 
+
+##Improtant - this is where all the linker libs will be in vc++
+open on cmake set the putput directory to sharc/build
+generate
+go to output direcotry C:\_DJ\gPCD3rdParty\shaderc\build and open shaderc.sln
+in solution explorer go tot CMakePredefinedTargets
+build ALL_BUILD
+
+3. Replace the three files
+
+
+INclude directories
+..\..\..\..\gPCD3rdParty\shaderc\third_party\glslang
+../../../../gPCD3rdParty/glfw/include/
+..\..\..\..\gPCD3rdParty\VMA\include
+..\..\..\..\gPCD3rdParty\tinyobjloader-release
+..\..\src_app
+..\..\src
+..\..\..\..\gPCD3rdParty\stb
+..\..\..\..\gPCD3rdParty\shaderc\libshaderc_util\include
+..\..\..\..\gPCD3rdParty\shaderc\glslc\src
+..\..\..\..\gPCD3rdParty\shaderc\libshaderc\include
+..\..\..\..\gPCD3rdParty\shaderc\third_party\SPIRV-Tools\include
+..\..\..\..\gPCD3rdParty\shaderc\build_vcc
+..\..\..\..\gPCD3rdParty\shaderc
+..\..\..\..\gPCD3rdParty\VulkanSDK\Include
+..\..\..\..\gPCD3rdParty\shaderc\libshaderc_util
+..\..\..\..\gPCD3rdParty\glm
+..\..\src\libconfig
+
+Linker libraries for debug
+Shlwapi.lib
+$(VULKAN_SDK)\Lib\vulkan-1.lib
+..\..\..\..\gPCD3rdParty\glfw\build\src\Debug\glfw3.lib
+..\..\..\..\gPCD3rdParty\shaderc\build\glslc\Debug\glslc.lib
+..\..\..\..\gPCD3rdParty\shaderc\build\libshaderc_util\Debug\shaderc_util.lib
+..\..\..\..\gPCD3rdParty\shaderc\build\libshaderc\Debug\shaderc.lib
+..\..\..\..\gPCD3rdParty\shaderc\build\third_party\glslang\glslang\Debug\glslangd.lib
+..\..\..\..\gPCD3rdParty\shaderc\build\third_party\glslang\SPIRV\Debug\SPIRVd.lib
+..\..\..\..\gPCD3rdParty\shaderc\build\third_party\spirv-tools\source\opt\Debug\SPIRV-Tools-opt.lib
+..\..\..\..\gPCD3rdParty\shaderc\build\third_party\spirv-tools\source\Debug\SPIRV-Tools.lib
+..\..\..\..\gPCD3rdParty\shaderc\build\third_party\glslang\glslang\Debug\MachineIndependentd.lib
+..\..\..\..\gPCD3rdParty\shaderc\build\third_party\glslang\glslang\OSDependent\Windows\Debug\OSDependentd.lib
+..\..\..\..\gPCD3rdParty\shaderc\build\third_party\glslang\glslang\Debug\GenericCodeGend.lib
+
+When linkng make sure in C++/

@@ -110,17 +110,27 @@ int main(int argc, const char* argv[]) try
 		std::string testfile = "application.testfile";
 		CfgTst->Create(CfgApp->GetString(testfile, true));
 		bool has_boundary = CfgApp->GetBool("application.has_boundary", true);
+		bool has_spheres = CfgApp->GetBool("application.particle_as_spheres", true);
 
-		if (has_boundary == true)
+		if (has_boundary == true && has_spheres == true)
 		{
 			
-			if (ParticleBoundaryV2(pf, nullptr, nullptr, false))
+			if (ParticleBoundaryParticle(pf, nullptr, nullptr, false))
+			{
+				return 1;
+			}
+		}
+		
+		else if (has_boundary == true)
+		{
+
+			if (ParticleBoundaryOnly(pf, nullptr, nullptr, false))
 			{
 				return 1;
 			}
 		}
 
-		if (has_boundary == false)
+		else if (has_boundary == false)
 		{
 			if (ParticleOnly(pf, nullptr, nullptr, false))
 			{
