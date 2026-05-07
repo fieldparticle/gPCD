@@ -1,10 +1,17 @@
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from base.gPCD import Demo
 
 RUN_CONFIGURATION = {
     "dt": 0.05,
     "substeps": 5,
     "window_size": (1000, 1000),
-    "wall_box": (-3.0, 3.0, -3.0, 3.0),
+    "wall_box": (-5.0, 5.0, -5.0, 5.0),
     "zoom": 0.5,
     "max_contacts_per_particle": 8,
     "momentum_per_area": 0.001,
@@ -20,7 +27,6 @@ PARTICLE_DATA = {
         "radius": 1.0,
         "fill": (100, 170, 255),
         "edge": (160, 210, 255),
-        "contacts": [None] * RUN_CONFIGURATION["max_contacts_per_particle"],
     },
     1: {
         "location": {"use": 1, "x1": -1.0, "y1": -1.0, "x2": -1.0, "y2": -1.0},
@@ -30,7 +36,6 @@ PARTICLE_DATA = {
         "radius": 1.0,
         "fill": (255, 120, 120),
         "edge": (255, 180, 180),
-        "contacts": [None] * RUN_CONFIGURATION["max_contacts_per_particle"],
     },
 }
 

@@ -25,12 +25,28 @@ class Dynamics:
             Particle mass used when converting momentum into velocity change.
         vx, vy:
             Current velocity components.
-        contact_count:
-            Number of valid entries in contacts.
-        contacts:
-            Fixed-length list of contact-particle indices found by
-            Base.detect_contacts. The contact-particle array contains all real
-            particles plus any wall ghost particles created for this step.
+        PosLocA, PosLocB:
+            GLSL-shaped position buffers mirrored from location.
+        VelRad:
+            GLSL-shaped velocity mirror. x/y are vx/vy, z is unused for now,
+            and w stores the velocity angle in radians.
+        Data:
+            GLSL-shaped data mirror. x stores particle radius.
+        parms:
+            GLSL-shaped parameter/result mirror. x stores mass, y/z store
+            overlap_momentum_x/y, and w stores scalar overlap momentum sum.
+        sltnum:
+            Number of valid particle-collision entries in ccs.
+        ColFlg:
+            1 when this source particle has any active ccs particle collision,
+            otherwise 0. Python wall contacts do not make ColFlg shader-ready.
+        ccs:
+            Fixed-length particle contact list. Active slots have clflg != 0
+            and pindex set to the target particle index.
+        bcs:
+            Python-only boundary contact list for the current wall demos.
+            Active slots have clflg != 0, but this is not treated as
+            GLSL-ready wall behavior yet.
 
     Written particle fields:
         overlap_momentum_x, overlap_momentum_y:
@@ -49,61 +65,78 @@ class Dynamics:
         self.momentum_per_area = 0.001
         self.inverse_square_softening = 1.0
 
-    def process_collisions(self, particles, contact_particles=None):
-        """Compute collision momentum for each particle from its contacts.
+    def process_collisions(self, particles, walls=None):
+        """Compute collision momentum for every source particle.
 
-        Base.detect_contacts fills each particle's contact array before this
-        method runs. For every particle_i, this method loops only over
-        particle_i["contacts"], computes the overlap with each listed
-        particle_j, and accumulates the resulting momentum vector into
-        particle_i. Contact entries index into contact_particles, which is the
-        real particle list plus any wall ghost particles for the current step.
+        This is the Python convenience wrapper around the GLSL-shaped unit of
+        work, process_source_collision(source_id). Contact detection is assumed
+        to be complete before this method runs.
 
         This method intentionally does not apply the momentum to velocity. It
         only stores the calculated response on the particle. The separate
         apply_overlap_momentum() method performs the velocity update.
         """
-        
-        if contact_particles is None:
-            contact_particles = particles
+        for source_id in range(len(particles)):
+            self.process_source_collision(source_id, particles, walls)
 
-        #JMB# If contact particles is none then why is it iterating over particles instead 
-        # of contact_particles? It seems like it should be iterating over contact_particles instead. 
-        # if contact_particles is None then there are no more collisons for this particle and 
-        # we should return.
-        for particle_i in particles:
-            momentum_x = 0.0
-            momentum_y = 0.0
-            momentum_sum = 0.0
+    def process_source_collision(self, source_id, particles, walls=None):
+        """Process the completed collision list for one source particle.
 
-            for slot in range(particle_i["contact_count"]):
-                j = particle_i["contacts"][slot]
-                if j is None:
-                    continue
+        This method mirrors the intended GLSL entry point:
 
-                particle_j = contact_particles[j]
-                contact = self.particle_contact(particle_i, particle_j)
-                if contact is None:
-                    continue
+            ProcessCollision(uint SourceID)
 
-                nx, ny, overlap_area, center_distance = contact
-                momentum = self.overlap_momentum(
-                    overlap_area,
-                    center_distance,
-                    particle_i,
-                )
-                # nx, ny points from particle_i toward particle_j. The response
-                # for particle_i is in the opposite direction, so subtract it.
-                momentum_x -= nx * momentum
-                momentum_y -= ny * momentum
-                momentum_sum += momentum
+        It assumes ccs[0:sltnum] has already been filled by collision
+        detection. It does not perform broad-phase search, cell lookup, corner
+        list traversal, or duplicate filtering.
+        """
+        source_particle = particles[source_id]
+        momentum_x = 0.0
+        momentum_y = 0.0
+        momentum_sum = 0.0
 
-            particle_i["overlap_momentum_x"] = momentum_x
-            particle_i["overlap_momentum_y"] = momentum_y
-            particle_i["overlap_momentum"] = momentum_sum
-            particle_i["internal_momentum_x"] = momentum_x
-            particle_i["internal_momentum_y"] = momentum_y
-            particle_i["internal_momentum"] = math.hypot(momentum_x, momentum_y)
+        for slot in range(source_particle.get("sltnum", 0)):
+            contact_record = source_particle["ccs"][slot]
+            if contact_record.get("clflg", 0) == 0:
+                continue
+
+            contact = self.ccs_contact_geometry(source_particle, contact_record, particles)
+            if contact is None:
+                continue
+
+            momentum_x, momentum_y, momentum_sum = self.add_contact_momentum(
+                source_particle,
+                contact,
+                momentum_x,
+                momentum_y,
+                momentum_sum,
+            )
+
+        for contact_record in source_particle.get("bcs", []):
+            if contact_record.get("clflg", 0) == 0:
+                continue
+
+            contact = self.bcs_contact_geometry(source_particle, contact_record, walls)
+            if contact is None:
+                continue
+
+            momentum_x, momentum_y, momentum_sum = self.add_contact_momentum(
+                source_particle,
+                contact,
+                momentum_x,
+                momentum_y,
+                momentum_sum,
+            )
+
+        source_particle["overlap_momentum_x"] = momentum_x
+        source_particle["overlap_momentum_y"] = momentum_y
+        source_particle["overlap_momentum"] = momentum_sum
+        source_particle["parms"][1] = momentum_x
+        source_particle["parms"][2] = momentum_y
+        source_particle["parms"][3] = momentum_sum
+        source_particle["internal_momentum_x"] = momentum_x
+        source_particle["internal_momentum_y"] = momentum_y
+        source_particle["internal_momentum"] = math.hypot(momentum_x, momentum_y)
 
     def apply_overlap_momentum(self, particles):
         """Convert each particle's stored overlap momentum into velocity.
@@ -118,16 +151,27 @@ class Dynamics:
         for particle in particles:
             particle["vx"] += particle.get("overlap_momentum_x", 0.0) / particle["mass"]
             particle["vy"] += particle.get("overlap_momentum_y", 0.0) / particle["mass"]
+            self.sync_velocity_mirror(particle)
 
-    def particle_contact(self, particle_i, particle_j):
-        """Return contact geometry for two overlapping disks.
+    @staticmethod
+    def sync_velocity_mirror(particle):
+        """Keep the GLSL-shaped velocity vector aligned with vx/vy."""
+        vx = particle["vx"]
+        vy = particle["vy"]
+        particle["VelRad"][0] = vx
+        particle["VelRad"][1] = vy
+        particle["VelRad"][3] = math.atan2(vy, vx) if vx != 0.0 or vy != 0.0 else 0.0
+
+    def particle_contact(self, source_particle, target_particle):
+        """Return contact geometry for two overlapping source/target disks.
 
         Returns None when the disks do not overlap.
 
         When they overlap, returns:
 
             nx, ny:
-                Unit vector from particle_i center to particle_j center.
+                Unit vector from source_particle center to target_particle
+                center.
             overlap_area:
                 Area of intersection between the two equal-radius disks.
             center_distance:
@@ -136,14 +180,14 @@ class Dynamics:
         The zero-distance branch chooses an arbitrary normal of (1, 0). That
         avoids division by zero while keeping the response deterministic.
         """
-        xi, yi = self.current_location(particle_i)
-        xj, yj = self.current_location(particle_j)
-        dx = xj - xi
-        dy = yj - yi
+        source_x, source_y = self.current_location(source_particle)
+        target_x, target_y = self.current_location(target_particle)
+        dx = target_x - source_x
+        dy = target_y - source_y
         center_distance = math.hypot(dx, dy)
-        radius_i = particle_i["radius"]
-        radius_j = particle_j["radius"]
-        radius_sum = radius_i + radius_j
+        source_radius = source_particle["radius"]
+        target_radius = target_particle["radius"]
+        radius_sum = source_radius + target_radius
         if center_distance >= radius_sum:
             return None
 
@@ -154,12 +198,75 @@ class Dynamics:
             nx = dx / center_distance
             ny = dy / center_distance
 
-        delta = min(radius_sum - center_distance, min(radius_i, radius_j))
+        delta = min(radius_sum - center_distance, min(source_radius, target_radius))
         contact_distance = radius_sum - delta
-        overlap_area = self.circle_overlap_area(radius_i, radius_j, contact_distance)
+        overlap_area = self.circle_overlap_area(source_radius, target_radius, contact_distance)
         return nx, ny, overlap_area, center_distance
 
-    def overlap_momentum(self, overlap_area, center_distance, particle_i):
+    def add_contact_momentum(self, source_particle, contact, momentum_x, momentum_y, momentum_sum):
+        """Accumulate response momentum from one contact geometry tuple."""
+        nx, ny, overlap_area, center_distance = contact
+        momentum = self.overlap_momentum(
+            overlap_area,
+            center_distance,
+            source_particle,
+        )
+        # nx, ny points from the source toward the target. The response for the
+        # source is in the opposite direction, so subtract it.
+        return (
+            momentum_x - nx * momentum,
+            momentum_y - ny * momentum,
+            momentum_sum + momentum,
+        )
+
+    def ccs_contact_geometry(self, source_particle, contact_record, particles):
+        """Return geometry for one active ccs particle contact record."""
+        target_particle = particles[contact_record["pindex"]]
+        return self.particle_contact(source_particle, target_particle)
+
+    def bcs_contact_geometry(self, source_particle, contact_record, walls):
+        """Return geometry for one active bcs boundary contact record."""
+        return self.wall_contact(source_particle, contact_record["clflg"], walls)
+
+    def wall_contact(self, source_particle, wall_flag, walls):
+        """Return contact geometry for the current flat wall box.
+
+        This function is intentionally the wall-specific geometry hook. The
+        current implementation handles the rectangular wall box, while future
+        profiles can return the same nx, ny, overlap_area, distance tuple from
+        curved or segmented boundaries.
+        """
+        if walls is None:
+            return None
+
+        x, y = self.current_location(source_particle)
+        radius = source_particle["radius"]
+
+        if wall_flag == 1:
+            distance_to_wall = x - walls["start_x"]
+            nx, ny = -1.0, 0.0
+        elif wall_flag == 2:
+            distance_to_wall = walls["end_x"] - x
+            nx, ny = 1.0, 0.0
+        elif wall_flag == 3:
+            distance_to_wall = y - walls["start_y"]
+            nx, ny = 0.0, -1.0
+        elif wall_flag == 4:
+            distance_to_wall = walls["end_y"] - y
+            nx, ny = 0.0, 1.0
+        else:
+            raise ValueError(f"Unknown wall flag: {wall_flag!r}")
+
+        if distance_to_wall >= radius:
+            return None
+
+        center_distance = max(0.0, 2.0 * distance_to_wall)
+        delta = min(2.0 * radius - center_distance, radius)
+        contact_distance = 2.0 * radius - delta
+        overlap_area = self.circle_overlap_area(radius, radius, contact_distance)
+        return nx, ny, overlap_area, center_distance
+
+    def overlap_momentum(self, overlap_area, center_distance, source_particle):
         """Convert overlap area into a scalar momentum amount.
 
         This follows the legacy Mom idea: overlap area is the source of a
@@ -168,15 +275,15 @@ class Dynamics:
 
             momentum = momentum_per_area * overlap_area * inverse_square_weight
 
-        particle_i may override momentum_per_area. The other particle is not
-        queried for optional configuration so this particle-owned calculation
+        source_particle may override momentum_per_area. The target particle is
+        not queried for optional configuration so this source-owned calculation
         stays friendly to one-thread-per-particle execution.
         """
         # Legacy Mom model: overlap area is treated as the source of a momentum
         # amount, not as a force that gets multiplied by dt.
-        momentum_per_area = particle_i.get(
+        momentum_per_area = source_particle.get(
             "momentum_per_area",
-            particle_i.get("repulsion_force_per_area", self.momentum_per_area),
+            source_particle.get("repulsion_force_per_area", self.momentum_per_area),
         )
         return momentum_per_area * overlap_area * self.inverse_square_weight(center_distance)
 

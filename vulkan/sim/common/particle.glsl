@@ -31,31 +31,31 @@
 %*
 %******************************************************************/
 struct lstr {
-	uint pindex;
-	uint ploc;
-	uint fill;
+	uint pindex; 				// Index of cell the corner occupies
+	uint ploc;					// TBD
+	uint fill;					// fill
 };
 struct bcoll {
-	uint clflg;
+	uint clflg;					// TBD
 };
 struct ccoll {
-	uint pindex;
-	uint clflg;
+	uint pindex;				// TBD
+	uint clflg;					// TBD
 };
 // The particle structure.
 struct Particle {
-	vec4  PosLoc; 				// Position - x,y,z, and w stores the particle radius.
-	vec4  VelRad;				// Velocity - mapped to vertex input
-	vec4  FrcAng;				// Not implimented yet.
-    vec4  prvvel;				// Previous velocity (delete)
-	vec4  parms;				// x containes the sequens, y kills the particle
-	lstr  CornerList[8];		// Particle Corner List
-	bcoll bcs[4];				// boundary collisions
-	ccoll ccs[12];				// boundary collisions
-	uint  sltnum;				// dupcate collisions slot
-	uint  ColFlg;				// Not implimented yet.
-	float MolarMatter;
-	float temp_vel;
+	vec4  PosLocA; 				// First position buffer. x,y,z, hold the location and 1 stores the active flag. 0.0 if active, 1.0 if not.
+	vec4  PosLocB;				// Second position buffer. x,y,z, hold the location and 1 stores the active flag. 0.0 if active, 1.0 if not.
+	vec4  VelRad;				// Velocity, vx,vy,vz, w not used.
+    vec4  Data;					// Particle Data x=particle radius, yzw not used
+	vec4  parms;				// TBD
+	lstr  CornerList[8];		// Particle Corner List (see lstr)
+	bcoll bcs[4];				// Current glsl version does not support walls. Only particle contacts.
+	ccoll ccs[12];				// TBD
+	uint  sltnum;				// Use to store contact count.
+	uint  ColFlg;				// 1 if in collision, 0 if not.
+	float MolarMatter;			// To be used later
+	float temp_vel;				// To be used later
 };
 struct boundStruct
 {
@@ -69,6 +69,3 @@ layout(binding = 4) buffer ParticleSSBOOut
 {
    Particle P[NUMPARTS];
 };
-
-
-

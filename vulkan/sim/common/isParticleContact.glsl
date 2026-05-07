@@ -37,28 +37,28 @@ uint isParticleContact(uint crnr, uint Findex, uint Tindex)
 	if(Findex == Tindex )
 		return 0;
 
-	float xT = P[Findex].PosLoc.x;
-    float yT = P[Findex].PosLoc.y;
-    float zT = P[Findex].PosLoc.z;
+	float xT = P[Findex].PosLocA.x;
+    float yT = P[Findex].PosLocA.y;
+    float zT = P[Findex].PosLocA.z;
 	
-	float xP = P[Tindex].PosLoc.x;
-    float yP = P[Tindex].PosLoc.y;
-    float zP = P[Tindex].PosLoc.z;
+	float xP = P[Tindex].PosLocA.x;
+    float yP = P[Tindex].PosLocA.y;
+    float zP = P[Tindex].PosLocA.z;
 		 // Get distance between centers
     float dsq = ((xP-xT)*(xP-xT)+
                     (yP-yT)*(yP-yT)+
                     (zP-zT)*(zP-zT));
 	
-	float rsq = ((P[Findex].PosLoc.w+P[Tindex].PosLoc.w)*(P[Findex].PosLoc.w+P[Tindex].PosLoc.w));
-	
+	//float rsq = ((P[Findex].PosLoc.w+P[Tindex].PosLoc.w)*(P[Findex].PosLoc.w+P[Tindex].PosLoc.w));
+	float rsq = ((P[Findex].Data.x+P[Tindex].Data.x)*(P[Findex].Data.x+P[Tindex].Data.x));
 	// If square of distance is less than square of radii there is a collision.
 	float tdt = rsq/dsq;
-#if 0		
-		if(uint(ShaderFlags.frameNum) == 3)// && Findex == 1)
+#if 1		
+		if(uint(ShaderFlags.frameNum) == 3 && Findex == 5)
 			debugPrintfEXT("Collison Frame(%0.1f),FRM:%d,TO:%d dsq:%0.8f,rsq:%0.8f,rddiff:%0.8f,Radius1:%0.4f,Radius2:%0.4f",
 			ShaderFlags.frameNum,
 			Findex,
-			Tindex,dsq,rsq,dsq-rsq,P[Findex].PosLoc.w,P[Tindex].PosLoc.w);
+			Tindex,dsq,rsq,dsq-rsq,P[Findex].Data.x,P[Tindex].Data.x);
 #endif	
 	float rddiff = dsq-rsq;	
 	//if (dsq <= rsq )

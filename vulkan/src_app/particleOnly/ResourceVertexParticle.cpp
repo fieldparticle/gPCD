@@ -110,10 +110,11 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 			}
 		}
 #endif		
-		part.PosLoc			= glm::vec4(part_pos.rx, part_pos.ry,part_pos.rz, part_pos.radius);
+		part.PosLocA			= glm::vec4(part_pos.rx, part_pos.ry,part_pos.rz, 0.0);
 		part.pnum			= m_NumParticles;
 		part.VelRad			= glm::vec4(part_pos.vx, part_pos.vy, part_pos.vz,1.0);
-		part.FrcAng			= glm::vec4(0.0, 0.0, 0.0,1.0);
+		part.PosLocB		= glm::vec4(0.0, 0.0, 0.0,1.0);
+		part.Data			= glm::vec4(part_pos.radius, 0.0, 0.0, 1.0);
 		part.MolarMatter	= static_cast<float>(1.0);
 		part.temp_vel		= static_cast<float>(0.04);
 		part.parms		=  glm::vec4(part_pos.seq, 0.0,0.0, 0.0);
@@ -259,26 +260,26 @@ ResourceVertexParticle::GetAttributeDescriptions()
 	ad.binding = m_BindPoint;
 	ad.location = 0;
 	ad.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	ad.offset = offsetof(Particle, PosLoc);
+	ad.offset = offsetof(Particle, PosLocA);
 
 	m_AttributeDescriptions.push_back(ad);
 
 	ad.binding = m_BindPoint;
 	ad.location = 1;
 	ad.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	ad.offset = offsetof(Particle, VelRad);
+	ad.offset = offsetof(Particle, PosLocB);
 	m_AttributeDescriptions.push_back(ad);
 
 	ad.binding = m_BindPoint;
 	ad.location = 2;
 	ad.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	ad.offset = offsetof(Particle, FrcAng);
+	ad.offset = offsetof(Particle, VelRad);
 	m_AttributeDescriptions.push_back(ad);
 
 	ad.binding = m_BindPoint;
 	ad.location = 3;
 	ad.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	ad.offset = offsetof(Particle, prvvel);
+	ad.offset = offsetof(Particle, Data);
 	m_AttributeDescriptions.push_back(ad);
 	
 	

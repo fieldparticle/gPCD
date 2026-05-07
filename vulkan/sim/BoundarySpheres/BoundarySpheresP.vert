@@ -1,7 +1,7 @@
-#version 450
+#version 460
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
-#if defined(DEBUG)
+#if 1
 	#extension GL_EXT_debug_printf : enable
 #endif
 //#extension GL_EXT_scalar_block_layout :enable
@@ -87,10 +87,10 @@ void main(){
 	//gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
 	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
 	
-	float cx 		= P[index].PosLoc.x;
-	float cy 		= P[index].PosLoc.y;
-	float cz 		= P[index].PosLoc.z;
-	float R			= P[index].PosLoc.w;
+	float cx 		= P[index].PosLocA.x;
+	float cy 		= P[index].PosLocA.y;
+	float cz 		= P[index].PosLocA.z;
+	float R			= P[index].Data.x;
 	
 	uint duplist[8];
 	uint dupcntr = 0;

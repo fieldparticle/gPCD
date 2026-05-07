@@ -197,6 +197,7 @@
     <ClInclude Include="..\..\src\VulkanObj\Input.hpp" />
     <ClInclude Include="..\..\src\VulkanObj\InstanceObj.hpp" />
     <ClInclude Include="..\..\src\VulkanObj\ObjLoader.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\pdata.hpp" />
     <ClInclude Include="..\..\src\VulkanObj\PerfObj.hpp" />
     <ClInclude Include="..\..\src\VulkanObj\PhysDevObj.hpp" />
     <ClInclude Include="..\..\src\VulkanObj\PipelineObj.hpp" />
@@ -232,7 +233,6 @@
     <ClInclude Include="..\..\src_app\particleOnly\FrameBuffer.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\ParticleOnly.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\ParticleStruct.hpp" />
-    <ClInclude Include="..\..\src_app\particleOnly\pdata.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\PipelineComputeParticle.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\PipelineGraphicsParticleOnly.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\RenderPassParticleOnly.hpp" />

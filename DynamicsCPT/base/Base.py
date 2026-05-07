@@ -1,3 +1,5 @@
+import math
+
 from base.Dynamics import Dynamics
 from base.Report import Report
 
@@ -12,32 +14,38 @@ class Base:
     def __init__(self):
         self.particle_configs = []
         self.particles = []
-        self.contact_particles = []
         self.dt = 0.05
         self.substeps = 1
         self.time = 0.0
         self.walls = None
-        self.max_contacts_per_particle = 8
+        self.max_contacts_per_particle = 12
+        # Python wall-contact support. The current GLSL particle structure has
+        # bcs[4], but wall behavior is not treated as shader-ready yet.
+        self.max_boundary_contacts_per_particle = 4
         self.dynamics = Dynamics()
         self.report = Report()
 
     def clear_particles(self):
         self.particle_configs = []
         self.particles = []
-        self.contact_particles = []
 
     def add_particle(self, vx, vy, mass, radius, location=None, x=None, y=None, **display):
         if location is None:
             if x is None or y is None:
                 raise ValueError("Particle requires either location or x/y.")
             location = {"use": 1, "x1": float(x), "y1": float(y), "x2": float(x), "y2": float(y)}
+        vx = float(vx)
+        vy = float(vy)
+        radius = float(radius)
+        location = dict(location)
         self.particle_configs.append(
             {
-                "vx": float(vx),
-                "vy": float(vy),
+                "vx": vx,
+                "vy": vy,
                 "mass": float(mass),
-                "radius": float(radius),
-                "location": dict(location),
+                "radius": radius,
+                "location": location,
+                **self.glsl_field_mirrors(location, vx, vy, float(mass), radius),
                 **display,
             }
         )
@@ -56,16 +64,22 @@ class Base:
     def reset(self):
         self.time = 0.0
         self.particles = []
-        self.contact_particles = []
         self.report.clear()
         for config in self.particle_configs:
             particle = dict(config)
             particle["location"] = dict(particle["location"])
-            if "contacts" in particle:
-                particle["contacts"] = list(particle["contacts"])
+            particle["PosLocA"] = list(particle["PosLocA"])
+            particle["PosLocB"] = list(particle["PosLocB"])
+            particle["VelRad"] = list(particle["VelRad"])
+            particle["Data"] = list(particle["Data"])
+            particle["parms"] = list(particle["parms"])
+            if "ccs" in particle:
+                particle["ccs"] = [dict(contact) for contact in particle["ccs"]]
+            if "bcs" in particle:
+                particle["bcs"] = [dict(contact) for contact in particle["bcs"]]
             self.particles.append(particle)
         self.detect_contacts()
-        self.dynamics.process_collisions(self.particles, self.contact_particles)
+        self.dynamics.process_collisions(self.particles, self.walls)
         self.record_step_report()
 
     def step(self, dt):
@@ -79,7 +93,7 @@ class Base:
         self.move()
         self.time += dt
         self.detect_contacts()
-        self.dynamics.process_collisions(self.particles, self.contact_particles)
+        self.dynamics.process_collisions(self.particles, self.walls)
         self.dynamics.apply_overlap_momentum(self.particles)
         self.record_step_report()
 
@@ -89,10 +103,13 @@ class Base:
     def detect_contacts(self):
         # Rebuild contact storage from scratch each step. Each particle owns a
         # fixed-size list so later response code can read predictable slots.
-        self.contact_particles = list(self.particles)
         for particle in self.particles:
-            particle["contacts"] = [None] * self.max_contacts_per_particle
+            particle["ccs"] = [self.empty_particle_contact() for _ in range(self.max_contacts_per_particle)]
+            particle["bcs"] = [self.empty_boundary_contact() for _ in range(self.max_boundary_contacts_per_particle)]
+            particle["sltnum"] = 0
+            particle["ColFlg"] = 0
             particle["contact_count"] = 0
+            particle["wall_contact_count"] = 0
             particle["contact_overflow"] = False
 
         # Each particle owns its own contact storage. This pass writes only to
@@ -105,7 +122,7 @@ class Base:
                     continue
                 particle_j = self.particles[j]
                 if self.dynamics.particle_contact(particle_i, particle_j) is not None:
-                    self.add_contact(i, j)
+                    self.add_particle_contact(i, j)
             self.detect_wall_contacts(i, particle_i)
 
     def detect_wall_contacts(self, particle_index, particle):
@@ -117,45 +134,71 @@ class Base:
         walls = self.walls
 
         if x - radius < walls["start_x"]:
-            self.add_wall_ghost_contact(particle_index, particle, 2.0 * walls["start_x"] - x, y, "left")
+            self.add_wall_contact(particle_index, "left")
         if x + radius > walls["end_x"]:
-            self.add_wall_ghost_contact(particle_index, particle, 2.0 * walls["end_x"] - x, y, "right")
+            self.add_wall_contact(particle_index, "right")
         if y - radius < walls["start_y"]:
-            self.add_wall_ghost_contact(particle_index, particle, x, 2.0 * walls["start_y"] - y, "bottom")
+            self.add_wall_contact(particle_index, "bottom")
         if y + radius > walls["end_y"]:
-            self.add_wall_ghost_contact(particle_index, particle, x, 2.0 * walls["end_y"] - y, "top")
+            self.add_wall_contact(particle_index, "top")
 
-    def add_wall_ghost_contact(self, particle_index, particle, ghost_x, ghost_y, wall_name):
-        ghost_index = len(self.contact_particles)
-        self.contact_particles.append(
-            {
-                "location": {
-                    "use": 1,
-                    "x1": float(ghost_x),
-                    "y1": float(ghost_y),
-                    "x2": float(ghost_x),
-                    "y2": float(ghost_y),
-                },
-                "radius": particle["radius"],
-                "mass": particle["mass"],
-                "vx": 0.0,
-                "vy": 0.0,
-                "is_wall_ghost": True,
-                "wall": wall_name,
-            }
-        )
-        self.add_contact(particle_index, ghost_index)
-
-    def add_contact(self, particle_index, other_index):
+    def add_particle_contact(self, particle_index, target_index):
         particle = self.particles[particle_index]
-        contact_count = particle["contact_count"]
-        # Keep the fixed-length array stable. If more contacts exist than slots,
-        # remember that overflow happened instead of resizing during detection.
-        if contact_count >= self.max_contacts_per_particle:
+        slot = particle["sltnum"]
+        if slot >= self.max_contacts_per_particle:
             particle["contact_overflow"] = True
             return
-        particle["contacts"][contact_count] = other_index
-        particle["contact_count"] = contact_count + 1
+
+        particle["ccs"][slot] = {
+            "pindex": target_index,
+            "clflg": 1,
+        }
+        particle["sltnum"] = slot + 1
+        particle["contact_count"] = particle["sltnum"]
+        particle["ColFlg"] = 1
+
+    def add_wall_contact(self, particle_index, wall_name):
+        particle = self.particles[particle_index]
+        wall_slot = self.wall_slot(wall_name)
+        if wall_slot >= self.max_boundary_contacts_per_particle:
+            particle["contact_overflow"] = True
+            return
+
+        particle["bcs"][wall_slot] = {
+            "clflg": self.wall_flag(wall_name),
+        }
+        particle["wall_contact_count"] = self.boundary_contact_count(particle)
+        particle["contact_count"] = particle.get("sltnum", 0) + particle["wall_contact_count"]
+
+    @staticmethod
+    def empty_particle_contact():
+        return {"pindex": 0, "clflg": 0}
+
+    @staticmethod
+    def empty_boundary_contact():
+        return {"clflg": 0}
+
+    @staticmethod
+    def wall_slot(wall_name):
+        return {
+            "left": 0,
+            "right": 1,
+            "bottom": 2,
+            "top": 3,
+        }[wall_name]
+
+    @staticmethod
+    def wall_flag(wall_name):
+        return {
+            "left": 1,
+            "right": 2,
+            "bottom": 3,
+            "top": 4,
+        }[wall_name]
+
+    @staticmethod
+    def boundary_contact_count(particle):
+        return sum(1 for contact in particle.get("bcs", []) if contact.get("clflg", 0) != 0)
 
     def current_location(self, particle):
         location = particle["location"]
@@ -168,14 +211,64 @@ class Base:
         if int(location["use"]) == 1:
             location["x2"] = float(x)
             location["y2"] = float(y)
+            particle["PosLocB"][0] = float(x)
+            particle["PosLocB"][1] = float(y)
         else:
             location["x1"] = float(x)
             location["y1"] = float(y)
+            particle["PosLocA"][0] = float(x)
+            particle["PosLocA"][1] = float(y)
 
     def move(self):
         for particle in self.particles:
             location = particle["location"]
             location["use"] = 2 if int(location["use"]) == 1 else 1
+            self.sync_position_active_flags(particle)
+
+    @staticmethod
+    def glsl_field_mirrors(location, vx, vy, mass, radius):
+        use = int(location["use"])
+        return {
+            "PosLocA": [
+                float(location["x1"]),
+                float(location["y1"]),
+                0.0,
+                0.0 if use == 1 else 1.0,
+            ],
+            "PosLocB": [
+                float(location["x2"]),
+                float(location["y2"]),
+                0.0,
+                0.0 if use == 2 else 1.0,
+            ],
+            "VelRad": [
+                float(vx),
+                float(vy),
+                0.0,
+                math.atan2(float(vy), float(vx)) if vx != 0.0 or vy != 0.0 else 0.0,
+            ],
+            "Data": [
+                float(radius),
+                0.0,
+                0.0,
+                0.0,
+            ],
+            "parms": [
+                float(mass),
+                0.0,
+                0.0,
+                0.0,
+            ],
+        }
+
+    @staticmethod
+    def sync_position_active_flags(particle):
+        if int(particle["location"]["use"]) == 1:
+            particle["PosLocA"][3] = 0.0
+            particle["PosLocB"][3] = 1.0
+        else:
+            particle["PosLocA"][3] = 1.0
+            particle["PosLocB"][3] = 0.0
 
     def record_step_report(self):
         for index, particle in enumerate(self.particles):
@@ -186,6 +279,11 @@ class Base:
                     "time": self.time,
                     "mass": particle["mass"],
                     "radius": particle["radius"],
+                    "PosLocA": list(particle["PosLocA"]),
+                    "PosLocB": list(particle["PosLocB"]),
+                    "VelRad": list(particle["VelRad"]),
+                    "Data": list(particle["Data"]),
+                    "parms": list(particle["parms"]),
                     "x": x,
                     "y": y,
                     "vx": particle["vx"],
@@ -196,7 +294,11 @@ class Base:
                     * particle["mass"]
                     * (particle["vx"] * particle["vx"] + particle["vy"] * particle["vy"]),
                     "contact_count": particle.get("contact_count", 0),
-                    "contacts": list(particle.get("contacts", [])),
+                    "wall_contact_count": particle.get("wall_contact_count", 0),
+                    "sltnum": particle.get("sltnum", 0),
+                    "ColFlg": particle.get("ColFlg", 0),
+                    "ccs": [dict(contact) for contact in particle.get("ccs", [])],
+                    "bcs": [dict(contact) for contact in particle.get("bcs", [])],
                     "contact_overflow": particle.get("contact_overflow", False),
                     "overlap_momentum_x": particle.get("overlap_momentum_x", 0.0),
                     "overlap_momentum_y": particle.get("overlap_momentum_y", 0.0),
