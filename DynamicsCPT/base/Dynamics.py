@@ -17,7 +17,7 @@ class Dynamics:
     Required particle fields:
         location:
             Double-buffered position dictionary:
-            {"use": 1 or 2, "x1": ..., "y1": ..., "x2": ..., "y2": ...}
+            {"use": 0 or 1, "x1": ..., "y1": ..., "x2": ..., "y2": ...}
         radius:
             Disk radius. The current overlap-area shortcut assumes every
             particle has the same radius.
@@ -322,6 +322,6 @@ class Dynamics:
     def current_location(particle):
         """Read the active position from a particle's double-buffered location."""
         location = particle["location"]
-        if int(location["use"]) == 1:
+        if int(location["use"]) == 0:
             return location["x1"], location["y1"]
         return location["x2"], location["y2"]

@@ -76,9 +76,10 @@ void  ShaderObj::WriteShaderHeaderCDNOZ()
 		version = "VERCDNOZ ";
 		
 		uint32_t motion_str = 0;
-		if(CfgApp->GetBool("application.doMotion", true) == true)
+		if (CfgApp->GetBool("application.doMotion", true) == true)
+		{
 			motion_str = 1;
-		
+		}
 
 		
 		uint32_t MaxLoc = static_cast<uint32_t>(CfgTst->GetUInt("CellAryW", true)
@@ -143,8 +144,13 @@ void  ShaderObj::WriteShaderHeader()
 //		return;
 	uint32_t compflag=0;
 	uint32_t motion_str = 0;
-	if(CfgApp->GetBool("application.doMotion", true) == true)
+	float dt = 0.0;
+	if (CfgApp->GetBool("application.doMotion", true) == true)
+	{
+		dt = CfgApp->GetBool("application.dt", true);
+		dt = CfgApp->GetBool("application.inverse_square_softening", true);
 		motion_str = 1;
+	}
 
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
     std::string filename = fildir + "/params.glsl";

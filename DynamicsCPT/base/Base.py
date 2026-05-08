@@ -12,6 +12,8 @@ class Base:
     """
 
     def __init__(self):
+        self.POSITION_BUFFER_A = 0
+        self.POSITION_BUFFER_B = 1
         self.particle_configs = []
         self.particles = []
         self.dt = 0.05
@@ -33,11 +35,11 @@ class Base:
         if location is None:
             if x is None or y is None:
                 raise ValueError("Particle requires either location or x/y.")
-            location = {"use": 1, "x1": float(x), "y1": float(y), "x2": float(x), "y2": float(y)}
+            location = {"use": self.POSITION_BUFFER_A, "x1": float(x), "y1": float(y), "x2": float(x), "y2": float(y)}
         vx = float(vx)
         vy = float(vy)
         radius = float(radius)
-        location = dict(location)
+        location = self.normalized_location(location)
         self.particle_configs.append(
             {
                 "vx": vx,
@@ -83,18 +85,11 @@ class Base:
         self.record_step_report()
 
     def step(self, dt):
-        for particle in self.particles:
-            x, y = self.current_location(particle)
-            self.set_next_location(
-                particle,
-                x + particle["vx"] * dt,
-                y + particle["vy"] * dt,
-            )
-        self.move()
-        self.time += dt
         self.detect_contacts()
         self.dynamics.process_collisions(self.particles, self.walls)
         self.dynamics.apply_overlap_momentum(self.particles)
+        self.move(dt)
+        self.time += dt
         self.record_step_report()
 
     def do_substep(self, sub_dt):
@@ -202,13 +197,13 @@ class Base:
 
     def current_location(self, particle):
         location = particle["location"]
-        if int(location["use"]) == 1:
+        if int(location["use"]) == self.POSITION_BUFFER_A:
             return location["x1"], location["y1"]
         return location["x2"], location["y2"]
 
     def set_next_location(self, particle, x, y):
         location = particle["location"]
-        if int(location["use"]) == 1:
+        if int(location["use"]) == self.POSITION_BUFFER_A:
             location["x2"] = float(x)
             location["y2"] = float(y)
             particle["PosLocB"][0] = float(x)
@@ -219,11 +214,29 @@ class Base:
             particle["PosLocA"][0] = float(x)
             particle["PosLocA"][1] = float(y)
 
-    def move(self):
+    def move(self, dt):
         for particle in self.particles:
+            x, y = self.current_location(particle)
+            self.set_next_location(
+                particle,
+                x + particle["vx"] * dt,
+                y + particle["vy"] * dt,
+            )
             location = particle["location"]
-            location["use"] = 2 if int(location["use"]) == 1 else 1
+            location["use"] = (
+                self.POSITION_BUFFER_B
+                if int(location["use"]) == self.POSITION_BUFFER_A
+                else self.POSITION_BUFFER_A
+            )
             self.sync_position_active_flags(particle)
+
+    def normalized_location(self, location):
+        location = dict(location)
+        use = int(location["use"])
+        if use not in (self.POSITION_BUFFER_A, self.POSITION_BUFFER_B):
+            raise ValueError(f"Unknown position buffer: {location['use']!r}")
+        location["use"] = use
+        return location
 
     @staticmethod
     def glsl_field_mirrors(location, vx, vy, mass, radius):
@@ -233,13 +246,13 @@ class Base:
                 float(location["x1"]),
                 float(location["y1"]),
                 0.0,
-                0.0 if use == 1 else 1.0,
+                0.0 if use == 0 else 1.0,
             ],
             "PosLocB": [
                 float(location["x2"]),
                 float(location["y2"]),
                 0.0,
-                0.0 if use == 2 else 1.0,
+                0.0 if use == 1 else 1.0,
             ],
             "VelRad": [
                 float(vx),
@@ -263,7 +276,7 @@ class Base:
 
     @staticmethod
     def sync_position_active_flags(particle):
-        if int(particle["location"]["use"]) == 1:
+        if int(particle["location"]["use"]) == 0:
             particle["PosLocA"][3] = 0.0
             particle["PosLocB"][3] = 1.0
         else:

@@ -50,6 +50,7 @@ class ResourceParticlePush : public Resource
 		float StopFlg;
 		float frameNum;
 		float actualFrame;
+		float positionBuffer;
 	} m_ShaderFlags;
 
 

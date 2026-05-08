@@ -48,13 +48,23 @@ void ResourceParticlePush::Create(ResourceVertexParticle* vertP)
 
 void ResourceParticlePush::PushMem(uint32_t currentBuffer)
 {
-	
+	if (m_ShaderFlags.frameNum != static_cast<float>(m_App->m_FrameNumber))
+	{
+		if (m_ShaderFlags.positionBuffer == 0.0)
+			m_ShaderFlags.positionBuffer = 1.0;
+		else
+			m_ShaderFlags.positionBuffer = 0.0;
+	}
+	// Update only once
+	m_ShaderFlags.frameNum = static_cast<float>(m_App->m_FrameNumber);
+
 	//m_ShaderFlags.DrawInstance = 5.0;
 	m_ShaderFlags.SideLength = static_cast<float>(m_VertP->m_SideLength);
 	m_ShaderFlags.Ptot = static_cast<float>(m_App->m_Numparticles);
 	m_ShaderFlags.dt = m_App->m_dt;
 	m_ShaderFlags.systemp = 250.0;
 	m_ShaderFlags.ColorMap = ColorMap;
+	
 
 	if(G_Stop == true)
 	{
@@ -73,6 +83,6 @@ void ResourceParticlePush::PushMem(uint32_t currentBuffer)
 	else
 		m_ShaderFlags.Boundary = 0.0;
 
-	m_ShaderFlags.frameNum = static_cast<float>(m_App->m_FrameNumber);
+	
 	//mout << "ResourcePush::UpdateMem frame num:" << m_App->m_FrameNumber << ende;
 }

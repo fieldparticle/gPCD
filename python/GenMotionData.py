@@ -1,6 +1,7 @@
 from utilities import *
 from GenDataBase import *
 import math
+from pdata import *
 class GenMotionData():
 
     local_particles_in_row = 0
@@ -50,6 +51,7 @@ class GenMotionData():
         self.count = 0
     
     def twoParticleHorizontal(self):
+        self.p_list = []
         self.add_null_particle(self.p_list)
         self.index = 0
         self.cell_x_len = self.cell_y_len = self.cell_z_len = 5
@@ -70,6 +72,9 @@ class GenMotionData():
         particle_struct.vz = 0.0
         particle_struct.molar_mass = 1.0
         particle_struct.radius = 1.0
+        particle_struct.inverse_square_softening = 0.001
+        particle_struct.momentum_per_area = 1.0
+
         self.p_list.append(particle_struct)
     
         particle_struct = pdata()
@@ -82,12 +87,14 @@ class GenMotionData():
         particle_struct.vz = 0.0
         particle_struct.molar_mass = 1.0
         particle_struct.radius = 1.0
+        particle_struct.inverse_square_softening = 0.001
+        particle_struct.momentum_per_area = 1.0
         self.p_list.append(particle_struct)
         self.write_test_file()
         self.create_bin_file()
         self.write_bin_file(self.p_list)
         self.close_bin_file()
-
+        print(f"TwoParticleHorizontal: Wrote {self.count} particles to {self.test_bin_name}")
 
     def close_bin_file(self):
         self.bin_file.flush()

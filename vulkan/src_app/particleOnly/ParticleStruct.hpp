@@ -15,10 +15,10 @@ struct ccoll {
 	uint32_t clflg;
 };
 struct Particle {
-	glm::vec4	PosLocA; //  x,y,z,radius16
-	glm::vec4	PosLocB;
-	glm::vec4	VelRad;
-	glm::vec4	Data;
+	glm::vec4	PosLocA; // First position buffer.x, y, z, hold the location and 1 stores the active flag. 0.0 if active, 1.0 if not.
+	glm::vec4	PosLocB; // Second position buffer. x,y,z, hold the location and 1 stores the active flag. 0.0 if active, 1.0 if not.
+	glm::vec4	VelRad;  // Velocity, vx,vy,vz, w = velocity angle.
+	glm::vec4	Data; // 
 	glm::vec4	parms;
 	lstr		zlink[8];
 	bcoll		bcs[4];				// boundary collisions

@@ -70,18 +70,18 @@ void VulkanObj::CreateLogicalDevice() {
         builtins.shaderSMBuiltins = VK_TRUE;
         VkPhysicalDeviceFeatures deviceFeatures{};
         // For textures
-        deviceFeatures.samplerAnisotropy = VK_FALSE;
-        deviceFeatures.vertexPipelineStoresAndAtomics = VK_FALSE;
-		deviceFeatures.fragmentStoresAndAtomics = VK_FALSE;
-		deviceFeatures.sampleRateShading = VK_FALSE;
-		deviceFeatures.geometryShader = VK_FALSE;
-        deviceFeatures.shaderClipDistance = VK_FALSE;
-        deviceFeatures.fillModeNonSolid = VK_FALSE;
+        deviceFeatures.samplerAnisotropy = VK_TRUE;
+        deviceFeatures.vertexPipelineStoresAndAtomics = VK_TRUE;
+		deviceFeatures.fragmentStoresAndAtomics = VK_TRUE;
+		deviceFeatures.sampleRateShading = VK_TRUE;
+		deviceFeatures.geometryShader = VK_TRUE;
+        deviceFeatures.shaderClipDistance = VK_TRUE;
+        deviceFeatures.fillModeNonSolid = VK_TRUE;
 
         VkPhysicalDeviceShadingRateImageFeaturesNV fragFeatures{};
         fragFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADING_RATE_IMAGE_FEATURES_NV;
         fragFeatures.pNext =&builtins;
-        fragFeatures.shadingRateImage = VK_FALSE;
+        fragFeatures.shadingRateImage = VK_TRUE;
 
        
 
@@ -103,9 +103,9 @@ void VulkanObj::CreateLogicalDevice() {
         VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT interlock{};
         interlock.sType= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT;
         interlock.pNext = &supportedatomics;
-        interlock.fragmentShaderSampleInterlock = VK_FALSE;
-        interlock.fragmentShaderPixelInterlock = VK_FALSE;
-        interlock.fragmentShaderShadingRateInterlock = VK_FALSE;
+        interlock.fragmentShaderSampleInterlock = VK_TRUE;
+        interlock.fragmentShaderPixelInterlock = VK_TRUE;
+        interlock.fragmentShaderShadingRateInterlock = VK_TRUE;
         
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

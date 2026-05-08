@@ -19,23 +19,10 @@ import time
 from PlotParticles import *
 import struct
 import ctypes
+from pdata import *
 from GenPQBData import *
 
-class pdata(ctypes.Structure):
-    _fields_ = [("pnum", ctypes.c_double),
-                ("rx",  ctypes.c_double),
-                ("ry",  ctypes.c_double),
-                ("rz",  ctypes.c_double),
-                ("radius",  ctypes.c_double),
-                ("vx",  ctypes.c_double),
-                ("vy",  ctypes.c_double),
-                ("vz",  ctypes.c_double),
-                ("ptype",  ctypes.c_double),
-                ("seq",  ctypes.c_double),
-                ("acc_r",  ctypes.c_double),
-                ("Acc_a",  ctypes.c_double),
-                ("molar_mass",  ctypes.c_double),
-                ("temp_vel",  ctypes.c_double)]          
+
 
 class WorkerSignals(QObject):
     finished = pyqtSignal()
@@ -633,7 +620,8 @@ class TabGenData(QTabWidget):
         self.log.log(self,"TabFormLatex finished Create.")        
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenDUP.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
+        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
     def valueChange(self,listObj):  
         selected_items = listObj.selectedItems()
         if selected_items:

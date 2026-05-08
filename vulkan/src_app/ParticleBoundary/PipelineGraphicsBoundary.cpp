@@ -101,7 +101,7 @@ void PipelineGraphicsBoundary::CreatePipeline()
        {   
            inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
            inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-           //inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+           inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
            inputAssembly.primitiveRestartEnable = VK_FALSE;
        }
 
@@ -139,8 +139,14 @@ void PipelineGraphicsBoundary::CreatePipeline()
         rasterizer.sType 					= VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
         rasterizer.depthClampEnable 		= VK_FALSE;
         rasterizer.rasterizerDiscardEnable 	= VK_FALSE;
-        //rasterizer.polygonMode 				= VK_POLYGON_MODE_FILL;
-        rasterizer.polygonMode 				= VK_POLYGON_MODE_LINE;
+        if (CfgApp->GetBool("application.wire_frame", true) == false)
+        {
+            rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        }
+        else
+        {
+            rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
+        }
         rasterizer.lineWidth 				= 1.0f;
         rasterizer.cullMode 				= VK_CULL_MODE_NONE;
         rasterizer.frontFace 				= VK_FRONT_FACE_COUNTER_CLOCKWISE;

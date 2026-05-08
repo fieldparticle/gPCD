@@ -32,7 +32,7 @@
 %******************************************************************/
 struct lstr {
 	uint pindex; 				// Index of cell the corner occupies
-	uint ploc;					// TBD
+	uint typ;					// TBD
 	uint fill;					// fill
 };
 struct bcoll {
@@ -46,8 +46,8 @@ struct ccoll {
 struct Particle {
 	vec4  PosLocA; 				// First position buffer. x,y,z, hold the location and 1 stores the active flag. 0.0 if active, 1.0 if not.
 	vec4  PosLocB;				// Second position buffer. x,y,z, hold the location and 1 stores the active flag. 0.0 if active, 1.0 if not.
-	vec4  VelRad;				// Velocity, vx,vy,vz, w not used.
-    vec4  Data;					// Particle Data x=particle radius, yzw not used
+	vec4  VelRad;				// Velocity, vx,vy,vz, w = velocity angle.
+    vec4  Data;					// Particle Data x=particle radius, y=inverse_square_softening,z=momentum_per_area,w not used
 	vec4  parms;				// x=mass, y=overlap momentum x, z=overlap momentum y, w=overlap momentum scalar sum
 	lstr  CornerList[8];		// Particle Corner List (see lstr)
 	bcoll bcs[4];				// Current glsl version does not support walls. Only particle contacts.

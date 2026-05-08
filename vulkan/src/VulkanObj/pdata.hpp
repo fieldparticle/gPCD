@@ -46,4 +46,6 @@ struct pdata
 	double acc_a;
 	double molar_mass;
 	double temp_vel;
+	double inverse_square_softening;
+	double momentum_per_area;
 } ;

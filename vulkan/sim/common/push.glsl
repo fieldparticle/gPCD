@@ -44,5 +44,6 @@ layout( push_constant ) uniform constants
 	float StopFlg;
 	float frameNum;		// Current frame number
 	float actualFrame;  // actual frame for flow
+	float positionBuffer; //For position double buffereing
 	
 } ShaderFlags;

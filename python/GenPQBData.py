@@ -1,7 +1,7 @@
 from utilities import *
 import random
 from GenDataBase import *
-
+from pdata import *
 class GenPQBData(GenDataBase):
 
     

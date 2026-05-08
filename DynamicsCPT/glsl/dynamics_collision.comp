@@ -42,6 +42,7 @@ const uint CCS_CONTACT_ACTIVE = 1u;
 const float EPSILON_DISTANCE = 1.0e-12;
 #include "params.glsl"
 #include "../common/particle.glsl"
+#include "move_particle.glsl"
 
 uniform float momentum_per_area = 0.001;
 uniform float inverse_square_softening = 1.0;
@@ -229,4 +230,6 @@ void main()
     }
 
     ProcessCollision(SourceID);
+    ApplyOverlapMomentum(SourceID);
+    MoveParticle(SourceID, ShaderFlags.positionBuffer);
 }
