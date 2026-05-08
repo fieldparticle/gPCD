@@ -200,10 +200,65 @@ class TabGenData(QTabWidget):
         except BaseException as e2:
             self.log.log(self,f"Error opening:{self.itemcfg.selections_file}, err: {e2}")
             return
-        self.clear_files()
-        self.do_all_files_dbg()
+        self.gen_class.clear_files()
+        self.gen_class.do_all_files_dbg()
         #self.start_thread()
 
+    #******************************************************************
+    # Read particle data in range
+    # 
+    #
+    def read_particle_data(self,file_name):
+        struct_fmt = 'dddddddddddddd'
+        struct_len = struct.calcsize(struct_fmt)
+        #print(struct_len)
+        struct_unpack = struct.Struct(struct_fmt).unpack_from
+        count = 0
+        results = []
+        counter = 0
+        slist = self.itemcfg.particle_range
+        start_it = int(slist[0])
+        end_it = int(slist[1])
+        with open(file_name, "rb") as f:
+            
+            while True:
+                if counter >= start_it: 
+                    record = pdata()
+                    ret = f.readinto(record)
+                    if ret == 0:
+                        break
+                    #print(record.pnum)
+                    results.append(record)
+                    if counter > end_it:
+                        break
+                counter += 1
+                
+        p_lst = []
+        return results
+        
+    #******************************************************************
+    # Reead all of the particle data
+    # 
+    #
+    def read_all_particle_data(self,file_name):
+        struct_fmt = 'dddddddddddddd'
+        struct_len = struct.calcsize(struct_fmt)
+        #print(struct_len)
+        struct_unpack = struct.Struct(struct_fmt).unpack_from
+        count = 0
+        results = []
+        with open(file_name, "rb") as f:
+            while True:
+                record = pdata()
+                ret = f.readinto(record)
+                if ret == 0:
+                    break
+                results.append(record)
+        p_lst = []
+        return results
+    
+    def calc_test_parms(self):
+        pass
     #******************************************************************
     # Generate the data
     #
@@ -212,22 +267,9 @@ class TabGenData(QTabWidget):
         index = 0
         self.current_test_file = 0
         
-        # Create the data directory if it does not exist
-        try:
-            if not os.path.exists(self.itemcfg.data_dir):
-                os.makedirs(self.itemcfg.data_dir)
-        except BaseException as e1:
-            self.log.log(self,f"Error creating data directory:{self.itemcfg.data_dir}, err: {e1}")
-            return
-        # Open the selections file
-        self.gen_class.clear_selections()
-        try :
-            self.gen_class.open_selections_file()
-        except BaseException as e2:
-            self.log.log(self,f"Error opening:{self.itemcfg.selections_file}, err: {e2}")
-            return
-        self.clear_files()
-        self.do_all_files_dbg()
+        self.gen_class.openSelectionsFile()
+        self.gen_class.clear_files()
+        self.gen_class.do_all_files_dbg()
     #******************************************************************
     # Update the list widget
     #
@@ -276,14 +318,7 @@ class TabGenData(QTabWidget):
     #******************************************************************
     def do_all_files_dbg(self):
         index = 0
-        try:
-            for ii in range(len(self.gen_class.select_list)):
-                #print(f"{ii}")
-                self.gen_class.gen_data_base(ii)
-
-        except BaseException as e:
-            print(f"do_all_files_dbg err:{e}")
-            return
+        self.gen_class.do_all_files_dbg()
         self.update_list_widget()
 
     #******************************************************************
@@ -306,38 +341,15 @@ class TabGenData(QTabWidget):
         print(f"{n:.3f}% done")
         self.terminal.append(f"{n:.3f}% done")
 
-    #******************************************************************
-    # Clear the files in the data directory
-    #
-    def clear_files(self):
-        if self.itemcfg.test_files_only == False and self.itemcfg.replace_all == True:
-            clr_path = self.itemcfg.data_dir + "/*.csv"
-            files = glob.glob(clr_path)
-            for f in files:
-                os.remove(f)
-
-            clr_path = self.itemcfg.data_dir + "/*.bin"
-            files = glob.glob(clr_path)
-            for f in files:
-                os.remove(f)
-            
-            clr_path = self.itemcfg.data_dir + "/*.tst"
-            files = glob.glob(clr_path)
-            for f in files:
-                os.remove(f)
-        return
+   
     #******************************************************************
     # Read the data from a file and return os as 
     #
-    def read_particle_data(self,file_name):
-        return self.gen_class.read_particle_data(file_name)
     
     #******************************************************************
     # Read the data from a file and return os as 
     #
-    def read_all_particle_data(self,file_name):
-        return self.gen_class.read_all_particle_data(file_name)
-    
+   
     #******************************************************************
     # List a subset of particles to chgeck location and numers
     #

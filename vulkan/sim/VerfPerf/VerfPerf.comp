@@ -32,14 +32,15 @@
 
 #version 460
 #extension GL_ARB_separate_shader_objects : enable
-#extension GL_ARB_shading_language_420pack : enable
+//#extension GL_ARB_shading_language_420pack : enable
+#include "../VerfPerf/debug.glsl"
 #if defined(DEBUG)
 	#extension GL_EXT_debug_printf : enable
 #endif
 //#extension GL_EXT_scalar_block_layout :enable
-#extension GL_KHR_memory_scope_semantics:enable
-#extension GL_EXT_shader_atomic_float:enable
-#extension GL_KHR_shader_subgroup_basic:enable
+//#extension GL_KHR_memory_scope_semantics:enable
+//#extension GL_EXT_shader_atomic_float:enable
+//#extension GL_KHR_shader_subgroup_basic:enable
 
 
 #include "../VerfPerf/params.glsl"
@@ -136,12 +137,13 @@ void main()
 							// Add the TO particle number ot the dups list.
 							duplst[dd] = Tindex;
 							// Report is verification
-							#ifdef DEBUG
+							#if defined(DEBUG)
 								atomicAdd(collOut.CollisionCount,1);
 							#endif
+							
 							#if defined(DEBUG)
-							if(uint(ShaderFlags.frameNum) == 3 && Findex == 3)
-								debugPrintfEXT("%d,%d",Tindex,Findex);
+								if(uint(ShaderFlags.frameNum) == 3 && Findex == 3)
+									debugPrintfEXT("%d,%d",Tindex,Findex);
 							#endif
 							break;
 						}

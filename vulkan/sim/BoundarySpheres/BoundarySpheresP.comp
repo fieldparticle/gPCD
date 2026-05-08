@@ -72,14 +72,14 @@ void main()
 		return;
 	}
 
-#ifdef DEBUG
+#if defined(DEBUG)
 	// Thread count
 	atomicAdd(collOut.holdPidx,1);	
 #endif	
 
 
 	
-#ifdef DEBUG
+#if defined(DEBUG)
 	// Particle count
 	atomicAdd(collOut.numParticles,1);	
 #endif
@@ -139,10 +139,12 @@ void main()
 							#ifdef DEBUG
 								atomicAdd(collOut.CollisionCount,1);
 							#endif
-							#if defined(DEBUG)
-							if(uint(ShaderFlags.frameNum) == 3 && Findex == 3)
-								debugPrintfEXT("%d,%d",Tindex,Findex);
+							
+							#if 0 && defined(DEBUG)
+								if(uint(ShaderFlags.frameNum) == 3 && Findex == 3)
+									debugPrintfEXT("%d,%d",Tindex,Findex);
 							#endif
+							
 							break;
 						}
 						

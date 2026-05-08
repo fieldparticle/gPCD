@@ -305,13 +305,14 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 			bool mistfile = false;
 			uint32_t ret = 0;
 			bool exst = fs::exists(outfile);
-			if (m_DoOnlyMissingData && exst == false)
+			if (m_DoOnlyMissingData == false)
 			{
 				uint32_t ret = ParticleOnly(this, tcps, tcpcapp, false);
 				mistfile = true;
 			}
-			else if(m_DoOnlyMissingData == false)
+			else if(m_DoOnlyMissingData == true && exst == false)
 			{
+				mout << "Outfile:" << outfile.c_str() << " does not exist.";
 				uint32_t ret = ParticleOnly(this, tcps, tcpcapp, false);
 			}
 				
@@ -341,7 +342,7 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 					std::cout << "Resting:" << ii << " of " << m_AutoSleep << " seconds." << std::endl;
 					Sleep(1000);
 				}
-			mistfile = false;
+			
 		}
 		if (GetAsyncKeyState(VK_ESCAPE))
 		{

@@ -38,6 +38,7 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 		m_LMO = LMO;
 
 		WriteShaderHeader();
+		WriteShaderDbgHeader();
 		GenWorkGroups();
 }
 void ShaderObj::GenWorkGroups()
@@ -113,7 +114,28 @@ void  ShaderObj::WriteShaderHeaderCDNOZ()
     }
 }
 
-
+void ShaderObj::WriteShaderDbgHeader()
+{
+	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
+	std::string filename = fildir + "/debug.glsl";
+	{
+		std::string dbgflag = {};
+		#ifdef NDEBUG
+				dbgflag = "#define RELEASE";
+		#else
+				dbgflag = "#define DEBUG";
+		#endif
+		std::ofstream ostrm(filename);
+		if (!ostrm.is_open())
+		{
+			std::string rpt = "Failed to open file:" + filename;
+			throw std::runtime_error(rpt.c_str());
+		}
+		ostrm << dbgflag.c_str() << "\n";
+		ostrm.flush();
+		ostrm.close();
+	}
+}
 void  ShaderObj::WriteShaderHeader()
 {
 	// Dont compile shaders if using nsight.
@@ -128,12 +150,7 @@ void  ShaderObj::WriteShaderHeader()
     std::string filename = fildir + "/params.glsl";
     {
 		std::string dbgflag = {};
-#ifdef NDEBUG
-		dbgflag = "RELEASE ";
-#else
-		dbgflag = "DEBUG ";
-#endif
-		
+
 		std::string version = {};
 		version = "VERPONLY ";
 		
@@ -146,8 +163,7 @@ void  ShaderObj::WriteShaderHeader()
 			std::string rpt = "Failed to open file:" + filename;
 			throw std::runtime_error(rpt.c_str());
 		}
-		ostrm	<< "#define " << dbgflag << "\n"
-				<< "#define " << version.c_str()  << "\n"
+		ostrm	<< "#define " << version.c_str()  << "\n"
 				<< "const uint WIDTH=" << CfgTst->GetUInt("CellAryW", true) << ";\n"
 				<< "const uint HEIGHT=" << CfgTst->GetUInt("CellAryH", true)  << ";\n"
 				<< "const uint DEPTH=" << CfgTst->GetUInt("CellAryL", true) << ";\n"

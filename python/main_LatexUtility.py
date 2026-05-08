@@ -3,7 +3,8 @@
 import sys                                                    #  
 import os                                                     #
 syspth = sys.path                                             #
-cwd = os.getcwd()                   
+cwd = os.path.dirname(os.path.abspath(__file__))
+os.chdir(cwd)
 print(cwd)                          #
 #shrddir = cwd + "\\python\\shared"                            #
 #sys.path.append(shrddir)           
@@ -30,7 +31,7 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     screens = app.screens()
     window = UtilityMainWin(bc,"UtilMainWin")
-    screen = screens[1]
+    screen = screens[1] if len(screens) > 1 else screens[0]
     qr = screen.geometry()
     window.move(qr.left(), qr.top())
     window.Create(bc)

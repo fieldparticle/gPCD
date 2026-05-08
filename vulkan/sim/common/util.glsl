@@ -111,10 +111,8 @@ uint TestArrayToIndex(uint start,uint stop)
 	uvec3 ary = uvec3(0,0,0);
 	uint idx = 0;
 	uint count = 0;
-	#if 0
-	#if defined(DEBUG)
+	#if 0 && defined(DEBUG)
 		debugPrintfEXT("W:%d H:%d",WIDTH,HEIGHT);
-	#endif
 	#endif
 	for (uint ii=start;ii<WIDTH;ii++)
 	{
@@ -126,11 +124,9 @@ uint TestArrayToIndex(uint start,uint stop)
 				ary[1] = jj;
 				ary[2] = ii;
 				idx = ArrayToIndex(ary);
-				#if 0
-				#if defined(DEBUG)
+				#if 0 && defined(DEBUG)
 				if (stop != 0)
 					debugPrintfEXT("I:%d<%d,%d,%d>",idx,kk,jj,ii);
-				#endif
 				#endif
 				if (count != idx)
 					return count;

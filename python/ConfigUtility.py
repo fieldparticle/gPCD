@@ -1,6 +1,6 @@
 import configparser
 import os
-import python.libconf as libconf
+import libconf
 import io
 import inspect
 import shutil

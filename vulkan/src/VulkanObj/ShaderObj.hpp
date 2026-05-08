@@ -42,18 +42,20 @@ public:
 	ResourceVertexParticle* m_VPO = {};
 	ResourceCollMatrix* m_CMO = {};
 	SwapChain* m_SCO = {};
-	ResourceLockMatrix* m_LMO;
+	ResourceLockMatrix* m_LMO = {};
 
 	uint32_t SH_VERT = 1;
 	uint32_t SH_FRAG = 2;
 	uint32_t SH_COMP = 3;
 
-
+	
 	ShaderObj(VulkanObj* App, std::string Name) : BaseObj(Name, 0, App) {};
 	void GenWorkGroups();
 	void WriteShaderHeader();
 	void WriteShaderHeaderCDNOZ();
-	int RemoteCompileShaders();
+	void WriteShaderDbgHeader();
+
+
 	std::vector<char> ReadSPVFile(const std::string& filename);
 	int WriteBinaryFile(std::string fileName, std::vector<char> buffer);
 	int CompileShader(std::string ShaderName, 

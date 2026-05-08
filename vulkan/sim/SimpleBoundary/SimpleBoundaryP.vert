@@ -54,8 +54,7 @@ layout(location = 2) out vec3 matpos;
 void main(){
 	
 	int index 		= gl_VertexIndex;
-#if 0
-#if defined(DEBUG)
+#if 0 && defined(DEBUG)
 	if(uint(ShaderFlags.frameNum) == 0 && index == 0)
 	{
 		//debugPrintfEXT("Testing Indexing H:%d,W:%d,CMEM %d, ACTMEM %d",HEIGHT,WIDTH,HEIGHT*HEIGHT*HEIGHT,);
@@ -71,7 +70,7 @@ void main(){
 			debugPrintfEXT("Indexing passed H:%d,W:%d at #:%d",HEIGHT,WIDTH,ret);
 	}
 #endif
-#endif
+
 	if(index == 0)
 	{
 		collIn.numParticles = 0;
@@ -227,7 +226,7 @@ void main(){
 	}
 //######################################### ADD SLOTS END##############################	
 	
-	#if 0
+	#if 0 && defined(DEBUG)
 		if(index == 3 && uint(ShaderFlags.frameNum) == 100)
 		{
 			debugPrintfEXT("p:%d,H:%d,W:%d[%d,%d,%d,%d,%d,%d,%d,%d]",index,WIDTH,HEIGHT,
@@ -243,7 +242,7 @@ void main(){
 			
 	#endif
 //Need this to get the number particles count correct
-#ifdef DEBUG
+#if defined(DEBUG)
 	atomicAdd(collIn.numParticles,1);	
 #endif
 	if(uint(P[index].ColFlg) == 1)
@@ -273,9 +272,9 @@ uint AddSlot(uint CornerIndex, uint ParticleID)
 void MaxCellLocationsError(uint CellArrayIndex, uint ParticleID)
 {
 	
-	//#if defined(DEBUG)
-	//	debugPrintfEXT("ParticleVerfPerf sltidx > MaxLocation:P=%d,sltidx=%d,MaxLocation=%d",index,sltidx,MAX_CELL_ARRAY_LOCATIONS);
-	//#endif	
+	#if 0 && defined(DEBUG)
+		debugPrintfEXT("ParticleVerfPerf sltidx > MaxLocation:P=%d,sltidx=%d,MaxLocation=%d",index,sltidx,MAX_CELL_ARRAY_LOCATIONS);
+	#endif	
 	collIn.ExcessSlots = CellArrayIndex;
 	collIn.ErrorReturn = 3;
 	P[ParticleID].parms.w = 1.0;
@@ -287,11 +286,9 @@ void MaxCellOccupancyError(uint CellOccupancySlot)
 	// If the array at this index of the particle-cell hash 
 	// does not have enough slots to handle the particle density
 	// then report it.
-	#if 0
-	#if defined(DEBUG)
+	#if 0 && defined(DEBUG)
 		debugPrintfEXT("ParticleVerfPerf slot>F:%u,P:%d,MAX_CELL_OCCUPANY:%d,at loc: %d",
 		uint(ShaderFlags.frameNum),index,MAX_CELL_OCCUPANY,CellOccupancySlot);
-	#endif
 	#endif
 	collIn.ExcessSlots = CellOccupancySlot;
 	collIn.ErrorReturn = 2;

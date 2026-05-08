@@ -1,6 +1,7 @@
 import struct
 import os
 import csv
+import glob
 #from mpl_interactions import ioff, panhandler, zoom_factory
 #import plotly.express as px
 import matplotlib.pyplot as plt
@@ -125,6 +126,43 @@ class GenDataBase:
     # File I/O
     # 
     ##############################################################################    
+     #******************************************************************
+    # Clear the files in the data directory
+    #
+    def clear_files(self):
+        if self.itemcfg.test_files_only == False and self.itemcfg.replace_all == True:
+            clr_path = self.itemcfg.data_dir + "/*.csv"
+            files = glob.glob(clr_path)
+            for f in files:
+                os.remove(f)
+
+            clr_path = self.itemcfg.data_dir + "/*.bin"
+            files = glob.glob(clr_path)
+            for f in files:
+                os.remove(f)
+            
+            clr_path = self.itemcfg.data_dir + "/*.tst"
+            files = glob.glob(clr_path)
+            for f in files:
+                os.remove(f)
+        return
+    
+    def openSelectionsFile(self):
+
+    # Create the data directory if it does not exist
+        try:
+            if not os.path.exists(self.itemcfg.data_dir):
+                os.makedirs(self.itemcfg.data_dir)
+        except BaseException as e1:
+            self.log.log(self,f"Error creating data directory:{self.itemcfg.data_dir}, err: {e1}")
+            return
+        # Open the selections file
+        self.clear_selections()
+        try :
+            self.open_selections_file()
+        except BaseException as e2:
+            self.log.log(self,f"Error opening:{self.itemcfg.selections_file}, err: {e2}")
+            return
     #******************************************************************
     # Create the binary particles file
     # 
@@ -189,61 +227,7 @@ class GenDataBase:
         if(self.bin_file.closed != True):
             self.bobj.log.log("File:{self.test_bin_name} not closed")
 
-    #******************************************************************
-    # Read particle data in range
-    # 
-    #
-    def read_particle_data(self,file_name):
-        struct_fmt = 'dddddddddddddd'
-        struct_len = struct.calcsize(struct_fmt)
-        #print(struct_len)
-        struct_unpack = struct.Struct(struct_fmt).unpack_from
-        count = 0
-        results = []
-        counter = 0
-        slist = self.itemcfg.particle_range
-        start_it = int(slist[0])
-        end_it = int(slist[1])
-        with open(file_name, "rb") as f:
-            
-            while True:
-                if counter >= start_it: 
-                    record = pdata()
-                    ret = f.readinto(record)
-                    if ret == 0:
-                        break
-                    #print(record.pnum)
-                    results.append(record)
-                    if counter > end_it:
-                        break
-                counter += 1
-                
-        p_lst = []
-        return results
-        
-    #******************************************************************
-    # Reead all of the particle data
-    # 
-    #
-    def read_all_particle_data(self,file_name):
-        struct_fmt = 'dddddddddddddd'
-        struct_len = struct.calcsize(struct_fmt)
-        #print(struct_len)
-        struct_unpack = struct.Struct(struct_fmt).unpack_from
-        count = 0
-        results = []
-        with open(file_name, "rb") as f:
-            while True:
-                record = pdata()
-                ret = f.readinto(record)
-                if ret == 0:
-                    break
-                results.append(record)
-        p_lst = []
-        return results
-    
-    def calc_test_parms(self):
-        pass
+   
 
     #******************************************************************
     # Always add a null particle to the beginging of the particles

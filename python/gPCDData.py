@@ -32,6 +32,15 @@ class gPCDData():
         self.log = self.bobj.log
         self.itemcfg = itemcfg
 
+    def do_all_files_dbg(self):
+        try:
+            for ii in range(len(self.gen_class.select_list)):
+                #print(f"{ii}")
+                self.gen_class.gen_data_base(ii)
+
+        except BaseException as e:
+            print(f"do_all_files_dbg err:{e}")
+            return
         
     def isNumber(self,value):
         try:
@@ -142,7 +151,7 @@ class gPCDData():
     #      
     def do_performance(self,file_dict): 
         if 'max' in file_dict.compute_type:
-            self.get_maxes(file_dict)
+            self.get_maxFPSminSPF(file_dict)
         elif 'avg' in file_dict.compute_type:
             self.get_averages(file_dict)
         elif 'min' in file_dict.compute_type:
@@ -295,7 +304,7 @@ class gPCDData():
     #******************************************************************
     # Get maximuns write then to summary file
     #
-    def get_maxes(self,file_dict):
+    def get_maxFPSminSPF(self,file_dict):
         self.create_summary(file_dict)
         for ii in self.data_files:
             fps_old = 0
@@ -310,6 +319,7 @@ class gPCDData():
             try:
                 with open(data_file, 'r') as filename:
                     file = csv.DictReader(filename)
+                    cms_old = cpums_old = gms_old = 1000.0
                     for col in file:
                         
                         count += 1
@@ -318,13 +328,13 @@ class gPCDData():
                         if fps > fps_old:
                             fps_old = fps
                         cpums = float(col['cpums'])
-                        if cpums > cpums_old:
+                        if cpums < cpums_old:
                             cpums_old = cpums
                         cms = float(col['cms'])
-                        if cms > cms_old:
+                        if cms < cms_old:
                             cms_old = cms
                         gms = float(col['gms'])
-                        if gms > gms_old:
+                        if gms < gms_old:
                             gms_old = gms
                         if count == 1:
                             loadedp = float(col['loadedp'])

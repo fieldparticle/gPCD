@@ -45,7 +45,9 @@ mat4 BuildTranslation(vec3 delta)
 
 void main()
 {
-#if 1
+							
+							
+#if 0 && defined(DEBUG)
 	if(ShaderFlags.frameNum == 5.0 && gl_VertexIndex == 1)
 		{
 		debugPrintfEXT("VERTBOUND:Instance");

@@ -1,15 +1,14 @@
-#version 450
+#version 460
 #extension GL_ARB_separate_shader_objects : enable
-#extension GL_ARB_shading_language_420pack : enable
-#if 1
+//#extension GL_ARB_shading_language_420pack : enable
+#include "debug.glsl"
+#if defined(DEBUG)
 	#extension GL_EXT_debug_printf : enable
 #endif
 //#extension GL_EXT_scalar_block_layout :enable
 
-void MaxCellOccupancyError(uint CellOccupancySlot);
-void MaxCellLocationsError(uint CellArrayIndex, uint ParticleID);
-uint AddSlot(uint CornerIndex, uint ParticleID);
-#include "../VerfPerf/params.glsl"
+
+#include "params.glsl"
 #include "../common/constants.glsl"
 #include "../common/util.glsl"
 #include "../common/push.glsl"
@@ -54,7 +53,7 @@ layout(location = 2) out vec3 matpos;
 void main(){
 	
 	int index 		= gl_VertexIndex;
-#if 0
+	
 #if defined(DEBUG)
 	if(uint(ShaderFlags.frameNum) == 0 && index == 0)
 	{
@@ -71,7 +70,7 @@ void main(){
 			debugPrintfEXT("Indexing passed H:%d,W:%d at #:%d",HEIGHT,WIDTH,ret);
 	}
 #endif
-#endif
+
 	if(index == 0)
 	{
 		collIn.numParticles = 0;
@@ -87,10 +86,13 @@ void main(){
 	//gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
 	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
 	
+	
+	
+
 	float cx 		= P[index].PosLocA.x;
 	float cy 		= P[index].PosLocA.y;
 	float cz 		= P[index].PosLocA.z;
-	float R			= P[index].Data.x;
+	float R			= P[index].PosLocA.w;
 	
 	uint duplist[8];
 	uint dupcntr = 0;
@@ -107,50 +109,40 @@ void main(){
 	P[index].CornerList[7].ploc = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy-R)),uint(round(cz-R))));
 	#endif
 	
+	//####################### fill_particle_corner_array #################
+	
 	// Clear this paricles corner array
 	for (uint kk = 0;kk<8;kk++)
 		P[index].CornerList[kk].ploc = 0;
 	
-	uint cellOccupancySlot = 0;
-	uint err = 0;
-	//######################################### ADD SLOTS START ##############################
-	
 	// First corner always written since there is no possibility of duplicate
 	// Get the index location in the cell array the first particle corner
-	
-	//-----------------------------------------------------------------------------------
-	// Slot 1 ---------------------------------------
 	cnr_index = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy+R)),uint(round(cz-R))));
 	duplist[0] = cnr_index;
 	P[index].CornerList[0].ploc = cnr_index;
-	err = AddSlot(cnr_index, index);
-	if (err != 0)
-		return;
 	
-	// Slot 2 ---------------------------------------
+	
+	// Get the index location in the cell array the first particle corner.
 	cnr_index = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy+R)),uint(round(cz+R))));
+	// Compare this to the previous locations and if it is not there -
 	if (cnr_index != P[index].CornerList[0].ploc)
 	{
+		// Increment the dup counter
 		dupcntr++;
+		// Add the corner to the particle's corner array
 		P[index].CornerList[dupcntr].ploc = cnr_index;
-		err = AddSlot(cnr_index, index);
-		if (err != 0)
-			return;
 	}
 	
-	// Slot 3 ---------------------------------------
+	// ditto
 	cnr_index = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy+R)),uint(round(cz+R))));
 	if (cnr_index != P[index].CornerList[0].ploc && 
 		cnr_index != P[index].CornerList[1].ploc)
 	{
 		dupcntr++;
 		P[index].CornerList[dupcntr].ploc = cnr_index;
-		err = AddSlot(cnr_index, index);
-		if (err != 0)
-			return;
 	}
 		
-	// Slot 4 ---------------------------------------
+	
 	cnr_index = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy+R)),uint(round(cz-R))));
 	if (cnr_index != P[index].CornerList[0].ploc && 
 		cnr_index != P[index].CornerList[1].ploc &&
@@ -158,12 +150,9 @@ void main(){
 	{
 		dupcntr++;
 		P[index].CornerList[dupcntr].ploc = cnr_index;
-		err = AddSlot(cnr_index, index);
-		if (err != 0)
-			return;
 	}
 		
-	// Slot 5 ---------------------------------------
+	
 	cnr_index = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy-R)),uint(round(cz+R))));
 	if (cnr_index != P[index].CornerList[0].ploc && 
 		cnr_index != P[index].CornerList[1].ploc &&
@@ -172,12 +161,9 @@ void main(){
 	{
 		dupcntr++;
 		P[index].CornerList[dupcntr].ploc = cnr_index;
-		err = AddSlot(cnr_index, index);
-		if (err != 0)
-			return;
 	}
 	
-	// Slot 6 ---------------------------------------
+	
 	cnr_index = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy-R)),uint(round(cz-R))));
 	if (cnr_index != P[index].CornerList[0].ploc && 
 		cnr_index != P[index].CornerList[1].ploc &&
@@ -187,12 +173,9 @@ void main(){
 	{
 		dupcntr++;
 		P[index].CornerList[dupcntr].ploc = cnr_index;
-		err = AddSlot(cnr_index, index);
-		if (err != 0)
-			return;
 	}
 		
-	// Slot 7 ---------------------------------------
+	
 	cnr_index = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy-R)),uint(round(cz+R))));
 	if (cnr_index != P[index].CornerList[0].ploc && 
 		cnr_index != P[index].CornerList[1].ploc &&
@@ -202,14 +185,11 @@ void main(){
 		cnr_index != P[index].CornerList[5].ploc)
 	{
 		dupcntr++;
+		duplist[dupcntr] = cnr_index;
 		P[index].CornerList[dupcntr].ploc = cnr_index;
-		err = AddSlot(cnr_index, index);
-		if (err != 0)
-			return;
-		
 	}
 		
-	// Slot 8 ---------------------------------------
+	
 	cnr_index = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy-R)),uint(round(cz-R))));
 	if (cnr_index != P[index].CornerList[0].ploc && 
 		cnr_index != P[index].CornerList[1].ploc &&
@@ -221,11 +201,8 @@ void main(){
 	{
 		dupcntr++;
 		P[index].CornerList[dupcntr].ploc = cnr_index;
-		err = AddSlot(cnr_index, index);
-		if (err != 0)
-			return;
 	}
-//######################################### ADD SLOTS END##############################	
+	
 	
 	#if 0
 		if(index == 3 && uint(ShaderFlags.frameNum) == 100)
@@ -242,60 +219,107 @@ void main(){
 		}
 			
 	#endif
-//Need this to get the number particles count correct
+//#################################################################
+//################### Populate the cell array with this particles corners
+//#################################################################
+	//Need this to get the number particles count correct (?!)
 #ifdef DEBUG
 	atomicAdd(collIn.numParticles,1);	
 #endif
+
+	// Traverse the particles corner array if there is not a global error 
+	// which is stored in the 0th partcle parms emlent
+	for( uint ii = 0; ii < 8 && P[index].CornerList[ii].ploc!=0; ii++)
+	{
+		// Location index for this slot.
+		uint sltidx = 0;
+		// Resrved slot
+		uint slot 	= 0;
+		
+		
+		// Get the first non-duplicate corner.
+		sltidx = P[index].CornerList[ii].ploc;
+	
+		// If it's not zero then do nothing - 0 index or location <0,0,0> 
+		// is not allowed
+		if (sltidx == 0)
+			break;
+		
+		
+		if(sltidx > MAX_CELL_ARRAY_LOCATIONS)
+		{
+			#if defined(DEBUG)
+				debugPrintfEXT("ParticleVerfPerf sltidx > MaxLocation:P=%d,sltidx=%d,MaxLocation=%d",index,sltidx,MAX_CELL_ARRAY_LOCATIONS);
+			#endif	
+			collIn.ExcessSlots = sltidx;
+			collIn.ErrorReturn = 3;
+			P[index].parms.w = 1.0;
+			P[0].ColFlg = 1;
+			break;
+		}
+		
+		// Reserve a slot for this location in the cell array occupancy list
+		// atomic add increments the value in the lock array and returns the 
+		// *previous value*.
+		slot = atomicAdd(L[sltidx],1);
+		
+		// If the array at this index of the particle-cell hash 
+		// does not have enough slots to handle the particle density
+		// then report it.
+		if(slot > MAX_CELL_OCCUPANY)
+		{
+			uvec3 badloc;
+			#if 0
+			#if defined(DEBUG)
+				//IndexToArray(sltidx,badloc);
+				debugPrintfEXT("ParticleVerfPerf slot>F:%u,P:%d,MAX_CELL_OCCUPANY:%d,at loc: %d",
+				uint(ShaderFlags.frameNum),index,MAX_CELL_OCCUPANY,slot);
+			#endif
+			#endif
+			collIn.ExcessSlots = slot;
+			collIn.ErrorReturn = 2;
+			P[0].ColFlg = 1;
+			P[index].parms.w = 2.0;
+			break;
+		}
+		
+
+		// Insert the location of this particle in the particle-cell 
+		// hash table.
+		
+		#if 0 && defined(DEBUG)
+			if(index == 3 && uint(ShaderFlags.frameNum) == 100)
+			{
+				debugPrintfEXT("VerfPerf particle %d added to cell %d slot %d.",index,sltidx,slot);
+			}
+		#endif	
+		
+	#if 0
+		if(uint(ShaderFlags.frameNum) == 8 && index == 1)
+		{
+			debugPrintfEXT("P:%u,CNRIDX:%u,CNRL:%u,LOC:%u,SLT:%u ",index,ii,P[index].CornerList[ii].ploc, sltidx,slot);
+		}
+	#endif
+
+		// If everythin is valid add this particles corner to the 
+		// cell array at the indoctaed location and slot in the cell occupancy array
+		// NOTE: particle 0 is a dummy particle so that the particle 0-based index matches
+		// the particle number
+		clink[sltidx].idx[slot] = index;
+	
+	#if defined(DEBUG)
+		if(uint(ShaderFlags.frameNum) == 8 && index == 1)
+		{
+			debugPrintfEXT("P:%u,CNRIDX:%u,CELLARYVAL:%u ",index,ii,clink[sltidx].idx[slot]);
+		}
+	#endif
+		
+	}
+	
 	if(uint(P[index].ColFlg) == 1)
 		fragColor = vec3(1.0,0.0,0.0);	
 	else if(uint(P[index].ColFlg) == 0)
 		fragColor = vec3(0.0,1.0,0.0);	
-}
 	
-uint AddSlot(uint CornerIndex, uint ParticleID)
-{
-	if(CornerIndex > MAX_CELL_ARRAY_LOCATIONS)
-	{
-		MaxCellLocationsError(CornerIndex,ParticleID);
-		return 1;
-	}
-	uint cellOccupancySlot = atomicAdd(L[CornerIndex],1);
-	if(cellOccupancySlot > MAX_CELL_OCCUPANY)
-	{
-		MaxCellOccupancyError(cellOccupancySlot);
-		return 1;
-	}
-	clink[CornerIndex].idx[cellOccupancySlot] = ParticleID;
-	return 0;
-
-
-}
-void MaxCellLocationsError(uint CellArrayIndex, uint ParticleID)
-{
 	
-	//#if defined(DEBUG)
-	//	debugPrintfEXT("ParticleVerfPerf sltidx > MaxLocation:P=%d,sltidx=%d,MaxLocation=%d",index,sltidx,MAX_CELL_ARRAY_LOCATIONS);
-	//#endif	
-	collIn.ExcessSlots = CellArrayIndex;
-	collIn.ErrorReturn = 3;
-	P[ParticleID].parms.w = 1.0;
-	P[0].ColFlg = 1;
-
 }
-void MaxCellOccupancyError(uint CellOccupancySlot)
-{
-	// If the array at this index of the particle-cell hash 
-	// does not have enough slots to handle the particle density
-	// then report it.
-	#if 0
-	#if defined(DEBUG)
-		debugPrintfEXT("ParticleVerfPerf slot>F:%u,P:%d,MAX_CELL_OCCUPANY:%d,at loc: %d",
-		uint(ShaderFlags.frameNum),index,MAX_CELL_OCCUPANY,CellOccupancySlot);
-	#endif
-	#endif
-	collIn.ExcessSlots = CellOccupancySlot;
-	collIn.ErrorReturn = 2;
-	
-
-}
-		

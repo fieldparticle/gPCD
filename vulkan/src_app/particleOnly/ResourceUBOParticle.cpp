@@ -110,7 +110,7 @@ void ResourceParticleUBO::createBuffers()
 
 void ResourceParticleUBO::PushMem(uint32_t currentBuffer)
 {
-
+	/*
 	float s = m_Particle->m_SideLength;
 	glm::vec3 center(s * 0.5f, s * 0.5f, s * 0.5f);
 
@@ -155,7 +155,102 @@ void ResourceParticleUBO::PushMem(uint32_t currentBuffer)
 	uint32_t bufsize = sizeof(m_UBO) + m_NumElements * sizeof(uint32_t);
 
 	vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, &m_UBO, m_Allocation[currentBuffer],
-		0, sizeof(m_UBO));
+		0, sizeof(m_UBO));*/
+	
+		float s = m_Particle->m_SideLength;
+
+		glm::vec3 center(
+			s * 0.5f,
+			s * 0.5f,
+			s * 0.5f
+		);
+
+		m_UBO = {};
+
+		// ============================================================
+		// Model matrix
+		// Cube corner stays at (0,0,0), cube extends positive.
+		// Rotation is performed about cube center.
+		// ============================================================
+
+		m_UBO.model = glm::mat4(1.0f);
+
+		m_UBO.model = glm::translate(m_UBO.model, center);
+
+		m_UBO.model = glm::rotate(
+			m_UBO.model,
+			glm::radians(rRotZ),
+			glm::vec3(0.0f, 0.0f, 1.0f)
+		);
+
+		m_UBO.model = glm::rotate(
+			m_UBO.model,
+			glm::radians(rRotY),
+			glm::vec3(0.0f, 1.0f, 0.0f)
+		);
+
+		m_UBO.model = glm::rotate(
+			m_UBO.model,
+			glm::radians(rRotX),
+			glm::vec3(1.0f, 0.0f, 0.0f)
+		);
+
+		m_UBO.model = glm::translate(m_UBO.model, -center);
+
+		// ============================================================
+		// View matrix
+		// Camera looks at cube center.
+		// ============================================================
+
+		m_UBO.view = glm::lookAt(
+			glm::vec3(center.x, center.y, center.z + s * 4.0f),
+			center,
+			glm::vec3(0.0f, 1.0f, 0.0f)
+		);
+
+		// ============================================================
+		// Projection matrix
+		// Orthographic zoom is handled here, not by scaling the model.
+		// Bounding sphere radius keeps rotated cube visible.
+		// ============================================================
+
+		float aspect =
+			static_cast<float>(m_SCO->m_SwapChainExtent.width) /
+			static_cast<float>(m_SCO->m_SwapChainExtent.height);
+
+		float radius = 0.5f * sqrt(3.0f) * s;
+		if (ZoomX == 0.0)
+		{
+			mout << "Particle UBO Zoom is zero" << ende;
+
+		}
+		// Larger ZoomX = zoom in
+		float half = radius / ZoomX;
+
+		m_UBO.proj = glm::ortho(
+			-half * aspect,
+			half * aspect,
+			-half,
+			half,
+			0.1f,
+			s * 10.0f
+		);
+
+		// Vulkan clip-space correction
+		m_UBO.proj[1][1] *= -1.0f;
+
+		// ============================================================
+		// Upload UBO
+		// ============================================================
+
+		vmaCopyMemoryToAllocation(
+			m_App->m_vmaAllocator,
+			&m_UBO,
+			m_Allocation[currentBuffer],
+			0,
+			sizeof(m_UBO)
+		);
+	}
 
 
-}
+
