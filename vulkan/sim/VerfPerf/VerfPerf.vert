@@ -246,7 +246,7 @@ void main(){
 			break;
 		
 		
-		if(sltidx > MAX_CELL_ARRAY_LOCATIONS)
+		if(sltidx >= MAX_CELL_ARRAY_LOCATIONS)
 		{
 			#if defined(DEBUG)
 				debugPrintfEXT("ParticleVerfPerf sltidx > MaxLocation:P=%d,sltidx=%d,MaxLocation=%d",index,sltidx,MAX_CELL_ARRAY_LOCATIONS);
@@ -266,7 +266,7 @@ void main(){
 		// If the array at this index of the particle-cell hash 
 		// does not have enough slots to handle the particle density
 		// then report it.
-		if(slot > MAX_CELL_OCCUPANY)
+		if(slot >= MAX_CELL_OCCUPANY)
 		{
 			uvec3 badloc;
 			#if 0

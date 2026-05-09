@@ -50,6 +50,11 @@ float RotateZ=0.0;
 float rRotX;
 float rRotY = 90.0;
 float rRotZ;
+uint32_t VIEW_XY = 1;
+uint32_t VIEW_ZY = 2;
+uint32_t VIEW_XZ = 3;
+float rCoordView = VIEW_XZ;
+
 float ox = -1;
 float oy = -1;
 bool rightMouse = false;
@@ -142,18 +147,21 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	}
 	if (key == GLFW_KEY_X && action == GLFW_PRESS)
 	{
-		rRotX = rRotX += 15.0;
-		mout << "RotX:" << rRotX << " RotY:" << rRotY << " RotZ:" << rRotZ << ende;
+		//rRotX = rRotX += 15.0;
+		//mout << "RotX:" << rRotX << " RotY:" << rRotY << " RotZ:" << rRotZ << ende;
+		rCoordView = VIEW_XY;
 	}
 	if (key == GLFW_KEY_Y && action == GLFW_PRESS)
 	{
-		rRotY = rRotY += 15.0;
-		mout << "RotX:" << rRotX << " RotY:" << rRotY << " RotZ:" << rRotZ << ende;
+		//rRotY = rRotY += 15.0;
+		//mout << "RotX:" << rRotX << " RotY:" << rRotY << " RotZ:" << rRotZ << ende;
+		rCoordView = VIEW_ZY;
 	}
 	if (key == GLFW_KEY_Z && action == GLFW_PRESS)
 	{
-		rRotZ = rRotZ += 15.0;
-		mout << "RotX:" << rRotX << " RotY:" << rRotY << " RotZ:" << rRotZ << ende;
+		//rRotZ = rRotZ += 15.0;
+		//mout << "RotX:" << rRotX << " RotY:" << rRotY << " RotZ:" << rRotZ << ende;
+		rCoordView = VIEW_XZ;
 	}
 	if (key == GLFW_KEY_S && action == GLFW_PRESS)
 	{

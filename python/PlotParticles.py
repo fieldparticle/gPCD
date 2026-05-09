@@ -110,7 +110,7 @@ class PlotParticles():
                             self.ax.plot_surface(x, y, z, color='blue',alpha=0.8)
                         else:
                             self.ax.plot_surface(x, y, z,alpha=0.8)
-                    # Else uese standar color
+                    # Else use standard color
                     else:
                         if self.itemcfg.vary_color == False:
                             self.ax.plot_surface(x, y, z, color=pcolor,alpha=0.8)

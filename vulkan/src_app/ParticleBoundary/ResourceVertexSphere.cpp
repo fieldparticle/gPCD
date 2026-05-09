@@ -40,9 +40,9 @@ void ResourceVertexSphere::Create(ResourceVertexParticle* PartVert)
 	for (size_t ii = 0; ii < m_vtemp.size(); ii++)
 	{
 		CartVert tmp = {};
-		tmp.pos.x = m_vtemp[ii].x * 2 * PartVert->m_Radius;
-		tmp.pos.y = m_vtemp[ii].y * 2 * PartVert->m_Radius; //*m_ParticleVert->m_SideLength;
-		tmp.pos.z = m_vtemp[ii].z * 2 * PartVert->m_Radius; //*m_ParticleVert->m_SideLength;
+		tmp.pos.x = m_vtemp[ii].x * 0.5 * PartVert->m_Radius;
+		tmp.pos.y = m_vtemp[ii].y * 0.5 * PartVert->m_Radius; //*m_ParticleVert->m_SideLength;
+		tmp.pos.z = m_vtemp[ii].z * 0.5 * PartVert->m_Radius; //*m_ParticleVert->m_SideLength;
 		tmp.pos.w = 0.2f;
 		tmp.color = glm::vec4(1.0, 0.0, 0.0, 1.0);
 		m_Verts.push_back(tmp);

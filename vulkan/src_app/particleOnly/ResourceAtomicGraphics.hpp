@@ -35,6 +35,7 @@ struct GCollision
 {
 	uint32_t ErrorReturn;
 	uint32_t numParticles;
+	uint32_t maxCells;
 	uint32_t particleNumber;
 	uint32_t ReadWriteConflict;
 	uint32_t ExcessSlots;

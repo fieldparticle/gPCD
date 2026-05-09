@@ -48,6 +48,28 @@ float ResourceVertexParticle::CalcSpeedLimit(float max_vel, float radius)
 }
 void ResourceVertexParticle::Create(uint32_t BindPoint)
 {
+
+#include <cstddef>
+#include <cstdint>
+
+	static_assert(sizeof(lstr) == 12);
+	static_assert(sizeof(bcoll) == 4);
+	static_assert(sizeof(ccoll) == 8);
+
+	static_assert(offsetof(Particle, PosLocA) == 0);
+	static_assert(offsetof(Particle, PosLocB) == 16);
+	static_assert(offsetof(Particle, VelRad) == 32);
+	static_assert(offsetof(Particle, Data) == 48);
+	static_assert(offsetof(Particle, parms) == 64);
+	static_assert(offsetof(Particle, zlink) == 80);
+	static_assert(offsetof(Particle, bcs) == 176);
+	static_assert(offsetof(Particle, ccs) == 192);
+	static_assert(offsetof(Particle, pnum) == 288);
+	static_assert(offsetof(Particle, colFlg) == 292);
+	static_assert(offsetof(Particle, MolarMatter) == 296);
+	static_assert(offsetof(Particle, temp_vel) == 300);
+
+	static_assert(sizeof(Particle) == 304);
 	
 	m_MaxColls				= MAXSPCOLLS;
 	m_thisFramesBuffered	= 1;

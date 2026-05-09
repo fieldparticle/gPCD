@@ -41,13 +41,6 @@ public:
 	
 	UniformBufferObject m_UBO={};
 	bool m_done = false;
-	float m_RotX = 0.0;
-	float m_RotY = 0.0;
-	float m_rRotX = 0.0;
-	float m_rRotY = 0.0;
-	float m_TranslateX=10.0;
-	float m_TranslateY=10.0;
-	float m_TranslateZ=0.0;
 	float width = 800.0;
 	float height = 800.0;
 

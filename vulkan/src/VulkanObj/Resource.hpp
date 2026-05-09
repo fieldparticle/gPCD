@@ -49,7 +49,15 @@ class Resource : public BaseObj
 {
 
 public:
-
+	float m_RotX = 0.0;
+	float m_RotY = 0.0;
+	float m_rRotX = 0.0;
+	float m_rRotY = 0.0;
+	float m_TranslateX = 10.0;
+	float m_TranslateY = 10.0;
+	float m_TranslateZ = 0.0;
+	
+	UniformBufferObject m_UBO = {};
 	
 	//============================================================
 	//VK_TYPE_SUBPASS
@@ -109,6 +117,8 @@ public:
 	virtual void PushMem(uint32_t currentBuffer) = 0;
 	// Copy meme copies memory to the device
 	virtual void PullMem(uint32_t currentBuffer) = 0;
+
+	void GeneralViewing(uint32_t SideLength, uint32_t CurrentBuffer);
 
 	//============================================================
 		

@@ -37,6 +37,7 @@ layout (binding = 5) coherent buffer CollisionIn
 {
 	uint ErrorReturn; 	// Number of colisions.
 	uint numParticles;		// number of particle into compute.
+	uint maxCells;
 	uint particleNumber;
 	uint ReadWriteConflict;			// Reserved
 	uint ExcessSlots;

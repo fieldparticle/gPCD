@@ -54,8 +54,8 @@ class GenMotionData():
         self.p_list = []
         self.add_null_particle(self.p_list)
         self.index = 0
-        self.cell_x_len = self.cell_y_len = self.cell_z_len = 5
-        self.particles_in_cell = 2
+        self.cell_x_len = self.cell_y_len = self.cell_z_len = 6
+        self.particles_in_cell = 8
         self.number_particles = 2
         self.tot_num_collsions = self.num_collisions_per_cell =self.collsion_count_check = 0
 
@@ -79,7 +79,7 @@ class GenMotionData():
     
         particle_struct = pdata()
         particle_struct.pnum = 0
-        particle_struct.rx = 4.5
+        particle_struct.rx = 3.5
         particle_struct.ry = 2.1
         particle_struct.rz = 2.0
         particle_struct.vx = -0.05
@@ -156,7 +156,7 @@ class GenMotionData():
         f.write(fstr)
         fstr = f"pdensity = 0;\n"
         f.write(fstr)
-        fstr = f"dispatchx = {self.number_particles};\n"
+        fstr = f"dispatchx = 3;\n"
         f.write(fstr)
         fstr = f"dispatchy = 1;\n"
         f.write(fstr)

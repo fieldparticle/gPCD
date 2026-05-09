@@ -134,6 +134,17 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 			}
 
 			double diff_time = currentTime - lastTime;
+			if (currentTime - lastTime >= 1.0 && doAuto != true)
+			{ 
+				float fps = static_cast<double>(nbFrames) / diff_time;
+				float spf = diff_time / nbFrames;
+				 
+				std::cout << "Seconds:" << aprCount << " FrameNumber:" << VulkanWin->m_FrameNumber 
+					<< " FRate:" << 1000.0 / double(nbFrames) << " ms/F, " 
+					<< " FPS:" << nbFrames << " F/s." << std::endl;
+				nbFrames = 0;
+				lastTime += 1.0;
+			}
 			// Load the perf data if less than series length
 			if (currentTime - lastTime >= 1.0 && doAuto == true)
 			{

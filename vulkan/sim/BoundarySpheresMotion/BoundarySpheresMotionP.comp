@@ -40,7 +40,7 @@
 //#extension GL_EXT_scalar_block_layout :enable
 #extension GL_KHR_memory_scope_semantics:enable
 #extension GL_EXT_shader_atomic_float:enable
-#extension GL_KHR_shader_subgroup_basic:enable
+
 
 
 #include "params.glsl"
@@ -126,7 +126,7 @@ void main()
 				if(TargetID == 0)
 					break;
 				
-				if(isParticleContact(ii,SourceID, TargetID) > 0)
+				if(isParticleContact(ii,SourceID, TargetID, uint(ShaderFlags.positionBuffer)) > 0)
 				{
 					// Run thru the duplicates list to the current count
 					for(uint dd = 0; dd < DUP_LIST_SIZE;dd++)
@@ -149,8 +149,8 @@ void main()
 							#endif
 							
 							#if 0 && defined(DEBUG)
-								if(uint(ShaderFlags.frameNum) == 3 && SourceID == 3)
-									debugPrintfEXT("%d,%d",TargetID,SourceID);
+								///if(uint(ShaderFlags.frameNum) == 29962)
+									debugPrintfEXT("Contact Src:%d,Tgt:%d, frame:%d",TargetID,SourceID,uint(ShaderFlags.frameNum));
 							#endif
 							
 							break;

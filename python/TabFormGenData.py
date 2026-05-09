@@ -19,6 +19,7 @@ import time
 from PlotParticles import *
 import struct
 import ctypes
+from Utilites import read_particle_data
 from pdata import *
 from GenPQBData import *
 
@@ -191,58 +192,9 @@ class TabGenData(QTabWidget):
         self.gen_class.do_all_files_dbg()
         #self.start_thread()
 
-    #******************************************************************
-    # Read particle data in range
-    # 
-    #
-    def read_particle_data(self,file_name):
-        struct_fmt = 'dddddddddddddd'
-        struct_len = struct.calcsize(struct_fmt)
-        #print(struct_len)
-        struct_unpack = struct.Struct(struct_fmt).unpack_from
-        count = 0
-        results = []
-        counter = 0
-        slist = self.itemcfg.particle_range
-        start_it = int(slist[0])
-        end_it = int(slist[1])
-        with open(file_name, "rb") as f:
-            
-            while True:
-                if counter >= start_it: 
-                    record = pdata()
-                    ret = f.readinto(record)
-                    if ret == 0:
-                        break
-                    #print(record.pnum)
-                    results.append(record)
-                    if counter > end_it:
-                        break
-                counter += 1
-                
-        p_lst = []
-        return results
+   
         
-    #******************************************************************
-    # Reead all of the particle data
-    # 
-    #
-    def read_all_particle_data(self,file_name):
-        struct_fmt = 'dddddddddddddd'
-        struct_len = struct.calcsize(struct_fmt)
-        #print(struct_len)
-        struct_unpack = struct.Struct(struct_fmt).unpack_from
-        count = 0
-        results = []
-        with open(file_name, "rb") as f:
-            while True:
-                record = pdata()
-                ret = f.readinto(record)
-                if ret == 0:
-                    break
-                results.append(record)
-        p_lst = []
-        return results
+   
     
     def calc_test_parms(self):
         pass
@@ -442,7 +394,8 @@ class TabGenData(QTabWidget):
 
         if self.selected_item:
             try:
-                self.particle_data = self.read_particle_data(self.selected_item[0].text())
+                plot_particle_list = self.itemcfg.particle_range
+                self.particle_data = read_particle_data(self.selected_item[0].text(), plot_particle_list)
             except BaseException as e:
                 self.log.log(self,f"Could not read particle data:{e}")
                 return
@@ -620,8 +573,8 @@ class TabGenData(QTabWidget):
         self.log.log(self,"TabFormLatex finished Create.")        
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenDUP.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
-        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
+        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
     def valueChange(self,listObj):  
         selected_items = listObj.selectedItems()
         if selected_items:

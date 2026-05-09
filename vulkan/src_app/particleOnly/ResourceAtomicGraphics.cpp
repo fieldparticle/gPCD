@@ -131,9 +131,9 @@ void ResourceAtomicGraphics::PullMem(uint32_t currentBuffer)
 			if (m_collisionStruct.ErrorReturn == 3)
 			{
 				m_App->m_quit_event = 3;
-				objtxt << m_Name << " ResourceAtomicGraphics::Vertex Kernel Error Max Location:"
-					<< m_collisionStruct.ErrorReturn
-					<< " Excess slots:" << m_collisionStruct.ExcessSlots << std::ends;
+				objtxt << m_Name << " ResourceAtomicGraphics::Vertex Kernel Max Location error number:"
+					<< m_collisionStruct.ErrorReturn << " For particle number:" << m_collisionStruct.particleNumber
+					<< " Corner Location:" << m_collisionStruct.ExcessSlots << " exceeds total number of cells:" << m_collisionStruct.maxCells <<  std::ends;
 				mout << objtxt.str().c_str() << ende;
 			}
 			if (m_collisionStruct.ErrorReturn == 4)

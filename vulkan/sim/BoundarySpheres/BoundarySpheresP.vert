@@ -252,13 +252,13 @@ void main(){
 	
 uint AddSlot(uint CornerIndex, uint ParticleID)
 {
-	if(CornerIndex > MAX_CELL_ARRAY_LOCATIONS)
+	if(CornerIndex >= MAX_CELL_ARRAY_LOCATIONS)
 	{
 		MaxCellLocationsError(CornerIndex,ParticleID);
 		return 1;
 	}
 	uint cellOccupancySlot = atomicAdd(L[CornerIndex],1);
-	if(cellOccupancySlot > MAX_CELL_OCCUPANY)
+	if(cellOccupancySlot >= MAX_CELL_OCCUPANY)
 	{
 		MaxCellOccupancyError(cellOccupancySlot);
 		return 1;
@@ -277,6 +277,8 @@ void MaxCellLocationsError(uint CellArrayIndex, uint ParticleID)
 	
 	collIn.ExcessSlots = CellArrayIndex;
 	collIn.ErrorReturn = 3;
+	collIn.particleNumber = ParticleID;
+	collIn.maxCells = MAX_CELL_ARRAY_LOCATIONS;
 	P[ParticleID].parms.w = 1.0;
 	P[0].ColFlg = 1;
 

@@ -50,6 +50,11 @@ extern float RotateZ;
 extern float rRotX;
 extern float rRotY;
 extern float rRotZ;
+extern uint32_t VIEW_XY;
+extern uint32_t VIEW_ZY;
+extern uint32_t VIEW_XZ;
+extern float rCoordView;
+
 
 void SetCallBacks(VulkanObj* VO);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);

@@ -1,0 +1,34 @@
+review/debug the Vulkan GLSL code
+fix shader compilation errors
+improve performance
+inspect pipeline/layout issues
+explain the architecture
+convert OpenGL GLSL to Vulkan GLSL
+analyze synchronization or descriptor usage
+help with rendering bugs
+
+
+The cell table and lock array must be cleared every frame.
+The bounds check likely has an off-by-one issue.
+The occupancy overflow check likely has an off-by-one issue.
+
+
+VkBufferMemoryBarrier barrier{};
+barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+barrier.buffer = collMem->m_Buffers[currentBuffer];
+barrier.offset = 0;
+barrier.size = collMem->m_BufSize;
+
+vkCmdPipelineBarrier(
+    m_CommandGBuffers[currentBuffer],
+    VK_PIPELINE_STAGE_TRANSFER_BIT,
+    VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+    0,
+    0, nullptr,
+    1, &barrier,
+    0, nullptr
+);
