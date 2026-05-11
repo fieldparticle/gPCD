@@ -39,7 +39,7 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 	TimerObj* timerstep;
 	uint32_t			endFrame		= CfgApp->GetUInt("application.end_frame", true);
 	bool				stopondata		= CfgApp->GetBool("application.stopondata", true);
-	uint32_t			frameDelay		= CfgApp->GetInt("application.frame_delay", true);
+	uint32_t			frameDelay		= CfgApp->GetFloat("application.frame_delay", true);
 	float				deltaTime		= 0.0f;
 	float				lastFrame		= 0.0f;
 	uint32_t			quit_event		= 0;

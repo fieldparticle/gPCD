@@ -47,10 +47,10 @@ uniform float inverse_square_softening = 1.0;
 
 vec2 CurrentLocation(uint particle_id)
 {
-    // PosLocA.w and PosLocB.w are active flags: 0.0 means active, 1.0 means
-    // inactive. Only one position buffer should be active for a particle.
+    // Match the simulation-wide double-buffer selector used by contact
+    // detection and rendering.
     Particle particle = P[particle_id];
-    if (particle.PosLocA.w == 0.0) {
+    if (uint(ShaderFlags.positionBuffer) == 0u) {
         return particle.PosLocA.xy;
     }
     return particle.PosLocB.xy;

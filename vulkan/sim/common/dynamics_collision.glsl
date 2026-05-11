@@ -15,8 +15,6 @@
 // - This keeps the response pass free of atomics and friendly to GPU execution.
 //
 // Current limitations:
-// - Only particle-particle contacts in ccs are processed.
-// - bcs wall contacts are intentionally omitted for now.
 // - CircleOverlapArea currently returns 0.0 for unequal radii to match the
 //   current equal-radius model.
 //
@@ -30,15 +28,12 @@
 const uint CCS_CONTACT_ACTIVE = 1u;
 const float EPSILON_DISTANCE = 1.0e-12;
 
-const float momentum_per_area = 0.001;
-const float inverse_square_softening = 1.0;
-
 vec2 CurrentLocation(uint particle_id)
 {
-    // PosLocA.w and PosLocB.w are active flags: 0.0 means active, 1.0 means
-    // inactive. Only one position buffer should be active for a particle.
+    // Match the simulation-wide double-buffer selector used by contact
+    // detection and rendering.
     Particle particle = P[particle_id];
-    if (particle.PosLocA.w == 0.0) {
+    if (uint(ShaderFlags.positionBuffer) == 0u) {
         return particle.PosLocA.xy;
     }
     return particle.PosLocB.xy;
@@ -48,6 +43,16 @@ float ParticleRadius(uint particle_id)
 {
     // Data.x is the radius slot defined by the shared Particle structure.
     return P[particle_id].Data.x;
+}
+
+float InverseSquareSoftening(uint particle_id)
+{
+    return max(P[particle_id].Data.y, EPSILON_DISTANCE);
+}
+
+float MomentumPerArea(uint particle_id)
+{
+    return P[particle_id].Data.z;
 }
 
 float CircleOverlapArea(float source_radius, float target_radius, float center_distance)
@@ -70,19 +75,19 @@ float CircleOverlapArea(float source_radius, float target_radius, float center_d
     );
 }
 
-float InverseSquareWeight(float distance)
+float InverseSquareWeight(uint source_id, float distance)
 {
     // Softening prevents singular momentum when source and target centers are
     // identical or extremely close.
-    float softening = max(inverse_square_softening, EPSILON_DISTANCE);
-    return 1.0 / max(distance * distance, softening * softening);
+    float softening = InverseSquareSoftening(source_id);
+    return 1.0;// / max(distance * distance, softening * softening);
 }
 
-float OverlapMomentum(float overlap_area, float center_distance)
+float OverlapMomentum(uint source_id, float overlap_area, float center_distance)
 {
     // Memoryless overlap response: current overlap area is converted directly
     // into a momentum amount for this source particle.
-    return momentum_per_area * overlap_area * InverseSquareWeight(center_distance);
+    return MomentumPerArea(source_id) * overlap_area * InverseSquareWeight(source_id, center_distance);
 }
 
 // Computes narrow-phase geometry for one source-target pair from ccs.
@@ -135,6 +140,67 @@ bool ParticleContactGeometry(
     return overlap_area > 0.0;
 }
 
+bool BoundaryWallContactGeometry(
+    uint source_id,
+    uint wall_flag,
+    out vec2 normal,
+    out float overlap_area,
+    out float center_distance
+) {
+    vec2 source_location = CurrentLocation(source_id);
+    float radius = ParticleRadius(source_id);
+    float distance_to_wall = 0.0;
+
+    if (wall_flag == 1u) {
+        distance_to_wall = source_location.x - BOUNDARY_XMIN;
+        normal = vec2(-1.0, 0.0);
+    } else if (wall_flag == 2u) {
+        distance_to_wall = BOUNDARY_XMAX - source_location.x;
+        normal = vec2(1.0, 0.0);
+    } else if (wall_flag == 3u) {
+        distance_to_wall = source_location.y - BOUNDARY_YMIN;
+        normal = vec2(0.0, -1.0);
+    } else if (wall_flag == 4u) {
+        distance_to_wall = BOUNDARY_YMAX - source_location.y;
+        normal = vec2(0.0, 1.0);
+    } else {
+        return false;
+    }
+
+    if (distance_to_wall >= radius) {
+        return false;
+    }
+
+    center_distance = max(0.0, 2.0 * distance_to_wall);
+    float penetration = min(2.0 * radius - center_distance, radius);
+    float contact_distance = 2.0 * radius - penetration;
+    overlap_area = CircleOverlapArea(radius, radius, contact_distance);
+    return overlap_area > 0.0;
+}
+
+void ProcessBoundaryCollisions(
+    uint SourceID,
+    inout vec2 overlap_momentum,
+    inout float overlap_momentum_sum
+) {
+    if (BOUNDARY_ENABLED == 0u) {
+        return;
+    }
+
+    for (uint wall_flag = 1u; wall_flag <= 4u; ++wall_flag) {
+        vec2 normal;
+        float overlap_area;
+        float center_distance;
+        if (!BoundaryWallContactGeometry(SourceID, wall_flag, normal, overlap_area, center_distance)) {
+            continue;
+        }
+
+        float momentum = OverlapMomentum(SourceID, overlap_area, center_distance);
+        overlap_momentum -= normal * momentum;
+        overlap_momentum_sum += momentum;
+    }
+}
+
 void ProcessCollision(uint SourceID)
 {
     // GLSL equivalent of Python Dynamics.process_source_collision().
@@ -180,12 +246,14 @@ void ProcessCollision(uint SourceID)
             continue;
         }
 
-        float momentum = OverlapMomentum(overlap_area, center_distance);
+        float momentum = OverlapMomentum(SourceID, overlap_area, center_distance);
         // normal points from source to target, so the source response is the
         // opposite direction.
         overlap_momentum -= normal * momentum;
         overlap_momentum_sum += momentum;
     }
+
+    ProcessBoundaryCollisions(SourceID, overlap_momentum, overlap_momentum_sum);
 
     P[SourceID].parms.y = overlap_momentum.x;
     P[SourceID].parms.z = overlap_momentum.y;
@@ -207,4 +275,3 @@ void ApplyOverlapMomentum(uint SourceID)
     vec2 velocity = P[SourceID].VelRad.xy;
     P[SourceID].VelRad.w = length(velocity) > 0.0 ? atan(velocity.y, velocity.x) : 0.0;
 }
-

@@ -45,14 +45,15 @@
 
 #include "params.glsl"
 #include "../common/constants.glsl"
+#include "boundary.glsl"
 #include "../common/util.glsl"
 #include "../common/push.glsl"
 #include "../common/atomic.glsl"
 #include "../common/CollimageIndex.glsl"
 #include "../common/Lockimage.glsl"
 #include "../common/particle.glsl"
-#include "../VerfPerf/workgroups.glsl"
-#include "../common/isParticleContact.glsl"
+#include "workgroups.glsl"
+#include "../common/isParticleContactMotion.glsl"
 #include "../common/dynamics_collision.glsl"
 #include "../common/move_particle.glsl"
  
@@ -99,7 +100,7 @@ void main()
 	P[SourceID].ColFlg = 0;
 	P[SourceID].sltnum = 0;
 	// Clear the duparray
-	for(uint kk =0; kk < 8; kk++)
+	for(uint kk =0; kk < DUP_LIST_SIZE; kk++)
 		duplst[kk] = 0;
 	
 	// For all of the corner locations in the particle corner array
@@ -124,8 +125,14 @@ void main()
 				TargetID = clink[loc].idx[jj];
 				// If the particle number is 0, then end of list
 				if(TargetID == 0)
+				{
+					
 					break;
+				}
 				
+				#if 0 && defined(DEBUG)
+						debugPrintfEXT("SourceID:%d TargetID %d", SourceID,TargetID);
+				#endif
 				if(isParticleContact(ii,SourceID, TargetID, uint(ShaderFlags.positionBuffer)) > 0)
 				{
 					// Run thru the duplicates list to the current count
@@ -137,9 +144,13 @@ void main()
 						// If the end of the duplist no duplicate found so count the collison
 						if (duplst[dd] == 0)
 						{
+							if(P[SourceID].sltnum >= 12)
+								break;
+
 							// Set the collison flag
 							P[SourceID].ColFlg = 1;
 							P[SourceID].ccs[P[SourceID].sltnum].pindex = TargetID;
+							P[SourceID].ccs[P[SourceID].sltnum].clflg = 1;
 							P[SourceID].sltnum +=1;
 							// Add the TO particle number ot the dups list.
 							duplst[dd] = TargetID;
@@ -169,7 +180,8 @@ void main()
 	#endif
 	 
 	ProcessCollision(SourceID);
-	MoveParticle(SourceID,uint(ShaderFlags.positionBuffer));
+	ApplyOverlapMomentum(SourceID);
+	MoveParticle(SourceID,uint(ShaderFlags.positionBuffer),ShaderFlags.dt);
 	
 }
 

@@ -1,9 +1,11 @@
-VerfPerf/VerfPerf.frag
-VerfPerf/VerfPerf.vert
-VerfPerf/VerfPerf.comp
-VerfPerf/params.glsl
-VerfPerf/workgroups.glsl
-VerfPerf/debug.glsl
+BoundarySpheresMotion/BoundarySpheresMotion.frag
+BoundarySpheresMotion/BoundarySpheresMotion.vert
+BoundarySpheresMotion/BoundarySpheresMotionP.comp
+BoundarySpheresMotion/BoundarySpheresMotionP.vert
+BoundarySpheresMotion/BoundarySpheresMotionP.frag
+BoundarySpheresMotion/params.glsl
+BoundarySpheresMotion/workgroups.glsl
+BoundarySpheresMotion/debug.glsl
 common/atomic.glsl
 common/atomicg.glsl
 common/CollimageIndex.glsl

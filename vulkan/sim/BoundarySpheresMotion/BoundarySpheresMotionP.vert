@@ -43,7 +43,17 @@ layout(location = 3) in vec2 inParms;
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 outParms;
 layout(location = 2) out vec3 matpos;
+uint addUniqueCell(uint index, uint CornerLocation, uint Count)
+{
+    for(uint i = 0; i < Count; i++)
+    {
+        if(P[index].CornerList[i].ploc == CornerLocation)
+            return 0;
+    }
 
+    P[index].CornerList[Count].ploc = CornerLocation;
+    return 1;
+}
 
 ///
 // Use this one with 000_ParticleVerfPerfCountOnly.comp to
@@ -77,7 +87,7 @@ void main(){
 		return;
 	}	
 
-
+	
 	
 	// Set point size 
 	gl_PointSize = 1.0;
@@ -87,138 +97,49 @@ void main(){
 	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
 	
 	
-	
+	// Clear this paricles corner array
+	for (uint kk = 0;kk<8;kk++)
+		P[index].CornerList[kk].ploc = 0;
 
 	float cx 		= P[index].PosLocA.x;
 	float cy 		= P[index].PosLocA.y;
 	float cz 		= P[index].PosLocA.z;
-	float R			= P[index].PosLocA.w;
+	float R			= P[index].Data.x;
 	
+	if (ShaderFlags.positionBuffer == 1u) 
+	{
+		cx 		= P[index].PosLocA.x;
+		cy 		= P[index].PosLocA.y;
+		cz 		= P[index].PosLocA.z;
+	} 
+	else{
+		cx 		= P[index].PosLocB.x;
+		cy 		= P[index].PosLocB.y;
+		cz 		= P[index].PosLocB.z;
+	}
 	uint duplist[8];
 	uint dupcntr = 0;
-	uint cnr_index = 0;
-	
-	#if 0
-	P[index].CornerList[0].ploc = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy+R)),uint(round(cz-R))));
-	P[index].CornerList[1].ploc = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy+R)),uint(round(cz+R))));
-	P[index].CornerList[2].ploc = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy+R)),uint(round(cz+R))));
-	P[index].CornerList[3].ploc = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy+R)),uint(round(cz-R))));
-	P[index].CornerList[4].ploc = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy-R)),uint(round(cz+R))));
-	P[index].CornerList[5].ploc = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy-R)),uint(round(cz-R))));
-	P[index].CornerList[6].ploc = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy-R)),uint(round(cz+R))));
-	P[index].CornerList[7].ploc = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy-R)),uint(round(cz-R))));
+	uint CornerLocation = 0;
+	uint count = 0;
+	#if 1
+	CornerLocation = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy+R)),uint(round(cz-R))));
+	count += addUniqueCell(index, CornerLocation, count);
+	CornerLocation = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy+R)),uint(round(cz+R))));
+	count += addUniqueCell(index, CornerLocation, count);
+	CornerLocation = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy+R)),uint(round(cz+R))));
+	count += addUniqueCell(index, CornerLocation, count);
+	CornerLocation = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy+R)),uint(round(cz-R))));
+	count += addUniqueCell(index, CornerLocation, count);
+	CornerLocation = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy-R)),uint(round(cz+R))));
+	count += addUniqueCell(index, CornerLocation, count);
+	CornerLocation = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy-R)),uint(round(cz-R))));
+	count += addUniqueCell(index, CornerLocation, count);
+	CornerLocation = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy-R)),uint(round(cz+R))));
+	count += addUniqueCell(index, CornerLocation, count);
+	CornerLocation = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy-R)),uint(round(cz-R))));
+	count += addUniqueCell(index, CornerLocation, count);
 	#endif
 	
-	//####################### fill_particle_corner_array #################
-	
-	// Clear this paricles corner array
-	for (uint kk = 0;kk<8;kk++)
-		P[index].CornerList[kk].ploc = 0;
-	
-	// First corner always written since there is no possibility of duplicate
-	// Get the index location in the cell array the first particle corner
-	cnr_index = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy+R)),uint(round(cz-R))));
-	duplist[0] = cnr_index;
-	P[index].CornerList[0].ploc = cnr_index;
-	
-	
-	// Get the index location in the cell array the first particle corner.
-	cnr_index = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy+R)),uint(round(cz+R))));
-	// Compare this to the previous locations and if it is not there -
-	if (cnr_index != P[index].CornerList[0].ploc)
-	{
-		// Increment the dup counter
-		dupcntr++;
-		// Add the corner to the particle's corner array
-		P[index].CornerList[dupcntr].ploc = cnr_index;
-	}
-	
-	// ditto
-	cnr_index = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy+R)),uint(round(cz+R))));
-	if (cnr_index != P[index].CornerList[0].ploc && 
-		cnr_index != P[index].CornerList[1].ploc)
-	{
-		dupcntr++;
-		P[index].CornerList[dupcntr].ploc = cnr_index;
-	}
-		
-	
-	cnr_index = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy+R)),uint(round(cz-R))));
-	if (cnr_index != P[index].CornerList[0].ploc && 
-		cnr_index != P[index].CornerList[1].ploc &&
-		cnr_index != P[index].CornerList[2].ploc)
-	{
-		dupcntr++;
-		P[index].CornerList[dupcntr].ploc = cnr_index;
-	}
-		
-	
-	cnr_index = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy-R)),uint(round(cz+R))));
-	if (cnr_index != P[index].CornerList[0].ploc && 
-		cnr_index != P[index].CornerList[1].ploc &&
-		cnr_index != P[index].CornerList[2].ploc &&
-		cnr_index != P[index].CornerList[3].ploc)
-	{
-		dupcntr++;
-		P[index].CornerList[dupcntr].ploc = cnr_index;
-	}
-	
-	
-	cnr_index = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy-R)),uint(round(cz-R))));
-	if (cnr_index != P[index].CornerList[0].ploc && 
-		cnr_index != P[index].CornerList[1].ploc &&
-		cnr_index != P[index].CornerList[2].ploc &&
-		cnr_index != P[index].CornerList[3].ploc &&
-		cnr_index != P[index].CornerList[4].ploc)
-	{
-		dupcntr++;
-		P[index].CornerList[dupcntr].ploc = cnr_index;
-	}
-		
-	
-	cnr_index = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy-R)),uint(round(cz+R))));
-	if (cnr_index != P[index].CornerList[0].ploc && 
-		cnr_index != P[index].CornerList[1].ploc &&
-		cnr_index != P[index].CornerList[2].ploc &&
-		cnr_index != P[index].CornerList[3].ploc &&
-		cnr_index != P[index].CornerList[4].ploc &&
-		cnr_index != P[index].CornerList[5].ploc)
-	{
-		dupcntr++;
-		duplist[dupcntr] = cnr_index;
-		P[index].CornerList[dupcntr].ploc = cnr_index;
-	}
-		
-	
-	cnr_index = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy-R)),uint(round(cz-R))));
-	if (cnr_index != P[index].CornerList[0].ploc && 
-		cnr_index != P[index].CornerList[1].ploc &&
-		cnr_index != P[index].CornerList[2].ploc &&
-		cnr_index != P[index].CornerList[3].ploc &&
-		cnr_index != P[index].CornerList[4].ploc &&
-		cnr_index != P[index].CornerList[5].ploc&&
-		cnr_index != P[index].CornerList[6].ploc)
-	{
-		dupcntr++;
-		P[index].CornerList[dupcntr].ploc = cnr_index;
-	}
-	
-	
-	#if 0
-		if(index == 3 && uint(ShaderFlags.frameNum) == 100)
-		{
-			debugPrintfEXT("p:%d,H:%d,W:%d[%d,%d,%d,%d,%d,%d,%d,%d]",index,WIDTH,HEIGHT,
-				P[index].CornerList[0].ploc,
-				P[index].CornerList[1].ploc,
-				P[index].CornerList[2].ploc,
-				P[index].CornerList[3].ploc,
-				P[index].CornerList[4].ploc,
-				P[index].CornerList[5].ploc,
-				P[index].CornerList[6].ploc,
-				P[index].CornerList[7].ploc);
-		}
-			
-	#endif
 //#################################################################
 //################### Populate the cell array with this particles corners
 //#################################################################
@@ -239,6 +160,7 @@ void main(){
 		
 		// Get the first non-duplicate corner.
 		sltidx = P[index].CornerList[ii].ploc;
+		
 	
 		// If it's not zero then do nothing - 0 index or location <0,0,0> 
 		// is not allowed
@@ -264,7 +186,10 @@ void main(){
 		// atomic add increments the value in the lock array and returns the 
 		// *previous value*.
 		slot = atomicAdd(L[sltidx],1);
-		
+		#if 1 && defined(DEBUG)
+			if((uint(ShaderFlags.frameNum) == 55 || uint(ShaderFlags.frameNum) == 56) && ii <3)
+				debugPrintfEXT("F:%d,P:%d,Slot:%d, Corner Loc:%d, loc<%f,%f,%f> R:%f",uint(ShaderFlags.frameNum),index,slot,sltidx,cx,cy,cz,R);
+		#endif	
 		// If the array at this index of the particle-cell hash 
 		// does not have enough slots to handle the particle density
 		// then report it.

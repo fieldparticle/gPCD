@@ -18,6 +18,5 @@ const uint ColAryLen=24389;
 const uint LockAryLen=24389;
 const uint doMotion = 0;
 const uint MAX_CELL_ARRAY_LOCATIONS =24389;
-const float dt =0.1;
 const uint compflag =0;
 const uint bbound =74240;

@@ -54,7 +54,7 @@ class GenMotionData():
         self.p_list = []
         self.add_null_particle(self.p_list)
         self.index = 0
-        self.cell_x_len = self.cell_y_len = self.cell_z_len = 6
+        self.cell_x_len = self.cell_y_len = self.cell_z_len = 5
         self.particles_in_cell = 8
         self.number_particles = 2
         self.tot_num_collsions = self.num_collisions_per_cell =self.collsion_count_check = 0
@@ -62,8 +62,11 @@ class GenMotionData():
         self.test_file_name = f"{self.itemcfg.data_dir}/TwoParticleHorizontal.tst"
         self.test_bin_name = f"{self.itemcfg.data_dir}/TwoParticleHorizontal.bin"
         self.report_file = f"{self.itemcfg.data_dir}/TwoParticleHorizontal.rpt"
+        inverse_square_softening = 1.0
+        momentum_per_area = 0.001
+
         particle_struct = pdata()
-        particle_struct.pnum = 0
+        particle_struct.pnum = 1
         particle_struct.rx = 2.0
         particle_struct.ry = 2.1
         particle_struct.rz = 2.0
@@ -71,24 +74,24 @@ class GenMotionData():
         particle_struct.vy = 0.0
         particle_struct.vz = 0.0
         particle_struct.molar_mass = 1.0
-        particle_struct.radius = 1.0
-        particle_struct.inverse_square_softening = 0.001
-        particle_struct.momentum_per_area = 1.0
+        particle_struct.radius = 0.25
+        particle_struct.inverse_square_softening = inverse_square_softening
+        particle_struct.momentum_per_area = momentum_per_area
 
         self.p_list.append(particle_struct)
     
         particle_struct = pdata()
-        particle_struct.pnum = 0
-        particle_struct.rx = 3.5
+        particle_struct.pnum = 2
+        particle_struct.rx = 3.0
         particle_struct.ry = 2.1
         particle_struct.rz = 2.0
         particle_struct.vx = -0.05
         particle_struct.vy = 0.0
         particle_struct.vz = 0.0
         particle_struct.molar_mass = 1.0
-        particle_struct.radius = 1.0
-        particle_struct.inverse_square_softening = 0.001
-        particle_struct.momentum_per_area = 1.0
+        particle_struct.radius = 0.25
+        particle_struct.inverse_square_softening = inverse_square_softening
+        particle_struct.momentum_per_area = momentum_per_area
         self.p_list.append(particle_struct)
         self.write_test_file()
         self.create_bin_file()
@@ -136,7 +139,7 @@ class GenMotionData():
         f.write(fstr)
         fstr = f"radius = 1.0;\n"
         f.write(fstr)
-        fstr = f"particles_per_cell = {self.particles_in_cell};\n"
+        fstr = f"particles_per_cell = {self.particles_in_cell+2};\n"
         f.write(fstr)
         fstr = f"num_particles = {self.number_particles};\n"
         f.write(fstr)
@@ -168,7 +171,7 @@ class GenMotionData():
         f.write(fstr)
         fstr = f"workGroupsz = 1;\n"
         f.write(fstr)
-        fstr = f"cell_occupancy_list_size = {self.number_particles};\n"
+        fstr = f"cell_occupancy_list_size = 4;\n"
         f.write(fstr)
         f.flush()
         f.close()

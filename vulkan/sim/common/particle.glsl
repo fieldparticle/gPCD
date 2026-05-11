@@ -47,10 +47,10 @@ struct Particle {
 	vec4  PosLocA; 				// First position buffer. x,y,z, hold the location and 1 stores the active flag. 0.0 if active, 1.0 if not.
 	vec4  PosLocB;				// Second position buffer. x,y,z, hold the location and 1 stores the active flag. 0.0 if active, 1.0 if not.
 	vec4  VelRad;				// Velocity, vx,vy,vz, w not used.
-    vec4  Data;					// Particle Data x=particle radius, yzw not used
+    vec4  Data;					// Particle Data x=particle radius, y=inverse_square_softening, z=momentum_per_area, w not used
 	vec4  parms;				// TBD
 	lstr  CornerList[8];		// Particle Corner List (see lstr)
-	bcoll bcs[4];				// Current glsl version does not support walls. Only particle contacts.
+	bcoll bcs[4];				// Wall contact flags: 1=left, 2=right, 3=bottom, 4=top.
 	ccoll ccs[12];				// TBD
 	uint  sltnum;				// Use to store contact count.
 	uint  ColFlg;				// 1 if in collision, 0 if not.

@@ -48,6 +48,7 @@ void ResourceParticlePush::Create(ResourceVertexParticle* vertP)
 
 void ResourceParticlePush::PushMem(uint32_t currentBuffer)
 {
+	
 	if (m_ShaderFlags.frameNum != static_cast<float>(m_App->m_FrameNumber))
 	{
 		if (m_ShaderFlags.positionBuffer == 0.0)
@@ -55,6 +56,8 @@ void ResourceParticlePush::PushMem(uint32_t currentBuffer)
 		else
 			m_ShaderFlags.positionBuffer = 0.0;
 	}
+	
+	
 	// Update only once
 	m_ShaderFlags.frameNum = static_cast<float>(m_App->m_FrameNumber);
 
