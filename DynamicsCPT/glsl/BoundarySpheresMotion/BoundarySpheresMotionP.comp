@@ -53,7 +53,7 @@
 #include "../common/Lockimage.glsl"
 #include "../common/particle.glsl"
 #include "workgroups.glsl"
-#include "../common/isParticleContact.glsl"
+#include "../common/isParticleContactMotion.glsl"
 #include "../common/dynamics_collision.glsl"
 #include "../common/move_particle.glsl"
  
@@ -125,8 +125,14 @@ void main()
 				TargetID = clink[loc].idx[jj];
 				// If the particle number is 0, then end of list
 				if(TargetID == 0)
+				{
+					
 					break;
+				}
 				
+				#if 0 && defined(DEBUG)
+						debugPrintfEXT("SourceID:%d TargetID %d", SourceID,TargetID);
+				#endif
 				if(isParticleContact(ii,SourceID, TargetID, uint(ShaderFlags.positionBuffer)) > 0)
 				{
 					// Run thru the duplicates list to the current count

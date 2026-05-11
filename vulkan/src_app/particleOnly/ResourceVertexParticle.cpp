@@ -139,7 +139,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		part.Data			= glm::vec4(part_pos.radius, part_pos.inverse_square_softening, part_pos.momentum_per_area, 1.0);
 		part.MolarMatter	= static_cast<float>(1.0);
 		part.temp_vel		= static_cast<float>(0.04);
-		part.parms			=  glm::vec4(part_pos.molar_mass, 0.0,0.0, 0.0);
+		part.parms			= glm::vec4(part_pos.molar_mass, 0.0,0.0, 0.0);
 		part.colFlg			= 0;
 
 

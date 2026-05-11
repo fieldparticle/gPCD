@@ -1,0 +1,95 @@
+Read-only evaluation done. I would suggest these changes first, in this order:
+
+Apply the collision momentum before moving
+
+BoundarySpheresMotionP.comp (line 175) calls:
+
+glsl
+
+
+
+ProcessCollision(SourceID);
+MoveParticle(SourceID, uint(ShaderFlags.positionBuffer));
+
+
+
+But ProcessCollision() only writes P[SourceID].parms.yzw. It does not change velocity. MoveParticle() uses P[SourceID].VelRad.xy, so collision response currently has no effect on motion.
+
+Suggested next test:
+
+glsl
+
+
+
+ProcessCollision(SourceID);
+ApplyOverlapMomentum(SourceID);
+MoveParticle(SourceID, uint(ShaderFlags.positionBuffer));
+
+
+
+Use the push-constant dt, not the generated constant
+
+move_particle.glsl (line 10) uses dt, which comes from params.glsl (line 21) as 0.001.
+
+Your Python run uses dt = 0.05 with substeps = 5, so effective sub_dt = 0.01. The shader movement is currently 10x smaller than that if it uses 0.001.
+
+Suggested change:
+
+glsl
+
+
+
+P[SourceID].PosLocB.xy = P[SourceID].PosLocA.xy + velocity * ShaderFlags.dt;
+
+
+
+and same for the other buffer branch.
+
+Make positionBuffer mean one thing everywhere
+
+Right now there is a likely mismatch:
+
+dynamics_collision.glsl (line 41): positionBuffer == 0 reads PosLocA
+
+isParticleContact.glsl (line 47): Pindex == 0 reads PosLocA
+
+BoundarySpheresMotionP.vert (line 95): positionBuffer == 1 reads PosLocA
+
+
+
+
+That means compute/contact may be using one buffer while render/corner-list generation uses the other. I’d define the convention explicitly: either positionBuffer means “current/read buffer” or “next/write buffer,” then update all three shader sites to match.
+
+Fix the local include path before trusting shader compile
+
+glslc currently fails on:
+
+text
+
+
+
+#include "../VerfPerf/workgroups.glsl"
+
+
+
+from BoundarySpheresMotionP.comp (line 54).
+
+Your tree has:
+
+text
+
+
+
+glsl/BoundarySpheresMotion/workgroups.glsl
+
+
+
+So this staging copy does not compile as-is unless that missing VerfPerf directory exists elsewhere in the actual build.
+
+Clear the full duplicate list
+
+BoundarySpheresMotionP.comp (line 96) declares duplst[32], but line 102 clears only 8 entries. The duplicate scan loops over all 32. That can cause random stale values to suppress contacts.
+
+Suggested change: clear kk < DUP_LIST_SIZE.
+
+The big one is still number 1: collision momentum is being calculated, but it is not being applied to velocity before movement. That alone would make the dynamics look like they are not working.

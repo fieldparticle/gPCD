@@ -50,7 +50,7 @@ struct Particle {
     vec4  Data;					// Particle Data x=particle radius, y=inverse_square_softening, z=momentum_per_area, w not used
 	vec4  parms;				// TBD
 	lstr  CornerList[8];		// Particle Corner List (see lstr)
-	bcoll bcs[4];				// Reserved for future per-particle boundary contacts.
+	bcoll bcs[4];				// Wall contact flags: 1=left, 2=right, 3=bottom, 4=top.
 	ccoll ccs[12];				// TBD
 	uint  sltnum;				// Use to store contact count.
 	uint  ColFlg;				// 1 if in collision, 0 if not.

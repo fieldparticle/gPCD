@@ -1,3 +1,4 @@
+from asyncio import subprocess
 import sys
 import importlib
 from contextlib import redirect_stdout
@@ -22,7 +23,11 @@ import ctypes
 from Utilites import read_particle_data
 from pdata import *
 from GenPQBData import *
-
+#from GenMotionData import *
+#from subprocess import Popen
+import subprocess
+subprocess.__file__
+#import asyncio
 
 
 class WorkerSignals(QObject):
@@ -123,7 +128,8 @@ class TabGenData(QTabWidget):
                 return 
             try:
                 # Import the class named in generate_class
-                self.gen_class = self.load_class(self.itemcfg.generate_class)()  
+                
+                self.gen_class = self.load_class(self.itemcfg.generate_class)()
                 self.gen_class.create(self,self.itemcfg) 
             except BaseException as e:
                 self.log.log(self,f"Unable to import data generation file: {self.itemcfg.generate_class} error:{e}")
@@ -134,6 +140,9 @@ class TabGenData(QTabWidget):
             self.update_list_widget()
             # Enable to generate data
             self.GenDataButton.setEnabled(True)
+            notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
+            subprocess.Popen([notepad_plus_plus_path, self.CfgFile])
+
 
     #******************************************************************
     # reload the configuration file
@@ -573,8 +582,8 @@ class TabGenData(QTabWidget):
         self.log.log(self,"TabFormLatex finished Create.")        
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenDUP.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
-        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
+        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
     def valueChange(self,listObj):  
         selected_items = listObj.selectedItems()
         if selected_items:

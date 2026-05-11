@@ -41,7 +41,7 @@ class ResourceVertexCube : public ResourceVertexObj
 		virtual void UpdateMem() {};
 		virtual void GetShaderMem() {};
 		virtual void CopyMem() {};
-
+		void MakeAxes(uint32_t sidelen);
 ;
 
 		virtual void* GetBuffer(uint32_t bufNum,

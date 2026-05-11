@@ -56,7 +56,7 @@ class ResourceVertexObj : public Resource
 				{
 					m_VkType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 				};
-		void MakeAxes(uint32_t sidelen);
+		
 	
 	virtual void Create(uint32_t BindPoint, ResourceVertexParticle* PartVert);
 	virtual void Create(uint32_t BindPoint);

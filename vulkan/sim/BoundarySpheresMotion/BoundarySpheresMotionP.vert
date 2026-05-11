@@ -92,11 +92,6 @@ void main(){
 	// Set point size 
 	gl_PointSize = 1.0;
 	
-	// Apply view to location
-	//gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
-	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
-	
-	
 	// Clear this paricles corner array
 	for (uint kk = 0;kk<8;kk++)
 		P[index].CornerList[kk].ploc = 0;
@@ -106,7 +101,7 @@ void main(){
 	float cz 		= P[index].PosLocA.z;
 	float R			= P[index].Data.x;
 	
-	if (ShaderFlags.positionBuffer == 1u) 
+	if (ShaderFlags.positionBuffer == 0u) 
 	{
 		cx 		= P[index].PosLocA.x;
 		cy 		= P[index].PosLocA.y;
@@ -117,6 +112,12 @@ void main(){
 		cy 		= P[index].PosLocB.y;
 		cz 		= P[index].PosLocB.z;
 	}
+
+	// Render the particle from the same selected position buffer used to build
+	// the corner list and drive compute collision detection.
+	vec3 particleCenter = vec3(cx, cy, cz);
+	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz + particleCenter, 1.0);
+
 	uint duplist[8];
 	uint dupcntr = 0;
 	uint CornerLocation = 0;

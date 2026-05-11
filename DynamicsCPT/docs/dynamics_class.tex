@@ -437,6 +437,211 @@ At the current rebuild stage, the relevant order is:
     \item \texttt{Base.record\_step\_report()} stores per-particle values.
 \end{enumerate}
 
+\section{Estimating Steps Spent In Collision}
+
+For debugging and stability checks, it is useful to estimate how many simulation
+steps a pair of particles will spend in overlap. This estimate helps identify
+cases where the relative motion is so fast that contact may last only one or
+two sampled steps.
+
+Let the frame rate be \(F\) frames per second and let the simulation use \(N_s\)
+substeps per frame. The substep duration is:
+
+\[
+    \Delta t_s
+    =
+    \frac{1}{F N_s}.
+\]
+
+For two particles with positions \(\mathbf{x}_i,\mathbf{x}_j\), velocities
+\(\mathbf{v}_i,\mathbf{v}_j\), and radii \(r_i,r_j\), define the relative
+position and velocity:
+
+\[
+    \mathbf{x}_{rel}
+    =
+    \mathbf{x}_j-\mathbf{x}_i,
+    \qquad
+    \mathbf{v}_{rel}
+    =
+    \mathbf{v}_j-\mathbf{v}_i.
+\]
+
+The pair is geometrically in contact while:
+
+\[
+    \|\mathbf{x}_{rel}+\mathbf{v}_{rel}t\|
+    \le
+    r_i+r_j.
+\]
+
+Expanding this condition gives a quadratic:
+
+\[
+    at^2+bt+c \le 0,
+\]
+
+where:
+
+\[
+\begin{aligned}
+    a &= \mathbf{v}_{rel}\cdot\mathbf{v}_{rel},\\
+    b &= 2(\mathbf{x}_{rel}\cdot\mathbf{v}_{rel}),\\
+    c &= \mathbf{x}_{rel}\cdot\mathbf{x}_{rel}-(r_i+r_j)^2.
+\end{aligned}
+\]
+
+If the discriminant
+
+\[
+    D=b^2-4ac
+\]
+
+is negative, the constant-velocity paths do not overlap. If \(D\ge 0\), the
+entry and exit times are:
+
+\[
+    t_{entry}
+    =
+    \frac{-b-\sqrt{D}}{2a},
+    \qquad
+    t_{exit}
+    =
+    \frac{-b+\sqrt{D}}{2a}.
+\]
+
+The continuous collision duration is:
+
+\[
+    T_c
+    =
+    t_{exit}-t_{entry}.
+\]
+
+The estimated number of simulation substeps spent in collision is:
+
+\[
+    n_c
+    =
+    T_c F N_s
+    =
+    \frac{T_c}{\Delta t_s}.
+\]
+
+\subsection{Speed-Limit Estimate}
+
+If the only known velocity is a system speed limit \(v_{max}\), the largest
+possible relative speed for two particles moving directly toward each other is:
+
+\[
+    v_{rel,max}=2v_{max}.
+\]
+
+The shortest head-on geometric contact duration is therefore:
+
+\[
+    T_{c,min}
+    =
+    \frac{2(r_i+r_j)}{v_{rel,max}}
+    =
+    \frac{r_i+r_j}{v_{max}}.
+\]
+
+The corresponding conservative lower bound on substeps in collision is:
+
+\[
+    n_{c,min}
+    =
+    \frac{r_i+r_j}{v_{max}} F N_s.
+\]
+
+For equal-radius particles \(r_i=r_j=r\):
+
+\[
+    n_{c,min}
+    =
+    \frac{2r}{v_{max}} F N_s.
+\]
+
+This estimate ignores collision response. It only answers how many sampled
+substeps the particles would overlap if they continued at constant velocity.
+
+\subsection{Sampling Risk}
+
+A useful diagnostic is the relative distance traveled in one substep:
+
+\[
+    \Delta x_{rel,s}
+    =
+    \|\mathbf{v}_{rel}\|\Delta t_s.
+\]
+
+If:
+
+\[
+    \Delta x_{rel,s} > r_i+r_j,
+\]
+
+then the particles move more than the contact radius in one substep. If:
+
+\[
+    \Delta x_{rel,s} > 2(r_i+r_j),
+\]
+
+then they can cross the entire geometric collision window in one substep. These
+cases are risky for overlap-only contact detection because a collision may be
+sampled for too few steps, or missed entirely depending on the sampled
+positions.
+
+\subsection{Response-Aware Estimate}
+
+The actual number of steps in contact can differ from the geometric estimate
+because \texttt{momentum\_per\_area} and
+\texttt{inverse\_square\_softening} change particle velocities during overlap.
+For each substep, the current model computes:
+
+\[
+    J_{ij}
+    =
+    k_i A_{ij} w(d),
+\]
+
+with:
+
+\[
+    k_i = \texttt{momentum\_per\_area},
+    \qquad
+    w(d)=\frac{1}{\max(d^2,s^2)},
+    \qquad
+    s=\texttt{inverse\_square\_softening}.
+\]
+
+The response velocity change is:
+
+\[
+    \Delta \mathbf{v}_i
+    =
+    \frac{-J_{ij}\mathbf{n}_{ij}}{m_i}.
+\]
+
+Because this velocity change alters later positions, a response-aware collision
+step count is best estimated by running the same substep loop as the simulation:
+
+\begin{enumerate}
+    \item compute the current center distance,
+    \item detect whether \(d < r_i+r_j\),
+    \item compute overlap area \(A_{ij}\),
+    \item compute \(J_{ij}=k_iA_{ij}w(d)\),
+    \item update velocity from momentum,
+    \item move by the substep duration \(\Delta t_s\),
+    \item count each substep where overlap is present.
+\end{enumerate}
+
+The geometric estimate and the response-aware estimate should both be reported.
+The geometric estimate shows whether the time resolution is adequate; the
+response-aware estimate shows how the current momentum parameters change the
+actual contact duration.
+
 \section{What This Class Does Not Do}
 
 The current \texttt{Dynamics} class does not include bonding, field dynamics,

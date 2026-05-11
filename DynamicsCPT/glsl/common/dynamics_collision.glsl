@@ -33,7 +33,7 @@ vec2 CurrentLocation(uint particle_id)
     // Match the simulation-wide double-buffer selector used by contact
     // detection and rendering.
     Particle particle = P[particle_id];
-    if (uint(ShaderFlags.positionBuffer) == 1u) {
+    if (uint(ShaderFlags.positionBuffer) == 0u) {
         return particle.PosLocA.xy;
     }
     return particle.PosLocB.xy;
@@ -266,6 +266,7 @@ void ApplyOverlapMomentum(uint SourceID)
     // main() does not call this yet because the Python model keeps momentum
     // calculation and velocity application as separate passes.
     float mass = max(P[SourceID].parms.x, EPSILON_DISTANCE);
+    vec2 old_velocity = P[SourceID].VelRad.xy;
     P[SourceID].VelRad.x += P[SourceID].parms.y / mass;
     P[SourceID].VelRad.y += P[SourceID].parms.z / mass;
 
@@ -274,4 +275,23 @@ void ApplyOverlapMomentum(uint SourceID)
     // so store 0.0 as the stable default.
     vec2 velocity = P[SourceID].VelRad.xy;
     P[SourceID].VelRad.w = length(velocity) > 0.0 ? atan(velocity.y, velocity.x) : 0.0;
+
+#if defined(DEBUG)
+    if (SourceID == 1u && P[SourceID].ColFlg == 1u) {
+        debugPrintfEXT(
+            "ApplyOverlapMomentum frame:%f src:%d mass:%0.8f mpa:%0.8f mom<%0.8f,%0.8f,%0.8f> vel<%0.8f,%0.8f> -> <%0.8f,%0.8f>",
+            ShaderFlags.frameNum,
+            SourceID,
+            P[SourceID].parms.x,
+            P[SourceID].Data.z,
+            P[SourceID].parms.y,
+            P[SourceID].parms.z,
+            P[SourceID].parms.w,
+            old_velocity.x,
+            old_velocity.y,
+            velocity.x,
+            velocity.y
+        );
+    }
+#endif
 }

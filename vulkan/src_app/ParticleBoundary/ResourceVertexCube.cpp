@@ -109,3 +109,67 @@ void ResourceVertexCube::Create(ResourceVertexParticle* PartVert)
 
 
 }
+void ResourceVertexCube::MakeAxes(uint32_t sidelen)
+{
+
+
+	m_CubeIndices =
+	{
+		0, 2, 1,  2, 0, 3,   // back
+		4, 5, 6,  6, 7, 4,   // front
+
+		0, 4, 7,  7, 3, 0,   // left
+		1, 2, 6,  6, 5, 1,   // right
+
+		0, 1, 5,  5, 4, 0,   // bottom
+		3, 7, 6,  6, 2, 3    // top
+	};
+	int side = static_cast<int>(sidelen) - 1;
+
+	m_Axes.push_back({ { 0, 0, 0, 1.0 },{1.0,1.0,1.0,1} });
+	m_Axes.push_back({ { side, 0.0, 0.0, 1.0 }, {1.0,1,1.,1} });
+	m_Axes.push_back({ { side,  side, 0.0, 1.0 }, {1.,1.,1,1} });
+	m_Axes.push_back({ {0.0,  side, 0.0, 1.0 }, {1,1,1.,1} });
+
+	m_Axes.push_back({ {0.0, 0.0,  side, 1.0 }, {1,1.,1,1} });
+	m_Axes.push_back({ { side, 0.0,  side, 1.0 }, {1.,1,1,1} });
+	m_Axes.push_back({ { side,  side,  side, 1.0 }, {1,1,1,1} });
+	m_Axes.push_back({ {0.0,  side,  side, 1.0 }, {1.0,1.0,1.0,1} });
+
+	m_Verts = m_Axes;
+	/*
+	m_Axes.push_back({ {0.0,0.0,0.0,1.0f},{1.0, 0.0, 0.0,1.0} });
+	m_Axes.push_back({ {sidelen,0.0,0.0,1.0f}, {1.0, 0.0, 0.0,1.0} });
+	//y
+	m_Axes.push_back({ {0.0, 0.0, 0.0,1.0f},{0.0, 1.0, 0.0,1.0} });
+	m_Axes.push_back({ {0.0, sidelen, 0.0,1.0f}, {0.0, 1.0, 0.0,1.0} });
+	//z
+	m_Axes.push_back({ {0.0, 0.0, 0.0,1.0},{0.0, 0.0, 1.0,1.0} });
+	m_Axes.push_back({ {0.0, 0.0, sidelen,1.0},{0.0, 0.0, 1.0,1.0} });
+
+#if 0
+	for (size_t ii = 0; ii < sidelen; ii++)
+	{
+		float length = static_cast<float>(ii + 1);
+		// 	xtic
+		m_Axes.push_back({ {length,-0.1,0.0,1.0},{1.0,0.0,0.0,1.0} });
+		m_Axes.push_back({ {length,0.1,0.0,1.0},{1.0,0.0,0.0,1.0} });
+		// y tic
+		m_Axes.push_back({ {0.0,length,0.1,1.0},{0.0,1.0,0.0,1.0} });
+		m_Axes.push_back({ {0.0,length,-0.1,1.0},{0.0,1.0,0.0,1.0} });
+		// z tic
+		m_Axes.push_back({ {0.1,0.0,length,1.0},{0.0,0.0,1.0,1.0} });
+		m_Axes.push_back({ {-0.1,0.0,length,1.0},{0.0,0.0,1.0,1.0} });
+	}
+#endif
+	m_Axes.push_back({ {0.90,-0.5,0.0,1.0},{1.0,0.0,0.0,1.0} });
+	m_Axes.push_back({ {0.90,0.5,0.0,1.0},{1.0,0.0,0.0,1.0} });
+
+	m_Axes.push_back({ {1.10,-0.5,0.0,1.0},{1.0,0.0,0.0,1.0} });
+	m_Axes.push_back({ {1.10,0.5,0.0,1.0},{1.0,0.0,0.0,1.0} });
+
+
+
+	//m_Verts = m_Axes;
+	*/
+}

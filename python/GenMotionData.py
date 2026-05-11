@@ -2,6 +2,8 @@ from utilities import *
 from GenDataBase import *
 import math
 from pdata import *
+from libconf import AttrDict
+import io
 class GenMotionData():
 
     local_particles_in_row = 0
@@ -40,7 +42,7 @@ class GenMotionData():
     def clear_files(self):
         pass
     def do_all_files_dbg(self):
-        self.twoParticleHorizontal()
+        self.runner()
     
     def create_bin_file(self):
         try:
@@ -50,6 +52,9 @@ class GenMotionData():
             return
         self.count = 0
     
+    
+
+        
     def twoParticleHorizontal(self):
         self.p_list = []
         self.add_null_particle(self.p_list)
@@ -121,7 +126,7 @@ class GenMotionData():
     # Write the tst files taht are read by particle.exe for tests
     # 
     #
-    def write_test_file(self):
+    def write_test_file(self,run_cfg=None):
 
         try:
             f = open(self.test_file_name,'w')
@@ -131,47 +136,106 @@ class GenMotionData():
         f.write(fstr)
         # size lengths must be plus 1 since the cell locations start as <0,0,0>
         # THIS is the only place you so this - The vulkan code nees to check this
-        fstr = f"CellAryW = {self.cell_x_len};\n"     
+        fstr = f"CellAryW = {run_cfg.side_len};\n"     
         f.write(fstr)
-        fstr = f"CellAryH = {self.cell_y_len};\n"     
+        fstr = f"CellAryH = {run_cfg.side_len};\n"     
         f.write(fstr)
-        fstr = f"CellAryL = {self.cell_z_len};\n"     
+        fstr = f"CellAryL = {run_cfg.side_len};\n"     
         f.write(fstr)
-        fstr = f"radius = 1.0;\n"
+        fstr = f"radius = {run_cfg.radius};\n"
         f.write(fstr)
-        fstr = f"particles_per_cell = {self.particles_in_cell+2};\n"
+        fstr = f"particles_per_cell = {run_cfg.particles_per_cell};\n"
         f.write(fstr)
         fstr = f"num_particles = {self.number_particles};\n"
         f.write(fstr)
-        fstr = f"num_particle_colliding =  0;\n"
+        fstr = f"num_particle_colliding =  {run_cfg.num_particle_colliding};\n"
         f.write(fstr)
-        fstr = f"exp_collisions_per_cell = 0;\n"
+        fstr = f"exp_collisions_per_cell = {run_cfg.exp_collisions_per_cell};\n"
         f.write(fstr)
-        fstr = f"act_collisions_per_cell = 0;\n"
+        fstr = f"act_collisions_per_cell = {run_cfg.act_collisions_per_cell};\n"
         f.write(fstr)
-        fstr = f"particles_in_row =  0;\n"
+        fstr = f"particles_in_row =  {run_cfg.particles_in_row};\n"
         f.write(fstr)
         fstr = f"particle_data_bin_file = \"{self.test_bin_name}\";\n"
         f.write(fstr)
         fstr = f"report_file = \"{self.report_file}\";\n"
         f.write(fstr)
-        fstr = f"collsion_density = 0;\n"
+        fstr = f"collsion_density = {run_cfg.collision_density};\n"
         f.write(fstr)
-        fstr = f"pdensity = 0;\n"
+        fstr = f"pdensity = {run_cfg.pdensity};\n"
         f.write(fstr)
-        fstr = f"dispatchx = 3;\n"
+        fstr = f"dispatchx = {run_cfg.dispatchx};\n"
         f.write(fstr)
-        fstr = f"dispatchy = 1;\n"
+        fstr = f"dispatchy = {run_cfg.dispatchy};\n"
         f.write(fstr)
-        fstr = f"dispatchz = 1;\n"
+        fstr = f"dispatchz = {run_cfg.dispatchz};\n"
         f.write(fstr)
-        fstr = f"workGroupsx = 1\n"
+        fstr = f"workGroupsx = {run_cfg.workGroupsx}\n"
         f.write(fstr)
-        fstr = f"workGroupsy = 1;\n"
+        fstr = f"workGroupsy = {run_cfg.workGroupsy};\n"
         f.write(fstr)
-        fstr = f"workGroupsz = 1;\n"
+        fstr = f"workGroupsz = {run_cfg.workGroupsz};\n"
         f.write(fstr)
-        fstr = f"cell_occupancy_list_size = 4;\n"
+        fstr = f"cell_occupancy_list_size = {run_cfg.cell_occupancy_list_size};\n"
+        f.write(fstr)
+        fstr = f"walls = {run_cfg.wall_box};\n"
         f.write(fstr)
         f.flush()
         f.close()
+
+    def runner(self):
+        config = None
+        cfg_study_name = self.itemcfg.simulation_file
+        cfg_study_dir = self.itemcfg.simulation_dir
+        cfg_file = f"{cfg_study_dir}/{cfg_study_name}"
+
+        
+        try:
+            with io.open(cfg_file) as f:
+                #self.log.log(self,"gPCD into Open config file.")
+                config = libconf.load(f)
+        except IOError as e:
+            print("gPCD failed to open config file: " + cfg_file)
+            return
+        except libconf.ConfigParseError as e:
+            print("gPCD failed to parse config file: " + cfg_file)
+            print(e)
+            return
+        self.p_list = []
+        self.add_null_particle(self.p_list)
+        self.index = 0
+        try:
+            RUN_CONFIGURATION = config["RUN_CONFIGURATION"]
+            PARTICLE_DATA = AttrDict()
+            PP = config["PARTICLE_DATA"]
+
+            for pp in range(len(PP)):
+                src_str = f"p{pp+1}"
+                part = AttrDict(PP[src_str])
+                PARTICLE_DATA[pp] = part
+                particle_struct = pdata()
+                particle_struct.pnum = pp+1
+                particle_struct.rx = part.location.x1
+                particle_struct.ry = part.location.y1
+                particle_struct.rz = part.location.z1
+                particle_struct.vx = part.vx
+                particle_struct.vy = part.vy
+                particle_struct.vz = 0.0
+                particle_struct.molar_mass = part.mass
+                particle_struct.radius = part.radius
+                particle_struct.inverse_square_softening = part.inverse_square_softening
+                particle_struct.momentum_per_area = part.momentum_per_area
+                self.p_list.append(particle_struct)
+                self.number_particles = pp+1
+        except BaseException as e:
+            print("gPCD failed to read config file: " + cfg_file)   
+            return
+        cfg_data_name = config["STUDY_NAME"]
+        self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.tst"
+        self.test_bin_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.bin"
+        self.report_file = f"{self.itemcfg.data_dir}/{cfg_data_name}.rpt"
+        self.write_test_file(RUN_CONFIGURATION)
+        self.create_bin_file()
+        self.write_bin_file(self.p_list)
+        self.close_bin_file()
+        print(f"TwoParticleHorizontal: Wrote {self.number_particles} particles to {self.test_bin_name}")
