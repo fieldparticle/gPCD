@@ -53,7 +53,7 @@ float rRotZ;
 uint32_t VIEW_XY = 1;
 uint32_t VIEW_ZY = 2;
 uint32_t VIEW_XZ = 3;
-float rCoordView = VIEW_XZ;
+float rCoordView = VIEW_ZY;
 
 float ox = -1;
 float oy = -1;

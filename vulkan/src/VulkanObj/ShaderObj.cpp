@@ -44,7 +44,9 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 }
 void ShaderObj::WriteWalls()
 {
-	std::vector<double> walls(4);
+	std::vector<double> walls = { 0.0, 0.0, 0.0, 0.0 };
+	bool walls_on = CfgApp->GetBool("application.walls_on", true);
+	bool has_walls = false;
 
 	config_setting_t* setting;
 	setting = config_lookup(&CfgApp->m_cfg, "application.walls");
@@ -53,17 +55,23 @@ void ShaderObj::WriteWalls()
 	{
 		int count = config_setting_length(setting);
 
-		for (int i = 0; i < count; i++)
+		for (int i = 0; i < count && i < static_cast<int>(walls.size()); i++)
 		{
 			walls[i] =
 				config_setting_get_float_elem(setting, i);
 		}
+		has_walls = count >= static_cast<int>(walls.size());
+	}
+	if (!has_walls && walls_on)
+	{
+		walls[0] = CfgTst->GetFloat("wallXMIN", true);
+		walls[1] = CfgTst->GetFloat("wallXMAX", true);
+		walls[2] = CfgTst->GetFloat("wallYMIN", true);
+		walls[3] = CfgTst->GetFloat("wallYMAX", true);
 	}
 	
 	std::string wlflg = "0u";
 
-
-	bool walls_on = CfgApp->GetBool("application.walls_on", true);
 	if (walls_on == true)
 		wlflg = "1u;";
 	else

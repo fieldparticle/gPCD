@@ -79,13 +79,13 @@ uint isParticleContact(uint crnr, uint SourceID, uint TargetID, uint Pindex)
 	//float rsq = ((P[SourceID].Data.x+P[TargetID].Data.x)*(P[SourceID].Data.x+P[TargetID].Data.x));
 	// If square of distance is less than square of radii there is a collision.
 	float tdt = rsq/dsq;
-	//#if 1 && defined(DEBUG)
+	#if 0 && defined(DEBUG)
 		if(SourceID == 1 )
 			debugPrintfEXT("Collison Frame(%0.1f),FRM:%d,TO:%d dsq:%0.8f,rsq:%0.8f,rddiff:%0.8f,Radius1:%0.4f,Radius2:%0.4f",
 			ShaderFlags.frameNum,
 			SourceID,
 			TargetID,dsq,rsq,dsq-rsq,P[SourceID].Data.x,P[TargetID].Data.x);
-	//#endif
+	#endif
 	
 	float rddiff = dsq-rsq;	
 	//if (dsq <= rsq )

@@ -111,7 +111,13 @@ void ResourceVertexCube::Create(ResourceVertexParticle* PartVert)
 }
 void ResourceVertexCube::MakeAxes(uint32_t sidelen)
 {
+	int side = 0;
 
+	bool basw = CfgApp->GetBool("application.boundary_as_walls",true);
+	if (basw == false)
+		side = static_cast<int>(sidelen) - 1;
+	else
+		side = CfgTst->GetFloat("wallXMAX", true);
 
 	m_CubeIndices =
 	{
@@ -124,7 +130,7 @@ void ResourceVertexCube::MakeAxes(uint32_t sidelen)
 		0, 1, 5,  5, 4, 0,   // bottom
 		3, 7, 6,  6, 2, 3    // top
 	};
-	int side = static_cast<int>(sidelen) - 1;
+	
 
 	m_Axes.push_back({ { 0, 0, 0, 1.0 },{1.0,1.0,1.0,1} });
 	m_Axes.push_back({ { side, 0.0, 0.0, 1.0 }, {1.0,1,1.,1} });

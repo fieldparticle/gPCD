@@ -52,57 +52,6 @@ class GenMotionData():
             return
         self.count = 0
     
-    
-
-        
-    def twoParticleHorizontal(self):
-        self.p_list = []
-        self.add_null_particle(self.p_list)
-        self.index = 0
-        self.cell_x_len = self.cell_y_len = self.cell_z_len = 5
-        self.particles_in_cell = 8
-        self.number_particles = 2
-        self.tot_num_collsions = self.num_collisions_per_cell =self.collsion_count_check = 0
-
-        self.test_file_name = f"{self.itemcfg.data_dir}/TwoParticleHorizontal.tst"
-        self.test_bin_name = f"{self.itemcfg.data_dir}/TwoParticleHorizontal.bin"
-        self.report_file = f"{self.itemcfg.data_dir}/TwoParticleHorizontal.rpt"
-        inverse_square_softening = 1.0
-        momentum_per_area = 0.001
-
-        particle_struct = pdata()
-        particle_struct.pnum = 1
-        particle_struct.rx = 2.0
-        particle_struct.ry = 2.1
-        particle_struct.rz = 2.0
-        particle_struct.vx = 0.05
-        particle_struct.vy = 0.0
-        particle_struct.vz = 0.0
-        particle_struct.molar_mass = 1.0
-        particle_struct.radius = 0.25
-        particle_struct.inverse_square_softening = inverse_square_softening
-        particle_struct.momentum_per_area = momentum_per_area
-
-        self.p_list.append(particle_struct)
-    
-        particle_struct = pdata()
-        particle_struct.pnum = 2
-        particle_struct.rx = 3.0
-        particle_struct.ry = 2.1
-        particle_struct.rz = 2.0
-        particle_struct.vx = -0.05
-        particle_struct.vy = 0.0
-        particle_struct.vz = 0.0
-        particle_struct.molar_mass = 1.0
-        particle_struct.radius = 0.25
-        particle_struct.inverse_square_softening = inverse_square_softening
-        particle_struct.momentum_per_area = momentum_per_area
-        self.p_list.append(particle_struct)
-        self.write_test_file()
-        self.create_bin_file()
-        self.write_bin_file(self.p_list)
-        self.close_bin_file()
-        print(f"TwoParticleHorizontal: Wrote {self.count} particles to {self.test_bin_name}")
 
     def close_bin_file(self):
         self.bin_file.flush()
@@ -178,7 +127,17 @@ class GenMotionData():
         f.write(fstr)
         fstr = f"cell_occupancy_list_size = {run_cfg.cell_occupancy_list_size};\n"
         f.write(fstr)
-        fstr = f"walls = {run_cfg.wall_box};\n"
+        fstr = f"wallXMIN = {run_cfg.WallXMIN};\n"
+        f.write(fstr)
+        fstr = f"wallXMAX = {run_cfg.WallXMAX};\n"
+        f.write(fstr)
+        fstr = f"wallYMIN = {run_cfg.WallYMIN};\n"
+        f.write(fstr)
+        fstr = f"wallYMAX = {run_cfg.WallYMAX};\n"
+        f.write(fstr)
+        fstr = f"wallZMIN = {run_cfg.WallZMIN};\n"
+        f.write(fstr)
+        fstr = f"wallZMAX = {run_cfg.WallZMAX};\n"
         f.write(fstr)
         f.flush()
         f.close()

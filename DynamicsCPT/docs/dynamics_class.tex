@@ -8,7 +8,20 @@
 \title{The Current \texttt{Dynamics} Class}
 \author{}
 \date{}
+\setlength\parindent{0cm}
 
+\newcommand{\parnum}{(\arabic{parcount})}
+
+\newcounter{parcount}
+\newcommand\p{%
+    \stepcounter{parcount}%
+    \parnum \hspace{1em}%
+}
+
+\newenvironment{parnumbers}{%
+   \par%
+   \everypar{\noindent \stepcounter{parcount}\parnum \hspace{1em}}%
+}{}
 \begin{document}
 
 \maketitle
@@ -641,6 +654,19 @@ The geometric estimate and the response-aware estimate should both be reported.
 The geometric estimate shows whether the time resolution is adequate; the
 response-aware estimate shows how the current momentum parameters change the
 actual contact duration.
+
+\subsection{Issues}
+
+The are a number of issues that arise while designing a simulation.
+
+\begin{parnumbers}
+There is an python menu driven application velocity\_menu.py that takes parameters of the maximum speed and radius of particle which produces the number of frames the particle will be in collision. If there are errors (tunneling etc.) it will report these also.
+
+Reducing the particle radius requires increasing momentum per area and increasing the radius requires lowering it.
+
+\end{parnumbers}
+
+
 
 \section{What This Class Does Not Do}
 

@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../vulkan/sim/BoundarySpheresMotion"
+		},
+		{
+			"path": "../vulkan/sim/common"
+		}
+	],
+	"settings": {}
+}

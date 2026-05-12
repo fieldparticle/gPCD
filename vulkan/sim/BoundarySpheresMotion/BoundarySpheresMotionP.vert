@@ -116,13 +116,14 @@ void main(){
 	// Render the particle from the same selected position buffer used to build
 	// the corner list and drive compute collision detection.
 	vec3 particleCenter = vec3(cx, cy, cz);
-	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz + particleCenter, 1.0);
+	//gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz + particleCenter, 1.0);
+	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
 
 	uint duplist[8];
 	uint dupcntr = 0;
 	uint CornerLocation = 0;
 	uint count = 0;
-	#if 1
+	
 	CornerLocation = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy+R)),uint(round(cz-R))));
 	count += addUniqueCell(index, CornerLocation, count);
 	CornerLocation = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy+R)),uint(round(cz+R))));
@@ -139,7 +140,7 @@ void main(){
 	count += addUniqueCell(index, CornerLocation, count);
 	CornerLocation = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy-R)),uint(round(cz-R))));
 	count += addUniqueCell(index, CornerLocation, count);
-	#endif
+	
 	
 //#################################################################
 //################### Populate the cell array with this particles corners
@@ -187,7 +188,7 @@ void main(){
 		// atomic add increments the value in the lock array and returns the 
 		// *previous value*.
 		slot = atomicAdd(L[sltidx],1);
-		#if 1 && defined(DEBUG)
+		#if 0 && defined(DEBUG)
 			if((uint(ShaderFlags.frameNum) == 55 || uint(ShaderFlags.frameNum) == 56) && ii <3)
 				debugPrintfEXT("F:%d,P:%d,Slot:%d, Corner Loc:%d, loc<%f,%f,%f> R:%f",uint(ShaderFlags.frameNum),index,slot,sltidx,cx,cy,cz,R);
 		#endif	
@@ -197,12 +198,10 @@ void main(){
 		if(slot >= MAX_CELL_OCCUPANY)
 		{
 			uvec3 badloc;
-			#if 0
-			#if defined(DEBUG)
+			#if 0 && defined(DEBUG)
 				//IndexToArray(sltidx,badloc);
 				debugPrintfEXT("ParticleVerfPerf slot>F:%u,P:%d,MAX_CELL_OCCUPANY:%d,at loc: %d",
 				uint(ShaderFlags.frameNum),index,MAX_CELL_OCCUPANY,slot);
-			#endif
 			#endif
 			collIn.ExcessSlots = slot;
 			collIn.ErrorReturn = 2;
@@ -222,7 +221,7 @@ void main(){
 			}
 		#endif	
 		
-	#if 0
+	#if 0 && defined(DEBUG)
 		if(uint(ShaderFlags.frameNum) == 8 && index == 1)
 		{
 			debugPrintfEXT("P:%u,CNRIDX:%u,CNRL:%u,LOC:%u,SLT:%u ",index,ii,P[index].CornerList[ii].ploc, sltidx,slot);
@@ -235,7 +234,7 @@ void main(){
 		// the particle number
 		clink[sltidx].idx[slot] = index;
 	
-	#if defined(DEBUG)
+	#if 0 && defined(DEBUG)
 		if(uint(ShaderFlags.frameNum) == 8 && index == 1)
 		{
 			debugPrintfEXT("P:%u,CNRIDX:%u,CELLARYVAL:%u ",index,ii,clink[sltidx].idx[slot]);

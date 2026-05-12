@@ -195,6 +195,7 @@ void ProcessBoundaryCollisions(
             continue;
         }
 
+        P[SourceID].ColFlg = 1;
         float momentum = OverlapMomentum(SourceID, overlap_area, center_distance);
         overlap_momentum -= normal * momentum;
         overlap_momentum_sum += momentum;
@@ -246,6 +247,7 @@ void ProcessCollision(uint SourceID)
             continue;
         }
 
+        P[SourceID].ColFlg = 1;
         float momentum = OverlapMomentum(SourceID, overlap_area, center_distance);
         // normal points from source to target, so the source response is the
         // opposite direction.
@@ -276,7 +278,7 @@ void ApplyOverlapMomentum(uint SourceID)
     vec2 velocity = P[SourceID].VelRad.xy;
     P[SourceID].VelRad.w = length(velocity) > 0.0 ? atan(velocity.y, velocity.x) : 0.0;
 
-#if defined(DEBUG)
+#if 0 && defined(DEBUG)
     if (SourceID == 1u && P[SourceID].ColFlg == 1u) {
         debugPrintfEXT(
             "ApplyOverlapMomentum frame:%f src:%d mass:%0.8f mpa:%0.8f mom<%0.8f,%0.8f,%0.8f> vel<%0.8f,%0.8f> -> <%0.8f,%0.8f>",
