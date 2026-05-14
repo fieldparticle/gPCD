@@ -46,9 +46,9 @@ struct ccoll {
 struct Particle {
 	vec4  PosLocA; 				// First position buffer. x,y,z, hold the location and 1 stores the active flag. 0.0 if active, 1.0 if not.
 	vec4  PosLocB;				// Second position buffer. x,y,z, hold the location and 1 stores the active flag. 0.0 if active, 1.0 if not.
-	vec4  VelRad;				// Velocity, vx,vy,vz, w not used.
+	vec4  VelRad;				// Velocity, vx,vy,vz, velocity angle.
     vec4  Data;					// Particle Data x=particle radius, y=inverse_square_softening, z=momentum_per_area, w not used
-	vec4  parms;				// TBD
+	vec4  parms;				// x = mass, y = particle type, z = live/dead flag, w unused.
 	lstr  CornerList[8];		// Particle Corner List (see lstr)
 	bcoll bcs[4];				// Wall contact flags: 1=left, 2=right, 3=bottom, 4=top.
 	ccoll ccs[12];				// TBD

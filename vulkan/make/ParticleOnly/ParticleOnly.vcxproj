@@ -356,14 +356,20 @@
   <ItemGroup>
     <None Include="..\..\run\particleOnly\mps.cfg" />
     <None Include="..\..\run\particleOnly\Particle.cfg" />
-    <None Include="..\..\run\particle\Particle.cfg" />
     <None Include="..\..\shaders\common\isParticleContact.glsl" />
     <None Include="..\..\shaders\NoThreads\ParticleNoThreads.comp" />
     <None Include="..\..\shaders\NoThreads\ParticleNoThreads.frag" />
     <None Include="..\..\shaders\NoThreads\ParticleNoThreads.vert" />
+    <None Include="..\..\sim\BoundarySpheresMotion\BoundarySpheresMotion.cfg" />
+    <None Include="..\..\sim\BoundarySpheres\BoundarySpheres.cfg" />
+    <None Include="..\..\sim\PipeReservoirEntry\PipeReservoirEntry.cfg" />
+    <None Include="..\..\sim\VerfPerf\VerfPerf.cfg" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\..\run\particleOnly\particle.log" />
+    <Text Include="..\..\sim\BoundarySpheres\BoundarySpheresCMD.txt" />
+    <Text Include="..\..\sim\PipeReservoirEntry\PipeReservoirEntryCMD.txt" />
+    <Text Include="..\..\sim\VerfPerf\VerfPerfcmd.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

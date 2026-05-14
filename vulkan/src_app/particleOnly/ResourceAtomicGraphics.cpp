@@ -118,10 +118,14 @@ void ResourceAtomicGraphics::PullMem(uint32_t currentBuffer)
 		{
 			
 			std::ostringstream  objtxt;
+			objtxt << "====================================================================" << std::ends;
+			mout << objtxt.str().c_str() << ende;
+			objtxt.str("");
+			objtxt.clear();
 			if (m_collisionStruct.ErrorReturn == 2)
 			{
 				m_App->m_quit_event = 2;
-				objtxt << m_Name << " ResourceAtomicGraphics::Vertex Kernel Error Max Slots: "
+				objtxt << " ResourceAtomicGraphics::Vertex Kernel Error Max Slots: "
 					<< m_collisionStruct.ErrorReturn 
 					<< " Failing Slot:"
 					<< m_collisionStruct.ExcessSlots << std::ends;
@@ -131,7 +135,7 @@ void ResourceAtomicGraphics::PullMem(uint32_t currentBuffer)
 			if (m_collisionStruct.ErrorReturn == 3)
 			{
 				m_App->m_quit_event = 3;
-				objtxt << m_Name << " ResourceAtomicGraphics::Vertex Kernel Max Location error number:"
+				objtxt << " ResourceAtomicGraphics::Vertex Kernel Max Location error number:"
 					<< m_collisionStruct.ErrorReturn << " For particle number:" << m_collisionStruct.particleNumber
 					<< " Corner Location:" << m_collisionStruct.ExcessSlots << " exceeds total number of cells:" << m_collisionStruct.maxCells <<  std::ends;
 				mout << objtxt.str().c_str() << ende;
@@ -139,16 +143,15 @@ void ResourceAtomicGraphics::PullMem(uint32_t currentBuffer)
 			if (m_collisionStruct.ErrorReturn == 4)
 			{
 				m_App->m_quit_event = 4;
-				objtxt << 
-					m_Name << " ResourceAtomicGraphics::Vertex Kernel Error Boundary Error: "
+				objtxt <<  " ResourceAtomicGraphics::Vertex Kernel Error Boundary Error: "
 					<< m_collisionStruct.ErrorReturn 
-					<<" P(" << m_collisionStruct.ExcessSlots << ")" << std::ends;
+					<<" P(" << m_collisionStruct.particleNumber << ")" << std::ends;
 				mout << objtxt.str().c_str() << ende;
 			}
 			if (m_collisionStruct.ErrorReturn == 5)
 			{
 				m_App->m_quit_event = 5;
-				objtxt << m_Name << " ResourceAtomicGraphics::Boundary"
+				objtxt << " ResourceAtomicGraphics::Boundary"
 					<< m_collisionStruct.ErrorReturn 
 					<< "(" << m_collisionStruct.ExcessSlots << ")" << std::ends;
 				mout << objtxt.str().c_str() << ende;
@@ -156,7 +159,7 @@ void ResourceAtomicGraphics::PullMem(uint32_t currentBuffer)
 			if (m_collisionStruct.ErrorReturn == 6)
 			{
 				m_App->m_quit_event = 5;
-				objtxt << m_Name << " ResourceAtomicGraphics::Isnan at Frame:"
+				objtxt << " ResourceAtomicGraphics::Isnan at Frame:"
 					<< m_collisionStruct.ErrorReturn 
 					<< m_App->m_FrameNumber 
 					<< "Particle:" 
@@ -166,7 +169,7 @@ void ResourceAtomicGraphics::PullMem(uint32_t currentBuffer)
 			if (m_collisionStruct.ErrorReturn == 5)
 			{
 				m_App->m_quit_event = 8;
-				objtxt << m_Name << " ResourceAtomicGraphics::Lost Index:"
+				objtxt << " ResourceAtomicGraphics::Lost Index:"
 					<< m_collisionStruct.ErrorReturn 
 					<< m_App->m_FrameNumber 
 					<< "Particle:" 
@@ -174,7 +177,10 @@ void ResourceAtomicGraphics::PullMem(uint32_t currentBuffer)
 				mout << objtxt.str().c_str() << ende;
 			}
 			//throw std::runtime_error(objtxt.str().c_str());
-
+			objtxt.str("");
+			objtxt.clear();
+			objtxt << "====================================================================" << std::endl;
+			mout << objtxt.str().c_str() << ende;
 		}
 
 	if (m_App->m_FrameNumber < m_ReportGraphFramesLessThan)

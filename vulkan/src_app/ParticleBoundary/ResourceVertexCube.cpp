@@ -111,13 +111,44 @@ void ResourceVertexCube::Create(ResourceVertexParticle* PartVert)
 }
 void ResourceVertexCube::MakeAxes(uint32_t sidelen)
 {
-	int side = 0;
+	m_Axes.clear();
+	m_CubeIndices.clear();
 
-	bool basw = CfgApp->GetBool("application.boundary_as_walls",true);
+	bool basw = CfgApp->GetBool("application.boundary_as_walls", true);
+
+	glm::vec3 minCorner;
+	glm::vec3 maxCorner;
+
 	if (basw == false)
-		side = static_cast<int>(sidelen) - 1;
+	{
+		minCorner = glm::vec3(0.0f, 0.0f, 0.0f);
+
+		float side = static_cast<float>(sidelen) - 1.0f;
+
+		maxCorner = glm::vec3(side, side, side);
+	}
 	else
-		side = CfgTst->GetFloat("wallXMAX", true);
+	{
+		minCorner = glm::vec3(
+			CfgTst->GetFloat("wallXMIN", true),
+			CfgTst->GetFloat("wallYMIN", true),
+			CfgTst->GetFloat("wallZMIN", true)
+		);
+
+		maxCorner = glm::vec3(
+			CfgTst->GetFloat("wallXMAX", true),
+			CfgTst->GetFloat("wallYMAX", true),
+			CfgTst->GetFloat("wallZMAX", true)
+		);
+	}
+
+	float xmin = minCorner.x;
+	float ymin = minCorner.y;
+	float zmin = minCorner.z;
+
+	float xmax = maxCorner.x;
+	float ymax = maxCorner.y;
+	float zmax = maxCorner.z;
 
 	m_CubeIndices =
 	{
@@ -130,52 +161,22 @@ void ResourceVertexCube::MakeAxes(uint32_t sidelen)
 		0, 1, 5,  5, 4, 0,   // bottom
 		3, 7, 6,  6, 2, 3    // top
 	};
-	
 
-	m_Axes.push_back({ { 0, 0, 0, 1.0 },{1.0,1.0,1.0,1} });
-	m_Axes.push_back({ { side, 0.0, 0.0, 1.0 }, {1.0,1,1.,1} });
-	m_Axes.push_back({ { side,  side, 0.0, 1.0 }, {1.,1.,1,1} });
-	m_Axes.push_back({ {0.0,  side, 0.0, 1.0 }, {1,1,1.,1} });
+	glm::vec4 color(1.0f, 1.0f, 1.0f, 1.0f);
 
-	m_Axes.push_back({ {0.0, 0.0,  side, 1.0 }, {1,1.,1,1} });
-	m_Axes.push_back({ { side, 0.0,  side, 1.0 }, {1.,1,1,1} });
-	m_Axes.push_back({ { side,  side,  side, 1.0 }, {1,1,1,1} });
-	m_Axes.push_back({ {0.0,  side,  side, 1.0 }, {1.0,1.0,1.0,1} });
+	m_Axes.push_back({ { xmin, ymin, zmin, 1.0f }, color });
+	m_Axes.push_back({ { xmax, ymin, zmin, 1.0f }, color });
+	m_Axes.push_back({ { xmax, ymax, zmin, 1.0f }, color });
+	m_Axes.push_back({ { xmin, ymax, zmin, 1.0f }, color });
+
+	m_Axes.push_back({ { xmin, ymin, zmax, 1.0f }, color });
+	m_Axes.push_back({ { xmax, ymin, zmax, 1.0f }, color });
+	m_Axes.push_back({ { xmax, ymax, zmax, 1.0f }, color });
+	m_Axes.push_back({ { xmin, ymax, zmax, 1.0f }, color });
 
 	m_Verts = m_Axes;
-	/*
-	m_Axes.push_back({ {0.0,0.0,0.0,1.0f},{1.0, 0.0, 0.0,1.0} });
-	m_Axes.push_back({ {sidelen,0.0,0.0,1.0f}, {1.0, 0.0, 0.0,1.0} });
-	//y
-	m_Axes.push_back({ {0.0, 0.0, 0.0,1.0f},{0.0, 1.0, 0.0,1.0} });
-	m_Axes.push_back({ {0.0, sidelen, 0.0,1.0f}, {0.0, 1.0, 0.0,1.0} });
-	//z
-	m_Axes.push_back({ {0.0, 0.0, 0.0,1.0},{0.0, 0.0, 1.0,1.0} });
-	m_Axes.push_back({ {0.0, 0.0, sidelen,1.0},{0.0, 0.0, 1.0,1.0} });
 
-#if 0
-	for (size_t ii = 0; ii < sidelen; ii++)
-	{
-		float length = static_cast<float>(ii + 1);
-		// 	xtic
-		m_Axes.push_back({ {length,-0.1,0.0,1.0},{1.0,0.0,0.0,1.0} });
-		m_Axes.push_back({ {length,0.1,0.0,1.0},{1.0,0.0,0.0,1.0} });
-		// y tic
-		m_Axes.push_back({ {0.0,length,0.1,1.0},{0.0,1.0,0.0,1.0} });
-		m_Axes.push_back({ {0.0,length,-0.1,1.0},{0.0,1.0,0.0,1.0} });
-		// z tic
-		m_Axes.push_back({ {0.1,0.0,length,1.0},{0.0,0.0,1.0,1.0} });
-		m_Axes.push_back({ {-0.1,0.0,length,1.0},{0.0,0.0,1.0,1.0} });
-	}
-#endif
-	m_Axes.push_back({ {0.90,-0.5,0.0,1.0},{1.0,0.0,0.0,1.0} });
-	m_Axes.push_back({ {0.90,0.5,0.0,1.0},{1.0,0.0,0.0,1.0} });
-
-	m_Axes.push_back({ {1.10,-0.5,0.0,1.0},{1.0,0.0,0.0,1.0} });
-	m_Axes.push_back({ {1.10,0.5,0.0,1.0},{1.0,0.0,0.0,1.0} });
-
-
-
-	//m_Verts = m_Axes;
-	*/
+	// Optional: save these for PushMem/view-centering
+	//m_MinCorner = minCorner;
+	//m_MaxCorner = maxCorner;
 }

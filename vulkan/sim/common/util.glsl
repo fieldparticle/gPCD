@@ -95,17 +95,22 @@ void IndexToArray(uint index, inout uvec3 ary)
 }
 uint ArrayToIndex(uvec3 loc)
 {
-		
-	uint w = WIDTH;
-	uint h = HEIGHT;
-	
-	uint indxLoc =  loc.x + w * (loc.y + h * loc.z);
-	if(indxLoc > MAX_CELL_ARRAY_LOCATIONS)
-		return npos;
-	else
-		return indxLoc;
+    uint w = WIDTH;
+    uint h = HEIGHT;
+    uint d = DEPTH;
+
+    if (loc.x >= w || loc.y >= h || loc.z >= d) {
+        return npos;
+    }
+
+    uint indxLoc = loc.x + w * (loc.y + h * loc.z);
+    if (indxLoc >= MAX_CELL_ARRAY_LOCATIONS) {
+        return npos;
+    }
+    return indxLoc;
 
 }
+
 uint TestArrayToIndex(uint start,uint stop)
 {
 	uvec3 ary = uvec3(0,0,0);

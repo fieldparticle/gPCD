@@ -242,7 +242,8 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 				lastTime += 1.0;
 			}
 			// Sleep if frame_delay is set
-			Sleep(frameDelay);
+			if(doAuto != true)
+				Sleep(frameDelay);
 			vkDeviceWaitIdle(VulkanWin->GetLogicalDevice());
 			
 		}

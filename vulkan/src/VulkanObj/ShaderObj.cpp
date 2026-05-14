@@ -40,8 +40,40 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 		WriteShaderHeader();
 		WriteShaderDbgHeader();
 		WriteWalls();
+		Reservoir();
 		GenWorkGroups();
 }
+void ShaderObj::Reservoir()
+{
+
+	std::string pipe_reservoir_entry = CfgTst->GetString("flow_type", true);
+	if (pipe_reservoir_entry.compare("pipe_reservoir_entry")==0)
+	{
+		std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
+		std::string filename = fildir + "/flow.glsl";
+		{
+			std::ofstream ostrm(filename);
+			if (!ostrm.is_open())
+			{
+				std::string rpt = "Failed to open file:" + filename;
+				throw std::runtime_error(rpt.c_str());
+			}
+			ostrm << "const float PARTICLE_RATE =" << std::fixed << std::setprecision(2) << CfgTst->GetFloat("particle_rate", true) << ";\n";
+			ostrm << "const float INLET_VELOCITY =" << std::fixed << std::setprecision(2) << CfgTst->GetFloat("inlet_velocity", true) << ";\n";
+			ostrm << "const float INLET_X =" << std::fixed << std::setprecision(2) << CfgTst->GetFloat("inlet_x", true) << ";\n";
+			ostrm << "const float OUTLET_X =" << std::fixed << std::setprecision(2) << CfgTst->GetFloat("outlet_x", true) << ";\n";
+			ostrm << "const float PIPE_Y_MIN =" << std::fixed << std::setprecision(2) << CfgTst->GetFloat("pipe_y_min", true) << ";\n";
+			ostrm << "const float PIPE_Y_MAX =" << std::fixed << std::setprecision(2) << CfgTst->GetFloat("pipe_y_max", true) << ";\n";
+			ostrm << "const uint  ESCAPE_MODE=" << CfgTst->GetUInt("escape_mode", true) << "u;\n";
+
+		}
+	}
+
+
+}
+
+
+
 void ShaderObj::WriteWalls()
 {
 	std::vector<double> walls = { 0.0, 0.0, 0.0, 0.0 };

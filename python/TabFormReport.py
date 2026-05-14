@@ -10,18 +10,21 @@ from PyQt6.QtWidgets import QGridLayout, QTabWidget, QLineEdit,QListWidget
 from PyQt6.QtWidgets import QPushButton, QGroupBox,QTextEdit
 from PyQt6 import QtCore
 from _thread import *
-from ConfigUtility import *
-from DataContainer import *
-from ReportClass import *
-from ReportLatexPlot import *
-from ReportLatexEquation import *
-from ReportTable import *
-from LatexPreview import *
-from PdfViewer import *
-from CheckCfg import *
-from AttrDictFields import *
+from PyReportCode.A_PQBRT_TABLE_ALL import A_PQBRT_TABLE_ALL
+from gbase.ConfigUtility import *
+from gbase.DataContainer import *
+from gbase.ReportClass import *
+from gbase.ReportLatexPlot import *
+from gbase.ReportLatexEquation import *
+from gbase.ReportTable import *
+from gbase.LatexPreview import *
+from gbase.PdfViewer import *
+from gbase.CheckCfg import *
+from gbase.AttrDictFields import *
 import importlib.util
 from pathlib import Path
+
+from gbase.import_module import load_class_from_file
 class TabFormReport(QTabWidget):
     
     texFolder = ""
@@ -219,14 +222,17 @@ class TabFormReport(QTabWidget):
                 self.report_obj = ReportLatexEquation(self,self.itemcfg)
                 self.report_obj.save_latex()
             case 'table_code':
+                
+                
                 try:
                     module_name = self.itemcfg.name
                     file_path = self.itemcfg.code_dir + '/' + self.itemcfg.name + ".py"
                 
-                    CLS = self.load_class_from_file(file_path )
+                    CLS = load_class_from_file(file_path )
                 except BaseException as e:
                     print(f"Load plot code class failed:{e}")
                     return
+                
                 try:
                     self.table_code_class = CLS(self.itemcfg,self.bobj)
                     table = self.table_code_class.run() 
@@ -585,22 +591,4 @@ class TabFormReport(QTabWidget):
             self.ltxObj.setTypeText(selected_items[0].text())         
 
 
-    def load_class_from_file(self,file_path):
-        file_path = Path(file_path).resolve()
-        class_name = file_path.stem   # filename without .py
-
-        spec = importlib.util.spec_from_file_location(class_name, str(file_path))
-        if spec is None or spec.loader is None:
-            raise ImportError(f"Could not load: {file_path}")
-
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-
-        cls = getattr(module, class_name, None)
-
-        if cls is None:
-            raise AttributeError(
-                f"File loaded, but no class named '{class_name}' exists in {file_path.name}"
-            )
-
-        return cls
+    

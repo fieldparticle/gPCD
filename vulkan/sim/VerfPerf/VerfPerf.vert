@@ -65,7 +65,7 @@ void main(){
 	
 	int index 		= gl_VertexIndex;
 	
-#if defined(DEBUG)
+#if 0 && defined(DEBUG)
 	if(uint(ShaderFlags.frameNum) == 0 && index == 0)
 	{
 		//debugPrintfEXT("Testing Indexing H:%d,W:%d,CMEM %d, ACTMEM %d",HEIGHT,WIDTH,HEIGHT*HEIGHT*HEIGHT,);
@@ -168,7 +168,7 @@ void main(){
 		
 		if(sltidx >= MAX_CELL_ARRAY_LOCATIONS)
 		{
-			#if defined(DEBUG)
+			#if 0 && defined(DEBUG)
 				debugPrintfEXT("ParticleVerfPerf sltidx > MaxLocation:P=%d,sltidx=%d,MaxLocation=%d",index,sltidx,MAX_CELL_ARRAY_LOCATIONS);
 			#endif	
 			collIn.ExcessSlots = sltidx;
@@ -189,12 +189,10 @@ void main(){
 		if(slot >= MAX_CELL_OCCUPANY)
 		{
 			uvec3 badloc;
-			#if 0
-			#if defined(DEBUG)
+			#if 0 && defined(DEBUG)
 				//IndexToArray(sltidx,badloc);
 				debugPrintfEXT("ParticleVerfPerf slot>F:%u,P:%d,MAX_CELL_OCCUPANY:%d,at loc: %d",
 				uint(ShaderFlags.frameNum),index,MAX_CELL_OCCUPANY,slot);
-			#endif
 			#endif
 			collIn.ExcessSlots = slot;
 			collIn.ErrorReturn = 2;
@@ -214,7 +212,7 @@ void main(){
 			}
 		#endif	
 		
-	#if 0
+	#if 0 && defined(DEBUG)
 		if(uint(ShaderFlags.frameNum) == 8 && index == 1)
 		{
 			debugPrintfEXT("P:%u,CNRIDX:%u,CNRL:%u,LOC:%u,SLT:%u ",index,ii,P[index].CornerList[ii].ploc, sltidx,slot);
@@ -227,7 +225,7 @@ void main(){
 		// the particle number
 		clink[sltidx].idx[slot] = index;
 	
-	#if defined(DEBUG)
+	#if 0 && defined(DEBUG)
 		if(uint(ShaderFlags.frameNum) == 8 && index == 1)
 		{
 			debugPrintfEXT("P:%u,CNRIDX:%u,CELLARYVAL:%u ",index,ii,clink[sltidx].idx[slot]);

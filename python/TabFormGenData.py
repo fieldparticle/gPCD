@@ -10,19 +10,20 @@ from PyQt6.QtWidgets import QPushButton, QGroupBox,QTextEdit
 from PyQt6.QtGui import QFocusEvent
 from PyQt6 import QtCore
 from PyQt6.QtCore import Qt,QThread,QEvent, pyqtSignal,pyqtSlot,QObject,QRunnable,QThreadPool
-from ConfigUtility import *
+from gbase.ConfigUtility import *
 import tkinter as tk
 from tkinter import * 
 from tkinter import messagebox 
 import glob
 import traceback
 import time
-from PlotParticles import *
+from gbase.PlotParticles import *
 import struct
 import ctypes
-from Utilites import read_particle_data
-from pdata import *
-from GenPQBData import *
+from gbase.BinaryFileUtilities import clear_files, read_particle_data
+from gbase.import_module import load_class_from_file
+from gbase.pdata import *
+from gbase.GenPQBData import *
 #from GenMotionData import *
 #from subprocess import Popen
 import subprocess
@@ -127,12 +128,17 @@ class TabGenData(QTabWidget):
                 self.hasConfig = False
                 return 
             try:
+                notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
+                subprocess.Popen([notepad_plus_plus_path, self.CfgFile])
+                mod_path = self.itemcfg.module_dir
+                mod_name = self.itemcfg.module_class
+                full_path = os.path.join(mod_path, mod_name)
                 # Import the class named in generate_class
-                
-                self.gen_class = self.load_class(self.itemcfg.generate_class)()
+                self.gen_class = load_class_from_file(full_path)()
+                #self.gen_class = self.load_class(self.itemcfg.generate_class)()
                 self.gen_class.create(self,self.itemcfg) 
             except BaseException as e:
-                self.log.log(self,f"Unable to import data generation file: {self.itemcfg.generate_class} error:{e}")
+                self.log.log(self,f"Unable to import data generation file: error:{e}")
                 return 
 
             self.plot_obj.create(self.itemcfg,self)
@@ -140,8 +146,7 @@ class TabGenData(QTabWidget):
             self.update_list_widget()
             # Enable to generate data
             self.GenDataButton.setEnabled(True)
-            notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
-            subprocess.Popen([notepad_plus_plus_path, self.CfgFile])
+            
 
 
     #******************************************************************
@@ -161,6 +166,7 @@ class TabGenData(QTabWidget):
         # If a valid configuation file name is returned
         if folder[0]:
             self.load_item_cfg(folder[0])
+    '''
     #******************************************************************
     # Dynamically load the class
     #           
@@ -170,7 +176,7 @@ class TabGenData(QTabWidget):
         return getattr(module, class_name)
         #return GenPQBData
 
-   
+    '''
     ##############################################################################
     # Generate data stuff
     # 
@@ -178,6 +184,7 @@ class TabGenData(QTabWidget):
     #******************************************************************
     # Start the data threaded generaton process
     #
+    '''
     def gen_tst_files(self):
          # Pass the function to execute
         index = 0
@@ -197,10 +204,10 @@ class TabGenData(QTabWidget):
         except BaseException as e2:
             self.log.log(self,f"Error opening:{self.itemcfg.selections_file}, err: {e2}")
             return
-        self.gen_class.clear_files()
+        clear_files(self.itemcfg)
         self.gen_class.do_all_files_dbg()
         #self.start_thread()
-
+    '''
    
         
    
@@ -218,6 +225,7 @@ class TabGenData(QTabWidget):
         self.gen_class.openSelectionsFile()
         self.gen_class.clear_files()
         self.gen_class.do_all_files_dbg()
+        
     #******************************************************************
     # Update the list widget
     #
@@ -230,6 +238,8 @@ class TabGenData(QTabWidget):
 
     def print_output(self, s):
         print(s)
+
+    '''
     #******************************************************************
     # Set up and start the thread
     #
@@ -248,6 +258,7 @@ class TabGenData(QTabWidget):
     #******************************************************************
     # Thread that does one file set
     #
+    
     def do_one_file(self,progress_callback):
 
         index = self.current_test_file
@@ -281,7 +292,7 @@ class TabGenData(QTabWidget):
           # Pass the function to execute
         print(f"Next Thread index:{self.current_test_file}")
         self.start_thread()
-
+    '''
     #******************************************************************
     # Update the terminal window
     #

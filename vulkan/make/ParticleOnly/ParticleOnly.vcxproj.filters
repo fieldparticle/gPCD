@@ -493,7 +493,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\run\particle\Particle.cfg" />
     <None Include="..\..\run\particleOnly\mps.cfg">
       <Filter>ConfigFiles</Filter>
     </None>
@@ -512,10 +511,31 @@
     <None Include="..\..\shaders\common\isParticleContact.glsl">
       <Filter>shaders</Filter>
     </None>
+    <None Include="..\..\sim\VerfPerf\VerfPerf.cfg">
+      <Filter>ConfigFiles</Filter>
+    </None>
+    <None Include="..\..\sim\BoundarySpheresMotion\BoundarySpheresMotion.cfg">
+      <Filter>ConfigFiles</Filter>
+    </None>
+    <None Include="..\..\sim\BoundarySpheres\BoundarySpheres.cfg">
+      <Filter>ConfigFiles</Filter>
+    </None>
+    <None Include="..\..\sim\PipeReservoirEntry\PipeReservoirEntry.cfg">
+      <Filter>ConfigFiles</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\..\run\particleOnly\particle.log">
       <Filter>logfiles</Filter>
+    </Text>
+    <Text Include="..\..\sim\BoundarySpheres\BoundarySpheresCMD.txt">
+      <Filter>ConfigFiles</Filter>
+    </Text>
+    <Text Include="..\..\sim\VerfPerf\VerfPerfcmd.txt">
+      <Filter>ConfigFiles</Filter>
+    </Text>
+    <Text Include="..\..\sim\PipeReservoirEntry\PipeReservoirEntryCMD.txt">
+      <Filter>ConfigFiles</Filter>
     </Text>
   </ItemGroup>
 </Project>

@@ -45,6 +45,10 @@ layout(location = 1) out vec2 outParms;
 layout(location = 2) out vec3 matpos;
 uint addUniqueCell(uint index, uint CornerLocation, uint Count)
 {
+    if (CornerLocation == npos) {
+        return 0;
+    }
+
     for(uint i = 0; i < Count; i++)
     {
         if(P[index].CornerList[i].ploc == CornerLocation)
@@ -64,7 +68,7 @@ void main(){
 	
 	int index 		= gl_VertexIndex;
 	
-#if defined(DEBUG)
+#if 0 && defined(DEBUG)
 	if(uint(ShaderFlags.frameNum) == 0 && index == 0)
 	{
 		//debugPrintfEXT("Testing Indexing H:%d,W:%d,CMEM %d, ACTMEM %d",HEIGHT,WIDTH,HEIGHT*HEIGHT*HEIGHT,);
@@ -91,14 +95,20 @@ void main(){
 	
 	// Set point size 
 	gl_PointSize = 1.0;
+	if(uint(ShaderFlags.frameNum) == 0u)
+	{
+		gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+		gl_PointSize = 0.0;
+		return;
+	}
 	
 	// Clear this paricles corner array
 	for (uint kk = 0;kk<8;kk++)
-		P[index].CornerList[kk].ploc = 0;
+		P[index].CornerList[kk].ploc = npos;
 
-	float cx 		= P[index].PosLocA.x;
-	float cy 		= P[index].PosLocA.y;
-	float cz 		= P[index].PosLocA.z;
+	float cx=0.0;
+	float cy=0.0;
+	float cz=0.0;
 	float R			= P[index].Data.x;
 	
 	if (ShaderFlags.positionBuffer == 0u) 
@@ -124,21 +134,50 @@ void main(){
 	uint CornerLocation = 0;
 	uint count = 0;
 	
-	CornerLocation = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy+R)),uint(round(cz-R))));
+	float min_x = cx - R;
+	float min_y = cy - R;
+	float min_z = cz - R;
+	float max_x = cx + R;
+	float max_y = cy + R;
+	float max_z = cz + R;
+
+	#if 0 && defined(DEBUG)
+	if(uint(ShaderFlags.frameNum) == 366)
+	{
+		debugPrintfEXT("Boundary->P:%d,min:<%0.3f,%0.3f,%0.3f> max:<%0.3f,%0.3f,%0.3f>",
+			index,min_x,min_y,min_z,max_x,max_y,max_z);
+	}
+	#endif
+		
+	if (min_x < 0 || min_y < 0 || min_z < 0
+		|| max_x >= float(WIDTH) || max_y >= float(HEIGHT) || max_z >= float(DEPTH))
+	{
+		#if 1 && defined(DEBUG)
+			debugPrintfEXT("F:%d,Boundary->P:=%d,min:<%0.3f,%0.3f,%0.3f> max:<%0.3f,%0.3f,%0.3f>",
+				uint(ShaderFlags.frameNum),index,min_x,min_y,min_z,max_x,max_y,max_z);
+		#endif
+		collIn.ExcessSlots = 0;
+		collIn.particleNumber = index;
+		collIn.ErrorReturn = 4;
+		collIn.maxCells = MAX_CELL_ARRAY_LOCATIONS;
+		return;
+	}
+
+	CornerLocation = ArrayToIndex(uvec3(uint(max_x), uint(max_y), uint(min_z)));
 	count += addUniqueCell(index, CornerLocation, count);
-	CornerLocation = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy+R)),uint(round(cz+R))));
+	CornerLocation = ArrayToIndex(uvec3(uint(max_x), uint(max_y), uint(max_z)));
 	count += addUniqueCell(index, CornerLocation, count);
-	CornerLocation = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy+R)),uint(round(cz+R))));
+	CornerLocation = ArrayToIndex(uvec3(uint(min_x), uint(max_y), uint(max_z)));
 	count += addUniqueCell(index, CornerLocation, count);
-	CornerLocation = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy+R)),uint(round(cz-R))));
+	CornerLocation = ArrayToIndex(uvec3(uint(min_x), uint(max_y), uint(min_z)));
 	count += addUniqueCell(index, CornerLocation, count);
-	CornerLocation = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy-R)),uint(round(cz+R))));
+	CornerLocation = ArrayToIndex(uvec3(uint(max_x), uint(min_y), uint(max_z)));
 	count += addUniqueCell(index, CornerLocation, count);
-	CornerLocation = ArrayToIndex(uvec3(uint(round(cx+R)),uint(round(cy-R)),uint(round(cz-R))));
+	CornerLocation = ArrayToIndex(uvec3(uint(max_x), uint(min_y), uint(min_z)));
 	count += addUniqueCell(index, CornerLocation, count);
-	CornerLocation = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy-R)),uint(round(cz+R))));
+	CornerLocation = ArrayToIndex(uvec3(uint(min_x), uint(min_y), uint(max_z)));
 	count += addUniqueCell(index, CornerLocation, count);
-	CornerLocation = ArrayToIndex(uvec3(uint(round(cx-R)),uint(round(cy-R)),uint(round(cz-R))));
+	CornerLocation = ArrayToIndex(uvec3(uint(min_x), uint(min_y), uint(min_z)));
 	count += addUniqueCell(index, CornerLocation, count);
 	
 	
@@ -152,7 +191,7 @@ void main(){
 
 	// Traverse the particles corner array if there is not a global error 
 	// which is stored in the 0th partcle parms emlent
-	for( uint ii = 0; ii < 8 && P[index].CornerList[ii].ploc!=0; ii++)
+	for( uint ii = 0; ii < 8 && P[index].CornerList[ii].ploc!=npos; ii++)
 	{
 		// Location index for this slot.
 		uint sltidx = 0;
@@ -164,15 +203,13 @@ void main(){
 		sltidx = P[index].CornerList[ii].ploc;
 		
 	
-		// If it's not zero then do nothing - 0 index or location <0,0,0> 
-		// is not allowed
-		if (sltidx == 0)
-			break;
+		// Cell index 0 is valid for cell location (0,0,0), so only invalid
+		// corners are excluded by the npos sentinel.
 		
 		
 		if(sltidx >= MAX_CELL_ARRAY_LOCATIONS)
 		{
-			#if defined(DEBUG)
+			#if 0 && defined(DEBUG)
 				debugPrintfEXT("ParticleVerfPerf sltidx > MaxLocation:P=%d,sltidx=%d,MaxLocation=%d",index,sltidx,MAX_CELL_ARRAY_LOCATIONS);
 			#endif	
 			collIn.ExcessSlots = sltidx;

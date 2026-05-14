@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import QGridLayout, QTabWidget, QLineEdit,QListWidget
 from PyQt6.QtWidgets import QPushButton, QGroupBox,QTextEdit
 from PyQt6 import QtCore
 from _thread import *
-from ConfigUtility import *
+from gbase.ConfigUtility import *
 import subprocess
 import threading
 from subprocess import Popen, CREATE_NEW_CONSOLE

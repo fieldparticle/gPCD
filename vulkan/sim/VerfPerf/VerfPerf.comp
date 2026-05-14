@@ -141,7 +141,7 @@ void main()
 								atomicAdd(collOut.CollisionCount,1);
 							#endif
 							
-							#if defined(DEBUG)
+							#if 0 && defined(DEBUG)
 								if(uint(ShaderFlags.frameNum) == 3 && Findex == 3)
 									debugPrintfEXT("%d,%d",Tindex,Findex);
 							#endif
@@ -153,6 +153,7 @@ void main()
 				dupflg = true;
 			}
 		}
+		// Here zero the corner location instead of doing in the vertex shader
 	}
 	
 	

@@ -32,20 +32,20 @@
 #pragma once
 struct pdata
 {
-	double pnum;
-	double rx;
-	double ry;
-	double rz;
-	double radius;
-	double vx;
-	double vy;
-	double vz;
-	double ptype;
-	double seq;
-	double acc_r;
+	double pnum;		// Particle numebr
+	double rx;			// x pos
+	double ry;			// y pos
+	double rz;			// z pos
+	double radius;		// radius
+	double vx;			// x vel
+	double vy;			// y vel
+	double vz;			// zvel
+	double ptype;		// boundary or particle		
+	double state_flg;	// 1 live or 0 dead
+	double acc_r;		
 	double acc_a;
 	double molar_mass;
 	double temp_vel;
-	double inverse_square_softening;
+	double inverse_square_softening;	
 	double momentum_per_area;
 } ;

@@ -47,13 +47,13 @@ bool G_Stop = true;
 float RotateX=0.0;
 float RotateY=0.0;
 float RotateZ=0.0;
-float rRotX;
-float rRotY = 90.0;
-float rRotZ;
+float rRotX = 0.0;
+float rRotY = 0.0;
+float rRotZ = 0.0;
 uint32_t VIEW_XY = 1;
 uint32_t VIEW_ZY = 2;
 uint32_t VIEW_XZ = 3;
-float rCoordView = VIEW_ZY;
+float rCoordView = VIEW_XY;
 
 float ox = -1;
 float oy = -1;

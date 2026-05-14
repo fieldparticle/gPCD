@@ -314,6 +314,8 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 			{
 				mout << "Outfile:" << outfile.c_str() << " does not exist.";
 				uint32_t ret = ParticleOnly(this, tcps, tcpcapp, false);
+				mistfile = true;
+
 			}
 				
 			//Fail
@@ -336,7 +338,7 @@ uint32_t PerfObj::DoStudy(TCPObj* tcps,TCPObj* tcpcapp, bool rmtFlag)
 			}
 			if (QuitEvent == 1)
 				return 0;
-			if (mistfile == true)
+			if (mistfile  == true)
 				for (size_t ii = 0; ii < m_AutoSleep; ii++)
 				{
 					std::cout << "Resting:" << ii << " of " << m_AutoSleep << " seconds." << std::endl;

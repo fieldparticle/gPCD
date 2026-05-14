@@ -110,8 +110,8 @@ void main()
 		// Set location of this corner to local variable.
 		uint loc = P[SourceID].CornerList[ii].ploc;
 		
-		// If the lcation is not zero...
-		if (loc != 0)
+		// If the location is valid...
+		if (loc != npos)
 		{
 			// Use the linked particle location to index into the particle-cell hash table 
 			// And compare this particle with all of the paricles at this location.

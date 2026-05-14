@@ -46,127 +46,139 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
 		m_BindPoint=BindPoint;
    
     
-}
-void Resource::GeneralViewing(uint32_t SideLength, uint32_t CurrentBuffer)
+}void Resource::GeneralViewing(uint32_t SideLength, uint32_t CurrentBuffer)
 {
-	float s = SideLength;
+    float s = static_cast<float>(SideLength);
 
-	glm::vec3 center(
-		s * 0.5f,
-		s * 0.5f,
-		s * 0.5f
-	);
+    glm::vec3 center(
+        0.5f * s,
+        0.5f * s,
+        0.5f * s
+    );
 
-	m_UBO = {};
+    m_UBO = {};
 
-	// ============================================================
-	// Model matrix
-	// Cube corner stays at (0,0,0), cube extends positive.
-	// Rotation is performed about cube center.
-	// ============================================================
+    // ============================================================
+    // Model
+    // Cube vertices are assumed to span:
+    // (0,0,0) to (s,s,s)
+    // Rotate about cube center.
+    // ============================================================
 
-	m_UBO.model = glm::mat4(1.0f);
+    m_UBO.model = glm::mat4(1.0f);
 
-	m_UBO.model = glm::translate(m_UBO.model, center);
+    m_UBO.model = glm::translate(m_UBO.model, center);
+    
+    m_UBO.model = glm::rotate(
+        m_UBO.model,
+        glm::radians((rRotZ+180)),
+        glm::vec3(0.0f, 0.0f, 1.0f)
+    );
 
-	m_UBO.model = glm::rotate(
-		m_UBO.model,
-		glm::radians(rRotZ),
-		glm::vec3(0.0f, 0.0f, 1.0f)
-	);
+    m_UBO.model = glm::rotate(
+        m_UBO.model,
+        glm::radians((rRotY+180)),
+        glm::vec3(0.0f, 1.0f, 0.0f)
+    );
 
-	m_UBO.model = glm::rotate(
-		m_UBO.model,
-		glm::radians(rRotY),
-		glm::vec3(0.0f, 1.0f, 0.0f)
-	);
+    m_UBO.model = glm::rotate(
+        m_UBO.model,
+        glm::radians(rRotX),
+        glm::vec3(1.0f, 0.0f, 0.0f)
+    );
 
-	m_UBO.model = glm::rotate(
-		m_UBO.model,
-		glm::radians(rRotX),
-		glm::vec3(1.0f, 0.0f, 0.0f)
-	);
+    m_UBO.model = glm::translate(m_UBO.model, -center);
 
-	m_UBO.model = glm::translate(m_UBO.model, -center);
+    // ============================================================
+    // View convention:
+    //
+    // Screen +X = right
+    // Screen +Y = up
+    // Screen +Z = out of the screen
+    //
+    // Therefore:
+    // VIEW_XY: look along -Z
+    // VIEW_ZY: look along -X
+    // VIEW_XZ: look along -Y
+    // ============================================================
 
-	// ============================================================
-	// View matrix
-	// Camera looks at cube center.
-	// ============================================================
-	glm::vec3 eye;
-	glm::vec3 up;
+    glm::vec3 eye;
+    glm::vec3 up;
 
-	if (rCoordView == VIEW_XY)
-	{
-		// Look along +Z toward XY plane
-		eye = glm::vec3(center.x, center.y, center.z + s * 4.0f);
-		up = glm::vec3(0.0f, 1.0f, 0.0f);
-	}
-	else if (rCoordView == VIEW_ZY)
-	{
-		// Look along +X toward ZY plane
-		eye = glm::vec3(center.x + s * 4.0f, center.y, center.z);
-		up = glm::vec3(0.0f, 1.0f, 0.0f);
-	}
-	else if (rCoordView == VIEW_XZ)
-	{
-		// Look along +Y toward XZ plane
-		eye = glm::vec3(center.x, center.y + s * 4.0f, center.z);
-		up = glm::vec3(0.0f, 0.0f, -1.0f);
-	}
-	else
-	{
-		// fallback
-		eye = glm::vec3(center.x, center.y, center.z + s * 4.0f);
-		up = glm::vec3(0.0f, 1.0f, 0.0f);
-	}
+    float dist = s * 4.0f;
 
-	m_UBO.view = glm::lookAt(
-		eye,
-		center,
-		up
-	);
+    if (rCoordView == VIEW_XY)
+    {
+        // screen right = +X
+        // screen up    = +Y
+        // screen out   = +Z
+        eye = center + glm::vec3(0.0f, 0.0f, dist);
+        up = glm::vec3(0.0f, 1.0f, 0.0f);
+    }
+    else if (rCoordView == VIEW_ZY)
+    {
+        // screen right = +Z
+        // screen up    = +Y
+        // screen out   = +X
+        eye = center + glm::vec3(dist, 0.0f, 0.0f);
+        up = glm::vec3(0.0f, 1.0f, 0.0f);
+    }
+    else if (rCoordView == VIEW_XZ)
+    {
+        // screen right = +X
+        // screen up    = +Z
+        // screen out   = +Y
+        eye = center + glm::vec3(0.0f, dist, 0.0f);
+        up = glm::vec3(0.0f, 0.0f, 1.0f);
+    }
+    else
+    {
+        eye = center + glm::vec3(0.0f, 0.0f, dist);
+        up = glm::vec3(0.0f, 1.0f, 0.0f);
+    }
 
-	// ============================================================
-	// Projection matrix
-	// Orthographic zoom is handled here, not by scaling the model.
-	// Bounding sphere radius keeps rotated cube visible.
-	// ============================================================
+    m_UBO.view = glm::lookAt(
+        eye,
+        center,
+        up
+    );
 
-	float aspect =
-		static_cast<float>(m_SCO->m_SwapChainExtent.width) /
-		static_cast<float>(m_SCO->m_SwapChainExtent.height);
+    // ============================================================
+    // Projection
+    // Ortho is centered in view space.
+    // ============================================================
 
-	float radius = 0.5f * sqrt(3.0f) * s;
-	if (ZoomX == 0.0)
-	{
-		mout << "Particle UBO Zoom is zero" << ende;
+    float aspect =
+        static_cast<float>(m_SCO->m_SwapChainExtent.width) /
+        static_cast<float>(m_SCO->m_SwapChainExtent.height);
 
-	}
-	// Larger ZoomX = zoom in
-	float half = radius / ZoomX;
+    if (ZoomX == 0.0f)
+    {
+        mout << "GeneralViewing ZoomX is zero" << ende;
+        ZoomX = 1.0f;
+    }
 
-	m_UBO.proj = glm::ortho(
-		-half * aspect,
-		half * aspect,
-		-half,
-		half,
-		0.1f,
-		s * 10.0f
-	);
+    float half = (0.5f * s) / ZoomX;
 
-	// Vulkan clip-space correction
-	m_UBO.proj[1][1] *= -1.0f;
+    m_UBO.proj = glm::ortho(
+        -half * aspect,
+        half * aspect,
+        -half,
+        half,
+        0.1f,
+        s * 10.0f
+    );
 
-	// ============================================================
-	// Upload UBO
-	// ============================================================
+    // Vulkan clip-space correction
+    m_UBO.proj[1][1] *= -1.0f;
 
-	vmaCopyMemoryToAllocation(
-		m_App->m_vmaAllocator,
-		&m_UBO,
-		m_Allocation[CurrentBuffer],
-		0,
-		sizeof(m_UBO)
-	);
+    vmaCopyMemoryToAllocation(
+        m_App->m_vmaAllocator,
+        &m_UBO,
+        m_Allocation[CurrentBuffer],
+        0,
+        sizeof(m_UBO)
+    );
+
+   
 }

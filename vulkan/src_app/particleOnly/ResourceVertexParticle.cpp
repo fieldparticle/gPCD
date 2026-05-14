@@ -61,10 +61,10 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 	static_assert(offsetof(Particle, VelRad) == 32);
 	static_assert(offsetof(Particle, Data) == 48);
 	static_assert(offsetof(Particle, parms) == 64);
-	static_assert(offsetof(Particle, zlink) == 80);
+	static_assert(offsetof(Particle, CornerList) == 80);
 	static_assert(offsetof(Particle, bcs) == 176);
 	static_assert(offsetof(Particle, ccs) == 192);
-	static_assert(offsetof(Particle, pnum) == 288);
+	static_assert(offsetof(Particle, sltnum) == 288);
 	static_assert(offsetof(Particle, colFlg) == 292);
 	static_assert(offsetof(Particle, MolarMatter) == 296);
 	static_assert(offsetof(Particle, temp_vel) == 300);
@@ -119,27 +119,33 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 	{
 		input_file.read((char*)&part_pos, sizeof(part_pos));
 		Particle part{};
-#if 1
-		if (part_pos.rx < 0.5 || part_pos.ry < 0.5 || part_pos.rz < 0.5)
+
+
+		// Check to see if this flow type is resevior before checkig the lower bounds
+		// since position is <-99,-99,-99> or  <-99,-99,1.0> in 2D
+		std::string pipe_reservoir_entry = CfgTst->GetString("flow_type", true);
+		if (pipe_reservoir_entry.compare("pipe_reservoir_entry") != 0)
 		{
-			std::ostringstream  objtxt;
-			if (m_NumParticles != 0)
+			if (part_pos.rx < 0.5 || part_pos.ry < 0.5 || part_pos.rz < 0.5)
 			{
-				objtxt << m_Name << "ResourceVertexParticle::Particle location below bounds P:" <<
-					part_pos.pnum << "<" << part_pos.rx << "," << part_pos.ry  << "," << part_pos.rz
+				std::ostringstream  objtxt;
+				if (m_NumParticles != 0)
+				{
+					objtxt << m_Name << "ResourceVertexParticle::Particle location below bounds P:" <<
+						part_pos.pnum << "<" << part_pos.rx << "," << part_pos.ry << "," << part_pos.rz
 						<< ">" << std::ends;
-				throw std::runtime_error(objtxt.str().c_str());
+					throw std::runtime_error(objtxt.str().c_str());
+				}
 			}
 		}
-#endif		
 		part.PosLocA		= glm::vec4(part_pos.rx, part_pos.ry,part_pos.rz, 0.0);
-		part.pnum			= m_NumParticles;
+		part.sltnum			= 0;
 		part.VelRad			= glm::vec4(part_pos.vx, part_pos.vy, part_pos.vz,1.0);
 		part.PosLocB		= glm::vec4(part_pos.rx, part_pos.ry, part_pos.rz, 0.0);
-		part.Data			= glm::vec4(part_pos.radius, part_pos.inverse_square_softening, part_pos.momentum_per_area, 1.0);
+		part.Data			= glm::vec4(part_pos.radius, part_pos.inverse_square_softening, part_pos.momentum_per_area, part_pos.state_flg);
 		part.MolarMatter	= static_cast<float>(1.0);
 		part.temp_vel		= static_cast<float>(0.04);
-		part.parms			= glm::vec4(part_pos.molar_mass, 0.0,0.0, 0.0);
+		part.parms			= glm::vec4(part_pos.molar_mass, 0.0, 0.0, 0.0);
 		part.colFlg			= 0;
 
 

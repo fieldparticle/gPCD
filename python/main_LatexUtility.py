@@ -18,7 +18,7 @@ guser = getpass.getuser()                            #
 from PyQt6.QtWidgets import QApplication, QWidget,  QFormLayout, QGridLayout, QTabWidget, QLineEdit, QDateEdit, QPushButton
 from PyQt6.QtCore import Qt
 from UtilityMainWin import *
-from ParticleBase import *
+from gbase.ParticleBase import *
 import matplotlib
 ## Create a base class.
 bc = ParticleBase("FrontEnd")

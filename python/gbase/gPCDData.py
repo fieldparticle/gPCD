@@ -1,0 +1,415 @@
+import pandas as pd
+import os
+import csv
+import re
+import statistics
+import pandas as pd
+from gbase.AttrDictFields import *
+from gbase.ReportClass import *
+import os
+import inspect
+from gbase.TrendLine import *
+import re
+from gbase.ConfigUtility import *
+from PyQt6.QtWidgets import QFileDialog, QGroupBox,QMessageBox
+from  gbase.msg_box import *
+class gPCDData():
+
+    sumFile = ""
+    average_list = []
+    mode = 0
+    mmrr_fps = 0.0
+    mmrr_cpums = 0.0
+    mmrr_gms = 0.0
+    MODE_VERF = 1
+    MODE_PERF = 0
+    data_files = None    
+    lines_return = pd.DataFrame()
+    
+    def __init__(self,Base, itemcfg):
+        self.bobj = Base
+        self.cfg = self.bobj.cfg
+        self.log = self.bobj.log
+        self.itemcfg = itemcfg
+
+    def do_all_files_dbg(self):
+        try:
+            for ii in range(len(self.gen_class.select_list)):
+                #print(f"{ii}")
+                self.gen_class.gen_data_base(ii)
+
+        except BaseException as e:
+            print(f"do_all_files_dbg err:{e}")
+            return
+        
+    def isNumber(self,value):
+        try:
+            float(value)
+        except ValueError:
+            return False
+        try:
+            int(value)
+        except ValueError:
+            return False
+        return True
+   
+    def assign_data(self,lines_list):
+        self.check_data_files(lines_list)
+        self.do_performance(lines_list)
+        data = self.read_summary_file(lines_list)
+        return data
+
+    def do_reports(self):
+        for ii in self.itemcfg_main.include:
+            self.itemcfg = ConfigUtility(ii)
+            self.itemcfg.Create(self.bobj.log,ii)
+            self.do_report()
+
+    #******************************************************************
+    # Create thr mmrr summary file
+    #  
+    def read_summary_file(self,file_dict):
+        
+        try :
+            data = pd.read_csv(file_dict.summary_file_name)
+        except BaseException as e:
+            raise BaseException(f"read_summary_file fail:{e}")
+        return data
+            
+    
+    #******************************************************************
+    # Create thr mmrr summary file
+    #
+    def do_mmrr(self):
+        fps = cpums = cms = gms = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = 0
+        mmr_path = f"{self.itemcfg.mmrr_dir}"
+        if(os.path.exists(mmr_path) == False):
+            print ("MMRR Directories not available" )
+            return False
+        try:
+            with open(mmr_path, 'r') as filename:
+                file = csv.DictReader(filename)
+                count = 0
+                for col in file:
+                    count += 1
+                    fps += float(col['fps'])
+                    cpums += float(col['cpums'])
+                    gms += float(col['gms'])
+                    #print(float(col['gms']))
+        except BaseException as e:
+            print("LatexDataParticle line 159:",e)
+            return
+        
+        self.mmrr_fps = fps / count
+        self.mmrr_cpums = cpums / count
+        self.mmrr_gms = gms / count    
+     #******************************************************************
+    # GP message box
+    #
+    def msg_box(self,text):
+        msgBox = QMessageBox()
+        msgBox.setText(text)
+        msgBox.exec()
+
+    #******************************************************************
+    # Check the data counts
+    #
+    # Returns true if number of .tst files equal to number of R or D files
+    def check_data_files(self,file_dict) -> bool:
+        # Check to see if the data directory exists
+        if(os.path.exists(file_dict.source_dir) == False):
+            raise ValueError(f"check_data_files() inavid directory {file_dict.source_dir}")
+        # Get a list of the *.tst files in the data directory
+        tst_files = [i for i in os.listdir(file_dict.source_dir) if i.endswith(".tst")]
+        # If its verifcation
+        if "V" in file_dict.mode:
+            file_dict["summary_file_name"] = file_dict.target_dir + "/" + "perfdataVerificationSummary.csv"
+            file_dict["err_file_name"] = file_dict.target_dir + "/" + "perfdataVerificationSummaryErrors.csv"
+            self.data_files = [i[:-5] for i in os.listdir(file_dict.target_dir) if i.endswith("D.csv")]
+        elif "P" in file_dict.mode:
+            file_dict["summary_file_name"] = file_dict.target_dir + "/" + "perfdataPerformanceSummary.csv"
+            self.data_files = [i[:-5] for i in os.listdir(file_dict.target_dir) if i.endswith("R.csv")]
+      
+
+        self.hasData = len(tst_files) == len(self.data_files)
+
+        if len(tst_files) == 0:
+            showdialog("In gPCDData.py check_data_files","The test files (*.tst) were not found. Check cfg.input_data_dir")
+            raise BaseException("In gPCDData.py check_data_files","The test files (*.tst) were not found. Check cfg.input_data_dir")
+        if len(self.data_files) == 0:
+            showdialog("In gPCDData.py check_data_files","The results files (*.R.csv or *.D.csv) were not found. Check cfg.data_source")
+            raise BaseException("In gPCDData.py check_data_files","The results files (*.R.csv or *.D.csv) were not found. Check cfg.data_source")
+            return
+        
+        if(self.hasData == False):
+            print(f"Warning - Data set mismatch. Number *.tst files:{len(tst_files)}, Number data files:{ len(self.data_files)}")
+        
+        return 
+    #******************************************************************
+    # Do the performnce tests
+    #
+    #      
+    def do_performance(self,file_dict): 
+        if 'max' in file_dict.compute_type:
+            self.get_maxFPSminSPF(file_dict)
+        elif 'avg' in file_dict.compute_type:
+            self.get_averages(file_dict)
+        elif 'min' in file_dict.compute_type:
+            self.get_mins(file_dict)
+        return 0
+    
+    #******************************************************************
+    # Create the summary file wqith headers
+    #
+    def create_summary(self,file_dict):
+        data = ['Name', 'fps', 'cpums', 'cms', 'gms', 'expectedp', 'loadedp',
+                'shaderp_comp', 'shaderp_grph', 'expectedc', 'shaderc', 'sidelen','cell_count','mean','stddev','mmrr']
+        try :
+            with open(file_dict.summary_file_name, mode= 'w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(data)
+        except BaseException as e:
+            raise BaseException(f"create_summary file failed{e}:")
+
+    #******************************************************************
+    # Create the summary file wqith headers
+    #
+    def create_summary_r(self,file_name):
+        
+        data = ['Name', 'fps', 'cpums', 'cms', 'gms', 'expectedp', 'loadedp',
+                'shaderp_comp', 'shaderp_grph', 'expectedc', 'shaderc', 'sidelen','cell_count','mean','stddev','mmrr']
+        try :
+            with open(file_name, mode= 'w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(data)
+        except BaseException as e:
+            raise BaseException(f"create_summary file failed{e}:")
+
+    #******************************************************************
+    # Create the summary file wqith headers
+    #
+    # 
+            
+    #******************************************************************
+    # Run thoruogh the verification files and check counts
+    #
+    def do_verify(self,file_dict):
+        file_count = 0
+        error_count = 0
+        header = ['Name', 'expectedp', 'loadedp',
+                'shaderp_comp', 'shaderp_grph', 'expectedc', 'shaderc']
+        with open(file_dict.summary_file_name, 'w', newline='') as sfile:
+                    writer = csv.writer(sfile)
+                    writer.writerow(header)
+
+        err_list = []
+        average_list = []
+        for ii in self.data_files:
+            
+            try:
+                data_file = file_dict.target_dir + "/" + ii + "D.csv"
+                with open(data_file, 'r') as filename:
+                    file = csv.DictReader(filename)
+                    loaded_err = grphp_err = compp_err = coll_err = expectedp = loadedp = shaderp_comp = shaderp_grph = shaderc = 0
+                    line_count = 0
+                    for col in file:
+                        expectedp = int(col['expectedp'])
+                        loadedp = int(col['loadedp'])
+                        shaderp_comp = int(col['shaderp_comp'])
+                        shaderp_grph= int(col['shaderp_grph'])
+                        
+
+                        if loadedp != expectedp:
+                            loaded_err = 1
+                        if shaderp_comp != expectedp:
+                            compp_err = 1
+                        if shaderp_grph != expectedp:
+                            grphp_err = 1
+                        
+                        expectedc = int(col['expectedc'])
+                        shaderc = int(col['shaderc'])
+                        
+                        if expectedc != shaderc:
+                            coll_err = 1
+
+                avg_list = [data_file, expectedp, loadedp, shaderp_comp,
+                    shaderp_grph, expectedc, shaderc]
+                if loaded_err or grphp_err or compp_err or coll_err:
+                    error_count+=1
+                    line_count += 1
+                    err_row = [data_file,file_count,line_count, expectedp, loadedp, shaderp_comp, shaderp_grph, expectedc, shaderc, loaded_err,compp_err,grphp_err,coll_err]
+                    err_list.append(err_row)            
+                    
+            except BaseException as e:
+                raise BaseException(f"do_verify - summary file open error:{e}")
+            
+            file_count += 1
+            with open(file_dict.summary_file_name, 'a', newline='') as sfile:
+                    writer = csv.writer(sfile)
+                    writer.writerow(avg_list)
+
+        with open(file_dict.err_file_name, 'w', newline='\n') as efile:
+            writer = csv.writer(efile)
+            writer.writerow( ['file_name','file_count', 'line_count', 'expectedp', 'loadedp', 'shaderp_comp',
+                        'shaderp_grph','expectedc', 'shaderc', 'loaded_err', 'compp_err', 'grphp_err', 'coll_err'])
+            if error_count > 0:
+                #//for jj in range(len(average_list)):
+                 writer.writerows(err_list)
+        return error_count
+            
+    #******************************************************************
+    # Get averages
+    #
+    def get_averages(self,file_dict):
+        self.create_summary(file_dict)
+        #print("Performing Averages")
+        self.average_list = []
+        for ii in self.data_files:
+            file_path_release = file_dict.target_dir + "/" + ii + "R.csv"
+            fps = cpums = cms = gms = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = 0
+        
+            try:
+                with open(file_path_release, 'r') as filename:
+                    file = csv.DictReader(filename)
+                    for col in file:
+                        
+                        count += 1
+                        fps += float(col['fps'])
+                        cpums += float(col['cpums'])
+                        cms += float(col['cms'])
+                        gms += float(col['gms'])
+                        if count == 1:
+                            loadedp = float(col['loadedp'])
+                            expectedc = int(col['expectedc'])
+                            sidelen = int(col['sidelen'])
+                            
+            except BaseException as e:
+                print("LatexDataParticle get_averages line 282:",e)
+
+            fps = fps / count
+            cpums = cpums / count
+            cms = cms / count
+            gms = gms / count
+            shaderp_comp = shaderp_comp / count
+            shaderp_grph = shaderp_grph / count
+            shaderc = shaderc / count
+            avg_list = [ii, fps, cpums, cms, gms, expectedp, loadedp, shaderp_comp,
+                        shaderp_grph, expectedc, shaderc, sidelen]
+            with open( file_dict.summary_file_name, 'a', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(avg_list)
+            self.average_list.append(avg_list)
+        file.close()
+
+    #******************************************************************
+    # Get maximuns write then to summary file
+    #
+    def get_maxFPSminSPF(self,file_dict):
+        self.create_summary(file_dict)
+        for ii in self.data_files:
+            fps_old = 0
+            cpums_old = 0.0
+            cms_old = 0.0
+            gms_old = 0.0
+            self.do_mmrr()
+            data_file = file_dict.target_dir + "/" + ii + "R.csv"
+            mean = stddev = fps = cpums = cms = gms = cell_count = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = mmrr = 0
+            fps_list = []
+          
+            try:
+                with open(data_file, 'r') as filename:
+                    file = csv.DictReader(filename)
+                    cms_old = cpums_old = gms_old = 1000.0
+                    for col in file:
+                        
+                        count += 1
+                        fps = float(col['fps'])
+                        fps_list.append(fps)
+                        if fps > fps_old:
+                            fps_old = fps
+                        cpums = float(col['cpums'])
+                        if cpums < cpums_old:
+                            cpums_old = cpums
+                        cms = float(col['cms'])
+                        if cms < cms_old:
+                            cms_old = cms
+                        gms = float(col['gms'])
+                        if gms < gms_old:
+                            gms_old = gms
+                        if count == 1:
+                            loadedp = float(col['loadedp'])
+                            expectedc = int(col['expectedc'])
+                            sidelen = int(col['sidelen'])
+                            if 'cell_count' in col:
+                                cell_count = int(col['cell_count'])
+            except BaseException as e:
+                raise BaseException(f"LatexDataParticle get_max failed: {e}")
+
+            mean = statistics.mean(fps_list)
+            stddev = statistics.stdev(fps_list)
+            mmrr = self.mmrr_gms 
+            max_list = [ii, fps_old, cpums_old, cms_old, gms_old, expectedp, loadedp, shaderp_comp,
+                        shaderp_grph, expectedc, shaderc, sidelen,cell_count,mean,stddev,mmrr]
+            with open( file_dict.summary_file_name, 'a', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(max_list)
+            self.average_list.append(max_list)
+        #print("REMEMBER CELL_COUNT is new and needs to be uncommented after new tests.")
+        file.close()
+
+
+
+    #******************************************************************
+    # Get maximuns write then to summary file
+    #
+    def get_mins(self,file_dict):
+        self.create_summary(file_dict)
+        for ii in self.data_files:
+            fps_old = 0
+            cpums_old = 1000.0
+            cms_old = 1000.0
+            gms_old = 1000.0
+            self.do_mmrr()
+            data_file = file_dict.target_dir + "/" + ii + "R.csv"
+            mean = stddev = fps = cpums = cms = gms = cell_count = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = mmrr = 0
+            fps_list = []
+          
+            try:
+                with open(data_file, 'r') as filename:
+                    file = csv.DictReader(filename)
+                    for col in file:
+                        
+                        count += 1
+                        fps = float(col['fps'])
+                        fps_list.append(fps)
+                        if fps > fps_old:
+                            fps_old = fps
+                        cpums = float(col['cpums'])
+                        if cpums < cpums_old:
+                            cpums_old = cpums
+                        cms = float(col['cms'])
+                        if cms < cms_old:
+                            cms_old = cms
+                        gms = float(col['gms'])
+                        if gms < gms_old:
+                            gms_old = gms
+                        if count == 1:
+                            loadedp = float(col['loadedp'])
+                            expectedc = int(col['expectedc'])
+                            sidelen = int(col['sidelen'])
+                            if 'cell_count' in col:
+                                cell_count = int(col['cell_count'])
+            except BaseException as e:
+                raise BaseException(f"LatexDataParticle get_max failed: {e}")
+
+            mean = statistics.mean(fps_list)
+            stddev = statistics.stdev(fps_list)
+            mmrr = self.mmrr_gms 
+            max_list = [ii, fps_old, cpums_old, cms_old, gms_old, expectedp, loadedp, shaderp_comp,
+                        shaderp_grph, expectedc, shaderc, sidelen,cell_count,mean,stddev,mmrr]
+            with open( file_dict.summary_file_name, 'a', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(max_list)
+            self.average_list.append(max_list)
+        #print("REMEMBER CELL_COUNT is new and needs to be uncommented after new tests.")
+        file.close()
