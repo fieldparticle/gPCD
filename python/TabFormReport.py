@@ -176,6 +176,7 @@ class TabFormReport(QTabWidget):
         except BaseException as e:
             print(f"preview failed:{e}")
 
+    
 
     def do_batch(self):
         batch_files = self.itemcfg.include
@@ -246,7 +247,7 @@ class TabFormReport(QTabWidget):
                 try:
                     module_name = self.itemcfg.name
                     file_path = self.itemcfg.code_dir + '/' + self.itemcfg.name + ".py"
-                    CLS = self.load_class_from_file(file_path )
+                    CLS = load_class_from_file(file_path )
                 except BaseException as e:
                     print(f"Load plot code class failed:{e}")
                     return
@@ -295,6 +296,7 @@ class TabFormReport(QTabWidget):
     #   
     def reload(self):
         self.load_item_cfg(self.CfgFile)
+        
        
 
     def refresh_dir(self):

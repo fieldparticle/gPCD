@@ -1,11 +1,11 @@
-from ReportClass import *
+from gbase.ReportClass import *
 import os
 import inspect
-from TrendLine import *
 import re
-from AttrDictFields import *
-from ConfigUtility import *
-from ValuesDataBase import *
+import pandas as pd
+from gbase.AttrDictFields import *
+from gbase.ConfigUtility import *
+from gbase.ValuesDataBase import *
 class A_COMPARE_TABLE():
 
     def __init__(self,itemcfg,base):

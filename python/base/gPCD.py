@@ -1,4 +1,5 @@
 from logging import config
+from pathlib import Path
 
 import pygame
 
@@ -28,15 +29,23 @@ class Demo:
         self.center_dot_color = (245, 245, 245)
         self.collision_normal_color = (255, 245, 140)
         self.overlap_alpha = 185
-        self.start_overlap_momentum = 0.0
         self.start_kinetic_energy = 0.0
+        self.start_total_momentum_x = 0.0
+        self.start_total_momentum_y = 0.0
         self.paused = False
         self.frame_number = 0
         self.current_fps = 0.0
         self.frame_rate = 60
+        self.print_report_requested = False
+        self.rpt_frames = set()
+        self.captured_report_frames = set()
+        self.report_capture_dir = Path.cwd()
 
     def configure(self, particle_data, run_configuration):
         self.config = {} if run_configuration is None else dict(run_configuration)
+        self.report_capture_dir = Path(self.config.get("data_dir", Path.cwd()))
+        self.rpt_frames = self.normalized_report_frames(self.config.get("rpt_frames", []))
+        self.captured_report_frames = set()
         self.base = Base()
         self.base.dt = float(self.config.get("dt", self.base.dt))
         self.base.substeps = int(self.config.get("substeps", self.base.substeps))
@@ -67,14 +76,32 @@ class Demo:
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
 
         self.base.clear_particles()
+        self.start_total_momentum_x, self.start_total_momentum_y = self.starting_momentum_vector(particle_data)
         for _index, particle in sorted(particle_data.items()):
             self.base.add_particle(**particle)
         self.base.reset()
-        self.start_overlap_momentum = self.total_overlap_momentum()
         self.start_kinetic_energy = self.total_kinetic_energy()
         self.frame_number = 0
         self.current_fps = 0.0
         self.paused = False
+
+    @staticmethod
+    def normalized_report_frames(rpt_frames):
+        if rpt_frames is None or rpt_frames is False:
+            return set()
+        if isinstance(rpt_frames, int):
+            return {rpt_frames}
+        return {int(frame) for frame in rpt_frames}
+
+    @staticmethod
+    def starting_momentum_vector(particle_data):
+        momentum_x = 0.0
+        momentum_y = 0.0
+        for particle in particle_data.values():
+            mass = float(particle["mass"])
+            momentum_x += mass * float(particle["vx"])
+            momentum_y += mass * float(particle["vy"])
+        return momentum_x, momentum_y
 
     def set_zoom(self, zoom):
         self.zoom = max(0.01, float(zoom))
@@ -245,9 +272,6 @@ class Demo:
         pygame.draw.line(self.screen, self.collision_normal_color, start, end, 3)
         pygame.draw.circle(self.screen, self.collision_normal_color, end, 5)
 
-    def total_overlap_momentum(self):
-        return sum(particle.get("overlap_momentum", 0.0) for particle in self.base.particles)
-
     def total_kinetic_energy(self):
         return sum(
             0.5 * particle["mass"] * (particle["vx"] * particle["vx"] + particle["vy"] * particle["vy"])
@@ -255,14 +279,71 @@ class Demo:
             if self.base.dynamics.is_active_particle(particle)
         )
 
+    def total_momentum_vector(self):
+        momentum_x = 0.0
+        momentum_y = 0.0
+        for particle in self.base.particles:
+            if not self.base.dynamics.is_active_particle(particle):
+                continue
+            momentum_x += particle["mass"] * particle["vx"]
+            momentum_y += particle["mass"] * particle["vy"]
+        return momentum_x, momentum_y
+
+    def particle_contact_diagnostics(self, source_index, source_particle):
+        diagnostics = []
+        for slot in range(source_particle.get("sltnum", 0)):
+            contact_record = source_particle["ccs"][slot]
+            if contact_record.get("clflg", 0) == 0:
+                continue
+            target_index = contact_record["pindex"]
+            pair_key = tuple(sorted((source_index, target_index)))
+            target_particle = self.base.particles[target_index]
+            contact = self.base.dynamics.particle_contact(source_particle, target_particle)
+            if contact is None:
+                continue
+            nx, ny, _overlap_area, _center_distance = contact
+            rel_vx = target_particle["vx"] - source_particle["vx"]
+            rel_vy = target_particle["vy"] - source_particle["vy"]
+            rel_normal_velocity = rel_vx * nx + rel_vy * ny
+            source_mass = source_particle["mass"]
+            target_mass = target_particle["mass"]
+            reduced_mass = (source_mass * target_mass) / (source_mass + target_mass)
+            rel_normal_momentum = reduced_mass * abs(rel_normal_velocity)
+            contact_state = self.base.contact_state.get(pair_key, {})
+            internal_contact_momentum = contact_state.get("internal_contact_momentum", 0.0)
+            overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
+            last_relative_normal_velocity = contact_state.get(
+                "last_relative_normal_velocity",
+                rel_normal_velocity,
+            )
+            phase = "closing" if rel_normal_velocity < 0.0 else "separating"
+            diagnostics.append(
+                f"c{source_index}->{target_index} reln={rel_normal_velocity:.8f} "
+                f"rmass={reduced_mass:.8f} relp={rel_normal_momentum:.8f} "
+                f"omom={overlap_contact_momentum:.8f} cinternal={internal_contact_momentum:.8f} "
+                f"last_reln={last_relative_normal_velocity:.8f} phase={phase}"
+            )
+        return diagnostics
+
     def draw_report(self):
         x = 12
         y = 12
-        current_overlap_momentum = self.total_overlap_momentum()
+        current_total_momentum_x, current_total_momentum_y = self.total_momentum_vector()
         current_kinetic_energy = self.total_kinetic_energy()
+        start_total_momentum_mag = (
+            self.start_total_momentum_x * self.start_total_momentum_x
+            + self.start_total_momentum_y * self.start_total_momentum_y
+        ) ** 0.5
+        current_total_momentum_mag = (
+            current_total_momentum_x * current_total_momentum_x
+            + current_total_momentum_y * current_total_momentum_y
+        ) ** 0.5
+        total_momentum_mag_delta = current_total_momentum_mag - start_total_momentum_mag
         summary_lines = (
-            f"overlap_momentum start={self.start_overlap_momentum:.8f} end={current_overlap_momentum:.8f}",
-            f"ke               start={self.start_kinetic_energy:.8f} end={current_kinetic_energy:.8f}",
+            f"total_momentum    |start|={start_total_momentum_mag:.8f} "
+            f"|current|={current_total_momentum_mag:.8f} "
+            f"diff={total_momentum_mag_delta:.8f}",
+            f"ke                start={self.start_kinetic_energy:.8f}   end={current_kinetic_energy:.8f}",
         )
         fps_line = f"frame={self.frame_number} fps={self.current_fps:.1f}"
         surface = self.report_font.render(fps_line, True, self.center_dot_color)
@@ -281,22 +362,46 @@ class Demo:
         self.screen.blit(surface, (x, y))
         y += 18
         y += 6
-        if(self.config.get("plot_report") == True):
+        report_lines = [fps_line, *summary_lines, lifecycle_line]
+        if(self.config.get("plot_report", True) == True):
                 
             for index, particle in enumerate(self.base.particles):
-                overlap_momentum = particle.get("overlap_momentum", 0.0)
-                internal_momentum = particle.get("internal_momentum", 0.0)
-                kinetic_energy = 0.5 * particle["mass"] * (
-                    particle["vx"] * particle["vx"] + particle["vy"] * particle["vy"]
-                )
+                starting_momentum = particle.get("starting_momentum", 0.0)
+                momentum_x = particle["mass"] * particle["vx"]
+                momentum_y = particle["mass"] * particle["vy"]
+                particle_momentum = (momentum_x * momentum_x + momentum_y * momentum_y) ** 0.5
+                momentum_delta_x = particle.get("momentum_delta_x", 0.0)
+                momentum_delta_y = particle.get("momentum_delta_y", 0.0)
                 line = (
-                    f"p{index} overlap_momentum={overlap_momentum:.8f} "
-                    f"internal_momentum={internal_momentum:.8f} "
-                    f"ke={kinetic_energy:.8f}"
+                    f"p{index} px={momentum_x:.8f} py={momentum_y:.8f} "
+                    f"|p|={particle_momentum:.8f} "
+                    f"start={starting_momentum:.8f} "
+                    f"dpx={momentum_delta_x:.8f} dpy={momentum_delta_y:.8f}"
                 )
+                contact_diagnostics = self.particle_contact_diagnostics(index, particle)
+                if contact_diagnostics:
+                    line = f"{line} {' '.join(contact_diagnostics)}"
                 surface = self.report_font.render(line, True, self.center_dot_color)
                 self.screen.blit(surface, (x, y))
                 y += 18
+                report_lines.append(line)
+
+        should_auto_capture = (
+            self.frame_number in self.rpt_frames
+            and self.frame_number not in self.captured_report_frames
+        )
+        if self.print_report_requested or should_auto_capture:
+            self.write_report_capture(report_lines)
+            self.captured_report_frames.add(self.frame_number)
+            self.print_report_requested = False
+
+    def write_report_capture(self, report_lines):
+        self.report_capture_dir.mkdir(parents=True, exist_ok=True)
+        report_file = self.report_capture_dir / f"Cap{self.frame_number:06d}.rpt"
+        with report_file.open("w", encoding="utf-8") as outfile:
+            for line in report_lines:
+                outfile.write(f"{line}\n")
+        print(f"Wrote report capture: {report_file}")
 
     def run(self, particle_data, run_configuration=None):
         self.configure(particle_data, run_configuration)
@@ -310,18 +415,20 @@ class Demo:
                     running = False
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                     self.paused = not self.paused
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_p:
+                    self.print_report_requested = True
                 elif event.type == pygame.KEYDOWN and event.key in (pygame.K_EQUALS, pygame.K_PLUS, pygame.K_KP_PLUS):
                     self.set_zoom(self.zoom * 1.2)
                 elif event.type == pygame.KEYDOWN and event.key in (pygame.K_MINUS, pygame.K_UNDERSCORE, pygame.K_KP_MINUS):
                     self.set_zoom(self.zoom / 1.2)
 
+            self.current_fps = self.clock.get_fps()
+            self.draw()
             if not self.paused:
                 sub_dt = self.base.dt / self.base.substeps
                 for _ in range(self.base.substeps):
                     self.base.do_substep(sub_dt)
-            self.current_fps = self.clock.get_fps()
-            self.frame_number += 1
-            self.draw()
+                self.frame_number += 1
             self.clock.tick(self.frame_rate)
 
         pygame.quit()

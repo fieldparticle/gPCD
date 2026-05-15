@@ -19,12 +19,17 @@ import matplotlib.pyplot as mplt
 import numpy as np
 import csv
 import math
-from ValuesDataBase import *
-from AttrDictFields import *
-from PlotterClass import *
+from gbase.ValuesDataBase import *
+from gbase.AttrDictFields import *
+from gbase.PlotterClass import *
 
 class A_PQBR_THROUGH_PUT_ALL(PlotterClass):
     
+  def __init__(self,itemcfg,base):
+        super().__init__(itemcfg,base)
+        self.df = None
+        update_gpcd_data(base,self.itemcfg)
+        
   def run(self):
 
       df = self.__open_data_file__()

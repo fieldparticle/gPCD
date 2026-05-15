@@ -2,12 +2,12 @@ import numpy as np
 import matplotlib.pyplot as mplt
 import csv
 import math
-from ValuesDataBase import *
-from AttrDictFields import *
+from gbase.ValuesDataBase import *
+from gbase.AttrDictFields import *
 
 data_list = []
 
-from PlotterClass import *
+from gbase.PlotterClass import *
 
 class A_COMPARISION_PLOT(PlotterClass):
     

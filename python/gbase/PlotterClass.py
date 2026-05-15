@@ -1,6 +1,6 @@
-from ValuesDataBase import *
-from AttrDictFields import *
-from DataLine import *
+from gbase.ValuesDataBase import *
+from gbase.AttrDictFields import *
+from gbase.DataLine import *
 import math
 import numpy as np
 import pandas as pd
@@ -117,10 +117,11 @@ class PlotterClass():
         leg_str = ""
         legend_commands = self.itemcfg.plot_legend 
         legend_string =legend_commands[0]
-        stripped_leg = re.sub('$.*?', '', legend_string)
+        print(f"Legend string: {legend_string}")
+        stripped_leg = re.sub(r'\$.*?', '', legend_string)
         for ll in range(len(legend_commands)):
             if '{' in legend_commands[ll]:
-                variable_string = re.findall('\((.*?)\)', legend_commands[ll])
+                variable_string = re.findall(r'\((.*?)\)', legend_commands[ll])
                 if len(variable_string) == 0:
                     leg_list.append(legend_commands[ll])
                     continue

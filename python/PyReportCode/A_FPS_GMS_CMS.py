@@ -2,9 +2,9 @@ import numpy as np
 import matplotlib.pyplot as mplt
 import csv
 import math
-from ValuesDataBase import *
-from AttrDictFields import *
-from PlotterClass import *
+from gbase.ValuesDataBase import *
+from gbase.AttrDictFields import *
+from gbase.PlotterClass import *
 
 class A_FPS_GMS_CMS(PlotterClass):
     
@@ -12,7 +12,7 @@ class A_FPS_GMS_CMS(PlotterClass):
     # Allocates prefix_name
     def __init__(self,itemcfg,base):
         super().__init__(itemcfg,base)
-
+        update_gpcd_data(base,self.itemcfg)
 
     def do_linear_fit(self,N,ydata):
         popt,cov=curve_fit(linearFunc,N,ydata)
@@ -66,7 +66,7 @@ class A_FPS_GMS_CMS(PlotterClass):
     def run(self):
         data_source = self.itemcfg.data_source
         for ii in data_source:
-            file_name = self.itemcfg.input_data_dir + "/" + f"perfData{ii}/perfdataPerformanceSummary.csv"
+            file_name = self.itemcfg.input_data_file
             try :
                 self.df = pd.read_csv(file_name)
             except BaseException as e:

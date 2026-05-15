@@ -1,11 +1,11 @@
-from ReportClass import *
+from gbase.ReportClass import *
 import os
 import inspect
-from TrendLine import *
+
 import re
-from AttrDictFields import *
-from ConfigUtility import *
-from ValuesDataBase import *
+from gbase.AttrDictFields import *
+from gbase.ConfigUtility import *
+from gbase.ValuesDataBase import *
 class A_TABLE_LOGLOG_REGRESS():
 
     def __init__(self,itemcfg,base):

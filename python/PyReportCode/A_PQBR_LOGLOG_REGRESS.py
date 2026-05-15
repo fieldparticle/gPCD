@@ -18,12 +18,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import linregress
 
-from ValuesDataBase import *
-from AttrDictFields import *
+from gbase.ValuesDataBase import *
+from gbase.AttrDictFields import *
 
 data_list = []
 N0 = 10_0000   
-from PlotterClass import *
+from gbase.PlotterClass import *
 
 class A_PQBR_LOGLOG_REGRESS(PlotterClass):
     
@@ -31,6 +31,7 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
     def __init__(self,itemcfg,base):
         super().__init__(itemcfg,base)
         self.df = None
+        update_gpcd_data(base,self.itemcfg)
 
     def fit_range(self,mask):
       x, y = self.logN[mask], self.logT[mask]

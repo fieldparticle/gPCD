@@ -2,18 +2,19 @@ import numpy as np
 import matplotlib.pyplot as mplt
 import csv
 import math
-from ValuesDataBase import *
-from AttrDictFields import *
+from gbase.ValuesDataBase import *
+from gbase.AttrDictFields import *
 
 
 
-from PlotterClass import *
+from gbase.PlotterClass import *
 
 class A_PBQR_CURVATURE(PlotterClass):
     
         
     def __init__(self,itemcfg,base):
         super().__init__(itemcfg,base)
+        update_gpcd_data(base,self.itemcfg)
 
     def curvature_thresholds(self,a, b, c, eps=0.01, dT=1e-5):
     

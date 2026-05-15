@@ -1,11 +1,11 @@
-from ReportClass import *
+from gbase.ReportClass import *
 import os
 import inspect
-from TrendLine import *
+from gbase.TrendLine import *
 import re
-from AttrDictFields import *
-from ConfigUtility import *
-from ValuesDataBase import *
+from gbase.AttrDictFields import *
+from gbase.ConfigUtility import *
+from gbase.ValuesDataBase import *
 class A_PQBRT_DATA_ALL():
 
     def __init__(self,itemcfg,base):
@@ -14,6 +14,8 @@ class A_PQBRT_DATA_ALL():
         self.include = []
         self.vals_list = AttrDictFields()
         self.prefix_name = self.itemcfg.name.replace('_','')
+        update_gpcd_data(base,self.itemcfg)
+        
        
     def replace_between_delimiters(self,text, start_delimiter, end_delimiter, replacement_string):
         pattern = re.escape(start_delimiter) + r"(.*?)" + re.escape(end_delimiter)
@@ -53,7 +55,7 @@ class A_PQBRT_DATA_ALL():
         return self.Table
     
     def save_export_vals(self):
-        
+        '''
         g = self.lines_list[0]
         vdb = ValuesDataBase(self.bobj)
         save_lines_vals = 0
@@ -67,6 +69,8 @@ class A_PQBRT_DATA_ALL():
                        self.vals_list[f"{prefix_name}{vdb.alph(rr+1)}{vdb.alph(cc+1)}"] = self.table_array[rr][cc]
                             
         vdb.write_values(self.vals_list)
+            '''
         return
+
           
     

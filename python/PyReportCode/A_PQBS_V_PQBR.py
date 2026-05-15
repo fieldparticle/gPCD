@@ -7,7 +7,7 @@ from AttrDictFields import *
 
 data_list = []
 
-from PlotterClass import *
+from gbase.PlotterClass import *
 
 def linearFunc(x,intercept,slope):
         """This function defines the function to be fit. In this case a linear

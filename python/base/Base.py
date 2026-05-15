@@ -26,6 +26,7 @@ class Base:
         self.max_boundary_contacts_per_particle = 4
         self.dynamics = Dynamics()
         self.report = Report()
+        self.contact_state = {}
 
     def clear_particles(self):
         self.particle_configs = []
@@ -46,6 +47,9 @@ class Base:
                 "vy": vy,
                 "mass": float(mass),
                 "radius": radius,
+                "starting_momentum_x": float(mass) * vx,
+                "starting_momentum_y": float(mass) * vy,
+                "starting_momentum": float(mass) * math.hypot(vx, vy),
                 "location": location,
                 **self.glsl_field_mirrors(location, vx, vy, float(mass), radius),
                 **display,
@@ -66,6 +70,7 @@ class Base:
     def reset(self):
         self.time = 0.0
         self.particles = []
+        self.contact_state = {}
         self.report.clear()
         for config in self.particle_configs:
             particle = dict(config)
@@ -82,12 +87,15 @@ class Base:
             particle["state_flg"] = int(particle.get("state_flg", self.dynamics.STATE_ACTIVE))
             self.particles.append(particle)
         self.detect_contacts()
+        self.update_contact_state()
         self.dynamics.process_collisions(self.particles, self.walls)
+        self.dynamics.resolve_starting_collisions(self.particles)
         self.record_step_report()
 
     def step(self, dt):
         self.dynamics.begin_step(self.particles, dt, self.set_location)
         self.detect_contacts()
+        self.update_contact_state()
         self.dynamics.process_collisions(self.particles, self.walls)
         self.dynamics.apply_overlap_momentum(self.particles)
         self.move(dt)
@@ -172,6 +180,56 @@ class Base:
         }
         particle["wall_contact_count"] = self.boundary_contact_count(particle)
         particle["contact_count"] = particle.get("sltnum", 0) + particle["wall_contact_count"]
+
+    def update_contact_state(self):
+        active_pairs = set()
+        for source_index, source_particle in enumerate(self.particles):
+            for slot in range(source_particle.get("sltnum", 0)):
+                contact_record = source_particle["ccs"][slot]
+                if contact_record.get("clflg", 0) == 0:
+                    continue
+
+                target_index = contact_record["pindex"]
+                pair_key = tuple(sorted((source_index, target_index)))
+                if pair_key in active_pairs:
+                    continue
+
+                target_particle = self.particles[target_index]
+                contact = self.dynamics.particle_contact(source_particle, target_particle)
+                if contact is None:
+                    continue
+
+                nx, ny, overlap_area, center_distance = contact
+                rel_vx = target_particle["vx"] - source_particle["vx"]
+                rel_vy = target_particle["vy"] - source_particle["vy"]
+                rel_normal_velocity = rel_vx * nx + rel_vy * ny
+                reduced_mass = (
+                    source_particle["mass"] * target_particle["mass"]
+                ) / (source_particle["mass"] + target_particle["mass"])
+                rel_normal_momentum = reduced_mass * abs(rel_normal_velocity)
+                overlap_contact_momentum = self.dynamics.overlap_momentum(
+                    overlap_area,
+                    center_distance,
+                    source_particle,
+                )
+                state = self.contact_state.setdefault(
+                    pair_key,
+                    {
+                        "internal_contact_momentum": 0.0,
+                        "last_relative_normal_velocity": rel_normal_velocity,
+                    },
+                )
+                if rel_normal_velocity < 0.0:
+                    state["internal_contact_momentum"] += overlap_contact_momentum
+                else:
+                    state["internal_contact_momentum"] = max(
+                        0.0,
+                        state["internal_contact_momentum"] - overlap_contact_momentum,
+                    )
+                state["relative_normal_momentum"] = rel_normal_momentum
+                state["overlap_contact_momentum"] = overlap_contact_momentum
+                state["last_relative_normal_velocity"] = rel_normal_velocity
+                active_pairs.add(pair_key)
 
     @staticmethod
     def empty_particle_contact():
@@ -344,5 +402,8 @@ class Base:
                     "internal_momentum_x": particle.get("internal_momentum_x", 0.0),
                     "internal_momentum_y": particle.get("internal_momentum_y", 0.0),
                     "internal_momentum": particle.get("internal_momentum", 0.0),
+                    "momentum_delta_x": particle.get("momentum_delta_x", 0.0),
+                    "momentum_delta_y": particle.get("momentum_delta_y", 0.0),
+                    "momentum_delta": particle.get("momentum_delta", 0.0),
                 },
             )

@@ -16,15 +16,8 @@ class A_PQBRT_TABLE_ALL():
         self.include = []
         self.vals_list = AttrDictFields()
         self.prefix_name = self.itemcfg.name.replace('_','')
-        self.gpcddata = gPCDData(base,itemcfg)
-        self.data_parms = AttrDictFields()
-        self.data_parms["source_dir"] = self.itemcfg.input_data_dir
-        self.data_parms["target_dir"] = self.itemcfg.output_summary_dir
-        self.data_parms["compute_type"] = self.itemcfg.compute_type
-        self.data_parms["summary_file_name"] = self.itemcfg.input_data_file
-        self.data_parms["mode"] = self.itemcfg.mode
-
-        self.gpcddata.assign_data(self.data_parms)
+        update_gpcd_data(base,self.itemcfg)
+        
        
     def replace_between_delimiters(self,text, start_delimiter, end_delimiter, replacement_string):
         pattern = re.escape(start_delimiter) + r"(.*?)" + re.escape(end_delimiter)

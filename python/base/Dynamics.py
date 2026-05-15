@@ -55,10 +55,10 @@ class Dynamics:
             current contacts.
         overlap_momentum:
             Scalar sum of contact momentum magnitudes.
-        internal_momentum_x, internal_momentum_y, internal_momentum:
-            Same vector and magnitude currently used for reporting. Kept as a
-            separate name because this is the internal collision response state
-            we may want to inspect independently from the applied velocity.
+        momentum_delta_x, momentum_delta_y:
+            Per-step vector momentum change caused by the stored overlap
+            momentum. Contact-level internal state owns unresolved collision
+            storage.
     """
 
     def __init__(self):
@@ -230,6 +230,31 @@ class Dynamics:
                 continue
             self.process_source_collision(source_id, particles, walls)
 
+    def resolve_starting_collisions(self, particles):
+        """Balance initial overlap momentum against initial particle momentum.
+
+        Some tests intentionally begin with overlapping particles. The overlap
+        response computed at t=0 transfers scalar momentum magnitude between
+        current motion and internal storage during apply_overlap_momentum().
+        The internal reservoir starts at zero because the initial velocity is
+        the starting total.
+        """
+        for particle in particles:
+            if not self.is_active_particle(particle):
+                continue
+
+            linear_momentum_x = particle["mass"] * particle["vx"]
+            linear_momentum_y = particle["mass"] * particle["vy"]
+            particle["starting_momentum_x"] = linear_momentum_x
+            particle["starting_momentum_y"] = linear_momentum_y
+            particle["starting_momentum"] = math.hypot(linear_momentum_x, linear_momentum_y)
+            particle["internal_momentum_x"] = 0.0
+            particle["internal_momentum_y"] = 0.0
+            particle["internal_momentum"] = 0.0
+            particle["momentum_delta_x"] = 0.0
+            particle["momentum_delta_y"] = 0.0
+            particle["momentum_delta"] = 0.0
+
     def process_source_collision(self, source_id, particles, walls=None):
         """Process the completed collision list for one source particle.
 
@@ -285,9 +310,6 @@ class Dynamics:
         source_particle["parms"][1] = momentum_x
         source_particle["parms"][2] = momentum_y
         source_particle["parms"][3] = momentum_sum
-        source_particle["internal_momentum_x"] = momentum_x
-        source_particle["internal_momentum_y"] = momentum_y
-        source_particle["internal_momentum"] = math.hypot(momentum_x, momentum_y)
 
     def apply_overlap_momentum(self, particles):
         """Convert each particle's stored overlap momentum into velocity.
@@ -302,8 +324,26 @@ class Dynamics:
         for particle in particles:
             if not self.is_active_particle(particle):
                 continue
-            particle["vx"] += particle.get("overlap_momentum_x", 0.0) / particle["mass"]
-            particle["vy"] += particle.get("overlap_momentum_y", 0.0) / particle["mass"]
+            overlap_momentum_x = particle.get("overlap_momentum_x", 0.0)
+            overlap_momentum_y = particle.get("overlap_momentum_y", 0.0)
+            old_momentum_x = particle["mass"] * particle["vx"]
+            old_momentum_y = particle["mass"] * particle["vy"]
+            candidate_vx = particle["vx"] + overlap_momentum_x / particle["mass"]
+            candidate_vy = particle["vy"] + overlap_momentum_y / particle["mass"]
+
+            particle["vx"] = candidate_vx
+            particle["vy"] = candidate_vy
+            new_momentum_x = particle["mass"] * particle["vx"]
+            new_momentum_y = particle["mass"] * particle["vy"]
+            particle["momentum_delta_x"] = new_momentum_x - old_momentum_x
+            particle["momentum_delta_y"] = new_momentum_y - old_momentum_y
+            particle["momentum_delta"] = math.hypot(
+                particle["momentum_delta_x"],
+                particle["momentum_delta_y"],
+            )
+            particle["internal_momentum_x"] = 0.0
+            particle["internal_momentum_y"] = 0.0
+            particle["internal_momentum"] = 0.0
             self.sync_velocity_mirror(particle)
 
     @staticmethod
@@ -314,6 +354,13 @@ class Dynamics:
         particle["VelRad"][0] = vx
         particle["VelRad"][1] = vy
         particle["VelRad"][3] = math.atan2(vy, vx) if vx != 0.0 or vy != 0.0 else 0.0
+
+    @staticmethod
+    def velocity_direction(particle):
+        speed = math.hypot(particle["vx"], particle["vy"])
+        if speed <= 1.0e-12:
+            return 0.0, 0.0
+        return particle["vx"] / speed, particle["vy"] / speed
 
     def particle_contact(self, source_particle, target_particle):
         """Return contact geometry for two overlapping source/target disks.

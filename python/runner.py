@@ -70,7 +70,7 @@ def getParticleData(config):
 
 
 def build_particle_data(config):
-
+    
     if config.pdata_from_file == True:
         return getParticleData(config)
     else:
@@ -119,6 +119,8 @@ def wall_box_from_array(section):
 
 def build_run_configuration(config):
     run_configuration = AttrDict(config["RUN_CONFIGURATION"])
+    if "data_dir" in config:
+        run_configuration["data_dir"] = config["data_dir"]
     application = config.get("application")
     sections = (run_configuration, config, application)
 
@@ -174,6 +176,12 @@ def browseFolder():
     DEFAULT_CFG_FILE = file_path
     print(f"Selected configuration file: {DEFAULT_CFG_FILE}")
 
+def run_analysis(cfg_file):
+    config = load_runner_config(cfg_file)
+    run_configuration = build_run_configuration(config)
+    particle_data = build_particle_data(config)
+    demo = Demo()
+    demo.run(particle_data, run_configuration)
 
 def main():
     browseFolder()

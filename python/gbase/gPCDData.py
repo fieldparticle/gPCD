@@ -13,6 +13,17 @@ import re
 from gbase.ConfigUtility import *
 from PyQt6.QtWidgets import QFileDialog, QGroupBox,QMessageBox
 from  gbase.msg_box import *
+
+def update_gpcd_data(bobj,itemcfg):
+    gpcddata = gPCDData(bobj,itemcfg)
+    data_parms = AttrDictFields()
+    data_parms["source_dir"] = itemcfg.input_data_dir
+    data_parms["target_dir"] = itemcfg.output_summary_dir
+    data_parms["compute_type"] = itemcfg.compute_type
+    data_parms["summary_file_name"] = itemcfg.input_data_file
+    data_parms["mode"] = itemcfg.mode
+    gpcddata.assign_data(data_parms)
+
 class gPCDData():
 
     sumFile = ""
