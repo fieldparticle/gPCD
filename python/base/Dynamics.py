@@ -231,23 +231,38 @@ class Dynamics:
             self.process_source_collision(source_id, particles, walls)
 
     def resolve_starting_collisions(self, particles):
-        """Balance initial overlap momentum against initial particle momentum.
+        """Record reset-time collision correction diagnostics.
 
-        Some tests intentionally begin with overlapping particles. The overlap
-        response computed at t=0 transfers scalar momentum magnitude between
-        current motion and internal storage during apply_overlap_momentum().
-        The internal reservoir starts at zero because the initial velocity is
-        the starting total.
+        Some tests intentionally begin with overlapping particles. At reset
+        time, process_collisions() has already computed the instantaneous
+        overlap momentum for that starting geometry. For now this method only
+        reports what the velocity would be after applying that overlap
+        momentum; it does not alter the live dynamics velocity.
         """
         for particle in particles:
             if not self.is_active_particle(particle):
                 continue
+
+            uncorrected_vx = particle["vx"]
+            uncorrected_vy = particle["vy"]
+            overlap_momentum_x = particle.get("overlap_momentum_x", 0.0)
+            overlap_momentum_y = particle.get("overlap_momentum_y", 0.0)
+            corrected_vx = uncorrected_vx + overlap_momentum_x / particle["mass"]
+            corrected_vy = uncorrected_vy + overlap_momentum_y / particle["mass"]
 
             linear_momentum_x = particle["mass"] * particle["vx"]
             linear_momentum_y = particle["mass"] * particle["vy"]
             particle["starting_momentum_x"] = linear_momentum_x
             particle["starting_momentum_y"] = linear_momentum_y
             particle["starting_momentum"] = math.hypot(linear_momentum_x, linear_momentum_y)
+            particle["starting_uncorrected_vx"] = uncorrected_vx
+            particle["starting_uncorrected_vy"] = uncorrected_vy
+            particle["starting_corrected_vx"] = corrected_vx
+            particle["starting_corrected_vy"] = corrected_vy
+            particle["starting_velocity_correction_x"] = corrected_vx - uncorrected_vx
+            particle["starting_velocity_correction_y"] = corrected_vy - uncorrected_vy
+            particle["starting_uncorrected_speed"] = math.hypot(uncorrected_vx, uncorrected_vy)
+            particle["starting_corrected_speed"] = math.hypot(corrected_vx, corrected_vy)
             particle["internal_momentum_x"] = 0.0
             particle["internal_momentum_y"] = 0.0
             particle["internal_momentum"] = 0.0

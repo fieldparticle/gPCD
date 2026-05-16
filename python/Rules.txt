@@ -1,0 +1,16 @@
+Rules
+
+1. We can never change the model from overlap geometry. 
+2. Capture (CapXXXXXX.rpt) files are located in C:\_DJ\gPCDData\examples.
+3. Must always be parallel friendly.
+4. Particle velocities in the cfg represent incoming velocity before turnaround; they define the particles' initial momentum.
+
+5. If a particle at t=0 is in a collision state it will have an overlap area. 
+	We assume the particle is always in the rebound phase.
+	This means that it started a contact at its initial velocity, penetrated to the zero velocity point, 
+	and is outbound from the collision. The zero_velocity_point is the point at which direction changes
+	from inbound to outbound. The velocity at the current overlap rebound point is the
+	velocity at the particles current condition that would have occured if the particle
+	had collided naturally from the initial velocity. 
+
+

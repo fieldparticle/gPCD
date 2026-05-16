@@ -1,1 +1,13 @@
-We know two things about starting in a collision. The velocity direction and magnitude.
+Keep current dynamics for natural collisions
+Since TwoParticleHorizontal works, don’t break it immediately.
+
+Use experimental model for starting overlaps
+This is what we just wired.
+
+Add reporting for natural collisions under ExperimentalBase
+Compare old dynamics vs new geometry-progress predictions without applying them.
+
+Create a new full GeometryDynamics class
+It owns pair contact states:
+
+Switch one test at a time
