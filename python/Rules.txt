@@ -11,6 +11,10 @@ Rules
 	and is outbound from the collision. The zero_velocity_point is the point at which direction changes
 	from inbound to outbound. The velocity at the current overlap rebound point is the
 	velocity at the particles current condition that would have occured if the particle
-	had collided naturally from the initial velocity. 
+	had collided naturally from the initial velocity.
+
+6. zero_velocity_overlap_fraction is good for designed natural collisions,
+ 	but starting collisions need a calculated pair-level A_zero because we do not 
+	know how deep into the collision history they already are.
 
 

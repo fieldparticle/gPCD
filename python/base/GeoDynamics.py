@@ -1,8 +1,8 @@
 import math
 
 
-class ExperimentalBase:
-    """Pair-level experimental collision model.
+class GeoDynamics:
+    """Pair-level geometry collision model.
 
     This class is intentionally separate from Base/Dynamics. It is for testing
     the starting-overlap model from Rules.txt:
@@ -127,6 +127,17 @@ class ExperimentalBase:
             zero_geometry["solution_source"] = "provided"
         else:
             zero_geometry["solution_source"] = "solved"
+        if zero_geometry["overlap_area"] + 1.0e-12 < overlap_area:
+            zero_geometry = dict(zero_geometry)
+            zero_geometry["center_distance"] = center_distance
+            zero_geometry["overlap_area"] = overlap_area
+            zero_geometry["overlap_momentum"] = self.overlap_momentum_at_distance(
+                center_distance,
+                source_particle,
+                target_particle,
+            )
+            zero_geometry["solution_clamped"] = True
+            zero_geometry["solution_source"] = "promoted_to_current_overlap"
         zero_overlap_area = zero_geometry["overlap_area"]
         if zero_overlap_area > 1.0e-12:
             compression_fraction = overlap_area / zero_overlap_area
@@ -311,7 +322,7 @@ class ExperimentalBase:
     def normalized_location(location):
         location = dict(location)
         use = int(location["use"])
-        if use not in (ExperimentalBase.POSITION_BUFFER_A, ExperimentalBase.POSITION_BUFFER_B):
+        if use not in (GeoDynamics.POSITION_BUFFER_A, GeoDynamics.POSITION_BUFFER_B):
             raise ValueError(f"Unknown position buffer: {location['use']!r}")
         location["use"] = use
         if "x2" not in location and "x1" in location:
@@ -323,7 +334,7 @@ class ExperimentalBase:
     @staticmethod
     def current_location(particle):
         location = particle["location"]
-        if int(location["use"]) == ExperimentalBase.POSITION_BUFFER_A:
+        if int(location["use"]) == GeoDynamics.POSITION_BUFFER_A:
             return location["x1"], location["y1"]
         return location["x2"], location["y2"]
 

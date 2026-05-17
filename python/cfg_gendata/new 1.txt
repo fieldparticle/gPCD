@@ -1,10 +1,10 @@
 Keep current dynamics for natural collisions
 Since TwoParticleHorizontal works, don’t break it immediately.
 
-Use experimental model for starting overlaps
+Use geometry model for starting overlaps
 This is what we just wired.
 
-Add reporting for natural collisions under ExperimentalBase
+Add reporting for natural collisions under GeoDynamics
 Compare old dynamics vs new geometry-progress predictions without applying them.
 
 Create a new full GeometryDynamics class
