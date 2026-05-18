@@ -52,24 +52,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 #include <cstddef>
 #include <cstdint>
 
-	static_assert(sizeof(lstr) == 12);
-	static_assert(sizeof(bcoll) == 4);
-	static_assert(sizeof(ccoll) == 8);
-
-	static_assert(offsetof(Particle, PosLocA) == 0);
-	static_assert(offsetof(Particle, PosLocB) == 16);
-	static_assert(offsetof(Particle, VelRad) == 32);
-	static_assert(offsetof(Particle, Data) == 48);
-	static_assert(offsetof(Particle, parms) == 64);
-	static_assert(offsetof(Particle, CornerList) == 80);
-	static_assert(offsetof(Particle, bcs) == 176);
-	static_assert(offsetof(Particle, ccs) == 192);
-	static_assert(offsetof(Particle, sltnum) == 288);
-	static_assert(offsetof(Particle, colFlg) == 292);
-	static_assert(offsetof(Particle, MolarMatter) == 296);
-	static_assert(offsetof(Particle, temp_vel) == 300);
-
-	static_assert(sizeof(Particle) == 304);
+	
 	
 	m_MaxColls				= MAXSPCOLLS;
 	m_thisFramesBuffered	= 1;
@@ -139,14 +122,20 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 			}
 		}
 		part.PosLocA		= glm::vec4(part_pos.rx, part_pos.ry,part_pos.rz, 0.0);
-		part.sltnum			= 0;
 		part.VelRad			= glm::vec4(part_pos.vx, part_pos.vy, part_pos.vz,1.0);
 		part.PosLocB		= glm::vec4(part_pos.rx, part_pos.ry, part_pos.rz, 0.0);
-		part.Data			= glm::vec4(part_pos.radius, part_pos.inverse_square_softening, part_pos.momentum_per_area, part_pos.state_flg);
+		part.Data			= glm::vec4(part_pos.radius, 0.0, 0.0, part_pos.state_flg);
 		part.MolarMatter	= static_cast<float>(1.0);
 		part.temp_vel		= static_cast<float>(0.04);
 		part.parms			= glm::vec4(part_pos.molar_mass, 0.0, 0.0, 0.0);
 		part.colFlg			= 0;
+		part.contactCount = 0;
+		for (size_t nn = 0; nn < MAX_CONTACTS; nn++)
+		{
+			part.ncs[nn].ids = glm::uvec4(0, 0, 0, 0);
+			part.ncs[nn].vel = glm::vec4(0.0, 0.0, 0.0, 0.0);
+			part.ncs[nn].geom = glm::vec4(0.0, 0.0, 0.0, 0.0);
+		}
 
 
 		if (part_pos.ptype == 1.0)

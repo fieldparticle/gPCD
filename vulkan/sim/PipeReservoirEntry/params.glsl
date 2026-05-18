@@ -18,5 +18,7 @@ const uint ColAryLen=1000;
 const uint LockAryLen=1000;
 const uint doMotion = 0;
 const uint MAX_CELL_ARRAY_LOCATIONS =1000;
+const float NEO_COLLISION_STIFFNESS_Q=1.1;
+const float NEO_REBOUND_MIN_FRACTION=0.02;
 const uint compflag =0;
 const uint bbound =0;

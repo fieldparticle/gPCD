@@ -180,7 +180,6 @@ void  ShaderObj::WriteShaderHeader()
 	if (CfgApp->GetBool("application.doMotion", true) == true)
 	{
 		dt = CfgApp->GetBool("application.dt", true);
-		dt = CfgApp->GetBool("application.inverse_square_softening", true);
 		motion_str = 1;
 	}
 
@@ -222,7 +221,8 @@ void  ShaderObj::WriteShaderHeader()
 			<< "const uint LockAryLen=" << m_LMO->m_MaxLoc << ";\n"
 			<< "const uint doMotion = " << motion_str << ";\n"
 			<< "const uint MAX_CELL_ARRAY_LOCATIONS =" << m_CMO->m_MaxLoc << ";\n"
-			<< "const float GEO_ZERO_VELOCITY_OVERLAP_FRACTION=" << CfgTst->GetFloat("zero_velocity_overlap_fraction", true) << ";\n"
+			<< "const float NEO_COLLISION_STIFFNESS_Q=" << CfgTst->GetFloat("NEO_COLLISION_STIFFNESS_Q", true) << ";\n"
+			<< "const float NEO_REBOUND_MIN_FRACTION=" << CfgTst->GetFloat("geo_rebound_min_fraction", false) << ";\n"
 				//##JMBDont know what this is
 			<< "const uint compflag =" << compflag << ";\n"
 			<< "const uint bbound =" << m_VPO->BoundaryParticleLimit << ";\n";

@@ -1,0 +1,47 @@
+\section{Assumptions}
+
+\begin{enumerate}
+    \item The collision model must remain an overlap-geometry model. Collision state is determined from particle and wall overlap geometry, not from an unrelated force proxy.
+
+    \item Capture report files, named \texttt{CapXXXXXX.rpt}, are written to \texttt{C:\textbackslash\_DJ\textbackslash gPCDData\textbackslash examples}.
+
+    \item The simulation must remain parallel friendly. A source particle may read target-particle information, but it should write only to source-owned storage.
+
+    \item Particle velocities in cfg files represent the incoming velocity before turnaround. They define the particle's initial momentum for the collision.
+
+    \item If particles start at \texttt{t = 0} already overlapping, the starting collision is treated as post-turnaround rebound. The particles are assumed to have entered contact in the past, penetrated to the zero-velocity point, and then rebounded to the current overlap state.
+
+    \item Starting wall collisions follow the same rule as starting particle-particle collisions: a wall overlap at \texttt{t = 0} is treated as rebound, with the incoming first-contact velocity reconstructed from the current wall normal velocity when needed.
+
+    \item The zero-velocity point is the point of maximum penetration where the normal component of relative velocity changes from inbound/compression to outbound/rebound.
+
+    \item The current Neo model computes the zero-velocity penetration from the force law
+    \[
+        F(\alpha) = Q \alpha^2
+    \]
+    and the turnaround depth
+    \[
+        \alpha_0 = \left(\frac{3 \mu v_{in}^2}{2Q}\right)^{1/3}
+    \]
+    for particle-particle contacts. For wall contacts, the particle mass is used in place of reduced mass.
+
+    \item Collision stiffness, \(Q\), is global for now and is configured by \texttt{collision\_stiffness\_q}. Per-particle stiffness is a possible future extension, but it is not part of the current model.
+
+    \item The old parameters \texttt{momentum\_per\_area}, \texttt{inverse\_square\_softening},\\ and \texttt{zero\_velocity\_overlap\_fraction} are obsolete for Neo dynamics.
+
+    \item Contact state is source-owned. For GPU parity with Python, each source particle needs contact-state memory that stores target or wall id, contact type, phase, first-contact velocities, first-contact normal, \(A_0\), and zero-center distance.
+
+    \item Particle-particle and wall contacts can share one contact-state structure. The contact type distinguishes particle contacts from wall contacts.
+
+    \item The old \texttt{ccs} and \texttt{bcs} contact lists are obsolete once unified Neo contact state is used.
+
+    \item The current GLSL replacement should be named \texttt{NeoDynamics.glsl} and should fully replace \texttt{GeoDyamics.glsl}. The new GLSL must use the Neo force-law model, not the old configured-overlap-fraction model.
+
+    \item The binary particle data structure should remove obsolete collision fields. If stiffness remains global, particle binary records do not need per-particle stiffness fields.
+
+    \item \texttt{Base.py} owns particle storage, contact detection, contact-state memory, reporting, and application of velocities returned by the dynamics model.
+
+    \item \texttt{NeoDynamics.py} owns collision calculations: zero-velocity overlap, phase-dependent velocity prediction, rebound clamping, and final rebound velocity calculations.
+
+    \item \texttt{SimCalc.py} owns simulation-specific lifecycle processes such as reservoir release, outlet handling, and periodic boundary wrapping. These are not raw collision dynamics.
+\end{enumerate}

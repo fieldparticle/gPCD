@@ -92,7 +92,7 @@ void main()
 	uint duplst[DUP_LIST_SIZE];
 	uint dupcnt = 0;
 	bool dupflg = false;
-	P[Findex].ColFlg = 0;
+	P[Findex].colFlg = 0;
 	// Clear the duparray
 	for(uint kk =0; kk < 8; kk++)
 		duplst[kk] = 0;
@@ -133,7 +133,7 @@ void main()
 						if (duplst[dd] == 0)
 						{
 							// Set the collison flag
-							P[Findex].ColFlg = 1;
+							P[Findex].colFlg = 1;
 							// Add the TO particle number ot the dups list.
 							duplst[dd] = Tindex;
 							// Report is verification

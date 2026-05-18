@@ -142,7 +142,7 @@ class GenMotionData():
         f.write(fstr)
         fstr = f"wallZMAX = {run_cfg.WallZMAX};\n"
         f.write(fstr)
-        fstr = f"zero_velocity_overlap_fraction = {run_cfg.zero_velocity_overlap_fraction};\n"
+        fstr = f"NEO_COLLISION_STIFFNESS_Q = {run_cfg.collision_stiffness_q:0.2f};\n"
         f.write(fstr)
         f.flush()
         f.close()
@@ -189,8 +189,6 @@ class GenMotionData():
                 particle_struct.vz = 0.0
                 particle_struct.molar_mass = part.mass
                 particle_struct.radius = part.radius
-                particle_struct.inverse_square_softening = part.inverse_square_softening
-                particle_struct.momentum_per_area = part.momentum_per_area
                 self.p_list.append(particle_struct)
                 self.number_particles = pp+1
         except BaseException as e:

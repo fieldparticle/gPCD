@@ -42,10 +42,7 @@ struct pdata
 	double vz;			// zvel
 	double ptype;		// boundary or particle		
 	double state_flg;	// 1 live or 0 dead
-	double acc_r;		
-	double acc_a;
 	double molar_mass;
 	double temp_vel;
-	double inverse_square_softening;	
-	double momentum_per_area;
+
 } ;

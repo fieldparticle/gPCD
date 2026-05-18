@@ -154,8 +154,6 @@ class GenParticlesInBox():
         self.number_particles = 0
         self.add_null_particle(self.p_list)
         self.index = 0
-        inverse_square_softening = 1.0
-        momentum_per_area = 0.1
         RUN_CONFIGURATION = self.itemcfg["RUN_CONFIGURATION"]
         count = 0
         try:
@@ -172,8 +170,6 @@ class GenParticlesInBox():
                     particle_struct.vz = 0.0
                     particle_struct.molar_mass = 1.0
                     particle_struct.radius = 0.25
-                    particle_struct.inverse_square_softening = inverse_square_softening
-                    particle_struct.momentum_per_area = momentum_per_area
                     self.p_list.append(particle_struct)
                     
         except BaseException as e:

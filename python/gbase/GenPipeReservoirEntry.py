@@ -175,8 +175,8 @@ class GenPipeReservoirEntry():
         self.number_particles = 0
         self.add_null_particle(self.p_list)
         self.index = 0
-        inverse_square_softening = 1.0
-        momentum_per_area = 0.1
+        
+        
         RUN_CONFIGURATION = self.itemcfg["RUN_CONFIGURATION"]
         reservoir_count = int(self.cfg_value(RUN_CONFIGURATION, "reservoir_particle_count", 32))
         radius = float(self.cfg_value(RUN_CONFIGURATION, "radius", 0.25))
@@ -199,8 +199,7 @@ class GenPipeReservoirEntry():
                 particle_struct.state_flg = 0
                 particle_struct.molar_mass = mass
                 particle_struct.radius = radius
-                particle_struct.inverse_square_softening = inverse_square_softening
-                particle_struct.momentum_per_area = momentum_per_area
+                
                 self.p_list.append(particle_struct)
                     
         except BaseException as e:

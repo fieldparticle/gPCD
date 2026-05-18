@@ -64,7 +64,7 @@ void main(){
 		if (ret != 0)
 		{
 			debugPrintfEXT("Indexing Failed H:%d,W:%d at #:%d",HEIGHT,WIDTH,ret);
-			P[0].ColFlg = 1;
+			P[0].colFlg = 1;
 		}
 		else
 			debugPrintfEXT("Indexing passed H:%d,W:%d at #:%d",HEIGHT,WIDTH,ret);
@@ -244,9 +244,9 @@ void main(){
 #ifdef DEBUG
 	atomicAdd(collIn.numParticles,1);	
 #endif
-	if(uint(P[index].ColFlg) == 1)
+	if(uint(P[index].colFlg) == 1)
 		fragColor = vec3(1.0,0.0,0.0);	
-	else if(uint(P[index].ColFlg) == 0)
+	else if(uint(P[index].colFlg) == 0)
 		fragColor = vec3(0.0,1.0,0.0);	
 }
 	
@@ -280,7 +280,7 @@ void MaxCellLocationsError(uint CellArrayIndex, uint ParticleID)
 	collIn.particleNumber = ParticleID;
 	collIn.maxCells = MAX_CELL_ARRAY_LOCATIONS;
 	P[ParticleID].parms.w = 1.0;
-	P[0].ColFlg = 1;
+	P[0].colFlg = 1;
 
 }
 void MaxCellOccupancyError(uint CellOccupancySlot)

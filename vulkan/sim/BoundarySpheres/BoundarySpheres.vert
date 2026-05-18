@@ -58,9 +58,9 @@ void main()
 	{
 		vec4 newPos = vec4(inPosition.x+P[ModelInstance].PosLocA.x,inPosition.y+P[ModelInstance].PosLocA.y,inPosition.z+P[ModelInstance].PosLocA.z,1.0);
 		gl_Position = subo.proj * subo.view * subo.model * newPos;
-		if(uint(P[ModelInstance].ColFlg) == 1)
+		if(uint(P[ModelInstance].colFlg) == 1)
 			fragColor = vec4(1.0,0.0,0.0,1.0);	
-		else if(uint(P[ModelInstance].ColFlg) == 0)
+		else if(uint(P[ModelInstance].colFlg) == 0)
 			fragColor = vec4(0.0,1.0,0.0,1.0);	
 		//fragColor = inColor;
 	}

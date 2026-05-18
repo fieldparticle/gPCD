@@ -1,0 +1,515 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{listings}
+
+\title{gPCD Geometry Dynamics}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Finite Reservoir Inlet Injection Model}
+
+To model open-flow particle transport through a pipe, a finite particle reservoir was introduced. Particles are injected into the inlet boundary at prescribed times and are removed permanently once they exit the computational domain. This approach avoids periodic boundary conditions while naturally conserving the finite particle inventory of the system.
+
+The total particle population is divided into three states:
+
+\begin{equation}
+N_{\mathrm{total}}
+=
+N_{\mathrm{reservoir}}
++
+N_{\mathrm{active}}
++
+N_{\mathrm{dead}}
+\end{equation}
+
+where:
+
+\begin{itemize}
+\item $N_{\mathrm{reservoir}}$ represents particles not yet injected,
+\item $N_{\mathrm{active}}$ represents particles currently participating in the simulation,
+\item $N_{\mathrm{dead}}$ represents particles removed from the system.
+\end{itemize}
+
+The particle lifecycle is therefore:
+
+\begin{equation}
+\mathrm{reservoir}
+\rightarrow
+\mathrm{active}
+\rightarrow
+\mathrm{dead}
+\end{equation}
+
+\subsection{Parallel Injection Scheduling}
+
+Because the system is fully parallel, particles are not introduced sequentially. Instead, every reservoir particle stores its own prescribed injection time:
+
+\begin{equation}
+t_i
+=
+i \Delta t_{\mathrm{frame}}
+\end{equation}
+
+where:
+
+\begin{itemize}
+\item $t_i$ is the activation time of particle $i$,
+\item $\Delta t_{\mathrm{frame}}$ is the injection frame interval.
+\end{itemize}
+
+Each particle independently determines whether it should become active:
+
+\begin{equation}
+t \ge t_i
+\end{equation}
+
+This eliminates the need for centralized particle spawning logic and allows all reservoir particles to remain resident on the GPU throughout the simulation.
+
+Each particle stores:
+
+\begin{equation}
+\left(
+t_i,
+\mathbf{x}_{i,\mathrm{entry}},
+\mathbf{u}_{i,\mathrm{entry}}
+\right)
+\end{equation}
+
+where:
+
+\begin{itemize}
+\item $t_i$ is the entry time,
+\item $\mathbf{x}_{i,\mathrm{entry}}$ is the inlet location,
+\item $\mathbf{u}_{i,\mathrm{entry}}$ is the prescribed inlet velocity.
+\end{itemize}
+
+\subsection{Injection Frames}
+
+Particles are grouped into injection frames. If each frame injects $M$ particles, then the particle ID determines both the injection frame and the inlet slot:
+
+\begin{equation}
+\mathrm{frameID}
+=
+\left\lfloor
+\frac{pID}{M}
+\right\rfloor
+\end{equation}
+
+\begin{equation}
+\mathrm{slotID}
+=
+pID \bmod M
+\end{equation}
+
+Particles belonging to different frames may therefore reuse identical inlet locations while entering at different times.
+
+For example:
+
+\begin{equation}
+\mathrm{Frame}\ 0:
+\{0,1,2,\dots,M-1\}
+\end{equation}
+
+\begin{equation}
+\mathrm{Frame}\ 1:
+\{0,1,2,\dots,M-1\}
+\end{equation}
+
+thus producing a temporally repeating inlet structure.
+
+\subsection{Prescribed Inlet Locations}
+
+The inlet cross-section is discretized into a finite set of injection slots. Each slot corresponds to a precomputed particle center location.
+
+For a circular inlet of radius $R$, inlet positions may be distributed using:
+
+\begin{equation}
+r
+=
+R\sqrt{\xi_1}
+\end{equation}
+
+\begin{equation}
+\theta
+=
+2\pi \xi_2
+\end{equation}
+
+\begin{equation}
+y
+=
+y_c + r\cos\theta
+\end{equation}
+
+\begin{equation}
+z
+=
+z_c + r\sin\theta
+\end{equation}
+
+\begin{equation}
+x
+=
+x_{\mathrm{in}}
+\end{equation}
+
+where $\xi_1,\xi_2 \in [0,1]$ are random or deterministic sampling parameters.
+
+The inlet velocity is prescribed as:
+
+\begin{equation}
+\mathbf{u}_{\mathrm{in}}
+=
+(U_{\mathrm{in}},0,0)
+\end{equation}
+
+\subsection{Inlet Boundary Contact Injection}
+
+The inlet itself is treated as an active boundary. Injected particles are born already in contact with the inlet boundary rather than freely placed inside the domain.
+
+Each injected particle is positioned such that its rear portion overlaps the inlet boundary by a prescribed amount:
+
+\begin{equation}
+\delta_b
+=
+0.25R_p
+\end{equation}
+
+where $R_p$ is the particle radius.
+
+For an inlet plane normal to the $x$-direction:
+
+\begin{equation}
+x_p
+=
+x_{\mathrm{in}}
++
+(1-\alpha)R_p
+\end{equation}
+
+with:
+
+\begin{equation}
+\alpha = 0.25
+\end{equation}
+
+thus:
+
+\begin{equation}
+x_p
+=
+x_{\mathrm{in}}
++
+0.75R_p
+\end{equation}
+
+This causes the particle to begin in rebound/contact mode with the inlet boundary.
+
+Conceptually:
+
+\begin{equation}
+\mathrm{reservoir}
+\rightarrow
+\mathrm{boundary\ contact}
+\rightarrow
+\mathrm{rebound\ into\ pipe}
+\end{equation}
+
+This approach causes the inlet boundary to behave as a momentum-driving surface analogous to a back-pressure condition.
+
+\subsection{Boundary Removal}
+
+Particles remain active until any corner of their axis-aligned bounding box exceeds the computational boundary.
+
+For each corner coordinate:
+
+\begin{equation}
+x_c < x_{\min}
+\quad
+\mathrm{or}
+\quad
+x_c > x_{\max}
+\end{equation}
+
+\begin{equation}
+y_c < y_{\min}
+\quad
+\mathrm{or}
+\quad
+y_c > y_{\max}
+\end{equation}
+
+\begin{equation}
+z_c < z_{\min}
+\quad
+\mathrm{or}
+\quad
+z_c > z_{\max}
+\end{equation}
+
+the particle is removed from the simulation and marked as dead.
+
+This produces a finite open-flow system:
+
+\begin{equation}
+\mathrm{finite\ reservoir}
+\rightarrow
+\mathrm{pipe}
+\rightarrow
+\mathrm{absorbing\ outlet}
+\end{equation}
+
+Once the reservoir is exhausted, no additional particles enter the system and the pipe naturally drains as active particles exit the domain.
+
+\subsection{Injection Timing Constraint}
+
+To avoid immediate collisions between particles injected from the same inlet slot, the injection interval must be sufficiently large so that a previously injected particle has traveled at least one particle diameter before the next particle is introduced.
+
+Let:
+
+\begin{equation}
+R_p = \mathrm{particle\ radius}
+\end{equation}
+
+\begin{equation}
+D_p = 2R_p
+\end{equation}
+
+\begin{equation}
+U_{\mathrm{in}} = \mathrm{entry\ velocity\ magnitude}
+\end{equation}
+
+\begin{equation}
+\Delta t = \mathrm{simulation\ timestep}
+\end{equation}
+
+The minimum continuous injection interval is therefore:
+
+\begin{equation}
+\Delta t_{\mathrm{inj,min}}
+=
+\frac{2R_p}{U_{\mathrm{in}}}
+\end{equation}
+
+This corresponds to the time required for a particle traveling at velocity $U_{\mathrm{in}}$ to move one particle diameter downstream.
+
+Because the simulation advances using discrete timesteps, the injection interval is quantized to an integer number of timesteps.
+
+The required number of injection timesteps is:
+
+\begin{equation}
+n_{\mathrm{inj}}
+=
+\left\lceil
+\frac{2R_p}
+     {U_{\mathrm{in}}\Delta t}
+\right\rceil
+\end{equation}
+
+where $\lceil \cdot \rceil$ denotes the ceiling operator.
+
+The actual injection interval used by the simulation is then:
+
+\begin{equation}
+\Delta t_{\mathrm{inj}}
+=
+n_{\mathrm{inj}}\Delta t
+\end{equation}
+
+A small safety spacing $g$ may additionally be introduced:
+
+\begin{equation}
+n_{\mathrm{inj}}
+=
+\left\lceil
+\frac{2R_p + g}
+     {U_{\mathrm{in}}\Delta t}
+\right\rceil
+\end{equation}
+
+where a typical initial choice is:
+
+\begin{equation}
+g = 0.1R_p
+\end{equation}
+
+\subsection{Injection Frame Scheduling}
+
+If each injection frame contains $M$ particles, then the particle ID determines both the injection frame and the inlet slot.
+
+The frame index is:
+
+\begin{equation}
+\mathrm{frameID}
+=
+\left\lfloor
+\frac{pID}{M}
+\right\rfloor
+\end{equation}
+
+The inlet slot index is:
+
+\begin{equation}
+\mathrm{slotID}
+=
+pID \bmod M
+\end{equation}
+
+The activation time of particle $i$ is therefore:
+
+\begin{equation}
+t_i
+=
+\mathrm{frameID}
+\Delta t_{\mathrm{inj}}
+\end{equation}
+
+Thus, particles assigned to the same inlet slot are separated temporally by at least one particle diameter of downstream motion before the next particle is introduced.
+
+\subsection{Injection With Boundary Overlap}
+
+Injected particles are born in contact with the inlet boundary. The particle center is positioned such that the rear portion of the particle overlaps the inlet plane by a prescribed overlap distance.
+
+For an overlap fraction $\alpha$:
+
+\begin{equation}
+\delta_b
+=
+\alpha R_p
+\end{equation}
+
+with:
+
+\begin{equation}
+\alpha = 0.25
+\end{equation}
+
+the initial particle center location becomes:
+
+\begin{equation}
+x_p
+=
+x_{\mathrm{in}}
++
+(1-\alpha)R_p
+\end{equation}
+
+thus:
+
+\begin{equation}
+x_p
+=
+x_{\mathrm{in}}
++
+0.75R_p
+\end{equation}
+
+The inlet boundary therefore acts as a momentum-driving surface, placing newly activated particles immediately into rebound/contact mode.
+\subsection{Injection Timing Constraint With Rebound Acceleration}
+
+A newly injected particle is introduced at zero velocity while overlapping the inlet boundary. The inlet boundary then resolves the overlap and accelerates the particle into the pipe through rebound/contact response.
+
+Thus, the particle is not assigned the inlet velocity directly:
+
+\begin{equation}
+\mathbf{u}_p(t_i) = \mathbf{0}
+\end{equation}
+
+Instead, the particle reaches an effective downstream velocity after rebounding from the inlet boundary:
+
+\begin{equation}
+\mathbf{u}_p \rightarrow \mathbf{u}_{\mathrm{entry}}
+\end{equation}
+
+The injection timing should therefore be based on the effective rebound velocity:
+
+\begin{equation}
+U_{\mathrm{entry}}
+=
+\left\|
+\mathbf{u}_{\mathrm{entry}}
+\right\|
+\end{equation}
+
+The minimum continuous injection interval is:
+
+\begin{equation}
+\Delta t_{\mathrm{inj,min}}
+=
+\frac{2R_p}{U_{\mathrm{entry}}}
+\end{equation}
+
+Because the simulation advances using discrete timesteps, the required number of timesteps between repeated injections from the same inlet slot is:
+
+\begin{equation}
+n_{\mathrm{inj}}
+=
+\left\lceil
+\frac{2R_p}
+     {U_{\mathrm{entry}}\Delta t}
+\right\rceil
+\end{equation}
+
+With an optional safety spacing $g$:
+
+\begin{equation}
+n_{\mathrm{inj}}
+=
+\left\lceil
+\frac{2R_p + g}
+     {U_{\mathrm{entry}}\Delta t}
+\right\rceil
+\end{equation}
+
+The actual injection interval is then:
+
+\begin{equation}
+\Delta t_{\mathrm{inj}}
+=
+n_{\mathrm{inj}}\Delta t
+\end{equation}
+
+At activation, the particle is placed in boundary contact with zero velocity:
+
+\begin{equation}
+x_p
+=
+x_{\mathrm{in}}
++
+(1-\alpha)R_p
+\end{equation}
+
+\begin{equation}
+\mathbf{u}_p(t_i)
+=
+\mathbf{0}
+\end{equation}
+
+where the overlap fraction is:
+
+\begin{equation}
+\alpha = 0.25
+\end{equation}
+
+so that:
+
+\begin{equation}
+x_p
+=
+x_{\mathrm{in}}
++
+0.75R_p
+\end{equation}
+
+The inlet boundary then produces the downstream rebound motion. In this sense, the inlet velocity is not an imposed initial velocity, but the velocity resulting from the inlet-boundary rebound response.
+
+\end{document}

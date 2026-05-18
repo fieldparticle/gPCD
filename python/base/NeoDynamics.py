@@ -442,7 +442,14 @@ class NeoDynamics:
         }
 
     @staticmethod
-    def wall_velocity_prediction(start_velocity, normal, overlap_area, zero_area, phase):
+    def wall_velocity_prediction(
+        start_velocity,
+        normal,
+        overlap_area,
+        zero_area,
+        phase,
+        rebound_min_fraction=0.0,
+    ):
         start_vx, start_vy = start_velocity
         nx, ny = normal
         incoming_speed = start_vx * nx + start_vy * ny
@@ -464,10 +471,19 @@ class NeoDynamics:
                 start_vx + compression_progress * (turn_vx - start_vx),
                 start_vy + compression_progress * (turn_vy - start_vy),
             )
-        return (
+        predicted_velocity = (
             turn_vx + rebound_velocity_fraction * (full_vx - turn_vx),
             turn_vy + rebound_velocity_fraction * (full_vy - turn_vy),
         )
+        minimum_outward_speed = max(0.0, rebound_min_fraction) * incoming_speed
+        predicted_normal_velocity = predicted_velocity[0] * nx + predicted_velocity[1] * ny
+        if predicted_normal_velocity > -minimum_outward_speed:
+            correction = predicted_normal_velocity + minimum_outward_speed
+            predicted_velocity = (
+                predicted_velocity[0] - correction * nx,
+                predicted_velocity[1] - correction * ny,
+            )
+        return predicted_velocity
 
     @staticmethod
     def outward_clamped_rebound_velocities(

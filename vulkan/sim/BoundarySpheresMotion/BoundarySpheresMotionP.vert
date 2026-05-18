@@ -78,7 +78,7 @@ void main(){
 		if (ret != 0)
 		{
 			debugPrintfEXT("Indexing Failed H:%d,W:%d at #:%d",HEIGHT,WIDTH,ret);
-			P[0].ColFlg = 1;
+			P[0].colFlg = 1;
 		}
 		else
 			debugPrintfEXT("Indexing passed H:%d,W:%d at #:%d",HEIGHT,WIDTH,ret);
@@ -217,7 +217,7 @@ void main(){
 			collIn.ErrorReturn = 3;
 			collIn.maxCells = MAX_CELL_ARRAY_LOCATIONS;
 			P[index].parms.w = 1.0;
-			P[0].ColFlg = 1;
+			P[0].colFlg = 1;
 			break;
 		}
 		
@@ -242,7 +242,7 @@ void main(){
 			#endif
 			collIn.ExcessSlots = slot;
 			collIn.ErrorReturn = 2;
-			P[0].ColFlg = 1;
+			P[0].colFlg = 1;
 			P[index].parms.w = 2.0;
 			break;
 		}
@@ -280,9 +280,9 @@ void main(){
 		
 	}
 	
-	if(uint(P[index].ColFlg) == 1)
+	if(uint(P[index].colFlg) == 1)
 		fragColor = vec3(1.0,0.0,0.0);	
-	else if(uint(P[index].ColFlg) == 0)
+	else if(uint(P[index].colFlg) == 0)
 		fragColor = vec3(0.0,1.0,0.0);	
 	
 	

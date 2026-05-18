@@ -31,6 +31,7 @@
 %******************************************************************/
 
 #version 460
+#extension GL_GOOGLE_include_directive : enable
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
 #include "debug.glsl"
@@ -55,10 +56,9 @@
 #include "workgroups.glsl"
 #include "flow.glsl"
 #include "../common/isParticleContactMotion.glsl"
-#include "../common/dynamics_collision.glsl"
+#include "../common/NeoDynamics.glsl"
 #include "../common/move_particle.glsl"
 #include "pipe_reservoir_entry.glsl"
-#include "pipe_reservoir_entry_collision.glsl"
  
 
 ///
@@ -111,8 +111,8 @@ void main()
 	uint duplst[DUP_LIST_SIZE];
 	uint dupcnt = 0;
 	bool dupflg = false;
-	P[SourceID].ColFlg = 0;
-	P[SourceID].sltnum = 0;
+	NeoBeginContactFrame(SourceID);
+	
 	// Clear the duparray
 	for(uint kk =0; kk < DUP_LIST_SIZE; kk++)
 		duplst[kk] = 0;
@@ -162,14 +162,9 @@ void main()
 						// If the end of the duplist no duplicate found so count the collison
 						if (duplst[dd] == 0)
 						{
-							if(P[SourceID].sltnum >= 12)
-								break;
-
+							
 							// Set the collison flag
-							P[SourceID].ColFlg = 1;
-							P[SourceID].ccs[P[SourceID].sltnum].pindex = TargetID;
-							P[SourceID].ccs[P[SourceID].sltnum].clflg = 1;
-							P[SourceID].sltnum +=1;
+							NeoAddParticleContact(SourceID, TargetID);
 							// Add the TO particle number ot the dups list.
 							duplst[dd] = TargetID;
 							// Report is verification
@@ -197,8 +192,7 @@ void main()
 			debugPrintfEXT("positionBuffer:%f",ShaderFlags.positionBuffer);
 	#endif
 	 
-	PipeReservoirProcessCollision(SourceID);
-	ApplyOverlapMomentum(SourceID);
+	NeoProcessCollision(SourceID);
 	MoveParticle(SourceID,uint(ShaderFlags.positionBuffer),ShaderFlags.dt);
 	PipeReservoirApplyOutlet(SourceID,uint(ShaderFlags.positionBuffer));
 	

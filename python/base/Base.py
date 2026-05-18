@@ -204,7 +204,8 @@ class Base:
                 continue
 
             nx, ny, overlap_area, center_distance = contact
-            normal_velocity = particle["vx"] * nx + particle["vy"] * ny
+            first_vx, first_vy = state.get("first_contact_velocity", (particle["vx"], particle["vy"]))
+            normal_velocity = first_vx * nx + first_vy * ny
             zero_state = self.new_neo_model().wall_zero_velocity_state(
                 particle,
                 normal_velocity,
@@ -227,6 +228,10 @@ class Base:
             state["geo_zero_velocity_overlap_area"] = zero_geometry["overlap_area"]
             state["geo_zero_velocity_center_distance"] = zero_geometry["center_distance"]
             state["geo_zero_velocity_source"] = zero_geometry["solution_source"]
+            state["geo_zero_velocity_penetration_depth"] = zero_state.get("geo_zero_velocity_penetration_depth")
+            state["geo_zero_velocity_overlap_fraction"] = zero_state.get("geo_zero_velocity_overlap_fraction")
+            state["geo_zero_velocity_stiffness_q"] = zero_state.get("geo_zero_velocity_stiffness_q")
+            state["geo_zero_velocity_incoming_speed"] = zero_state.get("geo_zero_velocity_incoming_speed")
             state["geo_starting_overlap"] = True
 
     def geo_starting_overlap_pair_report(self, pair_key):
@@ -584,6 +589,7 @@ class Base:
             overlap_area,
             zero_area,
             phase,
+            self.geo_rebound_min_fraction,
         )
         if predicted_velocity is None:
             return None

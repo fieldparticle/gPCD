@@ -1,33 +1,47 @@
+
 #ifndef PARTICLE_STRUCT_HPP
 #define PARTICLE_STRUCT_HPP
 #include "VulkanObj/Core.hpp"
 const uint32_t MAXSPCOLLS = 8;
+constexpr uint32_t MAX_CONTACTS = 16;
+
 struct lstr {
 	uint32_t pindex;
 	uint32_t typ;
 	uint32_t fill;
 };
-struct bcoll {
-	uint32_t clflg;
+
+struct NeoContactState {
+	glm::uvec4 ids;   // x=target particle index or wall flag
+	// y=type: 0=inactive, 1=particle, 2=wall
+	// z=phase: 0=inactive, 1=compression, 2=rebound
+	// w=flags
+
+	glm::vec4 vel;    // xy=source first-contact velocity
+	// zw=target first-contact velocity for particle contacts
+
+	glm::vec4 geom;   // xy=first-contact normal
+	// z=A_zero
+	// w=zero center distance
 };
-struct ccoll {
-	uint32_t pindex;
-	uint32_t clflg;
-};
+
 struct Particle {
-	glm::vec4	PosLocA;		// First position buffer.x, y, z, hold the location and 1 stores the active flag. 0.0 if active, 1.0 if not.
-	glm::vec4	PosLocB;		// Second position buffer. x,y,z, hold the location and 1 stores the active flag. 0.0 if active, 1.0 if not.
-	glm::vec4	VelRad;			// Velocity, vx,vy,vz, w = velocity angle.
-	glm::vec4	Data;			// Particle Data x=particle radius, y=inverse_square_softening, z=momentum_per_area, w not used
-	glm::vec4	parms;			// x is mass, y is particle type, z is 1 = live 0 dead, w unused.
-	lstr		CornerList[8];	// Particle Corner List (see lstr)
-	bcoll		bcs[4];			// Wall contact flags: 1=left, 2=right, 3=bottom, 4=top.
-	ccoll		ccs[12];		// TBD
-	uint32_t	sltnum;			// Use to store contact count.
-	uint32_t	colFlg;			// 1 if in collision, 0 if not.
-	float		MolarMatter;	// TBD
-	float		temp_vel;		// TBD
-	
+	glm::vec4 PosLocA; // xyz=position, w=active flag: 0 active, 1 inactive
+	glm::vec4 PosLocB; // xyz=alternate position buffer, w=active flag
+	glm::vec4 VelRad;  // xyz=velocity, w=velocity angle
+
+	glm::vec4 Data;    // x=radius, y=collision_stiffness_q, z=rebound_min_fraction, w=state/flags
+	glm::vec4 parms;   // x=mass, y=delta_vx, z=delta_vy, w=delta_speed
+
+	lstr CornerList[8];
+
+	NeoContactState ncs[MAX_CONTACTS];
+
+	uint32_t contactCount; // active entries in ncs
+	uint32_t colFlg;       // 1 if in collision, 0 if not
+
+	float MolarMatter;     // reserved
+	float temp_vel;        // reserved
 };
-	
+
 #endif

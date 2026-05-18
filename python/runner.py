@@ -60,8 +60,6 @@ def getParticleData(config):
         particle["radius"] = pp.radius
         particle["ptype"] = pp.ptype
         particle["state_flg"] = int(pp.state_flg)
-        particle["inverse_square_softening"] = pp.inverse_square_softening
-        particle["momentum_per_area"] = pp.momentum_per_area
         particle["edge"] = (100, 170, 255)
         particle["fill"] = (160, 210, 255)
         particle_data[pp.pnum] = particle
