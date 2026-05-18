@@ -56,10 +56,6 @@ class Demo:
             self.base.collision_stiffness_q = float(self.config["collision_stiffness_q"])
         self.base.dt = float(self.config.get("dt", self.base.dt))
         self.base.substeps = int(self.config.get("substeps", self.base.substeps))
-        if "zero_velocity_overlap_area" in self.config:
-            self.base.zero_velocity_overlap_area = float(self.config["zero_velocity_overlap_area"])
-        if "zero_velocity_overlap_fraction" in self.config:
-            self.base.zero_velocity_overlap_fraction = float(self.config["zero_velocity_overlap_fraction"])
         if "zero_velocity_overlap_tolerance" in self.config:
             self.base.zero_velocity_overlap_tolerance = float(self.config["zero_velocity_overlap_tolerance"])
         if "geo_rebound_min_fraction" in self.config:
@@ -79,6 +75,15 @@ class Demo:
         if wall_box is not None and wall_box is not False:
             self.base.set_walls(*wall_box)
             self.world_box = tuple(float(value) for value in wall_box)
+        elif self.config.get("walls_on") is True:
+            wall_box = (
+                float(self.config["WallXMIN"]),
+                float(self.config["WallXMAX"]),
+                float(self.config["WallYMIN"]),
+                float(self.config["WallYMAX"]),
+            )
+            self.base.set_walls(*wall_box)
+            self.world_box = wall_box
         elif self.config.get("world_box") is not None:
             self.world_box = tuple(float(value) for value in self.config["world_box"])
         self.set_zoom(self.config.get("zoom", 1.0))
@@ -111,15 +116,6 @@ class Demo:
             if key not in self.config or self.config[key] in (None, "")
         ]
         invalid_items = []
-
-        if "zero_velocity_overlap_fraction" in self.config:
-            try:
-                zero_fraction = float(self.config["zero_velocity_overlap_fraction"])
-            except (TypeError, ValueError):
-                invalid_items.append("zero_velocity_overlap_fraction must be numeric.")
-            else:
-                if not 0.0 < zero_fraction <= 1.0:
-                    invalid_items.append("zero_velocity_overlap_fraction must be > 0 and <= 1.")
 
         if "collision_stiffness_q" in self.config:
             try:

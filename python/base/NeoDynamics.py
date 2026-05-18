@@ -116,6 +116,29 @@ class NeoDynamics:
             source_particle,
             target_particle,
         )
+        if source_particle.get("zero_velocity_overlap_area") is not None:
+            zero_geometry = dict(zero_geometry)
+            zero_geometry["overlap_area"] = float(source_particle["zero_velocity_overlap_area"])
+            zero_geometry["center_distance"] = float(
+                source_particle.get("zero_velocity_center_distance", zero_geometry["center_distance"])
+            )
+            zero_geometry["overlap_momentum"] = incoming_relative_normal_momentum
+            zero_geometry["penetration_depth"] = max(
+                0.0,
+                source_particle["radius"] + target_particle["radius"] - zero_geometry["center_distance"],
+            )
+            max_overlap_area = self.circle_overlap_area(
+                source_particle["radius"],
+                target_particle["radius"],
+                0.0,
+            )
+            zero_geometry["overlap_fraction"] = (
+                zero_geometry["overlap_area"] / max_overlap_area
+                if max_overlap_area > 0.0
+                else 0.0
+            )
+            zero_geometry["solution_clamped"] = False
+            zero_geometry["solution_source"] = "stored_contact_state"
 
         if zero_geometry["overlap_area"] + 1.0e-12 < overlap_area:
             zero_geometry = dict(zero_geometry)
@@ -293,6 +316,234 @@ class NeoDynamics:
         if target_q is None:
             target_q = self.collision_stiffness_q
         return max(1.0e-12, 0.5 * (float(source_q) + float(target_q)))
+
+    def particle_zero_velocity_state(
+        self,
+        source_particle,
+        target_particle,
+        rel_normal_velocity,
+        current_overlap_area,
+        current_center_distance,
+    ):
+        source_mass = source_particle["mass"]
+        target_mass = target_particle["mass"]
+        reduced_mass = (source_mass * target_mass) / (source_mass + target_mass)
+        incoming_speed = max(0.0, -rel_normal_velocity)
+        stiffness_q = self.contact_stiffness_q(source_particle, target_particle)
+        radius_sum = source_particle["radius"] + target_particle["radius"]
+        max_overlap_area = self.circle_overlap_area(
+            source_particle["radius"],
+            target_particle["radius"],
+            0.0,
+        )
+
+        if incoming_speed <= 0.0:
+            zero_center_distance = radius_sum
+            zero_overlap_area = 0.0
+            alpha_zero = 0.0
+            solution_source = "force_law_zero_speed"
+        else:
+            alpha_zero = ((3.0 * reduced_mass * incoming_speed * incoming_speed) / (2.0 * stiffness_q)) ** (
+                1.0 / 3.0
+            )
+            alpha_zero = max(0.0, min(radius_sum, alpha_zero))
+            zero_center_distance = max(0.0, radius_sum - alpha_zero)
+            zero_overlap_area = self.circle_overlap_area(
+                source_particle["radius"],
+                target_particle["radius"],
+                zero_center_distance,
+            )
+            solution_source = "force_law"
+
+        if zero_overlap_area + 1.0e-12 < current_overlap_area:
+            zero_overlap_area = current_overlap_area
+            zero_center_distance = current_center_distance
+            alpha_zero = max(0.0, radius_sum - current_center_distance)
+            solution_source = "force_law_promoted_to_current_overlap"
+
+        return self.zero_state_dict(
+            zero_overlap_area,
+            zero_center_distance,
+            alpha_zero,
+            max_overlap_area,
+            solution_source,
+            stiffness_q,
+            reduced_mass,
+            incoming_speed,
+        )
+
+    def wall_zero_velocity_state(
+        self,
+        particle,
+        normal_velocity,
+        current_overlap_area,
+        current_center_distance,
+    ):
+        incoming_speed = max(0.0, normal_velocity)
+        stiffness_q = max(1.0e-12, float(particle.get("collision_stiffness_q", self.collision_stiffness_q)))
+        radius = particle["radius"]
+        max_overlap_area = self.circle_overlap_area(radius, radius, 0.0)
+
+        if incoming_speed <= 0.0:
+            zero_center_distance = 2.0 * radius
+            zero_overlap_area = 0.0
+            alpha_zero = 0.0
+            solution_source = "force_law_zero_speed"
+        else:
+            alpha_zero = ((3.0 * particle["mass"] * incoming_speed * incoming_speed) / (2.0 * stiffness_q)) ** (
+                1.0 / 3.0
+            )
+            alpha_zero = max(0.0, min(2.0 * radius, alpha_zero))
+            zero_center_distance = max(0.0, 2.0 * radius - alpha_zero)
+            zero_overlap_area = self.circle_overlap_area(radius, radius, zero_center_distance)
+            solution_source = "force_law_wall"
+
+        if zero_overlap_area + 1.0e-12 < current_overlap_area:
+            zero_overlap_area = current_overlap_area
+            zero_center_distance = current_center_distance
+            alpha_zero = max(0.0, 2.0 * radius - current_center_distance)
+            solution_source = "force_law_wall_promoted_to_current_overlap"
+
+        return self.zero_state_dict(
+            zero_overlap_area,
+            zero_center_distance,
+            alpha_zero,
+            max_overlap_area,
+            solution_source,
+            stiffness_q,
+            particle["mass"],
+            incoming_speed,
+        )
+
+    @staticmethod
+    def zero_state_dict(
+        zero_overlap_area,
+        zero_center_distance,
+        alpha_zero,
+        max_overlap_area,
+        solution_source,
+        stiffness_q,
+        reduced_mass,
+        incoming_speed,
+    ):
+        return {
+            "geo_zero_velocity_overlap_area": zero_overlap_area,
+            "geo_zero_velocity_center_distance": zero_center_distance,
+            "geo_zero_velocity_penetration_depth": alpha_zero,
+            "geo_zero_velocity_overlap_fraction": (
+                zero_overlap_area / max_overlap_area
+                if max_overlap_area > 0.0
+                else 0.0
+            ),
+            "geo_zero_velocity_solution_source": solution_source,
+            "geo_zero_velocity_stiffness_q": stiffness_q,
+            "geo_zero_velocity_reduced_mass": reduced_mass,
+            "geo_zero_velocity_incoming_speed": incoming_speed,
+        }
+
+    @staticmethod
+    def wall_velocity_prediction(start_velocity, normal, overlap_area, zero_area, phase):
+        start_vx, start_vy = start_velocity
+        nx, ny = normal
+        incoming_speed = start_vx * nx + start_vy * ny
+        if incoming_speed <= 0.0 or zero_area is None or zero_area <= 1.0e-12:
+            return None
+
+        compression_fraction = max(0.0, min(1.0, overlap_area / zero_area))
+        compression_velocity_fraction = math.sqrt(max(0.0, 1.0 - compression_fraction))
+        compression_progress = 1.0 - compression_velocity_fraction
+        rebound_velocity_fraction = math.sqrt(max(0.0, 1.0 - compression_fraction))
+
+        turn_vx = start_vx - incoming_speed * nx
+        turn_vy = start_vy - incoming_speed * ny
+        full_vx = start_vx - 2.0 * incoming_speed * nx
+        full_vy = start_vy - 2.0 * incoming_speed * ny
+
+        if phase == "compression":
+            return (
+                start_vx + compression_progress * (turn_vx - start_vx),
+                start_vy + compression_progress * (turn_vy - start_vy),
+            )
+        return (
+            turn_vx + rebound_velocity_fraction * (full_vx - turn_vx),
+            turn_vy + rebound_velocity_fraction * (full_vy - turn_vy),
+        )
+
+    @staticmethod
+    def outward_clamped_rebound_velocities(
+        source_velocity,
+        target_velocity,
+        normal,
+        source_start_velocity,
+        target_start_velocity,
+        rebound_min_fraction,
+    ):
+        nx, ny = normal
+        rel_vx = target_velocity[0] - source_velocity[0]
+        rel_vy = target_velocity[1] - source_velocity[1]
+        rel_normal_velocity = rel_vx * nx + rel_vy * ny
+
+        start_rel_vx = target_start_velocity[0] - source_start_velocity[0]
+        start_rel_vy = target_start_velocity[1] - source_start_velocity[1]
+        start_closing_speed = max(0.0, -(start_rel_vx * nx + start_rel_vy * ny))
+        minimum_outward_speed = rebound_min_fraction * start_closing_speed
+        if rel_normal_velocity >= minimum_outward_speed:
+            return source_velocity, target_velocity
+
+        correction = minimum_outward_speed - rel_normal_velocity
+        half_correction = 0.5 * correction
+        return (
+            (
+                source_velocity[0] - half_correction * nx,
+                source_velocity[1] - half_correction * ny,
+            ),
+            (
+                target_velocity[0] + half_correction * nx,
+                target_velocity[1] + half_correction * ny,
+            ),
+        )
+
+    @staticmethod
+    def final_pair_rebound_velocities(
+        source_start_velocity,
+        target_start_velocity,
+        source_mass,
+        target_mass,
+        normal,
+    ):
+        nx, ny = normal
+        source_start_vx, source_start_vy = source_start_velocity
+        target_start_vx, target_start_vy = target_start_velocity
+        reduced_mass = (source_mass * target_mass) / (source_mass + target_mass)
+        start_rel_vx = target_start_vx - source_start_vx
+        start_rel_vy = target_start_vy - source_start_vy
+        incoming_relative_normal_momentum = max(0.0, -reduced_mass * (start_rel_vx * nx + start_rel_vy * ny))
+        if incoming_relative_normal_momentum <= 0.0:
+            return None
+
+        rebound_impulse = 2.0 * incoming_relative_normal_momentum
+        return (
+            (
+                source_start_vx - (rebound_impulse / source_mass) * nx,
+                source_start_vy - (rebound_impulse / source_mass) * ny,
+            ),
+            (
+                target_start_vx + (rebound_impulse / target_mass) * nx,
+                target_start_vy + (rebound_impulse / target_mass) * ny,
+            ),
+        )
+
+    @staticmethod
+    def final_wall_rebound_velocity(start_velocity, normal):
+        start_vx, start_vy = start_velocity
+        nx, ny = normal
+        incoming_speed = start_vx * nx + start_vy * ny
+        if incoming_speed <= 0.0:
+            return None
+        return (
+            start_vx - 2.0 * incoming_speed * nx,
+            start_vy - 2.0 * incoming_speed * ny,
+        )
 
     def apply_rebound_report_velocities(self):
         for particle in self.particles:
