@@ -1,5 +1,5 @@
 from base.Base import Base
-from base.GeoDynamics import GeoDynamics
+from base.NeoDynamics import NeoDynamics
 
 
-__all__ = ["Base", "GeoDynamics"]
+__all__ = ["Base", "NeoDynamics"]

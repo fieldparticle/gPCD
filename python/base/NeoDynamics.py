@@ -13,8 +13,8 @@ class NeoDynamics:
         alpha_0 = ((3 * reduced_mass * v_in^2) / (2 * Q)) ** (1 / 3)
 
     The zero-velocity overlap area is then A(alpha_0). This class is kept
-    independent from GeoDynamics and Dynamics so changes to either older model
-    cannot alter the Neo report path.
+    independent from the retired collision models so changes to old code cannot
+    alter the Neo report path.
     """
 
     POSITION_BUFFER_A = 0

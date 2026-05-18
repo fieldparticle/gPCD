@@ -52,7 +52,6 @@ class Demo:
         self.rpt_frames = self.normalized_report_frames(self.config.get("rpt_frames", []))
         self.captured_report_frames = set()
         self.base = Base()
-        self.base.dynamics_model = str(self.config.get("dynamics_model", self.base.dynamics_model)).lower()
         if "collision_stiffness_q" in self.config:
             self.base.collision_stiffness_q = float(self.config["collision_stiffness_q"])
         self.base.dt = float(self.config.get("dt", self.base.dt))
@@ -68,13 +67,13 @@ class Demo:
         self.base.max_contacts_per_particle = int(
             self.config.get("max_contacts_per_particle", self.base.max_contacts_per_particle)
         )
-        self.base.dynamics.momentum_per_area = float(
-            self.config.get("momentum_per_area", self.base.dynamics.momentum_per_area)
+        self.base.momentum_per_area = float(
+            self.config.get("momentum_per_area", self.base.momentum_per_area)
         )
-        self.base.dynamics.inverse_square_softening = float(
-            self.config.get("inverse_square_softening", self.base.dynamics.inverse_square_softening)
+        self.base.inverse_square_softening = float(
+            self.config.get("inverse_square_softening", self.base.inverse_square_softening)
         )
-        self.base.dynamics.configure_flow(self.config)
+        self.base.configure_flow(self.config)
 
         wall_box = self.config.get("wall_box")
         if wall_box is not None and wall_box is not False:
@@ -105,21 +104,13 @@ class Demo:
         return True
 
     def validate_run_configuration(self):
-        dynamics_model = str(self.config.get("dynamics_model", "geo")).lower()
-        required_items = (
-            ("collision_stiffness_q",)
-            if dynamics_model == "neo"
-            else ("zero_velocity_overlap_fraction",)
-        )
+        required_items = ("collision_stiffness_q",)
         missing_items = [
             key
             for key in required_items
             if key not in self.config or self.config[key] in (None, "")
         ]
         invalid_items = []
-
-        if dynamics_model not in ("geo", "neo"):
-            invalid_items.append("dynamics_model must be 'geo' or 'neo'.")
 
         if "zero_velocity_overlap_fraction" in self.config:
             try:
@@ -278,7 +269,7 @@ class Demo:
 
         particle_screen_data = []
         for index, particle in enumerate(self.base.particles):
-            if not self.base.dynamics.is_active_particle(particle):
+            if not self.base.is_active_particle(particle):
                 continue
             x, y = self.base.current_location(particle)
             center = self.to_screen(x, y)
@@ -310,7 +301,7 @@ class Demo:
                 right = particle_screen_data[right_pos]
                 _li, left_particle, _lx, _ly, left_center, left_radius, left_fill, _left_edge = left
                 _ri, right_particle, _rx, _ry, right_center, right_radius, right_fill, _right_edge = right
-                if self.base.dynamics.particle_contact(left_particle, right_particle) is None:
+                if self.base.particle_contact(left_particle, right_particle) is None:
                     continue
                 self.draw_overlap_lens(left_center, left_radius, left_fill, right_center, right_radius, right_fill)
 
@@ -371,7 +362,7 @@ class Demo:
                     self.draw_wall_collision_normal(source_particle, wall_flag)
 
     def draw_particle_collision_normal(self, source_particle, target_particle):
-        contact = self.base.dynamics.particle_contact(source_particle, target_particle)
+        contact = self.base.particle_contact(source_particle, target_particle)
         if contact is None:
             return
         nx, ny, _overlap_area, _center_distance = contact
@@ -382,7 +373,7 @@ class Demo:
         self.draw_normal_line(mid_x, mid_y, nx, ny)
 
     def draw_wall_collision_normal(self, source_particle, wall_flag):
-        contact = self.base.dynamics.wall_contact(source_particle, wall_flag, self.base.walls)
+        contact = self.base.wall_contact(source_particle, wall_flag, self.base.walls)
         if contact is None:
             return
         nx, ny, _overlap_area, _center_distance = contact
@@ -403,14 +394,14 @@ class Demo:
         return sum(
             0.5 * particle["mass"] * (particle["vx"] * particle["vx"] + particle["vy"] * particle["vy"])
             for particle in self.base.particles
-            if self.base.dynamics.is_active_particle(particle)
+            if self.base.is_active_particle(particle)
         )
 
     def total_momentum_vector(self):
         momentum_x = 0.0
         momentum_y = 0.0
         for particle in self.base.particles:
-            if not self.base.dynamics.is_active_particle(particle):
+            if not self.base.is_active_particle(particle):
                 continue
             momentum_x += particle["mass"] * particle["vx"]
             momentum_y += particle["mass"] * particle["vy"]
@@ -424,7 +415,7 @@ class Demo:
                 continue
             target_index = contact_record["pindex"]
             target_particle = self.base.particles[target_index]
-            contact = self.base.dynamics.particle_contact(source_particle, target_particle)
+            contact = self.base.particle_contact(source_particle, target_particle)
             if contact is None:
                 continue
             nx, ny, _overlap_area, _center_distance = contact
@@ -454,7 +445,7 @@ class Demo:
             if wall_flag == 0:
                 continue
 
-            contact = self.base.dynamics.wall_contact(source_particle, wall_flag, self.base.walls)
+            contact = self.base.wall_contact(source_particle, wall_flag, self.base.walls)
             if contact is None:
                 continue
 
@@ -485,7 +476,7 @@ class Demo:
             lines.extend(
                 [
                     "",
-                    f"[particle p{index} Dynamics ]",
+                    f"[particle p{index} Neo ]",
                     f"px: {momentum_x:.8f}",
                     f"py: {momentum_y:.8f}",
                     f"|p|: {particle_momentum:.8f}",
@@ -513,7 +504,7 @@ class Demo:
                 continue
             target_index = contact_record["pindex"]
             target_particle = self.base.particles[target_index]
-            contact = self.base.dynamics.particle_contact(source_particle, target_particle)
+            contact = self.base.particle_contact(source_particle, target_particle)
             if contact is None:
                 continue
 
@@ -556,7 +547,7 @@ class Demo:
             if wall_flag == 0:
                 continue
 
-            contact = self.base.dynamics.wall_contact(source_particle, wall_flag, self.base.walls)
+            contact = self.base.wall_contact(source_particle, wall_flag, self.base.walls)
             if contact is None:
                 continue
 
@@ -626,9 +617,9 @@ class Demo:
             self.screen.blit(surface, (x, y))
             y += 18
         lifecycle_line = (
-            f"released={self.base.dynamics.released_count} "
-            f"recycled={self.base.dynamics.recycled_count} "
-            f"escaped={self.base.dynamics.escaped_count}"
+            f"released={self.base.released_count} "
+            f"recycled={self.base.recycled_count} "
+            f"escaped={self.base.escaped_count}"
         )
         surface = self.report_font.render(lifecycle_line, True, self.center_dot_color)
         self.screen.blit(surface, (x, y))
@@ -689,9 +680,9 @@ class Demo:
             outfile.write(f"end={current_kinetic_energy:.8f}\n")
             outfile.write("\n[status]\n")
             outfile.write(
-                f"released={self.base.dynamics.released_count} "
-                f"recycled={self.base.dynamics.recycled_count} "
-                f"escaped={self.base.dynamics.escaped_count}\n"
+                f"released={self.base.released_count} "
+                f"recycled={self.base.recycled_count} "
+                f"escaped={self.base.escaped_count}\n"
             )
             outfile.write("\n[particles]\n")
             for line in self.compact_particle_capture_report_lines():
