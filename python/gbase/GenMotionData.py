@@ -142,6 +142,8 @@ class GenMotionData():
         f.write(fstr)
         fstr = f"wallZMAX = {run_cfg.WallZMAX};\n"
         f.write(fstr)
+        fstr = f"zero_velocity_overlap_fraction = {run_cfg.zero_velocity_overlap_fraction};\n"
+        f.write(fstr)
         f.flush()
         f.close()
 

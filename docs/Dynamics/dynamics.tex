@@ -1,0 +1,335 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\title{gPCD Geometry Dynamics}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Purpose}
+
+The current Python dynamics model is an overlap-geometry collision model.  A
+collision is not treated as an instantaneous impulse at first contact.  Instead,
+the current overlap area determines where the pair is along a compression or
+rebound path.
+
+The old overlap-momentum response in \texttt{Dynamics.py} is no longer the
+active collision response.  \texttt{Dynamics.py} remains as support code for
+contact geometry, wall geometry, lifecycle helpers, and diagnostic overlap
+momentum.  The active model is coordinated by \texttt{Base.py} and uses
+\texttt{GeoDynamics.py} for the pair-level geometry calculation.
+
+\section{Rules}
+
+The model follows these project rules:
+
+\begin{enumerate}[leftmargin=*]
+    \item The model must remain an overlap-geometry model.
+    \item Capture files are written as \texttt{CapXXXXXX.rpt} under
+    \texttt{C:\textbackslash\_DJ\textbackslash gPCDData\textbackslash examples}.
+    \item The model must remain parallel-friendly.
+    \item Particle velocities in the cfg represent incoming velocity before
+    turnaround; they define the particles' initial momentum.
+    \item If a particle starts overlapped at time zero, the state is assumed to
+    be post-turnaround and rebounding.
+    \item \texttt{zero\_velocity\_overlap\_fraction} is good for designed
+    natural collisions, but starting collisions need a calculated pair-level
+    \(A_0\) because we do not know how deep into collision history they already
+    are.
+\end{enumerate}
+
+\section{Contact Geometry}
+
+For two particles, \texttt{Dynamics.particle\_contact()} returns:
+
+\begin{itemize}[leftmargin=*]
+    \item the unit normal \((n_x,n_y)\) from source center to target center,
+    \item the current overlap area \(A\),
+    \item the current center distance \(d\).
+\end{itemize}
+
+For equal-radius disks, the overlap area is:
+
+\[
+A(d) =
+2r^2\cos^{-1}\left(\frac{d}{2r}\right)
+- \frac{d}{2}\sqrt{4r^2-d^2}.
+\]
+
+Wall contacts use mirrored-circle geometry.  A particle at distance \(s\) from
+a flat wall is treated as overlapping its mirror image at center distance
+\(d=2s\).  The same circle-overlap area formula is then used.
+
+\section{Zero-Velocity Overlap}
+
+The zero-velocity overlap point, \(A_0\), is the deepest overlap reached by a
+collision.  It is the turnaround point: compression ends and rebound begins.
+
+For designed natural collisions, \(A_0\) comes from configuration:
+
+\[
+A_0 = f_0 A_{\max},
+\]
+
+where \(f_0=\texttt{zero\_velocity\_overlap\_fraction}\).
+
+For starting overlaps, \(A_0\) is solved from incoming momentum and overlap
+geometry.  If the solved \(A_0\) is shallower than the current overlap, the
+model promotes \(A_0\) to the current overlap.  That keeps the starting state
+physically possible.
+
+\section{Velocity Profile}
+
+Let \(A\) be the current overlap area and \(A_0\) be the zero-velocity overlap
+area.  The compression fraction is:
+
+\[
+c = \mathrm{clamp}\left(\frac{A}{A_0}, 0, 1\right).
+\]
+
+The velocity fraction is:
+
+\[
+v_f = \sqrt{1-c}.
+\]
+
+This creates a parabolic collision process, analogous to the velocity profile
+of a ball thrown upward in a vacuum.  At first contact, \(c=0\) and
+\(v_f=1\).  At the zero-velocity point, \(c=1\) and \(v_f=0\).  During rebound,
+the same geometry fraction maps velocity back from zero toward full rebound.
+
+\section{Relative Velocity And Momentum}
+
+For a particle pair, only relative velocity along the contact normal participates
+in the collision response:
+
+\[
+v_n = (\vec{v}_t - \vec{v}_s)\cdot\vec{n}.
+\]
+
+The reduced mass is:
+
+\[
+\mu = \frac{m_s m_t}{m_s + m_t}.
+\]
+
+The incoming relative normal momentum is:
+
+\[
+p_n = \max(0, -\mu v_n).
+\]
+
+Tangential velocity is preserved.  The normal component is interpolated from the
+starting velocity to the zero-velocity point during compression, and from the
+zero-velocity point to full rebound during rebound.
+
+\section{Contact State}
+
+The Python model uses explicit contact state so a collision can remember its
+history across frames.  This is essential because the rebound path cannot be
+deduced from instantaneous geometry alone.  At the zero-velocity point, the
+current velocity may be zero; without saved first-contact information, the model
+would forget which way rebound should go.
+
+\subsection{Where Contact State Lives}
+
+Contact-state memory currently lives in \texttt{Base.py}, but particle-pair
+state is now stored on the source particle:
+
+\begin{itemize}[leftmargin=*]
+    \item \texttt{particle["gcs"]}: source-owned particle-particle contact
+    state slots.
+    \item \texttt{Base.wall\_contact\_state}: particle-wall contact state.
+\end{itemize}
+
+\texttt{gcs} is initialized in \texttt{Base.reset()} for every live particle.
+It is a fixed list with one available state slot per configured particle-contact
+slot.  The current Python model uses \texttt{max\_contacts\_per\_particle}
+slots, matching the existing \texttt{ccs} contact list.  Wall state remains in a
+dictionary keyed by particle and wall flag.
+
+\subsection{Particle-Pair Keys}
+
+Particle-pair contact state is source-owned.  The key inside a particle is the
+target particle index:
+
+\[
+\texttt{source particle gcs entry} \rightarrow \texttt{target\_index}.
+\]
+
+This means a physical pair can have two mirrored state records:
+
+\[
+P_i.\texttt{gcs} \rightarrow j
+\qquad\text{and}\qquad
+P_j.\texttt{gcs} \rightarrow i.
+\]
+
+The duplication is intentional.  It matches the future GPU ownership rule:
+each source particle may write only its own state.  Normals are opposite in the
+two records, but each source uses its own normal convention consistently.
+
+Each state record stores:
+
+\begin{itemize}[leftmargin=*]
+    \item \texttt{active}: whether the slot is in use,
+    \item \texttt{target\_index}: the target particle for this source-owned
+    contact,
+    \item \texttt{touched}: whether this state was observed in the current
+    detection pass,
+    \item \texttt{geo\_phase}: \texttt{compression} or \texttt{rebound},
+    \item \texttt{first\_contact\_velocities}: starting velocity for both
+    particles,
+    \item \texttt{first\_contact\_normal},
+    \item \texttt{first\_contact\_distance},
+    \item \texttt{first\_contact\_overlap\_area},
+    \item \texttt{geo\_zero\_velocity\_overlap\_area},
+    \item \texttt{geo\_zero\_velocity\_center\_distance},
+    \item diagnostic values such as relative normal momentum and overlap
+    contact momentum.
+\end{itemize}
+
+When a \texttt{gcs} slot is not touched during a contact update, the contact has
+exited.  If the state had reached rebound, the final rebound velocity is applied
+before the slot is cleared.
+
+\subsection{Wall Keys}
+
+Wall contact state is keyed by:
+
+\[
+\texttt{wall\_key} = (\texttt{particle\_index}, \texttt{wall\_flag}).
+\]
+
+The wall flags are:
+
+\begin{center}
+\begin{tabular}{cl}
+\toprule
+Flag & Wall \\
+\midrule
+1 & left \\
+2 & right \\
+3 & bottom \\
+4 & top \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Each wall state record stores:
+
+\begin{itemize}[leftmargin=*]
+    \item \texttt{geo\_phase},
+    \item \texttt{first\_contact\_velocity},
+    \item \texttt{first\_contact\_normal},
+    \item \texttt{first\_contact\_distance},
+    \item \texttt{first\_contact\_overlap\_area},
+    \item \texttt{geo\_zero\_velocity\_overlap\_area},
+    \item \texttt{geo\_zero\_velocity\_center\_distance}.
+\end{itemize}
+
+\subsection{Why This Memory Is Needed}
+
+The geometry model needs three pieces of history:
+
+\begin{enumerate}[leftmargin=*]
+    \item the velocity at starting contact,
+    \item the current phase, compression or rebound,
+    \item the zero-velocity overlap geometry \(A_0\).
+\end{enumerate}
+
+The current position and velocity alone are not enough.  At turnaround the
+normal velocity is zero, so a memoryless model can lock at the zero point or
+misclassify the rebound as compression.  Contact state prevents that by keeping
+the original first-contact velocity and the chosen \(A_0\).
+
+\section{Step Flow}
+
+The Python step flow in \texttt{Base.step()} is:
+
+\begin{enumerate}[leftmargin=*]
+    \item Begin the dynamics step.
+    \item Detect current particle and wall contacts.
+    \item Update particle-pair contact state.
+    \item Update wall contact state.
+    \item Apply geometry dynamics.
+    \item Move particles.
+    \item Detect contacts again at the new positions.
+    \item Update wall contact state again.
+    \item Clip rebound overlaps so contacts do not penetrate deeper than
+    \(A_0\).
+    \item End the dynamics step and record the report.
+\end{enumerate}
+
+\section{Starting Overlaps}
+
+At reset, the model detects contacts before the first report.  Starting
+particle-pair overlaps are initialized by
+\texttt{initialize\_geo\_starting\_overlap\_zero\_state()}.  Starting wall
+overlaps are initialized by
+\texttt{initialize\_geo\_starting\_wall\_overlap\_zero\_state()}.
+
+For starting overlaps:
+
+\begin{itemize}[leftmargin=*]
+    \item the phase is set to \texttt{rebound},
+    \item \(A_0\) is solved from incoming momentum,
+    \item if needed, \(A_0\) is promoted to the current overlap,
+    \item the current velocity is set to the velocity that corresponds to the
+    current overlap on the rebound path.
+\end{itemize}
+
+For starting wall overlaps, if the cfg velocity is already outward from the
+wall, the incoming first-contact velocity is inferred by reflecting that
+velocity across the wall normal.
+
+\section{Exit Finalization}
+
+When a contact exits, the state is removed.  If the contact had reached rebound,
+the model finalizes the velocity to the full rebound velocity computed from the
+stored first-contact velocity and normal.
+
+For particle pairs, \texttt{finalize\_exited\_geo\_contact()} applies the final
+pair rebound impulse.  For wall contacts,
+\texttt{finalize\_exited\_geo\_wall\_contact()} reflects the stored incoming
+wall velocity.
+
+\section{Reporting}
+
+Capture reports are compact text files.  They show:
+
+\begin{itemize}[leftmargin=*]
+    \item total momentum,
+    \item kinetic energy,
+    \item per-particle dynamics,
+    \item particle-particle collision diagnostics,
+    \item wall collision diagnostics.
+\end{itemize}
+
+These reports are intended to compare the live velocity against the expected
+geometry-state velocity without reintroducing the old dynamics response.
+
+\section{GPU Direction}
+
+The Python \texttt{particle["gcs"]} contact-state slots are now the reference
+shape for the GPU port.  The GPU should embed equivalent source-owned contact
+state in the particle structure:
+
+\begin{itemize}[leftmargin=*]
+    \item one slot for each \texttt{ccs} particle contact,
+    \item later, one slot for each \texttt{bcs} wall contact.
+\end{itemize}
+
+That keeps the GPU rule parallel-friendly: each invocation writes only its own
+source particle state.  The state must store first-contact velocity, phase, and
+\(A_0\), matching the Python dictionaries described above.
+
+\end{document}

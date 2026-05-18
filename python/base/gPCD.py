@@ -1,11 +1,9 @@
 import math
-from logging import config
 from pathlib import Path
 
 import pygame
 
 from base.Base import Base
-from base.GeoDynamics import GeoDynamics
 
 
 class Demo:
@@ -47,11 +45,16 @@ class Demo:
 
     def configure(self, particle_data, run_configuration):
         self.config = {} if run_configuration is None else dict(run_configuration)
+        if not self.validate_run_configuration():
+            return False
         self.report_capture_dir = Path(self.config.get("data_dir", Path.cwd()))
         self.clear_report_captures()
         self.rpt_frames = self.normalized_report_frames(self.config.get("rpt_frames", []))
         self.captured_report_frames = set()
         self.base = Base()
+        self.base.dynamics_model = str(self.config.get("dynamics_model", self.base.dynamics_model)).lower()
+        if "collision_stiffness_q" in self.config:
+            self.base.collision_stiffness_q = float(self.config["collision_stiffness_q"])
         self.base.dt = float(self.config.get("dt", self.base.dt))
         self.base.substeps = int(self.config.get("substeps", self.base.substeps))
         if "zero_velocity_overlap_area" in self.config:
@@ -99,6 +102,71 @@ class Demo:
         self.frame_number = 0
         self.current_fps = 0.0
         self.paused = False
+        return True
+
+    def validate_run_configuration(self):
+        dynamics_model = str(self.config.get("dynamics_model", "geo")).lower()
+        required_items = (
+            ("collision_stiffness_q",)
+            if dynamics_model == "neo"
+            else ("zero_velocity_overlap_fraction",)
+        )
+        missing_items = [
+            key
+            for key in required_items
+            if key not in self.config or self.config[key] in (None, "")
+        ]
+        invalid_items = []
+
+        if dynamics_model not in ("geo", "neo"):
+            invalid_items.append("dynamics_model must be 'geo' or 'neo'.")
+
+        if "zero_velocity_overlap_fraction" in self.config:
+            try:
+                zero_fraction = float(self.config["zero_velocity_overlap_fraction"])
+            except (TypeError, ValueError):
+                invalid_items.append("zero_velocity_overlap_fraction must be numeric.")
+            else:
+                if not 0.0 < zero_fraction <= 1.0:
+                    invalid_items.append("zero_velocity_overlap_fraction must be > 0 and <= 1.")
+
+        if "collision_stiffness_q" in self.config:
+            try:
+                stiffness_q = float(self.config["collision_stiffness_q"])
+            except (TypeError, ValueError):
+                invalid_items.append("collision_stiffness_q must be numeric.")
+            else:
+                if stiffness_q <= 0.0:
+                    invalid_items.append("collision_stiffness_q must be > 0.")
+
+        if not missing_items and not invalid_items:
+            return True
+
+        message_lines = []
+        if missing_items:
+            message_lines.append("Missing RUN_CONFIGURATION item(s):")
+            message_lines.extend(f"  - {item}" for item in missing_items)
+        if invalid_items:
+            if message_lines:
+                message_lines.append("")
+            message_lines.append("Invalid RUN_CONFIGURATION item(s):")
+            message_lines.extend(f"  - {item}" for item in invalid_items)
+        message = "\n".join(message_lines)
+        self.show_config_error(message)
+        return False
+
+    @staticmethod
+    def show_config_error(message):
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showerror("Missing required configuration", message)
+            root.destroy()
+        except Exception:
+            print(f"Missing required configuration:\n{message}")
 
     def clear_report_captures(self):
         self.report_capture_dir.mkdir(parents=True, exist_ok=True)
@@ -355,7 +423,6 @@ class Demo:
             if contact_record.get("clflg", 0) == 0:
                 continue
             target_index = contact_record["pindex"]
-            pair_key = tuple(sorted((source_index, target_index)))
             target_particle = self.base.particles[target_index]
             contact = self.base.dynamics.particle_contact(source_particle, target_particle)
             if contact is None:
@@ -368,7 +435,7 @@ class Demo:
             target_mass = target_particle["mass"]
             reduced_mass = (source_mass * target_mass) / (source_mass + target_mass)
             rel_normal_momentum = reduced_mass * abs(rel_normal_velocity)
-            contact_state = self.base.contact_state.get(pair_key, {})
+            contact_state = self.base.source_geo_contact_state(source_particle, target_index) or {}
             internal_contact_momentum = contact_state.get("internal_contact_momentum", 0.0)
             overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
             last_relative_normal_velocity = contact_state.get(
@@ -382,58 +449,34 @@ class Demo:
                 f"omom={overlap_contact_momentum:.8f} cinternal={internal_contact_momentum:.8f} "
                 f"last_reln={last_relative_normal_velocity:.8f} phase={phase}"
             )
+        for contact_record in source_particle.get("bcs", []):
+            wall_flag = contact_record.get("clflg", 0)
+            if wall_flag == 0:
+                continue
+
+            contact = self.base.dynamics.wall_contact(source_particle, wall_flag, self.base.walls)
+            if contact is None:
+                continue
+
+            nx, ny, _overlap_area, _center_distance = contact
+            normal_velocity = source_particle["vx"] * nx + source_particle["vy"] * ny
+            wall_key = (source_index, wall_flag)
+            contact_state = self.base.wall_contact_state.get(wall_key, {})
+            overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
+            last_normal_velocity = contact_state.get("last_relative_normal_velocity", normal_velocity)
+            phase = contact_state.get(
+                "geo_phase",
+                "closing" if normal_velocity > 0.0 else "separating",
+            )
+            diagnostics.append(
+                f"w{self.wall_name(wall_flag)} vn={normal_velocity:.8f} "
+                f"p={source_particle['mass'] * abs(normal_velocity):.8f} "
+                f"omom={overlap_contact_momentum:.8f} "
+                f"last_vn={last_normal_velocity:.8f} phase={phase}"
+            )
         return diagnostics
 
-    def starting_overlap_capture_diagnostics(self):
-        if self.frame_number != 0:
-            return []
-
-        lines = []
-        for source_index, source_particle in enumerate(self.base.particles):
-            if not self.base.dynamics.is_active_particle(source_particle):
-                continue
-            for slot in range(source_particle.get("sltnum", 0)):
-                contact_record = source_particle["ccs"][slot]
-                if contact_record.get("clflg", 0) == 0:
-                    continue
-
-                target_index = contact_record["pindex"]
-                target_particle = self.base.particles[target_index]
-                contact = self.base.dynamics.particle_contact(source_particle, target_particle)
-                if contact is None:
-                    continue
-
-                nx, ny, _overlap_area, center_distance = contact
-                v_in_x = source_particle.get("starting_uncorrected_vx", source_particle["vx"])
-                v_in_y = source_particle.get("starting_uncorrected_vy", source_particle["vy"])
-                v_step_x = source_particle.get("starting_corrected_vx", source_particle["vx"])
-                v_step_y = source_particle.get("starting_corrected_vy", source_particle["vy"])
-                inward_speed = v_in_x * nx + v_in_y * ny
-                inward_x = inward_speed * nx
-                inward_y = inward_speed * ny
-                v_turn_x = v_in_x - inward_x
-                v_turn_y = v_in_y - inward_y
-                v_rebound_x = v_in_x - 2.0 * inward_x
-                v_rebound_y = v_in_y - 2.0 * inward_y
-                phase = "incoming" if inward_speed > 0.0 else "not_incoming"
-                lines.extend(
-                    [
-                        "",
-                        f"[starting_overlap p{source_index}->{target_index}]",
-                        f"phase: {phase}",
-                        f"center_distance: {center_distance:.8f}",
-                        f"normal: ({nx:.8f}, {ny:.8f})",
-                        f"vin: ({v_in_x:.8f}, {v_in_y:.8f})",
-                        f"vstep: ({v_step_x:.8f}, {v_step_y:.8f})",
-                        f"vturn: ({v_turn_x:.8f}, {v_turn_y:.8f})",
-                        f"vrebound: ({v_rebound_x:.8f}, {v_rebound_y:.8f})",
-                        f"inward_speed: {inward_speed:.8f}",
-                        f"|pin|: {source_particle['mass'] * math.hypot(v_in_x, v_in_y):.8f}",
-                    ]
-                )
-        return lines
-
-    def particle_capture_report_lines(self):
+    def compact_particle_capture_report_lines(self):
         lines = []
         for index, particle in enumerate(self.base.particles):
             momentum_x = particle["mass"] * particle["vx"]
@@ -442,7 +485,7 @@ class Demo:
             lines.extend(
                 [
                     "",
-                    f"[particle p{index}]",
+                    f"[particle p{index} Dynamics ]",
                     f"px: {momentum_x:.8f}",
                     f"py: {momentum_y:.8f}",
                     f"|p|: {particle_momentum:.8f}",
@@ -453,314 +496,104 @@ class Demo:
                     "v0: "
                     f"({particle.get('starting_uncorrected_vx', particle['vx']):.8f}, "
                     f"{particle.get('starting_uncorrected_vy', particle['vy']):.8f})",
-                    "old_vcorr: "
-                    f"({particle.get('starting_corrected_vx', particle['vx']):.8f}, "
-                    f"{particle.get('starting_corrected_vy', particle['vy']):.8f})",
                 ]
             )
-            contact_diagnostics = self.particle_contact_diagnostics(index, particle)
-            if contact_diagnostics:
+            contact_lines = self.particle_contact_capture_lines(index, particle)
+            contact_lines.extend(self.wall_contact_capture_lines(index, particle))
+            if contact_lines:
                 lines.append("contacts:")
-                for diagnostic in contact_diagnostics:
-                    lines.append(f"  {diagnostic}")
+                lines.extend(contact_lines)
         return lines
 
-    def geo_dynamics_capture_lines(self):
-        geo_dynamics = GeoDynamics()
-        geo_dynamics.momentum_per_area = self.base.dynamics.momentum_per_area
-        geo_dynamics.inverse_square_softening = self.base.dynamics.inverse_square_softening
-        for particle_config in self.base.particle_configs:
-            particle = dict(particle_config)
-            particle["location"] = dict(particle["location"])
-            geo_dynamics.add_particle(**particle)
-        geo_dynamics.reset()
-
-        start_total_momentum_x = 0.0
-        start_total_momentum_y = 0.0
-        rebound_total_momentum_x = 0.0
-        rebound_total_momentum_y = 0.0
-        for particle in geo_dynamics.particles:
-            start_total_momentum_x += particle["mass"] * particle["velocity_at_starting_contact_x"]
-            start_total_momentum_y += particle["mass"] * particle["velocity_at_starting_contact_y"]
-            rebound_total_momentum_x += particle["mass"] * particle["velocity_at_current_overlap_rebound_x"]
-            rebound_total_momentum_y += particle["mass"] * particle["velocity_at_current_overlap_rebound_y"]
-
-        lines = [
-            "[geo_total_momentum]",
-            f"starting_px: {start_total_momentum_x:.8f}",
-            f"starting_py: {start_total_momentum_y:.8f}",
-            f"starting_|p|: {math.hypot(start_total_momentum_x, start_total_momentum_y):.8f}",
-            f"current_overlap_rebound_px: {rebound_total_momentum_x:.8f}",
-            f"current_overlap_rebound_py: {rebound_total_momentum_y:.8f}",
-            "current_overlap_rebound_|p|: "
-            f"{math.hypot(rebound_total_momentum_x, rebound_total_momentum_y):.8f}",
-            "momentum_delta_x: "
-            f"{rebound_total_momentum_x - start_total_momentum_x:.8f}",
-            "momentum_delta_y: "
-            f"{rebound_total_momentum_y - start_total_momentum_y:.8f}",
-        ]
-        for index, particle in enumerate(geo_dynamics.particles):
-            lines.extend(
-                [
-                    "",
-                    f"[geo_particle p{index}]",
-                    "velocity_at_starting_contact: "
-                    f"({particle['velocity_at_starting_contact_x']:.8f}, "
-                    f"{particle['velocity_at_starting_contact_y']:.8f})",
-                    "velocity_at_current_overlap_rebound: "
-                    f"({particle['velocity_at_current_overlap_rebound_x']:.8f}, "
-                    f"{particle['velocity_at_current_overlap_rebound_y']:.8f})",
-                    f"starting_momentum: {particle['starting_momentum']:.8f}",
-                    "starting_px: "
-                    f"{particle['mass'] * particle['velocity_at_starting_contact_x']:.8f}",
-                    "starting_py: "
-                    f"{particle['mass'] * particle['velocity_at_starting_contact_y']:.8f}",
-                    "current_overlap_rebound_px: "
-                    f"{particle['mass'] * particle['velocity_at_current_overlap_rebound_x']:.8f}",
-                    "current_overlap_rebound_py: "
-                    f"{particle['mass'] * particle['velocity_at_current_overlap_rebound_y']:.8f}",
-                ]
-            )
-
-        for report in geo_dynamics.contact_reports:
-            source_index = report["source_index"]
-            target_index = report["target_index"]
-            lines.extend(
-                [
-                    "",
-                    f"[geo_contact p{source_index}->p{target_index}]",
-                    f"phase_assumption: {report['phase_assumption']}",
-                    f"center_distance: {report['center_distance']:.8f}",
-                    f"overlap_area: {report['overlap_area']:.8f}",
-                    f"normal: ({report['normal_x']:.8f}, {report['normal_y']:.8f})",
-                    "relative_normal_velocity_at_starting_contact: "
-                    f"{report['relative_normal_velocity_at_starting_contact']:.8f}",
-                    f"reduced_mass: {report['reduced_mass']:.8f}",
-                    "incoming_relative_normal_momentum: "
-                    f"{report['incoming_relative_normal_momentum']:.8f}",
-                    "zero_velocity_center_distance: "
-                    f"{report['zero_velocity_center_distance']:.8f}",
-                    "zero_velocity_overlap_area: "
-                    f"{report['zero_velocity_overlap_area']:.8f}",
-                    "zero_velocity_overlap_momentum: "
-                    f"{report['zero_velocity_overlap_momentum']:.8f}",
-                    "zero_velocity_solution_clamped: "
-                    f"{report['zero_velocity_solution_clamped']}",
-                    f"compression_fraction: {report['compression_fraction']:.8f}",
-                    f"rebound_fraction: {report['rebound_fraction']:.8f}",
-                    f"turn_impulse: {report['turn_impulse']:.8f}",
-                    f"rebound_impulse: {report['rebound_impulse']:.8f}",
-                    "source_velocity_at_starting_contact: "
-                    f"({report['source_velocity_at_starting_contact_x']:.8f}, "
-                    f"{report['source_velocity_at_starting_contact_y']:.8f})",
-                    "source_velocity_at_zero_velocity_point: "
-                    f"({report['source_velocity_at_zero_velocity_point_x']:.8f}, "
-                    f"{report['source_velocity_at_zero_velocity_point_y']:.8f})",
-                    "source_velocity_at_current_overlap_compression: "
-                    f"({report['source_velocity_at_current_overlap_compression_x']:.8f}, "
-                    f"{report['source_velocity_at_current_overlap_compression_y']:.8f})",
-                    "source_velocity_at_full_rebound: "
-                    f"({report['source_velocity_at_full_rebound_x']:.8f}, "
-                    f"{report['source_velocity_at_full_rebound_y']:.8f})",
-                    "source_velocity_at_current_overlap_rebound: "
-                    f"({report['source_velocity_at_current_overlap_rebound_x']:.8f}, "
-                    f"{report['source_velocity_at_current_overlap_rebound_y']:.8f})",
-                    "target_velocity_at_starting_contact: "
-                    f"({report['target_velocity_at_starting_contact_x']:.8f}, "
-                    f"{report['target_velocity_at_starting_contact_y']:.8f})",
-                    "target_velocity_at_zero_velocity_point: "
-                    f"({report['target_velocity_at_zero_velocity_point_x']:.8f}, "
-                    f"{report['target_velocity_at_zero_velocity_point_y']:.8f})",
-                    "target_velocity_at_current_overlap_compression: "
-                    f"({report['target_velocity_at_current_overlap_compression_x']:.8f}, "
-                    f"{report['target_velocity_at_current_overlap_compression_y']:.8f})",
-                    "target_velocity_at_full_rebound: "
-                    f"({report['target_velocity_at_full_rebound_x']:.8f}, "
-                    f"{report['target_velocity_at_full_rebound_y']:.8f})",
-                    "target_velocity_at_current_overlap_rebound: "
-                    f"({report['target_velocity_at_current_overlap_rebound_x']:.8f}, "
-                    f"{report['target_velocity_at_current_overlap_rebound_y']:.8f})",
-                ]
-            )
-        return lines
-
-    def geo_current_contact_capture_lines(self):
+    def particle_contact_capture_lines(self, source_index, source_particle):
         lines = []
-        reported_pairs = set()
-        for source_index, source_particle in enumerate(self.base.particles):
-            for slot in range(source_particle.get("sltnum", 0)):
-                contact_record = source_particle["ccs"][slot]
-                if contact_record.get("clflg", 0) == 0:
-                    continue
+        for slot in range(source_particle.get("sltnum", 0)):
+            contact_record = source_particle["ccs"][slot]
+            if contact_record.get("clflg", 0) == 0:
+                continue
+            target_index = contact_record["pindex"]
+            target_particle = self.base.particles[target_index]
+            contact = self.base.dynamics.particle_contact(source_particle, target_particle)
+            if contact is None:
+                continue
 
-                target_index = contact_record["pindex"]
-                pair_key = tuple(sorted((source_index, target_index)))
-                if pair_key in reported_pairs:
-                    continue
-                reported_pairs.add(pair_key)
-
-                target_particle = self.base.particles[target_index]
-                contact = self.base.dynamics.particle_contact(source_particle, target_particle)
-                if contact is None:
-                    continue
-
-                nx, ny, overlap_area, center_distance = contact
-                live_rel_vx = target_particle["vx"] - source_particle["vx"]
-                live_rel_vy = target_particle["vy"] - source_particle["vy"]
-                live_relative_normal_velocity = live_rel_vx * nx + live_rel_vy * ny
-                live_phase = "compression" if live_relative_normal_velocity < 0.0 else "rebound"
-                contact_state = self.base.contact_state.get(pair_key, {})
-                source_mass = source_particle["mass"]
-                target_mass = target_particle["mass"]
-                reduced_mass = (source_mass * target_mass) / (source_mass + target_mass)
-                live_relative_normal_momentum = reduced_mass * abs(live_relative_normal_velocity)
-                current_overlap_momentum = self.base.dynamics.overlap_momentum(
-                    overlap_area,
-                    center_distance,
-                    source_particle,
-                )
-                internal_contact_momentum = contact_state.get("internal_contact_momentum", 0.0)
-                first_contact_velocities = contact_state.get("first_contact_velocities", {})
-                source_start_vx, source_start_vy = first_contact_velocities.get(
-                    source_index,
-                    (source_particle["vx"], source_particle["vy"]),
-                )
-                target_start_vx, target_start_vy = first_contact_velocities.get(
-                    target_index,
-                    (target_particle["vx"], target_particle["vy"]),
-                )
-
-                source_x, source_y = self.base.current_location(source_particle)
-                target_x, target_y = self.base.current_location(target_particle)
-                geo_dynamics = GeoDynamics()
-                geo_dynamics.momentum_per_area = self.base.dynamics.momentum_per_area
-                geo_dynamics.inverse_square_softening = self.base.dynamics.inverse_square_softening
-                geo_dynamics.add_particle(
-                    source_particle["vx"],
-                    source_particle["vy"],
-                    source_particle["mass"],
-                    source_particle["radius"],
-                    x=source_x,
-                    y=source_y,
-                    momentum_per_area=source_particle.get("momentum_per_area"),
-                    inverse_square_softening=source_particle.get("inverse_square_softening"),
-                    velocity_at_starting_contact_x=source_start_vx,
-                    velocity_at_starting_contact_y=source_start_vy,
-                    zero_velocity_overlap_area=contact_state.get("geo_zero_velocity_overlap_area"),
-                    zero_velocity_center_distance=contact_state.get("geo_zero_velocity_center_distance"),
-                )
-                geo_dynamics.add_particle(
-                    target_particle["vx"],
-                    target_particle["vy"],
-                    target_particle["mass"],
-                    target_particle["radius"],
-                    x=target_x,
-                    y=target_y,
-                    momentum_per_area=target_particle.get("momentum_per_area"),
-                    inverse_square_softening=target_particle.get("inverse_square_softening"),
-                    velocity_at_starting_contact_x=target_start_vx,
-                    velocity_at_starting_contact_y=target_start_vy,
-                )
-                geo_dynamics.reset()
-                report = next(
-                    (
-                        contact_report
-                        for contact_report in geo_dynamics.contact_reports
-                        if contact_report["source_index"] == 0 and contact_report["target_index"] == 1
-                    ),
-                    None,
-                )
-                if report is None:
-                    continue
-
-                if live_phase == "compression":
-                    source_prediction = (
-                        report["source_velocity_at_current_overlap_compression_x"],
-                        report["source_velocity_at_current_overlap_compression_y"],
-                    )
-                    target_prediction = (
-                        report["target_velocity_at_current_overlap_compression_x"],
-                        report["target_velocity_at_current_overlap_compression_y"],
-                    )
-                else:
-                    source_prediction = (
-                        report["source_velocity_at_current_overlap_rebound_x"],
-                        report["source_velocity_at_current_overlap_rebound_y"],
-                    )
-                    target_prediction = (
-                        report["target_velocity_at_current_overlap_rebound_x"],
-                        report["target_velocity_at_current_overlap_rebound_y"],
-                    )
-
-                geo_start_px = source_mass * source_start_vx + target_mass * target_start_vx
-                geo_start_py = source_mass * source_start_vy + target_mass * target_start_vy
-                geo_prediction_px = (
-                    source_mass * source_prediction[0] + target_mass * target_prediction[0]
-                )
-                geo_prediction_py = (
-                    source_mass * source_prediction[1] + target_mass * target_prediction[1]
-                )
-
-                lines.extend(
-                    [
-                        "",
-                        f"[geo_current_contact p{source_index}->p{target_index}]",
-                        f"live_phase: {live_phase}",
-                        "geo_phase: "
-                        f"{contact_state.get('geo_phase', 'compression')}",
-                        f"center_distance: {center_distance:.8f}",
-                        f"overlap_area: {overlap_area:.8f}",
-                        f"normal: ({nx:.8f}, {ny:.8f})",
-                        f"live_relative_normal_velocity: {live_relative_normal_velocity:.8f}",
-                        f"live_relative_normal_momentum: {live_relative_normal_momentum:.8f}",
-                        f"current_overlap_momentum: {current_overlap_momentum:.8f}",
-                        f"internal_contact_momentum: {internal_contact_momentum:.8f}",
-                        "source_live_velocity: "
-                        f"({source_particle['vx']:.8f}, {source_particle['vy']:.8f})",
-                        "target_live_velocity: "
-                        f"({target_particle['vx']:.8f}, {target_particle['vy']:.8f})",
-                        "source_velocity_at_starting_contact: "
-                        f"({source_start_vx:.8f}, {source_start_vy:.8f})",
-                        "target_velocity_at_starting_contact: "
-                        f"({target_start_vx:.8f}, {target_start_vy:.8f})",
-                        "source_geo_prediction: "
-                        f"({source_prediction[0]:.8f}, {source_prediction[1]:.8f})",
-                        "target_geo_prediction: "
-                        f"({target_prediction[0]:.8f}, {target_prediction[1]:.8f})",
-                        f"geo_start_px: {geo_start_px:.8f}",
-                        f"geo_start_py: {geo_start_py:.8f}",
-                        "geo_prediction_px: "
-                        f"{geo_prediction_px:.8f}",
-                        "geo_prediction_py: "
-                        f"{geo_prediction_py:.8f}",
-                        "geo_prediction_momentum_delta_x: "
-                        f"{geo_prediction_px - geo_start_px:.8f}",
-                        "geo_prediction_momentum_delta_y: "
-                        f"{geo_prediction_py - geo_start_py:.8f}",
-                    f"compression_fraction: {report['compression_fraction']:.8f}",
-                    f"rebound_fraction: {report['rebound_fraction']:.8f}",
-                    "compression_velocity_fraction: "
-                    f"{report['compression_velocity_fraction']:.8f}",
-                    f"compression_progress: {report['compression_progress']:.8f}",
-                    "rebound_velocity_fraction: "
-                    f"{report['rebound_velocity_fraction']:.8f}",
-                    "zero_velocity_overlap_area: "
-                    f"{report['zero_velocity_overlap_area']:.8f}",
-                        "state_zero_velocity_overlap_area: "
-                        f"{contact_state.get('geo_zero_velocity_overlap_area', 0.0):.8f}",
-                        "state_zero_velocity_source: "
-                        f"{contact_state.get('geo_zero_velocity_source', 'none')}",
-                        "state_zero_velocity_interpolated: "
-                        f"{contact_state.get('geo_zero_velocity_interpolated', False)}",
-                        "state_zero_velocity_interpolation_alpha: "
-                        f"{contact_state.get('geo_zero_velocity_interpolation_alpha', 0.0):.8f}",
-                        "zero_velocity_solution_clamped: "
-                        f"{report['zero_velocity_solution_clamped']}",
-                    ]
-                )
-        if not lines:
-            return ["no active particle contacts"]
+            nx, ny, _overlap_area, _center_distance = contact
+            rel_vx = target_particle["vx"] - source_particle["vx"]
+            rel_vy = target_particle["vy"] - source_particle["vy"]
+            rel_normal_velocity = rel_vx * nx + rel_vy * ny
+            source_mass = source_particle["mass"]
+            target_mass = target_particle["mass"]
+            reduced_mass = (source_mass * target_mass) / (source_mass + target_mass)
+            rel_normal_momentum = reduced_mass * abs(rel_normal_velocity)
+            contact_state = self.base.source_geo_contact_state(source_particle, target_index) or {}
+            internal_contact_momentum = contact_state.get("internal_contact_momentum", 0.0)
+            overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
+            last_relative_normal_velocity = contact_state.get(
+                "last_relative_normal_velocity",
+                rel_normal_velocity,
+            )
+            phase = "closing" if rel_normal_velocity < 0.0 else "separating"
+            lines.extend(
+                [
+                    "",
+                    f"[particle P{source_index} Collision]",
+                    f"c{source_index}->{target_index}",
+                    f"reln={rel_normal_velocity:.8f}",
+                    f"rmass={reduced_mass:.8f}",
+                    f"relp={rel_normal_momentum:.8f}",
+                    f"omom={overlap_contact_momentum:.8f}",
+                    f"cinternal={internal_contact_momentum:.8f}",
+                    f"last_reln={last_relative_normal_velocity:.8f}",
+                    f"phase={phase}",
+                ]
+            )
         return lines
+
+    def wall_contact_capture_lines(self, source_index, source_particle):
+        lines = []
+        for contact_record in source_particle.get("bcs", []):
+            wall_flag = contact_record.get("clflg", 0)
+            if wall_flag == 0:
+                continue
+
+            contact = self.base.dynamics.wall_contact(source_particle, wall_flag, self.base.walls)
+            if contact is None:
+                continue
+
+            nx, ny, overlap_area, center_distance = contact
+            normal_velocity = source_particle["vx"] * nx + source_particle["vy"] * ny
+            wall_key = (source_index, wall_flag)
+            contact_state = self.base.wall_contact_state.get(wall_key, {})
+            overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
+            last_normal_velocity = contact_state.get("last_relative_normal_velocity", normal_velocity)
+            phase = contact_state.get(
+                "geo_phase",
+                "closing" if normal_velocity > 0.0 else "separating",
+            )
+            lines.extend(
+                [
+                    "",
+                    f"[particle P{source_index} WallCollision]",
+                    f"wall={self.wall_name(wall_flag)}",
+                    f"vn={normal_velocity:.8f}",
+                    f"p={source_particle['mass'] * abs(normal_velocity):.8f}",
+                    f"omom={overlap_contact_momentum:.8f}",
+                    f"last_vn={last_normal_velocity:.8f}",
+                    f"area={overlap_area:.8f}",
+                    f"center_distance={center_distance:.8f}",
+                    f"phase={phase}",
+                ]
+            )
+        return lines
+
+    @staticmethod
+    def wall_name(wall_flag):
+        return {
+            1: "left",
+            2: "right",
+            3: "bottom",
+            4: "top",
+        }.get(wall_flag, f"unknown{wall_flag}")
 
     def draw_report(self):
         x = 12
@@ -801,7 +634,6 @@ class Demo:
         self.screen.blit(surface, (x, y))
         y += 18
         y += 6
-        report_lines = [fps_line, *summary_lines, lifecycle_line]
         if(self.config.get("plot_report", True) == True):
                 
             for index, particle in enumerate(self.base.particles):
@@ -813,16 +645,13 @@ class Demo:
                 momentum_delta_y = particle.get("momentum_delta_y", 0.0)
                 starting_uncorrected_vx = particle.get("starting_uncorrected_vx", particle["vx"])
                 starting_uncorrected_vy = particle.get("starting_uncorrected_vy", particle["vy"])
-                starting_corrected_vx = particle.get("starting_corrected_vx", particle["vx"])
-                starting_corrected_vy = particle.get("starting_corrected_vy", particle["vy"])
                 line = (
                     f"p{index} px={momentum_x:.8f} py={momentum_y:.8f} "
                     f"|p|={particle_momentum:.8f} "
                     f"start={starting_momentum:.8f} "
                     f"dpx={momentum_delta_x:.8f} dpy={momentum_delta_y:.8f} "
                     f"v=({particle['vx']:.8f},{particle['vy']:.8f}) "
-                    f"v0=({starting_uncorrected_vx:.8f},{starting_uncorrected_vy:.8f}) "
-                    f"old_vcorr=({starting_corrected_vx:.8f},{starting_corrected_vy:.8f})"
+                    f"v0=({starting_uncorrected_vx:.8f},{starting_uncorrected_vy:.8f})"
                 )
                 contact_diagnostics = self.particle_contact_diagnostics(index, particle)
                 if contact_diagnostics:
@@ -830,45 +659,49 @@ class Demo:
                 surface = self.report_font.render(line, True, self.center_dot_color)
                 self.screen.blit(surface, (x, y))
                 y += 18
-                report_lines.append(line)
 
         should_auto_capture = (
             self.frame_number in self.rpt_frames
             and self.frame_number not in self.captured_report_frames
         )
         if self.print_report_requested or should_auto_capture:
-            self.write_report_capture(report_lines)
+            self.write_report_capture()
             self.captured_report_frames.add(self.frame_number)
             self.print_report_requested = False
 
-    def write_report_capture(self, report_lines):
+    def write_report_capture(self):
         self.report_capture_dir.mkdir(parents=True, exist_ok=True)
         report_file = self.report_capture_dir / f"Cap{self.frame_number:06d}.rpt"
+        current_total_momentum_x, current_total_momentum_y = self.total_momentum_vector()
+        current_kinetic_energy = self.total_kinetic_energy()
+        start_total_momentum_mag = math.hypot(self.start_total_momentum_x, self.start_total_momentum_y)
+        current_total_momentum_mag = math.hypot(current_total_momentum_x, current_total_momentum_y)
+        total_momentum_mag_delta = current_total_momentum_mag - start_total_momentum_mag
         with report_file.open("w", encoding="utf-8") as outfile:
             outfile.write("[summary]\n")
-            for line in report_lines:
-                if len(line) >= 2 and line[0] == "p" and line[1].isdigit():
-                    continue
-                outfile.write(f"{line}\n")
+            outfile.write(f"frame={self.frame_number} fps={self.current_fps:.1f}\n")
+            outfile.write("\n[total_momentum]\n")
+            outfile.write(f"|start|={start_total_momentum_mag:.8f}\n")
+            outfile.write(f"|current|={current_total_momentum_mag:.8f}\n")
+            outfile.write(f"diff={total_momentum_mag_delta:.8f}\n")
+            outfile.write("\n[ke]\n")
+            outfile.write(f"start={self.start_kinetic_energy:.8f}\n")
+            outfile.write(f"end={current_kinetic_energy:.8f}\n")
+            outfile.write("\n[status]\n")
+            outfile.write(
+                f"released={self.base.dynamics.released_count} "
+                f"recycled={self.base.dynamics.recycled_count} "
+                f"escaped={self.base.dynamics.escaped_count}\n"
+            )
             outfile.write("\n[particles]\n")
-            for line in self.particle_capture_report_lines():
-                outfile.write(f"{line}\n")
-            outfile.write("\n[starting_overlap_diagnostics]\n")
-            starting_overlap_lines = self.starting_overlap_capture_diagnostics()
-            if not starting_overlap_lines:
-                starting_overlap_lines = ["not frame 0 or no starting overlaps"]
-            for line in starting_overlap_lines:
-                outfile.write(f"{line}\n")
-            outfile.write("\n[geo_dynamics]\n")
-            for line in self.geo_dynamics_capture_lines():
-                outfile.write(f"{line}\n")
-            outfile.write("\n[geo_current_contacts]\n")
-            for line in self.geo_current_contact_capture_lines():
+            for line in self.compact_particle_capture_report_lines():
                 outfile.write(f"{line}\n")
         print(f"Wrote report capture: {report_file}")
 
     def run(self, particle_data, run_configuration=None):
-        self.configure(particle_data, run_configuration)
+        if not self.configure(particle_data, run_configuration):
+            pygame.quit()
+            return
         running = True
         while running:
             self.clock.tick(60)

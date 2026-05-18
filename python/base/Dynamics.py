@@ -3,17 +3,16 @@ import random
 
 
 class Dynamics:
-    """Collision dynamics kernel for the particle model.
+    """Flow, contact geometry, and legacy collision helpers.
 
     Base owns particle storage, contact detection, time stepping, and reporting.
-    Dynamics owns the math that converts a particle's contact list into momentum
-    changes.
+    GeoDynamics owns the active particle-particle collision model. This class
+    still owns flow lifecycle helpers, active-particle state checks, wall/contact
+    geometry, velocity mirrors, and a few scalar diagnostics.
 
-    The important parallelization rule is that this class only writes to the
-    particle currently being processed. Other particles may be read for current
-    position, radius, velocity, and momentum-like state, but this pass must not
-    update another particle's memory. That keeps the structure close to a future
-    C++ or GLSL kernel where one thread owns one particle.
+    The old overlap-momentum response entry points are intentionally quarantined
+    below. They remain only as named tripwires so the retired response model
+    cannot sneak back into the runtime path silently.
 
     Required particle fields:
         location:
@@ -49,16 +48,8 @@ class Dynamics:
             Active slots have clflg != 0, but this is not treated as
             GLSL-ready wall behavior yet.
 
-    Written particle fields:
-        overlap_momentum_x, overlap_momentum_y:
-            Net collision momentum components computed from this particle's
-            current contacts.
-        overlap_momentum:
-            Scalar sum of contact momentum magnitudes.
-        momentum_delta_x, momentum_delta_y:
-            Per-step vector momentum change caused by the stored overlap
-            momentum. Contact-level internal state owns unresolved collision
-            storage.
+    Written particle fields are now limited to lifecycle/mirror updates. Active
+    collision velocity updates are handled by Base through GeoDynamics.
     """
 
     def __init__(self):
@@ -215,151 +206,23 @@ class Dynamics:
         return int(escape_mode)
 
     def process_collisions(self, particles, walls=None):
-        """Compute collision momentum for every source particle.
-
-        This is the Python convenience wrapper around the GLSL-shaped unit of
-        work, process_source_collision(source_id). Contact detection is assumed
-        to be complete before this method runs.
-
-        This method intentionally does not apply the momentum to velocity. It
-        only stores the calculated response on the particle. The separate
-        apply_overlap_momentum() method performs the velocity update.
-        """
-        for source_id in range(len(particles)):
-            if not self.is_active_particle(particles[source_id]):
-                continue
-            self.process_source_collision(source_id, particles, walls)
+        self.raise_legacy_response_error("process_collisions")
 
     def resolve_starting_collisions(self, particles):
-        """Record reset-time collision correction diagnostics.
-
-        Some tests intentionally begin with overlapping particles. At reset
-        time, process_collisions() has already computed the instantaneous
-        overlap momentum for that starting geometry. For now this method only
-        reports what the velocity would be after applying that overlap
-        momentum; it does not alter the live dynamics velocity.
-        """
-        for particle in particles:
-            if not self.is_active_particle(particle):
-                continue
-
-            uncorrected_vx = particle["vx"]
-            uncorrected_vy = particle["vy"]
-            overlap_momentum_x = particle.get("overlap_momentum_x", 0.0)
-            overlap_momentum_y = particle.get("overlap_momentum_y", 0.0)
-            corrected_vx = uncorrected_vx + overlap_momentum_x / particle["mass"]
-            corrected_vy = uncorrected_vy + overlap_momentum_y / particle["mass"]
-
-            linear_momentum_x = particle["mass"] * particle["vx"]
-            linear_momentum_y = particle["mass"] * particle["vy"]
-            particle["starting_momentum_x"] = linear_momentum_x
-            particle["starting_momentum_y"] = linear_momentum_y
-            particle["starting_momentum"] = math.hypot(linear_momentum_x, linear_momentum_y)
-            particle["starting_uncorrected_vx"] = uncorrected_vx
-            particle["starting_uncorrected_vy"] = uncorrected_vy
-            particle["starting_corrected_vx"] = corrected_vx
-            particle["starting_corrected_vy"] = corrected_vy
-            particle["starting_velocity_correction_x"] = corrected_vx - uncorrected_vx
-            particle["starting_velocity_correction_y"] = corrected_vy - uncorrected_vy
-            particle["starting_uncorrected_speed"] = math.hypot(uncorrected_vx, uncorrected_vy)
-            particle["starting_corrected_speed"] = math.hypot(corrected_vx, corrected_vy)
-            particle["internal_momentum_x"] = 0.0
-            particle["internal_momentum_y"] = 0.0
-            particle["internal_momentum"] = 0.0
-            particle["momentum_delta_x"] = 0.0
-            particle["momentum_delta_y"] = 0.0
-            particle["momentum_delta"] = 0.0
+        self.raise_legacy_response_error("resolve_starting_collisions")
 
     def process_source_collision(self, source_id, particles, walls=None):
-        """Process the completed collision list for one source particle.
-
-        This method mirrors the intended GLSL entry point:
-
-            ProcessCollision(uint SourceID)
-
-        It assumes ccs[0:sltnum] has already been filled by collision
-        detection. It does not perform broad-phase search, cell lookup, corner
-        list traversal, or duplicate filtering.
-        """
-        source_particle = particles[source_id]
-        momentum_x = 0.0
-        momentum_y = 0.0
-        momentum_sum = 0.0
-
-        for slot in range(source_particle.get("sltnum", 0)):
-            contact_record = source_particle["ccs"][slot]
-            if contact_record.get("clflg", 0) == 0:
-                continue
-
-            contact = self.ccs_contact_geometry(source_particle, contact_record, particles)
-            if contact is None:
-                continue
-
-            momentum_x, momentum_y, momentum_sum = self.add_contact_momentum(
-                source_particle,
-                contact,
-                momentum_x,
-                momentum_y,
-                momentum_sum,
-            )
-
-        for contact_record in source_particle.get("bcs", []):
-            if contact_record.get("clflg", 0) == 0:
-                continue
-
-            contact = self.bcs_contact_geometry(source_particle, contact_record, walls)
-            if contact is None:
-                continue
-
-            momentum_x, momentum_y, momentum_sum = self.add_contact_momentum(
-                source_particle,
-                contact,
-                momentum_x,
-                momentum_y,
-                momentum_sum,
-            )
-
-        source_particle["overlap_momentum_x"] = momentum_x
-        source_particle["overlap_momentum_y"] = momentum_y
-        source_particle["overlap_momentum"] = momentum_sum
-        source_particle["parms"][1] = momentum_x
-        source_particle["parms"][2] = momentum_y
-        source_particle["parms"][3] = momentum_sum
+        self.raise_legacy_response_error("process_source_collision")
 
     def apply_overlap_momentum(self, particles):
-        """Convert each particle's stored overlap momentum into velocity.
+        self.raise_legacy_response_error("apply_overlap_momentum")
 
-        This is the only place where collision response changes velocity:
-
-            dv = p / m
-
-        The position update is handled by Base before collision processing, so
-        this velocity change affects the next Base.step() movement.
-        """
-        for particle in particles:
-            if not self.is_active_particle(particle):
-                continue
-            overlap_momentum_x = particle.get("overlap_momentum_x", 0.0)
-            overlap_momentum_y = particle.get("overlap_momentum_y", 0.0)
-            old_momentum_x = particle["mass"] * particle["vx"]
-            old_momentum_y = particle["mass"] * particle["vy"]
-            candidate_vx = particle["vx"] + overlap_momentum_x / particle["mass"]
-            candidate_vy = particle["vy"] + overlap_momentum_y / particle["mass"]
-
-            particle["vx"] = candidate_vx
-            particle["vy"] = candidate_vy
-            new_momentum_x = particle["mass"] * particle["vx"]
-            new_momentum_y = particle["mass"] * particle["vy"]
-            particle["momentum_delta_x"] = new_momentum_x - old_momentum_x
-            particle["momentum_delta_y"] = new_momentum_y - old_momentum_y
-            particle["momentum_delta"] = math.hypot(
-                particle["momentum_delta_x"],
-                particle["momentum_delta_y"],
-            )
-            particle["internal_momentum_x"] = 0.0
-            particle["internal_momentum_y"] = 0.0
-            particle["internal_momentum"] = 0.0
-            self.sync_velocity_mirror(particle)
+    @staticmethod
+    def raise_legacy_response_error(method_name):
+        raise RuntimeError(
+            f"Dynamics.{method_name} is retired. "
+            "Use Base's GeoDynamics path for collision response."
+        )
 
     @staticmethod
     def sync_velocity_mirror(particle):
@@ -421,29 +284,13 @@ class Dynamics:
         return nx, ny, overlap_area, center_distance
 
     def add_contact_momentum(self, source_particle, contact, momentum_x, momentum_y, momentum_sum):
-        """Accumulate response momentum from one contact geometry tuple."""
-        nx, ny, overlap_area, center_distance = contact
-        momentum = self.overlap_momentum(
-            overlap_area,
-            center_distance,
-            source_particle,
-        )
-        # nx, ny points from the source toward the target. The response for the
-        # source is in the opposite direction, so subtract it.
-        return (
-            momentum_x - nx * momentum,
-            momentum_y - ny * momentum,
-            momentum_sum + momentum,
-        )
+        self.raise_legacy_response_error("add_contact_momentum")
 
     def ccs_contact_geometry(self, source_particle, contact_record, particles):
-        """Return geometry for one active ccs particle contact record."""
-        target_particle = particles[contact_record["pindex"]]
-        return self.particle_contact(source_particle, target_particle)
+        self.raise_legacy_response_error("ccs_contact_geometry")
 
     def bcs_contact_geometry(self, source_particle, contact_record, walls):
-        """Return geometry for one active bcs boundary contact record."""
-        return self.wall_contact(source_particle, contact_record["clflg"], walls)
+        self.raise_legacy_response_error("bcs_contact_geometry")
 
     def wall_contact(self, source_particle, wall_flag, walls):
         """Return contact geometry for the current flat wall box.
@@ -478,9 +325,7 @@ class Dynamics:
             return None
 
         center_distance = max(0.0, 2.0 * distance_to_wall)
-        delta = min(2.0 * radius - center_distance, radius)
-        contact_distance = 2.0 * radius - delta
-        overlap_area = self.circle_overlap_area(radius, radius, contact_distance)
+        overlap_area = self.circle_overlap_area(radius, radius, center_distance)
         return nx, ny, overlap_area, center_distance
 
     def overlap_momentum(self, overlap_area, center_distance, source_particle):

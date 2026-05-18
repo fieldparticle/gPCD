@@ -46,7 +46,8 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 void ShaderObj::Reservoir()
 {
 
-	std::string pipe_reservoir_entry = CfgTst->GetString("flow_type", true);
+	std::string pipe_reservoir_entry = CfgTst->GetString("flow_type", false);
+
 	if (pipe_reservoir_entry.compare("pipe_reservoir_entry")==0)
 	{
 		std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
@@ -200,30 +201,31 @@ void  ShaderObj::WriteShaderHeader()
 			std::string rpt = "Failed to open file:" + filename;
 			throw std::runtime_error(rpt.c_str());
 		}
-		ostrm	<< "#define " << version.c_str()  << "\n"
-				<< "const uint WIDTH=" << CfgTst->GetUInt("CellAryW", true) << ";\n"
-				<< "const uint HEIGHT=" << CfgTst->GetUInt("CellAryH", true)  << ";\n"
-				<< "const uint DEPTH=" << CfgTst->GetUInt("CellAryL", true) << ";\n"
-				//##JMB Get RID
-				<< "const uint CENTER=" << 0.0 << ";\n"
-				<< "const float RADIUS=" << 0.0 << ";\n"
-				<< "const uint MAX_CELL_OCCUPANY=" << CfgTst->GetInt("cell_occupancy_list_size", true) << ";\n"
-				<< "const uint SCR_W =" << m_SCO->m_SwapWidth << ";\n"
-				<< "const uint SCR_H =" << m_SCO->m_SwapHeight << ";\n"
-				<< "const uint SCR_X =" << m_SCO->m_SwapX << ";\n"
-				<< "const uint SCR_Y =" << m_SCO->m_SwapY << ";\n"
-				<< "const uint NUMPARTS =" << m_VPO->m_NumParticles << ";\n"
-				<< "const uint NUM_PARICLES_COLLIDING =" << CfgTst-> GetInt("num_particle_colliding", true) << ";\n"
-				<< "const uint MAXSPCOLLS =" << m_VPO->m_MaxColls << ";\n"
-				<< "const uint ColArySize=" << m_CMO->m_BufSize << ";\n"
-				<< "const uint LockArySize=" << m_LMO->m_BufSize << ";\n"
-				<< "const uint ColAryLen=" << m_CMO->m_MaxLoc << ";\n"
-				<< "const uint LockAryLen=" << m_LMO->m_MaxLoc << ";\n"
-				<< "const uint doMotion = " << motion_str << ";\n"
-				<< "const uint MAX_CELL_ARRAY_LOCATIONS =" << m_CMO->m_MaxLoc << ";\n"
+		ostrm << "#define " << version.c_str() << "\n"
+			<< "const uint WIDTH=" << CfgTst->GetUInt("CellAryW", true) << ";\n"
+			<< "const uint HEIGHT=" << CfgTst->GetUInt("CellAryH", true) << ";\n"
+			<< "const uint DEPTH=" << CfgTst->GetUInt("CellAryL", true) << ";\n"
+			//##JMB Get RID
+			<< "const uint CENTER=" << 0.0 << ";\n"
+			<< "const float RADIUS=" << 0.0 << ";\n"
+			<< "const uint MAX_CELL_OCCUPANY=" << CfgTst->GetInt("cell_occupancy_list_size", true) << ";\n"
+			<< "const uint SCR_W =" << m_SCO->m_SwapWidth << ";\n"
+			<< "const uint SCR_H =" << m_SCO->m_SwapHeight << ";\n"
+			<< "const uint SCR_X =" << m_SCO->m_SwapX << ";\n"
+			<< "const uint SCR_Y =" << m_SCO->m_SwapY << ";\n"
+			<< "const uint NUMPARTS =" << m_VPO->m_NumParticles << ";\n"
+			<< "const uint NUM_PARICLES_COLLIDING =" << CfgTst->GetInt("num_particle_colliding", true) << ";\n"
+			<< "const uint MAXSPCOLLS =" << m_VPO->m_MaxColls << ";\n"
+			<< "const uint ColArySize=" << m_CMO->m_BufSize << ";\n"
+			<< "const uint LockArySize=" << m_LMO->m_BufSize << ";\n"
+			<< "const uint ColAryLen=" << m_CMO->m_MaxLoc << ";\n"
+			<< "const uint LockAryLen=" << m_LMO->m_MaxLoc << ";\n"
+			<< "const uint doMotion = " << motion_str << ";\n"
+			<< "const uint MAX_CELL_ARRAY_LOCATIONS =" << m_CMO->m_MaxLoc << ";\n"
+			<< "const float GEO_ZERO_VELOCITY_OVERLAP_FRACTION=" << CfgTst->GetFloat("zero_velocity_overlap_fraction", true) << ";\n"
 				//##JMBDont know what this is
-				<< "const uint compflag =" << compflag << ";\n"
-				<< "const uint bbound =" << m_VPO->BoundaryParticleLimit << ";\n";
+			<< "const uint compflag =" << compflag << ";\n"
+			<< "const uint bbound =" << m_VPO->BoundaryParticleLimit << ";\n";
 			
 			
 		ostrm.flush();

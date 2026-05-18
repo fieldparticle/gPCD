@@ -54,7 +54,7 @@
 #include "../common/particle.glsl"
 #include "workgroups.glsl"
 #include "../common/isParticleContactMotion.glsl"
-#include "../common/dynamics_collision.glsl"
+#include "../common/GeoDyamics.glsl"
 #include "../common/move_particle.glsl"
  
 
@@ -179,8 +179,7 @@ void main()
 			debugPrintfEXT("positionBuffer:%f",ShaderFlags.positionBuffer);
 	#endif
 	 
-	ProcessCollision(SourceID);
-	ApplyOverlapMomentum(SourceID);
+	GeoProcessCollision(SourceID);
 	MoveParticle(SourceID,uint(ShaderFlags.positionBuffer),ShaderFlags.dt);
 	
 }

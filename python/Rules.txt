@@ -17,4 +17,4 @@ Rules
  	but starting collisions need a calculated pair-level A_zero because we do not 
 	know how deep into the collision history they already are.
 
-
+7. A future enhancment is a per particle zero_velocity_overlap_fraction.

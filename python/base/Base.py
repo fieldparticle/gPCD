@@ -2,6 +2,7 @@ import math
 
 from base.Dynamics import Dynamics
 from base.GeoDynamics import GeoDynamics
+from base.NeoDynamics import NeoDynamics
 from base.Report import Report
 
 
@@ -26,12 +27,14 @@ class Base:
         # bcs[4], but wall behavior is not treated as shader-ready yet.
         self.max_boundary_contacts_per_particle = 4
         self.zero_velocity_overlap_area = None
-        self.zero_velocity_overlap_fraction = 1.0
+        self.zero_velocity_overlap_fraction = None
         self.zero_velocity_overlap_tolerance = 0.01
         self.geo_rebound_min_fraction = 0.02
+        self.dynamics_model = "geo"
+        self.collision_stiffness_q = 1.0
         self.dynamics = Dynamics()
         self.report = Report()
-        self.contact_state = {}
+        self.wall_contact_state = {}
 
     def clear_particles(self):
         self.particle_configs = []
@@ -75,7 +78,7 @@ class Base:
     def reset(self):
         self.time = 0.0
         self.particles = []
-        self.contact_state = {}
+        self.wall_contact_state = {}
         self.report.clear()
         for config in self.particle_configs:
             particle = dict(config)
@@ -89,19 +92,24 @@ class Base:
                 particle["ccs"] = [dict(contact) for contact in particle["ccs"]]
             if "bcs" in particle:
                 particle["bcs"] = [dict(contact) for contact in particle["bcs"]]
+            particle["gcs"] = self.empty_geo_contact_states()
             particle["state_flg"] = int(particle.get("state_flg", self.dynamics.STATE_ACTIVE))
             self.particles.append(particle)
         self.detect_contacts()
         self.update_contact_state()
+        self.update_wall_contact_state()
         self.initialize_geo_starting_overlap_zero_state()
+        self.initialize_geo_starting_wall_overlap_zero_state()
         self.apply_geo_starting_overlap()
+        self.apply_geo_starting_wall_overlap()
         self.detect_contacts()
         self.update_contact_state()
+        self.update_wall_contact_state()
         self.initialize_starting_diagnostics()
         self.record_step_report()
 
     def apply_geo_starting_overlap(self):
-        geo_dynamics = GeoDynamics()
+        geo_dynamics = self.new_pair_dynamics()
         geo_dynamics.momentum_per_area = self.dynamics.momentum_per_area
         geo_dynamics.inverse_square_softening = self.dynamics.inverse_square_softening
 
@@ -122,22 +130,57 @@ class Base:
             particle["vy"] = geo_particle["velocity_at_current_overlap_rebound_y"]
             self.dynamics.sync_velocity_mirror(particle)
 
+    def apply_geo_starting_wall_overlap(self):
+        predictions = self.geo_wall_velocity_predictions()
+        if predictions:
+            self.apply_geo_velocity_predictions(predictions)
+
     def initialize_geo_starting_overlap_zero_state(self):
-        for pair_key, state in self.contact_state.items():
-            report = self.geo_starting_overlap_pair_report(pair_key)
-            if report is None:
+        for source_index, source_particle in enumerate(self.particles):
+            for state in source_particle.get("gcs", []):
+                if not state.get("active", False):
+                    continue
+                target_index = state.get("target_index")
+                if target_index is None:
+                    continue
+                report = self.geo_starting_overlap_source_report(source_index, target_index)
+                if report is None:
+                    continue
+                state["geo_phase"] = "rebound"
+                state["geo_zero_velocity_overlap_area"] = report["zero_velocity_overlap_area"]
+                state["geo_zero_velocity_center_distance"] = report["zero_velocity_center_distance"]
+                state["geo_zero_velocity_overlap_momentum"] = report["zero_velocity_overlap_momentum"]
+                state["geo_zero_velocity_source"] = report["zero_velocity_solution_source"]
+                state["geo_starting_overlap"] = True
+
+    def initialize_geo_starting_wall_overlap_zero_state(self):
+        for wall_key, state in self.wall_contact_state.items():
+            particle_index, wall_flag = wall_key
+            particle = self.particles[particle_index]
+            contact = self.dynamics.wall_contact(particle, wall_flag, self.walls)
+            if contact is None:
                 continue
+
+            _nx, _ny, overlap_area, center_distance = contact
+            zero_geometry = self.solved_wall_zero_velocity_geometry(particle, state)
+            if zero_geometry["overlap_area"] + 1.0e-12 < overlap_area:
+                zero_geometry = {
+                    "overlap_area": overlap_area,
+                    "center_distance": center_distance,
+                    "solution_source": "promoted_to_current_overlap",
+                }
+
             state["geo_phase"] = "rebound"
-            state["geo_zero_velocity_overlap_area"] = report["zero_velocity_overlap_area"]
-            state["geo_zero_velocity_center_distance"] = report["zero_velocity_center_distance"]
-            state["geo_zero_velocity_overlap_momentum"] = report["zero_velocity_overlap_momentum"]
-            state["geo_zero_velocity_interpolated"] = False
-            state["geo_zero_velocity_interpolation_alpha"] = 1.0
-            state["geo_zero_velocity_source"] = report["zero_velocity_solution_source"]
+            state["geo_zero_velocity_overlap_area"] = zero_geometry["overlap_area"]
+            state["geo_zero_velocity_center_distance"] = zero_geometry["center_distance"]
+            state["geo_zero_velocity_source"] = zero_geometry["solution_source"]
             state["geo_starting_overlap"] = True
 
     def geo_starting_overlap_pair_report(self, pair_key):
         source_index, target_index = pair_key
+        return self.geo_starting_overlap_source_report(source_index, target_index)
+
+    def geo_starting_overlap_source_report(self, source_index, target_index):
         source_particle = self.particles[source_index]
         target_particle = self.particles[target_index]
         contact = self.dynamics.particle_contact(source_particle, target_particle)
@@ -146,7 +189,7 @@ class Base:
 
         source_x, source_y = self.current_location(source_particle)
         target_x, target_y = self.current_location(target_particle)
-        geo_dynamics = GeoDynamics()
+        geo_dynamics = self.new_pair_dynamics()
         geo_dynamics.momentum_per_area = self.dynamics.momentum_per_area
         geo_dynamics.inverse_square_softening = self.dynamics.inverse_square_softening
         geo_dynamics.add_particle(
@@ -215,18 +258,28 @@ class Base:
         self.dynamics.begin_step(self.particles, dt, self.set_location)
         self.detect_contacts()
         self.update_contact_state()
+        self.update_wall_contact_state()
         self.apply_geo_dynamics()
         self.move(dt)
         self.detect_contacts()
+        self.update_wall_contact_state()
         self.clip_configured_zero_velocity_overlaps()
+        self.clip_configured_zero_velocity_wall_overlaps()
         self.dynamics.end_step(self.particles, self.set_location)
         self.time += dt
         self.record_step_report()
 
     def apply_geo_dynamics(self):
+        applied_predictions = False
         predictions = self.geo_velocity_predictions()
         if predictions is not None:
             self.apply_geo_velocity_predictions(predictions)
+            applied_predictions = True
+        wall_predictions = self.geo_wall_velocity_predictions()
+        if wall_predictions is not None:
+            self.apply_geo_velocity_predictions(wall_predictions)
+            applied_predictions = True
+        if applied_predictions:
             return
         for particle in self.particles:
             particle["momentum_delta_x"] = 0.0
@@ -255,40 +308,101 @@ class Base:
             particle["internal_momentum"] = 0.0
             self.dynamics.sync_velocity_mirror(particle)
         self.clip_configured_zero_velocity_overlaps()
+        self.clip_configured_zero_velocity_wall_overlaps()
 
     def has_configured_zero_velocity_overlap(self):
         return self.zero_velocity_overlap_area is not None or self.zero_velocity_overlap_fraction is not None
 
+    def has_pair_zero_velocity_model(self):
+        return self.dynamics_model == "neo" or self.has_configured_zero_velocity_overlap()
+
+    def new_pair_dynamics(self):
+        if self.dynamics_model == "neo":
+            pair_dynamics = NeoDynamics()
+            pair_dynamics.collision_stiffness_q = self.collision_stiffness_q
+            return pair_dynamics
+        return GeoDynamics()
+
     def clip_configured_zero_velocity_overlaps(self):
-        for pair_key, state in self.contact_state.items():
+        processed_pairs = set()
+        for source_index, source_particle in enumerate(self.particles):
+            for state in source_particle.get("gcs", []):
+                if not state.get("active", False):
+                    continue
+                target_index = state.get("target_index")
+                if target_index is None:
+                    continue
+                pair_key = tuple(sorted((source_index, target_index)))
+                if pair_key in processed_pairs:
+                    continue
+                processed_pairs.add(pair_key)
+                if state.get("geo_phase") != "rebound":
+                    continue
+
+                pair_source_index, pair_target_index = pair_key
+                pair_source_particle = self.particles[pair_source_index]
+                pair_target_particle = self.particles[pair_target_index]
+                zero_geometry = self.contact_state_zero_velocity_geometry(state)
+                if zero_geometry is None:
+                    zero_geometry = self.configured_zero_velocity_geometry(pair_source_particle, pair_target_particle)
+                if zero_geometry is None:
+                    continue
+
+                contact = self.dynamics.particle_contact(pair_source_particle, pair_target_particle)
+                if contact is None:
+                    continue
+
+                nx, ny, overlap_area, center_distance = contact
+                if overlap_area <= zero_geometry["overlap_area"]:
+                    continue
+
+                self.set_pair_center_distance(
+                    pair_source_particle,
+                    pair_target_particle,
+                    nx,
+                    ny,
+                    zero_geometry["center_distance"],
+                )
+                state["geo_zero_velocity_clipped"] = True
+
+    def clip_configured_zero_velocity_wall_overlaps(self):
+        for wall_key, state in self.wall_contact_state.items():
             if state.get("geo_phase") != "rebound":
                 continue
 
-            source_index, target_index = pair_key
-            source_particle = self.particles[source_index]
-            target_particle = self.particles[target_index]
+            particle_index, wall_flag = wall_key
+            particle = self.particles[particle_index]
             zero_geometry = self.contact_state_zero_velocity_geometry(state)
             if zero_geometry is None:
-                zero_geometry = self.configured_zero_velocity_geometry(source_particle, target_particle)
+                zero_geometry = self.configured_wall_zero_velocity_geometry(particle)
             if zero_geometry is None:
                 continue
 
-            contact = self.dynamics.particle_contact(source_particle, target_particle)
+            contact = self.dynamics.wall_contact(particle, wall_flag, self.walls)
             if contact is None:
                 continue
 
-            nx, ny, overlap_area, center_distance = contact
+            _nx, _ny, overlap_area, _center_distance = contact
             if overlap_area <= zero_geometry["overlap_area"]:
                 continue
 
-            self.set_pair_center_distance(
-                source_particle,
-                target_particle,
-                nx,
-                ny,
-                zero_geometry["center_distance"],
-            )
+            self.set_wall_center_distance(particle, wall_flag, zero_geometry["center_distance"])
             state["geo_zero_velocity_clipped"] = True
+
+    def set_wall_center_distance(self, particle, wall_flag, target_center_distance):
+        if self.walls is None:
+            return
+        x, y = self.current_location(particle)
+        distance_to_wall = 0.5 * max(0.0, target_center_distance)
+        if wall_flag == 1:
+            x = self.walls["start_x"] + distance_to_wall
+        elif wall_flag == 2:
+            x = self.walls["end_x"] - distance_to_wall
+        elif wall_flag == 3:
+            y = self.walls["start_y"] + distance_to_wall
+        elif wall_flag == 4:
+            y = self.walls["end_y"] - distance_to_wall
+        self.set_location(particle, x, y)
 
     def set_pair_center_distance(self, source_particle, target_particle, nx, ny, target_distance):
         source_x, source_y = self.current_location(source_particle)
@@ -314,96 +428,9 @@ class Base:
         self.set_location(source_particle, source_new_x, source_new_y)
         self.set_location(target_particle, target_new_x, target_new_y)
 
-    def geo_has_rebound_pair(self):
-        return any(
-            state.get("geo_phase") == "rebound"
-            for state in self.contact_state.values()
-        )
-
-    def update_geo_turnaround(self):
-        for pair_key, state in self.contact_state.items():
-            if state.get("geo_phase") == "rebound":
-                continue
-
-            source_index, target_index = pair_key
-            source_particle = self.particles[source_index]
-            target_particle = self.particles[target_index]
-            contact = self.dynamics.particle_contact(source_particle, target_particle)
-            if contact is None:
-                continue
-
-            nx, ny, overlap_area, center_distance = contact
-            rel_vx = target_particle["vx"] - source_particle["vx"]
-            rel_vy = target_particle["vy"] - source_particle["vy"]
-            rel_normal_velocity = rel_vx * nx + rel_vy * ny
-            if rel_normal_velocity < 0.0:
-                state["geo_previous_center_distance"] = center_distance
-                state["geo_previous_overlap_area"] = overlap_area
-                state["geo_previous_relative_normal_velocity"] = rel_normal_velocity
-                continue
-
-            zero_prediction = self.predict_geo_zero_velocity_geometry(
-                state,
-                center_distance,
-                overlap_area,
-                rel_normal_velocity,
-                source_particle,
-                target_particle,
-            )
-            state["geo_phase"] = "rebound"
-            state["geo_zero_velocity_overlap_area"] = zero_prediction["overlap_area"]
-            state["geo_zero_velocity_center_distance"] = zero_prediction["center_distance"]
-            state["geo_zero_velocity_relative_normal_velocity"] = rel_normal_velocity
-            state["geo_zero_velocity_interpolation_alpha"] = zero_prediction["alpha"]
-            state["geo_zero_velocity_interpolated"] = zero_prediction["interpolated"]
-
-    def predict_geo_zero_velocity_geometry(
-        self,
-        state,
-        center_distance,
-        overlap_area,
-        rel_normal_velocity,
-        source_particle,
-        target_particle,
-    ):
-        previous_velocity = state.get("geo_previous_relative_normal_velocity")
-        previous_distance = state.get("geo_previous_center_distance")
-        previous_overlap_area = state.get("geo_previous_overlap_area")
-        if (
-            previous_velocity is None
-            or previous_distance is None
-            or previous_overlap_area is None
-            or previous_velocity >= 0.0
-            or rel_normal_velocity <= 0.0
-        ):
-            return {
-                "center_distance": center_distance,
-                "overlap_area": overlap_area,
-                "alpha": 1.0,
-                "interpolated": False,
-            }
-
-        denominator = rel_normal_velocity - previous_velocity
-        if abs(denominator) <= 1.0e-12:
-            alpha = 1.0
-        else:
-            alpha = -previous_velocity / denominator
-        alpha = max(0.0, min(1.0, alpha))
-        zero_distance = previous_distance + alpha * (center_distance - previous_distance)
-        zero_overlap_area = self.dynamics.circle_overlap_area(
-            source_particle["radius"],
-            target_particle["radius"],
-            zero_distance,
-        )
-        return {
-            "center_distance": zero_distance,
-            "overlap_area": zero_overlap_area,
-            "alpha": alpha,
-            "interpolated": True,
-        }
-
     def geo_velocity_predictions(self):
-        active_pairs = []
+        active_contacts = []
+        active_pairs = set()
         for source_index, source_particle in enumerate(self.particles):
             if not self.dynamics.is_active_particle(source_particle):
                 continue
@@ -413,36 +440,143 @@ class Base:
                     continue
                 target_index = contact_record["pindex"]
                 pair_key = tuple(sorted((source_index, target_index)))
-                if pair_key not in active_pairs:
-                    active_pairs.append(pair_key)
+                active_pairs.add(pair_key)
+                contact_key = (source_index, target_index)
+                if contact_key not in active_contacts:
+                    active_contacts.append(contact_key)
 
-        if not active_pairs:
+        if not active_contacts:
             return None
 
-        if len(active_pairs) != 1 and not self.has_configured_zero_velocity_overlap():
+        if len(active_pairs) != 1 and not self.has_pair_zero_velocity_model():
             return None
 
         combined_velocities = {}
-        for pair_key in active_pairs:
-            pair_prediction = self.geo_pair_prediction(pair_key)
-            if pair_prediction is None:
+        for source_index, target_index in active_contacts:
+            prediction = self.geo_pair_prediction(source_index, target_index)
+            if prediction is None:
                 return None
 
-            for particle_index, prediction in pair_prediction.items():
-                start_velocity = prediction["start_velocity"]
-                predicted_velocity = prediction["predicted_velocity"]
-                if particle_index not in combined_velocities:
-                    combined_velocities[particle_index] = [start_velocity[0], start_velocity[1]]
-                combined_velocities[particle_index][0] += predicted_velocity[0] - start_velocity[0]
-                combined_velocities[particle_index][1] += predicted_velocity[1] - start_velocity[1]
+            start_velocity = prediction["start_velocity"]
+            predicted_velocity = prediction["predicted_velocity"]
+            if source_index not in combined_velocities:
+                combined_velocities[source_index] = [start_velocity[0], start_velocity[1]]
+            combined_velocities[source_index][0] += predicted_velocity[0] - start_velocity[0]
+            combined_velocities[source_index][1] += predicted_velocity[1] - start_velocity[1]
 
         return {
             particle_index: (velocity[0], velocity[1])
             for particle_index, velocity in combined_velocities.items()
         }
 
-    def geo_pair_prediction(self, pair_key):
-        source_index, target_index = pair_key
+    def geo_wall_velocity_predictions(self):
+        active_walls = []
+        for particle_index, particle in enumerate(self.particles):
+            if not self.dynamics.is_active_particle(particle):
+                continue
+            for contact_record in particle.get("bcs", []):
+                wall_flag = contact_record.get("clflg", 0)
+                if wall_flag == 0:
+                    continue
+                wall_key = (particle_index, wall_flag)
+                if wall_key not in active_walls:
+                    active_walls.append(wall_key)
+
+        if not active_walls:
+            return None
+
+        combined_velocities = {}
+        for wall_key in active_walls:
+            prediction = self.geo_wall_prediction(wall_key)
+            if prediction is None:
+                return None
+            particle_index = wall_key[0]
+            start_velocity = prediction["start_velocity"]
+            predicted_velocity = prediction["predicted_velocity"]
+            if particle_index not in combined_velocities:
+                combined_velocities[particle_index] = [start_velocity[0], start_velocity[1]]
+            combined_velocities[particle_index][0] += predicted_velocity[0] - start_velocity[0]
+            combined_velocities[particle_index][1] += predicted_velocity[1] - start_velocity[1]
+
+        return {
+            particle_index: (velocity[0], velocity[1])
+            for particle_index, velocity in combined_velocities.items()
+        }
+
+    def geo_wall_prediction(self, wall_key):
+        particle_index, wall_flag = wall_key
+        particle = self.particles[particle_index]
+        contact = self.dynamics.wall_contact(particle, wall_flag, self.walls)
+        if contact is None:
+            return None
+
+        nx, ny, overlap_area, center_distance = contact
+        normal_velocity = particle["vx"] * nx + particle["vy"] * ny
+        phase = "compression" if normal_velocity > 0.0 else "rebound"
+        state = self.wall_contact_state.get(wall_key, {})
+        state_zero = self.contact_state_zero_velocity_geometry(state)
+        configured_zero = None
+        if state_zero is None:
+            configured_zero = self.configured_wall_zero_velocity_geometry(particle)
+        if configured_zero is not None:
+            self.update_configured_geo_wall_phase(
+                state,
+                overlap_area=overlap_area,
+                center_distance=center_distance,
+                normal_velocity=normal_velocity,
+                particle=particle,
+                configured_zero=configured_zero,
+            )
+            phase = state.get("geo_phase", phase)
+        elif state_zero is not None:
+            phase = state.get("geo_phase", "rebound")
+        elif state.get("geo_phase") != "rebound":
+            return None
+
+        start_vx, start_vy = state.get("first_contact_velocity", (particle["vx"], particle["vy"]))
+        incoming_speed = start_vx * nx + start_vy * ny
+        if incoming_speed <= 0.0:
+            return None
+
+        zero_area = (
+            state_zero["overlap_area"]
+            if state_zero is not None
+            else (
+                configured_zero["overlap_area"]
+                if configured_zero is not None
+                else state.get("geo_zero_velocity_overlap_area")
+            )
+        )
+        if zero_area is None or zero_area <= 1.0e-12:
+            return None
+
+        compression_fraction = max(0.0, min(1.0, overlap_area / zero_area))
+        compression_velocity_fraction = math.sqrt(max(0.0, 1.0 - compression_fraction))
+        compression_progress = 1.0 - compression_velocity_fraction
+        rebound_velocity_fraction = math.sqrt(max(0.0, 1.0 - compression_fraction))
+
+        turn_vx = start_vx - incoming_speed * nx
+        turn_vy = start_vy - incoming_speed * ny
+        full_vx = start_vx - 2.0 * incoming_speed * nx
+        full_vy = start_vy - 2.0 * incoming_speed * ny
+
+        if phase == "compression":
+            predicted_velocity = (
+                start_vx + compression_progress * (turn_vx - start_vx),
+                start_vy + compression_progress * (turn_vy - start_vy),
+            )
+        else:
+            predicted_velocity = (
+                turn_vx + rebound_velocity_fraction * (full_vx - turn_vx),
+                turn_vy + rebound_velocity_fraction * (full_vy - turn_vy),
+            )
+
+        return {
+            "start_velocity": (start_vx, start_vy),
+            "predicted_velocity": predicted_velocity,
+        }
+
+    def geo_pair_prediction(self, source_index, target_index):
         source_particle = self.particles[source_index]
         target_particle = self.particles[target_index]
         contact = self.dynamics.particle_contact(source_particle, target_particle)
@@ -454,7 +588,7 @@ class Base:
         rel_vy = target_particle["vy"] - source_particle["vy"]
         rel_normal_velocity = rel_vx * nx + rel_vy * ny
         phase = "compression" if rel_normal_velocity < 0.0 else "rebound"
-        contact_state = self.contact_state.get(pair_key, {})
+        contact_state = self.source_geo_contact_state(source_particle, target_index) or {}
         state_zero = self.contact_state_zero_velocity_geometry(contact_state)
         configured_zero = None
         if state_zero is None:
@@ -471,6 +605,15 @@ class Base:
             )
             phase = contact_state.get("geo_phase", phase)
         elif state_zero is not None:
+            self.update_configured_geo_phase(
+                contact_state,
+                overlap_area=_overlap_area,
+                center_distance=_center_distance,
+                rel_normal_velocity=rel_normal_velocity,
+                source_particle=source_particle,
+                target_particle=target_particle,
+                configured_zero=state_zero,
+            )
             phase = contact_state.get("geo_phase", "rebound")
         elif contact_state.get("geo_phase") != "rebound":
             return None
@@ -487,7 +630,7 @@ class Base:
 
         source_x, source_y = self.current_location(source_particle)
         target_x, target_y = self.current_location(target_particle)
-        geo_dynamics = GeoDynamics()
+        geo_dynamics = self.new_pair_dynamics()
         geo_dynamics.momentum_per_area = self.dynamics.momentum_per_area
         geo_dynamics.inverse_square_softening = self.dynamics.inverse_square_softening
         geo_dynamics.add_particle(
@@ -574,14 +717,8 @@ class Base:
             )
 
         return {
-            source_index: {
-                "start_velocity": (source_start_vx, source_start_vy),
-                "predicted_velocity": source_velocity,
-            },
-            target_index: {
-                "start_velocity": (target_start_vx, target_start_vy),
-                "predicted_velocity": target_velocity,
-            },
+            "start_velocity": (source_start_vx, source_start_vy),
+            "predicted_velocity": source_velocity,
         }
 
     @staticmethod
@@ -654,6 +791,137 @@ class Base:
             "center_distance": zero_center_distance,
         }
 
+    def configured_wall_zero_velocity_geometry(self, particle):
+        if self.zero_velocity_overlap_area is None and self.zero_velocity_overlap_fraction is None:
+            return None
+
+        max_overlap_area = self.dynamics.circle_overlap_area(
+            particle["radius"],
+            particle["radius"],
+            0.0,
+        )
+        if self.zero_velocity_overlap_area is not None:
+            zero_overlap_area = float(self.zero_velocity_overlap_area)
+        else:
+            zero_overlap_area = float(self.zero_velocity_overlap_fraction) * max_overlap_area
+        zero_overlap_area = max(0.0, min(max_overlap_area, zero_overlap_area))
+        zero_center_distance = self.center_distance_for_wall_overlap_area(zero_overlap_area, particle)
+        return {
+            "overlap_area": zero_overlap_area,
+            "center_distance": zero_center_distance,
+        }
+
+    def solved_wall_zero_velocity_geometry(self, particle, state):
+        start_vx, start_vy = state.get("first_contact_velocity", (particle["vx"], particle["vy"]))
+        nx, ny = state.get("first_contact_normal", (1.0, 0.0))
+        incoming_speed = max(0.0, start_vx * nx + start_vy * ny)
+        incoming_momentum = particle["mass"] * incoming_speed
+        radius = particle["radius"]
+        max_momentum = self.wall_overlap_momentum_at_center_distance(0.0, particle)
+        max_overlap_area = self.dynamics.circle_overlap_area(radius, radius, 0.0)
+        if incoming_momentum <= 0.0:
+            return {
+                "overlap_area": 0.0,
+                "center_distance": 2.0 * radius,
+                "solution_source": "solved",
+            }
+        if incoming_momentum >= max_momentum:
+            return {
+                "overlap_area": max_overlap_area,
+                "center_distance": 0.0,
+                "solution_source": "solved_clamped",
+            }
+
+        lo = 0.0
+        hi = 2.0 * radius
+        for _ in range(80):
+            mid = 0.5 * (lo + hi)
+            mid_momentum = self.wall_overlap_momentum_at_center_distance(mid, particle)
+            if mid_momentum < incoming_momentum:
+                hi = mid
+            else:
+                lo = mid
+        center_distance = 0.5 * (lo + hi)
+        return {
+            "overlap_area": self.dynamics.circle_overlap_area(radius, radius, center_distance),
+            "center_distance": center_distance,
+            "solution_source": "solved",
+        }
+
+    def neo_zero_velocity_state(
+        self,
+        source_particle,
+        target_particle,
+        rel_normal_velocity,
+        current_overlap_area,
+        current_center_distance,
+    ):
+        source_mass = source_particle["mass"]
+        target_mass = target_particle["mass"]
+        reduced_mass = (source_mass * target_mass) / (source_mass + target_mass)
+        incoming_speed = max(0.0, -rel_normal_velocity)
+        stiffness_q = self.contact_stiffness_q(source_particle, target_particle)
+        radius_sum = source_particle["radius"] + target_particle["radius"]
+        max_overlap_area = self.dynamics.circle_overlap_area(
+            source_particle["radius"],
+            target_particle["radius"],
+            0.0,
+        )
+
+        if incoming_speed <= 0.0:
+            zero_center_distance = radius_sum
+            zero_overlap_area = 0.0
+            alpha_zero = 0.0
+            solution_source = "force_law_zero_speed"
+        else:
+            alpha_zero = ((3.0 * reduced_mass * incoming_speed * incoming_speed) / (2.0 * stiffness_q)) ** (1.0 / 3.0)
+            alpha_zero = max(0.0, min(radius_sum, alpha_zero))
+            zero_center_distance = max(0.0, radius_sum - alpha_zero)
+            zero_overlap_area = self.dynamics.circle_overlap_area(
+                source_particle["radius"],
+                target_particle["radius"],
+                zero_center_distance,
+            )
+            solution_source = "force_law"
+
+        if zero_overlap_area + 1.0e-12 < current_overlap_area:
+            zero_overlap_area = current_overlap_area
+            zero_center_distance = current_center_distance
+            alpha_zero = max(0.0, radius_sum - current_center_distance)
+            solution_source = "force_law_promoted_to_current_overlap"
+
+        return {
+            "geo_zero_velocity_overlap_area": zero_overlap_area,
+            "geo_zero_velocity_center_distance": zero_center_distance,
+            "geo_zero_velocity_penetration_depth": alpha_zero,
+            "geo_zero_velocity_overlap_fraction": (
+                zero_overlap_area / max_overlap_area
+                if max_overlap_area > 0.0
+                else 0.0
+            ),
+            "geo_zero_velocity_solution_source": solution_source,
+            "geo_zero_velocity_stiffness_q": stiffness_q,
+            "geo_zero_velocity_reduced_mass": reduced_mass,
+            "geo_zero_velocity_incoming_speed": incoming_speed,
+        }
+
+    def contact_stiffness_q(self, source_particle, target_particle):
+        source_q = source_particle.get("collision_stiffness_q", self.collision_stiffness_q)
+        target_q = target_particle.get("collision_stiffness_q", self.collision_stiffness_q)
+        if source_q is None:
+            source_q = self.collision_stiffness_q
+        if target_q is None:
+            target_q = self.collision_stiffness_q
+        return max(1.0e-12, 0.5 * (float(source_q) + float(target_q)))
+
+    def wall_overlap_momentum_at_center_distance(self, center_distance, particle):
+        overlap_area = self.dynamics.circle_overlap_area(
+            particle["radius"],
+            particle["radius"],
+            center_distance,
+        )
+        return self.dynamics.overlap_momentum(overlap_area, center_distance, particle)
+
     def center_distance_for_overlap_area(self, overlap_area, source_particle, target_particle):
         radius_sum = source_particle["radius"] + target_particle["radius"]
         if overlap_area <= 0.0:
@@ -674,6 +942,34 @@ class Base:
             mid_area = self.dynamics.circle_overlap_area(
                 source_particle["radius"],
                 target_particle["radius"],
+                mid,
+            )
+            if mid_area > overlap_area:
+                lo = mid
+            else:
+                hi = mid
+        return 0.5 * (lo + hi)
+
+    def center_distance_for_wall_overlap_area(self, overlap_area, particle):
+        radius_sum = 2.0 * particle["radius"]
+        if overlap_area <= 0.0:
+            return radius_sum
+
+        max_overlap_area = self.dynamics.circle_overlap_area(
+            particle["radius"],
+            particle["radius"],
+            0.0,
+        )
+        if overlap_area >= max_overlap_area:
+            return 0.0
+
+        lo = 0.0
+        hi = radius_sum
+        for _ in range(80):
+            mid = 0.5 * (lo + hi)
+            mid_area = self.dynamics.circle_overlap_area(
+                particle["radius"],
+                particle["radius"],
                 mid,
             )
             if mid_area > overlap_area:
@@ -714,8 +1010,38 @@ class Base:
         contact_state["geo_phase"] = "rebound"
         contact_state["geo_zero_velocity_overlap_area"] = zero_overlap_area
         contact_state["geo_zero_velocity_center_distance"] = configured_zero["center_distance"]
-        contact_state["geo_zero_velocity_interpolated"] = False
-        contact_state["geo_zero_velocity_interpolation_alpha"] = 1.0
+
+    def update_configured_geo_wall_phase(
+        self,
+        contact_state,
+        overlap_area,
+        center_distance,
+        normal_velocity,
+        particle,
+        configured_zero,
+    ):
+        if contact_state.get("geo_phase") == "rebound":
+            return
+
+        zero_overlap_area = configured_zero["overlap_area"]
+        zero_tolerance_area = zero_overlap_area * max(0.0, min(1.0, self.zero_velocity_overlap_tolerance))
+        crossed_zero = overlap_area >= zero_overlap_area - zero_tolerance_area
+        if not crossed_zero and normal_velocity > 0.0:
+            next_distance = center_distance - 2.0 * normal_velocity * getattr(self, "current_step_dt", self.dt)
+            next_area = self.dynamics.circle_overlap_area(
+                particle["radius"],
+                particle["radius"],
+                next_distance,
+            )
+            crossed_zero = overlap_area <= zero_overlap_area <= next_area
+
+        if not crossed_zero:
+            contact_state["geo_phase"] = "compression"
+            return
+
+        contact_state["geo_phase"] = "rebound"
+        contact_state["geo_zero_velocity_overlap_area"] = zero_overlap_area
+        contact_state["geo_zero_velocity_center_distance"] = configured_zero["center_distance"]
 
     def do_substep(self, sub_dt):
         self.step(sub_dt)
@@ -796,6 +1122,10 @@ class Base:
         particle["contact_count"] = particle.get("sltnum", 0) + particle["wall_contact_count"]
 
     def update_contact_state(self):
+        for particle in self.particles:
+            for state in particle.get("gcs", []):
+                state["touched"] = False
+
         active_pairs = set()
         for source_index, source_particle in enumerate(self.particles):
             for slot in range(source_particle.get("sltnum", 0)):
@@ -805,13 +1135,12 @@ class Base:
 
                 target_index = contact_record["pindex"]
                 pair_key = tuple(sorted((source_index, target_index)))
-                if pair_key in active_pairs:
-                    continue
 
                 target_particle = self.particles[target_index]
                 contact = self.dynamics.particle_contact(source_particle, target_particle)
                 if contact is None:
                     continue
+                active_pairs.add(pair_key)
 
                 nx, ny, overlap_area, center_distance = contact
                 rel_vx = target_particle["vx"] - source_particle["vx"]
@@ -826,21 +1155,36 @@ class Base:
                     center_distance,
                     source_particle,
                 )
-                state = self.contact_state.setdefault(
-                    pair_key,
-                    {
-                        "internal_contact_momentum": 0.0,
-                        "last_relative_normal_velocity": rel_normal_velocity,
-                        "geo_phase": "compression",
-                        "first_contact_velocities": {
-                            source_index: (source_particle["vx"], source_particle["vy"]),
-                            target_index: (target_particle["vx"], target_particle["vy"]),
-                        },
-                        "first_contact_normal": (nx, ny),
-                        "first_contact_distance": center_distance,
-                        "first_contact_overlap_area": overlap_area,
-                    },
-                )
+                state = self.source_geo_contact_state(source_particle, target_index)
+                if state is None:
+                    state = self.allocate_geo_contact_state(source_particle, target_index)
+                    if state is None:
+                        source_particle["contact_overflow"] = True
+                        continue
+                    state.update(
+                        {
+                            "internal_contact_momentum": 0.0,
+                            "last_relative_normal_velocity": rel_normal_velocity,
+                            "geo_phase": "compression",
+                            "first_contact_velocities": {
+                                source_index: (source_particle["vx"], source_particle["vy"]),
+                                target_index: (target_particle["vx"], target_particle["vy"]),
+                            },
+                            "first_contact_normal": (nx, ny),
+                            "first_contact_distance": center_distance,
+                            "first_contact_overlap_area": overlap_area,
+                        }
+                    )
+                    if self.dynamics_model == "neo":
+                        state.update(
+                            self.neo_zero_velocity_state(
+                                source_particle,
+                                target_particle,
+                                rel_normal_velocity,
+                                overlap_area,
+                                center_distance,
+                            )
+                        )
                 if rel_normal_velocity < 0.0:
                     state["internal_contact_momentum"] += overlap_contact_momentum
                 else:
@@ -851,18 +1195,77 @@ class Base:
                 state["relative_normal_momentum"] = rel_normal_momentum
                 state["overlap_contact_momentum"] = overlap_contact_momentum
                 state["last_relative_normal_velocity"] = rel_normal_velocity
-                active_pairs.add(pair_key)
+                state["touched"] = True
 
-        for pair_key in list(self.contact_state):
-            if pair_key not in active_pairs:
-                self.finalize_exited_geo_contact(pair_key, self.contact_state[pair_key])
-                self.contact_state.pop(pair_key, None)
+        finalized_pairs = set()
+        for source_index, particle in enumerate(self.particles):
+            for state in particle.get("gcs", []):
+                if not state.get("active", False) or state.get("touched", False):
+                    continue
+                target_index = state.get("target_index")
+                if target_index is None:
+                    self.reset_geo_contact_state(state)
+                    continue
+                pair_key = tuple(sorted((source_index, target_index)))
+                if pair_key not in active_pairs and pair_key not in finalized_pairs:
+                    self.finalize_exited_geo_contact(source_index, target_index, state)
+                    finalized_pairs.add(pair_key)
+                self.reset_geo_contact_state(state)
 
-    def finalize_exited_geo_contact(self, pair_key, state):
+    def update_wall_contact_state(self):
+        active_walls = set()
+        for particle_index, particle in enumerate(self.particles):
+            if not self.dynamics.is_active_particle(particle):
+                continue
+            for contact_record in particle.get("bcs", []):
+                wall_flag = contact_record.get("clflg", 0)
+                if wall_flag == 0:
+                    continue
+
+                contact = self.dynamics.wall_contact(particle, wall_flag, self.walls)
+                if contact is None:
+                    continue
+
+                nx, ny, overlap_area, center_distance = contact
+                normal_velocity = particle["vx"] * nx + particle["vy"] * ny
+                first_velocity = (particle["vx"], particle["vy"])
+                if self.time == 0.0 and normal_velocity < 0.0:
+                    first_velocity = (
+                        particle["vx"] - 2.0 * normal_velocity * nx,
+                        particle["vy"] - 2.0 * normal_velocity * ny,
+                    )
+
+                wall_key = (particle_index, wall_flag)
+                state = self.wall_contact_state.setdefault(
+                    wall_key,
+                    {
+                        "last_relative_normal_velocity": normal_velocity,
+                        "geo_phase": "compression",
+                        "first_contact_velocity": first_velocity,
+                        "first_contact_normal": (nx, ny),
+                        "first_contact_distance": center_distance,
+                        "first_contact_overlap_area": overlap_area,
+                    },
+                )
+                overlap_contact_momentum = self.dynamics.overlap_momentum(
+                    overlap_area,
+                    center_distance,
+                    particle,
+                )
+                state["relative_normal_momentum"] = particle["mass"] * abs(normal_velocity)
+                state["overlap_contact_momentum"] = overlap_contact_momentum
+                state["last_relative_normal_velocity"] = normal_velocity
+                active_walls.add(wall_key)
+
+        for wall_key in list(self.wall_contact_state):
+            if wall_key not in active_walls:
+                self.finalize_exited_geo_wall_contact(wall_key, self.wall_contact_state[wall_key])
+                self.wall_contact_state.pop(wall_key, None)
+
+    def finalize_exited_geo_contact(self, source_index, target_index, state):
         if state.get("geo_phase") != "rebound":
             return
 
-        source_index, target_index = pair_key
         source_particle = self.particles[source_index]
         target_particle = self.particles[target_index]
         if source_particle.get("sltnum", 0) > 0 or target_particle.get("sltnum", 0) > 0:
@@ -894,6 +1297,26 @@ class Base:
         self.dynamics.sync_velocity_mirror(source_particle)
         self.dynamics.sync_velocity_mirror(target_particle)
 
+    def finalize_exited_geo_wall_contact(self, wall_key, state):
+        if state.get("geo_phase") != "rebound":
+            return
+        particle_index, _wall_flag = wall_key
+        particle = self.particles[particle_index]
+        if self.boundary_contact_count(particle) > 0:
+            return
+        if "first_contact_velocity" not in state or "first_contact_normal" not in state:
+            return
+
+        start_vx, start_vy = state["first_contact_velocity"]
+        nx, ny = state["first_contact_normal"]
+        incoming_speed = start_vx * nx + start_vy * ny
+        if incoming_speed <= 0.0:
+            return
+
+        particle["vx"] = start_vx - 2.0 * incoming_speed * nx
+        particle["vy"] = start_vy - 2.0 * incoming_speed * ny
+        self.dynamics.sync_velocity_mirror(particle)
+
     @staticmethod
     def empty_particle_contact():
         return {"pindex": 0, "clflg": 0}
@@ -901,6 +1324,48 @@ class Base:
     @staticmethod
     def empty_boundary_contact():
         return {"clflg": 0}
+
+    def empty_geo_contact_states(self):
+        return [
+            self.empty_geo_contact_state()
+            for _ in range(self.max_contacts_per_particle)
+        ]
+
+    @staticmethod
+    def empty_geo_contact_state():
+        return {
+            "active": False,
+            "target_index": None,
+            "touched": False,
+        }
+
+    def reset_geo_contact_state(self, state):
+        state.clear()
+        state.update(self.empty_geo_contact_state())
+
+    @staticmethod
+    def source_geo_contact_state(source_particle, target_index):
+        for state in source_particle.get("gcs", []):
+            if state.get("active", False) and state.get("target_index") == target_index:
+                return state
+        return None
+
+    def allocate_geo_contact_state(self, source_particle, target_index):
+        for state in source_particle.get("gcs", []):
+            if state.get("active", False) and state.get("target_index") == target_index:
+                return state
+        for state in source_particle.get("gcs", []):
+            if not state.get("active", False):
+                state.clear()
+                state.update(
+                    {
+                        "active": True,
+                        "target_index": target_index,
+                        "touched": False,
+                    }
+                )
+                return state
+        return None
 
     @staticmethod
     def wall_slot(wall_name):

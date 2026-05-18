@@ -16,4 +16,4 @@ common/push.glsl
 common/util.glsl
 common/move_particle.glsl
 common/dynamics_collision.glsl
-
+common/GeoDyamics.glsl

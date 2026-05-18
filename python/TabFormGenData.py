@@ -31,37 +31,6 @@ subprocess.__file__
 #import asyncio
 
 
-class WorkerSignals(QObject):
-    finished = pyqtSignal()
-    error = pyqtSignal(tuple)
-    result = pyqtSignal(object)
-    progress = pyqtSignal(float)
-
-class Worker(QRunnable):
-    def __init__(self, fn, *args, **kwargs):
-        super().__init__()
-        self.fn = fn
-        self.args = args
-        self.kwargs = kwargs
-        self.signals = WorkerSignals()
-        
-        # Add the callback to our kwargs
-        self.kwargs["progress_callback"] = self.signals.progress
-
-    @pyqtSlot()
-    def run(self):
-        try:
-            result = self.fn(*self.args, **self.kwargs)
-        except Exception:
-            traceback.print_exc()
-            exctype, value = sys.exc_info()[:2]
-            self.signals.error.emit((exctype, value, traceback.format_exc()))
-        else:
-            self.signals.result.emit(result)
-        finally:
-            self.signals.finished.emit()
-
-
 
 class TabGenData(QTabWidget):
     
@@ -111,41 +80,41 @@ class TabGenData(QTabWidget):
     # Load the configuration data
     #
     def load_item_cfg(self,file):
-            self.setFocus()
-            self.CfgFile = file
-            self.texFolder = os.path.dirname(self.CfgFile)
-            self.texFileName = os.path.splitext(os.path.basename(self.CfgFile))[0]
-            self.dirEdit.setText(self.CfgFile)
+        self.setFocus()
+        self.CfgFile = file
+        self.texFolder = os.path.dirname(self.CfgFile)
+        self.texFileName = os.path.splitext(os.path.basename(self.CfgFile))[0]
+        self.dirEdit.setText(self.CfgFile)
 
-            # Open the item configuration filke
-            try :
-                self.itemcfgFile = ConfigUtility(self.CfgFile)
-                self.itemcfgFile.Create(self.bobj.log,self.CfgFile)
-                self.itemcfg = self.itemcfgFile.config
-                
-            except BaseException as e:
-                self.log.log(self,f"Unable to open item configurations file:{e}")
-                self.hasConfig = False
-                return 
-            try:
-                notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
-                subprocess.Popen([notepad_plus_plus_path, self.CfgFile])
-                mod_path = self.itemcfg.module_dir
-                mod_name = self.itemcfg.module_class
-                full_path = os.path.join(mod_path, mod_name)
-                # Import the class named in generate_class
-                self.gen_class = load_class_from_file(full_path)()
-                #self.gen_class = self.load_class(self.itemcfg.generate_class)()
-                self.gen_class.create(self,self.itemcfg) 
-            except BaseException as e:
-                self.log.log(self,f"Unable to import data generation file: error:{e}")
-                return 
+        # Open the item configuration filke
+        try :
+            self.itemcfgFile = ConfigUtility(self.CfgFile)
+            self.itemcfgFile.Create(self.bobj.log,self.CfgFile)
+            self.itemcfg = self.itemcfgFile.config
+            
+        except BaseException as e:
+            self.log.log(self,f"Unable to open item configurations file:{e}")
+            self.hasConfig = False
+            return 
+        try:
+            notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
+            subprocess.Popen([notepad_plus_plus_path, self.CfgFile])
+            mod_path = self.itemcfg.module_dir
+            mod_name = self.itemcfg.module_class
+            full_path = os.path.join(mod_path, mod_name)
+            # Import the class named in generate_class
+            self.gen_class = load_class_from_file(full_path)()
+            #self.gen_class = self.load_class(self.itemcfg.generate_class)()
+            self.gen_class.create(self,self.itemcfg) 
+        except BaseException as e:
+            self.log.log(self,f"Unable to import data generation file: error:{e}")
+            return 
 
-            self.plot_obj.create(self.itemcfg,self)
-            # update the list
-            self.update_list_widget()
-            # Enable to generate data
-            self.GenDataButton.setEnabled(True)
+        self.plot_obj.create(self.itemcfg,self)
+        # update the list
+        self.update_list_widget()
+        # Enable to generate data
+        self.GenDataButton.setEnabled(True)
             
 
 
@@ -166,54 +135,8 @@ class TabGenData(QTabWidget):
         # If a valid configuation file name is returned
         if folder[0]:
             self.load_item_cfg(folder[0])
-    '''
-    #******************************************************************
-    # Dynamically load the class
-    #           
-    def load_class(self,class_name):
-        module_name, class_name = class_name.rsplit('.', 1)
-        module = importlib.import_module(module_name)
-        return getattr(module, class_name)
-        #return GenPQBData
-
-    '''
-    ##############################################################################
-    # Generate data stuff
-    # 
-    ##############################################################################
-    #******************************************************************
-    # Start the data threaded generaton process
-    #
-    '''
-    def gen_tst_files(self):
-         # Pass the function to execute
-        index = 0
-        self.current_test_file = 0
-        
-        # Create the data directory if it does not exist
-        try:
-            if not os.path.exists(self.itemcfg.data_dir):
-                os.makedirs(self.itemcfg.data_dir)
-        except BaseException as e1:
-            self.log.log(self,f"Error creating data directory:{self.itemcfg.data_dir}, err: {e1}")
-            return
-        # Open the selections file
-        self.gen_class.clear_selections()
-        try :
-            self.gen_class.open_selections_file()
-        except BaseException as e2:
-            self.log.log(self,f"Error opening:{self.itemcfg.selections_file}, err: {e2}")
-            return
-        clear_files(self.itemcfg)
-        self.gen_class.do_all_files_dbg()
-        #self.start_thread()
-    '''
+ 
    
-        
-   
-    
-    def calc_test_parms(self):
-        pass
     #******************************************************************
     # Generate the data
     #
@@ -221,7 +144,6 @@ class TabGenData(QTabWidget):
          # Pass the function to execute
         index = 0
         self.current_test_file = 0
-        
         self.gen_class.openSelectionsFile()
         self.gen_class.clear_files()
         self.gen_class.do_all_files_dbg()
@@ -239,76 +161,13 @@ class TabGenData(QTabWidget):
     def print_output(self, s):
         print(s)
 
-    '''
-    #******************************************************************
-    # Set up and start the thread
-    #
-    def start_thread(self):
-        try :
-            self.terminal.clear()
-            worker = Worker(self.do_one_file )  # Any other args, kwargs are passed to the run function
-            worker.signals.result.connect(self.print_output)
-            worker.signals.finished.connect(self.thread_complete)
-            worker.signals.progress.connect(self.update_terminal)
-            # Execute
-            self.threadpool.start(worker)
-        except BaseException as e:
-            print(f"Start Thread Failed:{e}")
-
-    #******************************************************************
-    # Thread that does one file set
-    #
-    
-    def do_one_file(self,progress_callback):
-
-        index = self.current_test_file
-        try:
-            self.gen_class.gen_data_base(index,progress_callback)
-        except BaseException as e3:
-            print("Thread Error")
-            raise BaseException(f"Error writing test file err:{e3}")
-            
-        return ""
-
-    #******************************************************************
-    # Thread that does all filed without threads (for testing)
-    #
-    #     
-    #******************************************************************
-    def do_all_files_dbg(self):
-        index = 0
-        self.gen_class.do_all_files_dbg()
-        self.update_list_widget()
-
-    #******************************************************************
-    # Thread is complete start a new thread for the next file if there is any
-    #
-    def thread_complete(self):
-        self.current_test_file+=1
-        if (self.current_test_file >= len(self.gen_class.select_list)) :
-            print(f"Data Set Complete")
-            self.update_list_widget()
-            return
-          # Pass the function to execute
-        print(f"Next Thread index:{self.current_test_file}")
-        self.start_thread()
-    '''
     #******************************************************************
     # Update the terminal window
     #
     def update_terminal(self,n):
         print(f"{n:.3f}% done")
         self.terminal.append(f"{n:.3f}% done")
-
-   
-    #******************************************************************
-    # Read the data from a file and return os as 
-    #
-    
-    #******************************************************************
-    # Read the data from a file and return os as 
-    #
-   
+  
     #******************************************************************
     # List a subset of particles to chgeck location and numers
     #
