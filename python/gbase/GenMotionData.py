@@ -144,29 +144,14 @@ class GenMotionData():
         f.write(fstr)
         fstr = f"NEO_COLLISION_STIFFNESS_Q = {run_cfg.collision_stiffness_q:0.2f};\n"
         f.write(fstr)
+        rebound_min_fraction = getattr(run_cfg, "geo_rebound_min_fraction", 0.02)
+        fstr = f"geo_rebound_min_fraction = {rebound_min_fraction:0.2f};\n"
+        f.write(fstr)
         f.flush()
         f.close()
 
     def runner(self):
         config = None
-        '''
-        cfg_study_name = self.itemcfg.simulation_file
-        cfg_study_dir = self.itemcfg.simulation_dir
-        cfg_file = f"{cfg_study_dir}/{cfg_study_name}"
-
-        
-        try:
-            with io.open(cfg_file) as f:
-                #self.log.log(self,"gPCD into Open config file.")
-                config = libconf.load(f)
-        except IOError as e:
-            print("gPCD failed to open config file: " + cfg_file)
-            return
-        except libconf.ConfigParseError as e:
-            print("gPCD failed to parse config file: " + cfg_file)
-            print(e)
-            return
-        '''
         self.p_list = []
         self.add_null_particle(self.p_list)
         self.index = 0
@@ -202,4 +187,4 @@ class GenMotionData():
         self.create_bin_file()
         self.write_bin_file(self.p_list)
         self.close_bin_file()
-        print(f"TwoParticleHorizontal: Wrote {self.number_particles} particles to {self.test_bin_name}")
+        print(f"TwoParticleHorizontal: Wrote {self.number_particles} plus 1 null particle to {self.test_bin_name}")

@@ -3,7 +3,7 @@
 \begin{enumerate}
     \item The collision model must remain an overlap-geometry model. Collision state is determined from particle and wall overlap geometry, not from an unrelated force proxy.
 
-    \item Capture report files, named \texttt{CapXXXXXX.rpt}, are written to \texttt{C:\textbackslash\_DJ\textbackslash gPCDData\textbackslash examples}.
+    \item Capture report files, named \texttt{CapXXXXXX.rpt}, are written to \texttt{C:\textbackslash\_DJ\textbackslash gPCDData\textbackslash examples\textbackslash reports}.
 
     \item The simulation must remain parallel friendly. A source particle may read target-particle information, but it should write only to source-owned storage.
 
@@ -15,6 +15,20 @@
 
     \item The zero-velocity point is the point of maximum penetration where the normal component of relative velocity changes from inbound/compression to outbound/rebound.
 
+    \item Wall contact detection remains wall-specific: a wall collision is detected when the distance from the particle center to the wall is less than the particle radius.
+
+    \item After wall contact detection, wall contacts are treated as particle-style contacts against a virtual wall ghost. The wall ghost is not a real particle in the particle list and is not integrated by the motion step.
+
+    \item The wall ghost center lies on the wall along the wall normal through the real particle center. For top and bottom walls the ghost uses the particle's current \(x\)-coordinate; for left and right walls it uses the particle's current \(y\)-coordinate. If the particle slides along the wall, the ghost position slides with it.
+
+    \item The wall collision normal is always the wall normal, regardless of the particle's travel direction. Tangential velocity is not used to rotate the wall contact normal.
+
+    \item For wall overlap geometry, the ghost is an equal-radius contact proxy, but the effective pair center distance is \(2s\), where \(s\) is the particle center distance from the wall. This makes wall contact begin at \(s < r\), while still using equal-radius pair overlap area.
+
+    \item The wall ghost copies the real particle's radius and contact material parameters for geometry and contact-law evaluation. The current implementation treats the ghost as a fixed virtual target for dynamics by assigning it a very large effective mass and zero velocity.
+
+    \item The wall ghost receives no integrated position update and no persistent velocity update. Any ghost rebound velocity calculated by the pair collision machinery is discarded; only the real particle velocity is applied.
+
     \item The current Neo model computes the zero-velocity penetration from the force law
     \[
         F(\alpha) = Q \alpha^2
@@ -23,7 +37,7 @@
     \[
         \alpha_0 = \left(\frac{3 \mu v_{in}^2}{2Q}\right)^{1/3}
     \]
-    for particle-particle contacts. For wall contacts, the particle mass is used in place of reduced mass.
+    for particle-particle contacts. For wall contacts, the fixed virtual ghost makes the effective reduced mass approximately the real particle mass.
 
     \item Collision stiffness, \(Q\), is global for now and is configured by \texttt{collision\_stiffness\_q}. Per-particle stiffness is a possible future extension, but it is not part of the current model.
 
@@ -31,7 +45,31 @@
 
     \item Contact state is source-owned. For GPU parity with Python, each source particle needs contact-state memory that stores target or wall id, contact type, phase, first-contact velocities, first-contact normal, \(A_0\), and zero-center distance.
 
-    \item Particle-particle and wall contacts can share one contact-state structure. The contact type distinguishes particle contacts from wall contacts.
+    \item Particle-particle and wall contacts share one collision-dynamics path. The contact type distinguishes real particle targets from fixed virtual wall ghosts.
+
+    \item Pair contacts are report edges, not independent owners of collision response. Each detected particle-particle contact should still produce pair-level contact state and capture-report line items so that contact geometry, phase, normal momentum, stored internal momentum, and release state remain inspectable.
+
+    \item Collision response is owned by the connected contact graph. If contacts connect particles into one component, that connected component is treated as one collision body for response during the current time step. For example, if particle \(0\) contacts particle \(1\), and particle \(0\) also contacts particle \(2\), then particles \(0\), \(1\), and \(2\) form one collision cluster.
+
+    \item A particle must receive at most one response velocity from its active collision cluster in a time step. Pair-level responses inside the same connected component must not be independently applied and summed, because that double-counts shared momentum when one particle participates in multiple contacts.
+
+    \item Different disconnected collision clusters are independent and may be solved in parallel. Parallelism is therefore preserved at the cluster level: contact detection and pair-state reporting remain particle-local, while response application is one write per particle from its owning cluster.
+
+    \item Cluster internal momentum is a contact-space quantity owned by the collision cluster. It is accumulated over the unique active contact constraints in the cluster, not over directed pair report rows. A particle-particle contact contributes once, even though it may appear as two source-owned report rows. A wall contact contributes once as a fixed wall constraint attached to the particle cluster.
+
+    \item For a contact \(k\), the scalar internal momentum components are tracked along that contact normal: \(I_k\) for current internal normal momentum, \(S_k\) for stored internal normal momentum, \(R_k\) for released internal normal momentum, and \(M_k\) for remaining internal normal momentum. The cluster scalar quantities are
+    \[
+        I_C = \sum_{k \in C} I_k,\quad
+        S_C = \sum_{k \in C} S_k,\quad
+        R_C = \sum_{k \in C} R_k,\quad
+        M_C = \sum_{k \in C} M_k.
+    \]
+
+    \item The cluster may also report a normal-basis resultant
+    \[
+        \vec I_C = \sum_{k \in C} I_k \hat n_k
+    \]
+    as a diagnostic for the dominant direction of stored contact pressure. This vector is not an externally applied momentum by itself; it is a report-space summary of the active contact normals.
 
     \item The old \texttt{ccs} and \texttt{bcs} contact lists are obsolete once unified Neo contact state is used.
 

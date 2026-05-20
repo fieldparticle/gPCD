@@ -168,6 +168,13 @@ class NeoDynamics:
 
         turn_impulse = incoming_relative_normal_momentum
         rebound_impulse = 2.0 * incoming_relative_normal_momentum
+        zero_internal_normal_momentum = incoming_relative_normal_momentum
+        compression_stored_internal_momentum = zero_internal_normal_momentum * compression_progress
+        rebound_released_internal_momentum = zero_internal_normal_momentum * rebound_velocity_fraction
+        rebound_remaining_internal_momentum = max(
+            0.0,
+            zero_internal_normal_momentum - rebound_released_internal_momentum,
+        )
 
         source_turn_vx = source_vx - (turn_impulse / source_mass) * nx
         source_turn_vy = source_vy - (turn_impulse / source_mass) * ny
@@ -184,18 +191,18 @@ class NeoDynamics:
         target_rebound_vx = target_vx + (rebound_impulse / target_mass) * nx
         target_rebound_vy = target_vy + (rebound_impulse / target_mass) * ny
 
-        source_current_rebound_vx = source_turn_vx + rebound_velocity_fraction * (
-            source_rebound_vx - source_turn_vx
-        )
-        source_current_rebound_vy = source_turn_vy + rebound_velocity_fraction * (
-            source_rebound_vy - source_turn_vy
-        )
-        target_current_rebound_vx = target_turn_vx + rebound_velocity_fraction * (
-            target_rebound_vx - target_turn_vx
-        )
-        target_current_rebound_vy = target_turn_vy + rebound_velocity_fraction * (
-            target_rebound_vy - target_turn_vy
-        )
+        source_current_rebound_vx = source_turn_vx - (
+            rebound_released_internal_momentum / source_mass
+        ) * nx
+        source_current_rebound_vy = source_turn_vy - (
+            rebound_released_internal_momentum / source_mass
+        ) * ny
+        target_current_rebound_vx = target_turn_vx + (
+            rebound_released_internal_momentum / target_mass
+        ) * nx
+        target_current_rebound_vy = target_turn_vy + (
+            rebound_released_internal_momentum / target_mass
+        ) * ny
 
         return {
             "source_index": source_index,
@@ -226,6 +233,10 @@ class NeoDynamics:
             "rebound_velocity_fraction": rebound_velocity_fraction,
             "turn_impulse": turn_impulse,
             "rebound_impulse": rebound_impulse,
+            "zero_internal_normal_momentum": zero_internal_normal_momentum,
+            "compression_stored_internal_momentum": compression_stored_internal_momentum,
+            "rebound_released_internal_momentum": rebound_released_internal_momentum,
+            "rebound_remaining_internal_momentum": rebound_remaining_internal_momentum,
             "source_velocity_at_starting_contact_x": source_vx,
             "source_velocity_at_starting_contact_y": source_vy,
             "target_velocity_at_starting_contact_x": target_vx,

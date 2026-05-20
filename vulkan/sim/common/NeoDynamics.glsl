@@ -311,7 +311,20 @@ vec2 NeoPairVelocityPrediction(uint source_id, uint slot, float overlap_area)
     }
 
     float rebound_velocity_fraction = sqrt(max(0.0, 1.0 - compression_fraction));
-    return mix(turn_velocity, full_rebound_velocity, rebound_velocity_fraction);
+    vec2 predicted_velocity = mix(turn_velocity, full_rebound_velocity, rebound_velocity_fraction);
+
+    vec2 target_turn_velocity = target_start + (incoming_momentum / target_mass) * normal;
+    vec2 target_full_rebound_velocity = target_start + (2.0 * incoming_momentum / target_mass) * normal;
+    vec2 predicted_target_velocity = mix(target_turn_velocity, target_full_rebound_velocity, rebound_velocity_fraction);
+
+    float start_closing_speed = max(0.0, -dot(start_rel, normal));
+    float minimum_outward_speed = NeoReboundMinFraction(source_id) * start_closing_speed;
+    float rel_normal_velocity = dot(predicted_target_velocity - predicted_velocity, normal);
+    if (rel_normal_velocity < minimum_outward_speed) {
+        float correction = minimum_outward_speed - rel_normal_velocity;
+        predicted_velocity -= 0.5 * correction * normal;
+    }
+    return predicted_velocity;
 }
 
 vec2 NeoWallVelocityPrediction(uint source_id, uint slot, float overlap_area)
@@ -358,8 +371,8 @@ void NeoProcessCollision(uint source_id)
         }
     }
 
-    vec2 velocity_sum = vec2(0.0);
-    uint velocity_count = 0u;
+    vec2 combined_velocity = P[source_id].VelRad.xy;
+    bool has_prediction = false;
     uint tracked_count = min(P[source_id].contactCount, MAX_CONTACTS);
 
     for (uint slot = 0u; slot < tracked_count; ++slot) {
@@ -392,12 +405,16 @@ void NeoProcessCollision(uint source_id)
             continue;
         }
 
-        velocity_sum += predicted_velocity;
-        velocity_count += 1u;
+        vec2 start_velocity = P[source_id].ncs[slot].vel.xy;
+        if (!has_prediction) {
+            combined_velocity = start_velocity;
+            has_prediction = true;
+        }
+        combined_velocity += predicted_velocity - start_velocity;
     }
 
-    if (velocity_count > 0u) {
-        P[source_id].VelRad.xy = velocity_sum / float(velocity_count);
+    if (has_prediction) {
+        P[source_id].VelRad.xy = combined_velocity;
         P[source_id].VelRad.w = length(P[source_id].VelRad.xy) > 0.0 ? atan(P[source_id].VelRad.y, P[source_id].VelRad.x) : 0.0;
         P[source_id].colFlg = 1u;
     }

@@ -6,6 +6,7 @@ import math
 from gbase.pdata import *
 from gbase.libconf import AttrDict
 import io
+from gbase.BinaryFileUtilities import clear_files, read_all_particle_data
 class GenParticlesInBox():
 
     local_particles_in_row = 0
@@ -170,6 +171,7 @@ class GenParticlesInBox():
                     particle_struct.vz = 0.0
                     particle_struct.molar_mass = 1.0
                     particle_struct.radius = 0.25
+                    particle_struct.state_flg = 1.0
                     self.p_list.append(particle_struct)
                     
         except BaseException as e:

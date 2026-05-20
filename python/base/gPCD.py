@@ -47,7 +47,7 @@ class Demo:
         self.config = {} if run_configuration is None else dict(run_configuration)
         if not self.validate_run_configuration():
             return False
-        self.report_capture_dir = Path(self.config.get("data_dir", Path.cwd()))
+        self.report_capture_dir = Path(self.config.get("data_dir", Path.cwd())) / "reports"
         self.clear_report_captures()
         self.rpt_frames = self.normalized_report_frames(self.config.get("rpt_frames", []))
         self.captured_report_frames = set()
@@ -424,17 +424,28 @@ class Demo:
             rel_normal_momentum = reduced_mass * abs(rel_normal_velocity)
             contact_state = self.base.source_geo_contact_state(source_particle, target_index) or {}
             internal_contact_momentum = contact_state.get("internal_contact_momentum", 0.0)
+            neo_internal_normal_momentum = contact_state.get("neo_internal_normal_momentum", 0.0)
+            neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
+            neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
+            neo_remaining_internal_momentum = contact_state.get("neo_rebound_remaining_normal_momentum", 0.0)
             overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
             last_relative_normal_velocity = contact_state.get(
                 "last_relative_normal_velocity",
                 rel_normal_velocity,
             )
+            zero_source = contact_state.get("geo_zero_velocity_source", "")
+            motion_mode = contact_state.get("neo_motion_mode", "")
             phase = "closing" if rel_normal_velocity < 0.0 else "separating"
             diagnostics.append(
                 f"c{source_index}->{target_index} reln={rel_normal_velocity:.8f} "
                 f"rmass={reduced_mass:.8f} relp={rel_normal_momentum:.8f} "
                 f"omom={overlap_contact_momentum:.8f} cinternal={internal_contact_momentum:.8f} "
-                f"last_reln={last_relative_normal_velocity:.8f} phase={phase}"
+                f"nimom={neo_internal_normal_momentum:.8f} "
+                f"istore={neo_stored_internal_momentum:.8f} "
+                f"irel={neo_released_internal_momentum:.8f} "
+                f"irem={neo_remaining_internal_momentum:.8f} "
+                f"last_reln={last_relative_normal_velocity:.8f} phase={phase} "
+                f"mode={motion_mode} zsrc={zero_source}"
             )
         for contact_record in source_particle.get("bcs", []):
             wall_flag = contact_record.get("clflg", 0)
@@ -450,7 +461,12 @@ class Demo:
             wall_key = (source_index, wall_flag)
             contact_state = self.base.wall_contact_state.get(wall_key, {})
             overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
+            neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
+            neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
+            neo_remaining_internal_momentum = contact_state.get("neo_rebound_remaining_normal_momentum", 0.0)
             last_normal_velocity = contact_state.get("last_relative_normal_velocity", normal_velocity)
+            zero_source = contact_state.get("geo_zero_velocity_source", "")
+            motion_mode = contact_state.get("neo_motion_mode", "")
             phase = contact_state.get(
                 "geo_phase",
                 "closing" if normal_velocity > 0.0 else "separating",
@@ -459,13 +475,18 @@ class Demo:
                 f"w{self.wall_name(wall_flag)} vn={normal_velocity:.8f} "
                 f"p={source_particle['mass'] * abs(normal_velocity):.8f} "
                 f"omom={overlap_contact_momentum:.8f} "
-                f"last_vn={last_normal_velocity:.8f} phase={phase}"
+                f"istore={neo_stored_internal_momentum:.8f} "
+                f"irel={neo_released_internal_momentum:.8f} "
+                f"irem={neo_remaining_internal_momentum:.8f} "
+                f"last_vn={last_normal_velocity:.8f} phase={phase} "
+                f"mode={motion_mode} zsrc={zero_source}"
             )
         return diagnostics
 
     def compact_particle_capture_report_lines(self):
         lines = []
         for index, particle in enumerate(self.base.particles):
+            x, y = self.base.current_location(particle)
             momentum_x = particle["mass"] * particle["vx"]
             momentum_y = particle["mass"] * particle["vy"]
             particle_momentum = math.hypot(momentum_x, momentum_y)
@@ -473,12 +494,16 @@ class Demo:
                 [
                     "",
                     f"[particle p{index} Neo ]",
+                    f"loc: ({x:.8f}, {y:.8f})",
                     f"px: {momentum_x:.8f}",
                     f"py: {momentum_y:.8f}",
                     f"|p|: {particle_momentum:.8f}",
                     f"start: {particle.get('starting_momentum', 0.0):.8f}",
                     f"dpx: {particle.get('momentum_delta_x', 0.0):.8f}",
                     f"dpy: {particle.get('momentum_delta_y', 0.0):.8f}",
+                    "nimom: "
+                    f"({particle.get('neo_internal_momentum_x', 0.0):.8f}, "
+                    f"{particle.get('neo_internal_momentum_y', 0.0):.8f})",
                     f"v: ({particle['vx']:.8f}, {particle['vy']:.8f})",
                     "v0: "
                     f"({particle.get('starting_uncorrected_vx', particle['vx']):.8f}, "
@@ -491,6 +516,193 @@ class Demo:
                 lines.append("contacts:")
                 lines.extend(contact_lines)
         return lines
+
+    def cluster_capture_report_lines(self):
+        pairs = self.active_particle_contact_pairs()
+        wall_contacts = self.active_wall_contacts()
+        clusters = [set(cluster) for cluster in self.base.pair_contact_clusters(pairs)]
+
+        clustered_particles = set()
+        for cluster in clusters:
+            clustered_particles.update(cluster)
+
+        for particle_index, _wall_flag in wall_contacts:
+            if particle_index not in clustered_particles:
+                clusters.append({particle_index})
+                clustered_particles.add(particle_index)
+
+        if not clusters:
+            return []
+
+        lines = ["", "[clusters]"]
+        for cluster_index, cluster in enumerate(clusters):
+            particle_indices = sorted(cluster)
+            cluster_pairs = [
+                pair for pair in pairs if pair[0] in cluster and pair[1] in cluster
+            ]
+            cluster_walls = [
+                (particle_index, wall_flag)
+                for particle_index, wall_flag in wall_contacts
+                if particle_index in cluster
+            ]
+            phases, modes = self.cluster_phase_modes(cluster_pairs, cluster_walls)
+            current_px, current_py, current_ke = self.cluster_current_momentum_energy(particle_indices)
+            start_px, start_py, start_ke = self.cluster_start_momentum_energy(particle_indices)
+            cimom_x, cimom_y, cimom, cistore, cirel, cirem = self.cluster_internal_momentum_totals(
+                cluster_pairs,
+                cluster_walls,
+            )
+            contact_labels = [f"{source}-{target}" for source, target in cluster_pairs]
+            contact_labels.extend(
+                f"{particle_index}-{self.wall_name(wall_flag)}"
+                for particle_index, wall_flag in cluster_walls
+            )
+            if not contact_labels:
+                contact_labels = ["none"]
+
+            lines.extend(
+                [
+                    "",
+                    f"[cluster c{cluster_index}]",
+                    "particles=" + ",".join(f"p{index}" for index in particle_indices),
+                    "contacts=" + ",".join(contact_labels),
+                    "phase=" + ",".join(phases),
+                    "mode=" + ",".join(modes),
+                    f"p_start=({start_px:.8f}, {start_py:.8f})",
+                    f"p_current=({current_px:.8f}, {current_py:.8f})",
+                    f"ke_start={start_ke:.8f}",
+                    f"ke_current={current_ke:.8f}",
+                    f"cimom={cimom:.8f}",
+                    f"cimom_vec=({cimom_x:.8f}, {cimom_y:.8f})",
+                    f"cistore={cistore:.8f}",
+                    f"cirel={cirel:.8f}",
+                    f"cirem={cirem:.8f}",
+                ]
+            )
+        return lines
+
+    def active_particle_contact_pairs(self):
+        pairs = []
+        seen = set()
+        for source_index, source_particle in enumerate(self.base.particles):
+            for slot in range(source_particle.get("sltnum", 0)):
+                contact_record = source_particle["ccs"][slot]
+                if contact_record.get("clflg", 0) == 0:
+                    continue
+                target_index = contact_record["pindex"]
+                pair = tuple(sorted((source_index, target_index)))
+                if pair in seen:
+                    continue
+                if self.base.particle_contact(
+                    self.base.particles[pair[0]],
+                    self.base.particles[pair[1]],
+                ) is None:
+                    continue
+                seen.add(pair)
+                pairs.append(pair)
+        return pairs
+
+    def active_wall_contacts(self):
+        contacts = []
+        for particle_index, particle in enumerate(self.base.particles):
+            for contact_record in particle.get("bcs", []):
+                wall_flag = contact_record.get("clflg", 0)
+                if wall_flag == 0:
+                    continue
+                if self.base.wall_contact(particle, wall_flag, self.base.walls) is None:
+                    continue
+                contacts.append((particle_index, wall_flag))
+        return contacts
+
+    def cluster_phase_modes(self, cluster_pairs, cluster_walls):
+        phases = set()
+        modes = set()
+        for source_index, target_index in cluster_pairs:
+            state = self.base.source_geo_contact_state(
+                self.base.particles[source_index],
+                target_index,
+            ) or self.base.source_geo_contact_state(
+                self.base.particles[target_index],
+                source_index,
+            ) or {}
+            phases.add(state.get("geo_phase", "unknown"))
+            modes.add(state.get("neo_motion_mode", "unknown"))
+        for wall_key in cluster_walls:
+            state = self.base.wall_contact_state.get(wall_key, {})
+            phases.add(state.get("geo_phase", "unknown"))
+            modes.add(state.get("neo_motion_mode", "unknown"))
+        return sorted(phases or {"none"}), sorted(modes or {"none"})
+
+    def cluster_current_momentum_energy(self, particle_indices):
+        momentum_x = 0.0
+        momentum_y = 0.0
+        kinetic_energy = 0.0
+        for index in particle_indices:
+            particle = self.base.particles[index]
+            momentum_x += particle["mass"] * particle["vx"]
+            momentum_y += particle["mass"] * particle["vy"]
+            kinetic_energy += 0.5 * particle["mass"] * (
+                particle["vx"] * particle["vx"] + particle["vy"] * particle["vy"]
+            )
+        return momentum_x, momentum_y, kinetic_energy
+
+    def cluster_start_momentum_energy(self, particle_indices):
+        momentum_x = 0.0
+        momentum_y = 0.0
+        kinetic_energy = 0.0
+        for index in particle_indices:
+            particle = self.base.particles[index]
+            vx = particle.get("starting_uncorrected_vx", particle["vx"])
+            vy = particle.get("starting_uncorrected_vy", particle["vy"])
+            momentum_x += particle["mass"] * vx
+            momentum_y += particle["mass"] * vy
+            kinetic_energy += 0.5 * particle["mass"] * (vx * vx + vy * vy)
+        return momentum_x, momentum_y, kinetic_energy
+
+    def cluster_internal_momentum_totals(self, cluster_pairs, cluster_walls):
+        cimom_x = 0.0
+        cimom_y = 0.0
+        cimom = 0.0
+        cistore = 0.0
+        cirel = 0.0
+        cirem = 0.0
+        for source_index, target_index in cluster_pairs:
+            source_particle = self.base.particles[source_index]
+            target_particle = self.base.particles[target_index]
+            contact = self.base.particle_contact(source_particle, target_particle)
+            if contact is None:
+                continue
+            nx, ny, _overlap_area, _center_distance = contact
+            state = self.base.source_geo_contact_state(
+                source_particle,
+                target_index,
+            ) or self.base.source_geo_contact_state(
+                target_particle,
+                source_index,
+            ) or {}
+            contact_internal_momentum = state.get("neo_internal_normal_momentum", 0.0)
+            cimom_x += contact_internal_momentum * nx
+            cimom_y += contact_internal_momentum * ny
+            cimom += contact_internal_momentum
+            cistore += state.get("neo_stored_internal_normal_momentum", 0.0)
+            cirel += state.get("neo_rebound_released_normal_momentum", 0.0)
+            cirem += state.get("neo_rebound_remaining_normal_momentum", 0.0)
+        for wall_key in cluster_walls:
+            particle_index, wall_flag = wall_key
+            particle = self.base.particles[particle_index]
+            contact = self.base.wall_contact(particle, wall_flag, self.base.walls)
+            if contact is None:
+                continue
+            nx, ny, _overlap_area, _center_distance = contact
+            state = self.base.wall_contact_state.get(wall_key, {})
+            contact_internal_momentum = state.get("neo_internal_normal_momentum", 0.0)
+            cimom_x += contact_internal_momentum * nx
+            cimom_y += contact_internal_momentum * ny
+            cimom += contact_internal_momentum
+            cistore += state.get("neo_stored_internal_normal_momentum", 0.0)
+            cirel += state.get("neo_rebound_released_normal_momentum", 0.0)
+            cirem += state.get("neo_rebound_remaining_normal_momentum", 0.0)
+        return cimom_x, cimom_y, cimom, cistore, cirel, cirem
 
     def particle_contact_capture_lines(self, source_index, source_particle):
         lines = []
@@ -514,11 +726,17 @@ class Demo:
             rel_normal_momentum = reduced_mass * abs(rel_normal_velocity)
             contact_state = self.base.source_geo_contact_state(source_particle, target_index) or {}
             internal_contact_momentum = contact_state.get("internal_contact_momentum", 0.0)
+            neo_internal_normal_momentum = contact_state.get("neo_internal_normal_momentum", 0.0)
+            neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
+            neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
+            neo_remaining_internal_momentum = contact_state.get("neo_rebound_remaining_normal_momentum", 0.0)
             overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
             last_relative_normal_velocity = contact_state.get(
                 "last_relative_normal_velocity",
                 rel_normal_velocity,
             )
+            zero_source = contact_state.get("geo_zero_velocity_source", "")
+            motion_mode = contact_state.get("neo_motion_mode", "")
             phase = "closing" if rel_normal_velocity < 0.0 else "separating"
             lines.extend(
                 [
@@ -530,7 +748,13 @@ class Demo:
                     f"relp={rel_normal_momentum:.8f}",
                     f"omom={overlap_contact_momentum:.8f}",
                     f"cinternal={internal_contact_momentum:.8f}",
+                    f"nimom={neo_internal_normal_momentum:.8f}",
+                    f"istore={neo_stored_internal_momentum:.8f}",
+                    f"irel={neo_released_internal_momentum:.8f}",
+                    f"irem={neo_remaining_internal_momentum:.8f}",
                     f"last_reln={last_relative_normal_velocity:.8f}",
+                    f"mode={motion_mode}",
+                    f"zsrc={zero_source}",
                     f"phase={phase}",
                 ]
             )
@@ -552,7 +776,12 @@ class Demo:
             wall_key = (source_index, wall_flag)
             contact_state = self.base.wall_contact_state.get(wall_key, {})
             overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
+            neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
+            neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
+            neo_remaining_internal_momentum = contact_state.get("neo_rebound_remaining_normal_momentum", 0.0)
             last_normal_velocity = contact_state.get("last_relative_normal_velocity", normal_velocity)
+            zero_source = contact_state.get("geo_zero_velocity_source", "")
+            motion_mode = contact_state.get("neo_motion_mode", "")
             phase = contact_state.get(
                 "geo_phase",
                 "closing" if normal_velocity > 0.0 else "separating",
@@ -565,7 +794,12 @@ class Demo:
                     f"vn={normal_velocity:.8f}",
                     f"p={source_particle['mass'] * abs(normal_velocity):.8f}",
                     f"omom={overlap_contact_momentum:.8f}",
+                    f"istore={neo_stored_internal_momentum:.8f}",
+                    f"irel={neo_released_internal_momentum:.8f}",
+                    f"irem={neo_remaining_internal_momentum:.8f}",
                     f"last_vn={last_normal_velocity:.8f}",
+                    f"mode={motion_mode}",
+                    f"zsrc={zero_source}",
                     f"area={overlap_area:.8f}",
                     f"center_distance={center_distance:.8f}",
                     f"phase={phase}",
@@ -680,6 +914,8 @@ class Demo:
                 f"recycled={self.base.recycled_count} "
                 f"escaped={self.base.escaped_count}\n"
             )
+            for line in self.cluster_capture_report_lines():
+                outfile.write(f"{line}\n")
             outfile.write("\n[particles]\n")
             for line in self.compact_particle_capture_report_lines():
                 outfile.write(f"{line}\n")

@@ -194,6 +194,8 @@ void  ShaderObj::WriteShaderHeader()
 		uint32_t MaxLoc = static_cast<uint32_t>(CfgTst->GetUInt("CellAryW", true)
 											  * CfgTst->GetUInt("CellAryH", true) 
 											  * CfgTst->GetUInt("CellAryL", true));
+		double neoReboundMinFraction = 0.02;
+		config_lookup_float(&CfgTst->m_cfg, "geo_rebound_min_fraction", &neoReboundMinFraction);
         std::ofstream ostrm(filename);
 		if (!ostrm.is_open())
 		{
@@ -222,7 +224,7 @@ void  ShaderObj::WriteShaderHeader()
 			<< "const uint doMotion = " << motion_str << ";\n"
 			<< "const uint MAX_CELL_ARRAY_LOCATIONS =" << m_CMO->m_MaxLoc << ";\n"
 			<< "const float NEO_COLLISION_STIFFNESS_Q=" << CfgTst->GetFloat("NEO_COLLISION_STIFFNESS_Q", true) << ";\n"
-			<< "const float NEO_REBOUND_MIN_FRACTION=" << CfgTst->GetFloat("geo_rebound_min_fraction", false) << ";\n"
+			<< "const float NEO_REBOUND_MIN_FRACTION=" << neoReboundMinFraction << ";\n"
 				//##JMBDont know what this is
 			<< "const uint compflag =" << compflag << ";\n"
 			<< "const uint bbound =" << m_VPO->BoundaryParticleLimit << ";\n";

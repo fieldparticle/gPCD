@@ -1,19 +1,56 @@
 
+"""Binary particle record shared by Python data generators and Vulkan.
+
+This module defines the on-disk particle record written to ``*.bin`` files by
+the Python generators and read by the Vulkan particle loader. The field order,
+field type, and total size are part of the binary file format. Keep this
+structure in sync with ``vulkan/src/VulkanObj/pdata.hpp``.
+
+The first record in generated motion files is usually a null particle with
+``pnum == 0``. Vulkan keeps particle index 0 reserved because zero is also used
+as an empty/end marker in cell occupancy lists.
+"""
+
 import ctypes
-import math
+
+
 class pdata(ctypes.Structure):
+    """Packed particle input record.
+
+    All fields are stored as C doubles for compatibility with the existing C++
+    ``pdata`` struct. Vulkan converts this compact input record into its larger
+    runtime ``Particle``/SSBO representation:
+
+    - ``rx``, ``ry``, ``rz`` become ``PosLocA.xyz`` and ``PosLocB.xyz``.
+    - ``vx``, ``vy``, ``vz`` become ``VelRad.xyz``.
+    - ``radius`` becomes ``Data.x``.
+    - ``state_flg`` becomes ``Data.w``.
+    - ``molar_mass`` becomes ``parms.x``.
+
+    ``state_flg`` lifecycle values match ``base.SimCalc``:
+
+    - ``0`` = reservoir/inactive, waiting to be released.
+    - ``1`` = active, moved and considered for collisions.
+    - ``2`` = escaped, removed from active simulation and not reused.
+    - ``3`` = retained, removed from active motion but kept/stored.
+
+    Do not reorder or rename fields without changing the matching Vulkan
+    ``pdata.hpp`` struct and regenerating any binary files that use the old
+    layout.
+    """
+
     _fields_ = [
-        ("pnum", ctypes.c_double),
-        ("rx", ctypes.c_double),
-        ("ry", ctypes.c_double),
-        ("rz", ctypes.c_double),
-        ("radius", ctypes.c_double),
-        ("vx", ctypes.c_double),
-        ("vy", ctypes.c_double),
-        ("vz", ctypes.c_double),
-        ("ptype", ctypes.c_double),
-        ("state_flg", ctypes.c_double),
-        ("molar_mass", ctypes.c_double),
-        ("temp_vel", ctypes.c_double),
+        ("pnum", ctypes.c_double),        # Particle id. Zero is reserved for the null particle.
+        ("rx", ctypes.c_double),          # Initial x position.
+        ("ry", ctypes.c_double),          # Initial y position.
+        ("rz", ctypes.c_double),          # Initial z position.
+        ("radius", ctypes.c_double),      # Particle radius.
+        ("vx", ctypes.c_double),          # Initial x velocity.
+        ("vy", ctypes.c_double),          # Initial y velocity.
+        ("vz", ctypes.c_double),          # Initial z velocity.
+        ("ptype", ctypes.c_double),       # Particle type; 1.0 is counted as a boundary particle.
+        ("state_flg", ctypes.c_double),   # Lifecycle: 0 reservoir, 1 active, 2 escaped, 3 retained.
+        ("molar_mass", ctypes.c_double),  # Particle mass; copied to Vulkan parms.x.
+        ("temp_vel", ctypes.c_double),    # Reserved legacy/temp velocity field.
         ]
         
