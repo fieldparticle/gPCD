@@ -61,8 +61,6 @@ class Demo:
         self.base.substeps = int(self.config.get("substeps", self.base.substeps))
         if "zero_velocity_overlap_tolerance" in self.config:
             self.base.zero_velocity_overlap_tolerance = float(self.config["zero_velocity_overlap_tolerance"])
-        if "geo_rebound_min_fraction" in self.config:
-            self.base.geo_rebound_min_fraction = float(self.config["geo_rebound_min_fraction"])
         self.base.max_contacts_per_particle = int(
             self.config.get("max_contacts_per_particle", self.base.max_contacts_per_particle)
         )

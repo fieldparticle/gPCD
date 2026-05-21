@@ -501,26 +501,6 @@ class NeoDynamics:
         )
 
     @staticmethod
-    def fixed_target_rebound_clamped_velocity(
-        source_velocity,
-        normal,
-        source_start_velocity,
-        rebound_min_fraction,
-    ):
-        nx, ny = normal
-        incoming_speed = max(0.0, source_start_velocity[0] * nx + source_start_velocity[1] * ny)
-        minimum_outward_speed = max(0.0, rebound_min_fraction) * incoming_speed
-        predicted_normal_velocity = source_velocity[0] * nx + source_velocity[1] * ny
-        if predicted_normal_velocity <= -minimum_outward_speed:
-            return source_velocity
-
-        correction = predicted_normal_velocity + minimum_outward_speed
-        return (
-            source_velocity[0] - correction * nx,
-            source_velocity[1] - correction * ny,
-        )
-
-    @staticmethod
     def contact_state_zero_velocity_geometry(contact_state):
         if contact_state.get("geo_zero_velocity_overlap_area") is None:
             return None
@@ -564,7 +544,7 @@ class NeoDynamics:
         overlap_area,
         zero_area,
         phase,
-        rebound_min_fraction=0.0,
+        escape_fraction=0.0,
     ):
         start_vx, start_vy = start_velocity
         nx, ny = normal
@@ -591,7 +571,7 @@ class NeoDynamics:
             turn_vx + rebound_velocity_fraction * (full_vx - turn_vx),
             turn_vy + rebound_velocity_fraction * (full_vy - turn_vy),
         )
-        minimum_outward_speed = max(0.0, rebound_min_fraction) * incoming_speed
+        minimum_outward_speed = max(0.0, escape_fraction) * incoming_speed
         predicted_normal_velocity = predicted_velocity[0] * nx + predicted_velocity[1] * ny
         if predicted_normal_velocity > -minimum_outward_speed:
             correction = predicted_normal_velocity + minimum_outward_speed
@@ -602,13 +582,13 @@ class NeoDynamics:
         return predicted_velocity
 
     @staticmethod
-    def outward_clamped_rebound_velocities(
+    def outward_escape_velocities(
         source_velocity,
         target_velocity,
         normal,
         source_start_velocity,
         target_start_velocity,
-        rebound_min_fraction,
+        escape_fraction,
     ):
         nx, ny = normal
         rel_vx = target_velocity[0] - source_velocity[0]
@@ -618,7 +598,7 @@ class NeoDynamics:
         start_rel_vx = target_start_velocity[0] - source_start_velocity[0]
         start_rel_vy = target_start_velocity[1] - source_start_velocity[1]
         start_closing_speed = max(0.0, -(start_rel_vx * nx + start_rel_vy * ny))
-        minimum_outward_speed = rebound_min_fraction * start_closing_speed
+        minimum_outward_speed = max(0.0, escape_fraction) * start_closing_speed
         if rel_normal_velocity >= minimum_outward_speed:
             return source_velocity, target_velocity
 

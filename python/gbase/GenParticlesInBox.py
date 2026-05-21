@@ -141,6 +141,8 @@ class GenParticlesInBox():
         f.write(fstr)
         fstr = f"wallZMAX = {run_cfg.WallZMAX};\n"
         f.write(fstr)
+        fstr = f"NEO_COLLISION_STIFFNESS_Q = {run_cfg.collision_stiffness_q:0.2f};\n"
+        f.write(fstr)
         f.flush()
         f.close()
         

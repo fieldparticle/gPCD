@@ -37,7 +37,6 @@ class Base:
         self.zero_velocity_overlap_tolerance = 0.01
         self.neo_velocity_tolerance = 1.0e-12
         self.wall_ghost_skin_fraction = 0.125
-        self.geo_rebound_min_fraction = 0.02
         self.collision_stiffness_q = 1.0
         self.momentum_per_area = 0.001
         self.inverse_square_softening = 1.0
@@ -872,12 +871,14 @@ class Base:
         if prediction is None:
             return None
 
-        if phase == "rebound":
-            prediction["predicted_velocity"] = NeoDynamics.fixed_target_rebound_clamped_velocity(
-                prediction["predicted_velocity"],
-                (nx, ny),
+        if phase == "rebound" and state_zero is not None:
+            prediction["predicted_velocity"] = NeoDynamics.wall_velocity_prediction(
                 prediction["start_velocity"],
-                self.geo_rebound_min_fraction,
+                (nx, ny),
+                overlap_area,
+                state_zero["overlap_area"],
+                phase,
+                escape_fraction=self.zero_velocity_overlap_tolerance,
             )
 
         current_velocity = (particle["vx"], particle["vy"])
@@ -1031,13 +1032,13 @@ class Base:
                 report["target_velocity_at_current_overlap_rebound_x"],
                 report["target_velocity_at_current_overlap_rebound_y"],
             )
-            source_velocity, target_velocity = self.new_neo_model().outward_clamped_rebound_velocities(
+            source_velocity, target_velocity = NeoDynamics.outward_escape_velocities(
                 source_velocity,
                 target_velocity,
                 (nx, ny),
                 (source_start_vx, source_start_vy),
                 (target_start_vx, target_start_vy),
-                self.geo_rebound_min_fraction,
+                self.zero_velocity_overlap_tolerance,
             )
             source_velocity = NeoDynamics.apply_internal_contact_momentum_feedback(
                 source_particle,
@@ -1984,4 +1985,3 @@ class Base:
                     ),
                 },
             )
-

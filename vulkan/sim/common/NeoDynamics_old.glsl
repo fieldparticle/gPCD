@@ -2,7 +2,7 @@
 #define NEO_DYNAMICS_GLSL
 
 // ---------------------------------------------------------------------------
-// Constants
+// Constants and Records
 // ---------------------------------------------------------------------------
 
 const uint NEO_CONTACT_INACTIVE = 0u;
@@ -51,14 +51,14 @@ float NeoMass(uint particle_id)
     return max(P[particle_id].parms.x, NEO_EPSILON);
 }
 
-float NeoCollisionStiffness(uint source_id, uint target_id)
+float NeoPairStiffness(uint source_id, uint target_id)
 {
     float source_q = P[source_id].Data.y > 0.0 ? P[source_id].Data.y : NEO_COLLISION_STIFFNESS_Q;
     float target_q = P[target_id].Data.y > 0.0 ? P[target_id].Data.y : NEO_COLLISION_STIFFNESS_Q;
     return max(NEO_EPSILON, 0.5 * (source_q + target_q));
 }
 
-float NeoWallCollisionStiffness(uint source_id)
+float NeoWallStiffness(uint source_id)
 {
     return max(NEO_EPSILON, P[source_id].Data.y > 0.0 ? P[source_id].Data.y : NEO_COLLISION_STIFFNESS_Q);
 }
@@ -86,7 +86,7 @@ float NeoCircleOverlapArea(float radius_i, float radius_j, float center_distance
     );
 }
 
-bool NeoParticleContactGeometry(uint source_id, uint target_id, out NeoContactGeometry contact)
+bool NeoParticleGeometry(uint source_id, uint target_id, out NeoContactGeometry contact)
 {
     vec2 delta = NeoCurrentLocation(target_id) - NeoCurrentLocation(source_id);
     contact.center_distance = length(delta);
@@ -105,7 +105,7 @@ bool NeoParticleContactGeometry(uint source_id, uint target_id, out NeoContactGe
     return contact.overlap_area > 0.0;
 }
 
-bool NeoWallContactGeometry(uint source_id, uint wall_flag, out NeoContactGeometry contact)
+bool NeoWallGeometry(uint source_id, uint wall_flag, out NeoContactGeometry contact)
 {
     vec2 location = NeoCurrentLocation(source_id);
     float radius = NeoRadius(source_id);
@@ -140,7 +140,7 @@ bool NeoWallContactGeometry(uint source_id, uint wall_flag, out NeoContactGeomet
 // Zero-State Force Law
 // ---------------------------------------------------------------------------
 
-NeoZeroState NeoParticleZeroState(
+NeoZeroState NeoPairZeroState(
     uint source_id,
     uint target_id,
     float relative_normal_velocity,
@@ -156,7 +156,7 @@ NeoZeroState NeoParticleZeroState(
     if (incoming_speed > 0.0) {
         penetration_depth = pow(
             (3.0 * reduced_mass * incoming_speed * incoming_speed)
-            / (2.0 * NeoCollisionStiffness(source_id, target_id)),
+            / (2.0 * NeoPairStiffness(source_id, target_id)),
             1.0 / 3.0
         );
         penetration_depth = clamp(penetration_depth, 0.0, radius_sum);
@@ -181,7 +181,7 @@ NeoZeroState NeoWallZeroState(uint source_id, float normal_velocity, NeoContactG
     if (incoming_speed > 0.0) {
         penetration_depth = pow(
             (3.0 * NeoMass(source_id) * incoming_speed * incoming_speed)
-            / (2.0 * NeoWallCollisionStiffness(source_id)),
+            / (2.0 * NeoWallStiffness(source_id)),
             1.0 / 3.0
         );
         penetration_depth = clamp(penetration_depth, 0.0, 2.0 * radius);
@@ -201,7 +201,7 @@ NeoZeroState NeoWallZeroState(uint source_id, float normal_velocity, NeoContactG
 // Contact State
 // ---------------------------------------------------------------------------
 
-uint NeoParticleInitialPhase(vec2 source_velocity, vec2 target_velocity, vec2 normal)
+uint NeoPairInitialPhase(vec2 source_velocity, vec2 target_velocity, vec2 normal)
 {
     return dot(target_velocity - source_velocity, normal) < -NEO_EPSILON
         ? NEO_PHASE_COMPRESSION
@@ -213,6 +213,13 @@ uint NeoWallInitialPhase(vec2 source_velocity, vec2 normal)
     return dot(source_velocity, normal) > NEO_EPSILON
         ? NEO_PHASE_COMPRESSION
         : NEO_PHASE_REBOUND;
+}
+
+void NeoDeactivateContact(uint source_id, uint slot)
+{
+    P[source_id].ncs[slot].ids.y = NEO_CONTACT_INACTIVE;
+    P[source_id].ncs[slot].ids.z = NEO_PHASE_INACTIVE;
+    P[source_id].ncs[slot].ids.w = 0u;
 }
 
 void NeoBeginContactFrame(uint source_id)
@@ -251,34 +258,26 @@ int NeoFindReusableContactSlot(uint source_id)
     return -1;
 }
 
-void NeoStoreParticleContact(
-    uint source_id,
-    uint target_id,
-    uint slot,
-    NeoContactGeometry contact,
-    vec2 source_velocity,
-    vec2 target_velocity
-) {
+void NeoStorePairContact(uint source_id, uint target_id, uint slot, NeoContactGeometry contact)
+{
+    vec2 source_velocity = P[source_id].VelRad.xy;
+    vec2 target_velocity = P[target_id].VelRad.xy;
     float relative_normal_velocity = dot(target_velocity - source_velocity, contact.normal);
-    NeoZeroState zero_state = NeoParticleZeroState(
-        source_id,
-        target_id,
-        relative_normal_velocity,
-        contact
-    );
+    NeoZeroState zero_state = NeoPairZeroState(source_id, target_id, relative_normal_velocity, contact);
 
     P[source_id].ncs[slot].ids = uvec4(
         target_id,
         NEO_CONTACT_PARTICLE,
-        NeoParticleInitialPhase(source_velocity, target_velocity, contact.normal),
+        NeoPairInitialPhase(source_velocity, target_velocity, contact.normal),
         NEO_CONTACT_ACTIVE_THIS_FRAME
     );
     P[source_id].ncs[slot].vel = vec4(source_velocity, target_velocity);
     P[source_id].ncs[slot].geom = vec4(contact.normal, zero_state.area, zero_state.center_distance);
 }
 
-void NeoStoreWallContact(uint source_id, uint wall_flag, uint slot, NeoContactGeometry contact, vec2 source_velocity)
+void NeoStoreWallContact(uint source_id, uint wall_flag, uint slot, NeoContactGeometry contact)
 {
+    vec2 source_velocity = P[source_id].VelRad.xy;
     float normal_velocity = dot(source_velocity, contact.normal);
     NeoZeroState zero_state = NeoWallZeroState(source_id, normal_velocity, contact);
 
@@ -295,7 +294,7 @@ void NeoStoreWallContact(uint source_id, uint wall_flag, uint slot, NeoContactGe
 void NeoAddParticleContact(uint source_id, uint target_id)
 {
     NeoContactGeometry contact;
-    if (!NeoParticleContactGeometry(source_id, target_id, contact)) {
+    if (!NeoParticleGeometry(source_id, target_id, contact)) {
         return;
     }
 
@@ -307,14 +306,7 @@ void NeoAddParticleContact(uint source_id, uint target_id)
 
     uint slot = uint(slot_index);
     if (found_slot < 0 || P[source_id].ncs[slot].ids.y == NEO_CONTACT_INACTIVE) {
-        NeoStoreParticleContact(
-            source_id,
-            target_id,
-            slot,
-            contact,
-            P[source_id].VelRad.xy,
-            P[target_id].VelRad.xy
-        );
+        NeoStorePairContact(source_id, target_id, slot, contact);
     } else {
         P[source_id].ncs[slot].ids.w = NEO_CONTACT_ACTIVE_THIS_FRAME;
     }
@@ -325,7 +317,7 @@ void NeoAddParticleContact(uint source_id, uint target_id)
 void NeoAddWallContact(uint source_id, uint wall_flag)
 {
     NeoContactGeometry contact;
-    if (!NeoWallContactGeometry(source_id, wall_flag, contact)) {
+    if (!NeoWallGeometry(source_id, wall_flag, contact)) {
         return;
     }
 
@@ -337,7 +329,7 @@ void NeoAddWallContact(uint source_id, uint wall_flag)
 
     uint slot = uint(slot_index);
     if (found_slot < 0 || P[source_id].ncs[slot].ids.y == NEO_CONTACT_INACTIVE) {
-        NeoStoreWallContact(source_id, wall_flag, slot, contact, P[source_id].VelRad.xy);
+        NeoStoreWallContact(source_id, wall_flag, slot, contact);
     } else {
         P[source_id].ncs[slot].ids.w = NEO_CONTACT_ACTIVE_THIS_FRAME;
     }
@@ -351,7 +343,7 @@ void NeoPromoteZeroState(uint source_id, uint slot, NeoContactGeometry contact)
     P[source_id].ncs[slot].geom.w = contact.center_distance;
 }
 
-void NeoUpdateParticlePhase(uint source_id, uint slot, NeoContactGeometry contact)
+void NeoUpdatePairPhase(uint source_id, uint slot, NeoContactGeometry contact, vec2 source_velocity)
 {
     if (P[source_id].ncs[slot].ids.z != NEO_PHASE_COMPRESSION) {
         return;
@@ -360,7 +352,7 @@ void NeoUpdateParticlePhase(uint source_id, uint slot, NeoContactGeometry contac
     uint target_id = P[source_id].ncs[slot].ids.x;
     vec2 normal = P[source_id].ncs[slot].geom.xy;
     float zero_area = P[source_id].ncs[slot].geom.z;
-    float relative_normal_velocity = dot(P[target_id].VelRad.xy - P[source_id].VelRad.xy, normal);
+    float relative_normal_velocity = dot(P[target_id].VelRad.xy - source_velocity, normal);
 
     bool reached_zero = zero_area > NEO_EPSILON
         && contact.overlap_area >= zero_area * (1.0 - NEO_ZERO_TOLERANCE);
@@ -375,7 +367,7 @@ void NeoUpdateParticlePhase(uint source_id, uint slot, NeoContactGeometry contac
     }
 }
 
-void NeoUpdateWallPhase(uint source_id, uint slot, NeoContactGeometry contact)
+void NeoUpdateWallPhase(uint source_id, uint slot, NeoContactGeometry contact, vec2 source_velocity)
 {
     if (P[source_id].ncs[slot].ids.z != NEO_PHASE_COMPRESSION) {
         return;
@@ -383,7 +375,7 @@ void NeoUpdateWallPhase(uint source_id, uint slot, NeoContactGeometry contact)
 
     vec2 normal = P[source_id].ncs[slot].geom.xy;
     float zero_area = P[source_id].ncs[slot].geom.z;
-    float normal_velocity = dot(P[source_id].VelRad.xy, normal);
+    float normal_velocity = dot(source_velocity, normal);
 
     bool reached_zero = zero_area > NEO_EPSILON
         && contact.overlap_area >= zero_area * (1.0 - NEO_ZERO_TOLERANCE);
@@ -408,20 +400,19 @@ vec2 NeoWithCurrentTangent(vec2 current_velocity, vec2 predicted_velocity, vec2 
     return current_velocity - dot(current_velocity, normal) * normal + predicted_normal_velocity * normal;
 }
 
-vec2 NeoParticleVelocityPrediction(uint source_id, uint slot, NeoContactGeometry contact)
+vec2 NeoPairPrediction(uint source_id, uint slot, NeoContactGeometry contact, vec2 current_velocity)
 {
     uint target_id = P[source_id].ncs[slot].ids.x;
     vec2 normal = P[source_id].ncs[slot].geom.xy;
     float zero_area = P[source_id].ncs[slot].geom.z;
     vec2 source_start = P[source_id].ncs[slot].vel.xy;
     vec2 target_start = P[source_id].ncs[slot].vel.zw;
-    vec2 current_velocity = P[source_id].VelRad.xy;
 
     if (zero_area <= NEO_EPSILON) {
         return current_velocity;
     }
 
-    NeoUpdateParticlePhase(source_id, slot, contact);
+    NeoUpdatePairPhase(source_id, slot, contact, current_velocity);
     zero_area = P[source_id].ncs[slot].geom.z;
 
     float source_mass = NeoMass(source_id);
@@ -468,12 +459,11 @@ vec2 NeoParticleVelocityPrediction(uint source_id, uint slot, NeoContactGeometry
     return NeoWithCurrentTangent(current_velocity, predicted_velocity, normal);
 }
 
-vec2 NeoWallVelocityPrediction(uint source_id, uint slot, NeoContactGeometry contact)
+vec2 NeoWallPrediction(uint source_id, uint slot, NeoContactGeometry contact, vec2 current_velocity)
 {
     vec2 normal = P[source_id].ncs[slot].geom.xy;
     float zero_area = P[source_id].ncs[slot].geom.z;
     vec2 start_velocity = P[source_id].ncs[slot].vel.xy;
-    vec2 current_velocity = P[source_id].VelRad.xy;
     float incoming_speed = dot(start_velocity, normal);
 
     if (incoming_speed <= 0.0 || zero_area <= NEO_EPSILON) {
@@ -481,7 +471,7 @@ vec2 NeoWallVelocityPrediction(uint source_id, uint slot, NeoContactGeometry con
         return current_velocity;
     }
 
-    NeoUpdateWallPhase(source_id, slot, contact);
+    NeoUpdateWallPhase(source_id, slot, contact, current_velocity);
     zero_area = P[source_id].ncs[slot].geom.z;
 
     float compression_fraction = clamp(contact.overlap_area / zero_area, 0.0, 1.0);
@@ -510,44 +500,8 @@ vec2 NeoWallVelocityPrediction(uint source_id, uint slot, NeoContactGeometry con
 }
 
 // ---------------------------------------------------------------------------
-// Process Entrypoint
+// Python-Order Scheduler
 // ---------------------------------------------------------------------------
-
-void NeoDeactivateStaleContact(uint source_id, uint slot)
-{
-    P[source_id].ncs[slot].ids.y = NEO_CONTACT_INACTIVE;
-    P[source_id].ncs[slot].ids.z = NEO_PHASE_INACTIVE;
-}
-
-bool NeoContactPrediction(uint source_id, uint slot, out vec2 predicted_velocity, out vec2 reference_velocity)
-{
-    predicted_velocity = P[source_id].VelRad.xy;
-    reference_velocity = P[source_id].ncs[slot].vel.xy;
-    uint contact_type = P[source_id].ncs[slot].ids.y;
-
-    if (contact_type == NEO_CONTACT_PARTICLE) {
-        uint target_id = P[source_id].ncs[slot].ids.x;
-        NeoContactGeometry contact;
-        if (!NeoParticleContactGeometry(source_id, target_id, contact)) {
-            return false;
-        }
-        predicted_velocity = NeoParticleVelocityPrediction(source_id, slot, contact);
-        return true;
-    }
-
-    if (contact_type == NEO_CONTACT_WALL) {
-        uint wall_flag = P[source_id].ncs[slot].ids.x;
-        NeoContactGeometry contact;
-        if (!NeoWallContactGeometry(source_id, wall_flag, contact)) {
-            return false;
-        }
-        predicted_velocity = NeoWallVelocityPrediction(source_id, slot, contact);
-        reference_velocity = P[source_id].VelRad.xy;
-        return true;
-    }
-
-    return false;
-}
 
 void NeoProcessBoundaryContacts(uint source_id)
 {
@@ -560,62 +514,94 @@ void NeoProcessBoundaryContacts(uint source_id)
     }
 }
 
+bool NeoBuildPairCandidate(uint source_id, out vec2 pair_velocity)
+{
+    vec2 base_velocity = P[source_id].VelRad.xy;
+    vec2 accumulated_delta = vec2(0.0, 0.0);
+    uint prediction_count = 0u;
+    bool has_pair = false;
+    uint tracked_count = min(P[source_id].contactCount, MAX_CONTACTS);
+
+    for (uint slot = 0u; slot < tracked_count; ++slot) {
+        if (P[source_id].ncs[slot].ids.y != NEO_CONTACT_PARTICLE) {
+            continue;
+        }
+        if (P[source_id].ncs[slot].ids.w != NEO_CONTACT_ACTIVE_THIS_FRAME) {
+            NeoDeactivateContact(source_id, slot);
+            continue;
+        }
+
+        uint target_id = P[source_id].ncs[slot].ids.x;
+        NeoContactGeometry contact;
+        if (!NeoParticleGeometry(source_id, target_id, contact)) {
+            NeoDeactivateContact(source_id, slot);
+            continue;
+        }
+
+        vec2 predicted_velocity = NeoPairPrediction(source_id, slot, contact, P[source_id].VelRad.xy);
+        vec2 start_velocity = P[source_id].ncs[slot].vel.xy;
+        if (!has_pair) {
+            base_velocity = start_velocity;
+            has_pair = true;
+        }
+
+        accumulated_delta += predicted_velocity - start_velocity;
+        prediction_count += 1u;
+    }
+
+    if (!has_pair) {
+        pair_velocity = P[source_id].VelRad.xy;
+        return false;
+    }
+
+    pair_velocity = base_velocity + accumulated_delta / max(float(prediction_count), 1.0);
+    return true;
+}
+
+bool NeoApplyWallScheduler(uint source_id, vec2 pair_velocity, out vec2 final_velocity)
+{
+    final_velocity = pair_velocity;
+    bool has_wall = false;
+    uint tracked_count = min(P[source_id].contactCount, MAX_CONTACTS);
+
+    for (uint slot = 0u; slot < tracked_count; ++slot) {
+        if (P[source_id].ncs[slot].ids.y != NEO_CONTACT_WALL) {
+            continue;
+        }
+        if (P[source_id].ncs[slot].ids.w != NEO_CONTACT_ACTIVE_THIS_FRAME) {
+            NeoDeactivateContact(source_id, slot);
+            continue;
+        }
+
+        uint wall_flag = P[source_id].ncs[slot].ids.x;
+        NeoContactGeometry contact;
+        if (!NeoWallGeometry(source_id, wall_flag, contact)) {
+            NeoDeactivateContact(source_id, slot);
+            continue;
+        }
+
+        final_velocity = NeoWallPrediction(source_id, slot, contact, final_velocity);
+        has_wall = true;
+    }
+
+    return has_wall;
+}
+
 void NeoProcessCollision(uint source_id)
 {
     NeoProcessBoundaryContacts(source_id);
 
-    vec2 base_velocity = P[source_id].VelRad.xy;
-    vec2 particle_delta = vec2(0.0, 0.0);
-    vec2 wall_delta = vec2(0.0, 0.0);
-    vec2 wall_axes = vec2(0.0, 0.0);
-    uint particle_prediction_count = 0u;
-    bool has_prediction = false;
-    bool has_wall_prediction = false;
-    uint tracked_count = min(P[source_id].contactCount, MAX_CONTACTS);
+    vec2 pair_velocity;
+    bool has_pair = NeoBuildPairCandidate(source_id, pair_velocity);
 
-    for (uint slot = 0u; slot < tracked_count; ++slot) {
-        if (P[source_id].ncs[slot].ids.w != NEO_CONTACT_ACTIVE_THIS_FRAME) {
-            NeoDeactivateStaleContact(source_id, slot);
-            continue;
-        }
+    vec2 final_velocity;
+    bool has_wall = NeoApplyWallScheduler(source_id, pair_velocity, final_velocity);
 
-        vec2 predicted_velocity;
-        vec2 reference_velocity;
-        if (!NeoContactPrediction(source_id, slot, predicted_velocity, reference_velocity)) {
-            continue;
-        }
-
-        if (!has_prediction) {
-            base_velocity = reference_velocity;
-            has_prediction = true;
-        }
-
-        if (P[source_id].ncs[slot].ids.y == NEO_CONTACT_WALL) {
-            wall_delta += predicted_velocity - reference_velocity;
-            wall_axes = max(wall_axes, abs(P[source_id].ncs[slot].geom.xy));
-            has_wall_prediction = true;
-        } else {
-            particle_delta += predicted_velocity - reference_velocity;
-            particle_prediction_count += 1u;
-        }
-    }
-
-    if (!has_prediction) {
+    if (!has_pair && !has_wall) {
         return;
     }
 
-    if (has_wall_prediction) {
-        vec2 averaged_particle_delta = particle_prediction_count > 0u
-            ? particle_delta / float(particle_prediction_count)
-            : vec2(0.0, 0.0);
-        vec2 tangent_particle_delta = averaged_particle_delta * (vec2(1.0, 1.0) - clamp(wall_axes, 0.0, 1.0));
-        P[source_id].VelRad.xy = P[source_id].VelRad.xy + tangent_particle_delta + wall_delta;
-    } else {
-        vec2 averaged_particle_delta = particle_prediction_count > 0u
-            ? particle_delta / float(particle_prediction_count)
-            : vec2(0.0, 0.0);
-        P[source_id].VelRad.xy = base_velocity + averaged_particle_delta;
-    }
+    P[source_id].VelRad.xy = final_velocity;
     P[source_id].VelRad.w = length(P[source_id].VelRad.xy) > 0.0
         ? atan(P[source_id].VelRad.y, P[source_id].VelRad.x)
         : 0.0;

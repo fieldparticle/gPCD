@@ -144,9 +144,6 @@ class GenMotionData():
         f.write(fstr)
         fstr = f"NEO_COLLISION_STIFFNESS_Q = {run_cfg.collision_stiffness_q:0.2f};\n"
         f.write(fstr)
-        rebound_min_fraction = getattr(run_cfg, "geo_rebound_min_fraction", 0.02)
-        fstr = f"geo_rebound_min_fraction = {rebound_min_fraction:0.2f};\n"
-        f.write(fstr)
         f.flush()
         f.close()
 

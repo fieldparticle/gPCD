@@ -18,6 +18,7 @@ const uint NEO_CONTACT_PENDING_THIS_FRAME = 2u;
 
 const float NEO_EPSILON = 1.0e-12;
 const float NEO_ZERO_TOLERANCE = 0.01;
+const float NEO_WALL_GHOST_SKIN_FRACTION = 0.125;
 
 struct NeoContactGeometry {
     vec2 normal;
@@ -61,11 +62,6 @@ float NeoPairStiffness(uint source_id, uint target_id)
 float NeoWallStiffness(uint source_id)
 {
     return max(NEO_EPSILON, P[source_id].Data.y > 0.0 ? P[source_id].Data.y : NEO_COLLISION_STIFFNESS_Q);
-}
-
-float NeoReboundMinFraction(uint source_id)
-{
-    return max(0.0, P[source_id].Data.z > 0.0 ? P[source_id].Data.z : NEO_REBOUND_MIN_FRACTION);
 }
 
 // ---------------------------------------------------------------------------
@@ -127,11 +123,12 @@ bool NeoWallGeometry(uint source_id, uint wall_flag, out NeoContactGeometry cont
         return false;
     }
 
-    if (distance_to_wall >= radius) {
+    float skin = radius * NEO_WALL_GHOST_SKIN_FRACTION;
+    if (distance_to_wall >= radius + skin) {
         return false;
     }
 
-    contact.center_distance = max(0.0, 2.0 * distance_to_wall);
+    contact.center_distance = max(0.0, distance_to_wall + radius - skin);
     contact.overlap_area = NeoCircleOverlapArea(radius, radius, contact.center_distance);
     return contact.overlap_area > 0.0;
 }
@@ -450,7 +447,7 @@ vec2 NeoPairPrediction(uint source_id, uint slot, NeoContactGeometry contact, ve
     );
 
     float start_closing_speed = max(0.0, -dot(start_relative_velocity, normal));
-    float minimum_outward_speed = NeoReboundMinFraction(source_id) * start_closing_speed;
+    float minimum_outward_speed = NEO_ZERO_TOLERANCE * start_closing_speed;
     float relative_normal_velocity = dot(predicted_target_velocity - predicted_velocity, normal);
     if (relative_normal_velocity < minimum_outward_speed) {
         predicted_velocity -= 0.5 * (minimum_outward_speed - relative_normal_velocity) * normal;
@@ -490,7 +487,7 @@ vec2 NeoWallPrediction(uint source_id, uint slot, NeoContactGeometry contact, ve
     float rebound_velocity_fraction = sqrt(max(0.0, 1.0 - compression_fraction));
     vec2 predicted_velocity = mix(turn_velocity, full_rebound_velocity, rebound_velocity_fraction);
 
-    float minimum_outward_speed = NeoReboundMinFraction(source_id) * incoming_speed;
+    float minimum_outward_speed = NEO_ZERO_TOLERANCE * incoming_speed;
     float predicted_normal_velocity = dot(predicted_velocity, normal);
     if (predicted_normal_velocity > -minimum_outward_speed) {
         predicted_velocity -= (predicted_normal_velocity + minimum_outward_speed) * normal;

@@ -57,7 +57,7 @@ struct Particle {
     vec4 PosLocB;              // xyz=alternate position buffer, w=active flag
     vec4 VelRad;               // xyz=velocity, w=velocity angle
 
-    vec4 Data;                 // x=radius, y=collision_stiffness_q, z=rebound_min_fraction, w=state/flags
+    vec4 Data;                 // x=radius, y=collision_stiffness_q, z=reserved, w=state/flags
     vec4 parms;                // x=mass, y=delta_vx, z=delta_vy, w=delta_speed
 
     lstr CornerList[8];
