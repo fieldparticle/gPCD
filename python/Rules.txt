@@ -6,3 +6,8 @@
 6. There is a .venv in this project.
 7. Capture files are in C:\_DJ\gPCDData\examples\reports and are in format CapXXXXXX.tpr wher XXXXXX is the frame number zeros left justified.
 8. The git repository is at https://github.com/fieldparticle/gPCD.git
+9. Porting to glsl must always be schedule wise.
+10. Main glsl is in C:\_DJ\gPCD\vulkan\sim\BoundarySpheresMotion
+11. Dynmaics are in C:\_DJ\gPCD\vulkan\sim\common\NeoDynamics.glsl
+12. Dynamics are only called in C:\_DJ\gPCD\vulkan\sim\BoundarySpheresMotion\BoundarySpheresMotionP.comp
+13. Latex documentation is located in C:\_DJ\gPCD\docs\Dynamics.

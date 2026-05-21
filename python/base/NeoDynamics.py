@@ -453,6 +453,111 @@ class NeoDynamics:
         }
 
     @staticmethod
+    def apply_internal_contact_momentum_feedback(
+        source_particle,
+        target_particle,
+        contact_state,
+        source_velocity,
+        normal,
+    ):
+        internal_momentum = contact_state.get("internal_contact_momentum", 0.0)
+        if internal_momentum <= 0.0:
+            return source_velocity
+
+        source_mass = source_particle.get("mass", 0.0)
+        target_mass = target_particle.get("mass", 0.0)
+        total_mass = source_mass + target_mass
+        if total_mass <= 0.0:
+            return source_velocity
+
+        reduced_mass = (source_mass * target_mass) / total_mass
+        if reduced_mass <= 0.0:
+            return source_velocity
+
+        delta_velocity = internal_momentum / reduced_mass
+        nx, ny = normal
+
+        return (
+            source_velocity[0] - delta_velocity * nx,
+            source_velocity[1] - delta_velocity * ny,
+        )
+
+    @staticmethod
+    def update_contact_internal_momentum_report(contact_state, report, phase):
+        zero_momentum = report.get("zero_internal_normal_momentum", 0.0)
+        compression_stored = report.get("compression_stored_internal_momentum", 0.0)
+        rebound_released = report.get("rebound_released_internal_momentum", 0.0)
+        rebound_remaining = report.get("rebound_remaining_internal_momentum", 0.0)
+
+        contact_state["neo_zero_internal_normal_momentum"] = zero_momentum
+        contact_state["neo_rebound_released_normal_momentum"] = (
+            rebound_released if phase == "rebound" else 0.0
+        )
+        contact_state["neo_rebound_remaining_normal_momentum"] = (
+            rebound_remaining if phase == "rebound" else zero_momentum
+        )
+        contact_state["neo_stored_internal_normal_momentum"] = (
+            rebound_remaining if phase == "rebound" else compression_stored
+        )
+
+    @staticmethod
+    def fixed_target_rebound_clamped_velocity(
+        source_velocity,
+        normal,
+        source_start_velocity,
+        rebound_min_fraction,
+    ):
+        nx, ny = normal
+        incoming_speed = max(0.0, source_start_velocity[0] * nx + source_start_velocity[1] * ny)
+        minimum_outward_speed = max(0.0, rebound_min_fraction) * incoming_speed
+        predicted_normal_velocity = source_velocity[0] * nx + source_velocity[1] * ny
+        if predicted_normal_velocity <= -minimum_outward_speed:
+            return source_velocity
+
+        correction = predicted_normal_velocity + minimum_outward_speed
+        return (
+            source_velocity[0] - correction * nx,
+            source_velocity[1] - correction * ny,
+        )
+
+    @staticmethod
+    def contact_state_zero_velocity_geometry(contact_state):
+        if contact_state.get("geo_zero_velocity_overlap_area") is None:
+            return None
+        if contact_state.get("geo_zero_velocity_center_distance") is None:
+            return None
+        return {
+            "overlap_area": contact_state["geo_zero_velocity_overlap_area"],
+            "center_distance": contact_state["geo_zero_velocity_center_distance"],
+        }
+
+    @staticmethod
+    def neo_internal_normal_momentum(contact_state, source_index, source_particle, normal):
+        first_velocities = contact_state.get("first_contact_velocities", {})
+        start_velocity = first_velocities.get(source_index)
+        if start_velocity is None:
+            return 0.0
+
+        nx, ny = normal
+        start_normal_momentum = source_particle["mass"] * (
+            start_velocity[0] * nx + start_velocity[1] * ny
+        )
+        current_normal_momentum = source_particle["mass"] * (
+            source_particle["vx"] * nx + source_particle["vy"] * ny
+        )
+        return start_normal_momentum - current_normal_momentum
+
+    @staticmethod
+    def accumulate_particle_neo_internal_momentum(particle, internal_momentum, normal):
+        nx, ny = normal
+        particle["neo_internal_momentum_x"] = particle.get("neo_internal_momentum_x", 0.0) + internal_momentum * nx
+        particle["neo_internal_momentum_y"] = particle.get("neo_internal_momentum_y", 0.0) + internal_momentum * ny
+        particle["neo_internal_momentum"] = math.hypot(
+            particle["neo_internal_momentum_x"],
+            particle["neo_internal_momentum_y"],
+        )
+
+    @staticmethod
     def wall_velocity_prediction(
         start_velocity,
         normal,
