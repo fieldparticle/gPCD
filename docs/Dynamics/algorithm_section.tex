@@ -1,0 +1,275 @@
+\section{Current Source-Owned Soft Contact Algorithm}
+
+This section describes the current Python dynamics algorithm as implemented in
+\texttt{Base.py} and \texttt{NeoDynamics.py}.  The algorithm is intended to be
+the reference behavior for the future GLSL implementation.
+
+The important modeling goals are:
+\begin{itemize}
+    \item particles are soft and may penetrate during contact,
+    \item contacts are purely repulsive,
+    \item tangential motion should pass through contact without artificial
+          friction,
+    \item wall contacts should use the same geometry path as particle-particle
+          contacts by using ghost particles,
+    \item each source particle may write only its own particle state and its
+          own source-owned contact state.
+\end{itemize}
+
+\subsection{Step Order}
+
+For each simulation substep, \texttt{Base.step} performs the following sequence:
+\begin{enumerate}
+    \item Begin the integration step and prepare the active position buffer.
+    \item Detect particle-particle and particle-wall contacts.
+    \item Update source-owned particle contact state.
+    \item Update source-owned wall ghost contact state.
+    \item Predict and apply source-owned collision velocities.
+    \item Move particles using the updated velocities.
+    \item Detect contacts again at the moved positions.
+    \item Update wall contact state again.
+    \item Clip rebound overlaps that exceed the stored zero-velocity geometry.
+    \item End the integration step and update diagnostic internal momentum.
+\end{enumerate}
+
+The second contact detection after movement is important because overlap
+geometry may change during the substep.  The clipping pass is intentionally
+geometric and source-owned.
+
+\subsection{Contact Geometry}
+
+For source particle \(i\) and target particle \(j\), the center distance is
+\[
+    d_{ij} = \lVert \mathbf{x}_j - \mathbf{x}_i \rVert .
+\]
+A contact exists when
+\[
+    d_{ij} < r_i + r_j .
+\]
+The source contact normal points from source to target:
+\[
+    \mathbf{n}_{ij}
+    =
+    \frac{\mathbf{x}_j - \mathbf{x}_i}{d_{ij}} .
+\]
+If the centers coincide, the implementation chooses a stable fallback normal.
+
+The relative normal velocity is
+\[
+    u_{ij}
+    =
+    (\mathbf{v}_j - \mathbf{v}_i) \cdot \mathbf{n}_{ij}.
+\]
+For particle-particle contacts, \(u_{ij}<0\) means compression and
+\(u_{ij}>0\) means separation.  The contact phase stored in source-owned
+contact state is either \texttt{compression} or \texttt{rebound}.
+
+\subsection{Source-Owned Contact State}
+
+Each particle owns an array \texttt{gcs} of contact-state records.  A record is
+owned by the source particle and stores either a real particle target index or a
+wall target of the form \texttt{("wall", wall\_flag)}.
+
+A contact-state record stores:
+\begin{itemize}
+    \item the contact type, target id, and active flag,
+    \item the phase, \texttt{compression} or \texttt{rebound},
+    \item the motion mode, \texttt{accumulating}, \texttt{releasing}, or
+          \texttt{blocked},
+    \item the first-contact normal,
+    \item first-contact source and target velocities,
+    \item the zero-velocity overlap area \(A_0\),
+    \item the zero-velocity center distance \(d_0\),
+    \item diagnostic internal momentum values.
+\end{itemize}
+
+The source-owned rule is strict: a source particle may read target particle
+state, but it must not write target position, target velocity, or target-owned
+contact state.
+
+\subsection{Wall Ghost Contacts}
+
+Walls are represented by virtual ghost particles.  For a real particle of
+radius \(r\), the ghost has the same radius and copies the real particle's
+contact material parameters.  The ghost is fixed, has zero velocity, and is
+given a very large effective mass.
+
+The ghost perimeter is moved slightly inside the visible wall by
+\[
+    s = \frac{1}{8}r .
+\]
+For the right wall, for example, with wall coordinate \(x_{\max}\), the ghost
+center is
+\[
+    \mathbf{x}_g = (x_{\max} + r - s,\; y_i).
+\]
+The other walls follow the same pattern.  The ghost is outside the domain, but
+its perimeter overlaps the wall line by the skin distance \(s\).  Contact is
+then evaluated as an ordinary equal-radius particle-particle overlap between
+the real particle and the ghost.
+
+This makes the wall contact law geometrically similar to particle-particle
+contact.  The wall is still fixed because the ghost is not integrated and any
+ghost velocity calculated by the pair model is discarded.
+
+\subsection{Zero-Velocity Geometry}
+
+The Neo force-law model computes a zero-velocity state for each contact.  The
+zero-velocity point is the point of maximum penetration: compression ends and
+rebound begins.
+
+The stored zero geometry is:
+\[
+    A_0 = \text{zero-velocity overlap area},
+\]
+\[
+    d_0 = \text{zero-velocity center distance}.
+\]
+The model uses overlap area as the progress coordinate.  During compression,
+overlap increases toward \(A_0\).  During rebound, overlap decreases away from
+\(A_0\).
+
+For contacts that exist at frame zero, the current overlap is treated as being
+on the rebound side of the collision history.  The model reconstructs a
+zero-velocity state from the starting overlap and the incoming contact
+momentum.
+
+\subsection{Velocity Prediction}
+
+Velocity prediction is source-owned.  Each source particle predicts only its
+own next velocity.  For each active particle contact and wall contact, the
+source particle asks \texttt{NeoDynamics} for a compression or rebound velocity
+at the current overlap.
+
+For a particle-particle contact, the prediction path is:
+\begin{enumerate}
+    \item read the source particle, target particle, contact normal, overlap
+          area, and center distance,
+    \item update the source-owned phase and motion mode,
+    \item construct a temporary two-particle Neo model,
+    \item compute the current-overlap compression or rebound velocity report,
+    \item apply only the source particle's predicted normal component,
+    \item preserve the source particle's current tangential component.
+\end{enumerate}
+
+Only the normal component is replaced.  Let
+\[
+    v_n = \mathbf{v}_i \cdot \mathbf{n}_{ij},
+\]
+and let \(v_n^\ast\) be the predicted normal component from the Neo report.
+The source velocity update is
+\[
+    \mathbf{v}_i^\ast
+    =
+    \mathbf{v}_i
+    +
+    (v_n^\ast - v_n)\mathbf{n}_{ij}.
+\]
+The tangential component is not modified by the contact response.
+
+When a source particle has multiple active contacts, the code applies predicted
+normal components sequentially to the same source velocity accumulator.  This
+is source-owned and GPU-friendly, but it is not a full coupled cluster solve.
+This is the current place where difficult glancing multi-contact behavior can
+appear.
+
+\subsection{Rebound Clamp}
+
+The current Python path still includes the parameter
+\texttt{geo\_rebound\_min\_fraction}.  Its default value is \(0.02\).  During
+rebound, the Neo model may clamp the predicted rebound velocity so that the
+outward normal speed is not below a small fraction of the original closing
+speed.
+
+This clamp is a numerical guard, not a fundamental physical rule.  Larger
+values can force contacts to separate quickly, but they also make soft contacts
+look too hard.  The intended physical model should not rely on this parameter
+as the primary reason particles separate.
+
+\subsection{Geometric Overlap Clipping}
+
+After velocity prediction and movement, rebound contacts are geometrically
+clipped if they penetrate deeper than their stored zero-velocity geometry.  For
+particle-particle contacts, if
+\[
+    A > A_0,
+\]
+the source particle is moved so that the pair center distance returns toward
+\[
+    d_0 .
+\]
+The correction is source-owned and mass-weighted.  If
+\[
+    c = d_{ij} - d_0,
+\]
+then the source particle moves by
+\[
+    \Delta \mathbf{x}_i
+    =
+    c
+    \frac{m_j}{m_i + m_j}
+    \mathbf{n}_{ij}.
+\]
+The target particle is not written by this source invocation.  When both source
+particles run their own source-owned correction, the combined effect is the
+usual mass-weighted pair correction without either invocation writing its
+target.
+
+For wall contacts, the real particle is moved along the wall normal so that the
+real-particle to ghost-particle center distance matches the stored
+zero-velocity distance.  The wall ghost is never moved or integrated.
+
+\subsection{Internal Momentum Accounting}
+
+The model reports internal momentum as a diagnostic quantity.  Internal normal
+momentum is computed from first-contact normal momentum and current normal
+momentum.  It is accumulated into per-particle diagnostic fields:
+\[
+    I_x = I\,n_x,
+    \qquad
+    I_y = I\,n_y .
+\]
+These fields are useful for understanding how much momentum is stored in active
+contacts, but they are not independent forces applied to particles.
+
+The UI reports:
+\begin{itemize}
+    \item starting particle momentum,
+    \item current particle momentum,
+    \item internal contact momentum,
+    \item returned wall momentum diagnostic,
+    \item corrected momentum difference.
+\end{itemize}
+
+\subsection{Known Failure Mode}
+
+The current soft source-owned algorithm can still produce a glancing-contact
+artifact.  In \texttt{TwoParticleStuckWall.cfg}, particle 0 can remain in wall
+contact while particle 1 remains in particle-particle contact with particle 0.
+The wall response changes particle 0's motion, while the particle-particle
+contact remains soft and overlapped.  As the particles slide, the
+particle-particle normal rotates.  Visually this can look like particle 1 is
+rotating around particle 0 or like an artificial attraction.
+
+This is not caused by an explicit attractive force.  It is caused by a
+long-lived soft overlap whose normal changes while velocity prediction is still
+being applied contact-by-contact.
+
+The attempted hard geometric response eliminated the rotation but also removed
+soft penetration from simple cases such as \texttt{TwoParticleHorizontal.cfg}.
+Therefore the velocity law must remain soft, while the geometric correction and
+future multi-contact handling must prevent nonphysical orbit-like behavior.
+
+\subsection{Implications For GLSL}
+
+The GLSL implementation should preserve the source-owned rule:
+\begin{itemize}
+    \item one invocation owns one source particle,
+    \item it may read neighboring particles and wall ghosts,
+    \item it may write only the source particle and source-owned contact state,
+    \item pair-level data is diagnostic, not an independent owner of response.
+\end{itemize}
+
+The GLSL code should not implement pair-owned target writes.  If a future
+multi-contact solver is needed, it must still be expressed as source-owned
+updates or as a separate staged process with explicit ownership rules.

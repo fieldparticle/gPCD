@@ -3,333 +3,325 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath}
 \usepackage{amssymb}
-\usepackage{booktabs}
-\usepackage{hyperref}
 \usepackage{enumitem}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
 
-\title{gPCD Geometry Dynamics}
+\title{gPCD Contact Dynamics}
 \author{}
-\date{\today}
+\date{}
 
 \begin{document}
 \maketitle
 
+\input{algorithm_section.tex}
 \section{Purpose}
 
-The current Python dynamics model is an overlap-geometry collision model.  A
-collision is not treated as an instantaneous impulse at first contact.  Instead,
-the current overlap area determines where the pair is along a compression or
-rebound path.
+The current dynamics model treats particles as soft, purely repulsive disks.
+Contact response is derived from overlap geometry and from a force-law estimate
+of the zero-velocity point. Walls are represented by ghost particles so that
+wall collision response follows the same geometry path as particle-particle
+collision response.
 
-The old overlap-momentum response in \texttt{Dynamics.py} is no longer the
-active collision response.  \texttt{Dynamics.py} remains as support code for
-contact geometry, wall geometry, lifecycle helpers, and diagnostic overlap
-momentum.  The active model is coordinated by \texttt{Base.py} and uses
-\texttt{GeoDynamics.py} for the pair-level geometry calculation.
+The implementation is split between \texttt{Base.py} and
+\texttt{NeoDynamics.py}. \texttt{Base.py} owns particle storage, wall/contact
+detection, contact state, cluster solving, and application of predicted
+velocities. \texttt{NeoDynamics.py} owns the force-law geometry calculations
+used to estimate compression, rebound, and the zero-velocity state.
 
-\section{Rules}
+\section{Particle State}
 
-The model follows these project rules:
-
-\begin{enumerate}[leftmargin=*]
-    \item The model must remain an overlap-geometry model.
-    \item Capture files are written as \texttt{CapXXXXXX.rpt} under
-    \texttt{C:\textbackslash\_DJ\textbackslash gPCDData\textbackslash examples}.
-    \item The model must remain parallel-friendly.
-    \item Particle velocities in the cfg represent incoming velocity before
-    turnaround; they define the particles' initial momentum.
-    \item If a particle starts overlapped at time zero, the state is assumed to
-    be post-turnaround and rebounding.
-    \item \texttt{zero\_velocity\_overlap\_fraction} is good for designed
-    natural collisions, but starting collisions need a calculated pair-level
-    \(A_0\) because we do not know how deep into collision history they already
-    are.
-\end{enumerate}
-
-\section{Contact Geometry}
-
-For two particles, \texttt{Dynamics.particle\_contact()} returns:
-
-\begin{itemize}[leftmargin=*]
-    \item the unit normal \((n_x,n_y)\) from source center to target center,
-    \item the current overlap area \(A\),
-    \item the current center distance \(d\).
-\end{itemize}
-
-For equal-radius disks, the overlap area is:
-
+Each active particle has position
 \[
-A(d) =
-2r^2\cos^{-1}\left(\frac{d}{2r}\right)
-- \frac{d}{2}\sqrt{4r^2-d^2}.
+    \mathbf{x}_i = (x_i, y_i),
+\]
+velocity
+\[
+    \mathbf{v}_i = (v_{xi}, v_{yi}),
+\]
+mass \(m_i\), and radius \(r_i\). Contacts are detected from center distance.
+For particles \(i\) and \(j\),
+\[
+    d_{ij} = \lVert \mathbf{x}_j - \mathbf{x}_i \rVert.
+\]
+A particle-particle contact exists when
+\[
+    d_{ij} < r_i + r_j.
 \]
 
-Wall contacts use mirrored-circle geometry.  A particle at distance \(s\) from
-a flat wall is treated as overlapping its mirror image at center distance
-\(d=2s\).  The same circle-overlap area formula is then used.
-
-\section{Zero-Velocity Overlap}
-
-The zero-velocity overlap point, \(A_0\), is the deepest overlap reached by a
-collision.  It is the turnaround point: compression ends and rebound begins.
-
-For designed natural collisions, \(A_0\) comes from configuration:
-
+The contact normal used by the source particle points from the source particle
+toward the target particle:
 \[
-A_0 = f_0 A_{\max},
+    \mathbf{n}_{ij}
+    =
+    \frac{\mathbf{x}_j - \mathbf{x}_i}{d_{ij}}.
+\]
+If the centers coincide, the code chooses a stable fallback normal.
+
+\section{Overlap Area}
+
+For the current equal-radius implementation, overlap area is the circular lens
+area
+\[
+    A(d, r)
+    =
+    2r^2 \cos^{-1}\left(\frac{d}{2r}\right)
+    -
+    \frac{d}{2}\sqrt{4r^2 - d^2}.
+\]
+The implementation clamps \(d\) into \([0, 2r]\) before evaluating the formula.
+
+The model uses overlap area as the geometric progress variable. Larger overlap
+means deeper compression. During rebound, decreasing overlap means stored
+normal momentum is being released.
+
+\section{Force Law And Zero-Velocity Point}
+
+The Neo model estimates the maximum penetration from the force law
+\[
+    F(\alpha) = Q\alpha^2,
+\]
+where \(Q\) is configured by \texttt{collision\_stiffness\_q} and
+\(\alpha\) is penetration depth.
+
+For two particles, the incoming normal speed is
+\[
+    v_{\mathrm{in}}
+    =
+    \max\left(0,\,
+    -(\mathbf{v}_j - \mathbf{v}_i)\cdot \mathbf{n}_{ij}
+    \right).
+\]
+The reduced mass is
+\[
+    \mu = \frac{m_i m_j}{m_i + m_j}.
+\]
+The estimated zero-velocity penetration is
+\[
+    \alpha_0
+    =
+    \left(
+        \frac{3\mu v_{\mathrm{in}}^2}{2Q}
+    \right)^{1/3}.
+\]
+The zero-velocity center distance is
+\[
+    d_0 = r_i + r_j - \alpha_0.
+\]
+The zero-velocity overlap area is
+\[
+    A_0 = A(d_0, r).
 \]
 
-where \(f_0=\texttt{zero\_velocity\_overlap\_fraction}\).
+If the current overlap is already greater than the force-law zero overlap,
+the zero state is promoted to the current overlap. This prevents the solver
+from trying to rewind a contact past the deepest overlap already observed.
 
-For starting overlaps, \(A_0\) is solved from incoming momentum and overlap
-geometry.  If the solved \(A_0\) is shallower than the current overlap, the
-model promotes \(A_0\) to the current overlap.  That keeps the starting state
-physically possible.
+\section{Compression And Rebound}
 
-\section{Velocity Profile}
+The zero-velocity point is the turnaround point. Before this point the contact
+is in compression. After this point the contact is in rebound.
 
-Let \(A\) be the current overlap area and \(A_0\) be the zero-velocity overlap
-area.  The compression fraction is:
-
+For a contact with current overlap \(A\), the normalized compression fraction is
 \[
-c = \mathrm{clamp}\left(\frac{A}{A_0}, 0, 1\right).
+    f_c = \mathrm{clamp}\left(\frac{A}{A_0}, 0, 1\right).
+\]
+The rebound fraction is
+\[
+    f_r = 1 - f_c.
 \]
 
-The velocity fraction is:
-
+The compression velocity fraction is
 \[
-v_f = \sqrt{1-c}.
+    s_c = \sqrt{1 - f_c},
+\]
+and the rebound velocity fraction is
+\[
+    s_r = \sqrt{f_r}.
 \]
 
-This creates a parabolic collision process, analogous to the velocity profile
-of a ball thrown upward in a vacuum.  At first contact, \(c=0\) and
-\(v_f=1\).  At the zero-velocity point, \(c=1\) and \(v_f=0\).  During rebound,
-the same geometry fraction maps velocity back from zero toward full rebound.
-
-\section{Relative Velocity And Momentum}
-
-For a particle pair, only relative velocity along the contact normal participates
-in the collision response:
-
+The incoming normal momentum stored at the zero-velocity point is
 \[
-v_n = (\vec{v}_t - \vec{v}_s)\cdot\vec{n}.
+    p_0 = \mu v_{\mathrm{in}}.
 \]
-
-The reduced mass is:
-
-\[
-\mu = \frac{m_s m_t}{m_s + m_t}.
-\]
-
-The incoming relative normal momentum is:
-
-\[
-p_n = \max(0, -\mu v_n).
-\]
-
-Tangential velocity is preserved.  The normal component is interpolated from the
-starting velocity to the zero-velocity point during compression, and from the
-zero-velocity point to full rebound during rebound.
+During compression, the model moves velocities toward the zero-velocity
+turnaround velocity. During rebound, the model releases stored normal momentum
+according to \(s_r\).
 
 \section{Contact State}
 
-The Python model uses explicit contact state so a collision can remember its
-history across frames.  This is essential because the rebound path cannot be
-deduced from instantaneous geometry alone.  At the zero-velocity point, the
-current velocity may be zero; without saved first-contact information, the model
-would forget which way rebound should go.
+Contact state is required because a collision spans many time steps. The state
+stores:
 
-\subsection{Where Contact State Lives}
-
-Contact-state memory currently lives in \texttt{Base.py}, but particle-pair
-state is now stored on the source particle:
-
-\begin{itemize}[leftmargin=*]
-    \item \texttt{particle["gcs"]}: source-owned particle-particle contact
-    state slots.
-    \item \texttt{Base.wall\_contact\_state}: particle-wall contact state.
+\begin{itemize}[noitemsep]
+    \item the target particle or wall id,
+    \item the current phase, either compression or rebound,
+    \item the first-contact velocities,
+    \item the first-contact normal,
+    \item the zero-velocity overlap area \(A_0\),
+    \item the zero-velocity center distance \(d_0\),
+    \item diagnostic internal momentum fields.
 \end{itemize}
 
-\texttt{gcs} is initialized in \texttt{Base.reset()} for every live particle.
-It is a fixed list with one available state slot per configured particle-contact
-slot.  The current Python model uses \texttt{max\_contacts\_per\_particle}
-slots, matching the existing \texttt{ccs} contact list.  Wall state remains in a
-dictionary keyed by particle and wall flag.
-
-\subsection{Particle-Pair Keys}
-
-Particle-pair contact state is source-owned.  The key inside a particle is the
-target particle index:
-
+Particle-particle and wall-contact state are both stored in source-owned
+\texttt{gcs} slots. Particle contacts use the target particle index as the
+\texttt{target\_index}. Wall contacts use a wall target marker:
 \[
-\texttt{source particle gcs entry} \rightarrow \texttt{target\_index}.
+    \texttt{("wall", wall\_flag)}.
+\]
+The current-frame wall list, \texttt{bcs}, still records which walls are active
+for detection, reporting, and visualization. The persistent collision history,
+however, lives in \texttt{gcs} for both particle and wall contacts.
+
+\section{Wall Ghost Particles}
+
+Walls are modeled as ghost particles. This keeps wall response close to the
+particle-particle response instead of using a separate wall force function.
+
+For a particle of radius \(r\), the ghost particle has the same radius and a
+large effective mass:
+\[
+    m_g = 10^{12}m.
+\]
+The large mass makes the wall effectively fixed while still allowing the same
+two-body geometry code to be used.
+
+\subsection{Wall Skin}
+
+The wall ghost is intentionally moved inward by a small skin distance
+\[
+    s = \gamma r,
+\]
+where
+\[
+    \gamma = 0.125.
+\]
+This means the ghost perimeter lies inside the wall by one eighth of the
+particle radius. For \(r = 0.25\), the skin is
+\[
+    s = 0.03125.
 \]
 
-This means a physical pair can have two mirrored state records:
-
+For the four walls, ghost centers are placed as follows:
 \[
-P_i.\texttt{gcs} \rightarrow j
-\qquad\text{and}\qquad
-P_j.\texttt{gcs} \rightarrow i.
+\begin{aligned}
+    x_g &= x_{\min} - r + s && \text{left wall},\\
+    x_g &= x_{\max} + r - s && \text{right wall},\\
+    y_g &= y_{\min} - r + s && \text{bottom wall},\\
+    y_g &= y_{\max} + r - s && \text{top wall}.
+\end{aligned}
 \]
 
-The duplication is intentional.  It matches the future GPU ownership rule:
-each source particle may write only its own state.  Normals are opposite in the
-two records, but each source uses its own normal convention consistently.
-
-Each state record stores:
-
-\begin{itemize}[leftmargin=*]
-    \item \texttt{active}: whether the slot is in use,
-    \item \texttt{target\_index}: the target particle for this source-owned
-    contact,
-    \item \texttt{touched}: whether this state was observed in the current
-    detection pass,
-    \item \texttt{geo\_phase}: \texttt{compression} or \texttt{rebound},
-    \item \texttt{first\_contact\_velocities}: starting velocity for both
-    particles,
-    \item \texttt{first\_contact\_normal},
-    \item \texttt{first\_contact\_distance},
-    \item \texttt{first\_contact\_overlap\_area},
-    \item \texttt{geo\_zero\_velocity\_overlap\_area},
-    \item \texttt{geo\_zero\_velocity\_center\_distance},
-    \item diagnostic values such as relative normal momentum and overlap
-    contact momentum.
-\end{itemize}
-
-When a \texttt{gcs} slot is not touched during a contact update, the contact has
-exited.  If the state had reached rebound, the final rebound velocity is applied
-before the slot is cleared.
-
-\subsection{Wall Keys}
-
-Wall contact state is keyed by:
-
+The contact detector must use the same skin. For example, left-wall contact
+begins when
 \[
-\texttt{wall\_key} = (\texttt{particle\_index}, \texttt{wall\_flag}).
+    x - r < x_{\min} + s,
+\]
+and right-wall contact begins when
+\[
+    x + r > x_{\max} - s.
 \]
 
-The wall flags are:
+This deliberately sacrifices a small amount of box space. The benefit is a
+more stable soft-wall interaction with less special-case cleanup code. The wall
+is still represented by a ghost particle; the only modeling choice is that the
+ghost perimeter is placed slightly inside the visible boundary.
 
-\begin{center}
-\begin{tabular}{cl}
-\toprule
-Flag & Wall \\
-\midrule
-1 & left \\
-2 & right \\
-3 & bottom \\
-4 & top \\
-\bottomrule
-\end{tabular}
-\end{center}
+\section{Wall Normal Velocity}
 
-Each wall state record stores:
+Wall normals point outward from the domain:
+\[
+\begin{aligned}
+    \mathbf{n}_{\mathrm{left}} &= (-1, 0),\\
+    \mathbf{n}_{\mathrm{right}} &= (1, 0),\\
+    \mathbf{n}_{\mathrm{bottom}} &= (0, -1),\\
+    \mathbf{n}_{\mathrm{top}} &= (0, 1).
+\end{aligned}
+\]
+The particle wall-normal velocity is
+\[
+    v_n = \mathbf{v}\cdot\mathbf{n}.
+\]
+Positive \(v_n\) means the particle is moving into that wall. Negative \(v_n\)
+means the particle is moving away from it.
 
-\begin{itemize}[leftmargin=*]
-    \item \texttt{geo\_phase},
-    \item \texttt{first\_contact\_velocity},
-    \item \texttt{first\_contact\_normal},
-    \item \texttt{first\_contact\_distance},
-    \item \texttt{first\_contact\_overlap\_area},
-    \item \texttt{geo\_zero\_velocity\_overlap\_area},
-    \item \texttt{geo\_zero\_velocity\_center\_distance}.
-\end{itemize}
+In the ghost-particle interpretation, the relative normal velocity against a
+fixed wall is equivalent to a particle moving against a very massive target.
+The implementation uses the wall ghost and fixed-target handling to preserve
+the particle tangent velocity while changing only the wall-normal component.
 
-\subsection{Why This Memory Is Needed}
+\section{Clusters}
 
-The geometry model needs three pieces of history:
+When multiple contacts are active at the same time, \texttt{Base.py} builds
+contact clusters. A cluster contains particles connected by active
+particle-particle contacts plus any active wall contacts on those particles.
 
-\begin{enumerate}[leftmargin=*]
-    \item the velocity at starting contact,
-    \item the current phase, compression or rebound,
-    \item the zero-velocity overlap geometry \(A_0\).
-\end{enumerate}
+For each contact, the model computes a desired change in relative normal
+velocity. The cluster solver forms a linear system whose unknowns are normal
+impulses. Applying those impulses gives velocities that satisfy all active
+contact predictions for the cluster as consistently as possible.
 
-The current position and velocity alone are not enough.  At turnaround the
-normal velocity is zero, so a memoryless model can lock at the zero point or
-misclassify the rebound as compression.  Contact state prevents that by keeping
-the original first-contact velocity and the chosen \(A_0\).
+Wall contacts are represented as contacts with no movable target. Their target
+mass is effectively infinite, so only the source particle receives the impulse.
 
-\section{Step Flow}
+\section{Zero-Overlap Clipping}
 
-The Python step flow in \texttt{Base.step()} is:
+After velocity prediction and movement, the code clips rebound contacts that
+would penetrate deeper than their stored zero-velocity geometry. For particle
+pairs, this moves both particles along the contact normal according to their
+masses. For wall contacts, it moves the source particle so that its distance to
+the skinned ghost matches the stored zero-center distance.
 
-\begin{enumerate}[leftmargin=*]
-    \item Begin the dynamics step.
-    \item Detect current particle and wall contacts.
-    \item Update particle-pair contact state.
-    \item Update wall contact state.
-    \item Apply geometry dynamics.
-    \item Move particles.
-    \item Detect contacts again at the new positions.
-    \item Update wall contact state again.
-    \item Clip rebound overlaps so contacts do not penetrate deeper than
-    \(A_0\).
-    \item End the dynamics step and record the report.
-\end{enumerate}
+For a wall contact with target center distance \(d_0\), the distance from the
+particle center to the visible wall line is
+\[
+    d_{\mathrm{wall}} = d_0 - r + s.
+\]
+This formula must include the skin \(s\). Omitting the skin makes the clipper
+place the particle at the wrong effective wall distance and can keep a particle
+stuck in wall contact.
 
 \section{Starting Overlaps}
 
-At reset, the model detects contacts before the first report.  Starting
-particle-pair overlaps are initialized by
-\texttt{initialize\_geo\_starting\_overlap\_zero\_state()}.  Starting wall
-overlaps are initialized by
-\texttt{initialize\_geo\_starting\_wall\_overlap\_zero\_state()}.
+If particles start at \(t=0\) already overlapping, the model treats the contact
+as post-turnaround rebound. The same rule applies to starting wall contacts.
+The first-contact velocity is reconstructed when needed so the force-law zero
+state is still based on an incoming collision.
 
-For starting overlaps:
+\section{Current Design Rules}
 
-\begin{itemize}[leftmargin=*]
-    \item the phase is set to \texttt{rebound},
-    \item \(A_0\) is solved from incoming momentum,
-    \item if needed, \(A_0\) is promoted to the current overlap,
-    \item the current velocity is set to the velocity that corresponds to the
-    current overlap on the rebound path.
+\begin{enumerate}[noitemsep]
+    \item Contacts are geometric overlaps, not independent force proxies.
+    \item Walls are ghost particles, not a separate collision model.
+    \item The wall skin is part of wall geometry and must be used consistently
+          by detection, ghost placement, prediction, clipping, reporting, and
+          visualization.
+    \item Tangential velocity is preserved by frictionless contacts.
+    \item Rebound contacts must not be allowed to move deeper than their stored
+          zero-velocity overlap.
+    \item Contact state is source-owned wherever possible to keep the model
+          compatible with future GPU execution.
+\end{enumerate}
+
+\section{Code Map}
+
+\begin{itemize}[noitemsep]
+    \item \texttt{Base.step}: runs contact detection, state update, prediction,
+          movement, and clipping.
+    \item \texttt{Base.detect\_contacts}: rebuilds particle and wall contact
+          lists.
+    \item \texttt{Base.wall\_ghost\_contact}: constructs skinned wall ghost
+          geometry.
+    \item \texttt{Base.geo\_velocity\_predictions}: builds active contact
+          clusters.
+    \item \texttt{Base.geo\_contact\_cluster\_prediction}: solves multi-contact
+          particle and wall clusters.
+    \item \texttt{Base.clip\_zero\_velocity\_wall\_overlaps}: prevents rebound
+          wall contacts from exceeding their zero-velocity geometry.
+    \item \texttt{NeoDynamics.particle\_zero\_velocity\_state}: computes the
+          force-law zero state for particle-particle contacts.
+    \item \texttt{NeoDynamics.starting\_overlap\_report}: computes compression
+          and rebound velocity reports for the current overlap.
 \end{itemize}
-
-For starting wall overlaps, if the cfg velocity is already outward from the
-wall, the incoming first-contact velocity is inferred by reflecting that
-velocity across the wall normal.
-
-\section{Exit Finalization}
-
-When a contact exits, the state is removed.  If the contact had reached rebound,
-the model finalizes the velocity to the full rebound velocity computed from the
-stored first-contact velocity and normal.
-
-For particle pairs, \texttt{finalize\_exited\_geo\_contact()} applies the final
-pair rebound impulse.  For wall contacts,
-\texttt{finalize\_exited\_geo\_wall\_contact()} reflects the stored incoming
-wall velocity.
-
-\section{Reporting}
-
-Capture reports are compact text files.  They show:
-
-\begin{itemize}[leftmargin=*]
-    \item total momentum,
-    \item kinetic energy,
-    \item per-particle dynamics,
-    \item particle-particle collision diagnostics,
-    \item wall collision diagnostics.
-\end{itemize}
-
-These reports are intended to compare the live velocity against the expected
-geometry-state velocity without reintroducing the old dynamics response.
-
-\section{GPU Direction}
-
-The Python \texttt{particle["gcs"]} contact-state slots are now the reference
-shape for the GPU port.  The GPU should embed equivalent source-owned contact
-state in the particle structure:
-
-\begin{itemize}[leftmargin=*]
-    \item one slot for each \texttt{ccs} particle contact,
-    \item later, one slot for each \texttt{bcs} wall contact.
-\end{itemize}
-
-That keeps the GPU rule parallel-friendly: each invocation writes only its own
-source particle state.  The state must store first-contact velocity, phase, and
-\(A_0\), matching the Python dictionaries described above.
 
 \end{document}

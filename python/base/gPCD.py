@@ -29,6 +29,9 @@ class Demo:
         self.center_dot_color = (245, 245, 245)
         self.collision_normal_color = (255, 245, 140)
         self.overlap_alpha = 185
+        self.wall_ghost_fill = (120, 220, 255, 55)
+        self.wall_ghost_edge = (90, 215, 255, 210)
+        self.wall_ghost_center = (245, 245, 245, 190)
         self.incoming_kinetic_energy = 0.0
         self.start_kinetic_energy = 0.0
         self.start_total_momentum_x = 0.0
@@ -275,6 +278,7 @@ class Demo:
             particle_screen_data.append((index, particle, x, y, center, radius, fill, edge))
             pygame.draw.circle(self.screen, fill, center, radius)
 
+        self.draw_wall_ghost_particles()
         self.draw_particle_overlaps(particle_screen_data)
 
         for index, particle, _x, _y, center, radius, _fill, edge in particle_screen_data:
@@ -289,6 +293,33 @@ class Demo:
         self.draw_report()
 
         pygame.display.flip()
+
+    def draw_wall_ghost_particles(self):
+        if self.base.walls is None:
+            return
+
+        ghost_surface = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+        for _index, particle in enumerate(self.base.particles):
+            if not self.base.is_active_particle(particle):
+                continue
+
+            for contact_record in particle.get("bcs", []):
+                wall_flag = contact_record.get("clflg", 0)
+                if wall_flag == 0:
+                    continue
+
+                contact = self.base.wall_ghost_contact(particle, wall_flag, self.base.walls)
+                if contact is None:
+                    continue
+
+                ghost_x, ghost_y = contact["ghost_location"]
+                center = self.to_screen(ghost_x, ghost_y)
+                radius = self.radius_to_pixels(particle["radius"])
+                pygame.draw.circle(ghost_surface, self.wall_ghost_fill, center, radius)
+                pygame.draw.circle(ghost_surface, self.wall_ghost_edge, center, radius, 2)
+                pygame.draw.circle(ghost_surface, self.wall_ghost_center, center, 3)
+
+        self.screen.blit(ghost_surface, (0, 0))
 
     def draw_particle_overlaps(self, particle_screen_data):
         for left_pos in range(len(particle_screen_data)):

@@ -128,6 +128,9 @@ StyleCopReport.xml
 *.spv
 *.png
 *.csv
+*.aux
+*.pdf
+*.gz
 
 # Chutzpah Test files
 _Chutzpah*
