@@ -45,6 +45,7 @@ class Base:
         self.sim_calc = SimCalc(self)
         self.report = Report()
         self.wall_contact_state = {}
+        self.geometry_only_mode = True
 
     def configure_flow(self, config):
         self.sim_calc.configure_flow(config)
@@ -384,6 +385,9 @@ class Base:
         return neo_model
 
     def clip_zero_velocity_overlaps(self):
+        if getattr(self, "geometry_only_mode", False):
+            return
+
         processed_pairs = set()
         for source_index, source_particle in enumerate(self.particles):
             for state in source_particle.get("gcs", []):
@@ -431,6 +435,9 @@ class Base:
                 state["geo_zero_velocity_clipped"] = True
 
     def clip_zero_velocity_wall_overlaps(self):
+        if getattr(self, "geometry_only_mode", False):
+            return
+
         for wall_key, state in self.wall_contact_state.items():
             if state.get("geo_phase") != "rebound":
                 continue
