@@ -30,7 +30,7 @@ struct Particle {
 	glm::vec4 PosLocB; // xyz=alternate position buffer, w=active flag
 	glm::vec4 VelRad;  // xyz=velocity, w=velocity angle
 
-	glm::vec4 Data;    // x=radius, y=collision_stiffness_q, z=rebound_min_fraction, w=state/flags
+	glm::vec4 Data;    // x=radius, y=collision_stiffness_q, z=reserved, w=state/flags
 	glm::vec4 parms;   // x=mass, y=delta_vx, z=delta_vy, w=delta_speed
 
 	lstr CornerList[8];
