@@ -433,7 +433,7 @@ class Demo:
         return momentum_x, momentum_y
 
     def total_internal_momentum_vector(self):
-        return self.contact_internal_momentum_vector()
+        return self.particle_side_internal_momentum_vector()
 
     @staticmethod
     def canonical_contact_internal_normal_momentum(state):
@@ -443,6 +443,9 @@ class Demo:
         )
 
     def pair_internal_momentum_vector(self):
+        return self.particle_pair_internal_momentum_vector()
+
+    def particle_pair_internal_momentum_vector(self):
         momentum_x = 0.0
         momentum_y = 0.0
         for source_index, target_index in self.active_particle_contact_pairs():
@@ -464,6 +467,17 @@ class Demo:
             momentum_y += internal_normal_momentum * ny
             momentum_x -= internal_normal_momentum * nx
             momentum_y -= internal_normal_momentum * ny
+        return momentum_x, momentum_y
+
+    def particle_side_internal_momentum_vector(self):
+        momentum_x = 0.0
+        momentum_y = 0.0
+        for index, particle in enumerate(self.base.particles):
+            if not self.base.is_active_particle(particle):
+                continue
+            particle_x, particle_y = self.particle_contact_internal_momentum_vector(index)
+            momentum_x += particle_x
+            momentum_y += particle_y
         return momentum_x, momentum_y
 
     def particle_contact_internal_momentum_vector(self, particle_index):
@@ -499,8 +513,8 @@ class Demo:
             nx, ny, _overlap_area, _center_distance = contact
             state = self.base.wall_contact_state.get(wall_key, {})
             internal_normal_momentum = self.canonical_contact_internal_normal_momentum(state)
-            momentum_x += internal_normal_momentum * nx
-            momentum_y += internal_normal_momentum * ny
+            momentum_x -= internal_normal_momentum * nx
+            momentum_y -= internal_normal_momentum * ny
         return momentum_x, momentum_y
 
     def wall_internal_momentum_vector(self):
@@ -520,7 +534,7 @@ class Demo:
         return momentum_x, momentum_y
 
     def contact_internal_momentum_vector(self):
-        pair_x, pair_y = self.pair_internal_momentum_vector()
+        pair_x, pair_y = self.particle_side_internal_momentum_vector()
         wall_x, wall_y = self.wall_internal_momentum_vector()
         return pair_x + wall_x, pair_y + wall_y
 
@@ -560,21 +574,23 @@ class Demo:
 
     def momentum_diagnostic_values(self):
         current_x, current_y = self.total_momentum_vector()
-        pair_internal_x, pair_internal_y = self.pair_internal_momentum_vector()
+        particle_side_internal_x, particle_side_internal_y = self.particle_side_internal_momentum_vector()
+        particle_pair_internal_x, particle_pair_internal_y = self.particle_pair_internal_momentum_vector()
         wall_internal_x, wall_internal_y = self.wall_internal_momentum_vector()
-        contact_internal_x, contact_internal_y = self.contact_internal_momentum_vector()
+        contact_internal_x = particle_side_internal_x + wall_internal_x
+        contact_internal_y = particle_side_internal_y + wall_internal_y
         pair_scalar, wall_scalar, stored, released, remaining = self.contact_internal_scalar_totals()
-        wall_ghost_x = getattr(self.base, "wall_ghost_momentum_x", 0.0)
-        wall_ghost_y = getattr(self.base, "wall_ghost_momentum_y", 0.0)
+        wall_velocity_reservoir_x = getattr(self.base, "wall_ghost_momentum_x", 0.0)
+        wall_velocity_reservoir_y = getattr(self.base, "wall_ghost_momentum_y", 0.0)
 
-        modeled_x = current_x + contact_internal_x
-        modeled_y = current_y + contact_internal_y
-        modeled_with_wall_x = modeled_x + wall_ghost_x
-        modeled_with_wall_y = modeled_y + wall_ghost_y
+        modeled_without_reservoir_x = current_x + contact_internal_x
+        modeled_without_reservoir_y = current_y + contact_internal_y
+        modeled_x = modeled_without_reservoir_x + wall_velocity_reservoir_x
+        modeled_y = modeled_without_reservoir_y + wall_velocity_reservoir_y
         drift_x = self.start_total_momentum_x - modeled_x
         drift_y = self.start_total_momentum_y - modeled_y
-        residual_with_wall_x = self.start_total_momentum_x - modeled_with_wall_x
-        residual_with_wall_y = self.start_total_momentum_y - modeled_with_wall_y
+        drift_without_reservoir_x = self.start_total_momentum_x - modeled_without_reservoir_x
+        drift_without_reservoir_y = self.start_total_momentum_y - modeled_without_reservoir_y
 
         values = {
             "start_px": self.start_total_momentum_x,
@@ -583,30 +599,57 @@ class Demo:
             "current_px": current_x,
             "current_py": current_y,
             "current_p": math.hypot(current_x, current_y),
-            "pair_internal_px": pair_internal_x,
-            "pair_internal_py": pair_internal_y,
-            "pair_internal_p": math.hypot(pair_internal_x, pair_internal_y),
+            "particle_velocity_px": current_x,
+            "particle_velocity_py": current_y,
+            "particle_velocity_p": math.hypot(current_x, current_y),
+            "particle_side_internal_px": particle_side_internal_x,
+            "particle_side_internal_py": particle_side_internal_y,
+            "particle_side_internal_p": math.hypot(particle_side_internal_x, particle_side_internal_y),
+            "particle_pair_internal_px": particle_pair_internal_x,
+            "particle_pair_internal_py": particle_pair_internal_y,
+            "particle_pair_internal_p": math.hypot(particle_pair_internal_x, particle_pair_internal_y),
+            "pair_internal_px": particle_pair_internal_x,
+            "pair_internal_py": particle_pair_internal_y,
+            "pair_internal_p": math.hypot(particle_pair_internal_x, particle_pair_internal_y),
             "wall_internal_px": wall_internal_x,
             "wall_internal_py": wall_internal_y,
             "wall_internal_p": math.hypot(wall_internal_x, wall_internal_y),
+            "wall_ghost_internal_px": wall_internal_x,
+            "wall_ghost_internal_py": wall_internal_y,
+            "wall_ghost_internal_p": math.hypot(wall_internal_x, wall_internal_y),
             "contact_internal_px": contact_internal_x,
             "contact_internal_py": contact_internal_y,
             "contact_internal_p": math.hypot(contact_internal_x, contact_internal_y),
+            "modeled_total_without_reservoir_px": modeled_without_reservoir_x,
+            "modeled_total_without_reservoir_py": modeled_without_reservoir_y,
+            "modeled_total_without_reservoir_p": math.hypot(
+                modeled_without_reservoir_x,
+                modeled_without_reservoir_y,
+            ),
             "modeled_total_px": modeled_x,
             "modeled_total_py": modeled_y,
             "modeled_total_p": math.hypot(modeled_x, modeled_y),
-            "wall_ghost_px": wall_ghost_x,
-            "wall_ghost_py": wall_ghost_y,
-            "wall_ghost_p": math.hypot(wall_ghost_x, wall_ghost_y),
-            "modeled_total_with_wall_px": modeled_with_wall_x,
-            "modeled_total_with_wall_py": modeled_with_wall_y,
-            "modeled_total_with_wall_p": math.hypot(modeled_with_wall_x, modeled_with_wall_y),
+            "wall_velocity_reservoir_px": wall_velocity_reservoir_x,
+            "wall_velocity_reservoir_py": wall_velocity_reservoir_y,
+            "wall_velocity_reservoir_p": math.hypot(wall_velocity_reservoir_x, wall_velocity_reservoir_y),
+            "wall_ghost_px": wall_velocity_reservoir_x,
+            "wall_ghost_py": wall_velocity_reservoir_y,
+            "wall_ghost_p": math.hypot(wall_velocity_reservoir_x, wall_velocity_reservoir_y),
+            "modeled_total_with_wall_px": modeled_x,
+            "modeled_total_with_wall_py": modeled_y,
+            "modeled_total_with_wall_p": math.hypot(modeled_x, modeled_y),
             "drift_modeled_px": drift_x,
             "drift_modeled_py": drift_y,
             "drift_modeled_p": math.hypot(drift_x, drift_y),
-            "drift_with_wall_ghost_px": residual_with_wall_x,
-            "drift_with_wall_ghost_py": residual_with_wall_y,
-            "drift_with_wall_ghost_p": math.hypot(residual_with_wall_x, residual_with_wall_y),
+            "drift_without_reservoir_px": drift_without_reservoir_x,
+            "drift_without_reservoir_py": drift_without_reservoir_y,
+            "drift_without_reservoir_p": math.hypot(
+                drift_without_reservoir_x,
+                drift_without_reservoir_y,
+            ),
+            "drift_with_wall_ghost_px": drift_x,
+            "drift_with_wall_ghost_py": drift_y,
+            "drift_with_wall_ghost_p": math.hypot(drift_x, drift_y),
             "pair_internal_scalar": pair_scalar,
             "wall_internal_scalar": wall_scalar,
             "contact_internal_scalar": pair_scalar + wall_scalar,
@@ -625,20 +668,30 @@ class Demo:
 
     def momentum_balance_rows(self):
         current_momentum_x, current_momentum_y = self.total_momentum_vector()
-        internal_momentum_x, internal_momentum_y = self.total_internal_momentum_vector()
-        wall_ghost_x = getattr(self.base, "wall_ghost_momentum_x", 0.0)
-        wall_ghost_y = getattr(self.base, "wall_ghost_momentum_y", 0.0)
-        modeled_momentum_x = current_momentum_x + internal_momentum_x
-        modeled_momentum_y = current_momentum_y + internal_momentum_y
-        modeled_with_wall_x = modeled_momentum_x + wall_ghost_x
-        modeled_with_wall_y = modeled_momentum_y + wall_ghost_y
+        particle_side_internal_x, particle_side_internal_y = self.particle_side_internal_momentum_vector()
+        wall_internal_x, wall_internal_y = self.wall_internal_momentum_vector()
+        wall_velocity_reservoir_x = getattr(self.base, "wall_ghost_momentum_x", 0.0)
+        wall_velocity_reservoir_y = getattr(self.base, "wall_ghost_momentum_y", 0.0)
+        modeled_with_wall_x = (
+            current_momentum_x
+            + particle_side_internal_x
+            + wall_internal_x
+            + wall_velocity_reservoir_x
+        )
+        modeled_with_wall_y = (
+            current_momentum_y
+            + particle_side_internal_y
+            + wall_internal_y
+            + wall_velocity_reservoir_y
+        )
         drift_x = self.start_total_momentum_x - modeled_with_wall_x
         drift_y = self.start_total_momentum_y - modeled_with_wall_y
         return (
             self.momentum_row("start", self.start_total_momentum_x, self.start_total_momentum_y),
-            self.momentum_row("kinetic", current_momentum_x, current_momentum_y),
-            self.momentum_row("contact_internal", internal_momentum_x, internal_momentum_y),
-            self.momentum_row("wall_ghost", wall_ghost_x, wall_ghost_y),
+            self.momentum_row("particle_velocity", current_momentum_x, current_momentum_y),
+            self.momentum_row("particle_side_int", particle_side_internal_x, particle_side_internal_y),
+            self.momentum_row("wall_ghost_int", wall_internal_x, wall_internal_y),
+            self.momentum_row("wall_vel_reserv", wall_velocity_reservoir_x, wall_velocity_reservoir_y),
             self.momentum_row("modeled_total", modeled_with_wall_x, modeled_with_wall_y),
             self.momentum_row("drift", drift_x, drift_y),
         )
@@ -1060,25 +1113,7 @@ class Demo:
     def draw_report(self):
         x = 12
         y = 12
-        current_total_momentum_x, current_total_momentum_y = self.total_momentum_vector()
-        current_kinetic_energy = self.total_kinetic_energy()
-        start_total_momentum_mag = (
-            self.start_total_momentum_x * self.start_total_momentum_x
-            + self.start_total_momentum_y * self.start_total_momentum_y
-        ) ** 0.5
-        current_total_momentum_mag = (
-            current_total_momentum_x * current_total_momentum_x
-            + current_total_momentum_y * current_total_momentum_y
-        ) ** 0.5
-        total_momentum_mag_delta = current_total_momentum_mag - start_total_momentum_mag
-        summary_lines = self.momentum_balance_rows() + (
-            f"total_momentum    |start|={start_total_momentum_mag:.8f} "
-            f"|current|={current_total_momentum_mag:.8f} "
-            f"diff={total_momentum_mag_delta:.8f}",
-            f"ke                incoming={self.incoming_kinetic_energy:.8f} "
-            f"live_start={self.start_kinetic_energy:.8f} "
-            f"current={current_kinetic_energy:.8f}",
-        )
+        summary_lines = self.momentum_balance_rows()
         fps_line = f"frame={self.frame_number} fps={self.current_fps:.1f}"
         surface = self.report_font.render(fps_line, True, self.center_dot_color)
         self.screen.blit(surface, (x, y))
@@ -1087,14 +1122,6 @@ class Demo:
             surface = self.report_font.render(line, True, self.center_dot_color)
             self.screen.blit(surface, (x, y))
             y += 18
-        lifecycle_line = (
-            f"released={self.base.released_count} "
-            f"recycled={self.base.recycled_count} "
-            f"escaped={self.base.escaped_count}"
-        )
-        surface = self.report_font.render(lifecycle_line, True, self.center_dot_color)
-        self.screen.blit(surface, (x, y))
-        y += 18
         y += 6
         if(self.config.get("plot_report", True) == True):
                 
@@ -1134,18 +1161,9 @@ class Demo:
     def write_report_capture(self):
         self.report_capture_dir.mkdir(parents=True, exist_ok=True)
         report_file = self.report_capture_dir / f"Cap{self.frame_number:06d}.rpt"
-        current_total_momentum_x, current_total_momentum_y = self.total_momentum_vector()
-        current_kinetic_energy = self.total_kinetic_energy()
-        start_total_momentum_mag = math.hypot(self.start_total_momentum_x, self.start_total_momentum_y)
-        current_total_momentum_mag = math.hypot(current_total_momentum_x, current_total_momentum_y)
-        total_momentum_mag_delta = current_total_momentum_mag - start_total_momentum_mag
         with report_file.open("w", encoding="utf-8") as outfile:
             outfile.write("[summary]\n")
             outfile.write(f"frame={self.frame_number} fps={self.current_fps:.1f}\n")
-            outfile.write("\n[total_momentum]\n")
-            outfile.write(f"|start|={start_total_momentum_mag:.8f}\n")
-            outfile.write(f"|current|={current_total_momentum_mag:.8f}\n")
-            outfile.write(f"diff={total_momentum_mag_delta:.8f}\n")
             outfile.write("\n[momentum_balance]\n")
             for line in self.momentum_balance_rows():
                 outfile.write(f"{line}\n")
@@ -1155,15 +1173,6 @@ class Demo:
                     outfile.write(f"{key}={int(value)}\n")
                 else:
                     outfile.write(f"{key}={value:.12f}\n")
-            outfile.write("\n[ke]\n")
-            outfile.write(f"start={self.start_kinetic_energy:.8f}\n")
-            outfile.write(f"end={current_kinetic_energy:.8f}\n")
-            outfile.write("\n[status]\n")
-            outfile.write(
-                f"released={self.base.released_count} "
-                f"recycled={self.base.recycled_count} "
-                f"escaped={self.base.escaped_count}\n"
-            )
             for line in self.cluster_capture_report_lines():
                 outfile.write(f"{line}\n")
             outfile.write("\n[particles]\n")
