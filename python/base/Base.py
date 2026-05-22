@@ -44,6 +44,8 @@ class Base:
         self.sim_calc = SimCalc(self)
         self.report = Report()
         self.wall_contact_state = {}
+        self.wall_ghost_momentum_x = 0.0
+        self.wall_ghost_momentum_y = 0.0
 
     def configure_flow(self, config):
         self.sim_calc.configure_flow(config)
@@ -123,6 +125,8 @@ class Base:
         self.time = 0.0
         self.particles = []
         self.wall_contact_state = {}
+        self.wall_ghost_momentum_x = 0.0
+        self.wall_ghost_momentum_y = 0.0
         self.report.clear()
         for config in self.particle_configs:
             particle = dict(config)
@@ -694,6 +698,9 @@ class Base:
                 target_particle = self.particles[target_index]
                 velocities[target_index][0] += impulse * nx / target_particle["mass"]
                 velocities[target_index][1] += impulse * ny / target_particle["mass"]
+            else:
+                self.wall_ghost_momentum_x += impulse * nx
+                self.wall_ghost_momentum_y += impulse * ny
 
         return {
             index: (velocity[0], velocity[1])
@@ -1733,6 +1740,12 @@ class Base:
         if not applied_rebound:
             return
 
+        old_momentum_x = particle["mass"] * particle["vx"]
+        old_momentum_y = particle["mass"] * particle["vy"]
+        new_momentum_x = particle["mass"] * combined_velocity[0]
+        new_momentum_y = particle["mass"] * combined_velocity[1]
+        self.wall_ghost_momentum_x += old_momentum_x - new_momentum_x
+        self.wall_ghost_momentum_y += old_momentum_y - new_momentum_y
         particle["vx"], particle["vy"] = combined_velocity
         self.sync_velocity_mirror(particle)
 

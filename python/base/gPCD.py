@@ -432,6 +432,217 @@ class Demo:
             momentum_y += particle["mass"] * particle["vy"]
         return momentum_x, momentum_y
 
+    def total_internal_momentum_vector(self):
+        return self.contact_internal_momentum_vector()
+
+    @staticmethod
+    def canonical_contact_internal_normal_momentum(state):
+        return state.get(
+            "neo_stored_internal_normal_momentum",
+            state.get("neo_rebound_remaining_normal_momentum", 0.0),
+        )
+
+    def pair_internal_momentum_vector(self):
+        momentum_x = 0.0
+        momentum_y = 0.0
+        for source_index, target_index in self.active_particle_contact_pairs():
+            source_particle = self.base.particles[source_index]
+            target_particle = self.base.particles[target_index]
+            contact = self.base.particle_contact(source_particle, target_particle)
+            if contact is None:
+                continue
+            nx, ny, _overlap_area, _center_distance = contact
+            state = (
+                self.base.source_geo_contact_state(source_particle, target_index)
+                or self.base.source_geo_contact_state(target_particle, source_index)
+                or {}
+            )
+            internal_normal_momentum = self.canonical_contact_internal_normal_momentum(state)
+            # Pair-contact internal vectors are equal and opposite across the two
+            # real particles, so their system-vector contribution cancels.
+            momentum_x += internal_normal_momentum * nx
+            momentum_y += internal_normal_momentum * ny
+            momentum_x -= internal_normal_momentum * nx
+            momentum_y -= internal_normal_momentum * ny
+        return momentum_x, momentum_y
+
+    def particle_contact_internal_momentum_vector(self, particle_index):
+        momentum_x = 0.0
+        momentum_y = 0.0
+        for source_index, target_index in self.active_particle_contact_pairs():
+            if particle_index not in (source_index, target_index):
+                continue
+            source_particle = self.base.particles[source_index]
+            target_particle = self.base.particles[target_index]
+            contact = self.base.particle_contact(source_particle, target_particle)
+            if contact is None:
+                continue
+            nx, ny, _overlap_area, _center_distance = contact
+            state = (
+                self.base.source_geo_contact_state(source_particle, target_index)
+                or self.base.source_geo_contact_state(target_particle, source_index)
+                or {}
+            )
+            internal_normal_momentum = self.canonical_contact_internal_normal_momentum(state)
+            sign = 1.0 if particle_index == source_index else -1.0
+            momentum_x += sign * internal_normal_momentum * nx
+            momentum_y += sign * internal_normal_momentum * ny
+
+        for wall_key in self.active_wall_contacts():
+            wall_particle_index, wall_flag = wall_key
+            if wall_particle_index != particle_index:
+                continue
+            particle = self.base.particles[particle_index]
+            contact = self.base.wall_contact(particle, wall_flag, self.base.walls)
+            if contact is None:
+                continue
+            nx, ny, _overlap_area, _center_distance = contact
+            state = self.base.wall_contact_state.get(wall_key, {})
+            internal_normal_momentum = self.canonical_contact_internal_normal_momentum(state)
+            momentum_x += internal_normal_momentum * nx
+            momentum_y += internal_normal_momentum * ny
+        return momentum_x, momentum_y
+
+    def wall_internal_momentum_vector(self):
+        momentum_x = 0.0
+        momentum_y = 0.0
+        for particle_index, wall_flag in self.active_wall_contacts():
+            particle = self.base.particles[particle_index]
+            contact = self.base.wall_contact(particle, wall_flag, self.base.walls)
+            if contact is None:
+                continue
+            nx, ny, _overlap_area, _center_distance = contact
+            wall_key = (particle_index, wall_flag)
+            state = self.base.wall_contact_state.get(wall_key, {})
+            internal_normal_momentum = self.canonical_contact_internal_normal_momentum(state)
+            momentum_x += internal_normal_momentum * nx
+            momentum_y += internal_normal_momentum * ny
+        return momentum_x, momentum_y
+
+    def contact_internal_momentum_vector(self):
+        pair_x, pair_y = self.pair_internal_momentum_vector()
+        wall_x, wall_y = self.wall_internal_momentum_vector()
+        return pair_x + wall_x, pair_y + wall_y
+
+    def contact_internal_scalar_totals(self):
+        pair_internal = 0.0
+        wall_internal = 0.0
+        stored = 0.0
+        released = 0.0
+        remaining = 0.0
+
+        for source_index, target_index in self.active_particle_contact_pairs():
+            source_particle = self.base.particles[source_index]
+            target_particle = self.base.particles[target_index]
+            state = (
+                self.base.source_geo_contact_state(source_particle, target_index)
+                or self.base.source_geo_contact_state(target_particle, source_index)
+                or {}
+            )
+            pair_internal += abs(self.canonical_contact_internal_normal_momentum(state))
+            stored += state.get("neo_stored_internal_normal_momentum", 0.0)
+            released += state.get("neo_rebound_released_normal_momentum", 0.0)
+            remaining += state.get("neo_rebound_remaining_normal_momentum", 0.0)
+
+        for wall_key in self.active_wall_contacts():
+            particle_index, wall_flag = wall_key
+            particle = self.base.particles[particle_index]
+            contact = self.base.wall_contact(particle, wall_flag, self.base.walls)
+            if contact is None:
+                continue
+            state = self.base.wall_contact_state.get(wall_key, {})
+            wall_internal += abs(self.canonical_contact_internal_normal_momentum(state))
+            stored += state.get("neo_stored_internal_normal_momentum", 0.0)
+            released += state.get("neo_rebound_released_normal_momentum", 0.0)
+            remaining += state.get("neo_rebound_remaining_normal_momentum", 0.0)
+
+        return pair_internal, wall_internal, stored, released, remaining
+
+    def momentum_diagnostic_values(self):
+        current_x, current_y = self.total_momentum_vector()
+        pair_internal_x, pair_internal_y = self.pair_internal_momentum_vector()
+        wall_internal_x, wall_internal_y = self.wall_internal_momentum_vector()
+        contact_internal_x, contact_internal_y = self.contact_internal_momentum_vector()
+        pair_scalar, wall_scalar, stored, released, remaining = self.contact_internal_scalar_totals()
+        wall_ghost_x = getattr(self.base, "wall_ghost_momentum_x", 0.0)
+        wall_ghost_y = getattr(self.base, "wall_ghost_momentum_y", 0.0)
+
+        modeled_x = current_x + contact_internal_x
+        modeled_y = current_y + contact_internal_y
+        modeled_with_wall_x = modeled_x + wall_ghost_x
+        modeled_with_wall_y = modeled_y + wall_ghost_y
+        drift_x = self.start_total_momentum_x - modeled_x
+        drift_y = self.start_total_momentum_y - modeled_y
+        residual_with_wall_x = self.start_total_momentum_x - modeled_with_wall_x
+        residual_with_wall_y = self.start_total_momentum_y - modeled_with_wall_y
+
+        values = {
+            "start_px": self.start_total_momentum_x,
+            "start_py": self.start_total_momentum_y,
+            "start_p": math.hypot(self.start_total_momentum_x, self.start_total_momentum_y),
+            "current_px": current_x,
+            "current_py": current_y,
+            "current_p": math.hypot(current_x, current_y),
+            "pair_internal_px": pair_internal_x,
+            "pair_internal_py": pair_internal_y,
+            "pair_internal_p": math.hypot(pair_internal_x, pair_internal_y),
+            "wall_internal_px": wall_internal_x,
+            "wall_internal_py": wall_internal_y,
+            "wall_internal_p": math.hypot(wall_internal_x, wall_internal_y),
+            "contact_internal_px": contact_internal_x,
+            "contact_internal_py": contact_internal_y,
+            "contact_internal_p": math.hypot(contact_internal_x, contact_internal_y),
+            "modeled_total_px": modeled_x,
+            "modeled_total_py": modeled_y,
+            "modeled_total_p": math.hypot(modeled_x, modeled_y),
+            "wall_ghost_px": wall_ghost_x,
+            "wall_ghost_py": wall_ghost_y,
+            "wall_ghost_p": math.hypot(wall_ghost_x, wall_ghost_y),
+            "modeled_total_with_wall_px": modeled_with_wall_x,
+            "modeled_total_with_wall_py": modeled_with_wall_y,
+            "modeled_total_with_wall_p": math.hypot(modeled_with_wall_x, modeled_with_wall_y),
+            "drift_modeled_px": drift_x,
+            "drift_modeled_py": drift_y,
+            "drift_modeled_p": math.hypot(drift_x, drift_y),
+            "drift_with_wall_ghost_px": residual_with_wall_x,
+            "drift_with_wall_ghost_py": residual_with_wall_y,
+            "drift_with_wall_ghost_p": math.hypot(residual_with_wall_x, residual_with_wall_y),
+            "pair_internal_scalar": pair_scalar,
+            "wall_internal_scalar": wall_scalar,
+            "contact_internal_scalar": pair_scalar + wall_scalar,
+            "contact_stored_scalar": stored,
+            "contact_released_scalar": released,
+            "contact_remaining_scalar": remaining,
+            "active_pair_contacts": float(len(self.active_particle_contact_pairs())),
+            "active_wall_contacts": float(len(self.active_wall_contacts())),
+        }
+        return values
+
+    @staticmethod
+    def momentum_row(label, momentum_x, momentum_y):
+        momentum_mag = math.hypot(momentum_x, momentum_y)
+        return f"{label:<17} px={momentum_x:.8f} py={momentum_y:.8f} |p|={momentum_mag:.8f}"
+
+    def momentum_balance_rows(self):
+        current_momentum_x, current_momentum_y = self.total_momentum_vector()
+        internal_momentum_x, internal_momentum_y = self.total_internal_momentum_vector()
+        wall_ghost_x = getattr(self.base, "wall_ghost_momentum_x", 0.0)
+        wall_ghost_y = getattr(self.base, "wall_ghost_momentum_y", 0.0)
+        modeled_momentum_x = current_momentum_x + internal_momentum_x
+        modeled_momentum_y = current_momentum_y + internal_momentum_y
+        modeled_with_wall_x = modeled_momentum_x + wall_ghost_x
+        modeled_with_wall_y = modeled_momentum_y + wall_ghost_y
+        drift_x = self.start_total_momentum_x - modeled_with_wall_x
+        drift_y = self.start_total_momentum_y - modeled_with_wall_y
+        return (
+            self.momentum_row("start", self.start_total_momentum_x, self.start_total_momentum_y),
+            self.momentum_row("kinetic", current_momentum_x, current_momentum_y),
+            self.momentum_row("contact_internal", internal_momentum_x, internal_momentum_y),
+            self.momentum_row("wall_ghost", wall_ghost_x, wall_ghost_y),
+            self.momentum_row("modeled_total", modeled_with_wall_x, modeled_with_wall_y),
+            self.momentum_row("drift", drift_x, drift_y),
+        )
+
     def particle_contact_diagnostics(self, source_index, source_particle):
         diagnostics = []
         for slot in range(source_particle.get("sltnum", 0)):
@@ -453,7 +664,7 @@ class Demo:
             rel_normal_momentum = reduced_mass * abs(rel_normal_velocity)
             contact_state = self.base.source_geo_contact_state(source_particle, target_index) or {}
             internal_contact_momentum = contact_state.get("internal_contact_momentum", 0.0)
-            neo_internal_normal_momentum = contact_state.get("neo_internal_normal_momentum", 0.0)
+            neo_internal_normal_momentum = self.canonical_contact_internal_normal_momentum(contact_state)
             neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
             neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
             neo_remaining_internal_momentum = contact_state.get("neo_rebound_remaining_normal_momentum", 0.0)
@@ -519,6 +730,7 @@ class Demo:
             momentum_x = particle["mass"] * particle["vx"]
             momentum_y = particle["mass"] * particle["vy"]
             particle_momentum = math.hypot(momentum_x, momentum_y)
+            internal_momentum_x, internal_momentum_y = self.particle_contact_internal_momentum_vector(index)
             lines.extend(
                 [
                     "",
@@ -531,8 +743,8 @@ class Demo:
                     f"dpx: {particle.get('momentum_delta_x', 0.0):.8f}",
                     f"dpy: {particle.get('momentum_delta_y', 0.0):.8f}",
                     "nimom: "
-                    f"({particle.get('neo_internal_momentum_x', 0.0):.8f}, "
-                    f"{particle.get('neo_internal_momentum_y', 0.0):.8f})",
+                    f"({internal_momentum_x:.8f}, "
+                    f"{internal_momentum_y:.8f})",
                     f"v: ({particle['vx']:.8f}, {particle['vy']:.8f})",
                     "v0: "
                     f"({particle.get('starting_uncorrected_vx', particle['vx']):.8f}, "
@@ -709,7 +921,7 @@ class Demo:
                 target_particle,
                 source_index,
             ) or {}
-            contact_internal_momentum = state.get("neo_internal_normal_momentum", 0.0)
+            contact_internal_momentum = self.canonical_contact_internal_normal_momentum(state)
             cimom_x += contact_internal_momentum * nx
             cimom_y += contact_internal_momentum * ny
             cimom += contact_internal_momentum
@@ -724,7 +936,7 @@ class Demo:
                 continue
             nx, ny, _overlap_area, _center_distance = contact
             state = self.base.wall_contact_state.get(wall_key, {})
-            contact_internal_momentum = state.get("neo_internal_normal_momentum", 0.0)
+            contact_internal_momentum = self.canonical_contact_internal_normal_momentum(state)
             cimom_x += contact_internal_momentum * nx
             cimom_y += contact_internal_momentum * ny
             cimom += contact_internal_momentum
@@ -755,7 +967,7 @@ class Demo:
             rel_normal_momentum = reduced_mass * abs(rel_normal_velocity)
             contact_state = self.base.source_geo_contact_state(source_particle, target_index) or {}
             internal_contact_momentum = contact_state.get("internal_contact_momentum", 0.0)
-            neo_internal_normal_momentum = contact_state.get("neo_internal_normal_momentum", 0.0)
+            neo_internal_normal_momentum = self.canonical_contact_internal_normal_momentum(contact_state)
             neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
             neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
             neo_remaining_internal_momentum = contact_state.get("neo_rebound_remaining_normal_momentum", 0.0)
@@ -859,7 +1071,7 @@ class Demo:
             + current_total_momentum_y * current_total_momentum_y
         ) ** 0.5
         total_momentum_mag_delta = current_total_momentum_mag - start_total_momentum_mag
-        summary_lines = (
+        summary_lines = self.momentum_balance_rows() + (
             f"total_momentum    |start|={start_total_momentum_mag:.8f} "
             f"|current|={current_total_momentum_mag:.8f} "
             f"diff={total_momentum_mag_delta:.8f}",
@@ -934,6 +1146,15 @@ class Demo:
             outfile.write(f"|start|={start_total_momentum_mag:.8f}\n")
             outfile.write(f"|current|={current_total_momentum_mag:.8f}\n")
             outfile.write(f"diff={total_momentum_mag_delta:.8f}\n")
+            outfile.write("\n[momentum_balance]\n")
+            for line in self.momentum_balance_rows():
+                outfile.write(f"{line}\n")
+            outfile.write("\n[momentum_diagnostics]\n")
+            for key, value in self.momentum_diagnostic_values().items():
+                if key.endswith("_contacts"):
+                    outfile.write(f"{key}={int(value)}\n")
+                else:
+                    outfile.write(f"{key}={value:.12f}\n")
             outfile.write("\n[ke]\n")
             outfile.write(f"start={self.start_kinetic_energy:.8f}\n")
             outfile.write(f"end={current_kinetic_energy:.8f}\n")

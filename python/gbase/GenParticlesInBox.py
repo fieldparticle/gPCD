@@ -160,8 +160,8 @@ class GenParticlesInBox():
         RUN_CONFIGURATION = self.itemcfg["RUN_CONFIGURATION"]
         count = 0
         try:
-            for row in range(1,5):
-                for col in range(1,5):
+            for row in range(1,3):
+                for col in range(1,3):
                     particle_struct = pdata()
                     self.number_particles += 1
                     particle_struct.pnum = self.number_particles

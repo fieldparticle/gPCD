@@ -1,0 +1,27 @@
+% !TeX root = GeoDynamics.tex
+\section{Drift calculations}
+
+Drift calculation is an accumulation of momentum changes during a simulation. The drift is:
+
+
+\begin{equation}
+\begin{aligned}
+\mathbf{p}_{CurrentTotalMomentum} = \mathbf{p}_{ParticleVelocityMomentum} \\ + \mathbf{p}_{ ParticleSideInternalMomentum} + \mathbf{p}_{WallGhostInternalMomentum} + \mathbf{p}_{WallVelocityMomentumReservoir}
+\end{aligned}
+\end{equation}
+
+Where velocity momentum, $\mathbf{p}_{ParticleVelocityMomentum} $, is the sum of all the particles translational momentum. Internal momentum, $\mathbf{p}_{ParticleSideInternalMomentum}$. Wall momentum \\ $\mathbf{p}_{ WallGhostInternalMomentum}$ is the value of the wall internal momentum. And \\ $\mathbf{p}_{WallVelocityMomentumReservoir}$ is the pseudo wall reaction velocity.
+
+The total starting momentum $\mathbf{p}_{InitialTotalMomentum}$, minus the current total momentum \\  $\mathbf{p}_{CurrentTotalMomentum}$ is drift $\mathbf{p}_{Drift}$.
+
+Reporting variable perform a running sum where as each particles momentum values are recorded by adding them to previous reporting values. This means for each particle, at a time step, the kinetic momentum is added to the global variable $\mathbf{p}_{ ParticleVelocity Momentum}$, and likewise for the other variables. They are independently assigned to reporting variables. At the end of the time step the filled reporting variables are used to calculate the drift.  
+
+Drift tells us how much the total system is varying from the current system and shows us the accumulation/system errors. The  accumulation/system errors become very important in large scale simulation of millions of particles.
+
+The model of wall internal momentum may not match the actual dynamics but it is viewed as follows: The wall/ghost internal momentum ,$\mathbf{p}_{WallGhostInternalMomentum}$ is equal and opposite to the particle-side,$\mathbf{p}_{ParticleSideInternalMomentum}$  wall-contact internal momentum. 
+
+The model of particle internal momentum may not match the actual dynamics but it is viewed as follows:Each particles internal momentum accumulates during compression and feeds back during rebound. During compression it is a vector opposite the velocity vector. In this way the internal momentum is fed back in the same direction as rebound. 
+
+Particle-particle collisions result in four offsetting vectors, two opposing velocity momentum vectors and two opposing internal momentum vectors. Particle-wall collisions differ mathematically since the wall does not move. There are then only three vectors - two internal momentum vectors and only one velocity momentum vector. This leaves an imbalance of one velocity momentum vector. To account for this we create a wall-side velocity momentum reservoir $\mathbf{p}_{WallVelocityMomentumReservoir}$.
+
+
