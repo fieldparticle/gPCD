@@ -397,16 +397,50 @@ vec2 NeoWithCurrentTangent(vec2 current_velocity, vec2 predicted_velocity, vec2 
     return current_velocity - dot(current_velocity, normal) * normal + predicted_normal_velocity * normal;
 }
 
-vec2 NeoPairPrediction(uint source_id, uint slot, NeoContactGeometry contact, vec2 current_velocity)
+float NeoPairMinimumOutwardSpeed(uint source_id, uint target_id, vec2 source_velocity, vec2 target_velocity, vec2 normal)
 {
+    float relative_speed = abs(dot(target_velocity - source_velocity, normal));
+    float radius_speed = NEO_ZERO_TOLERANCE * min(NeoRadius(source_id), NeoRadius(target_id));
+    return max(NEO_ZERO_TOLERANCE * relative_speed, radius_speed);
+}
+
+void NeoApplyPairOutwardEscape(
+    uint source_id,
+    uint target_id,
+    vec2 normal,
+    float minimum_outward_speed,
+    inout vec2 source_velocity,
+    inout vec2 target_velocity
+) {
+    float relative_normal_velocity = dot(target_velocity - source_velocity, normal);
+    if (relative_normal_velocity >= minimum_outward_speed) {
+        return;
+    }
+
+    float correction = minimum_outward_speed - relative_normal_velocity;
+    source_velocity -= 0.5 * correction * normal;
+    target_velocity += 0.5 * correction * normal;
+}
+
+bool NeoPairPredictionBoth(
+    uint source_id,
+    uint slot,
+    NeoContactGeometry contact,
+    vec2 current_velocity,
+    out vec2 source_prediction,
+    out vec2 target_prediction
+) {
     uint target_id = P[source_id].ncs[slot].ids.x;
     vec2 normal = P[source_id].ncs[slot].geom.xy;
     float zero_area = P[source_id].ncs[slot].geom.z;
     vec2 source_start = P[source_id].ncs[slot].vel.xy;
     vec2 target_start = P[source_id].ncs[slot].vel.zw;
 
+    source_prediction = current_velocity;
+    target_prediction = P[target_id].VelRad.xy;
+
     if (zero_area <= NEO_EPSILON) {
-        return current_velocity;
+        return false;
     }
 
     NeoUpdatePairPhase(source_id, slot, contact, current_velocity);
@@ -419,7 +453,23 @@ vec2 NeoPairPrediction(uint source_id, uint slot, NeoContactGeometry contact, ve
     float incoming_momentum = max(0.0, -reduced_mass * dot(start_relative_velocity, normal));
     if (incoming_momentum <= 0.0) {
         P[source_id].ncs[slot].ids.z = NEO_PHASE_REBOUND;
-        return current_velocity;
+        float fallback_outward_speed = NeoPairMinimumOutwardSpeed(
+            source_id,
+            target_id,
+            current_velocity,
+            P[target_id].VelRad.xy,
+            normal
+        );
+        NeoApplyPairOutwardEscape(
+            source_id,
+            target_id,
+            normal,
+            fallback_outward_speed,
+            source_prediction,
+            target_prediction
+        );
+        source_prediction = NeoWithCurrentTangent(current_velocity, source_prediction, normal);
+        return true;
     }
 
     float compression_fraction = clamp(contact.overlap_area / zero_area, 0.0, 1.0);
@@ -428,32 +478,56 @@ vec2 NeoPairPrediction(uint source_id, uint slot, NeoContactGeometry contact, ve
 
     if (P[source_id].ncs[slot].ids.z == NEO_PHASE_COMPRESSION) {
         float compression_progress = 1.0 - sqrt(max(0.0, 1.0 - compression_fraction));
-        return NeoWithCurrentTangent(
+        source_prediction = NeoWithCurrentTangent(
             current_velocity,
             mix(source_start, turn_velocity, compression_progress),
             normal
         );
+        target_prediction = mix(
+            target_start,
+            target_start + (incoming_momentum / target_mass) * normal,
+            compression_progress
+        );
+        return true;
     }
 
     float rebound_velocity_fraction = sqrt(max(0.0, 1.0 - compression_fraction));
-    vec2 predicted_velocity = mix(turn_velocity, full_rebound_velocity, rebound_velocity_fraction);
+    source_prediction = mix(turn_velocity, full_rebound_velocity, rebound_velocity_fraction);
 
     vec2 target_turn_velocity = target_start + (incoming_momentum / target_mass) * normal;
     vec2 target_full_rebound_velocity = target_start + (2.0 * incoming_momentum / target_mass) * normal;
-    vec2 predicted_target_velocity = mix(
+    target_prediction = mix(
         target_turn_velocity,
         target_full_rebound_velocity,
         rebound_velocity_fraction
     );
 
     float start_closing_speed = max(0.0, -dot(start_relative_velocity, normal));
-    float minimum_outward_speed = NEO_ZERO_TOLERANCE * start_closing_speed;
-    float relative_normal_velocity = dot(predicted_target_velocity - predicted_velocity, normal);
-    if (relative_normal_velocity < minimum_outward_speed) {
-        predicted_velocity -= 0.5 * (minimum_outward_speed - relative_normal_velocity) * normal;
-    }
+    float minimum_outward_speed = max(
+        NEO_ZERO_TOLERANCE * start_closing_speed,
+        NeoPairMinimumOutwardSpeed(source_id, target_id, source_prediction, target_prediction, normal)
+    );
+    NeoApplyPairOutwardEscape(
+        source_id,
+        target_id,
+        normal,
+        minimum_outward_speed,
+        source_prediction,
+        target_prediction
+    );
 
-    return NeoWithCurrentTangent(current_velocity, predicted_velocity, normal);
+    source_prediction = NeoWithCurrentTangent(current_velocity, source_prediction, normal);
+    return true;
+}
+
+vec2 NeoPairPrediction(uint source_id, uint slot, NeoContactGeometry contact, vec2 current_velocity)
+{
+    vec2 source_prediction;
+    vec2 target_prediction;
+    if (!NeoPairPredictionBoth(source_id, slot, contact, current_velocity, source_prediction, target_prediction)) {
+        return current_velocity;
+    }
+    return source_prediction;
 }
 
 vec2 NeoWallPrediction(uint source_id, uint slot, NeoContactGeometry contact, vec2 current_velocity)
@@ -584,6 +658,56 @@ bool NeoApplyWallScheduler(uint source_id, vec2 pair_velocity, out vec2 final_ve
     return has_wall;
 }
 
+bool NeoApplyPairEscapeScheduler(uint source_id, inout vec2 final_velocity)
+{
+    bool adjusted = false;
+    uint tracked_count = min(P[source_id].contactCount, MAX_CONTACTS);
+
+    for (uint slot = 0u; slot < tracked_count; ++slot) {
+        if (P[source_id].ncs[slot].ids.y != NEO_CONTACT_PARTICLE) {
+            continue;
+        }
+        if (P[source_id].ncs[slot].ids.w != NEO_CONTACT_ACTIVE_THIS_FRAME) {
+            continue;
+        }
+
+        uint target_id = P[source_id].ncs[slot].ids.x;
+        NeoContactGeometry contact;
+        if (!NeoParticleGeometry(source_id, target_id, contact)) {
+            NeoDeactivateContact(source_id, slot);
+            continue;
+        }
+
+        vec2 source_prediction;
+        vec2 target_prediction;
+        if (!NeoPairPredictionBoth(source_id, slot, contact, final_velocity, source_prediction, target_prediction)) {
+            continue;
+        }
+        if (P[source_id].ncs[slot].ids.z != NEO_PHASE_REBOUND) {
+            continue;
+        }
+
+        vec2 normal = P[source_id].ncs[slot].geom.xy;
+        float desired_relative_normal_velocity = dot(target_prediction - source_prediction, normal);
+        float minimum_outward_speed = NeoPairMinimumOutwardSpeed(
+            source_id,
+            target_id,
+            final_velocity,
+            P[target_id].VelRad.xy,
+            normal
+        );
+        desired_relative_normal_velocity = max(desired_relative_normal_velocity, minimum_outward_speed);
+
+        float current_relative_normal_velocity = dot(P[target_id].VelRad.xy - final_velocity, normal);
+        if (current_relative_normal_velocity < desired_relative_normal_velocity) {
+            final_velocity -= 0.5 * (desired_relative_normal_velocity - current_relative_normal_velocity) * normal;
+            adjusted = true;
+        }
+    }
+
+    return adjusted;
+}
+
 void NeoProcessCollision(uint source_id)
 {
     NeoProcessBoundaryContacts(source_id);
@@ -593,8 +717,9 @@ void NeoProcessCollision(uint source_id)
 
     vec2 final_velocity;
     bool has_wall = NeoApplyWallScheduler(source_id, pair_velocity, final_velocity);
+    bool pair_escape_adjusted = NeoApplyPairEscapeScheduler(source_id, final_velocity);
 
-    if (!has_pair && !has_wall) {
+    if (!has_pair && !has_wall && !pair_escape_adjusted) {
         return;
     }
 
