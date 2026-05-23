@@ -1,0 +1,40 @@
+% !TeX root = GeoDynamics.tex
+\section{Porting Python to glsl}
+
+
+
+Python needs to be a canonical source for the glsl. 
+This means that naming conventions, structures and dynamical processes should match as closely as possible.
+Where they cannot match is as follows
+
+The Python side should be organized schedule-wise in the same order as GLSL:
+\begin{enumerate}
+\item begin contact frame
+\item detect/add wall contacts
+\item detect/add particle contacts
+\item update phase
+\item predict pair velocity
+\item apply wall scheduler
+\item apply pair escape scheduler
+\item  write final velocity
+\end{enumerate}
+
+The main mismatch is that Python has extra analysis machinery:
+
+
+A mix. They are not all the same kind of mismatch.
+
+cluster solving: real GPU parallelism conflict.
+The current Python cluster solver solves coupled contacts together, which means one particle’s update depends on multiple other particles’ updates in the same solve. That is hard to port directly because GLSL is source-particle scheduled and avoids pairwise mutual writes. This would need a deliberately GPU-shaped approximation or a separate multi-pass solver.
+
+wall ghost diagnostics: mostly not in GLSL by choice.
+The wall ghost geometry is in GLSL conceptually, but the diagnostic visualization/accounting objects are Python-side. No hard conflict if we only need reporting, but GLSL would need extra buffers/fields to expose it.
+
+momentum reservoir reporting: not a dynamics conflict, but needs storage.
+The reservoir is an accounting term. GLSL can compute something equivalent, but it needs somewhere to store/report accumulated wall momentum. If multiple shader invocations update a shared global reservoir, that becomes an atomic/reduction issue. If stored per-particle, it is GPU-friendly.
+
+capture/UI diagnostics: not a conflict, just Python-only tooling.
+GLSL should not own this. The GPU can emit fields; Python or host-side tooling should capture/display them.
+
+Python dictionaries/contact reports: implementation mismatch, not conceptual conflict.
+Python uses dictionaries because they are convenient. GLSL needs fixed structs/slots like $P[source_id].ncs[slot]$. The conflict is not physics; it is representation. This is exactly the kind of thing the transfer document/generator should map.

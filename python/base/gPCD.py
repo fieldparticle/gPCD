@@ -1,4 +1,5 @@
 import math
+import json
 from pathlib import Path
 
 import pygame
@@ -27,6 +28,7 @@ class Demo:
         self.label_font = pygame.font.SysFont("consolas", 24, bold=True)
         self.report_font = pygame.font.SysFont("consolas", 16)
         self.center_dot_color = (245, 245, 245)
+        self.error_text_color = (255, 70, 70)
         self.collision_normal_color = (255, 245, 140)
         self.overlap_alpha = 185
         self.wall_ghost_fill = (120, 220, 255, 55)
@@ -52,15 +54,21 @@ class Demo:
             return False
         self.report_capture_dir = Path(self.config.get("data_dir", Path.cwd())) / "reports"
         self.clear_report_captures()
+        self.clear_contact_snapshots()
         self.rpt_frames = self.normalized_report_frames(self.config.get("rpt_frames", []))
         self.captured_report_frames = set()
         self.base = Base()
+        self.base.skip_starting_overlap_resolution = self.should_load_contact_snapshot()
         if "collision_stiffness_q" in self.config:
             self.base.collision_stiffness_q = float(self.config["collision_stiffness_q"])
         self.base.dt = float(self.config.get("dt", self.base.dt))
         self.base.substeps = int(self.config.get("substeps", self.base.substeps))
         if "zero_velocity_overlap_tolerance" in self.config:
             self.base.zero_velocity_overlap_tolerance = float(self.config["zero_velocity_overlap_tolerance"])
+        self.base.neo_prediction_mode = self.config.get(
+            "neo_prediction_mode",
+            self.base.neo_prediction_mode,
+        )
         self.base.max_contacts_per_particle = int(
             self.config.get("max_contacts_per_particle", self.base.max_contacts_per_particle)
         )
@@ -103,6 +111,8 @@ class Demo:
         for _index, particle in sorted(particle_data.items()):
             self.base.add_particle(**particle)
         self.base.reset()
+        if not self.load_contact_snapshot_if_configured():
+            return False
         self.start_kinetic_energy = self.total_kinetic_energy()
         self.frame_number = 0
         self.current_fps = 0.0
@@ -162,6 +172,27 @@ class Demo:
             if report_file.is_file():
                 report_file.unlink()
 
+    def clear_contact_snapshots(self):
+        if not self.config.get("contact_snapshot_file"):
+            return
+        if self.should_load_contact_snapshot():
+            return
+
+        snapshot_path = self.contact_snapshot_path(0)
+        snapshot_dir = snapshot_path.parent
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+
+        snapshot_pattern = str(Path(str(self.config["contact_snapshot_file"])).name)
+        snapshot_pattern = snapshot_pattern.replace("{frame:06d}", "*").replace("{frame}", "*")
+        for snapshot_file in snapshot_dir.glob(snapshot_pattern):
+            if snapshot_file.is_file():
+                snapshot_file.unlink()
+
+        particle_data_pattern = snapshot_pattern.replace(".json", ".particle_data.cfg")
+        for particle_data_file in snapshot_dir.glob(particle_data_pattern):
+            if particle_data_file.is_file():
+                particle_data_file.unlink()
+
     @staticmethod
     def normalized_report_frames(rpt_frames):
         if rpt_frames is None or rpt_frames is False:
@@ -197,6 +228,95 @@ class Demo:
         if end_frame <= 0:
             return None
         return end_frame
+
+    def contact_snapshot_mode(self):
+        snapshot_file = self.config.get("contact_snapshot_file")
+        default_mode = "load" if snapshot_file else "off"
+        return str(self.config.get("contact_snapshot_mode", default_mode)).strip().lower()
+
+    def contact_snapshot_path(self, frame=None):
+        snapshot_file = self.config.get("contact_snapshot_file")
+        if not snapshot_file:
+            return None
+
+        snapshot_file = str(snapshot_file)
+        if frame is not None:
+            snapshot_file = snapshot_file.format(frame=frame)
+        path = Path(snapshot_file)
+        if not path.is_absolute():
+            path = Path(self.config.get("data_dir", Path.cwd())) / path
+        return path
+
+    def should_load_contact_snapshot(self):
+        return self.contact_snapshot_path() is not None and self.contact_snapshot_mode() in (
+            "load",
+            "import",
+            "read",
+        )
+
+    def should_save_contact_snapshot(self):
+        return self.contact_snapshot_path(self.frame_number) is not None and self.contact_snapshot_mode() in (
+            "save",
+            "export",
+            "write",
+        )
+
+    def load_contact_snapshot_if_configured(self):
+        if not self.should_load_contact_snapshot():
+            return True
+
+        snapshot_path = self.contact_snapshot_path()
+        snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+        if not snapshot_path.exists():
+            self.show_config_error(
+                "Contact snapshot not found:\n"
+                f"{snapshot_path}\n\n"
+                "Run the source cfg with contact_snapshot_mode=\"save\" first, "
+                "using rpt_frames that include this frame."
+            )
+            return False
+        with snapshot_path.open("r", encoding="utf-8") as infile:
+            snapshot = json.load(infile)
+        self.base.load_contact_state_snapshot(snapshot)
+        self.base.report.clear()
+        self.base.record_step_report()
+        print(f"Loaded contact snapshot: {snapshot_path}")
+        return True
+
+    def write_contact_snapshot_if_configured(self):
+        if not self.should_save_contact_snapshot():
+            return None
+
+        snapshot_path = self.contact_snapshot_path(self.frame_number)
+        snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+        with snapshot_path.open("w", encoding="utf-8") as outfile:
+            json.dump(self.base.contact_state_snapshot(), outfile, indent=2)
+            outfile.write("\n")
+        print(f"Wrote contact snapshot: {snapshot_path}")
+        return snapshot_path
+
+    def write_particle_data_snapshot(self, snapshot_path):
+        particle_data_path = snapshot_path.with_suffix(".particle_data.cfg")
+        with particle_data_path.open("w", encoding="utf-8") as outfile:
+            outfile.write("PARTICLE_DATA =\n")
+            outfile.write("{\n")
+            for index, particle in enumerate(self.base.particles, start=1):
+                x, y = self.base.current_location(particle)
+                outfile.write(f"    p{index} =\n")
+                outfile.write("    {\n")
+                outfile.write(
+                    "        location = "
+                    f"{{ use = 0; x1 = {x:.8f}; y1 = {y:.8f}; z1 = 2.0; "
+                    f"x2 = {x:.8f}; y2 = {y:.8f}; z2 = 2.0; }};\n"
+                )
+                outfile.write(f"        vx = {particle['vx']:.8f};\n")
+                outfile.write(f"        vy = {particle['vy']:.8f};\n")
+                outfile.write(f"        mass = {particle['mass']:.8f};\n")
+                outfile.write(f"        radius = {particle['radius']:.8f};\n")
+                outfile.write("    };\n")
+            outfile.write("};\n")
+        print(f"Wrote particle data snapshot: {particle_data_path}")
+        return particle_data_path
 
     @staticmethod
     def starting_momentum_vector(particle_data):
@@ -696,6 +816,44 @@ class Demo:
             self.momentum_row("drift", drift_x, drift_y),
         )
 
+    def guardrail_errors(self):
+        errors = []
+        for index, particle in enumerate(self.base.particles):
+            if not self.base.is_active_particle(particle):
+                continue
+
+            partner_count = particle.get("sltnum", 0)
+            if partner_count > 4:
+                errors.append(
+                    f"ERROR p{index} collision_partners={partner_count} exceeds 4"
+                )
+
+            if self.base.walls is None:
+                continue
+            x, y = self.base.current_location(particle)
+            walls = self.base.walls
+            outside = []
+            if x < walls["start_x"]:
+                outside.append(f"x={x:.8f}<xmin={walls['start_x']:.8f}")
+            if x > walls["end_x"]:
+                outside.append(f"x={x:.8f}>xmax={walls['end_x']:.8f}")
+            if y < walls["start_y"]:
+                outside.append(f"y={y:.8f}<ymin={walls['start_y']:.8f}")
+            if y > walls["end_y"]:
+                outside.append(f"y={y:.8f}>ymax={walls['end_y']:.8f}")
+            if outside:
+                errors.append(f"ERROR p{index} boundary_exceeded {' '.join(outside)}")
+        return errors
+
+    @staticmethod
+    def particle_collision_partners(particle):
+        partners = []
+        for contact_record in particle.get("ccs", []):
+            if contact_record.get("clflg", 0) == 0:
+                continue
+            partners.append(contact_record.get("pindex", 0))
+        return partners
+
     def particle_contact_diagnostics(self, source_index, source_particle):
         diagnostics = []
         for slot in range(source_particle.get("sltnum", 0)):
@@ -784,6 +942,7 @@ class Demo:
             momentum_y = particle["mass"] * particle["vy"]
             particle_momentum = math.hypot(momentum_x, momentum_y)
             internal_momentum_x, internal_momentum_y = self.particle_contact_internal_momentum_vector(index)
+            collision_partners = self.particle_collision_partners(particle)
             lines.extend(
                 [
                     "",
@@ -802,6 +961,7 @@ class Demo:
                     "v0: "
                     f"({particle.get('starting_uncorrected_vx', particle['vx']):.8f}, "
                     f"{particle.get('starting_uncorrected_vy', particle['vy']):.8f})",
+                    f"collision_partners: {collision_partners}",
                 ]
             )
             contact_lines = self.particle_contact_capture_lines(index, particle)
@@ -1149,6 +1309,11 @@ class Demo:
                 self.screen.blit(surface, (x, y))
                 y += 18
 
+        for line in self.guardrail_errors():
+            surface = self.report_font.render(line, True, self.error_text_color)
+            self.screen.blit(surface, (x, y))
+            y += 18
+
         should_auto_capture = (
             self.frame_number in self.rpt_frames
             and self.frame_number not in self.captured_report_frames
@@ -1173,12 +1338,24 @@ class Demo:
                     outfile.write(f"{key}={int(value)}\n")
                 else:
                     outfile.write(f"{key}={value:.12f}\n")
+            guardrail_errors = self.guardrail_errors()
+            if guardrail_errors:
+                outfile.write("\n[guardrail_errors]\n")
+                for line in guardrail_errors:
+                    outfile.write(f"{line}\n")
             for line in self.cluster_capture_report_lines():
                 outfile.write(f"{line}\n")
             outfile.write("\n[particles]\n")
             for line in self.compact_particle_capture_report_lines():
                 outfile.write(f"{line}\n")
         print(f"Wrote report capture: {report_file}")
+        snapshot_path = self.write_contact_snapshot_if_configured()
+        if snapshot_path is not None:
+            particle_data_path = self.write_particle_data_snapshot(snapshot_path)
+            with report_file.open("a", encoding="utf-8") as outfile:
+                outfile.write("\n[contact_snapshot]\n")
+                outfile.write(f"path={snapshot_path}\n")
+                outfile.write(f"particle_data_path={particle_data_path}\n")
 
     def run(self, particle_data, run_configuration=None):
         if not self.configure(particle_data, run_configuration):
@@ -1203,6 +1380,8 @@ class Demo:
 
             self.current_fps = self.clock.get_fps()
             self.draw()
+            if self.guardrail_errors():
+                self.paused = True
             if not self.paused:
                 sub_dt = self.base.dt / self.base.substeps
                 for _ in range(self.base.substeps):

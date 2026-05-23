@@ -41,11 +41,13 @@ class Base:
         self.momentum_per_area = 0.001
         self.inverse_square_softening = 1.0
         self.wall_ghost_mass_multiplier = 1.0e12
+        self.neo_prediction_mode = "schedule"
         self.sim_calc = SimCalc(self)
         self.report = Report()
         self.wall_contact_state = {}
         self.wall_ghost_momentum_x = 0.0
         self.wall_ghost_momentum_y = 0.0
+        self.skip_starting_overlap_resolution = False
 
     def configure_flow(self, config):
         self.sim_calc.configure_flow(config)
@@ -146,13 +148,14 @@ class Base:
         self.detect_contacts()
         self.update_contact_state()
         self.update_wall_contact_state()
-        self.initialize_geo_starting_overlap_zero_state()
-        self.initialize_geo_starting_wall_overlap_zero_state()
-        self.apply_geo_starting_overlap()
-        self.apply_geo_starting_wall_overlap()
-        self.detect_contacts()
-        self.update_contact_state()
-        self.update_wall_contact_state()
+        if not self.skip_starting_overlap_resolution:
+            self.initialize_geo_starting_overlap_zero_state()
+            self.initialize_geo_starting_wall_overlap_zero_state()
+            self.apply_geo_starting_overlap()
+            self.apply_geo_starting_wall_overlap()
+            self.detect_contacts()
+            self.update_contact_state()
+            self.update_wall_contact_state()
         self.initialize_starting_diagnostics()
         self.update_neo_internal_momentum_report()
         self.record_step_report()
@@ -500,6 +503,163 @@ class Base:
         return source_new_x, source_new_y, target_new_x, target_new_y
 
     def geo_velocity_predictions(self):
+        if self.neo_prediction_mode == "cluster":
+            return self.geo_cluster_velocity_predictions_all()
+        return self.geo_schedule_velocity_predictions()
+
+    def geo_schedule_velocity_predictions(self):
+        predictions = {}
+        for source_index, source_particle in enumerate(self.particles):
+            if not self.is_active_particle(source_particle):
+                continue
+
+            pair_velocity, has_pair = self.geo_build_pair_candidate(source_index)
+            final_velocity, has_wall = self.geo_apply_wall_scheduler(source_index, pair_velocity)
+            pair_escape_adjusted = self.geo_apply_pair_escape_scheduler(source_index, final_velocity)
+            if pair_escape_adjusted is not None:
+                final_velocity = pair_escape_adjusted
+
+            if has_pair or has_wall or pair_escape_adjusted is not None:
+                predictions[source_index] = final_velocity
+
+        return predictions if predictions else None
+
+    def geo_build_pair_candidate(self, source_index):
+        source_particle = self.particles[source_index]
+        base_velocity = (source_particle["vx"], source_particle["vy"])
+        accumulated_delta_x = 0.0
+        accumulated_delta_y = 0.0
+        prediction_count = 0
+        has_pair = False
+
+        for slot in range(source_particle.get("sltnum", 0)):
+            contact_record = source_particle["ccs"][slot]
+            if contact_record.get("clflg", 0) == 0:
+                continue
+
+            target_index = contact_record["pindex"]
+            if self.particle_contact(source_particle, self.particles[target_index]) is None:
+                continue
+
+            prediction = self.geo_pair_prediction(source_index, target_index)
+            if prediction is None:
+                continue
+
+            start_velocity = prediction["start_velocity"]
+            predicted_velocity = prediction["predicted_velocity"]
+            if not has_pair:
+                base_velocity = start_velocity
+                has_pair = True
+            accumulated_delta_x += predicted_velocity[0] - start_velocity[0]
+            accumulated_delta_y += predicted_velocity[1] - start_velocity[1]
+            prediction_count += 1
+
+        if not has_pair:
+            return base_velocity, False
+
+        count = max(float(prediction_count), 1.0)
+        return (
+            base_velocity[0] + accumulated_delta_x / count,
+            base_velocity[1] + accumulated_delta_y / count,
+        ), True
+
+    def geo_apply_wall_scheduler(self, source_index, pair_velocity):
+        source_particle = self.particles[source_index]
+        final_velocity = pair_velocity
+        has_wall = False
+
+        for contact_record in source_particle.get("bcs", []):
+            wall_flag = contact_record.get("clflg", 0)
+            if wall_flag == 0:
+                continue
+            if self.wall_contact(source_particle, wall_flag, self.walls) is None:
+                continue
+
+            prediction = self.geo_wall_prediction(
+                (source_index, wall_flag),
+                current_velocity=final_velocity,
+            )
+            if prediction is None:
+                continue
+            final_velocity = prediction["predicted_velocity"]
+            has_wall = True
+
+        return final_velocity, has_wall
+
+    def geo_apply_pair_escape_scheduler(self, source_index, final_velocity):
+        source_particle = self.particles[source_index]
+        adjusted_velocity = final_velocity
+        adjusted = False
+
+        for slot in range(source_particle.get("sltnum", 0)):
+            contact_record = source_particle["ccs"][slot]
+            if contact_record.get("clflg", 0) == 0:
+                continue
+
+            target_index = contact_record["pindex"]
+            target_particle = self.particles[target_index]
+            contact = self.particle_contact(source_particle, target_particle)
+            if contact is None:
+                continue
+
+            state = self.source_geo_contact_state(source_particle, target_index) or {}
+            if state.get("geo_phase") != "rebound":
+                continue
+
+            nx, ny, _overlap_area, _center_distance = contact
+            source_prediction = self.geo_pair_prediction(source_index, target_index)
+            target_prediction = self.geo_pair_prediction(target_index, source_index)
+            if source_prediction is None or target_prediction is None:
+                continue
+
+            desired_relative_normal_velocity = (
+                (target_prediction["predicted_velocity"][0] - source_prediction["predicted_velocity"][0]) * nx
+                + (target_prediction["predicted_velocity"][1] - source_prediction["predicted_velocity"][1]) * ny
+            )
+            current_relative_normal_velocity = (
+                (target_particle["vx"] - adjusted_velocity[0]) * nx
+                + (target_particle["vy"] - adjusted_velocity[1]) * ny
+            )
+            minimum_outward_speed = self.neo_pair_minimum_outward_speed(
+                source_index,
+                target_index,
+                adjusted_velocity,
+                (target_particle["vx"], target_particle["vy"]),
+                (nx, ny),
+            )
+            desired_relative_normal_velocity = max(desired_relative_normal_velocity, minimum_outward_speed)
+            if current_relative_normal_velocity >= desired_relative_normal_velocity:
+                continue
+
+            correction = desired_relative_normal_velocity - current_relative_normal_velocity
+            adjusted_velocity = (
+                adjusted_velocity[0] - 0.5 * correction * nx,
+                adjusted_velocity[1] - 0.5 * correction * ny,
+            )
+            adjusted = True
+
+        return adjusted_velocity if adjusted else None
+
+    def neo_pair_minimum_outward_speed(
+        self,
+        source_index,
+        target_index,
+        source_velocity,
+        target_velocity,
+        normal,
+    ):
+        nx, ny = normal
+        relative_speed = abs(
+            (target_velocity[0] - source_velocity[0]) * nx
+            + (target_velocity[1] - source_velocity[1]) * ny
+        )
+        radius_speed = self.zero_velocity_overlap_tolerance * min(
+            self.particles[source_index]["radius"],
+            self.particles[target_index]["radius"],
+        )
+        return max(self.zero_velocity_overlap_tolerance * relative_speed, radius_speed)
+
+    def geo_cluster_velocity_predictions_all(self):
         active_pairs = []
         active_pair_set = set()
         active_walls = []
@@ -835,7 +995,7 @@ class Base:
             for particle_index, velocity in combined_velocities.items()
         }
 
-    def geo_wall_prediction(self, wall_key):
+    def geo_wall_prediction(self, wall_key, current_velocity=None):
         particle_index, wall_flag = wall_key
         particle = self.particles[particle_index]
         contact = self.wall_ghost_contact(particle, wall_flag, self.walls)
@@ -845,7 +1005,9 @@ class Base:
         nx, ny = contact["normal"]
         overlap_area = contact["overlap_area"]
         center_distance = contact["center_distance"]
-        normal_velocity = particle["vx"] * nx + particle["vy"] * ny
+        if current_velocity is None:
+            current_velocity = (particle["vx"], particle["vy"])
+        normal_velocity = current_velocity[0] * nx + current_velocity[1] * ny
         phase = "compression" if normal_velocity > 0.0 else "rebound"
         state = self.wall_contact_state.get(wall_key, {})
         state_zero = NeoDynamics.contact_state_zero_velocity_geometry(state)
@@ -879,7 +1041,7 @@ class Base:
             return None
 
         if phase == "rebound" and state_zero is not None:
-            prediction["predicted_velocity"] = NeoDynamics.wall_velocity_prediction(
+            wall_velocity = NeoDynamics.wall_velocity_prediction(
                 prediction["start_velocity"],
                 (nx, ny),
                 overlap_area,
@@ -887,8 +1049,9 @@ class Base:
                 phase,
                 escape_fraction=self.zero_velocity_overlap_tolerance,
             )
+            if wall_velocity is not None:
+                prediction["predicted_velocity"] = wall_velocity
 
-        current_velocity = (particle["vx"], particle["vy"])
         predicted_normal_velocity = (
             prediction["predicted_velocity"][0] * nx
             + prediction["predicted_velocity"][1] * ny
@@ -1812,6 +1975,119 @@ class Base:
                 )
                 return state
         return None
+
+    def contact_state_snapshot(self):
+        return {
+            "schema": "gpcd-contact-state-v1",
+            "time": self.time,
+            "wall_ghost_momentum": {
+                "x": self.wall_ghost_momentum_x,
+                "y": self.wall_ghost_momentum_y,
+            },
+            "particles": [
+                {
+                    "index": particle_index,
+                    "gcs": [
+                        self.contact_snapshot_value(state)
+                        for state in particle.get("gcs", [])
+                        if state.get("active", False)
+                    ],
+                }
+                for particle_index, particle in enumerate(self.particles)
+                if any(state.get("active", False) for state in particle.get("gcs", []))
+            ],
+            "wall_contact_state": [
+                {
+                    "particle_index": particle_index,
+                    "wall_flag": wall_flag,
+                    "state": self.contact_snapshot_value(state),
+                }
+                for (particle_index, wall_flag), state in sorted(self.wall_contact_state.items())
+            ],
+        }
+
+    def load_contact_state_snapshot(self, snapshot):
+        schema = snapshot.get("schema")
+        if schema != "gpcd-contact-state-v1":
+            raise ValueError(f"Unsupported contact snapshot schema: {schema!r}")
+        if "time" in snapshot:
+            self.time = float(snapshot["time"])
+
+        for particle in self.particles:
+            particle["gcs"] = self.empty_geo_contact_states()
+
+        for particle_record in snapshot.get("particles", []):
+            particle_index = int(particle_record["index"])
+            if particle_index < 0 or particle_index >= len(self.particles):
+                continue
+            particle = self.particles[particle_index]
+            for state_record in particle_record.get("gcs", []):
+                state_data = self.restore_contact_snapshot_value(state_record)
+                target_index = state_data.get("target_index")
+                if target_index is None:
+                    continue
+                state = self.allocate_geo_contact_state(particle, int(target_index))
+                if state is None:
+                    particle["contact_overflow"] = True
+                    continue
+                state.clear()
+                state.update(state_data)
+                state["active"] = True
+                state["target_index"] = int(target_index)
+                state["touched"] = False
+
+        self.wall_contact_state = {}
+        for wall_record in snapshot.get("wall_contact_state", []):
+            particle_index = int(wall_record["particle_index"])
+            wall_flag = int(wall_record["wall_flag"])
+            if particle_index < 0 or particle_index >= len(self.particles):
+                continue
+            self.wall_contact_state[(particle_index, wall_flag)] = (
+                self.restore_contact_snapshot_value(wall_record["state"])
+            )
+
+        wall_ghost_momentum = snapshot.get("wall_ghost_momentum", {})
+        self.wall_ghost_momentum_x = float(wall_ghost_momentum.get("x", 0.0))
+        self.wall_ghost_momentum_y = float(wall_ghost_momentum.get("y", 0.0))
+        self.update_neo_internal_momentum_report()
+
+    @classmethod
+    def contact_snapshot_value(cls, value):
+        if isinstance(value, dict):
+            return {
+                "__dict_items__": [
+                    {
+                        "key": cls.contact_snapshot_value(key),
+                        "value": cls.contact_snapshot_value(item_value),
+                    }
+                    for key, item_value in value.items()
+                ]
+            }
+        if isinstance(value, tuple):
+            return {"__tuple__": [cls.contact_snapshot_value(item) for item in value]}
+        if isinstance(value, list):
+            return [cls.contact_snapshot_value(item) for item in value]
+        return value
+
+    @classmethod
+    def restore_contact_snapshot_value(cls, value):
+        if isinstance(value, dict):
+            if "__dict_items__" in value:
+                return {
+                    cls.restore_contact_snapshot_value(item["key"]): cls.restore_contact_snapshot_value(
+                        item["value"]
+                    )
+                    for item in value["__dict_items__"]
+                }
+            if "__tuple__" in value:
+                return tuple(cls.restore_contact_snapshot_value(item) for item in value["__tuple__"])
+            return {
+                key: cls.restore_contact_snapshot_value(item_value)
+                for key, item_value in value.items()
+            }
+        if isinstance(value, list):
+            return [cls.restore_contact_snapshot_value(item) for item in value]
+        return value
 
     @staticmethod
     def wall_slot(wall_name):

@@ -1,0 +1,218 @@
+% !TeX root = GeoDynamics.tex
+\section{Schedule-Wise Contact Resolution}
+
+This section documents the current schedule-wise contact combination rule. The
+goal is to make the Python path match the GPU execution model as closely as
+possible before porting the dynamics to GLSL.
+
+The rule is source-owned:
+\begin{itemize}
+    \item one source particle computes its own velocity update,
+    \item the source particle may read target particles and wall contact state,
+    \item the source particle does not write target particle velocity,
+    \item pair contacts, wall contacts, and final escape correction are applied
+          in a fixed schedule.
+\end{itemize}
+
+This replaces the older cluster solve for the GLSL-portable path. The cluster
+solver is retained only as a diagnostic comparator.
+
+\subsection{Definitions}
+
+For a source particle \(i\), let its current velocity be
+\[
+    \mathbf{v}_i .
+\]
+
+For each active particle contact \(c\), the contact prediction function returns:
+\[
+    \mathbf{v}_{i,c}^{\ast}
+\]
+where \(\mathbf{v}_{i,c}^{\ast}\) is the velocity that contact \(c\) predicts
+for source particle \(i\) if that contact were evaluated by itself.
+
+The same contact state also stores the source velocity at first contact:
+\[
+    \mathbf{v}_{i,c}^{0}.
+\]
+
+The per-contact velocity delta is:
+\[
+    \Delta \mathbf{v}_{i,c}
+    =
+    \mathbf{v}_{i,c}^{\ast}
+    -
+    \mathbf{v}_{i,c}^{0}.
+\]
+
+\subsection{Algorithm}
+
+For each source particle \(i\), the current schedule-wise algorithm is:
+
+\begin{enumerate}
+    \item Start with the particle's current velocity:
+    \[
+        \mathbf{v}_{base} = \mathbf{v}_i .
+    \]
+
+    \item Initialize the pair-contact accumulator:
+    \[
+        \Delta \mathbf{v}_{sum} = (0,0),
+        \qquad
+        N = 0 .
+    \]
+
+    \item For each active particle-particle contact owned by source particle
+    \(i\):
+    \begin{enumerate}
+        \item Compute the single-contact predicted source velocity
+        \(\mathbf{v}_{i,c}^{\ast}\).
+
+        \item Read the first-contact source velocity
+        \(\mathbf{v}_{i,c}^{0}\).
+
+        \item If this is the first active pair contact, set:
+        \[
+            \mathbf{v}_{base} = \mathbf{v}_{i,c}^{0}.
+        \]
+
+        \item Accumulate the contact delta:
+        \[
+            \Delta \mathbf{v}_{sum}
+            \leftarrow
+            \Delta \mathbf{v}_{sum}
+            +
+            \left(
+                \mathbf{v}_{i,c}^{\ast}
+                -
+                \mathbf{v}_{i,c}^{0}
+            \right).
+        \]
+
+        \item Increment the active pair-contact count:
+        \[
+            N \leftarrow N + 1 .
+        \]
+    \end{enumerate}
+
+    \item If \(N > 0\), combine the particle-particle contact deltas by
+    averaging:
+    \[
+        \mathbf{v}_{pair}
+        =
+        \mathbf{v}_{base}
+        +
+        \frac{\Delta \mathbf{v}_{sum}}{N}.
+    \]
+    If \(N = 0\), use:
+    \[
+        \mathbf{v}_{pair} = \mathbf{v}_i .
+    \]
+
+    \item Apply wall contacts sequentially to \(\mathbf{v}_{pair}\). For each
+    active wall contact \(w\), compute the wall-predicted normal velocity and
+    replace only the normal component of the current accumulator:
+    \[
+        \mathbf{v}_{wall}
+        =
+        \mathbf{v}_{acc}
+        +
+        \left(
+            v_{n,w}^{\ast}
+            -
+            \mathbf{v}_{acc}\cdot\mathbf{n}_w
+        \right)
+        \mathbf{n}_w .
+    \]
+    After each wall contact:
+    \[
+        \mathbf{v}_{acc} \leftarrow \mathbf{v}_{wall}.
+    \]
+
+    \item Apply the pair rebound escape scheduler. For each active rebound pair
+    contact, compute the desired outward relative normal velocity. If the
+    current relative normal velocity is too small, adjust only the source
+    particle accumulator:
+    \[
+        \mathbf{v}_{acc}
+        \leftarrow
+        \mathbf{v}_{acc}
+        -
+        \frac{1}{2}
+        \left(
+            u_{desired}
+            -
+            u_{current}
+        \right)
+        \mathbf{n}_{ij}.
+    \]
+
+    \item Write the final accumulator back to the source particle:
+    \[
+        \mathbf{v}_i \leftarrow \mathbf{v}_{acc}.
+    \]
+\end{enumerate}
+
+\subsection{Pseudocode}
+
+\begin{verbatim}
+for each source particle i:
+    base_velocity = current_velocity(i)
+    accumulated_delta = (0, 0)
+    prediction_count = 0
+    has_pair = false
+
+    for each active particle contact c owned by i:
+        prediction = pair_prediction(i, c)
+        if prediction is invalid:
+            continue
+
+        start_velocity = prediction.start_velocity
+        predicted_velocity = prediction.predicted_velocity
+
+        if not has_pair:
+            base_velocity = start_velocity
+            has_pair = true
+
+        accumulated_delta += predicted_velocity - start_velocity
+        prediction_count += 1
+
+    if has_pair:
+        pair_velocity =
+            base_velocity + accumulated_delta / prediction_count
+    else:
+        pair_velocity = current_velocity(i)
+
+    final_velocity = pair_velocity
+
+    for each active wall contact w owned by i:
+        final_velocity = wall_prediction(i, w, final_velocity)
+
+    for each active rebound pair contact c owned by i:
+        final_velocity =
+            apply_pair_escape_if_needed(i, c, final_velocity)
+
+    velocity(i) = final_velocity
+\end{verbatim}
+
+\subsection{Known Question}
+
+The current combination rule uses an average:
+\[
+    \frac{\Delta \mathbf{v}_{sum}}{N}.
+\]
+
+This is GPU-friendly and prevents the response from growing linearly with the
+number of simultaneous contacts. However, it is not a coupled contact solve. In
+dense contact groups the average can under-correct, over-correct, or interact
+poorly with the later wall scheduler and pair escape scheduler.
+
+This averaging rule is the next item to evaluate. In particular, we need to
+decide whether dense contacts should use:
+\begin{itemize}
+    \item the current average of predicted deltas,
+    \item a weighted average,
+    \item a limited sum,
+    \item a strongest-contact rule,
+    \item or another source-owned combination rule.
+\end{itemize}

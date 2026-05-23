@@ -9,9 +9,8 @@ import io
 from gbase.BinaryFileUtilities import clear_files, read_all_particle_data
 class GenParticlesInBox():
 
-    local_particles_in_row = 0
-    local_particles_in_col = 0
-    local_particles_in_layer = 0
+    
+    
     sel_file = None
     cell_items = []
     name = "genPCDData"
@@ -159,17 +158,27 @@ class GenParticlesInBox():
         self.index = 0
         RUN_CONFIGURATION = self.itemcfg["RUN_CONFIGURATION"]
         count = 0
+        local_particles_in_row = self.itemcfg.num_particles_y
+        local_particles_in_col = self.itemcfg.num_particles_x
+
         try:
-            for row in range(1,3):
-                for col in range(1,3):
+            for row in range(1,local_particles_in_row+1):
+                for col in range(1,local_particles_in_col+1):
                     particle_struct = pdata()
                     self.number_particles += 1
                     particle_struct.pnum = self.number_particles
-                    particle_struct.rx = row+0.5
-                    particle_struct.ry = col+0.5
+                    particle_struct.rx = 1+row*.5
+                    particle_struct.ry = 1+col*.5
                     particle_struct.rz = 2.0
-                    particle_struct.vx = random.uniform(0.01, 0.02)
-                    particle_struct.vy = random.uniform(0.01, 0.02)
+                    if col > 2:
+                        particle_struct.vx = 0.01
+                        particle_struct.vy = 0.01
+                    if col <= 2:
+                        particle_struct.vx = 0.01
+                        particle_struct.vy = 0.01
+                    
+                    #particle_struct.vx = random.uniform(0.01, 0.02)
+                    #particle_struct.vy = random.uniform(0.01, 0.02)
                     particle_struct.vz = 0.0
                     particle_struct.molar_mass = 1.0
                     particle_struct.radius = 0.25

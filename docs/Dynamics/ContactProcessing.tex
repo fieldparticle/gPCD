@@ -1,0 +1,351 @@
+% !TeX root = GeoDynamics.tex
+\section{Contact Prediction Processing}
+
+This section documents the contact prediction process. Contact prediction is
+the operation that takes one active contact and produces a source-particle
+velocity prediction for that contact. The schedule-wise resolution algorithm
+then combines these predictions.
+
+Prediction is source-owned. A prediction may read the target particle and the
+source-owned contact state, but it returns only a velocity for the source
+particle.
+
+\subsection{Particle Contact Prediction Algorithm}
+
+For a source particle \(i\) and target particle \(j\), the particle contact
+prediction algorithm is:
+
+\begin{enumerate}
+    \item Read the current contact geometry:
+    \[
+        \mathbf{n}_{ij},\quad A,\quad d .
+    \]
+    Here \(\mathbf{n}_{ij}\) points from source particle \(i\) to target
+    particle \(j\), \(A\) is the current overlap area, and \(d\) is the current
+    center distance.
+
+    \item Compute the current relative normal velocity:
+    \[
+        u_{ij}
+        =
+        \left(
+            \mathbf{v}_j
+            -
+            \mathbf{v}_i
+        \right)
+        \cdot
+        \mathbf{n}_{ij}.
+    \]
+
+    \item Choose the provisional phase:
+    \[
+        u_{ij} < 0 \Rightarrow \text{compression},
+        \qquad
+        u_{ij} \ge 0 \Rightarrow \text{rebound}.
+    \]
+
+    \item Read the source-owned contact state. If the state contains stored
+    zero-velocity geometry, update the phase using the current overlap and
+    current relative normal velocity. If there is no zero-velocity geometry and
+    the state is not already rebound, the prediction is invalid.
+
+    \item Read the first-contact source and target velocities from the contact
+    state:
+    \[
+        \mathbf{v}_{i}^{0},
+        \qquad
+        \mathbf{v}_{j}^{0}.
+    \]
+    If these are missing, the current velocities are used as fallback values.
+
+    \item Construct a two-particle Neo prediction using the current geometry,
+    first-contact velocities, masses, radii, and stored zero-velocity geometry.
+
+    \item Compute the Neo report at the current overlap. The report contains
+    both compression and rebound velocities:
+    \[
+        \mathbf{v}_{i,compression}^{\ast},
+        \mathbf{v}_{j,compression}^{\ast},
+        \mathbf{v}_{i,rebound}^{\ast},
+        \mathbf{v}_{j,rebound}^{\ast}.
+    \]
+
+    \item Update the diagnostic internal momentum values stored in the contact
+    state.
+
+    \item Select the source and target predicted velocities from the report:
+    \[
+        \text{compression}
+        \Rightarrow
+        \left(
+            \mathbf{v}_{i,compression}^{\ast},
+            \mathbf{v}_{j,compression}^{\ast}
+        \right),
+    \]
+    \[
+        \text{rebound}
+        \Rightarrow
+        \left(
+            \mathbf{v}_{i,rebound}^{\ast},
+            \mathbf{v}_{j,rebound}^{\ast}
+        \right).
+    \]
+
+    \item If the phase is rebound, apply the outward escape rule to the pair of
+    predicted velocities. This enforces a small minimum outward relative normal
+    velocity:
+    \[
+        u_{out} \ge u_{min}.
+    \]
+
+    \item If the phase is rebound, apply the internal-contact momentum feedback
+    term to the source prediction.
+
+    \item Preserve the source particle's current tangential velocity. Only the
+    predicted normal component is transferred into the returned source
+    velocity:
+    \[
+        \mathbf{v}_{i}^{return}
+        =
+        \mathbf{v}_i
+        -
+        \left(
+            \mathbf{v}_i \cdot \mathbf{n}_{ij}
+        \right)
+        \mathbf{n}_{ij}
+        +
+        \left(
+            \mathbf{v}_{i}^{\ast} \cdot \mathbf{n}_{ij}
+        \right)
+        \mathbf{n}_{ij}.
+    \]
+
+    \item Return:
+    \[
+        \mathbf{v}_{i}^{0},
+        \qquad
+        \mathbf{v}_{i}^{return}.
+    \]
+\end{enumerate}
+
+\subsection{Wall Contact Prediction Algorithm}
+
+Wall contact prediction uses the same contact prediction machinery with a wall
+ghost particle. The wall ghost is fixed and is not integrated.
+
+For source particle \(i\) and wall \(w\), the wall prediction algorithm is:
+
+\begin{enumerate}
+    \item Build the wall ghost contact geometry:
+    \[
+        \mathbf{n}_{w},\quad A,\quad d.
+    \]
+    The normal \(\mathbf{n}_{w}\) points from the particle toward the wall
+    ghost.
+
+    \item Choose the velocity accumulator to process. If no accumulator is
+    provided, use the particle's current velocity:
+    \[
+        \mathbf{v}_{acc} = \mathbf{v}_i .
+    \]
+
+    \item Compute the wall normal velocity:
+    \[
+        u_w
+        =
+        \mathbf{v}_{acc}
+        \cdot
+        \mathbf{n}_{w}.
+    \]
+
+    \item Choose the provisional wall phase:
+    \[
+        u_w > 0 \Rightarrow \text{compression},
+        \qquad
+        u_w \le 0 \Rightarrow \text{rebound}.
+    \]
+
+    \item Read the wall contact state and update the phase against the stored
+    zero-velocity geometry. The wall update uses:
+    \[
+        u_{relative} = -2u_w
+    \]
+    so the wall ghost path follows the same pair-style phase logic.
+
+    \item Call the generic contact prediction operation with the real particle
+    as source and the wall ghost as target.
+
+    \item If the phase is rebound and zero-velocity geometry exists, replace
+    the generic pair rebound prediction with the wall-specific rebound
+    prediction. The wall-specific prediction reflects the source particle
+    against the fixed wall:
+    \[
+        \mathbf{v}_{full}
+        =
+        \mathbf{v}^{0}
+        -
+        2
+        \left(
+            \mathbf{v}^{0}\cdot\mathbf{n}_{w}
+        \right)
+        \mathbf{n}_{w}.
+    \]
+
+    \item Preserve the current tangential component of the accumulator and
+    replace only its normal component:
+    \[
+        \mathbf{v}_{return}
+        =
+        \mathbf{v}_{acc}
+        -
+        \left(
+            \mathbf{v}_{acc}\cdot\mathbf{n}_{w}
+        \right)
+        \mathbf{n}_{w}
+        +
+        \left(
+            \mathbf{v}^{\ast}\cdot\mathbf{n}_{w}
+        \right)
+        \mathbf{n}_{w}.
+    \]
+
+    \item Return:
+    \[
+        \mathbf{v}_{acc},
+        \qquad
+        \mathbf{v}_{return}.
+    \]
+\end{enumerate}
+
+\subsection{Phase Update Algorithm}
+
+The prediction process depends on whether the contact is compressing or
+rebounding. The phase update algorithm is:
+
+\begin{enumerate}
+    \item Classify the current motion mode from relative normal velocity:
+    \[
+        u < -\epsilon \Rightarrow \text{accumulating},
+    \]
+    \[
+        u > \epsilon \Rightarrow \text{releasing},
+    \]
+    \[
+        |u| \le \epsilon \Rightarrow \text{blocked}.
+    \]
+
+    \item Compare the current overlap area \(A\) to the stored zero-velocity
+    overlap area \(A_0\). With tolerance \(q\):
+    \[
+        A \ge A_0(1-q)
+        \Rightarrow
+        \text{zero reached}.
+    \]
+
+    \item If the contact reversed outward before reaching \(A_0\), promote the
+    zero-velocity state to the current geometry:
+    \[
+        A_0 \leftarrow A,
+        \qquad
+        d_0 \leftarrow d.
+    \]
+
+    \item If zero has been reached, set the phase to rebound.
+
+    \item Otherwise, if motion is accumulating, set the phase to compression.
+
+    \item Otherwise, if motion is releasing or blocked, keep or set the phase
+    to rebound.
+\end{enumerate}
+
+\subsection{Pseudocode}
+
+\begin{verbatim}
+particle_contact_prediction(source i, target j):
+    contact = particle_contact(i, j)
+    if contact does not exist:
+        return invalid
+
+    normal, overlap_area, center_distance = contact
+    relative_normal_velocity = dot(v[j] - v[i], normal)
+
+    phase =
+        compression if relative_normal_velocity < 0
+        rebound otherwise
+
+    state = source_owned_contact_state(i, j)
+    zero = zero_velocity_geometry(state)
+
+    if zero exists:
+        update_phase(state, overlap_area, center_distance,
+                     relative_normal_velocity)
+        phase = state.phase
+    else if state.phase is not rebound:
+        return invalid
+
+    prediction =
+        generic_contact_prediction(i, j, contact, state, phase)
+
+    return prediction
+
+
+generic_contact_prediction(source i, target j, contact, state, phase):
+    read first-contact source and target velocities
+    build temporary two-particle Neo model
+    compute current-overlap Neo report
+    update diagnostic internal momentum state
+
+    if phase is compression:
+        source_velocity = report.source_compression_velocity
+        target_velocity = report.target_compression_velocity
+    else:
+        source_velocity = report.source_rebound_velocity
+        target_velocity = report.target_rebound_velocity
+        source_velocity, target_velocity =
+            apply_outward_escape(source_velocity, target_velocity)
+        source_velocity =
+            apply_internal_contact_momentum_feedback(source_velocity)
+
+    source_velocity =
+        preserve_current_tangent_and_use_predicted_normal(source_velocity)
+
+    return first_contact_source_velocity, source_velocity
+
+
+wall_contact_prediction(source i, wall w, accumulator velocity):
+    contact = wall_ghost_contact(i, w)
+    if contact does not exist:
+        return invalid
+
+    normal_velocity = dot(accumulator_velocity, wall_normal)
+    phase =
+        compression if normal_velocity > 0
+        rebound otherwise
+
+    update wall phase using relative velocity -2 * normal_velocity
+
+    prediction =
+        generic_contact_prediction(i, wall_ghost, contact, state, phase)
+
+    if phase is rebound:
+        prediction = wall_specific_rebound_prediction(...)
+
+    prediction =
+        preserve_accumulator_tangent_and_use_predicted_normal(prediction)
+
+    return accumulator_velocity, prediction
+\end{verbatim}
+
+\subsection{Known Questions}
+
+The prediction process is source-owned, but it still contains several choices
+that affect dense-contact behavior:
+\begin{itemize}
+    \item when zero-velocity geometry should be promoted to the current overlap,
+    \item whether outward escape should be applied inside each contact
+          prediction or only after contact predictions are combined,
+    \item whether internal-contact momentum feedback should be applied before
+          or after schedule-wise combination,
+    \item whether wall prediction should use pair-style ghost prediction,
+          wall-specific prediction, or a single unified expression.
+\end{itemize}

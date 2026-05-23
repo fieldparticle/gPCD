@@ -24,6 +24,7 @@ from gbase.BinaryFileUtilities import clear_files, read_particle_data
 from gbase.import_module import load_class_from_file
 from gbase.pdata import *
 from gbase.GenPQBData import *
+from runner import run_analysis
 #from GenMotionData import *
 #from subprocess import Popen
 import subprocess
@@ -111,8 +112,7 @@ class TabGenData(QTabWidget):
             return 
 
         self.plot_obj.create(self.itemcfg,self)
-        # update the list
-        self.update_list_widget()
+        
         # Enable to generate data
         self.GenDataButton.setEnabled(True)
             
@@ -136,28 +136,41 @@ class TabGenData(QTabWidget):
         if folder[0]:
             self.load_item_cfg(folder[0])
  
-   
+    def run_analysis(self):
+        self.refresh()
+        run_analysis(self.CfgFile)
+        
     #******************************************************************
     # Generate the data
     #
     def gen_data(self):
          # Pass the function to execute
+        self.refresh()
         index = 0
         self.current_test_file = 0
         self.gen_class.openSelectionsFile()
         self.gen_class.clear_files()
         self.gen_class.do_all_files_dbg()
+    
+    def refresh_dir(self,cfg_file):
+        pass
+        ## -------------------------------------------------------------
+        ## CFg Files Select Interface
         
+        self.CfgFile = cfg_file
+        notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
+        subprocess.Popen([notepad_plus_plus_path, cfg_file])
     #******************************************************************
     # Update the list widget
     #
     def update_list_widget(self):
         self.ListObj.clear()
-        files_names = self.itemcfg.data_dir + "/*.bin"
+        files_names = self.cfg.analysis_script_dir + "/*.cfg"
         files = glob.glob(files_names)
         for ii in files:
                 self.ListObj.addItem(ii)
-
+        
+        
     def print_output(self, s):
         print(s)
 
@@ -274,12 +287,17 @@ class TabGenData(QTabWidget):
         if self.selected_item:
             try:
                 plot_particle_list = self.itemcfg.particle_range
-                self.particle_data = read_particle_data(self.selected_item[0].text(), plot_particle_list)
+                path_name = self.selected_item[0].text()
+                file_name = os.path.basename(path_name) 
+                tst_prefix = os.path.splitext(file_name)[0]
+                tst_file = self.itemcfg.data_dir + '/' + tst_prefix + '.bin'
+
+                self.particle_data = read_particle_data(tst_file, plot_particle_list)
             except BaseException as e:
                 self.log.log(self,f"Could not read particle data:{e}")
                 return
             try:
-                self.plot_obj.plot(self.itemcfg,self.particle_data,self.selected_item[0].text())
+                self.plot_obj.plot(self.itemcfg,self.particle_data,tst_file)
             except BaseException as e1:
                 self.log.log(self,f"Ploting error:{e1}")
         else:
@@ -346,12 +364,12 @@ class TabGenData(QTabWidget):
             dirgrid.addWidget(self.dirButton,0,0)
             dirgrid.addWidget(self.dirEdit,0,1)
 
-            self.SaveButton = QPushButton("Save")
-            self.setSize(self.SaveButton,30,100)
-            self.SaveButton.setStyleSheet("background-color:  #dddddd")
-            #self.SaveButton.clicked.connect(self.SaveConfigurationFile)
-            self.SaveButton.setEnabled(False)
-            dirgrid.addWidget(self.SaveButton,2,0)
+            self.AnalyseButton = QPushButton("Analysis")
+            self.setSize(self.AnalyseButton,30,100)
+            self.AnalyseButton.setStyleSheet("background-color:  #dddddd")
+            self.AnalyseButton.clicked.connect(self.run_analysis)
+            self.AnalyseButton.setEnabled(True)
+            dirgrid.addWidget(self.AnalyseButton,2,0)
 
             self.RefreshButton = QPushButton("Reload")
             self.setSize(self.RefreshButton,30,100)
@@ -424,8 +442,12 @@ class TabGenData(QTabWidget):
             self.setSize(self.ListObj,350,450)
             dirgrid.addWidget(self.ListObj,5,0,1,2)
 
+            self.ListObj.itemSelectionChanged.connect(lambda: self.valueChange(self.ListObj))   
+
             view_label = QLabel("Views")
             dirgrid.addWidget(view_label,6,0,1,2)
+
+
 
             self.ViewList =  QListWidget()
             
@@ -446,7 +468,8 @@ class TabGenData(QTabWidget):
         
         self.bobj.connect_to_output(self.terminal)
         self.plot_obj = PlotParticles()
-
+        # update the list
+        self.update_list_widget()
         for ii in self.plot_obj.views:
             self.ViewList.addItem(str(ii))
         self.log.log(self,"TabFormLatex finished Create.")        
@@ -456,8 +479,7 @@ class TabGenData(QTabWidget):
         self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
     def valueChange(self,listObj):  
         selected_items = listObj.selectedItems()
-        if selected_items:
-            pass
-            #print("List object Value Changed",selected_items[0].text())
-           
+        Text = selected_items[0].text() if selected_items else ""   
+        self.dirEdit.setText(Text)
+        self.refresh_dir(Text)   
     

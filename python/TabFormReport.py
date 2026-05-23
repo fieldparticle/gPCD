@@ -175,40 +175,7 @@ class TabFormReport(QTabWidget):
             self.data_container.do_report()
         except BaseException as e:
             print(f"preview failed:{e}")
-
-    
-
-    def do_batch(self):
-        batch_files = self.itemcfg.include
-        for ii in batch_files:
-            print(f'======================== Working: {ii} =====================')
-            self.load_item_cfg(ii)
-            match self.itemcfg.type:
-                case 'csvtable':
-                    self.itemcfg_main = self.itemcfg
-                    lines_list = self.do_table()
-                    self.report_obj = ReportLatexTable(self,self.itemcfg,lines_list)
-                case "csvplot":
-                    self.report_obj = ReportLatexPlot(self,self.itemcfg)
-                    self.itemcfg_main = self.itemcfg
-                    self.do_plot()
-                case "plot":
-                    self.report_obj = ReportLatexPlot(self,self.itemcfg)
-                    if len(self.itemcfg.include) == 0:
-                        self.itemcfg_main = self.itemcfg
-                        self.do_plot()
-                    else:
-                        self.do_plots()
-                    self.data_container.write_latex_values()
-                case "image":
-                    self.report_obj = ReportClass(self,self.itemcfg)
-                case "gpcd_table":
-                    self.itemcfg_main = self.itemcfg
-                    lines_list = self.do_gpcd_table()
-                    self.report_obj = ReportLatexTable(self,self.itemcfg,lines_list)
-                case _:
-                    print(f"Report type : {self.itemcfg.type} not found.")
-            self.report_obj.save_latex()
+   
 
     #******************************************************************
     # Preview the latex genberated pdf
