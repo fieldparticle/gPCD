@@ -538,50 +538,6 @@ class NeoDynamics:
         )
 
     @staticmethod
-    def wall_velocity_prediction(
-        start_velocity,
-        normal,
-        overlap_area,
-        zero_area,
-        phase,
-        escape_fraction=0.0,
-    ):
-        start_vx, start_vy = start_velocity
-        nx, ny = normal
-        incoming_speed = start_vx * nx + start_vy * ny
-        if incoming_speed <= 0.0 or zero_area is None or zero_area <= 1.0e-12:
-            return None
-
-        compression_fraction = max(0.0, min(1.0, overlap_area / zero_area))
-        compression_velocity_fraction = math.sqrt(max(0.0, 1.0 - compression_fraction))
-        compression_progress = 1.0 - compression_velocity_fraction
-        rebound_velocity_fraction = math.sqrt(max(0.0, 1.0 - compression_fraction))
-
-        turn_vx = start_vx - incoming_speed * nx
-        turn_vy = start_vy - incoming_speed * ny
-        full_vx = start_vx - 2.0 * incoming_speed * nx
-        full_vy = start_vy - 2.0 * incoming_speed * ny
-
-        if phase == "compression":
-            return (
-                start_vx + compression_progress * (turn_vx - start_vx),
-                start_vy + compression_progress * (turn_vy - start_vy),
-            )
-        predicted_velocity = (
-            turn_vx + rebound_velocity_fraction * (full_vx - turn_vx),
-            turn_vy + rebound_velocity_fraction * (full_vy - turn_vy),
-        )
-        minimum_outward_speed = max(0.0, escape_fraction) * incoming_speed
-        predicted_normal_velocity = predicted_velocity[0] * nx + predicted_velocity[1] * ny
-        if predicted_normal_velocity > -minimum_outward_speed:
-            correction = predicted_normal_velocity + minimum_outward_speed
-            predicted_velocity = (
-                predicted_velocity[0] - correction * nx,
-                predicted_velocity[1] - correction * ny,
-            )
-        return predicted_velocity
-
-    @staticmethod
     def outward_escape_velocities(
         source_velocity,
         target_velocity,

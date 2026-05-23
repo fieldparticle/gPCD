@@ -998,38 +998,43 @@ class Base:
     def geo_wall_prediction(self, wall_key, current_velocity=None):
         particle_index, wall_flag = wall_key
         particle = self.particles[particle_index]
-        contact = self.wall_ghost_contact(particle, wall_flag, self.walls)
-        if contact is None:
+        wall_contact = self.wall_ghost_contact(particle, wall_flag, self.walls)
+        if wall_contact is None:
             return None
 
-        nx, ny = contact["normal"]
-        overlap_area = contact["overlap_area"]
-        center_distance = contact["center_distance"]
+        nx, ny = wall_contact["normal"]
+        overlap_area = wall_contact["overlap_area"]
+        center_distance = wall_contact["center_distance"]
+        ghost_particle = wall_contact["ghost_particle"]
         if current_velocity is None:
             current_velocity = (particle["vx"], particle["vy"])
-        normal_velocity = current_velocity[0] * nx + current_velocity[1] * ny
-        phase = "compression" if normal_velocity > 0.0 else "rebound"
+        rel_normal_velocity = (
+            (ghost_particle["vx"] - current_velocity[0]) * nx
+            + (ghost_particle["vy"] - current_velocity[1]) * ny
+        )
+        phase = "compression" if rel_normal_velocity < 0.0 else "rebound"
         state = self.wall_contact_state.get(wall_key, {})
         state_zero = NeoDynamics.contact_state_zero_velocity_geometry(state)
         if state_zero is not None:
-            ghost_particle = contact["ghost_particle"]
             self.update_neo_phase(
                 state,
                 overlap_area=overlap_area,
                 center_distance=center_distance,
-                rel_normal_velocity=-2.0 * normal_velocity,
+                rel_normal_velocity=rel_normal_velocity,
                 source_particle=particle,
                 target_particle=ghost_particle,
                 zero_geometry=state_zero,
-                release_at_zero_while_accumulating=False,
+                release_at_zero_while_accumulating=True,
             )
             phase = state.get("geo_phase", "rebound")
         elif state.get("geo_phase") != "rebound":
             return None
 
+        source_particle = dict(particle)
+        source_particle["vx"], source_particle["vy"] = current_velocity
         prediction = self.geo_contact_prediction(
-            particle,
-            contact["ghost_particle"],
+            source_particle,
+            ghost_particle,
             (nx, ny, overlap_area, center_distance),
             state,
             source_index=particle_index,
@@ -1039,18 +1044,6 @@ class Base:
         )
         if prediction is None:
             return None
-
-        if phase == "rebound" and state_zero is not None:
-            wall_velocity = NeoDynamics.wall_velocity_prediction(
-                prediction["start_velocity"],
-                (nx, ny),
-                overlap_area,
-                state_zero["overlap_area"],
-                phase,
-                escape_fraction=self.zero_velocity_overlap_tolerance,
-            )
-            if wall_velocity is not None:
-                prediction["predicted_velocity"] = wall_velocity
 
         predicted_normal_velocity = (
             prediction["predicted_velocity"][0] * nx
@@ -1752,7 +1745,12 @@ class Base:
                 nx, ny = contact["normal"]
                 overlap_area = contact["overlap_area"]
                 center_distance = contact["center_distance"]
+                ghost_particle = contact["ghost_particle"]
                 normal_velocity = particle["vx"] * nx + particle["vy"] * ny
+                rel_normal_velocity = (
+                    (ghost_particle["vx"] - particle["vx"]) * nx
+                    + (ghost_particle["vy"] - particle["vy"]) * ny
+                )
                 first_velocity = (particle["vx"], particle["vy"])
                 if self.time == 0.0 and normal_velocity < 0.0:
                     first_velocity = (
@@ -1763,10 +1761,11 @@ class Base:
                 wall_key = (particle_index, wall_flag)
                 state = self.wall_contact_state.get(wall_key)
                 if state is None:
-                    ghost_particle = contact["ghost_particle"]
                     state = {
+                        "internal_contact_momentum": 0.0,
+                        "neo_internal_normal_momentum": 0.0,
                         "last_relative_normal_velocity": normal_velocity,
-                        "last_neo_relative_normal_velocity": -2.0 * normal_velocity,
+                        "last_neo_relative_normal_velocity": rel_normal_velocity,
                         "neo_motion_mode": "accumulating",
                         "geo_phase": "compression",
                         "first_contact_velocity": first_velocity,
@@ -1784,34 +1783,45 @@ class Base:
                 else:
                     state["wall_ghost_location"] = contact["ghost_location"]
                     state["wall_ghost_particle"] = dict(contact["ghost_particle"])
+                    state.setdefault("internal_contact_momentum", 0.0)
+                    state.setdefault("neo_internal_normal_momentum", 0.0)
                 if "geo_zero_velocity_overlap_area" not in state:
                     state.update(
                         self.new_neo_model().particle_zero_velocity_state(
                             particle,
-                            contact["ghost_particle"],
-                            -normal_velocity,
+                            ghost_particle,
+                            rel_normal_velocity,
                             overlap_area,
                             center_distance,
                         )
                     )
-                wall_rel_normal_velocity = -2.0 * normal_velocity
                 self.update_neo_motion_state(
                     state,
                     overlap_area,
                     center_distance,
-                    wall_rel_normal_velocity,
-                    release_at_zero_while_accumulating=False,
+                    rel_normal_velocity,
+                    release_at_zero_while_accumulating=True,
                 )
+                reduced_mass = (
+                    particle["mass"] * ghost_particle["mass"]
+                ) / (particle["mass"] + ghost_particle["mass"])
                 overlap_contact_momentum = self.overlap_momentum(
                     overlap_area,
                     center_distance,
                     particle,
                 )
-                state["relative_normal_momentum"] = particle["mass"] * abs(normal_velocity)
+                if rel_normal_velocity < 0.0:
+                    state["internal_contact_momentum"] += overlap_contact_momentum
+                else:
+                    state["internal_contact_momentum"] = max(
+                        0.0,
+                        state["internal_contact_momentum"] - overlap_contact_momentum,
+                    )
+                state["relative_normal_momentum"] = reduced_mass * abs(rel_normal_velocity)
                 state["overlap_contact_momentum"] = overlap_contact_momentum
-                state["current_neo_relative_normal_velocity"] = wall_rel_normal_velocity
+                state["current_neo_relative_normal_velocity"] = rel_normal_velocity
                 state["last_relative_normal_velocity"] = normal_velocity
-                state["last_neo_relative_normal_velocity"] = wall_rel_normal_velocity
+                state["last_neo_relative_normal_velocity"] = rel_normal_velocity
                 active_walls.add(wall_key)
 
         exited_wall_contacts = {}
@@ -1840,77 +1850,9 @@ class Base:
         self.finalize_exited_geo_wall_contacts(particle_index, [(wall_key, state)])
 
     def finalize_exited_geo_wall_contacts(self, particle_index, wall_contacts):
-        particle = self.particles[particle_index]
-        if self.boundary_contact_count(particle) > 0:
-            return
-
-        combined_velocity = None
-        applied_rebound = False
-        for wall_key, state in wall_contacts:
-            if state.get("geo_phase") != "rebound":
-                continue
-            if "first_contact_velocity" not in state or "first_contact_normal" not in state:
-                continue
-
-            _particle_index, wall_flag = wall_key
-            start_velocity = state["first_contact_velocity"]
-            ghost_particle = state.get("wall_ghost_particle")
-            if ghost_particle is None:
-                ghost_particle = self.wall_ghost_particle(
-                    particle,
-                    *state.get("wall_ghost_location", self.current_location(particle)),
-                    wall_flag,
-                    state["first_contact_normal"],
-                )
-            ghost_start_velocity = state.get("first_contact_velocities", {}).get(
-                ("wall", wall_flag),
-                (ghost_particle.get("vx", 0.0), ghost_particle.get("vy", 0.0)),
-            )
-            velocities = self.new_neo_model().final_pair_rebound_velocities(
-                start_velocity,
-                ghost_start_velocity,
-                particle["mass"],
-                ghost_particle["mass"],
-                state["first_contact_normal"],
-            )
-            if velocities is None:
-                continue
-            velocity, _ghost_velocity = velocities
-            velocity = self.velocity_with_current_tangent(
-                particle,
-                velocity,
-                state["first_contact_normal"],
-            )
-
-            if combined_velocity is None:
-                combined_velocity = [particle["vx"], particle["vy"]]
-            current_normal_velocity = (
-                combined_velocity[0] * state["first_contact_normal"][0]
-                + combined_velocity[1] * state["first_contact_normal"][1]
-            )
-            predicted_normal_velocity = (
-                velocity[0] * state["first_contact_normal"][0]
-                + velocity[1] * state["first_contact_normal"][1]
-            )
-            combined_velocity[0] += (
-                predicted_normal_velocity - current_normal_velocity
-            ) * state["first_contact_normal"][0]
-            combined_velocity[1] += (
-                predicted_normal_velocity - current_normal_velocity
-            ) * state["first_contact_normal"][1]
-            applied_rebound = True
-
-        if not applied_rebound:
-            return
-
-        old_momentum_x = particle["mass"] * particle["vx"]
-        old_momentum_y = particle["mass"] * particle["vy"]
-        new_momentum_x = particle["mass"] * combined_velocity[0]
-        new_momentum_y = particle["mass"] * combined_velocity[1]
-        self.wall_ghost_momentum_x += old_momentum_x - new_momentum_x
-        self.wall_ghost_momentum_y += old_momentum_y - new_momentum_y
-        particle["vx"], particle["vy"] = combined_velocity
-        self.sync_velocity_mirror(particle)
+        # Wall exits should not apply a second, wall-specific rebound. The
+        # active wall contact is already resolved as a particle-vs-ghost pair.
+        return
 
     @staticmethod
     def velocity_with_current_tangent(particle, predicted_velocity, normal):
