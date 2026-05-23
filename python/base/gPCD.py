@@ -818,6 +818,7 @@ class Demo:
 
     def guardrail_errors(self):
         errors = []
+        errors.extend(self.max_particle_overlap_errors())
         for index, particle in enumerate(self.base.particles):
             if not self.base.is_active_particle(particle):
                 continue
@@ -843,6 +844,50 @@ class Demo:
                 outside.append(f"y={y:.8f}>ymax={walls['end_y']:.8f}")
             if outside:
                 errors.append(f"ERROR p{index} boundary_exceeded {' '.join(outside)}")
+        return errors
+
+    def max_particle_overlap_errors(self):
+        errors = []
+        particles = self.base.particles
+        for source_index, source_particle in enumerate(particles):
+            if not self.base.is_active_particle(source_particle):
+                continue
+            source_x, source_y = self.base.current_location(source_particle)
+            source_radius = source_particle["radius"]
+            for target_index in range(source_index + 1, len(particles)):
+                target_particle = particles[target_index]
+                if not self.base.is_active_particle(target_particle):
+                    continue
+                target_x, target_y = self.base.current_location(target_particle)
+                target_radius = target_particle["radius"]
+                center_distance = math.hypot(target_x - source_x, target_y - source_y)
+                radius_sum = source_radius + target_radius
+                if center_distance >= radius_sum:
+                    continue
+
+                overlap_depth = radius_sum - center_distance
+                max_overlap_depth = min(source_radius, target_radius)
+                if overlap_depth <= max_overlap_depth + 1.0e-12:
+                    continue
+
+                overlap_pct = (
+                    100.0 * overlap_depth / radius_sum
+                    if radius_sum > 0.0
+                    else 0.0
+                )
+                max_overlap_pct = (
+                    100.0 * max_overlap_depth / radius_sum
+                    if radius_sum > 0.0
+                    else 0.0
+                )
+                errors.append(
+                    f"ERROR p{source_index}-p{target_index} "
+                    f"overlap_depth={overlap_depth:.8f} "
+                    f"exceeds_max={max_overlap_depth:.8f} "
+                    f"overlap={overlap_pct:.3f}% "
+                    f"max={max_overlap_pct:.3f}% "
+                    f"center_distance={center_distance:.8f}"
+                )
         return errors
 
     @staticmethod

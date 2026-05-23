@@ -374,7 +374,7 @@ class TabGenData(QTabWidget):
             self.RefreshButton = QPushButton("Reload")
             self.setSize(self.RefreshButton,30,100)
             self.RefreshButton.setStyleSheet("background-color:  #dddddd")
-            self.RefreshButton.clicked.connect(self.refresh)
+            self.RefreshButton.clicked.connect(self.update_list_widget)
             dirgrid.addWidget(self.RefreshButton,2,1)
 
             self.newButton = QPushButton("Plot")
@@ -447,10 +447,7 @@ class TabGenData(QTabWidget):
             view_label = QLabel("Views")
             dirgrid.addWidget(view_label,6,0,1,2)
 
-
-
             self.ViewList =  QListWidget()
-            
             self.ViewList.setStyleSheet("background-color:  #FFFFFF")
             self.setSize(self.ViewList,120,450)
             #self.ViewList.setSpacing(1)

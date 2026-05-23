@@ -1274,6 +1274,16 @@ class Base:
         zero_geometry,
         release_at_zero_while_accumulating=True,
     ):
+        if self.replace_reentrant_compression_zero_state(
+            contact_state,
+            overlap_area,
+            center_distance,
+            rel_normal_velocity,
+            source_particle,
+            target_particle,
+        ):
+            return
+
         mode = self.update_neo_motion_state(
             contact_state,
             overlap_area,
@@ -1322,6 +1332,40 @@ class Base:
         contact_state["geo_zero_velocity_overlap_area"] = zero_overlap_area
         contact_state["geo_zero_velocity_center_distance"] = zero_geometry["center_distance"]
         contact_state["geo_zero_velocity_source"] = zero_source
+
+    def replace_reentrant_compression_zero_state(
+        self,
+        contact_state,
+        overlap_area,
+        center_distance,
+        rel_normal_velocity,
+        source_particle,
+        target_particle,
+    ):
+        if contact_state.get("geo_phase") != "rebound":
+            return False
+        if rel_normal_velocity >= -self.neo_velocity_tolerance:
+            return False
+
+        new_zero_state = self.new_neo_model().particle_zero_velocity_state(
+            source_particle,
+            target_particle,
+            rel_normal_velocity,
+            overlap_area,
+            center_distance,
+        )
+        contact_state.update(new_zero_state)
+        contact_state["geo_phase"] = "compression"
+        contact_state["neo_motion_mode"] = "accumulating"
+        contact_state["geo_zero_velocity_source"] = "reentrant_compression"
+        contact_state["internal_contact_momentum"] = 0.0
+        contact_state["neo_rebound_released_normal_momentum"] = 0.0
+        contact_state["neo_rebound_remaining_normal_momentum"] = contact_state.get(
+            "geo_zero_velocity_reduced_mass",
+            0.0,
+        ) * abs(rel_normal_velocity)
+        contact_state["neo_stored_internal_normal_momentum"] = 0.0
+        return True
 
     def update_neo_motion_state(
         self,
@@ -1692,13 +1736,22 @@ class Base:
                     or target_particle.get("sltnum", 0) > 1
                 ):
                     state["multi_contact_cluster"] = True
-                self.update_neo_motion_state(
+                reentrant_compression = self.replace_reentrant_compression_zero_state(
                     state,
                     overlap_area,
                     center_distance,
                     rel_normal_velocity,
-                    release_at_zero_while_accumulating=True,
+                    source_particle,
+                    target_particle,
                 )
+                if not reentrant_compression:
+                    self.update_neo_motion_state(
+                        state,
+                        overlap_area,
+                        center_distance,
+                        rel_normal_velocity,
+                        release_at_zero_while_accumulating=True,
+                    )
                 if rel_normal_velocity < 0.0:
                     state["internal_contact_momentum"] += overlap_contact_momentum
                 else:
@@ -1795,13 +1848,22 @@ class Base:
                             center_distance,
                         )
                     )
-                self.update_neo_motion_state(
+                reentrant_compression = self.replace_reentrant_compression_zero_state(
                     state,
                     overlap_area,
                     center_distance,
                     rel_normal_velocity,
-                    release_at_zero_while_accumulating=True,
+                    particle,
+                    ghost_particle,
                 )
+                if not reentrant_compression:
+                    self.update_neo_motion_state(
+                        state,
+                        overlap_area,
+                        center_distance,
+                        rel_normal_velocity,
+                        release_at_zero_while_accumulating=True,
+                    )
                 reduced_mass = (
                     particle["mass"] * ghost_particle["mass"]
                 ) / (particle["mass"] + ghost_particle["mass"])
