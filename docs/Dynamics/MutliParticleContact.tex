@@ -1,0 +1,332 @@
+% !TeX root = GeoDynamics.tex
+\section{Multi-Particle Contacts}
+
+Currently multi-particle contacts averages the velocity of each particle pair.    
+This is not a geometric solution but a velocity prediction. 
+
+For a contact, the change in normal velocity is proportional to the penetration area. 
+The momentum response associated with that contact is proportional to mass times that velocity change.
+The relative contribution of each contact is proportional to its overlap area divided by the total active overlap area for the source particle.
+
+The total overlap area is the sum of all target particle
+overlap areas. From this the total momentum imposed on the target particle can be found.
+Taking the ratio of total overlap area to the individual overlap areas gives the fraction
+each target particle contributes to the collision.
+
+From section \ref{Fundamental}, we have three relationships:
+\begin{enumerate}
+\item Velocity/area relation
+\item Velocity change proportional to penetration area
+\item Force/penetration law
+\end{enumerate}
+
+\subsection{Velocity}
+
+The clearest rule for Mutli-Particle Contact is from the second fundamental relation:
+\begin{equation}
+\begin{aligned}
+(v_{in} - v_p) = P A_P
+\end{aligned}
+\end{equation}
+
+so that :
+\begin{equation}
+\begin{aligned}
+\Delta v = P A_P
+\end{aligned}
+\end{equation}
+
+That gives the clean area relationship:
+
+\textbf{Velocity change is proportional to penetration/overlap area}
+
+\subsection{Momentum}
+
+For momentum:
+
+\begin{equation}
+\begin{aligned}
+\Delta p = m \Delta v
+\end{aligned}
+\end{equation}
+
+so that:
+
+
+\begin{equation}
+\begin{aligned}
+\Delta p = m P A_P
+\end{aligned}
+\end{equation}
+
+So the momentum relationship states:
+
+\textbf{Contact momentum contribution is proportional to overlap area}
+
+For several contacts on the same source particle:
+
+\begin{equation}
+\begin{aligned}
+A_T = \sum_k A_k
+\end{aligned}
+\end{equation}
+
+Where each contact’s geometric weight is:
+\begin{equation}
+\begin{aligned}
+w_k = \frac{A_k}{A_T}
+\end{aligned}
+\end{equation}
+
+Which states that:
+
+\textbf{Each target contact contributes a fraction of the source particle's total contact response according to its overlap-area weight.}
+
+From the local relation:
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta v = P A_P
+\end{aligned}
+\end{equation}
+
+and since:
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta p = m \Delta v
+\end{aligned}
+\end{equation}
+
+we get:
+
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta p = m P A_P
+\end{aligned}
+\end{equation}
+
+So the simplest area-to-momentum relationship is:
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta p \propto m A_P
+\end{aligned}
+\end{equation}
+
+But for contact dynamics, the better mass term is probably not just source mass. For a pair contact, the normal exchange depends on reduced mass:
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\mu_{ij} = \frac{m_i m_j}{m_i + m_j}
+\end{aligned}
+\end{equation}
+
+So for a contact $k$ between source particle $i$ and target particle $j$:
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta p_k = C \mu_{ij} A_k
+\end{aligned}
+\end{equation}
+
+where:
+
+C = contact stiffness / momentum-per-area proportionality
+$A_k$ = overlap area for that contact
+Then for all contacts owned by source particle $i$:
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta p_{total,i}= C \sum_k \mu_{ik} A_{ik}
+\end{aligned}
+\end{equation}
+
+That gives a geometric total contact momentum scale.
+
+Then each contact gets:
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+w_k =
+\frac{\mu_{ik} A_{ik}}
+{\sum_j \mu_{ij} A_{ij}}
+\end{aligned}
+\end{equation}
+
+and:
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta p_k = w_k \Delta p_{total,i}
+\end{aligned}
+\end{equation}
+
+But because $w_k$ is built from the same quantity, this simplifies to:
+
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta p_k = C \mu_{ik} A_{ik}
+\end{aligned}
+\end{equation}
+
+The total is just the sum:
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta p_{total,i}=\sum_k \Delta p_k
+\end{aligned}
+\end{equation}
+
+So the real decision is the coefficient $C$.
+
+In the old code, the closest thing is:
+\begin{verbatim}
+overlap_contact_momentum =
+    momentum_per_area * overlap_area * inverse_square_weight(center_distance)
+\end{verbatim}
+So the current practical relationship is:
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta p_k=P A_k W(d_k)
+\end{aligned}
+\end{equation}
+
+where:
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+W(d_k) = \frac{1}{\max(d_k^2, \epsilon^2)}
+\end{aligned}
+\end{equation}
+
+But if we want to move more geometric and less heuristic, the cleaner relationship is:
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta p_k = P A_k
+\end{aligned}
+\end{equation}
+
+or with reduced mass:
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta p_k = P \mu_{ik} A_k
+\end{aligned}
+\end{equation}
+
+For equal masses, reduced mass is constant, so the weighting reduces to area weighting.
+
+The important correction for multi-particle contact is:
+
+text
+
+
+Do not average pair velocity predictions.
+Compute a contact momentum vector from area for each active contact,
+sum those contact momentum vectors,
+then apply the resulting source momentum change once.
+Vector form:
+
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta \mathbf{p}_{i}=-\sum_k\left(P \mu_{ik} A_{ik}\right)\mathbf{n}_{ik}
+\end{aligned}
+\end{equation}
+
+where $\mathbf{n}_{ik}$ points from source to target.
+
+Then:
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta \mathbf{v}_{i}=\frac{\Delta \mathbf{p}_{i}}{m_i}
+\end{aligned}
+\end{equation}
+
+That gives us the missing $\Delta \mathbf{p}_{total}$
+
+\begin{equation}
+\begin{aligned}
+\label{none}
+\Delta \mathbf{p}_{total,i}=-\sum_k P \mu_{ik} A_{ik} \mathbf{n}_{ik}
+\end{aligned}
+\end{equation}
+
+
+This is source-owned, geometric, and GLSL-friendly. It is not automatically globally momentum-conserving unless every source computes its matching response consistently, but it removes the current bad average and gives a concrete area-to-momentum rule.
+
+
+
+
+
+
+
+\subsection{Force}
+
+\begin{equation}
+\begin{aligned}
+\label{frclaw}
+F(\alpha) = Q\alpha^2
+\end{aligned}
+\end{equation}
+
+Equation \ref{frclaw}, is used to predict the zero-velocity depth: 
+\begin{equation}
+\begin{aligned}
+\label{zerodepth}
+\alpha_0 =
+\left(\frac{3\mu v_{in}^2}{2Q}\right)^{1/3}
+\end{aligned}
+\end{equation}
+
+
+\subsection{Multicontact rule}
+
+The multi-particle rule should is stated as:
+
+The change in velocity is proportional to the total collision overlap area. 
+\begin{equation}
+\begin{aligned}
+\label{mc}
+\Delta v_k \propto A_k
+\end{aligned}
+\end{equation}
+
+The contributing weight of each collision partner is the ratio of target overlap to total overlap.
+
+\begin{equation}
+\begin{aligned}
+\label{mc}
+w_k = \frac{A_k}{\sum_j A_j}
+\end{aligned}
+\end{equation}
+
+The change in momentum is equal to the total momentum times the weight.
+
+\begin{equation}
+\begin{aligned}
+\label{mca}
+\Delta \mathbf{p}_k = w_k \Delta \mathbf{p}_{total}
+\end{aligned}
+\end{equation}

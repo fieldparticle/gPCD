@@ -346,7 +346,7 @@ class TabGenData(QTabWidget):
             ## -------------------------------------------------------------
             ## Set parent directory
             LatexcfgFile = QGroupBox("Generate/Test Particle Data")
-            self.setSize(LatexcfgFile,700,700)
+            self.setSize(LatexcfgFile,650,700)
             self.tab_layout.addWidget(LatexcfgFile,0,0,4,2,alignment= Qt.AlignmentFlag.AlignLeft)
             
             dirgrid = QGridLayout()

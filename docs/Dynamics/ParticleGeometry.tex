@@ -1,0 +1,233 @@
+
+\section{Fundamental Geometry} \label{Fundamental}
+
+We need to have a relationship between velocity in ($v_{in}$) (just prior to the collision), the velocity at any degree of penetration ($v_p$), the total circle area ($A_T$) and penetration area ($A_P$). In an \textit{\textbf{instantaneous, purely geometric}} system is that the ratio of incoming velocity (the velocity just before the collision occurs) to penetration velocity is proportional to the ratio of total area to penetration area.
+\begin{equation}
+\begin{aligned}
+\frac{v_{in}}{v_p} \propto \frac{A_T}{A_P}
+\end{aligned}
+\end{equation}
+
+
+The proportionality factor is the force with which the particle resists collision at depth of penetration ($\alpha$) or repulsion force ($F_R(\alpha)$) being an increasing parabolic function. So,
+
+\begin{equation}
+\begin{aligned}
+\frac{v_{in}}{v_p} = F_R(\alpha) \frac{A_T}{A_P}
+\end{aligned}
+\end{equation}
+
+and,
+
+\begin{equation}
+\begin{aligned}
+v_{in}\frac{1}{F_R(\alpha)}\frac{A_P}{A_T} =  {v_p}
+\end{aligned}
+\end{equation}
+
+
+\section{A second collision function}
+A second collision function is that the change in velocity is proportional to the penetration area,
+
+\begin{equation}
+\begin{aligned}
+(v_{in} - v_{p}) = P A_P
+\end{aligned}
+\end{equation}
+
+
+So that 
+
+\begin{equation}
+\begin{aligned}
+v_{p} = v_{in}-P A_P
+\end{aligned}
+\end{equation}
+
+At the turnaround point, the penetration velocity is zero:
+
+\begin{equation}
+\begin{aligned}
+0 = v_{in}-P A_0
+\end{aligned}
+\end{equation}
+
+so the zero-velocity penetration area can be predicted from incoming velocity:
+
+\begin{equation}
+\begin{aligned}
+A_0 = \frac{v_{in}}{P}
+\end{aligned}
+\end{equation}
+
+\section{Equivalence of the two functions}
+
+This section derives the algebraic force factor needed to make the first
+collision function and second collision function describe the same velocity
+curve.
+
+The first function gives:
+
+\begin{equation}
+\begin{aligned}
+v_p = v_{in}\frac{1}{F_R(\alpha)}\frac{A_P}{A_T}
+\end{aligned}
+\end{equation}
+
+The second function gives:
+
+\begin{equation}
+\begin{aligned}
+v_p = v_{in}-P A_P
+\end{aligned}
+\end{equation}
+
+For the two functions to be equivalent, the two expressions for $v_p$ must be equal:
+
+\begin{equation}
+\begin{aligned}
+v_{in}\frac{1}{F_R(\alpha)}\frac{A_P}{A_T}
+=
+v_{in}-P A_P
+\end{aligned}
+\end{equation}
+
+Solving for the resistance function gives:
+
+\begin{equation}
+\begin{aligned}
+F_R(\alpha)
+=
+\frac{v_{in}A_P}
+{A_T(v_{in}-P A_P)}
+\end{aligned}
+\end{equation}
+
+Using the turnaround relation $A_0 = v_{in}/P$, this can also be written as:
+
+\begin{equation}
+\begin{aligned}
+F_R(\alpha)
+=
+\frac{A_P A_0}
+{A_T(A_0-A_P)}
+\end{aligned}
+\end{equation}
+
+Thus the first function and second function can describe the same collision
+curve if $F_R(\alpha)$ is chosen consistently.  As $A_P$ approaches $A_0$, the
+denominator approaches zero, so $F_R(\alpha)$ grows without bound.  This
+corresponds to the zero-velocity turnaround point.
+
+
+\section{Force factor}
+
+
+This section gives a physical force law that can be used to compute the
+turnaround depth by energy balance.  This is different from the algebraic
+equivalence factor in Section 3.  The Section 3 factor is the exact function
+needed to make two velocity equations equivalent.  The force law here describes
+how collision resistance grows with penetration depth.
+
+Assume the repulsive force is an increasing parabolic function of penetration
+depth:
+\begin{equation}
+\begin{aligned}
+F(\alpha) = Q\alpha^2
+\end{aligned}
+\end{equation}
+
+where $Q$ is the stiffness factor.
+
+At the zero-velocity turnaround point, incoming normal kinetic energy has been
+stored by the repulsive force:
+
+\begin{equation}
+\begin{aligned}
+\frac{1}{2}\mu v_{in}^2
+=
+\int_0^{\alpha_0} Q\alpha^2\,d\alpha
+\end{aligned}
+\end{equation}
+
+Evaluating the integral:
+
+\begin{equation}
+\begin{aligned}
+\frac{1}{2}\mu v_{in}^2
+=
+\frac{Q\alpha_0^3}{3}
+\end{aligned}
+\end{equation}
+
+Solving for turnaround penetration depth:
+
+\begin{equation}
+\begin{aligned}
+\alpha_0
+=
+\left(\frac{3\mu v_{in}^2}{2Q}\right)^{1/3}
+\end{aligned}
+\end{equation}
+
+The zero-velocity penetration area is then:
+
+\begin{equation}
+\begin{aligned}
+A_0 = A(\alpha_0)
+\end{aligned}
+\end{equation}
+
+Thus Section 3 gives the algebraic force factor for equivalence, while this
+section gives a physical force law for predicting the turnaround depth.
+
+\section{Impact on starting in a collision}
+
+When particles start in a collision, the configured velocity is interpreted as
+the incoming velocity before turnaround.  The current overlap is assumed to be
+on the rebound side of the collision history.
+
+With the physical force law, the zero-velocity penetration depth is no longer
+only a configured fraction.  It can be predicted from the incoming velocity and
+the stiffness factor $Q$:
+
+\begin{equation}
+\begin{aligned}
+\alpha_0
+=
+\left(\frac{3\mu v_{in}^2}{2Q}\right)^{1/3}
+\end{aligned}
+\end{equation}
+
+and:
+
+\begin{equation}
+\begin{aligned}
+A_0 = A(\alpha_0)
+\end{aligned}
+\end{equation}
+
+For a starting overlap with current penetration area $A_P$:
+
+\begin{itemize}[leftmargin=*]
+    \item If $A_P < A_0$, the starting state is physically valid and is on the
+    rebound path.
+    \item If $A_P = A_0$, the starting state is exactly at the zero-velocity
+    turnaround point.
+    \item If $A_P > A_0$, the starting overlap is deeper than the incoming
+    velocity and stiffness factor could physically produce.
+\end{itemize}
+
+The last case requires an explicit policy.  The simulation can:
+
+\begin{itemize}[leftmargin=*]
+    \item promote $A_0$ to the current penetration area, as the current Python
+    model does,
+    \item reject the configuration as physically impossible,
+    \item or infer the larger incoming velocity required to reach the current
+    penetration area.
+\end{itemize}
+
+Thus, for starting collisions, the force-law model replaces an arbitrary
+\texttt{zero\_velocity\_overlap\_fraction} with a predicted turnaround point
+based on incoming velocity, reduced mass, and stiffness.
