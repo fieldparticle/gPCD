@@ -140,18 +140,6 @@ class NeoDynamics:
             zero_geometry["solution_clamped"] = False
             zero_geometry["solution_source"] = "stored_contact_state"
 
-        if zero_geometry["overlap_area"] + 1.0e-12 < overlap_area:
-            zero_geometry = dict(zero_geometry)
-            zero_geometry["center_distance"] = center_distance
-            zero_geometry["overlap_area"] = overlap_area
-            zero_geometry["overlap_momentum"] = incoming_relative_normal_momentum
-            zero_geometry["penetration_depth"] = max(
-                0.0,
-                source_particle["radius"] + target_particle["radius"] - center_distance,
-            )
-            zero_geometry["solution_clamped"] = True
-            zero_geometry["solution_source"] = "force_law_promoted_to_current_overlap"
-
         zero_overlap_area = zero_geometry["overlap_area"]
         if zero_overlap_area > 1.0e-12:
             compression_fraction = overlap_area / zero_overlap_area
@@ -366,12 +354,6 @@ class NeoDynamics:
             )
             solution_source = "force_law"
 
-        if zero_overlap_area + 1.0e-12 < current_overlap_area:
-            zero_overlap_area = current_overlap_area
-            zero_center_distance = current_center_distance
-            alpha_zero = max(0.0, radius_sum - current_center_distance)
-            solution_source = "force_law_promoted_to_current_overlap"
-
         return self.zero_state_dict(
             zero_overlap_area,
             zero_center_distance,
@@ -408,12 +390,6 @@ class NeoDynamics:
             zero_center_distance = max(0.0, 2.0 * radius - alpha_zero)
             zero_overlap_area = self.circle_overlap_area(radius, radius, zero_center_distance)
             solution_source = "force_law_wall"
-
-        if zero_overlap_area + 1.0e-12 < current_overlap_area:
-            zero_overlap_area = current_overlap_area
-            zero_center_distance = current_center_distance
-            alpha_zero = max(0.0, 2.0 * radius - current_center_distance)
-            solution_source = "force_law_wall_promoted_to_current_overlap"
 
         return self.zero_state_dict(
             zero_overlap_area,

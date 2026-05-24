@@ -199,6 +199,8 @@ class Base:
                 if report is None:
                     continue
                 state["geo_phase"] = "rebound"
+                state["internal_momentum_phase"] = "returning"
+                state["neo_motion_mode"] = "releasing"
                 state["geo_zero_velocity_overlap_area"] = report["zero_velocity_overlap_area"]
                 state["geo_zero_velocity_center_distance"] = report["zero_velocity_center_distance"]
                 state["geo_zero_velocity_overlap_momentum"] = report["zero_velocity_overlap_momentum"]
@@ -230,14 +232,9 @@ class Base:
                 "center_distance": zero_state["geo_zero_velocity_center_distance"],
                 "solution_source": zero_state["geo_zero_velocity_solution_source"],
             }
-            if zero_geometry["overlap_area"] + 1.0e-12 < overlap_area:
-                zero_geometry = {
-                    "overlap_area": overlap_area,
-                    "center_distance": center_distance,
-                    "solution_source": "force_law_promoted_to_current_overlap",
-                }
-
             state["geo_phase"] = "rebound"
+            state["internal_momentum_phase"] = "returning"
+            state["neo_motion_mode"] = "releasing"
             state["geo_zero_velocity_overlap_area"] = zero_geometry["overlap_area"]
             state["geo_zero_velocity_center_distance"] = zero_geometry["center_distance"]
             state["geo_zero_velocity_source"] = zero_geometry["solution_source"]
@@ -518,8 +515,22 @@ class Base:
             pair_escape_adjusted = self.geo_apply_pair_escape_scheduler(source_index, final_velocity)
             if pair_escape_adjusted is not None:
                 final_velocity = pair_escape_adjusted
+            final_velocity, pair_lock_adjusted = self.geo_apply_pair_lock_scheduler(
+                source_index,
+                final_velocity,
+            )
+            final_velocity, wall_lock_adjusted = self.geo_apply_wall_lock_scheduler(
+                source_index,
+                final_velocity,
+            )
 
-            if has_pair or has_wall or pair_escape_adjusted is not None:
+            if (
+                has_pair
+                or has_wall
+                or pair_escape_adjusted is not None
+                or pair_lock_adjusted
+                or wall_lock_adjusted
+            ):
                 predictions[source_index] = final_velocity
 
         return predictions if predictions else None
@@ -582,9 +593,114 @@ class Base:
             if prediction is None:
                 continue
             final_velocity = prediction["predicted_velocity"]
+            final_velocity = self.apply_locked_wall_contact_velocity(
+                source_index,
+                wall_flag,
+                final_velocity,
+            )
             has_wall = True
 
         return final_velocity, has_wall
+
+    def geo_apply_pair_lock_scheduler(self, source_index, velocity):
+        adjusted_velocity = velocity
+        adjusted = False
+        source_particle = self.particles[source_index]
+        for slot in range(source_particle.get("sltnum", 0)):
+            contact_record = source_particle["ccs"][slot]
+            if contact_record.get("clflg", 0) == 0:
+                continue
+
+            target_index = contact_record["pindex"]
+            target_particle = self.particles[target_index]
+            contact = self.particle_contact(source_particle, target_particle)
+            if contact is None:
+                continue
+
+            state = self.source_geo_contact_state(source_particle, target_index) or {}
+            next_velocity = self.apply_locked_pair_contact_velocity(
+                source_index,
+                target_index,
+                adjusted_velocity,
+                state,
+                contact,
+            )
+            if next_velocity != adjusted_velocity:
+                adjusted = True
+                adjusted_velocity = next_velocity
+        return adjusted_velocity, adjusted
+
+    def geo_apply_wall_lock_scheduler(self, source_index, velocity):
+        final_velocity = velocity
+        adjusted = False
+        source_particle = self.particles[source_index]
+        for contact_record in source_particle.get("bcs", []):
+            wall_flag = contact_record.get("clflg", 0)
+            if wall_flag == 0:
+                continue
+            if self.wall_contact(source_particle, wall_flag, self.walls) is None:
+                continue
+            next_velocity = self.apply_locked_wall_contact_velocity(
+                source_index,
+                wall_flag,
+                final_velocity,
+            )
+            if next_velocity != final_velocity:
+                adjusted = True
+                final_velocity = next_velocity
+        return final_velocity, adjusted
+
+    def apply_locked_pair_contact_velocity(
+        self,
+        source_index,
+        target_index,
+        velocity,
+        state,
+        contact,
+    ):
+        if not state.get("zero_overlap_locked", False):
+            return velocity
+
+        target_particle = self.particles[target_index]
+        nx, ny, _overlap_area, _center_distance = contact
+        relative_normal_velocity = (
+            (target_particle["vx"] - velocity[0]) * nx
+            + (target_particle["vy"] - velocity[1]) * ny
+        )
+        state["locked_attempted_relative_normal_velocity"] = relative_normal_velocity
+        if relative_normal_velocity >= -self.neo_velocity_tolerance:
+            state["locked_blocked_relative_normal_velocity"] = 0.0
+            return velocity
+
+        state["locked_blocked_relative_normal_velocity"] = -relative_normal_velocity
+        state["geo_phase"] = "blocked"
+        return (
+            velocity[0] + relative_normal_velocity * nx,
+            velocity[1] + relative_normal_velocity * ny,
+        )
+
+    def apply_locked_wall_contact_velocity(self, source_index, wall_flag, velocity):
+        state = self.wall_contact_state.get((source_index, wall_flag), {})
+        if not state.get("zero_overlap_locked", False):
+            return velocity
+
+        contact = self.wall_contact(self.particles[source_index], wall_flag, self.walls)
+        if contact is None:
+            return velocity
+
+        nx, ny, _overlap_area, _center_distance = contact
+        normal_velocity = velocity[0] * nx + velocity[1] * ny
+        state["locked_attempted_normal_velocity"] = normal_velocity
+        if normal_velocity <= self.neo_velocity_tolerance:
+            state["locked_blocked_normal_velocity"] = 0.0
+            return velocity
+
+        state["locked_blocked_normal_velocity"] = normal_velocity
+        state["geo_phase"] = "blocked"
+        return (
+            velocity[0] - normal_velocity * nx,
+            velocity[1] - normal_velocity * ny,
+        )
 
     def geo_apply_pair_escape_scheduler(self, source_index, final_velocity):
         source_particle = self.particles[source_index]
@@ -603,10 +719,27 @@ class Base:
                 continue
 
             state = self.source_geo_contact_state(source_particle, target_index) or {}
-            if state.get("geo_phase") != "rebound":
+            if state.get("internal_momentum_phase") != "returning":
                 continue
 
             nx, ny, _overlap_area, _center_distance = contact
+            current_relative_normal_velocity = (
+                (target_particle["vx"] - adjusted_velocity[0]) * nx
+                + (target_particle["vy"] - adjusted_velocity[1]) * ny
+            )
+            if state.get("zero_overlap_locked", False):
+                state["locked_attempted_relative_normal_velocity"] = current_relative_normal_velocity
+                if current_relative_normal_velocity < -self.neo_velocity_tolerance:
+                    state["locked_blocked_relative_normal_velocity"] = -current_relative_normal_velocity
+                    adjusted_velocity = (
+                        adjusted_velocity[0] + current_relative_normal_velocity * nx,
+                        adjusted_velocity[1] + current_relative_normal_velocity * ny,
+                    )
+                    state["geo_phase"] = "blocked"
+                    adjusted = True
+                    continue
+                state["locked_blocked_relative_normal_velocity"] = 0.0
+
             source_prediction = self.geo_pair_prediction(source_index, target_index)
             target_prediction = self.geo_pair_prediction(target_index, source_index)
             if source_prediction is None or target_prediction is None:
@@ -615,10 +748,6 @@ class Base:
             desired_relative_normal_velocity = (
                 (target_prediction["predicted_velocity"][0] - source_prediction["predicted_velocity"][0]) * nx
                 + (target_prediction["predicted_velocity"][1] - source_prediction["predicted_velocity"][1]) * ny
-            )
-            current_relative_normal_velocity = (
-                (target_particle["vx"] - adjusted_velocity[0]) * nx
-                + (target_particle["vy"] - adjusted_velocity[1]) * ny
             )
             minimum_outward_speed = self.neo_pair_minimum_outward_speed(
                 source_index,
@@ -1026,7 +1155,7 @@ class Base:
                 zero_geometry=state_zero,
                 release_at_zero_while_accumulating=True,
             )
-            phase = state.get("geo_phase", "rebound")
+            phase = self.contact_prediction_phase(state)
         elif state.get("geo_phase") != "rebound":
             return None
 
@@ -1087,7 +1216,7 @@ class Base:
                 zero_geometry=state_zero,
                 release_at_zero_while_accumulating=True,
             )
-            phase = contact_state.get("geo_phase", "rebound")
+            phase = self.contact_prediction_phase(contact_state)
         elif contact_state.get("geo_phase") != "rebound":
             return None
 
@@ -1274,98 +1403,13 @@ class Base:
         zero_geometry,
         release_at_zero_while_accumulating=True,
     ):
-        if self.replace_reentrant_compression_zero_state(
-            contact_state,
-            overlap_area,
-            center_distance,
-            rel_normal_velocity,
-            source_particle,
-            target_particle,
-        ):
-            return
-
-        mode = self.update_neo_motion_state(
+        self.update_neo_motion_state(
             contact_state,
             overlap_area,
             center_distance,
             rel_normal_velocity,
             release_at_zero_while_accumulating=release_at_zero_while_accumulating,
         )
-        if mode != "releasing":
-            return
-
-        zero_overlap_area = zero_geometry["overlap_area"]
-        zero_tolerance_area = zero_overlap_area * max(0.0, min(1.0, self.zero_velocity_overlap_tolerance))
-        crossed_zero = overlap_area >= zero_overlap_area - zero_tolerance_area
-        zero_source = "force_law"
-        previous_rel_normal_velocity = contact_state.get("last_neo_relative_normal_velocity")
-        if (
-            not crossed_zero
-            and previous_rel_normal_velocity is not None
-            and previous_rel_normal_velocity < 0.0
-            and rel_normal_velocity >= 0.0
-        ):
-            crossed_zero = True
-            zero_overlap_area = overlap_area
-            zero_geometry = {
-                "overlap_area": overlap_area,
-                "center_distance": center_distance,
-            }
-            zero_source = "velocity_reversal_promoted_to_current_overlap"
-        if not crossed_zero and rel_normal_velocity < 0.0:
-            next_distance = center_distance + rel_normal_velocity * getattr(self, "current_step_dt", self.dt)
-            next_area = self.circle_overlap_area(
-                source_particle["radius"],
-                target_particle["radius"],
-                next_distance,
-            )
-            crossed_zero = overlap_area <= zero_overlap_area <= next_area
-
-        if not crossed_zero and mode != "releasing":
-            contact_state["geo_phase"] = "compression"
-            return
-        if not crossed_zero:
-            contact_state["geo_phase"] = "rebound"
-            return
-
-        contact_state["geo_phase"] = "rebound"
-        contact_state["geo_zero_velocity_overlap_area"] = zero_overlap_area
-        contact_state["geo_zero_velocity_center_distance"] = zero_geometry["center_distance"]
-        contact_state["geo_zero_velocity_source"] = zero_source
-
-    def replace_reentrant_compression_zero_state(
-        self,
-        contact_state,
-        overlap_area,
-        center_distance,
-        rel_normal_velocity,
-        source_particle,
-        target_particle,
-    ):
-        if contact_state.get("geo_phase") != "rebound":
-            return False
-        if rel_normal_velocity >= -self.neo_velocity_tolerance:
-            return False
-
-        new_zero_state = self.new_neo_model().particle_zero_velocity_state(
-            source_particle,
-            target_particle,
-            rel_normal_velocity,
-            overlap_area,
-            center_distance,
-        )
-        contact_state.update(new_zero_state)
-        contact_state["geo_phase"] = "compression"
-        contact_state["neo_motion_mode"] = "accumulating"
-        contact_state["geo_zero_velocity_source"] = "reentrant_compression"
-        contact_state["internal_contact_momentum"] = 0.0
-        contact_state["neo_rebound_released_normal_momentum"] = 0.0
-        contact_state["neo_rebound_remaining_normal_momentum"] = contact_state.get(
-            "geo_zero_velocity_reduced_mass",
-            0.0,
-        ) * abs(rel_normal_velocity)
-        contact_state["neo_stored_internal_normal_momentum"] = 0.0
-        return True
 
     def update_neo_motion_state(
         self,
@@ -1376,48 +1420,56 @@ class Base:
         release_at_zero_while_accumulating=True,
     ):
         tolerance = self.neo_velocity_tolerance
-        previous_rel_normal_velocity = contact_state.get("last_neo_relative_normal_velocity")
         if rel_normal_velocity < -tolerance:
-            mode = "accumulating"
+            geo_phase = "compression"
         elif rel_normal_velocity > tolerance:
-            mode = "releasing"
+            geo_phase = "rebound"
         else:
-            mode = "blocked"
+            geo_phase = "blocked"
 
         zero_overlap_area = contact_state.get("geo_zero_velocity_overlap_area")
         zero_reached = False
-        before_zero = False
         if zero_overlap_area is not None:
             zero_tolerance_area = zero_overlap_area * max(0.0, min(1.0, self.zero_velocity_overlap_tolerance))
             zero_reached = overlap_area >= zero_overlap_area - zero_tolerance_area
-            before_zero = overlap_area < zero_overlap_area - zero_tolerance_area
-            reversed_outward = (
-                previous_rel_normal_velocity is not None
-                and previous_rel_normal_velocity < -tolerance
-                and rel_normal_velocity > tolerance
-                and contact_state.get("geo_phase") != "rebound"
+
+        previous_internal_phase = contact_state.get("internal_momentum_phase")
+        previous_locked = contact_state.get("zero_overlap_locked", False)
+        if previous_internal_phase == "returning" or zero_reached or geo_phase == "rebound":
+            internal_phase = "returning"
+        else:
+            internal_phase = "accumulating"
+
+        zero_overlap_locked = previous_locked or zero_reached
+        if geo_phase == "compression" and zero_overlap_locked:
+            contact_state["zero_lock_attempted_compression"] = True
+        if geo_phase == "rebound" and not zero_reached:
+            contact_state["rebound_before_zero_overlap"] = True
+
+        contact_state["geo_phase"] = geo_phase
+        contact_state["internal_momentum_phase"] = internal_phase
+        contact_state["neo_motion_mode"] = (
+            "releasing" if internal_phase == "returning" else "accumulating"
+        )
+        contact_state["zero_velocity_reached"] = zero_reached
+        contact_state["zero_overlap_locked"] = zero_overlap_locked
+        contact_state["contact_lock_state"] = "locked_at_zero" if zero_overlap_locked else "free"
+        contact_state.setdefault("locked_blocked_normal_velocity", 0.0)
+        contact_state.setdefault("locked_blocked_relative_normal_velocity", 0.0)
+        if zero_reached and contact_state.get("geo_zero_velocity_source") is None:
+            contact_state["geo_zero_velocity_source"] = contact_state.get(
+                "geo_zero_velocity_solution_source",
+                "force_law",
             )
-            if before_zero and reversed_outward:
-                contact_state["geo_zero_velocity_overlap_area"] = overlap_area
-                contact_state["geo_zero_velocity_center_distance"] = center_distance
-                contact_state["geo_zero_velocity_source"] = "velocity_reversal_promoted_to_current_overlap"
-                zero_reached = True
+        return contact_state["neo_motion_mode"]
 
-        if zero_reached and (mode != "accumulating" or release_at_zero_while_accumulating):
-            mode = "releasing"
-            if contact_state.get("geo_zero_velocity_source") is None:
-                contact_state["geo_zero_velocity_source"] = contact_state.get(
-                    "geo_zero_velocity_solution_source",
-                    "force_law",
-                )
-
-        contact_state["neo_motion_mode"] = mode
-
-        if mode == "accumulating":
-            contact_state["geo_phase"] = "compression"
-        elif mode == "releasing":
-            contact_state["geo_phase"] = "rebound"
-        return mode
+    @staticmethod
+    def contact_prediction_phase(contact_state):
+        if contact_state.get("internal_momentum_phase") == "returning":
+            return "rebound"
+        if contact_state.get("neo_motion_mode") == "releasing":
+            return "rebound"
+        return "compression"
 
     def promote_neo_velocity_reversal_zero(
         self,
@@ -1439,10 +1491,7 @@ class Base:
             and rel_normal_velocity >= 0.0
             and contact_state.get("geo_phase") != "rebound"
         ):
-            contact_state["geo_phase"] = "rebound"
-            contact_state["geo_zero_velocity_overlap_area"] = overlap_area
-            contact_state["geo_zero_velocity_center_distance"] = center_distance
-            contact_state["geo_zero_velocity_source"] = "velocity_reversal_promoted_to_current_overlap"
+            contact_state["rebound_before_zero_overlap"] = True
 
     @staticmethod
     def sync_velocity_mirror(particle):
@@ -1712,6 +1761,9 @@ class Base:
                             "last_relative_normal_velocity": rel_normal_velocity,
                             "last_neo_relative_normal_velocity": rel_normal_velocity,
                             "neo_motion_mode": "accumulating",
+                            "internal_momentum_phase": "accumulating",
+                            "contact_lock_state": "free",
+                            "zero_overlap_locked": False,
                             "geo_phase": "compression",
                             "first_contact_velocities": {
                                 source_index: (source_particle["vx"], source_particle["vy"]),
@@ -1736,23 +1788,15 @@ class Base:
                     or target_particle.get("sltnum", 0) > 1
                 ):
                     state["multi_contact_cluster"] = True
-                reentrant_compression = self.replace_reentrant_compression_zero_state(
+                state.setdefault("internal_momentum_phase", "accumulating")
+                self.update_neo_motion_state(
                     state,
                     overlap_area,
                     center_distance,
                     rel_normal_velocity,
-                    source_particle,
-                    target_particle,
+                    release_at_zero_while_accumulating=True,
                 )
-                if not reentrant_compression:
-                    self.update_neo_motion_state(
-                        state,
-                        overlap_area,
-                        center_distance,
-                        rel_normal_velocity,
-                        release_at_zero_while_accumulating=True,
-                    )
-                if rel_normal_velocity < 0.0:
+                if state.get("internal_momentum_phase") == "accumulating":
                     state["internal_contact_momentum"] += overlap_contact_momentum
                 else:
                     state["internal_contact_momentum"] = max(
@@ -1762,6 +1806,9 @@ class Base:
                 state["relative_normal_momentum"] = rel_normal_momentum
                 state["overlap_contact_momentum"] = overlap_contact_momentum
                 state["current_neo_relative_normal_velocity"] = rel_normal_velocity
+                if not state.get("zero_overlap_locked", False):
+                    state["locked_attempted_relative_normal_velocity"] = 0.0
+                    state["locked_blocked_relative_normal_velocity"] = 0.0
                 state["last_relative_normal_velocity"] = rel_normal_velocity
                 state["last_neo_relative_normal_velocity"] = rel_normal_velocity
                 state["touched"] = True
@@ -1820,6 +1867,9 @@ class Base:
                         "last_relative_normal_velocity": normal_velocity,
                         "last_neo_relative_normal_velocity": rel_normal_velocity,
                         "neo_motion_mode": "accumulating",
+                        "internal_momentum_phase": "accumulating",
+                        "contact_lock_state": "free",
+                        "zero_overlap_locked": False,
                         "geo_phase": "compression",
                         "first_contact_velocity": first_velocity,
                         "first_contact_velocities": {
@@ -1838,6 +1888,7 @@ class Base:
                     state["wall_ghost_particle"] = dict(contact["ghost_particle"])
                     state.setdefault("internal_contact_momentum", 0.0)
                     state.setdefault("neo_internal_normal_momentum", 0.0)
+                    state.setdefault("internal_momentum_phase", "accumulating")
                 if "geo_zero_velocity_overlap_area" not in state:
                     state.update(
                         self.new_neo_model().particle_zero_velocity_state(
@@ -1848,22 +1899,13 @@ class Base:
                             center_distance,
                         )
                     )
-                reentrant_compression = self.replace_reentrant_compression_zero_state(
+                self.update_neo_motion_state(
                     state,
                     overlap_area,
                     center_distance,
                     rel_normal_velocity,
-                    particle,
-                    ghost_particle,
+                    release_at_zero_while_accumulating=True,
                 )
-                if not reentrant_compression:
-                    self.update_neo_motion_state(
-                        state,
-                        overlap_area,
-                        center_distance,
-                        rel_normal_velocity,
-                        release_at_zero_while_accumulating=True,
-                    )
                 reduced_mass = (
                     particle["mass"] * ghost_particle["mass"]
                 ) / (particle["mass"] + ghost_particle["mass"])
@@ -1872,7 +1914,7 @@ class Base:
                     center_distance,
                     particle,
                 )
-                if rel_normal_velocity < 0.0:
+                if state.get("internal_momentum_phase") == "accumulating":
                     state["internal_contact_momentum"] += overlap_contact_momentum
                 else:
                     state["internal_contact_momentum"] = max(
@@ -1882,6 +1924,9 @@ class Base:
                 state["relative_normal_momentum"] = reduced_mass * abs(rel_normal_velocity)
                 state["overlap_contact_momentum"] = overlap_contact_momentum
                 state["current_neo_relative_normal_velocity"] = rel_normal_velocity
+                if not state.get("zero_overlap_locked", False):
+                    state["locked_attempted_normal_velocity"] = 0.0
+                    state["locked_blocked_normal_velocity"] = 0.0
                 state["last_relative_normal_velocity"] = normal_velocity
                 state["last_neo_relative_normal_velocity"] = rel_normal_velocity
                 active_walls.add(wall_key)

@@ -931,6 +931,9 @@ class Demo:
             )
             zero_source = contact_state.get("geo_zero_velocity_source", "")
             motion_mode = contact_state.get("neo_motion_mode", "")
+            internal_phase = contact_state.get("internal_momentum_phase", "")
+            lock_state = contact_state.get("contact_lock_state", "free")
+            blocked_relative = contact_state.get("locked_blocked_relative_normal_velocity", 0.0)
             phase = "closing" if rel_normal_velocity < 0.0 else "separating"
             diagnostics.append(
                 f"c{source_index}->{target_index} reln={rel_normal_velocity:.8f} "
@@ -941,7 +944,8 @@ class Demo:
                 f"irel={neo_released_internal_momentum:.8f} "
                 f"irem={neo_remaining_internal_momentum:.8f} "
                 f"last_reln={last_relative_normal_velocity:.8f} phase={phase} "
-                f"mode={motion_mode} zsrc={zero_source}"
+                f"imode={internal_phase} lock={lock_state} "
+                f"block_reln={blocked_relative:.8f} mode={motion_mode} zsrc={zero_source}"
             )
         for contact_record in source_particle.get("bcs", []):
             wall_flag = contact_record.get("clflg", 0)
@@ -963,6 +967,9 @@ class Demo:
             last_normal_velocity = contact_state.get("last_relative_normal_velocity", normal_velocity)
             zero_source = contact_state.get("geo_zero_velocity_source", "")
             motion_mode = contact_state.get("neo_motion_mode", "")
+            internal_phase = contact_state.get("internal_momentum_phase", "")
+            lock_state = contact_state.get("contact_lock_state", "free")
+            blocked_normal = contact_state.get("locked_blocked_normal_velocity", 0.0)
             phase = contact_state.get(
                 "geo_phase",
                 "closing" if normal_velocity > 0.0 else "separating",
@@ -975,7 +982,8 @@ class Demo:
                 f"irel={neo_released_internal_momentum:.8f} "
                 f"irem={neo_remaining_internal_momentum:.8f} "
                 f"last_vn={last_normal_velocity:.8f} phase={phase} "
-                f"mode={motion_mode} zsrc={zero_source}"
+                f"imode={internal_phase} lock={lock_state} "
+                f"block_vn={blocked_normal:.8f} mode={motion_mode} zsrc={zero_source}"
             )
         return diagnostics
 
@@ -1044,7 +1052,7 @@ class Demo:
                 for particle_index, wall_flag in wall_contacts
                 if particle_index in cluster
             ]
-            phases, modes = self.cluster_phase_modes(cluster_pairs, cluster_walls)
+            phases, internal_modes = self.cluster_phase_modes(cluster_pairs, cluster_walls)
             current_px, current_py, current_ke = self.cluster_current_momentum_energy(particle_indices)
             start_px, start_py, start_ke = self.cluster_start_momentum_energy(particle_indices)
             cimom_x, cimom_y, cimom, cistore, cirel, cirem = self.cluster_internal_momentum_totals(
@@ -1066,7 +1074,7 @@ class Demo:
                     "particles=" + ",".join(f"p{index}" for index in particle_indices),
                     "contacts=" + ",".join(contact_labels),
                     "phase=" + ",".join(phases),
-                    "mode=" + ",".join(modes),
+                    "imode=" + ",".join(internal_modes),
                     f"p_start=({start_px:.8f}, {start_py:.8f})",
                     f"p_current=({current_px:.8f}, {current_py:.8f})",
                     f"ke_start={start_ke:.8f}",
@@ -1116,6 +1124,7 @@ class Demo:
     def cluster_phase_modes(self, cluster_pairs, cluster_walls):
         phases = set()
         modes = set()
+        internal_modes = set()
         for source_index, target_index in cluster_pairs:
             state = self.base.source_geo_contact_state(
                 self.base.particles[source_index],
@@ -1126,11 +1135,13 @@ class Demo:
             ) or {}
             phases.add(state.get("geo_phase", "unknown"))
             modes.add(state.get("neo_motion_mode", "unknown"))
+            internal_modes.add(state.get("internal_momentum_phase", "unknown"))
         for wall_key in cluster_walls:
             state = self.base.wall_contact_state.get(wall_key, {})
             phases.add(state.get("geo_phase", "unknown"))
             modes.add(state.get("neo_motion_mode", "unknown"))
-        return sorted(phases or {"none"}), sorted(modes or {"none"})
+            internal_modes.add(state.get("internal_momentum_phase", "unknown"))
+        return sorted(phases or {"none"}), sorted((internal_modes or modes) or {"none"})
 
     def cluster_current_momentum_energy(self, particle_indices):
         momentum_x = 0.0
@@ -1236,6 +1247,9 @@ class Demo:
             )
             zero_source = contact_state.get("geo_zero_velocity_source", "")
             motion_mode = contact_state.get("neo_motion_mode", "")
+            internal_phase = contact_state.get("internal_momentum_phase", "")
+            lock_state = contact_state.get("contact_lock_state", "free")
+            blocked_relative = contact_state.get("locked_blocked_relative_normal_velocity", 0.0)
             phase = "closing" if rel_normal_velocity < 0.0 else "separating"
             lines.extend(
                 [
@@ -1252,6 +1266,9 @@ class Demo:
                     f"irel={neo_released_internal_momentum:.8f}",
                     f"irem={neo_remaining_internal_momentum:.8f}",
                     f"last_reln={last_relative_normal_velocity:.8f}",
+                    f"imode={internal_phase}",
+                    f"lock={lock_state}",
+                    f"block_reln={blocked_relative:.8f}",
                     f"mode={motion_mode}",
                     f"zsrc={zero_source}",
                     f"phase={phase}",
@@ -1281,6 +1298,9 @@ class Demo:
             last_normal_velocity = contact_state.get("last_relative_normal_velocity", normal_velocity)
             zero_source = contact_state.get("geo_zero_velocity_source", "")
             motion_mode = contact_state.get("neo_motion_mode", "")
+            internal_phase = contact_state.get("internal_momentum_phase", "")
+            lock_state = contact_state.get("contact_lock_state", "free")
+            blocked_normal = contact_state.get("locked_blocked_normal_velocity", 0.0)
             phase = contact_state.get(
                 "geo_phase",
                 "closing" if normal_velocity > 0.0 else "separating",
@@ -1297,6 +1317,9 @@ class Demo:
                     f"irel={neo_released_internal_momentum:.8f}",
                     f"irem={neo_remaining_internal_momentum:.8f}",
                     f"last_vn={last_normal_velocity:.8f}",
+                    f"imode={internal_phase}",
+                    f"lock={lock_state}",
+                    f"block_vn={blocked_normal:.8f}",
                     f"mode={motion_mode}",
                     f"zsrc={zero_source}",
                     f"area={overlap_area:.8f}",
