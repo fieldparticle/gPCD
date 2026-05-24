@@ -934,6 +934,7 @@ class Demo:
             internal_phase = contact_state.get("internal_momentum_phase", "")
             lock_state = contact_state.get("contact_lock_state", "free")
             blocked_relative = contact_state.get("locked_blocked_relative_normal_velocity", 0.0)
+            return_relative = contact_state.get("locked_return_relative_normal_velocity", 0.0)
             phase = "closing" if rel_normal_velocity < 0.0 else "separating"
             diagnostics.append(
                 f"c{source_index}->{target_index} reln={rel_normal_velocity:.8f} "
@@ -945,7 +946,8 @@ class Demo:
                 f"irem={neo_remaining_internal_momentum:.8f} "
                 f"last_reln={last_relative_normal_velocity:.8f} phase={phase} "
                 f"imode={internal_phase} lock={lock_state} "
-                f"block_reln={blocked_relative:.8f} mode={motion_mode} zsrc={zero_source}"
+                f"return_reln={return_relative:.8f} block_reln={blocked_relative:.8f} "
+                f"mode={motion_mode} zsrc={zero_source}"
             )
         for contact_record in source_particle.get("bcs", []):
             wall_flag = contact_record.get("clflg", 0)
@@ -970,6 +972,7 @@ class Demo:
             internal_phase = contact_state.get("internal_momentum_phase", "")
             lock_state = contact_state.get("contact_lock_state", "free")
             blocked_normal = contact_state.get("locked_blocked_normal_velocity", 0.0)
+            return_normal = contact_state.get("locked_return_normal_velocity", 0.0)
             phase = contact_state.get(
                 "geo_phase",
                 "closing" if normal_velocity > 0.0 else "separating",
@@ -983,7 +986,8 @@ class Demo:
                 f"irem={neo_remaining_internal_momentum:.8f} "
                 f"last_vn={last_normal_velocity:.8f} phase={phase} "
                 f"imode={internal_phase} lock={lock_state} "
-                f"block_vn={blocked_normal:.8f} mode={motion_mode} zsrc={zero_source}"
+                f"return_vn={return_normal:.8f} block_vn={blocked_normal:.8f} "
+                f"mode={motion_mode} zsrc={zero_source}"
             )
         return diagnostics
 
@@ -1250,6 +1254,7 @@ class Demo:
             internal_phase = contact_state.get("internal_momentum_phase", "")
             lock_state = contact_state.get("contact_lock_state", "free")
             blocked_relative = contact_state.get("locked_blocked_relative_normal_velocity", 0.0)
+            return_relative = contact_state.get("locked_return_relative_normal_velocity", 0.0)
             phase = "closing" if rel_normal_velocity < 0.0 else "separating"
             lines.extend(
                 [
@@ -1268,6 +1273,7 @@ class Demo:
                     f"last_reln={last_relative_normal_velocity:.8f}",
                     f"imode={internal_phase}",
                     f"lock={lock_state}",
+                    f"return_reln={return_relative:.8f}",
                     f"block_reln={blocked_relative:.8f}",
                     f"mode={motion_mode}",
                     f"zsrc={zero_source}",
@@ -1301,6 +1307,7 @@ class Demo:
             internal_phase = contact_state.get("internal_momentum_phase", "")
             lock_state = contact_state.get("contact_lock_state", "free")
             blocked_normal = contact_state.get("locked_blocked_normal_velocity", 0.0)
+            return_normal = contact_state.get("locked_return_normal_velocity", 0.0)
             phase = contact_state.get(
                 "geo_phase",
                 "closing" if normal_velocity > 0.0 else "separating",
@@ -1319,6 +1326,7 @@ class Demo:
                     f"last_vn={last_normal_velocity:.8f}",
                     f"imode={internal_phase}",
                     f"lock={lock_state}",
+                    f"return_vn={return_normal:.8f}",
                     f"block_vn={blocked_normal:.8f}",
                     f"mode={motion_mode}",
                     f"zsrc={zero_source}",

@@ -663,6 +663,16 @@ class Base:
 
         target_particle = self.particles[target_index]
         nx, ny, _overlap_area, _center_distance = contact
+        return_velocity = self.locked_pair_return_velocity(
+            source_index,
+            target_index,
+            velocity,
+            state,
+            contact,
+        )
+        if return_velocity is not None:
+            velocity = return_velocity
+
         relative_normal_velocity = (
             (target_particle["vx"] - velocity[0]) * nx
             + (target_particle["vy"] - velocity[1]) * ny
@@ -679,6 +689,47 @@ class Base:
             velocity[1] + relative_normal_velocity * ny,
         )
 
+    def locked_pair_return_velocity(
+        self,
+        source_index,
+        target_index,
+        velocity,
+        state,
+        contact,
+    ):
+        target_particle = self.particles[target_index]
+        nx, ny, _overlap_area, _center_distance = contact
+        current_relative_normal_velocity = (
+            (target_particle["vx"] - velocity[0]) * nx
+            + (target_particle["vy"] - velocity[1]) * ny
+        )
+        prediction = self.geo_pair_prediction(source_index, target_index)
+        if prediction is None:
+            state["locked_return_relative_normal_velocity"] = 0.0
+            return None
+
+        predicted_velocity = prediction["predicted_velocity"]
+        return_relative_normal_velocity = (
+            (target_particle["vx"] - predicted_velocity[0]) * nx
+            + (target_particle["vy"] - predicted_velocity[1]) * ny
+        )
+        state["locked_return_relative_normal_velocity"] = return_relative_normal_velocity
+        if return_relative_normal_velocity <= self.neo_velocity_tolerance:
+            return None
+        if return_relative_normal_velocity <= current_relative_normal_velocity + self.neo_velocity_tolerance:
+            return None
+
+        current_normal_velocity = velocity[0] * nx + velocity[1] * ny
+        return_normal_velocity = predicted_velocity[0] * nx + predicted_velocity[1] * ny
+        tangent_velocity = (
+            velocity[0] - current_normal_velocity * nx,
+            velocity[1] - current_normal_velocity * ny,
+        )
+        return (
+            tangent_velocity[0] + return_normal_velocity * nx,
+            tangent_velocity[1] + return_normal_velocity * ny,
+        )
+
     def apply_locked_wall_contact_velocity(self, source_index, wall_flag, velocity):
         state = self.wall_contact_state.get((source_index, wall_flag), {})
         if not state.get("zero_overlap_locked", False):
@@ -689,6 +740,16 @@ class Base:
             return velocity
 
         nx, ny, _overlap_area, _center_distance = contact
+        return_velocity = self.locked_wall_return_velocity(
+            source_index,
+            wall_flag,
+            velocity,
+            state,
+            (nx, ny),
+        )
+        if return_velocity is not None:
+            velocity = return_velocity
+
         normal_velocity = velocity[0] * nx + velocity[1] * ny
         state["locked_attempted_normal_velocity"] = normal_velocity
         if normal_velocity <= self.neo_velocity_tolerance:
@@ -700,6 +761,34 @@ class Base:
         return (
             velocity[0] - normal_velocity * nx,
             velocity[1] - normal_velocity * ny,
+        )
+
+    def locked_wall_return_velocity(self, source_index, wall_flag, velocity, state, normal):
+        nx, ny = normal
+        current_normal_velocity = velocity[0] * nx + velocity[1] * ny
+        prediction = self.geo_wall_prediction(
+            (source_index, wall_flag),
+            current_velocity=velocity,
+        )
+        if prediction is None:
+            state["locked_return_normal_velocity"] = 0.0
+            return None
+
+        predicted_velocity = prediction["predicted_velocity"]
+        return_normal_velocity = predicted_velocity[0] * nx + predicted_velocity[1] * ny
+        state["locked_return_normal_velocity"] = return_normal_velocity
+        if return_normal_velocity >= -self.neo_velocity_tolerance:
+            return None
+        if return_normal_velocity >= current_normal_velocity - self.neo_velocity_tolerance:
+            return None
+
+        tangent_velocity = (
+            velocity[0] - current_normal_velocity * nx,
+            velocity[1] - current_normal_velocity * ny,
+        )
+        return (
+            tangent_velocity[0] + return_normal_velocity * nx,
+            tangent_velocity[1] + return_normal_velocity * ny,
         )
 
     def geo_apply_pair_escape_scheduler(self, source_index, final_velocity):
@@ -727,18 +816,6 @@ class Base:
                 (target_particle["vx"] - adjusted_velocity[0]) * nx
                 + (target_particle["vy"] - adjusted_velocity[1]) * ny
             )
-            if state.get("zero_overlap_locked", False):
-                state["locked_attempted_relative_normal_velocity"] = current_relative_normal_velocity
-                if current_relative_normal_velocity < -self.neo_velocity_tolerance:
-                    state["locked_blocked_relative_normal_velocity"] = -current_relative_normal_velocity
-                    adjusted_velocity = (
-                        adjusted_velocity[0] + current_relative_normal_velocity * nx,
-                        adjusted_velocity[1] + current_relative_normal_velocity * ny,
-                    )
-                    state["geo_phase"] = "blocked"
-                    adjusted = True
-                    continue
-                state["locked_blocked_relative_normal_velocity"] = 0.0
 
             source_prediction = self.geo_pair_prediction(source_index, target_index)
             target_prediction = self.geo_pair_prediction(target_index, source_index)
@@ -1339,6 +1416,15 @@ class Base:
                 source_velocity,
                 (nx, ny),
             )
+            if not fixed_target:
+                source_velocity, target_velocity = self.current_frame_pair_rebound_velocities(
+                    source_particle,
+                    target_particle,
+                    source_velocity,
+                    target_velocity,
+                    (nx, ny),
+                    contact_state,
+                )
 
         if not fixed_target:
             current_normal_velocity = source_particle["vx"] * nx + source_particle["vy"] * ny
@@ -1356,6 +1442,62 @@ class Base:
             "start_velocity": (source_start_vx, source_start_vy),
             "predicted_velocity": source_velocity,
         }
+
+    @staticmethod
+    def current_frame_pair_rebound_velocities(
+        source_particle,
+        target_particle,
+        source_rebound_velocity,
+        target_rebound_velocity,
+        normal,
+        contact_state=None,
+    ):
+        nx, ny = normal
+        source_mass = source_particle["mass"]
+        target_mass = target_particle["mass"]
+        total_mass = source_mass + target_mass
+        if total_mass <= 0.0:
+            return source_rebound_velocity, target_rebound_velocity
+
+        source_current_normal = source_particle["vx"] * nx + source_particle["vy"] * ny
+        target_current_normal = target_particle["vx"] * nx + target_particle["vy"] * ny
+        shared_normal = (
+            source_mass * source_current_normal
+            + target_mass * target_current_normal
+        ) / total_mass
+
+        rebound_relative_normal = (
+            (target_rebound_velocity[0] - source_rebound_velocity[0]) * nx
+            + (target_rebound_velocity[1] - source_rebound_velocity[1]) * ny
+        )
+        rebound_relative_normal = max(0.0, rebound_relative_normal)
+
+        source_normal = shared_normal - (target_mass / total_mass) * rebound_relative_normal
+        target_normal = shared_normal + (source_mass / total_mass) * rebound_relative_normal
+
+        source_current_tangent = (
+            source_particle["vx"] - source_current_normal * nx,
+            source_particle["vy"] - source_current_normal * ny,
+        )
+        target_current_tangent = (
+            target_particle["vx"] - target_current_normal * nx,
+            target_particle["vy"] - target_current_normal * ny,
+        )
+
+        if contact_state is not None:
+            contact_state["current_frame_shared_normal_velocity"] = shared_normal
+            contact_state["current_frame_rebound_relative_normal_velocity"] = rebound_relative_normal
+
+        return (
+            (
+                source_current_tangent[0] + source_normal * nx,
+                source_current_tangent[1] + source_normal * ny,
+            ),
+            (
+                target_current_tangent[0] + target_normal * nx,
+                target_current_tangent[1] + target_normal * ny,
+            ),
+        )
 
     def update_neo_internal_momentum_report(self):
         for particle in self.particles:
@@ -1807,6 +1949,7 @@ class Base:
                 state["overlap_contact_momentum"] = overlap_contact_momentum
                 state["current_neo_relative_normal_velocity"] = rel_normal_velocity
                 if not state.get("zero_overlap_locked", False):
+                    state["locked_return_relative_normal_velocity"] = 0.0
                     state["locked_attempted_relative_normal_velocity"] = 0.0
                     state["locked_blocked_relative_normal_velocity"] = 0.0
                 state["last_relative_normal_velocity"] = rel_normal_velocity
@@ -1925,6 +2068,7 @@ class Base:
                 state["overlap_contact_momentum"] = overlap_contact_momentum
                 state["current_neo_relative_normal_velocity"] = rel_normal_velocity
                 if not state.get("zero_overlap_locked", False):
+                    state["locked_return_normal_velocity"] = 0.0
                     state["locked_attempted_normal_velocity"] = 0.0
                     state["locked_blocked_normal_velocity"] = 0.0
                 state["last_relative_normal_velocity"] = normal_velocity

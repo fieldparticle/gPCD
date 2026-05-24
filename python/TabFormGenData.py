@@ -346,8 +346,8 @@ class TabGenData(QTabWidget):
             ## -------------------------------------------------------------
             ## Set parent directory
             LatexcfgFile = QGroupBox("Generate/Test Particle Data")
-            self.setSize(LatexcfgFile,600,600)
-            self.tab_layout.addWidget(LatexcfgFile,0,0,2,2,alignment= Qt.AlignmentFlag.AlignLeft)
+            self.setSize(LatexcfgFile,700,700)
+            self.tab_layout.addWidget(LatexcfgFile,0,0,4,2,alignment= Qt.AlignmentFlag.AlignLeft)
             
             dirgrid = QGridLayout()
             LatexcfgFile.setLayout(dirgrid)
@@ -439,13 +439,13 @@ class TabGenData(QTabWidget):
 
             self.ListObj =  QListWidget()
             self.ListObj.setStyleSheet("background-color:  #FFFFFF")
-            self.setSize(self.ListObj,350,450)
-            dirgrid.addWidget(self.ListObj,5,0,1,2)
+            self.setSize(self.ListObj,350,550)
+            dirgrid.addWidget(self.ListObj,5,0,2,2)
 
             self.ListObj.itemSelectionChanged.connect(lambda: self.valueChange(self.ListObj))   
 
             view_label = QLabel("Views")
-            dirgrid.addWidget(view_label,6,0,1,2)
+            dirgrid.addWidget(view_label,7,0,1,2)
 
             self.ViewList =  QListWidget()
             self.ViewList.setStyleSheet("background-color:  #FFFFFF")
@@ -458,7 +458,7 @@ class TabGenData(QTabWidget):
             self.terminal =  QTextEdit(self)
             self.terminal.setStyleSheet("background-color:  #ffffff; color: green")
             self.setSize(self.terminal,225,900)
-            self.tab_layout.addWidget(self.terminal,5,0,3,3,alignment= Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+            self.tab_layout.addWidget(self.terminal,9,0,3,3,alignment= Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
         except BaseException as e:
             self.log.log(self,f"Error in Create:{e}")
             return 

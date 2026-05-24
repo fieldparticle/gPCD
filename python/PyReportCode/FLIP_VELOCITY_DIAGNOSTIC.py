@@ -363,10 +363,12 @@ class FLIP_VELOCITY_DIAGNOSTIC:
         axis.plot(frames, self.series(rows, "wall_istore"), label="wall istore")
         axis.plot(frames, self.series(rows, "wall_irel"), label="wall irel")
         axis.plot(frames, self.series(rows, "wall_irem"), label="wall irem")
+        axis.plot(frames, self.series(rows, "wall_return_vn"), label="wall return vn")
         axis.plot(frames, self.series(rows, "wall_block_vn"), label="wall blocked vn")
         axis.plot(frames, self.series(rows, "pair_istore"), label="pair istore")
         axis.plot(frames, self.series(rows, "pair_irel"), label="pair irel")
         axis.plot(frames, self.series(rows, "pair_irem"), label="pair irem")
+        axis.plot(frames, self.series(rows, "pair_return_reln"), label="pair return reln")
         axis.plot(frames, self.series(rows, "pair_block_reln"), label="pair blocked reln")
         axis.set_ylabel("momentum")
 
