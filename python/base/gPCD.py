@@ -1251,6 +1251,10 @@ class Demo:
             neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
             neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
             neo_remaining_internal_momentum = contact_state.get("neo_rebound_remaining_normal_momentum", 0.0)
+            source_total_overlap_area = contact_state.get("source_total_overlap_area", 0.0)
+            source_contact_weight = contact_state.get("source_contact_weight", 1.0)
+            source_available_momentum = contact_state.get("source_available_momentum", 0.0)
+            unweighted_zero_momentum = contact_state.get("unweighted_zero_internal_normal_momentum", 0.0)
             overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
             last_relative_normal_velocity = contact_state.get(
                 "last_relative_normal_velocity",
