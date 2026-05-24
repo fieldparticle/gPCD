@@ -59,6 +59,25 @@ rules.
           reservoir momentum for accounting.
     \item Wall-specific reflection logic should not be used as a separate
           dynamics path after the ghost particle has been constructed.
+    \item \textbf{wall\_boundary} is the actual physical wall plane.
+    \item \textbf{wall\_contact\_offset} is an intentional offset from the
+          physical wall plane.  A zero offset means the contact plane is the
+          physical wall plane.
+    \item \textbf{wall\_ghost\_center} is computed from the wall boundary,
+          particle radius, and wall contact offset.  For the top wall:
+    \[
+        y_{ghost}
+        =
+        y_{wall}
+        +
+        r
+        -
+        wall\_contact\_offset .
+    \]
+    \item \textbf{distance\_to\_wall} is always measured to the physical wall
+          plane.
+    \item \textbf{distance\_to\_contact\_plane} is measured to the effective
+          contact plane after applying the wall contact offset.
 \end{itemize}
 
 \subsection{Compression, Rebound, and Zero Velocity}

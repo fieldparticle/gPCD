@@ -24,4 +24,155 @@ The model of particle internal momentum may not match the actual dynamics but it
 
 Particle-particle collisions result in four offsetting vectors, two opposing velocity momentum vectors and two opposing internal momentum vectors. Particle-wall collisions differ mathematically since the wall does not move. There are then only three vectors - two internal momentum vectors and only one velocity momentum vector. This leaves an imbalance of one velocity momentum vector. To account for this we create a wall-side velocity momentum reservoir $\mathbf{p}_{WallVelocityMomentumReservoir}$.
 
+\subsection{Reporting Values}
+
+The UI reports the momentum accounting values as vector rows.  Each row shows
+the x component, the y component, and the vector magnitude:
+
+\begin{equation}
+\begin{aligned}
+\mathbf{p} = (p_x, p_y), \qquad |\mathbf{p}| = \sqrt{p_x^2+p_y^2}
+\end{aligned}
+\end{equation}
+
+The UI rows are:
+
+\begin{itemize}
+\item \textbf{start}: The initial total translational momentum of all active
+particles at the start of the run.  This is the reference value used for drift
+calculation.
+
+\item \textbf{particle\_velocity}: The current translational momentum of all
+active particles.  For each particle,
+\begin{equation}
+\begin{aligned}
+\mathbf{p}_{particle} = m\mathbf{v}
+\end{aligned}
+\end{equation}
+and the row is the vector sum over all active particles.
+
+\item \textbf{particle\_side\_int}: The particle-side internal momentum vector
+currently stored in active contacts.  For a particle-particle contact, this is
+reported on the particle side of the contact normal.  For a wall contact, this
+is the particle-side contact internal momentum, opposite the wall/ghost side.
+This value is a signed vector sum, not a scalar sum.
+
+\item \textbf{wall\_ghost\_int}: The wall/ghost-side internal momentum vector
+for active wall contacts.  Under the current reporting convention, this is
+equal and opposite to the particle-side wall-contact internal momentum.  It is
+included so that wall contacts can be reported as if the wall contact has a
+ghost-side internal state.
+
+\item \textbf{wall\_vel\_reserv}: The wall velocity momentum reservoir.  This
+is the pseudo wall reaction velocity momentum used to account for momentum that
+would belong to the non-moving wall side of a wall collision.  It is zero when
+no wall velocity reservoir has been accumulated.
+
+\item \textbf{modeled\_total}: The current reported system momentum after
+adding all reported momentum components:
+\begin{equation}
+\begin{aligned}
+\mathbf{p}_{modeled}
+=
+\mathbf{p}_{particle\_velocity}
++ \mathbf{p}_{particle\_side\_int}
++ \mathbf{p}_{wall\_ghost\_int}
++ \mathbf{p}_{wall\_vel\_reserv}
+\end{aligned}
+\end{equation}
+
+\item \textbf{drift}: The difference between the starting total momentum and
+the modeled total momentum:
+\begin{equation}
+\begin{aligned}
+\mathbf{p}_{drift}
+=
+\mathbf{p}_{start}
+-
+\mathbf{p}_{modeled}
+\end{aligned}
+\end{equation}
+When the accounting and dynamics are consistent for the selected model, this
+row should be zero after all contacts have separated and all internal momentum
+has returned to translational momentum.
+\end{itemize}
+
+The capture files write these same values in the \texttt{[momentum\_balance]}
+section.  They also write a more detailed \texttt{[momentum\_diagnostics]}
+section.  The diagnostic names are more explicit and include aliases used while
+debugging:
+
+\begin{itemize}
+\item \texttt{start\_px}, \texttt{start\_py}, and \texttt{start\_p}: component
+and magnitude form of the UI \textbf{start} row.
+
+\item \texttt{current\_px}, \texttt{current\_py}, and \texttt{current\_p}:
+component and magnitude form of the current particle translational momentum.
+These are equivalent to \texttt{particle\_velocity\_*}.
+
+\item \texttt{particle\_velocity\_px}, \texttt{particle\_velocity\_py}, and
+\texttt{particle\_velocity\_p}: component and magnitude form of the UI
+\textbf{particle\_velocity} row.
+
+\item \texttt{particle\_side\_internal\_px},
+\texttt{particle\_side\_internal\_py}, and
+\texttt{particle\_side\_internal\_p}: component and magnitude form of the UI
+\textbf{particle\_side\_int} row.
+
+\item \texttt{particle\_pair\_internal\_*} and \texttt{pair\_internal\_*}: the
+particle-particle portion of particle-side internal momentum.  These exclude
+wall contacts.
+
+\item \texttt{wall\_internal\_*} and \texttt{wall\_ghost\_internal\_*}: the
+wall/ghost-side internal momentum for active wall contacts.  These are aliases
+for the same reported vector.
+
+\item \texttt{contact\_internal\_*}: the vector sum of particle-side internal
+momentum and wall/ghost internal momentum.  Because the current wall convention
+uses equal and opposite particle-side and wall/ghost-side internal vectors,
+wall-contact internal momentum can cancel inside this value.
+
+\item \texttt{wall\_velocity\_reservoir\_*} and \texttt{wall\_ghost\_*}: the
+wall velocity momentum reservoir.  These are aliases for the same vector.
+
+\item \texttt{modeled\_total\_without\_reservoir\_*}: the current particle
+momentum plus contact internal momentum, before adding the wall velocity
+momentum reservoir.
+
+\item \texttt{modeled\_total\_*} and
+\texttt{modeled\_total\_with\_wall\_*}: the full modeled total used by the UI
+\textbf{modeled\_total} row.
+
+\item \texttt{drift\_modeled\_*} and \texttt{drift\_with\_wall\_ghost\_*}: the
+full drift vector used by the UI \textbf{drift} row.
+
+\item \texttt{drift\_without\_reservoir\_*}: the drift that would be reported
+if the wall velocity momentum reservoir were omitted.
+
+\item \texttt{pair\_internal\_scalar}: scalar sum of active particle-particle
+contact internal momentum magnitudes.  This is a diagnostic scalar and is not
+used directly in the vector drift calculation.
+
+\item \texttt{wall\_internal\_scalar}: scalar sum of active wall-contact
+internal momentum magnitudes.  This is a diagnostic scalar and is not used
+directly in the vector drift calculation.
+
+\item \texttt{contact\_internal\_scalar}: scalar sum of pair and wall internal
+momentum magnitudes.  This is useful for seeing whether internal momentum is
+present too briefly to observe in the UI.
+
+\item \texttt{contact\_stored\_scalar},
+\texttt{contact\_released\_scalar}, and
+\texttt{contact\_remaining\_scalar}: scalar diagnostic totals for stored,
+released, and remaining internal contact momentum.
+
+\item \texttt{active\_pair\_contacts} and \texttt{active\_wall\_contacts}: the
+number of active particle-particle and particle-wall contacts in the current
+frame.
+\end{itemize}
+
+The vector rows are the authoritative values for drift accounting.  The scalar
+rows are diagnostics only; they help show whether a contact is accumulating,
+returning, or clear, but they are not substituted into the drift vector
+equation.
 

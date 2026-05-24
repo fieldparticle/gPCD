@@ -1,6 +1,16 @@
 % !TeX root = GeoDynamics.tex
 \section{Multi-Particle Contacts}
 
+Our model states that the dynamics of a particle depends only on the area of overlap into another particle. 
+
+
+Momentum is summed The momentum in collision must equal the amount total momentum per area in rebound. But in multi-contact, a source particle cannot independently apply the full area rule to every contact as if each contact owns the whole source response capacity. That double-counts available momentum. For a particle with multiple active contacts, the source has one current momentum state and multiple overlap areas. The contacts must share the source response by weight.  This is the fundamental source of conservation of the whole system. Therefore, schedule wise, \textbf{source owned contact resolution must work}. In multiple particle contacts the weighing of area, changes the momentum per area.
+
+In the geometric compression model, the momentum at a given frame is computed from the current overlap area, not by integrating every prior step.So it is instantaious. In the geometric compression model, the momentum at a given frame is computed from the current overlap area, not by integrating every prior step.
+ 
+
+But, 
+
 Currently multi-particle contacts averages the velocity of each particle pair.    
 This is not a geometric solution but a velocity prediction. 
 

@@ -78,6 +78,9 @@ class Demo:
         self.base.inverse_square_softening = float(
             self.config.get("inverse_square_softening", self.base.inverse_square_softening)
         )
+        self.base.wall_contact_offset = float(
+            self.config.get("wall_contact_offset", self.base.wall_contact_offset)
+        )
         self.base.configure_flow(self.config)
 
         wall_box = self.config.get("wall_box")
@@ -924,6 +927,10 @@ class Demo:
             neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
             neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
             neo_remaining_internal_momentum = contact_state.get("neo_rebound_remaining_normal_momentum", 0.0)
+            source_total_overlap_area = contact_state.get("source_total_overlap_area", 0.0)
+            source_contact_weight = contact_state.get("source_contact_weight", 1.0)
+            source_available_momentum = contact_state.get("source_available_momentum", 0.0)
+            unweighted_zero_momentum = contact_state.get("unweighted_zero_internal_normal_momentum", 0.0)
             overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
             last_relative_normal_velocity = contact_state.get(
                 "last_relative_normal_velocity",
@@ -1270,6 +1277,10 @@ class Demo:
                     f"istore={neo_stored_internal_momentum:.8f}",
                     f"irel={neo_released_internal_momentum:.8f}",
                     f"irem={neo_remaining_internal_momentum:.8f}",
+                    f"src_area={source_total_overlap_area:.8f}",
+                    f"src_weight={source_contact_weight:.8f}",
+                    f"src_avail={source_available_momentum:.8f}",
+                    f"unweighted_zero={unweighted_zero_momentum:.8f}",
                     f"last_reln={last_relative_normal_velocity:.8f}",
                     f"imode={internal_phase}",
                     f"lock={lock_state}",
@@ -1289,11 +1300,22 @@ class Demo:
             if wall_flag == 0:
                 continue
 
-            contact = self.base.wall_contact(source_particle, wall_flag, self.base.walls)
-            if contact is None:
+            wall_ghost_contact = self.base.wall_ghost_contact(
+                source_particle,
+                wall_flag,
+                self.base.walls,
+            )
+            if wall_ghost_contact is None:
                 continue
 
-            nx, ny, overlap_area, center_distance = contact
+            nx, ny = wall_ghost_contact["normal"]
+            overlap_area = wall_ghost_contact["overlap_area"]
+            center_distance = wall_ghost_contact["center_distance"]
+            distance_to_wall = wall_ghost_contact["distance_to_wall"]
+            distance_to_contact_plane = wall_ghost_contact["distance_to_contact_plane"]
+            wall_contact_offset = wall_ghost_contact["wall_contact_offset"]
+            wall_boundary = wall_ghost_contact["wall_boundary"]
+            wall_contact_plane = wall_ghost_contact["wall_contact_plane"]
             normal_velocity = source_particle["vx"] * nx + source_particle["vy"] * ny
             wall_key = (source_index, wall_flag)
             contact_state = self.base.wall_contact_state.get(wall_key, {})
@@ -1332,6 +1354,11 @@ class Demo:
                     f"zsrc={zero_source}",
                     f"area={overlap_area:.8f}",
                     f"center_distance={center_distance:.8f}",
+                    f"wall_boundary={wall_boundary:.8f}",
+                    f"wall_contact_offset={wall_contact_offset:.8f}",
+                    f"wall_contact_plane={wall_contact_plane:.8f}",
+                    f"distance_to_wall={distance_to_wall:.8f}",
+                    f"distance_to_contact_plane={distance_to_contact_plane:.8f}",
                     f"phase={phase}",
                 ]
             )
