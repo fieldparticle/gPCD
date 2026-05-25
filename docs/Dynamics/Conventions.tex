@@ -20,6 +20,26 @@ rules.
           execution model.
 \end{itemize}
 
+\subsection{Memory Ownership}
+
+\begin{itemize}[leftmargin=*]
+    \item Dynamics code should not depend on writable global memory shared by
+          all particles.
+    \item Global configuration values, such as wall locations and model
+          constants, may be shared only as read-only inputs.
+    \item A source particle may update only memory that it owns.
+    \item Per-particle memory may be updated only when there is an explicit
+          ownership rule for that field.
+    \item Source-owned contact state is allowed because each source particle
+          owns its own contact slots.
+    \item A contact update must not write a target particle's contact state,
+          velocity, internal momentum, or diagnostics.
+    \item Reductions, aggregate diagnostics, and UI totals may be computed
+          after the source-owned step, but they are not dynamics inputs.
+    \item Any proposed persistent reservoir or shared accumulator must be
+          rejected unless it has a GLSL-portable ownership rule.
+\end{itemize}
+
 \subsection{Contact Geometry}
 
 \begin{itemize}[leftmargin=*]
@@ -52,27 +72,38 @@ rules.
     \item Walls are detection objects.
     \item Once a wall contact is detected, the wall is represented as a ghost
           particle.
-    \item Wall contact dynamics should follow the same particle-particle
-          contact machinery used for real particle contacts.
-    \item The wall ghost is fixed and is not integrated as a moving particle.
-    \item The wall ghost may still carry diagnostic internal momentum and wall
-          reservoir momentum for accounting.
+    \item The ghost particle is instantaneous. It exists only for the current
+          contact evaluation and is rebuilt from the current source particle
+          state.
+    \item The ghost particle is not stored as a persistent particle and is not
+          integrated as a moving particle.
+    \item The ghost particle has the same radius and mass as the source
+          particle.
+    \item The ghost particle center is the mirror of the source particle center
+          across the wall contact plane.
+    \item For frictionless wall response, the ghost velocity mirrors only the
+          wall-normal component of the source velocity. The tangential ghost
+          velocity is zero unless a separate friction/deformation rule is
+          introduced.
+    \item After the instantaneous ghost has been constructed, wall contact
+          dynamics should use the same source-owned contact transfer operation
+          used for particle-particle contacts.
     \item Wall-specific reflection logic should not be used as a separate
           dynamics path after the ghost particle has been constructed.
+    \item A wall contact may change only the wall-normal component of the
+          source particle velocity. The tangential component must be preserved
+          from the current source velocity unless an explicit friction rule is
+          active.
     \item \textbf{wall\_boundary} is the actual physical wall plane.
     \item \textbf{wall\_contact\_offset} is an intentional offset from the
           physical wall plane.  A zero offset means the contact plane is the
           physical wall plane.
-    \item \textbf{wall\_ghost\_center} is computed from the wall boundary,
-          particle radius, and wall contact offset.  For the top wall:
+    \item \textbf{wall\_ghost\_center} is mirrored across the effective contact
+          plane.  For the top wall:
     \[
         y_{ghost}
         =
-        y_{wall}
-        +
-        r
-        -
-        wall\_contact\_offset .
+        2 y_{contact\ plane} - y_{source} .
     \]
     \item \textbf{distance\_to\_wall} is always measured to the physical wall
           plane.
@@ -159,9 +190,7 @@ rules.
         +
         \mathbf{p}_{particle\ side\ internal}
         +
-        \mathbf{p}_{wall\ ghost\ internal}
-        +
-        \mathbf{p}_{wall\ velocity\ reservoir}.
+        \mathbf{p}_{wall\ ghost\ internal}.
     \]
     \item Drift is:
     \[
@@ -173,20 +202,26 @@ rules.
     \]
     \item When no contacts are active, drift should return to zero, up to
           numerical error.
-    \item A nonzero drift during active contact may indicate missing reservoir
-          accounting, stale contact state, or an actual dynamics bug.
+    \item A nonzero drift during active contact may indicate stale contact
+          state, incorrect source weighting, tangent/normal contamination, or
+          an actual dynamics bug.
 \end{itemize}
 
-\subsection{Wall Momentum Reservoir}
+\subsection{Reservoirs}
 
 \begin{itemize}[leftmargin=*]
-    \item A wall is treated as immovable.
-    \item Because the wall does not receive velocity momentum, wall collisions
-          require a diagnostic velocity momentum reservoir for vector momentum
-          accounting.
-    \item The wall velocity reservoir is not a moving wall velocity.
-    \item The wall velocity reservoir records the momentum that would otherwise
-          appear as the wall-side velocity change in a two-moving-body contact.
+    \item Persistent wall velocity reservoirs are not part of the current
+          dynamics model.
+    \item A reservoir shared by multiple particles is writable global memory
+          and is not GLSL-portable without atomics or another explicit
+          ownership rule.
+    \item Wall ghost momentum is instantaneous contact state, not persistent
+          wall memory.
+    \item Wall-side internal/contact momentum may still be reported as a
+          diagnostic equal and opposite to the particle-side wall-contact
+          internal momentum.
+    \item Diagnostic reservoirs may be computed as post-step reductions, but
+          they must not feed back into the dynamics.
 \end{itemize}
 
 \subsection{Maximum Overlap}
@@ -226,11 +261,17 @@ rules.
 \begin{itemize}[leftmargin=*]
     \item The GLSL-portable path uses schedule-wise source-owned updates.
     \item Pair contacts produce per-contact source velocity predictions.
-    \item The current schedule combines multiple pair predictions by averaging
-          velocity deltas.
-    \item Wall contacts are then applied sequentially to the source velocity
-          accumulator.
-    \item Pair escape correction is applied after wall scheduling.
+    \item Multiple contacts for one source must be combined by an explicit
+          source-owned rule.
+    \item The current geometric direction is area-weighted source-owned contact
+          resolution, not unweighted averaging of independent full-contact
+          predictions.
+    \item A contact prediction should change only the component of velocity
+          owned by that contact normal. Tangential components should be carried
+          from the current source velocity unless a documented tangential rule
+          exists.
+    \item Pair escape correction must not apply a second, hidden dynamics rule
+          after source-owned contact resolution.
     \item The old cluster solver is retained only as a Python diagnostic
           comparator.
     \item Any rule that depends on writing both particles in a pair at once is

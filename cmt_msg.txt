@@ -1,0 +1,2 @@
+Now we have ParticleCornerHit.cfg (two corners at about the same time) working.
+TwoParticleStuckWall.cfg is not wortking it osscilates. That is the next fix.

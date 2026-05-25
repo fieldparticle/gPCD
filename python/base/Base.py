@@ -31,8 +31,8 @@ class Base:
         self.time = 0.0
         self.walls = None
         self.max_contacts_per_particle = 12
-        # Python wall-contact support. The current GLSL particle structure has
-        # bcs[4], but wall behavior is not treated as shader-ready yet.
+        # Wall contacts are represented as instantaneous source-local ghost
+        # particles so the resolver does not depend on persistent wall state.
         self.max_boundary_contacts_per_particle = 4
         self.zero_velocity_overlap_tolerance = 0.01
         self.neo_velocity_tolerance = 1.0e-12
@@ -40,14 +40,10 @@ class Base:
         self.collision_stiffness_q = 1.0
         self.momentum_per_area = 0.001
         self.inverse_square_softening = 1.0
-        self.wall_ghost_mass_multiplier = 1.0e12
         self.neo_prediction_mode = "schedule"
         self.sim_calc = SimCalc(self)
         self.report = Report()
         self.wall_contact_state = {}
-        self.wall_ghost_momentum_by_wall = {}
-        self.wall_ghost_momentum_x = 0.0
-        self.wall_ghost_momentum_y = 0.0
         self.skip_starting_overlap_resolution = False
 
     def configure_flow(self, config):
@@ -128,9 +124,6 @@ class Base:
         self.time = 0.0
         self.particles = []
         self.wall_contact_state = {}
-        self.wall_ghost_momentum_by_wall = {}
-        self.wall_ghost_momentum_x = 0.0
-        self.wall_ghost_momentum_y = 0.0
         self.report.clear()
         for config in self.particle_configs:
             particle = dict(config)
@@ -849,7 +842,6 @@ class Base:
             )
             if prediction is None:
                 continue
-            previous_velocity = final_velocity
             predicted_velocity = prediction["predicted_velocity"]
             final_velocity = predicted_velocity
             final_velocity = self.apply_locked_wall_contact_velocity(
@@ -857,45 +849,31 @@ class Base:
                 wall_flag,
                 final_velocity,
             )
-            source_delta_momentum_x = source_particle["mass"] * (
-                final_velocity[0] - previous_velocity[0]
-            )
-            source_delta_momentum_y = source_particle["mass"] * (
-                final_velocity[1] - previous_velocity[1]
-            )
-            self.add_wall_ghost_momentum(
-                wall_flag,
-                -source_delta_momentum_x,
-                -source_delta_momentum_y,
-            )
             has_wall = True
 
         return final_velocity, has_wall
 
     def wall_ghost_momentum(self, wall_flag):
-        return self.wall_ghost_momentum_by_wall.get(int(wall_flag), (0.0, 0.0))
+        return 0.0, 0.0
 
     def add_wall_ghost_momentum(self, wall_flag, delta_x, delta_y):
-        wall_flag = int(wall_flag)
-        current_x, current_y = self.wall_ghost_momentum(wall_flag)
-        self.wall_ghost_momentum_by_wall[wall_flag] = (
-            current_x + delta_x,
-            current_y + delta_y,
-        )
-        self.update_wall_ghost_momentum_total()
+        return
 
     def update_wall_ghost_momentum_total(self):
-        self.wall_ghost_momentum_x = sum(
-            momentum[0] for momentum in self.wall_ghost_momentum_by_wall.values()
-        )
-        self.wall_ghost_momentum_y = sum(
-            momentum[1] for momentum in self.wall_ghost_momentum_by_wall.values()
-        )
+        return
 
     def geo_wall_source_prediction(self, wall_key, current_velocity=None):
         particle_index, wall_flag = wall_key
         particle = self.particles[particle_index]
-        wall_contact = self.wall_ghost_contact(particle, wall_flag, self.walls)
+        if current_velocity is None:
+            current_velocity = (particle["vx"], particle["vy"])
+
+        wall_contact = self.wall_ghost_contact(
+            particle,
+            wall_flag,
+            self.walls,
+            source_velocity=current_velocity,
+        )
         if wall_contact is None:
             return None
 
@@ -903,12 +881,10 @@ class Base:
         overlap_area = wall_contact["overlap_area"]
         center_distance = wall_contact["center_distance"]
         ghost_particle = wall_contact["ghost_particle"]
-        if current_velocity is None:
-            current_velocity = (particle["vx"], particle["vy"])
 
         state = self.wall_contact_state.get(wall_key, {})
         contact = (nx, ny, overlap_area, center_distance)
-        return self.resolve_source_contact(
+        prediction = self.resolve_source_contact(
             particle,
             ghost_particle,
             contact,
@@ -918,6 +894,18 @@ class Base:
             source_velocity=current_velocity,
             target_velocity=(ghost_particle["vx"], ghost_particle["vy"]),
         )
+        if prediction is None:
+            return None
+
+        predicted_velocity = self.velocity_with_current_tangent_vector(
+            current_velocity,
+            prediction["predicted_velocity"],
+            (nx, ny),
+        )
+        return {
+            "start_velocity": current_velocity,
+            "predicted_velocity": predicted_velocity,
+        }
 
     def geo_apply_pair_lock_scheduler(self, source_index, velocity):
         adjusted_velocity = velocity
@@ -1333,12 +1321,6 @@ class Base:
                 target_particle = self.particles[target_index]
                 velocities[target_index][0] += impulse * nx / target_particle["mass"]
                 velocities[target_index][1] += impulse * ny / target_particle["mass"]
-            else:
-                self.add_wall_ghost_momentum(
-                    contact.get("wall_flag", 0),
-                    impulse * nx,
-                    impulse * ny,
-                )
 
         return {
             index: (velocity[0], velocity[1])
@@ -1859,7 +1841,7 @@ class Base:
             return 0.0
         return min(radius, offset)
 
-    def wall_ghost_contact(self, source_particle, wall_flag, walls):
+    def wall_ghost_contact(self, source_particle, wall_flag, walls, source_velocity=None):
         if walls is None:
             return None
 
@@ -1872,28 +1854,28 @@ class Base:
             contact_plane = walls["start_x"] + offset
             distance_to_contact_plane = x - contact_plane
             nx, ny = -1.0, 0.0
-            ghost_x, ghost_y = contact_plane - radius, y
+            ghost_x, ghost_y = 2.0 * contact_plane - x, y
             wall_boundary = walls["start_x"]
         elif wall_flag == 2:
             distance_to_wall = walls["end_x"] - x
             contact_plane = walls["end_x"] - offset
             distance_to_contact_plane = contact_plane - x
             nx, ny = 1.0, 0.0
-            ghost_x, ghost_y = contact_plane + radius, y
+            ghost_x, ghost_y = 2.0 * contact_plane - x, y
             wall_boundary = walls["end_x"]
         elif wall_flag == 3:
             distance_to_wall = y - walls["start_y"]
             contact_plane = walls["start_y"] + offset
             distance_to_contact_plane = y - contact_plane
             nx, ny = 0.0, -1.0
-            ghost_x, ghost_y = x, contact_plane - radius
+            ghost_x, ghost_y = x, 2.0 * contact_plane - y
             wall_boundary = walls["start_y"]
         elif wall_flag == 4:
             distance_to_wall = walls["end_y"] - y
             contact_plane = walls["end_y"] - offset
             distance_to_contact_plane = contact_plane - y
             nx, ny = 0.0, 1.0
-            ghost_x, ghost_y = x, contact_plane + radius
+            ghost_x, ghost_y = x, 2.0 * contact_plane - y
             wall_boundary = walls["end_y"]
         else:
             raise ValueError(f"Unknown wall flag: {wall_flag!r}")
@@ -1901,9 +1883,9 @@ class Base:
         if distance_to_contact_plane >= radius:
             return None
 
-        # The ghost is an equal-radius particle outside the domain, tangent to
-        # the wall line. Wall contact then uses ordinary particle-particle
-        # overlap geometry against that virtual particle.
+        # The wall ghost is an instantaneous mirror of the source particle
+        # across the contact plane. It has no persistent state; only the normal
+        # component of velocity is mirrored for frictionless wall response.
         center_distance = math.hypot(ghost_x - x, ghost_y - y)
         overlap_area = self.circle_overlap_area(radius, radius, center_distance)
         ghost_particle = self.wall_ghost_particle(
@@ -1912,6 +1894,7 @@ class Base:
             ghost_y,
             wall_flag,
             (nx, ny),
+            source_velocity=source_velocity,
         )
         return {
             "normal": (nx, ny),
@@ -1927,7 +1910,27 @@ class Base:
             "ghost_location": (ghost_x, ghost_y),
         }
 
-    def wall_ghost_particle(self, source_particle, ghost_x, ghost_y, wall_flag, normal):
+    @staticmethod
+    def instantaneous_wall_ghost_velocity(source_velocity, normal):
+        nx, ny = normal
+        source_vn = source_velocity[0] * nx + source_velocity[1] * ny
+        return -source_vn * nx, -source_vn * ny
+
+    def wall_ghost_particle(
+        self,
+        source_particle,
+        ghost_x,
+        ghost_y,
+        wall_flag,
+        normal,
+        source_velocity=None,
+    ):
+        if source_velocity is None:
+            source_velocity = (source_particle["vx"], source_particle["vy"])
+        ghost_vx, ghost_vy = self.instantaneous_wall_ghost_velocity(
+            source_velocity,
+            normal,
+        )
         return {
             "wall_flag": wall_flag,
             "wall_ghost": True,
@@ -1940,9 +1943,9 @@ class Base:
                 "y2": ghost_y,
                 "z2": source_particle.get("location", {}).get("z2", 0.0),
             },
-            "vx": 0.0,
-            "vy": 0.0,
-            "mass": max(source_particle["mass"], 1.0e-12) * self.wall_ghost_mass_multiplier,
+            "vx": ghost_vx,
+            "vy": ghost_vy,
+            "mass": max(source_particle["mass"], 1.0e-12),
             "source_mass": source_particle["mass"],
             "effective_mass": source_particle["mass"],
             "radius": source_particle["radius"],
@@ -2315,12 +2318,21 @@ class Base:
 
     @staticmethod
     def velocity_with_current_tangent(particle, predicted_velocity, normal):
+        current_velocity = (particle["vx"], particle["vy"])
+        return Base.velocity_with_current_tangent_vector(
+            current_velocity,
+            predicted_velocity,
+            normal,
+        )
+
+    @staticmethod
+    def velocity_with_current_tangent_vector(current_velocity, predicted_velocity, normal):
         nx, ny = normal
-        current_normal_velocity = particle["vx"] * nx + particle["vy"] * ny
+        current_normal_velocity = current_velocity[0] * nx + current_velocity[1] * ny
         predicted_normal_velocity = predicted_velocity[0] * nx + predicted_velocity[1] * ny
         current_tangent_velocity = (
-            particle["vx"] - current_normal_velocity * nx,
-            particle["vy"] - current_normal_velocity * ny,
+            current_velocity[0] - current_normal_velocity * nx,
+            current_velocity[1] - current_normal_velocity * ny,
         )
         return (
             current_tangent_velocity[0] + predicted_normal_velocity * nx,
@@ -2382,12 +2394,8 @@ class Base:
             "schema": "gpcd-contact-state-v1",
             "time": self.time,
             "wall_ghost_momentum": {
-                "x": self.wall_ghost_momentum_x,
-                "y": self.wall_ghost_momentum_y,
-            },
-            "wall_ghost_momentum_by_wall": {
-                str(wall_flag): {"x": momentum[0], "y": momentum[1]}
-                for wall_flag, momentum in sorted(self.wall_ghost_momentum_by_wall.items())
+                "x": 0.0,
+                "y": 0.0,
             },
             "particles": [
                 {
@@ -2451,18 +2459,6 @@ class Base:
                 self.restore_contact_snapshot_value(wall_record["state"])
             )
 
-        self.wall_ghost_momentum_by_wall = {}
-        for wall_flag, momentum in snapshot.get("wall_ghost_momentum_by_wall", {}).items():
-            self.wall_ghost_momentum_by_wall[int(wall_flag)] = (
-                float(momentum.get("x", 0.0)),
-                float(momentum.get("y", 0.0)),
-            )
-        wall_ghost_momentum = snapshot.get("wall_ghost_momentum", {})
-        if not self.wall_ghost_momentum_by_wall and wall_ghost_momentum:
-            self.wall_ghost_momentum_by_wall[0] = (
-                float(wall_ghost_momentum.get("x", 0.0)),
-                float(wall_ghost_momentum.get("y", 0.0)),
-            )
         self.update_wall_ghost_momentum_total()
         self.update_neo_internal_momentum_report()
 

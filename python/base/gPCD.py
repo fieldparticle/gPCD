@@ -703,13 +703,13 @@ class Demo:
         contact_internal_x = particle_side_internal_x + wall_internal_x
         contact_internal_y = particle_side_internal_y + wall_internal_y
         pair_scalar, wall_scalar, stored, released, remaining = self.contact_internal_scalar_totals()
-        wall_velocity_reservoir_x = getattr(self.base, "wall_ghost_momentum_x", 0.0)
-        wall_velocity_reservoir_y = getattr(self.base, "wall_ghost_momentum_y", 0.0)
+        wall_velocity_reservoir_x = 0.0
+        wall_velocity_reservoir_y = 0.0
 
         modeled_without_reservoir_x = current_x + contact_internal_x
         modeled_without_reservoir_y = current_y + contact_internal_y
-        modeled_x = modeled_without_reservoir_x + wall_velocity_reservoir_x
-        modeled_y = modeled_without_reservoir_y + wall_velocity_reservoir_y
+        modeled_x = modeled_without_reservoir_x
+        modeled_y = modeled_without_reservoir_y
         drift_x = self.start_total_momentum_x - modeled_x
         drift_y = self.start_total_momentum_y - modeled_y
         drift_without_reservoir_x = self.start_total_momentum_x - modeled_without_reservoir_x
@@ -793,19 +793,15 @@ class Demo:
         current_momentum_x, current_momentum_y = self.total_momentum_vector()
         particle_side_internal_x, particle_side_internal_y = self.particle_side_internal_momentum_vector()
         wall_internal_x, wall_internal_y = self.wall_internal_momentum_vector()
-        wall_velocity_reservoir_x = getattr(self.base, "wall_ghost_momentum_x", 0.0)
-        wall_velocity_reservoir_y = getattr(self.base, "wall_ghost_momentum_y", 0.0)
         modeled_with_wall_x = (
             current_momentum_x
             + particle_side_internal_x
             + wall_internal_x
-            + wall_velocity_reservoir_x
         )
         modeled_with_wall_y = (
             current_momentum_y
             + particle_side_internal_y
             + wall_internal_y
-            + wall_velocity_reservoir_y
         )
         drift_x = self.start_total_momentum_x - modeled_with_wall_x
         drift_y = self.start_total_momentum_y - modeled_with_wall_y
@@ -814,7 +810,6 @@ class Demo:
             self.momentum_row("particle_velocity", current_momentum_x, current_momentum_y),
             self.momentum_row("particle_side_int", particle_side_internal_x, particle_side_internal_y),
             self.momentum_row("wall_ghost_int", wall_internal_x, wall_internal_y),
-            self.momentum_row("wall_vel_reserv", wall_velocity_reservoir_x, wall_velocity_reservoir_y),
             self.momentum_row("modeled_total", modeled_with_wall_x, modeled_with_wall_y),
             self.momentum_row("drift", drift_x, drift_y),
         )
@@ -969,7 +964,6 @@ class Demo:
             normal_velocity = source_particle["vx"] * nx + source_particle["vy"] * ny
             wall_key = (source_index, wall_flag)
             contact_state = self.base.wall_contact_state.get(wall_key, {})
-            wall_reservoir_x, wall_reservoir_y = self.base.wall_ghost_momentum(wall_flag)
             overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
             neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
             neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
@@ -1321,10 +1315,15 @@ class Demo:
             wall_contact_offset = wall_ghost_contact["wall_contact_offset"]
             wall_boundary = wall_ghost_contact["wall_boundary"]
             wall_contact_plane = wall_ghost_contact["wall_contact_plane"]
+            ghost_particle = wall_ghost_contact["ghost_particle"]
             normal_velocity = source_particle["vx"] * nx + source_particle["vy"] * ny
+            ghost_normal_velocity = ghost_particle["vx"] * nx + ghost_particle["vy"] * ny
+            relative_normal_velocity = (
+                (ghost_particle["vx"] - source_particle["vx"]) * nx
+                + (ghost_particle["vy"] - source_particle["vy"]) * ny
+            )
             wall_key = (source_index, wall_flag)
             contact_state = self.base.wall_contact_state.get(wall_key, {})
-            wall_reservoir_x, wall_reservoir_y = self.base.wall_ghost_momentum(wall_flag)
             overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
             neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
             neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
@@ -1346,7 +1345,9 @@ class Demo:
                     f"[particle P{source_index} WallCollision]",
                     f"wall={self.wall_name(wall_flag)}",
                     f"vn={normal_velocity:.8f}",
-                    f"wall_reservoir=({wall_reservoir_x:.8f}, {wall_reservoir_y:.8f})",
+                    f"ghost_vn={ghost_normal_velocity:.8f}",
+                    f"rel_vn={relative_normal_velocity:.8f}",
+                    f"ghost_v=({ghost_particle['vx']:.8f}, {ghost_particle['vy']:.8f})",
                     f"p={source_particle['mass'] * abs(normal_velocity):.8f}",
                     f"omom={overlap_contact_momentum:.8f}",
                     f"istore={neo_stored_internal_momentum:.8f}",
