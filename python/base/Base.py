@@ -45,6 +45,7 @@ class Base:
         self.sim_calc = SimCalc(self)
         self.report = Report()
         self.wall_contact_state = {}
+        self.wall_ghost_momentum_by_wall = {}
         self.wall_ghost_momentum_x = 0.0
         self.wall_ghost_momentum_y = 0.0
         self.skip_starting_overlap_resolution = False
@@ -127,6 +128,7 @@ class Base:
         self.time = 0.0
         self.particles = []
         self.wall_contact_state = {}
+        self.wall_ghost_momentum_by_wall = {}
         self.wall_ghost_momentum_x = 0.0
         self.wall_ghost_momentum_y = 0.0
         self.report.clear()
@@ -861,11 +863,34 @@ class Base:
             source_delta_momentum_y = source_particle["mass"] * (
                 final_velocity[1] - previous_velocity[1]
             )
-            self.wall_ghost_momentum_x -= source_delta_momentum_x
-            self.wall_ghost_momentum_y -= source_delta_momentum_y
+            self.add_wall_ghost_momentum(
+                wall_flag,
+                -source_delta_momentum_x,
+                -source_delta_momentum_y,
+            )
             has_wall = True
 
         return final_velocity, has_wall
+
+    def wall_ghost_momentum(self, wall_flag):
+        return self.wall_ghost_momentum_by_wall.get(int(wall_flag), (0.0, 0.0))
+
+    def add_wall_ghost_momentum(self, wall_flag, delta_x, delta_y):
+        wall_flag = int(wall_flag)
+        current_x, current_y = self.wall_ghost_momentum(wall_flag)
+        self.wall_ghost_momentum_by_wall[wall_flag] = (
+            current_x + delta_x,
+            current_y + delta_y,
+        )
+        self.update_wall_ghost_momentum_total()
+
+    def update_wall_ghost_momentum_total(self):
+        self.wall_ghost_momentum_x = sum(
+            momentum[0] for momentum in self.wall_ghost_momentum_by_wall.values()
+        )
+        self.wall_ghost_momentum_y = sum(
+            momentum[1] for momentum in self.wall_ghost_momentum_by_wall.values()
+        )
 
     def geo_wall_source_prediction(self, wall_key, current_velocity=None):
         particle_index, wall_flag = wall_key
@@ -1280,6 +1305,7 @@ class Base:
                 {
                     "source_index": particle_index,
                     "target_index": None,
+                    "wall_flag": wall_flag,
                     "normal": (nx, ny),
                     "delta_relative_normal_velocity": (
                         desired_relative_normal_velocity - current_relative_normal_velocity
@@ -1308,8 +1334,11 @@ class Base:
                 velocities[target_index][0] += impulse * nx / target_particle["mass"]
                 velocities[target_index][1] += impulse * ny / target_particle["mass"]
             else:
-                self.wall_ghost_momentum_x += impulse * nx
-                self.wall_ghost_momentum_y += impulse * ny
+                self.add_wall_ghost_momentum(
+                    contact.get("wall_flag", 0),
+                    impulse * nx,
+                    impulse * ny,
+                )
 
         return {
             index: (velocity[0], velocity[1])
@@ -2356,6 +2385,10 @@ class Base:
                 "x": self.wall_ghost_momentum_x,
                 "y": self.wall_ghost_momentum_y,
             },
+            "wall_ghost_momentum_by_wall": {
+                str(wall_flag): {"x": momentum[0], "y": momentum[1]}
+                for wall_flag, momentum in sorted(self.wall_ghost_momentum_by_wall.items())
+            },
             "particles": [
                 {
                     "index": particle_index,
@@ -2418,9 +2451,19 @@ class Base:
                 self.restore_contact_snapshot_value(wall_record["state"])
             )
 
+        self.wall_ghost_momentum_by_wall = {}
+        for wall_flag, momentum in snapshot.get("wall_ghost_momentum_by_wall", {}).items():
+            self.wall_ghost_momentum_by_wall[int(wall_flag)] = (
+                float(momentum.get("x", 0.0)),
+                float(momentum.get("y", 0.0)),
+            )
         wall_ghost_momentum = snapshot.get("wall_ghost_momentum", {})
-        self.wall_ghost_momentum_x = float(wall_ghost_momentum.get("x", 0.0))
-        self.wall_ghost_momentum_y = float(wall_ghost_momentum.get("y", 0.0))
+        if not self.wall_ghost_momentum_by_wall and wall_ghost_momentum:
+            self.wall_ghost_momentum_by_wall[0] = (
+                float(wall_ghost_momentum.get("x", 0.0)),
+                float(wall_ghost_momentum.get("y", 0.0)),
+            )
+        self.update_wall_ghost_momentum_total()
         self.update_neo_internal_momentum_report()
 
     @classmethod

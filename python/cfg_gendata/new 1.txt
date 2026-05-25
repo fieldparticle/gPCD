@@ -1,5 +1,2 @@
-First remove or rename report leftovers, especially old_vcorr. 
-Then remove the dead Geo fallback/interpolation methods. 
-Last, delete the retired response module.
-
-I would not remove all overlap_momentum yet. It is still useful as a diagnostic/contact scalar, even though it no longer applies velocity.
+So wall ghosts are not using the same state machinery as real targets.
+They use a global wall reservoir

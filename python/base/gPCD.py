@@ -969,6 +969,7 @@ class Demo:
             normal_velocity = source_particle["vx"] * nx + source_particle["vy"] * ny
             wall_key = (source_index, wall_flag)
             contact_state = self.base.wall_contact_state.get(wall_key, {})
+            wall_reservoir_x, wall_reservoir_y = self.base.wall_ghost_momentum(wall_flag)
             overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
             neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
             neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
@@ -1323,6 +1324,7 @@ class Demo:
             normal_velocity = source_particle["vx"] * nx + source_particle["vy"] * ny
             wall_key = (source_index, wall_flag)
             contact_state = self.base.wall_contact_state.get(wall_key, {})
+            wall_reservoir_x, wall_reservoir_y = self.base.wall_ghost_momentum(wall_flag)
             overlap_contact_momentum = contact_state.get("overlap_contact_momentum", 0.0)
             neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
             neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
@@ -1344,6 +1346,7 @@ class Demo:
                     f"[particle P{source_index} WallCollision]",
                     f"wall={self.wall_name(wall_flag)}",
                     f"vn={normal_velocity:.8f}",
+                    f"wall_reservoir=({wall_reservoir_x:.8f}, {wall_reservoir_y:.8f})",
                     f"p={source_particle['mass'] * abs(normal_velocity):.8f}",
                     f"omom={overlap_contact_momentum:.8f}",
                     f"istore={neo_stored_internal_momentum:.8f}",
