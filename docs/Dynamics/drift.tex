@@ -1,178 +1,215 @@
 % !TeX root = GeoDynamics.tex
 \section{Drift calculations}
 
-Drift calculation is an accumulation of momentum changes during a simulation. The drift is:
+Drift reporting compares the current modeled particle momentum to the initial
+modeled particle momentum.  The UI reports only the compact particle-system
+accounting values.  Wall ghost closure is written to capture files as a
+diagnostic, but it is not shown as a UI momentum row.
 
+\subsection{UI Momentum Model}
 
-\begin{equation}
-\begin{aligned}
-\mathbf{p}_{CurrentTotalMomentum} = \mathbf{p}_{ParticleVelocityMomentum} \\ + \mathbf{p}_{ ParticleSideInternalMomentum} + \mathbf{p}_{WallGhostInternalMomentum} + \mathbf{p}_{WallVelocityMomentumReservoir}
-\end{aligned}
-\end{equation}
-
-Where velocity momentum, $\mathbf{p}_{ParticleVelocityMomentum} $, is the sum of all the particles translational momentum. Internal momentum, $\mathbf{p}_{ParticleSideInternalMomentum}$. Wall momentum \\ $\mathbf{p}_{ WallGhostInternalMomentum}$ is the value of the wall internal momentum. And \\ $\mathbf{p}_{WallVelocityMomentumReservoir}$ is the pseudo wall reaction velocity.
-
-The total starting momentum $\mathbf{p}_{InitialTotalMomentum}$, minus the current total momentum \\  $\mathbf{p}_{CurrentTotalMomentum}$ is drift $\mathbf{p}_{Drift}$.
-
-Reporting variable perform a running sum where as each particles momentum values are recorded by adding them to previous reporting values. This means for each particle, at a time step, the kinetic momentum is added to the global variable $\mathbf{p}_{ ParticleVelocity Momentum}$, and likewise for the other variables. They are independently assigned to reporting variables. At the end of the time step the filled reporting variables are used to calculate the drift.  
-
-Drift tells us how much the total system is varying from the current system and shows us the accumulation/system errors. The  accumulation/system errors become very important in large scale simulation of millions of particles.
-
-The model of wall internal momentum may not match the actual dynamics but it is viewed as follows: The wall/ghost internal momentum ,$\mathbf{p}_{WallGhostInternalMomentum}$ is equal and opposite to the particle-side,$\mathbf{p}_{ParticleSideInternalMomentum}$  wall-contact internal momentum. 
-
-The model of particle internal momentum may not match the actual dynamics but it is viewed as follows:Each particles internal momentum accumulates during compression and feeds back during rebound. During compression it is a vector opposite the velocity vector. In this way the internal momentum is fed back in the same direction as rebound. 
-
-Particle-particle collisions result in four offsetting vectors, two opposing velocity momentum vectors and two opposing internal momentum vectors. Particle-wall collisions differ mathematically since the wall does not move. There are then only three vectors - two internal momentum vectors and only one velocity momentum vector. This leaves an imbalance of one velocity momentum vector. To account for this we create a wall-side velocity momentum reservoir $\mathbf{p}_{WallVelocityMomentumReservoir}$.
-
-\subsection{Reporting Values}
-
-The UI reports the momentum accounting values as vector rows.  Each row shows
-the x component, the y component, and the vector magnitude:
+The UI current total momentum is:
 
 \begin{equation}
 \begin{aligned}
-\mathbf{p} = (p_x, p_y), \qquad |\mathbf{p}| = \sqrt{p_x^2+p_y^2}
+\mathbf{p}_{CurrentTotalMom}
+=
+\mathbf{p}_{KineticMom}
++
+\mathbf{p}_{TotalIntMom}.
 \end{aligned}
 \end{equation}
+
+The terms are:
+
+\begin{itemize}
+\item \(\mathbf{p}_{KineticMom}\): the vector sum of real-particle
+translational momentum.
+\item \(\mathbf{p}_{TotalIntMom}\): the vector sum of particle-particle
+internal momentum.
+\end{itemize}
+
+Wall particle-side internal momentum and wall ghost internal momentum are not
+included as separate UI rows.  For an instantaneous wall ghost, these two
+diagnostic vectors are equal and opposite during active wall contact:
+
+\begin{equation}
+\begin{aligned}
+\mathbf{p}_{WallParticleInt}
++
+\mathbf{p}_{WallGhostInt}
+=
+\mathbf{0}.
+\end{aligned}
+\end{equation}
+
+Therefore they do not change the UI current total momentum.
+
+\subsection{Momentum Drift}
+
+The UI momentum drift is:
+
+\begin{equation}
+\begin{aligned}
+\mathbf{p}_{MomDrift}
+=
+\mathbf{p}_{InitialTotalMom}
+-
+\mathbf{p}_{CurrentTotalMom}.
+\end{aligned}
+\end{equation}
+
+Equivalently:
+
+\begin{equation}
+\begin{aligned}
+\mathbf{p}_{MomDrift}
+=
+\mathbf{p}_{InitialTotalMom}
+-
+\left(
+\mathbf{p}_{KineticMom}
++
+\mathbf{p}_{TotalIntMom}
+\right).
+\end{aligned}
+\end{equation}
+
+For particle-particle-only interactions, \(\mathbf{p}_{MomDrift}\) should
+return to zero, up to numerical error, after all contacts have separated.  For
+wall contacts, nonzero \(\mathbf{p}_{MomDrift}\) means the real-particle
+momentum has changed relative to the initial real-particle momentum.  Capture
+diagnostics then show whether the instantaneous ghost-side wall accounting is
+equal and opposite during the wall contact.
+
+\subsection{UI Rows}
 
 The UI rows are:
 
 \begin{itemize}
-\item \textbf{start}: The initial total translational momentum of all active
-particles at the start of the run.  This is the reference value used for drift
-calculation.
+\item \textbf{initial\_total\_mom}: The initial total modeled momentum of all
+active real particles.
 
-\item \textbf{particle\_velocity}: The current translational momentum of all
-active particles.  For each particle,
+\item \textbf{kinetic\_mom}: The current translational momentum of all active
+real particles:
 \begin{equation}
 \begin{aligned}
-\mathbf{p}_{particle} = m\mathbf{v}
+\mathbf{p}_{particle} = m\mathbf{v}.
 \end{aligned}
 \end{equation}
-and the row is the vector sum over all active particles.
 
-\item \textbf{particle\_side\_int}: The particle-side internal momentum vector
-currently stored in active contacts.  For a particle-particle contact, this is
-reported on the particle side of the contact normal.  For a wall contact, this
-is the particle-side contact internal momentum, opposite the wall/ghost side.
-This value is a signed vector sum, not a scalar sum.
+\item \textbf{total\_int\_mom}: The current particle-particle internal
+momentum contribution.
 
-\item \textbf{wall\_ghost\_int}: The wall/ghost-side internal momentum vector
-for active wall contacts.  Under the current reporting convention, this is
-equal and opposite to the particle-side wall-contact internal momentum.  It is
-included so that wall contacts can be reported as if the wall contact has a
-ghost-side internal state.
-
-\item \textbf{wall\_vel\_reserv}: The wall velocity momentum reservoir.  This
-is the pseudo wall reaction velocity momentum used to account for momentum that
-would belong to the non-moving wall side of a wall collision.  It is zero when
-no wall velocity reservoir has been accumulated.
-
-\item \textbf{modeled\_total}: The current reported system momentum after
-adding all reported momentum components:
+\item \textbf{current\_total\_mom}: The current modeled particle-system
+momentum:
 \begin{equation}
 \begin{aligned}
-\mathbf{p}_{modeled}
+\mathbf{p}_{CurrentTotalMom}
 =
-\mathbf{p}_{particle\_velocity}
-+ \mathbf{p}_{particle\_side\_int}
-+ \mathbf{p}_{wall\_ghost\_int}
-+ \mathbf{p}_{wall\_vel\_reserv}
+\mathbf{p}_{KineticMom}
++
+\mathbf{p}_{TotalIntMom}.
 \end{aligned}
 \end{equation}
 
-\item \textbf{drift}: The difference between the starting total momentum and
-the modeled total momentum:
-\begin{equation}
-\begin{aligned}
-\mathbf{p}_{drift}
-=
-\mathbf{p}_{start}
--
-\mathbf{p}_{modeled}
-\end{aligned}
-\end{equation}
-When the accounting and dynamics are consistent for the selected model, this
-row should be zero after all contacts have separated and all internal momentum
-has returned to translational momentum.
+\item \textbf{mom\_drift}: The difference between
+\textbf{initial\_total\_mom} and \textbf{current\_total\_mom}.
 \end{itemize}
 
-The capture files write these same values in the \texttt{[momentum\_balance]}
-section.  They also write a more detailed \texttt{[momentum\_diagnostics]}
-section.  The diagnostic names are more explicit and include aliases used while
-debugging:
+\subsection{Capture Diagnostics}
+
+The capture files write the UI rows in the \texttt{[momentum\_balance]}
+section.  They also write detailed values in \texttt{[momentum\_diagnostics]}.
 
 \begin{itemize}
-\item \texttt{start\_px}, \texttt{start\_py}, and \texttt{start\_p}: component
-and magnitude form of the UI \textbf{start} row.
+\item \texttt{initial\_total\_mom\_*}: Component and magnitude form of the UI
+\textbf{initial\_total\_mom} row.
 
-\item \texttt{current\_px}, \texttt{current\_py}, and \texttt{current\_p}:
-component and magnitude form of the current particle translational momentum.
-These are equivalent to \texttt{particle\_velocity\_*}.
+\item \texttt{kinetic\_mom\_*}: Component and magnitude form of the UI
+\textbf{kinetic\_mom} row.
 
-\item \texttt{particle\_velocity\_px}, \texttt{particle\_velocity\_py}, and
-\texttt{particle\_velocity\_p}: component and magnitude form of the UI
-\textbf{particle\_velocity} row.
+\item \texttt{total\_int\_mom\_*}: Component and magnitude form of the UI
+\textbf{total\_int\_mom} row.
 
-\item \texttt{particle\_side\_internal\_px},
-\texttt{particle\_side\_internal\_py}, and
-\texttt{particle\_side\_internal\_p}: component and magnitude form of the UI
-\textbf{particle\_side\_int} row.
+\item \texttt{current\_total\_mom\_*}: Component and magnitude form of the UI
+\textbf{current\_total\_mom} row.
 
-\item \texttt{particle\_pair\_internal\_*} and \texttt{pair\_internal\_*}: the
-particle-particle portion of particle-side internal momentum.  These exclude
-wall contacts.
+\item \texttt{mom\_drift\_*}: Component and magnitude form of the UI
+\textbf{mom\_drift} row.
 
-\item \texttt{wall\_internal\_*} and \texttt{wall\_ghost\_internal\_*}: the
-wall/ghost-side internal momentum for active wall contacts.  These are aliases
-for the same reported vector.
+\item \texttt{particle\_side\_internal\_*}: The full particle-side internal
+momentum vector, including both particle-particle and wall-contact portions.
 
-\item \texttt{contact\_internal\_*}: the vector sum of particle-side internal
-momentum and wall/ghost internal momentum.  Because the current wall convention
-uses equal and opposite particle-side and wall/ghost-side internal vectors,
-wall-contact internal momentum can cancel inside this value.
+\item \texttt{particle\_pair\_internal\_*} and \texttt{pair\_internal\_*}: The
+particle-particle portion of particle-side internal momentum.
 
-\item \texttt{wall\_velocity\_reservoir\_*} and \texttt{wall\_ghost\_*}: the
-wall velocity momentum reservoir.  These are aliases for the same vector.
+\item \texttt{wall\_particle\_internal\_*}: The particle-side wall-contact
+internal momentum.
 
-\item \texttt{modeled\_total\_without\_reservoir\_*}: the current particle
-momentum plus contact internal momentum, before adding the wall velocity
-momentum reservoir.
+\item \texttt{wall\_internal\_*} and
+\texttt{wall\_ghost\_internal\_*}: The instantaneous wall/ghost-side internal
+momentum for active wall contacts.
 
-\item \texttt{modeled\_total\_*} and
-\texttt{modeled\_total\_with\_wall\_*}: the full modeled total used by the UI
-\textbf{modeled\_total} row.
+\item \texttt{contact\_internal\_*}: The vector sum of particle-side internal
+momentum and wall/ghost internal momentum.
 
-\item \texttt{drift\_modeled\_*} and \texttt{drift\_with\_wall\_ghost\_*}: the
-full drift vector used by the UI \textbf{drift} row.
+\item \texttt{modeled\_total\_*} and \texttt{modeled\_drift\_*}: Detailed
+diagnostic aliases that include wall particle-side and wall ghost internal
+terms.  These are capture diagnostics, not UI rows.
 
-\item \texttt{drift\_without\_reservoir\_*}: the drift that would be reported
-if the wall velocity momentum reservoir were omitted.
+\item \texttt{pair\_internal\_scalar}: Scalar sum of active particle-particle
+contact internal momentum magnitudes.  This is diagnostic only.
 
-\item \texttt{pair\_internal\_scalar}: scalar sum of active particle-particle
-contact internal momentum magnitudes.  This is a diagnostic scalar and is not
-used directly in the vector drift calculation.
-
-\item \texttt{wall\_internal\_scalar}: scalar sum of active wall-contact
-internal momentum magnitudes.  This is a diagnostic scalar and is not used
-directly in the vector drift calculation.
-
-\item \texttt{contact\_internal\_scalar}: scalar sum of pair and wall internal
-momentum magnitudes.  This is useful for seeing whether internal momentum is
-present too briefly to observe in the UI.
+\item \texttt{wall\_internal\_scalar}: Scalar sum of active wall-contact
+internal momentum magnitudes.  This is diagnostic only.
 
 \item \texttt{contact\_stored\_scalar},
 \texttt{contact\_released\_scalar}, and
-\texttt{contact\_remaining\_scalar}: scalar diagnostic totals for stored,
+\texttt{contact\_remaining\_scalar}: Scalar diagnostic totals for stored,
 released, and remaining internal contact momentum.
 
-\item \texttt{active\_pair\_contacts} and \texttt{active\_wall\_contacts}: the
+\item \texttt{active\_pair\_contacts} and \texttt{active\_wall\_contacts}: The
 number of active particle-particle and particle-wall contacts in the current
 frame.
 \end{itemize}
 
-The vector rows are the authoritative values for drift accounting.  The scalar
-rows are diagnostics only; they help show whether a contact is accumulating,
-returning, or clear, but they are not substituted into the drift vector
-equation.
+\subsection{Wall Contact Closure Diagnostics}
 
+Each active wall contact writes additional closure values in its
+\texttt{[particle Pn WallCollision]} capture block:
+
+\begin{itemize}
+\item \texttt{particle\_wall\_normal\_kinetic\_mom}: the source particle's
+normal kinetic momentum relative to the wall contact normal.
+
+\item \texttt{ghost\_wall\_normal\_kinetic\_mom}: the equal and opposite
+instantaneous ghost normal kinetic momentum.
+
+\item \texttt{wall\_particle\_int}: the particle-side wall internal momentum
+vector.
+
+\item \texttt{wall\_ghost\_int}: the equal and opposite ghost-side wall
+internal momentum vector.
+
+\item \texttt{wall\_closed\_total}: the sum of the four wall closure vectors.
+For a correctly constructed instantaneous ghost contact, this should be zero,
+up to numerical error:
+\begin{equation}
+\begin{aligned}
+\mathbf{p}_{ParticleWallNormalKinetic}
++
+\mathbf{p}_{GhostWallNormalKinetic}
++
+\mathbf{p}_{WallParticleInt}
++
+\mathbf{p}_{WallGhostInt}
+=
+\mathbf{0}.
+\end{aligned}
+\end{equation}
+\end{itemize}
+
+The wall closure diagnostics show that the instantaneous ghost is equal and
+opposite for the active contact.  They do not introduce a persistent wall
+reservoir and they do not change the dynamics.

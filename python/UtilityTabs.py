@@ -18,17 +18,16 @@ class UtilityTabs(QTabWidget):
         self.bobj.set_tab_object(self)
         ## Create the tabs
         self.tabFormGenData = TabGenData()        
-        self.tabFormRun = TabFormRun()        
+        #self.tabFormRun = TabFormRun()        
         self.tabFormReport = TabFormReport()
-        self.TabFormAnalysis = TabFormAnalysis()
+        
         self.addTab(self.tabFormGenData, 'Generate Data')
         self.addTab(self.tabFormReport, 'Reports')
-        self.addTab(self.tabFormRun, 'Run')
-        self.addTab(self.TabFormAnalysis, 'Analysis')
+        #self.addTab(self.tabFormRun, 'Run')
         
         
         self.tabFormReport.Create(self.bobj)
-        self.tabFormRun.Create(self.bobj)
+        #self.tabFormRun.Create(self.bobj)
         self.tabFormGenData.Create(self.bobj)
-        self.TabFormAnalysis.Create(self.bobj)
+        
       

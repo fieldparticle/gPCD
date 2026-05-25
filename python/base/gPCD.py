@@ -661,6 +661,11 @@ class Demo:
         wall_x, wall_y = self.wall_internal_momentum_vector()
         return pair_x + wall_x, pair_y + wall_y
 
+    def wall_particle_internal_momentum_vector(self):
+        particle_side_x, particle_side_y = self.particle_side_internal_momentum_vector()
+        pair_x, pair_y = self.particle_pair_internal_momentum_vector()
+        return particle_side_x - pair_x, particle_side_y - pair_y
+
     def contact_internal_scalar_totals(self):
         pair_internal = 0.0
         wall_internal = 0.0
@@ -699,32 +704,40 @@ class Demo:
         current_x, current_y = self.total_momentum_vector()
         particle_side_internal_x, particle_side_internal_y = self.particle_side_internal_momentum_vector()
         particle_pair_internal_x, particle_pair_internal_y = self.particle_pair_internal_momentum_vector()
+        wall_particle_internal_x, wall_particle_internal_y = self.wall_particle_internal_momentum_vector()
         wall_internal_x, wall_internal_y = self.wall_internal_momentum_vector()
         contact_internal_x = particle_side_internal_x + wall_internal_x
         contact_internal_y = particle_side_internal_y + wall_internal_y
         pair_scalar, wall_scalar, stored, released, remaining = self.contact_internal_scalar_totals()
-        wall_velocity_reservoir_x = 0.0
-        wall_velocity_reservoir_y = 0.0
 
-        modeled_without_reservoir_x = current_x + contact_internal_x
-        modeled_without_reservoir_y = current_y + contact_internal_y
-        modeled_x = modeled_without_reservoir_x
-        modeled_y = modeled_without_reservoir_y
-        drift_x = self.start_total_momentum_x - modeled_x
-        drift_y = self.start_total_momentum_y - modeled_y
-        drift_without_reservoir_x = self.start_total_momentum_x - modeled_without_reservoir_x
-        drift_without_reservoir_y = self.start_total_momentum_y - modeled_without_reservoir_y
+        particle_system_x = current_x + particle_pair_internal_x
+        particle_system_y = current_y + particle_pair_internal_y
+        modeled_x = current_x + contact_internal_x
+        modeled_y = current_y + contact_internal_y
+        particle_drift_x = self.start_total_momentum_x - particle_system_x
+        particle_drift_y = self.start_total_momentum_y - particle_system_y
+        modeled_drift_x = self.start_total_momentum_x - modeled_x
+        modeled_drift_y = self.start_total_momentum_y - modeled_y
 
         values = {
+            "initial_total_mom_px": self.start_total_momentum_x,
+            "initial_total_mom_py": self.start_total_momentum_y,
+            "initial_total_mom_p": math.hypot(self.start_total_momentum_x, self.start_total_momentum_y),
             "start_px": self.start_total_momentum_x,
             "start_py": self.start_total_momentum_y,
             "start_p": math.hypot(self.start_total_momentum_x, self.start_total_momentum_y),
+            "kinetic_mom_px": current_x,
+            "kinetic_mom_py": current_y,
+            "kinetic_mom_p": math.hypot(current_x, current_y),
             "current_px": current_x,
             "current_py": current_y,
             "current_p": math.hypot(current_x, current_y),
             "particle_velocity_px": current_x,
             "particle_velocity_py": current_y,
             "particle_velocity_p": math.hypot(current_x, current_y),
+            "total_int_mom_px": particle_pair_internal_x,
+            "total_int_mom_py": particle_pair_internal_y,
+            "total_int_mom_p": math.hypot(particle_pair_internal_x, particle_pair_internal_y),
             "particle_side_internal_px": particle_side_internal_x,
             "particle_side_internal_py": particle_side_internal_y,
             "particle_side_internal_p": math.hypot(particle_side_internal_x, particle_side_internal_y),
@@ -734,6 +747,9 @@ class Demo:
             "pair_internal_px": particle_pair_internal_x,
             "pair_internal_py": particle_pair_internal_y,
             "pair_internal_p": math.hypot(particle_pair_internal_x, particle_pair_internal_y),
+            "wall_particle_internal_px": wall_particle_internal_x,
+            "wall_particle_internal_py": wall_particle_internal_y,
+            "wall_particle_internal_p": math.hypot(wall_particle_internal_x, wall_particle_internal_y),
             "wall_internal_px": wall_internal_x,
             "wall_internal_py": wall_internal_y,
             "wall_internal_p": math.hypot(wall_internal_x, wall_internal_y),
@@ -743,36 +759,24 @@ class Demo:
             "contact_internal_px": contact_internal_x,
             "contact_internal_py": contact_internal_y,
             "contact_internal_p": math.hypot(contact_internal_x, contact_internal_y),
-            "modeled_total_without_reservoir_px": modeled_without_reservoir_x,
-            "modeled_total_without_reservoir_py": modeled_without_reservoir_y,
-            "modeled_total_without_reservoir_p": math.hypot(
-                modeled_without_reservoir_x,
-                modeled_without_reservoir_y,
-            ),
+            "particle_system_px": particle_system_x,
+            "particle_system_py": particle_system_y,
+            "particle_system_p": math.hypot(particle_system_x, particle_system_y),
+            "current_total_mom_px": particle_system_x,
+            "current_total_mom_py": particle_system_y,
+            "current_total_mom_p": math.hypot(particle_system_x, particle_system_y),
             "modeled_total_px": modeled_x,
             "modeled_total_py": modeled_y,
             "modeled_total_p": math.hypot(modeled_x, modeled_y),
-            "wall_velocity_reservoir_px": wall_velocity_reservoir_x,
-            "wall_velocity_reservoir_py": wall_velocity_reservoir_y,
-            "wall_velocity_reservoir_p": math.hypot(wall_velocity_reservoir_x, wall_velocity_reservoir_y),
-            "wall_ghost_px": wall_velocity_reservoir_x,
-            "wall_ghost_py": wall_velocity_reservoir_y,
-            "wall_ghost_p": math.hypot(wall_velocity_reservoir_x, wall_velocity_reservoir_y),
-            "modeled_total_with_wall_px": modeled_x,
-            "modeled_total_with_wall_py": modeled_y,
-            "modeled_total_with_wall_p": math.hypot(modeled_x, modeled_y),
-            "drift_modeled_px": drift_x,
-            "drift_modeled_py": drift_y,
-            "drift_modeled_p": math.hypot(drift_x, drift_y),
-            "drift_without_reservoir_px": drift_without_reservoir_x,
-            "drift_without_reservoir_py": drift_without_reservoir_y,
-            "drift_without_reservoir_p": math.hypot(
-                drift_without_reservoir_x,
-                drift_without_reservoir_y,
-            ),
-            "drift_with_wall_ghost_px": drift_x,
-            "drift_with_wall_ghost_py": drift_y,
-            "drift_with_wall_ghost_p": math.hypot(drift_x, drift_y),
+            "modeled_drift_px": modeled_drift_x,
+            "modeled_drift_py": modeled_drift_y,
+            "modeled_drift_p": math.hypot(modeled_drift_x, modeled_drift_y),
+            "mom_drift_px": particle_drift_x,
+            "mom_drift_py": particle_drift_y,
+            "mom_drift_p": math.hypot(particle_drift_x, particle_drift_y),
+            "particle_drift_px": particle_drift_x,
+            "particle_drift_py": particle_drift_y,
+            "particle_drift_p": math.hypot(particle_drift_x, particle_drift_y),
             "pair_internal_scalar": pair_scalar,
             "wall_internal_scalar": wall_scalar,
             "contact_internal_scalar": pair_scalar + wall_scalar,
@@ -791,27 +795,17 @@ class Demo:
 
     def momentum_balance_rows(self):
         current_momentum_x, current_momentum_y = self.total_momentum_vector()
-        particle_side_internal_x, particle_side_internal_y = self.particle_side_internal_momentum_vector()
-        wall_internal_x, wall_internal_y = self.wall_internal_momentum_vector()
-        modeled_with_wall_x = (
-            current_momentum_x
-            + particle_side_internal_x
-            + wall_internal_x
-        )
-        modeled_with_wall_y = (
-            current_momentum_y
-            + particle_side_internal_y
-            + wall_internal_y
-        )
-        drift_x = self.start_total_momentum_x - modeled_with_wall_x
-        drift_y = self.start_total_momentum_y - modeled_with_wall_y
+        particle_pair_internal_x, particle_pair_internal_y = self.particle_pair_internal_momentum_vector()
+        current_total_x = current_momentum_x + particle_pair_internal_x
+        current_total_y = current_momentum_y + particle_pair_internal_y
+        mom_drift_x = self.start_total_momentum_x - current_total_x
+        mom_drift_y = self.start_total_momentum_y - current_total_y
         return (
-            self.momentum_row("start", self.start_total_momentum_x, self.start_total_momentum_y),
-            self.momentum_row("particle_velocity", current_momentum_x, current_momentum_y),
-            self.momentum_row("particle_side_int", particle_side_internal_x, particle_side_internal_y),
-            self.momentum_row("wall_ghost_int", wall_internal_x, wall_internal_y),
-            self.momentum_row("modeled_total", modeled_with_wall_x, modeled_with_wall_y),
-            self.momentum_row("drift", drift_x, drift_y),
+            self.momentum_row("initial_total_mom", self.start_total_momentum_x, self.start_total_momentum_y),
+            self.momentum_row("kinetic_mom", current_momentum_x, current_momentum_y),
+            self.momentum_row("total_int_mom", particle_pair_internal_x, particle_pair_internal_y),
+            self.momentum_row("current_total_mom", current_total_x, current_total_y),
+            self.momentum_row("mom_drift", mom_drift_x, mom_drift_y),
         )
 
     def guardrail_errors(self):
@@ -968,6 +962,27 @@ class Demo:
             neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
             neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
             neo_remaining_internal_momentum = contact_state.get("neo_rebound_remaining_normal_momentum", 0.0)
+            canonical_internal_momentum = self.canonical_contact_internal_normal_momentum(contact_state)
+            particle_wall_normal_momentum_x = source_particle["mass"] * normal_velocity * nx
+            particle_wall_normal_momentum_y = source_particle["mass"] * normal_velocity * ny
+            ghost_wall_normal_momentum_x = -particle_wall_normal_momentum_x
+            ghost_wall_normal_momentum_y = -particle_wall_normal_momentum_y
+            wall_particle_internal_x = -canonical_internal_momentum * nx
+            wall_particle_internal_y = -canonical_internal_momentum * ny
+            wall_ghost_internal_x = canonical_internal_momentum * nx
+            wall_ghost_internal_y = canonical_internal_momentum * ny
+            wall_closed_total_x = (
+                particle_wall_normal_momentum_x
+                + ghost_wall_normal_momentum_x
+                + wall_particle_internal_x
+                + wall_ghost_internal_x
+            )
+            wall_closed_total_y = (
+                particle_wall_normal_momentum_y
+                + ghost_wall_normal_momentum_y
+                + wall_particle_internal_y
+                + wall_ghost_internal_y
+            )
             last_normal_velocity = contact_state.get("last_relative_normal_velocity", normal_velocity)
             zero_source = contact_state.get("geo_zero_velocity_source", "")
             motion_mode = contact_state.get("neo_motion_mode", "")
@@ -1328,6 +1343,27 @@ class Demo:
             neo_stored_internal_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
             neo_released_internal_momentum = contact_state.get("neo_rebound_released_normal_momentum", 0.0)
             neo_remaining_internal_momentum = contact_state.get("neo_rebound_remaining_normal_momentum", 0.0)
+            canonical_internal_momentum = self.canonical_contact_internal_normal_momentum(contact_state)
+            particle_wall_normal_momentum_x = source_particle["mass"] * normal_velocity * nx
+            particle_wall_normal_momentum_y = source_particle["mass"] * normal_velocity * ny
+            ghost_wall_normal_momentum_x = -particle_wall_normal_momentum_x
+            ghost_wall_normal_momentum_y = -particle_wall_normal_momentum_y
+            wall_particle_internal_x = -canonical_internal_momentum * nx
+            wall_particle_internal_y = -canonical_internal_momentum * ny
+            wall_ghost_internal_x = canonical_internal_momentum * nx
+            wall_ghost_internal_y = canonical_internal_momentum * ny
+            wall_closed_total_x = (
+                particle_wall_normal_momentum_x
+                + ghost_wall_normal_momentum_x
+                + wall_particle_internal_x
+                + wall_ghost_internal_x
+            )
+            wall_closed_total_y = (
+                particle_wall_normal_momentum_y
+                + ghost_wall_normal_momentum_y
+                + wall_particle_internal_y
+                + wall_ghost_internal_y
+            )
             last_normal_velocity = contact_state.get("last_relative_normal_velocity", normal_velocity)
             zero_source = contact_state.get("geo_zero_velocity_source", "")
             motion_mode = contact_state.get("neo_motion_mode", "")
@@ -1349,6 +1385,11 @@ class Demo:
                     f"rel_vn={relative_normal_velocity:.8f}",
                     f"ghost_v=({ghost_particle['vx']:.8f}, {ghost_particle['vy']:.8f})",
                     f"p={source_particle['mass'] * abs(normal_velocity):.8f}",
+                    f"particle_wall_normal_kinetic_mom=({particle_wall_normal_momentum_x:.8f}, {particle_wall_normal_momentum_y:.8f})",
+                    f"ghost_wall_normal_kinetic_mom=({ghost_wall_normal_momentum_x:.8f}, {ghost_wall_normal_momentum_y:.8f})",
+                    f"wall_particle_int=({wall_particle_internal_x:.8f}, {wall_particle_internal_y:.8f})",
+                    f"wall_ghost_int=({wall_ghost_internal_x:.8f}, {wall_ghost_internal_y:.8f})",
+                    f"wall_closed_total=({wall_closed_total_x:.8f}, {wall_closed_total_y:.8f})",
                     f"omom={overlap_contact_momentum:.8f}",
                     f"istore={neo_stored_internal_momentum:.8f}",
                     f"irel={neo_released_internal_momentum:.8f}",

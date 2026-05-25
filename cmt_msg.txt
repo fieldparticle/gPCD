@@ -1,3 +1,3 @@
-TwoParticleStuckWall.cfg now works since we made motion only work along the contact 
-normal for the particluar contact. After this check in we are going to analyze multi-particle
-collsions and fix any bugs.
+TwoParticleHorizontal.cfg frames 0 - 116 the diff is zero for particle collison 
+but is it small but signifigant for walls. Changed the drift accounting now are 
+working on getting the "equal and opposite" wall contact accounting correct.

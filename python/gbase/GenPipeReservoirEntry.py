@@ -181,26 +181,27 @@ class GenPipeReservoirEntry():
         reservoir_count = int(self.cfg_value(RUN_CONFIGURATION, "reservoir_particle_count", 32))
         radius = float(self.cfg_value(RUN_CONFIGURATION, "radius", 0.25))
         mass = float(self.cfg_value(RUN_CONFIGURATION, "particle_mass", 1.0))
-        reservoir_x = float(self.cfg_value(RUN_CONFIGURATION, "reservoir_x", RUN_CONFIGURATION.WallXMIN - 100.0))
-        reservoir_y = float(self.cfg_value(RUN_CONFIGURATION, "reservoir_y", RUN_CONFIGURATION.WallYMIN - 100.0))
-        reservoir_z = float(self.cfg_value(RUN_CONFIGURATION, "reservoir_z", RUN_CONFIGURATION.WallZMIN))
+        local_particles_in_row = self.itemcfg.num_particles_y
+        local_particles_in_col = self.itemcfg.num_particles_x
         try:
-            for _ii in range(reservoir_count):
-                particle_struct = pdata()
-                self.number_particles += 1
-                particle_struct.pnum = self.number_particles
-                particle_struct.rx = reservoir_x
-                particle_struct.ry = reservoir_y
-                particle_struct.rz = reservoir_z
-                particle_struct.vx = 0.0
-                particle_struct.vy = 0.0
-                particle_struct.vz = 0.0
-                particle_struct.ptype = 0
-                particle_struct.state_flg = 0
-                particle_struct.molar_mass = mass
-                particle_struct.radius = radius
+           for row in range(1,local_particles_in_row+1):
+                for col in range(1,local_particles_in_col+1):
+                    particle_struct = pdata()
+                    self.number_particles += 1
+                    particle_struct.pnum = self.number_particles
+                    particle_struct.rx = 1.5
+                    particle_struct.ry = row+0.5
+                    particle_struct.rz = 2.0
+                    particle_struct.vx = random.uniform(0.01, 0.02)
+                    particle_struct.vy = random.uniform(0.01, 0.02)
+                    particle_struct.vz = 0.0
+                    particle_struct.molar_mass = 1.0
+                    particle_struct.radius = 0.25
+                    particle_struct.state_flg = 1.0
+                    self.p_list.append(particle_struct)
+                    
                 
-                self.p_list.append(particle_struct)
+                
                     
         except BaseException as e:
             print(f"Failed adding Particle:{e} ")   
