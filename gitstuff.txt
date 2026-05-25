@@ -3,7 +3,7 @@ git commands
 cd c:/_DJ/gPCD
 git status
 git add 
-git commit -am -F cmt_msg.txt
+git commit -a -F cmt_msg.txt
 git push
 
 

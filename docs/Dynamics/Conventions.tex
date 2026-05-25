@@ -66,6 +66,26 @@ rules.
           clipping target.
 \end{itemize}
 
+\subsection{Contact-Normal Resolution}
+
+\begin{itemize}[leftmargin=*]
+    \item Contact dynamics are normal-owned.
+    \item A contact may change only the source velocity component along that
+          contact normal.
+    \item The source tangential velocity must be carried from the current
+          source velocity.
+    \item Stored first-contact velocity may be used to determine the contact's
+          normal compression and rebound history, but it must not restore a
+          stale tangential velocity component.
+    \item A contact may store full velocity vectors for diagnostics, but the
+          dynamics transfer operation must apply only the normal component.
+    \item This rule applies equally to particle-particle contacts and
+          particle-wall ghost contacts.
+    \item A tangential change is allowed only when a separate documented rule,
+          such as friction, bonding, or surface deformation, owns that
+          tangential component.
+\end{itemize}
+
 \subsection{Wall Contacts}
 
 \begin{itemize}[leftmargin=*]
@@ -90,10 +110,6 @@ rules.
           used for particle-particle contacts.
     \item Wall-specific reflection logic should not be used as a separate
           dynamics path after the ghost particle has been constructed.
-    \item A wall contact may change only the wall-normal component of the
-          source particle velocity. The tangential component must be preserved
-          from the current source velocity unless an explicit friction rule is
-          active.
     \item \textbf{wall\_boundary} is the actual physical wall plane.
     \item \textbf{wall\_contact\_offset} is an intentional offset from the
           physical wall plane.  A zero offset means the contact plane is the
@@ -266,10 +282,8 @@ rules.
     \item The current geometric direction is area-weighted source-owned contact
           resolution, not unweighted averaging of independent full-contact
           predictions.
-    \item A contact prediction should change only the component of velocity
-          owned by that contact normal. Tangential components should be carried
-          from the current source velocity unless a documented tangential rule
-          exists.
+    \item Per-contact predictions must be combined as normal-component
+          transfers. They must not be combined as full-vector velocity restores.
     \item Pair escape correction must not apply a second, hidden dynamics rule
           after source-owned contact resolution.
     \item The old cluster solver is retained only as a Python diagnostic

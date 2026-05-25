@@ -1,2 +1,3 @@
-Now we have ParticleCornerHit.cfg (two corners at about the same time) working.
-TwoParticleStuckWall.cfg is not wortking it osscilates. That is the next fix.
+TwoParticleStuckWall.cfg now works since we made motion only work along the contact 
+normal for the particluar contact. After this check in we are going to analyze multi-particle
+collsions and fix any bugs.

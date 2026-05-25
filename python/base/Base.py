@@ -769,12 +769,23 @@ class Base:
         contact_state["neo_rebound_released_normal_momentum"] = released_momentum
         contact_state["neo_rebound_remaining_normal_momentum"] = remaining_momentum
 
+        source_start_normal_velocity = (
+            source_start_velocity[0] * nx + source_start_velocity[1] * ny
+        )
+        predicted_normal_velocity = (
+            source_start_normal_velocity - source_contact_momentum / source_particle["mass"]
+        )
+        current_normal_velocity = source_velocity[0] * nx + source_velocity[1] * ny
+        current_tangent_velocity = (
+            source_velocity[0] - current_normal_velocity * nx,
+            source_velocity[1] - current_normal_velocity * ny,
+        )
         predicted_velocity = (
-            source_start_velocity[0] - (source_contact_momentum / source_particle["mass"]) * nx,
-            source_start_velocity[1] - (source_contact_momentum / source_particle["mass"]) * ny,
+            current_tangent_velocity[0] + predicted_normal_velocity * nx,
+            current_tangent_velocity[1] + predicted_normal_velocity * ny,
         )
         return {
-            "start_velocity": source_start_velocity,
+            "start_velocity": source_velocity,
             "predicted_velocity": predicted_velocity,
         }
 
