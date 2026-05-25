@@ -16,7 +16,9 @@ The UI current total momentum is:
 =
 \mathbf{p}_{KineticMom}
 +
-\mathbf{p}_{TotalIntMom}.
+\mathbf{p}_{TotalIntMom}
++
+\mathbf{p}_{WallGhostMomLedger}.
 \end{aligned}
 \end{equation}
 
@@ -27,6 +29,9 @@ The terms are:
 translational momentum.
 \item \(\mathbf{p}_{TotalIntMom}\): the vector sum of particle-particle
 internal momentum.
+\item \(\mathbf{p}_{WallGhostMomLedger}\): source-owned wall ghost momentum
+recorded when an instantaneous wall contact exits.  This is not a global wall
+reservoir and it is not used as a dynamics input.
 \end{itemize}
 
 Wall particle-side internal momentum and wall ghost internal momentum are not
@@ -71,6 +76,8 @@ Equivalently:
 \mathbf{p}_{KineticMom}
 +
 \mathbf{p}_{TotalIntMom}
++
+\mathbf{p}_{WallGhostMomLedger}
 \right).
 \end{aligned}
 \end{equation}
@@ -109,9 +116,13 @@ momentum:
 =
 \mathbf{p}_{KineticMom}
 +
-\mathbf{p}_{TotalIntMom}.
+\mathbf{p}_{TotalIntMom}
++
+\mathbf{p}_{WallGhostMomLedger}.
 \end{aligned}
 \end{equation}
+The wall ghost ledger is included in this row, but is reported as a detailed
+capture diagnostic rather than as a separate compact UI row.
 
 \item \textbf{mom\_drift}: The difference between
 \textbf{initial\_total\_mom} and \textbf{current\_total\_mom}.
@@ -150,6 +161,9 @@ internal momentum.
 \item \texttt{wall\_internal\_*} and
 \texttt{wall\_ghost\_internal\_*}: The instantaneous wall/ghost-side internal
 momentum for active wall contacts.
+
+\item \texttt{wall\_ghost\_mom\_*}: The source-owned wall ghost momentum
+ledger accumulated on wall-contact exit.
 
 \item \texttt{contact\_internal\_*}: The vector sum of particle-side internal
 momentum and wall/ghost internal momentum.

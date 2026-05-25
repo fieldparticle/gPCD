@@ -1,3 +1,2 @@
-TwoParticleHorizontal.cfg frames 0 - 116 the diff is zero for particle collison 
-but is it small but signifigant for walls. Changed the drift accounting now are 
-working on getting the "equal and opposite" wall contact accounting correct.
+Accounting is correct for two particle horizontal woith wall collsions. But there is a problem with 
+three paricles

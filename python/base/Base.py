@@ -139,6 +139,8 @@ class Base:
                 particle["bcs"] = [dict(contact) for contact in particle["bcs"]]
             particle["gcs"] = self.empty_geo_contact_states()
             particle["state_flg"] = int(particle.get("state_flg", self.STATE_ACTIVE))
+            particle["wall_ghost_momentum_x"] = float(particle.get("wall_ghost_momentum_x", 0.0))
+            particle["wall_ghost_momentum_y"] = float(particle.get("wall_ghost_momentum_y", 0.0))
             self.particles.append(particle)
         self.detect_contacts()
         self.update_contact_state()
@@ -872,6 +874,12 @@ class Base:
 
     def update_wall_ghost_momentum_total(self):
         return
+
+    @staticmethod
+    def normal_momentum_vector(mass, velocity, normal):
+        nx, ny = normal
+        normal_velocity = velocity[0] * nx + velocity[1] * ny
+        return mass * normal_velocity * nx, mass * normal_velocity * ny
 
     def geo_wall_source_prediction(self, wall_key, current_velocity=None):
         particle_index, wall_flag = wall_key
@@ -2323,9 +2331,42 @@ class Base:
         self.finalize_exited_geo_wall_contacts(particle_index, [(wall_key, state)])
 
     def finalize_exited_geo_wall_contacts(self, particle_index, wall_contacts):
-        # Wall exits should not apply a second, wall-specific rebound. The
-        # active wall contact is already resolved as a particle-vs-ghost pair.
-        return
+        # Wall exits do not apply a second, wall-specific rebound. They only
+        # close the instantaneous ghost accounting by moving the ghost-side
+        # normal kinetic balance into source-owned particle memory.
+        if particle_index < 0 or particle_index >= len(self.particles):
+            return
+
+        particle = self.particles[particle_index]
+        current_velocity = (particle["vx"], particle["vy"])
+        mass = particle["mass"]
+        ledger_x = particle.get("wall_ghost_momentum_x", 0.0)
+        ledger_y = particle.get("wall_ghost_momentum_y", 0.0)
+
+        for _wall_key, state in wall_contacts:
+            normal = state.get("first_contact_normal")
+            if normal is None:
+                continue
+
+            first_velocity = state.get("first_contact_velocity", current_velocity)
+            first_px, first_py = self.normal_momentum_vector(
+                mass,
+                first_velocity,
+                normal,
+            )
+            current_px, current_py = self.normal_momentum_vector(
+                mass,
+                current_velocity,
+                normal,
+            )
+
+            particle_delta_x = current_px - first_px
+            particle_delta_y = current_py - first_py
+            ledger_x -= particle_delta_x
+            ledger_y -= particle_delta_y
+
+        particle["wall_ghost_momentum_x"] = ledger_x
+        particle["wall_ghost_momentum_y"] = ledger_y
 
     @staticmethod
     def velocity_with_current_tangent(particle, predicted_velocity, normal):
@@ -2401,16 +2442,30 @@ class Base:
         return None
 
     def contact_state_snapshot(self):
+        wall_ghost_momentum_x = sum(
+            particle.get("wall_ghost_momentum_x", 0.0)
+            for particle in self.particles
+            if self.is_active_particle(particle)
+        )
+        wall_ghost_momentum_y = sum(
+            particle.get("wall_ghost_momentum_y", 0.0)
+            for particle in self.particles
+            if self.is_active_particle(particle)
+        )
         return {
             "schema": "gpcd-contact-state-v1",
             "time": self.time,
             "wall_ghost_momentum": {
-                "x": 0.0,
-                "y": 0.0,
+                "x": wall_ghost_momentum_x,
+                "y": wall_ghost_momentum_y,
             },
             "particles": [
                 {
                     "index": particle_index,
+                    "wall_ghost_momentum": {
+                        "x": particle.get("wall_ghost_momentum_x", 0.0),
+                        "y": particle.get("wall_ghost_momentum_y", 0.0),
+                    },
                     "gcs": [
                         self.contact_snapshot_value(state)
                         for state in particle.get("gcs", [])
@@ -2418,7 +2473,11 @@ class Base:
                     ],
                 }
                 for particle_index, particle in enumerate(self.particles)
-                if any(state.get("active", False) for state in particle.get("gcs", []))
+                if (
+                    any(state.get("active", False) for state in particle.get("gcs", []))
+                    or abs(particle.get("wall_ghost_momentum_x", 0.0)) > 1.0e-15
+                    or abs(particle.get("wall_ghost_momentum_y", 0.0)) > 1.0e-15
+                )
             ],
             "wall_contact_state": [
                 {
@@ -2445,6 +2504,9 @@ class Base:
             if particle_index < 0 or particle_index >= len(self.particles):
                 continue
             particle = self.particles[particle_index]
+            wall_ghost_momentum = particle_record.get("wall_ghost_momentum", {})
+            particle["wall_ghost_momentum_x"] = float(wall_ghost_momentum.get("x", 0.0))
+            particle["wall_ghost_momentum_y"] = float(wall_ghost_momentum.get("y", 0.0))
             for state_record in particle_record.get("gcs", []):
                 state_data = self.restore_contact_snapshot_value(state_record)
                 target_index = state_data.get("target_index")

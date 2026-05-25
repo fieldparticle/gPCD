@@ -555,6 +555,16 @@ class Demo:
             momentum_y += particle["mass"] * particle["vy"]
         return momentum_x, momentum_y
 
+    def wall_ghost_momentum_vector(self):
+        momentum_x = 0.0
+        momentum_y = 0.0
+        for particle in self.base.particles:
+            if not self.base.is_active_particle(particle):
+                continue
+            momentum_x += particle.get("wall_ghost_momentum_x", 0.0)
+            momentum_y += particle.get("wall_ghost_momentum_y", 0.0)
+        return momentum_x, momentum_y
+
     def total_internal_momentum_vector(self):
         return self.particle_side_internal_momentum_vector()
 
@@ -702,6 +712,7 @@ class Demo:
 
     def momentum_diagnostic_values(self):
         current_x, current_y = self.total_momentum_vector()
+        wall_ghost_momentum_x, wall_ghost_momentum_y = self.wall_ghost_momentum_vector()
         particle_side_internal_x, particle_side_internal_y = self.particle_side_internal_momentum_vector()
         particle_pair_internal_x, particle_pair_internal_y = self.particle_pair_internal_momentum_vector()
         wall_particle_internal_x, wall_particle_internal_y = self.wall_particle_internal_momentum_vector()
@@ -712,10 +723,12 @@ class Demo:
 
         particle_system_x = current_x + particle_pair_internal_x
         particle_system_y = current_y + particle_pair_internal_y
-        modeled_x = current_x + contact_internal_x
-        modeled_y = current_y + contact_internal_y
-        particle_drift_x = self.start_total_momentum_x - particle_system_x
-        particle_drift_y = self.start_total_momentum_y - particle_system_y
+        current_total_x = particle_system_x + wall_ghost_momentum_x
+        current_total_y = particle_system_y + wall_ghost_momentum_y
+        modeled_x = current_total_x + contact_internal_x - particle_pair_internal_x
+        modeled_y = current_total_y + contact_internal_y - particle_pair_internal_y
+        particle_drift_x = self.start_total_momentum_x - current_total_x
+        particle_drift_y = self.start_total_momentum_y - current_total_y
         modeled_drift_x = self.start_total_momentum_x - modeled_x
         modeled_drift_y = self.start_total_momentum_y - modeled_y
 
@@ -756,15 +769,18 @@ class Demo:
             "wall_ghost_internal_px": wall_internal_x,
             "wall_ghost_internal_py": wall_internal_y,
             "wall_ghost_internal_p": math.hypot(wall_internal_x, wall_internal_y),
+            "wall_ghost_mom_px": wall_ghost_momentum_x,
+            "wall_ghost_mom_py": wall_ghost_momentum_y,
+            "wall_ghost_mom_p": math.hypot(wall_ghost_momentum_x, wall_ghost_momentum_y),
             "contact_internal_px": contact_internal_x,
             "contact_internal_py": contact_internal_y,
             "contact_internal_p": math.hypot(contact_internal_x, contact_internal_y),
             "particle_system_px": particle_system_x,
             "particle_system_py": particle_system_y,
             "particle_system_p": math.hypot(particle_system_x, particle_system_y),
-            "current_total_mom_px": particle_system_x,
-            "current_total_mom_py": particle_system_y,
-            "current_total_mom_p": math.hypot(particle_system_x, particle_system_y),
+            "current_total_mom_px": current_total_x,
+            "current_total_mom_py": current_total_y,
+            "current_total_mom_p": math.hypot(current_total_x, current_total_y),
             "modeled_total_px": modeled_x,
             "modeled_total_py": modeled_y,
             "modeled_total_p": math.hypot(modeled_x, modeled_y),
@@ -796,8 +812,9 @@ class Demo:
     def momentum_balance_rows(self):
         current_momentum_x, current_momentum_y = self.total_momentum_vector()
         particle_pair_internal_x, particle_pair_internal_y = self.particle_pair_internal_momentum_vector()
-        current_total_x = current_momentum_x + particle_pair_internal_x
-        current_total_y = current_momentum_y + particle_pair_internal_y
+        wall_ghost_momentum_x, wall_ghost_momentum_y = self.wall_ghost_momentum_vector()
+        current_total_x = current_momentum_x + particle_pair_internal_x + wall_ghost_momentum_x
+        current_total_y = current_momentum_y + particle_pair_internal_y + wall_ghost_momentum_y
         mom_drift_x = self.start_total_momentum_x - current_total_x
         mom_drift_y = self.start_total_momentum_y - current_total_y
         return (

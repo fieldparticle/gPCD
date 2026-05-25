@@ -32,6 +32,9 @@ rules.
           ownership rule for that field.
     \item Source-owned contact state is allowed because each source particle
           owns its own contact slots.
+    \item Source-owned wall ghost momentum ledger state is allowed because it
+          belongs to one real particle, is updated only by that particle's wall
+          contact exit, and is not shared wall memory.
     \item A contact update must not write a target particle's contact state,
           velocity, internal momentum, or diagnostics.
     \item Reductions, aggregate diagnostics, and UI totals may be computed
@@ -233,6 +236,9 @@ rules.
           ownership rule.
     \item Wall ghost momentum is instantaneous contact state, not persistent
           wall memory.
+    \item A wall ghost momentum ledger may persist on the source particle for
+          accounting after a wall contact exits.  It is not a global wall
+          reservoir and it must not feed back into dynamics.
     \item Wall-side internal/contact momentum may still be reported as a
           diagnostic equal and opposite to the particle-side wall-contact
           internal momentum.
