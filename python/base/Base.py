@@ -535,8 +535,8 @@ class Base:
     def geo_build_pair_candidate(self, source_index):
         source_particle = self.particles[source_index]
         base_velocity = (source_particle["vx"], source_particle["vy"])
-        accumulated_delta_x = 0.0
-        accumulated_delta_y = 0.0
+        accumulated_momentum_x = 0.0
+        accumulated_momentum_y = 0.0
         has_pair = False
         source_contacts = self.source_pair_contact_entries(source_index)
         source_context = self.source_contact_context(source_contacts)
@@ -546,13 +546,7 @@ class Base:
             target_particle = entry["target_particle"]
             contact = entry["contact"]
             contact_state = entry["contact_state"]
-            first_contact_velocities = contact_state.get("first_contact_velocities", {})
-            start_velocity = first_contact_velocities.get(
-                source_index,
-                (source_particle["vx"], source_particle["vy"]),
-            )
-
-            prediction = self.resolve_source_contact(
+            contribution = self.resolve_source_contact_momentum(
                 source_particle,
                 target_particle,
                 contact,
@@ -564,23 +558,25 @@ class Base:
                     self.source_pair_contact_entries(target_index)
                 ),
             )
-            if prediction is None:
+            if contribution is None:
                 continue
 
-            start_velocity = prediction["start_velocity"]
-            predicted_velocity = prediction["predicted_velocity"]
             if not has_pair:
-                base_velocity = start_velocity
+                base_velocity = contribution["base_velocity"]
                 has_pair = True
-            accumulated_delta_x += predicted_velocity[0] - start_velocity[0]
-            accumulated_delta_y += predicted_velocity[1] - start_velocity[1]
+            accumulated_momentum_x += contribution["contact_momentum_vector"][0]
+            accumulated_momentum_y += contribution["contact_momentum_vector"][1]
 
         if not has_pair:
             return base_velocity, False
 
+        source_mass = source_particle["mass"]
+        if source_mass <= 0.0:
+            return base_velocity, True
+
         return (
-            base_velocity[0] + accumulated_delta_x,
-            base_velocity[1] + accumulated_delta_y,
+            base_velocity[0] + accumulated_momentum_x / source_mass,
+            base_velocity[1] + accumulated_momentum_y / source_mass,
         ), True
 
     def source_pair_contact_entries(self, source_index):
@@ -816,6 +812,56 @@ class Base:
         return {
             "start_velocity": source_velocity,
             "predicted_velocity": predicted_velocity,
+        }
+
+    def resolve_source_contact_momentum(
+        self,
+        source_particle,
+        target_particle,
+        contact_geometry,
+        contact_state,
+        source_index=None,
+        target_index=None,
+        source_context=None,
+        target_context=None,
+    ):
+        first_contact_velocities = contact_state.get("first_contact_velocities", {})
+        base_velocity = first_contact_velocities.get(
+            source_index,
+            (source_particle["vx"], source_particle["vy"]),
+        )
+
+        prediction = self.resolve_source_contact(
+            source_particle,
+            target_particle,
+            contact_geometry,
+            contact_state,
+            source_index,
+            target_index,
+            source_context=source_context,
+            target_context=target_context,
+        )
+        if prediction is None:
+            return None
+
+        nx, ny, _overlap_area, _center_distance = contact_geometry
+        predicted_velocity = prediction["predicted_velocity"]
+        if contact_state.get("internal_momentum_phase") == "returning":
+            contact_momentum = (
+                contact_state.get("neo_zero_internal_normal_momentum", 0.0)
+                + contact_state.get("neo_rebound_released_normal_momentum", 0.0)
+            )
+        else:
+            contact_momentum = contact_state.get("neo_stored_internal_normal_momentum", 0.0)
+        contact_momentum_x = -contact_momentum * nx
+        contact_momentum_y = -contact_momentum * ny
+
+        contact_state["source_delta_momentum_x"] = contact_momentum_x
+        contact_state["source_delta_momentum_y"] = contact_momentum_y
+        return {
+            "base_velocity": base_velocity,
+            "predicted_velocity": predicted_velocity,
+            "contact_momentum_vector": (contact_momentum_x, contact_momentum_y),
         }
 
     @staticmethod

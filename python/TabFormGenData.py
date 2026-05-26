@@ -47,6 +47,7 @@ class TabGenData(QTabWidget):
     current_test_file = 0
     particle_data = None
     terminal = None
+    batch_mode = False
     #******************************************************************
     # Init
     #
@@ -76,11 +77,18 @@ class TabGenData(QTabWidget):
     # Configuration file stuff
     # 
     ##############################################################################
-
+    def do_batch(self):
+        for ii in self.itemcfg.batch_items:
+            print(f"Batch item:{ii}")
+            self.CfgFile=f"{self.itemcfg.data_dir}/{ii[0]}"
+            if run_analysis(self.CfgFile, batch_mode=True, end_frame=ii[1]) == True:
+                break
+        self.batch_mode = False
     #******************************************************************
     # Load the configuration data
     #
     def load_item_cfg(self,file):
+        self.batch_mode = False
         self.setFocus()
         self.CfgFile = file
         self.texFolder = os.path.dirname(self.CfgFile)
@@ -97,6 +105,9 @@ class TabGenData(QTabWidget):
             self.log.log(self,f"Unable to open item configurations file:{e}")
             self.hasConfig = False
             return 
+        if self.itemcfg.type == "batch":
+            self.batch_mode = True
+            return
         try:
             notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
             subprocess.Popen([notepad_plus_plus_path, self.CfgFile])
@@ -137,9 +148,11 @@ class TabGenData(QTabWidget):
             self.load_item_cfg(folder[0])
  
     def run_analysis(self):
-        self.refresh()
-        run_analysis(self.CfgFile)
-        
+        if self.batch_mode==True:
+            self.do_batch()
+        else:
+            return run_analysis(self.CfgFile)
+
     #******************************************************************
     # Generate the data
     #
@@ -479,4 +492,5 @@ class TabGenData(QTabWidget):
         Text = selected_items[0].text() if selected_items else ""   
         self.dirEdit.setText(Text)
         self.refresh_dir(Text)   
+        self.load_item_cfg(Text)
     

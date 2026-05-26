@@ -174,18 +174,26 @@ def browseFolder():
     DEFAULT_CFG_FILE = file_path
     print(f"Selected configuration file: {DEFAULT_CFG_FILE}")
 
-def run_analysis(cfg_file):
+def run_analysis(cfg_file, batch_mode=False, end_frame=None):
     config = load_runner_config(cfg_file)
+    
     run_configuration = build_run_configuration(config)
+    
+    run_configuration["config_file"] = str(cfg_file)
+    
     particle_data = build_particle_data(config)
+    if batch_mode:
+       run_configuration["end_frame"] = end_frame
     demo = Demo()
-    demo.run(particle_data, run_configuration)
+    stp = demo.run(particle_data, run_configuration)
+    return stp
 
 def main():
     browseFolder()
     args = parse_args()
     config = load_runner_config(args.cfg_file)
     run_configuration = build_run_configuration(config)
+    run_configuration["config_file"] = str(args.cfg_file)
     particle_data = build_particle_data(config)
 
     demo = Demo()

@@ -1,2 +1,0 @@
-So wall ghosts are not using the same state machinery as real targets.
-They use a global wall reservoir

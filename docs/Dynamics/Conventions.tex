@@ -200,24 +200,29 @@ rules.
 \subsection{Momentum Accounting}
 
 \begin{itemize}[leftmargin=*]
-    \item Drift is a diagnostic, not a dynamics input.
-    \item Current modeled total momentum is:
+    \item Momentum accounting is not dynamics.
+    \item Drift, current total momentum, modeled total momentum, and UI
+          momentum rows must not feed back into contact resolution.
+    \item Current accounted total momentum is:
     \[
-        \mathbf{p}_{current}
+        \mathbf{p}_{accounted}
         =
-        \mathbf{p}_{particle\ velocity}
+        \mathbf{p}_{kinetic}
         +
-        \mathbf{p}_{particle\ side\ internal}
+        \mathbf{p}_{particle\ pair\ internal}
         +
-        \mathbf{p}_{wall\ ghost\ internal}.
+        \mathbf{p}_{wall\ mom}.
     \]
+    \item \(\mathbf{p}_{wall\ mom}\) is an accounting-only term.  It may
+          include active wall ghost balance and a source-owned exited-wall
+          ledger, but it is not a wall dynamics reservoir.
     \item Drift is:
     \[
         \mathbf{p}_{drift}
         =
         \mathbf{p}_{initial}
         -
-        \mathbf{p}_{current}.
+        \mathbf{p}_{accounted}.
     \]
     \item When no contacts are active, drift should return to zero, up to
           numerical error.
@@ -323,16 +328,46 @@ rules.
     \item The UI should pause when a guardrail error is present.
 \end{itemize}
 
+\subsection{Dynamics, Accounting, and Display Fields}
+
+\begin{itemize}[leftmargin=*]
+    \item Every field should be classified as one of:
+          \textbf{dynamics}, \textbf{accounting}, or \textbf{display}.
+    \item A \textbf{dynamics field} is used to advance the simulation.  These
+          fields are candidates for GLSL porting.
+    \item Dynamics fields include position, velocity, mass, radius, active
+          flags, source-owned contact state required by the resolver, and
+          contact geometry values computed for the current step.
+    \item An \textbf{accounting field} audits conservation or records an
+          explanatory balance.  It must not change particle motion.
+    \item Accounting fields include \texttt{wall\_mom},
+          \texttt{active\_wall\_mom}, \texttt{wall\_ghost\_momentum},
+          \texttt{current\_total\_mom}, \texttt{modeled\_total},
+          and \texttt{mom\_drift}.
+    \item A \textbf{display field} exists only to format UI rows, capture
+          files, plots, or reports.
+    \item Display fields include labels, strings, row names, capture-only
+          aliases, scalar summary totals, and UI colors.
+    \item Accounting and display fields are Python-side diagnostics unless a
+          future model explicitly promotes one of them into dynamics with a
+          documented ownership and porting rule.
+    \item GLSL porting should begin from dynamics fields only.  Accounting and
+          display fields may be recomputed after the dynamics step in Python
+          or another reporting layer.
+\end{itemize}
+
 \subsection{Python and GLSL Porting}
 
 \begin{itemize}[leftmargin=*]
     \item Python is the reference implementation while the model is changing.
     \item GLSL should be regenerated from the reference behavior rather than
           patched by hand.
-    \item Python structures may contain extra diagnostics that are not required
-          in GLSL.
-    \item Persistent state needed by the dynamics should be distinguished from
-          reporting-only state before porting.
+    \item Python structures may contain accounting and display diagnostics that
+          are not required in GLSL.
+    \item Persistent state needed by the dynamics must be separated from
+          accounting-only and display-only state before porting.
+    \item A field may be ported only if it is a dynamics field or if there is
+          an explicit documented reason to compute it inside GLSL.
     \item A dynamics rule should be expressible as source-owned operations
           before it is considered ready for GLSL.
 \end{itemize}

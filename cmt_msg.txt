@@ -1,2 +1,2 @@
-Still a problem with three particles. We updated the MultipleParticleCollision.tex but did not completly 
-implement it in the code. Everything elses is working not. We are going to try to do that next version.
+Got three particle working. Built a batch test mode. Updated the differnce between
+dynamics, reporting, and display values to insure clean glsl. Porting

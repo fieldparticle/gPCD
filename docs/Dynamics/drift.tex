@@ -2,9 +2,8 @@
 \section{Drift calculations}
 
 Drift reporting compares the current modeled particle momentum to the initial
-modeled particle momentum.  The UI reports only the compact particle-system
-accounting values.  Wall ghost closure is written to capture files as a
-diagnostic, but it is not shown as a UI momentum row.
+modeled particle momentum.  The UI reports compact particle-system accounting
+values, including an accounting-only wall momentum term.
 
 \subsection{UI Momentum Model}
 
@@ -18,7 +17,7 @@ The UI current total momentum is:
 +
 \mathbf{p}_{TotalIntMom}
 +
-\mathbf{p}_{WallGhostMomLedger}.
+\mathbf{p}_{WallMom}.
 \end{aligned}
 \end{equation}
 
@@ -29,7 +28,8 @@ The terms are:
 translational momentum.
 \item \(\mathbf{p}_{TotalIntMom}\): the vector sum of particle-particle
 internal momentum.
-\item \(\mathbf{p}_{WallGhostMomLedger}\): source-owned wall ghost momentum
+\item \(\mathbf{p}_{WallMom}\): accounting-only wall momentum.  This is the
+sum of active wall-contact ghost balance and source-owned wall ghost momentum
 recorded when an instantaneous wall contact exits.  This is not a global wall
 reservoir and it is not used as a dynamics input.
 \end{itemize}
@@ -48,7 +48,9 @@ diagnostic vectors are equal and opposite during active wall contact:
 \end{aligned}
 \end{equation}
 
-Therefore they do not change the UI current total momentum.
+These internal vectors do not change the UI current total momentum by
+themselves.  The \(\mathbf{p}_{WallMom}\) row accounts for the wall-side
+normal kinetic balance during active contact and after wall-contact exit.
 
 \subsection{Momentum Drift}
 
@@ -77,7 +79,7 @@ Equivalently:
 +
 \mathbf{p}_{TotalIntMom}
 +
-\mathbf{p}_{WallGhostMomLedger}
+\mathbf{p}_{WallMom}
 \right).
 \end{aligned}
 \end{equation}
@@ -108,6 +110,10 @@ real particles:
 \item \textbf{total\_int\_mom}: The current particle-particle internal
 momentum contribution.
 
+\item \textbf{wall\_mom}: The accounting-only wall momentum contribution.  It
+includes active wall-contact ghost balance plus the exited wall ghost momentum
+ledger.
+
 \item \textbf{current\_total\_mom}: The current modeled particle-system
 momentum:
 \begin{equation}
@@ -118,11 +124,9 @@ momentum:
 +
 \mathbf{p}_{TotalIntMom}
 +
-\mathbf{p}_{WallGhostMomLedger}.
+\mathbf{p}_{WallMom}.
 \end{aligned}
 \end{equation}
-The wall ghost ledger is included in this row, but is reported as a detailed
-capture diagnostic rather than as a separate compact UI row.
 
 \item \textbf{mom\_drift}: The difference between
 \textbf{initial\_total\_mom} and \textbf{current\_total\_mom}.
@@ -142,6 +146,9 @@ section.  They also write detailed values in \texttt{[momentum\_diagnostics]}.
 
 \item \texttt{total\_int\_mom\_*}: Component and magnitude form of the UI
 \textbf{total\_int\_mom} row.
+
+\item \texttt{wall\_mom\_*}: Component and magnitude form of the UI
+\textbf{wall\_mom} row.
 
 \item \texttt{current\_total\_mom\_*}: Component and magnitude form of the UI
 \textbf{current\_total\_mom} row.
@@ -164,6 +171,9 @@ momentum for active wall contacts.
 
 \item \texttt{wall\_ghost\_mom\_*}: The source-owned wall ghost momentum
 ledger accumulated on wall-contact exit.
+
+\item \texttt{active\_wall\_mom\_*}: The active wall-contact ghost balance
+component of \textbf{wall\_mom}.
 
 \item \texttt{contact\_internal\_*}: The vector sum of particle-side internal
 momentum and wall/ghost internal momentum.

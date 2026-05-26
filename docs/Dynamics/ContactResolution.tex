@@ -24,26 +24,14 @@ For a source particle \(i\), let its current velocity be
     \mathbf{v}_i .
 \]
 
-For each active particle contact \(c\), the contact prediction function returns:
+For each active particle contact \(c\), the contact resolver updates the
+contact state and returns a source-owned contact momentum vector:
 \[
-    \mathbf{v}_{i,c}^{\ast}
+    \Delta \mathbf{p}_{i,c}.
 \]
-where \(\mathbf{v}_{i,c}^{\ast}\) is the velocity that contact \(c\) predicts
-for source particle \(i\) if that contact were evaluated by itself.
-
-The same contact state also stores the source velocity at first contact:
-\[
-    \mathbf{v}_{i,c}^{0}.
-\]
-
-The per-contact velocity delta is:
-\[
-    \Delta \mathbf{v}_{i,c}
-    =
-    \mathbf{v}_{i,c}^{\ast}
-    -
-    \mathbf{v}_{i,c}^{0}.
-\]
+This vector is computed from the contact's geometric/internal momentum scalar
+and the contact normal.  The scheduler sums these momentum vectors and applies
+one source velocity update.
 
 \subsection{Algorithm}
 
@@ -55,56 +43,48 @@ For each source particle \(i\), the current schedule-wise algorithm is:
         \mathbf{v}_{base} = \mathbf{v}_i .
     \]
 
-    \item Initialize the pair-contact accumulator:
+    \item Initialize the pair-contact momentum accumulator:
     \[
-        \Delta \mathbf{v}_{sum} = (0,0),
-        \qquad
-        N = 0 .
+        \Delta \mathbf{p}_{sum} = (0,0).
     \]
 
     \item For each active particle-particle contact owned by source particle
     \(i\):
     \begin{enumerate}
-        \item Compute the single-contact predicted source velocity
-        \(\mathbf{v}_{i,c}^{\ast}\).
-
-        \item Read the first-contact source velocity
-        \(\mathbf{v}_{i,c}^{0}\).
+        \item Update the source-owned contact state.
 
         \item If this is the first active pair contact, set:
         \[
-            \mathbf{v}_{base} = \mathbf{v}_{i,c}^{0}.
+            \mathbf{v}_{base} = \mathbf{v}_{i,c}^{0}
+        \]
+        where \(\mathbf{v}_{i,c}^{0}\) is the source velocity at first contact.
+
+        \item Compute the contact momentum vector:
+        \[
+            \Delta \mathbf{p}_{i,c}
+            =
+            -p_{i,c}\mathbf{n}_{i,c}.
         \]
 
-        \item Accumulate the contact delta:
+        \item Accumulate the contact momentum vector:
         \[
-            \Delta \mathbf{v}_{sum}
+            \Delta \mathbf{p}_{sum}
             \leftarrow
-            \Delta \mathbf{v}_{sum}
+            \Delta \mathbf{p}_{sum}
             +
-            \left(
-                \mathbf{v}_{i,c}^{\ast}
-                -
-                \mathbf{v}_{i,c}^{0}
-            \right).
-        \]
-
-        \item Increment the active pair-contact count:
-        \[
-            N \leftarrow N + 1 .
+            \Delta \mathbf{p}_{i,c}.
         \]
     \end{enumerate}
 
-    \item If \(N > 0\), combine the particle-particle contact deltas by
-    averaging:
+    \item If there are active pair contacts, apply the summed momentum once:
     \[
         \mathbf{v}_{pair}
         =
         \mathbf{v}_{base}
         +
-        \frac{\Delta \mathbf{v}_{sum}}{N}.
+        \frac{\Delta \mathbf{p}_{sum}}{m_i}.
     \]
-    If \(N = 0\), use:
+    If there are no pair contacts, use:
     \[
         \mathbf{v}_{pair} = \mathbf{v}_i .
     \]
@@ -158,28 +138,23 @@ For each source particle \(i\), the current schedule-wise algorithm is:
 \begin{verbatim}
 for each source particle i:
     base_velocity = current_velocity(i)
-    accumulated_delta = (0, 0)
-    prediction_count = 0
+    accumulated_momentum = (0, 0)
     has_pair = false
 
     for each active particle contact c owned by i:
-        prediction = pair_prediction(i, c)
-        if prediction is invalid:
+        contribution = pair_momentum_contribution(i, c)
+        if contribution is invalid:
             continue
 
-        start_velocity = prediction.start_velocity
-        predicted_velocity = prediction.predicted_velocity
-
         if not has_pair:
-            base_velocity = start_velocity
+            base_velocity = contribution.base_velocity
             has_pair = true
 
-        accumulated_delta += predicted_velocity - start_velocity
-        prediction_count += 1
+        accumulated_momentum += contribution.contact_momentum_vector
 
     if has_pair:
         pair_velocity =
-            base_velocity + accumulated_delta / prediction_count
+            base_velocity + accumulated_momentum / mass(i)
     else:
         pair_velocity = current_velocity(i)
 
@@ -197,22 +172,8 @@ for each source particle i:
 
 \subsection{Known Question}
 
-The current combination rule uses an average:
-\[
-    \frac{\Delta \mathbf{v}_{sum}}{N}.
-\]
-
-This is GPU-friendly and prevents the response from growing linearly with the
-number of simultaneous contacts. However, it is not a coupled contact solve. In
-dense contact groups the average can under-correct, over-correct, or interact
-poorly with the later wall scheduler and pair escape scheduler.
-
-This averaging rule is the next item to evaluate. In particular, we need to
-decide whether dense contacts should use:
-\begin{itemize}
-    \item the current average of predicted deltas,
-    \item a weighted average,
-    \item a limited sum,
-    \item a strongest-contact rule,
-    \item or another source-owned combination rule.
-\end{itemize}
+The current combination rule sums source-owned contact momentum vectors.  This
+matches the geometric multi-contact convention more closely than averaging
+velocity predictions, but it is still not a coupled global solve.  Dense contact
+groups may still require limiting, weighting, or another source-owned
+geometric rule.

@@ -47,9 +47,12 @@ class Demo:
         self.rpt_frames = set()
         self.captured_report_frames = set()
         self.report_capture_dir = Path.cwd()
+        self.return_stop_flag = False
+        self.config_name = ""
 
     def configure(self, particle_data, run_configuration):
         self.config = {} if run_configuration is None else dict(run_configuration)
+        self.config_name = self.display_config_name()
         if not self.validate_run_configuration():
             return False
         self.report_capture_dir = Path(self.config.get("data_dir", Path.cwd())) / "reports"
@@ -155,6 +158,15 @@ class Demo:
         message = "\n".join(message_lines)
         self.show_config_error(message)
         return False
+
+    def display_config_name(self):
+        config_file = self.config.get("config_file") or self.config.get("cfg_file")
+        if config_file:
+            return Path(str(config_file)).name
+        config_name = self.config.get("config_name")
+        if config_name:
+            return str(config_name)
+        return str(self.config.get("STUDY_NAME", ""))
 
     @staticmethod
     def show_config_error(message):
@@ -565,6 +577,43 @@ class Demo:
             momentum_y += particle.get("wall_ghost_momentum_y", 0.0)
         return momentum_x, momentum_y
 
+    def active_wall_momentum_vector(self):
+        momentum_x = 0.0
+        momentum_y = 0.0
+        for particle_index, wall_flag in self.active_wall_contacts():
+            particle = self.base.particles[particle_index]
+            state = self.base.wall_contact_state.get((particle_index, wall_flag), {})
+            normal = state.get("first_contact_normal")
+            if normal is None:
+                contact = self.base.wall_contact(particle, wall_flag, self.base.walls)
+                if contact is None:
+                    continue
+                normal = (contact[0], contact[1])
+
+            first_velocity = state.get(
+                "first_contact_velocity",
+                (particle["vx"], particle["vy"]),
+            )
+            current_velocity = (particle["vx"], particle["vy"])
+            first_px, first_py = self.base.normal_momentum_vector(
+                particle["mass"],
+                first_velocity,
+                normal,
+            )
+            current_px, current_py = self.base.normal_momentum_vector(
+                particle["mass"],
+                current_velocity,
+                normal,
+            )
+            momentum_x += first_px - current_px
+            momentum_y += first_py - current_py
+        return momentum_x, momentum_y
+
+    def wall_momentum_vector(self):
+        active_x, active_y = self.active_wall_momentum_vector()
+        ledger_x, ledger_y = self.wall_ghost_momentum_vector()
+        return active_x + ledger_x, active_y + ledger_y
+
     def total_internal_momentum_vector(self):
         return self.particle_side_internal_momentum_vector()
 
@@ -713,6 +762,8 @@ class Demo:
     def momentum_diagnostic_values(self):
         current_x, current_y = self.total_momentum_vector()
         wall_ghost_momentum_x, wall_ghost_momentum_y = self.wall_ghost_momentum_vector()
+        active_wall_momentum_x, active_wall_momentum_y = self.active_wall_momentum_vector()
+        wall_momentum_x, wall_momentum_y = self.wall_momentum_vector()
         particle_side_internal_x, particle_side_internal_y = self.particle_side_internal_momentum_vector()
         particle_pair_internal_x, particle_pair_internal_y = self.particle_pair_internal_momentum_vector()
         wall_particle_internal_x, wall_particle_internal_y = self.wall_particle_internal_momentum_vector()
@@ -723,8 +774,8 @@ class Demo:
 
         particle_system_x = current_x + particle_pair_internal_x
         particle_system_y = current_y + particle_pair_internal_y
-        current_total_x = particle_system_x + wall_ghost_momentum_x
-        current_total_y = particle_system_y + wall_ghost_momentum_y
+        current_total_x = particle_system_x + wall_momentum_x
+        current_total_y = particle_system_y + wall_momentum_y
         modeled_x = current_total_x + contact_internal_x - particle_pair_internal_x
         modeled_y = current_total_y + contact_internal_y - particle_pair_internal_y
         particle_drift_x = self.start_total_momentum_x - current_total_x
@@ -772,6 +823,12 @@ class Demo:
             "wall_ghost_mom_px": wall_ghost_momentum_x,
             "wall_ghost_mom_py": wall_ghost_momentum_y,
             "wall_ghost_mom_p": math.hypot(wall_ghost_momentum_x, wall_ghost_momentum_y),
+            "active_wall_mom_px": active_wall_momentum_x,
+            "active_wall_mom_py": active_wall_momentum_y,
+            "active_wall_mom_p": math.hypot(active_wall_momentum_x, active_wall_momentum_y),
+            "wall_mom_px": wall_momentum_x,
+            "wall_mom_py": wall_momentum_y,
+            "wall_mom_p": math.hypot(wall_momentum_x, wall_momentum_y),
             "contact_internal_px": contact_internal_x,
             "contact_internal_py": contact_internal_y,
             "contact_internal_p": math.hypot(contact_internal_x, contact_internal_y),
@@ -812,15 +869,16 @@ class Demo:
     def momentum_balance_rows(self):
         current_momentum_x, current_momentum_y = self.total_momentum_vector()
         particle_pair_internal_x, particle_pair_internal_y = self.particle_pair_internal_momentum_vector()
-        wall_ghost_momentum_x, wall_ghost_momentum_y = self.wall_ghost_momentum_vector()
-        current_total_x = current_momentum_x + particle_pair_internal_x + wall_ghost_momentum_x
-        current_total_y = current_momentum_y + particle_pair_internal_y + wall_ghost_momentum_y
+        wall_momentum_x, wall_momentum_y = self.wall_momentum_vector()
+        current_total_x = current_momentum_x + particle_pair_internal_x + wall_momentum_x
+        current_total_y = current_momentum_y + particle_pair_internal_y + wall_momentum_y
         mom_drift_x = self.start_total_momentum_x - current_total_x
         mom_drift_y = self.start_total_momentum_y - current_total_y
         return (
             self.momentum_row("initial_total_mom", self.start_total_momentum_x, self.start_total_momentum_y),
             self.momentum_row("kinetic_mom", current_momentum_x, current_momentum_y),
             self.momentum_row("total_int_mom", particle_pair_internal_x, particle_pair_internal_y),
+            self.momentum_row("wall_mom", wall_momentum_x, wall_momentum_y),
             self.momentum_row("current_total_mom", current_total_x, current_total_y),
             self.momentum_row("mom_drift", mom_drift_x, mom_drift_y),
         )
@@ -1444,6 +1502,8 @@ class Demo:
         y = 12
         summary_lines = self.momentum_balance_rows()
         fps_line = f"frame={self.frame_number} fps={self.current_fps:.1f}"
+        if self.config_name:
+            fps_line = f"{fps_line} cfg={self.config_name}"
         surface = self.report_font.render(fps_line, True, self.center_dot_color)
         self.screen.blit(surface, (x, y))
         y += 18
@@ -1497,7 +1557,10 @@ class Demo:
         report_file = self.report_capture_dir / f"Cap{self.frame_number:06d}.rpt"
         with report_file.open("w", encoding="utf-8") as outfile:
             outfile.write("[summary]\n")
-            outfile.write(f"frame={self.frame_number} fps={self.current_fps:.1f}\n")
+            summary_line = f"frame={self.frame_number} fps={self.current_fps:.1f}"
+            if self.config_name:
+                summary_line = f"{summary_line} cfg={self.config_name}"
+            outfile.write(f"{summary_line}\n")
             outfile.write("\n[momentum_balance]\n")
             for line in self.momentum_balance_rows():
                 outfile.write(f"{line}\n")
@@ -1538,6 +1601,11 @@ class Demo:
                     running = False
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     running = False
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_s:
+                    running = False
+                    self.return_stop_flag = True
+                    pygame.quit()
+                    return self.return_stop_flag 
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                     self.paused = not self.paused
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_p:
@@ -1561,3 +1629,4 @@ class Demo:
             self.clock.tick(self.frame_rate)
 
         pygame.quit()
+        return self.return_stop_flag 
