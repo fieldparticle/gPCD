@@ -1,4 +1,6 @@
-TwoParticleStuck osccilates as ymin. Same with TwoParticleStuckWall.
-TwoParticleChaseWall.cfg also osscilatesa at wall release.
+These are the result of not fixing the ghost particle position after repairing
+one particle corner hit to be symetric.
+TwoParticleStuckWall,TwoParticleStuck no longer osccilates. 
+But TwoParticleChaseWall.cfg has drift
 
-Fixed the ResolveStartingWallCollision.cfg leaves drift
+

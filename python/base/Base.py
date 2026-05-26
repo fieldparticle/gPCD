@@ -1946,28 +1946,28 @@ class Base:
             contact_plane = walls["start_x"] + offset
             distance_to_contact_plane = x - contact_plane
             nx, ny = -1.0, 0.0
-            ghost_x, ghost_y = 2.0 * contact_plane - x, y
+            ghost_x, ghost_y = walls["start_x"] - radius + offset, y
             wall_boundary = walls["start_x"]
         elif wall_flag == 2:
             distance_to_wall = walls["end_x"] - x
             contact_plane = walls["end_x"] - offset
             distance_to_contact_plane = contact_plane - x
             nx, ny = 1.0, 0.0
-            ghost_x, ghost_y = 2.0 * contact_plane - x, y
+            ghost_x, ghost_y = walls["end_x"] + radius - offset, y
             wall_boundary = walls["end_x"]
         elif wall_flag == 3:
             distance_to_wall = y - walls["start_y"]
             contact_plane = walls["start_y"] + offset
             distance_to_contact_plane = y - contact_plane
             nx, ny = 0.0, -1.0
-            ghost_x, ghost_y = x, 2.0 * contact_plane - y
+            ghost_x, ghost_y = x, walls["start_y"] - radius + offset
             wall_boundary = walls["start_y"]
         elif wall_flag == 4:
             distance_to_wall = walls["end_y"] - y
             contact_plane = walls["end_y"] - offset
             distance_to_contact_plane = contact_plane - y
             nx, ny = 0.0, 1.0
-            ghost_x, ghost_y = x, 2.0 * contact_plane - y
+            ghost_x, ghost_y = x, walls["end_y"] + radius - offset
             wall_boundary = walls["end_y"]
         else:
             raise ValueError(f"Unknown wall flag: {wall_flag!r}")
@@ -1975,9 +1975,8 @@ class Base:
         if distance_to_contact_plane >= radius:
             return None
 
-        # The wall ghost is an instantaneous mirror of the source particle
-        # across the contact plane. It has no persistent state; only the normal
-        # component of velocity is mirrored for frictionless wall response.
+        # The wall ghost is fixed along the wall normal and shares the source
+        # tangent coordinate. Only its velocity is mirrored for resolution.
         center_distance = math.hypot(ghost_x - x, ghost_y - y)
         overlap_area = self.circle_overlap_area(radius, radius, center_distance)
         ghost_particle = self.wall_ghost_particle(
