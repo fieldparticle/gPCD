@@ -774,9 +774,36 @@ class Base:
         source_start_normal_velocity = (
             source_start_velocity[0] * nx + source_start_velocity[1] * ny
         )
-        predicted_normal_velocity = (
-            source_start_normal_velocity - source_contact_momentum / source_particle["mass"]
-        )
+        predicted_normal_velocity = None
+        if phase == "returning" and remaining_momentum > 0.0:
+            source_mass = source_particle["mass"]
+            target_mass = target_particle["mass"]
+            total_mass = source_mass + target_mass
+            reduced_mass = (
+                (source_mass * target_mass) / total_mass
+                if total_mass > 0.0
+                else 0.0
+            )
+            if reduced_mass > 0.0:
+                release_relative_normal_velocity = zero_momentum / reduced_mass
+                source_normal_velocity = source_velocity[0] * nx + source_velocity[1] * ny
+                target_normal_velocity = target_velocity[0] * nx + target_velocity[1] * ny
+                shared_normal_velocity = (
+                    source_mass * source_normal_velocity
+                    + target_mass * target_normal_velocity
+                ) / total_mass
+                predicted_normal_velocity = (
+                    shared_normal_velocity
+                    - (target_mass / total_mass) * release_relative_normal_velocity
+                )
+                contact_state["release_driver_relative_normal_velocity"] = (
+                    release_relative_normal_velocity
+                )
+
+        if predicted_normal_velocity is None:
+            predicted_normal_velocity = (
+                source_start_normal_velocity - source_contact_momentum / source_particle["mass"]
+            )
         current_normal_velocity = source_velocity[0] * nx + source_velocity[1] * ny
         current_tangent_velocity = (
             source_velocity[0] - current_normal_velocity * nx,

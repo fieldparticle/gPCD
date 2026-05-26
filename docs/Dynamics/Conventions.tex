@@ -246,6 +246,18 @@ rules.
           they must not feed back into the dynamics.
 \end{itemize}
 
+\subsection{To Do}
+
+\begin{itemize}[leftmargin=*]
+    \item The returning-phase release driver must remain source-owned and must
+          live inside \texttt{resolve\_source\_contact()}.  Do not restore the
+          older pair-specific rebound path wholesale.
+    \item Multi-contact release must be weighted by contact area and source
+          context.  An unweighted release driver can reintroduce momentum
+          accumulation when one source particle has multiple simultaneous
+          contacts.
+\end{itemize}
+
 \subsection{Maximum Overlap}
 
 \begin{itemize}[leftmargin=*]

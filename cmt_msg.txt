@@ -1,2 +1,2 @@
-Accounting is correct for two particle horizontal woith wall collsions. But there is a problem with 
-three paricles
+Still a problem with three particles. We updated the MultipleParticleCollision.tex but did not completly 
+implement it in the code. Everything elses is working not. We are going to try to do that next version.
