@@ -591,8 +591,11 @@ class Demo:
                 normal = (contact[0], contact[1])
 
             first_velocity = state.get(
-                "first_contact_velocity",
-                (particle["vx"], particle["vy"]),
+                "first_accounting_velocity",
+                state.get(
+                    "first_contact_velocity",
+                    (particle["vx"], particle["vy"]),
+                ),
             )
             current_velocity = (particle["vx"], particle["vy"])
             first_px, first_py = self.base.normal_momentum_vector(

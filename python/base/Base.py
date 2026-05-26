@@ -2297,7 +2297,8 @@ class Base:
                     (ghost_particle["vx"] - particle["vx"]) * nx
                     + (ghost_particle["vy"] - particle["vy"]) * ny
                 )
-                first_velocity = (particle["vx"], particle["vy"])
+                first_accounting_velocity = (particle["vx"], particle["vy"])
+                first_velocity = first_accounting_velocity
                 if self.time == 0.0 and normal_velocity < 0.0:
                     first_velocity = (
                         particle["vx"] - 2.0 * normal_velocity * nx,
@@ -2318,6 +2319,7 @@ class Base:
                         "zero_overlap_locked": False,
                         "geo_phase": "compression",
                         "first_contact_velocity": first_velocity,
+                        "first_accounting_velocity": first_accounting_velocity,
                         "first_contact_velocities": {
                             particle_index: first_velocity,
                             ("wall", wall_flag): (ghost_particle["vx"], ghost_particle["vy"]),
@@ -2421,7 +2423,10 @@ class Base:
             if normal is None:
                 continue
 
-            first_velocity = state.get("first_contact_velocity", current_velocity)
+            first_velocity = state.get(
+                "first_accounting_velocity",
+                state.get("first_contact_velocity", current_velocity),
+            )
             first_px, first_py = self.normal_momentum_vector(
                 mass,
                 first_velocity,

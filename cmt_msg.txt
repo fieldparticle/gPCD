@@ -1,2 +1,4 @@
-Got three particle working. Built a batch test mode. Updated the differnce between
-dynamics, reporting, and display values to insure clean glsl. Porting
+TwoParticleStuck osccilates as ymin. Same with TwoParticleStuckWall.
+TwoParticleChaseWall.cfg also osscilatesa at wall release.
+
+Fixed the ResolveStartingWallCollision.cfg leaves drift
