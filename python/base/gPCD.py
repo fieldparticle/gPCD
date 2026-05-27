@@ -87,6 +87,12 @@ class Demo:
         self.base.inverse_square_softening = float(
             self.config.get("inverse_square_softening", self.base.inverse_square_softening)
         )
+        self.base.p_zero_depth_limit_fraction = float(
+            self.config.get(
+                "p_zero_depth_limit_fraction",
+                self.base.p_zero_depth_limit_fraction,
+            )
+        )
         self.base.wall_contact_offset = float(
             self.config.get("wall_contact_offset", self.base.wall_contact_offset)
         )
@@ -1104,6 +1110,13 @@ class Demo:
                 rel_normal_velocity,
             )
             zero_source = contact_state.get("geo_zero_velocity_source", "")
+            p_zero_capped = contact_state.get("geo_zero_velocity_p_zero_capped", False)
+            raw_p_zero_depth = contact_state.get("geo_zero_velocity_raw_penetration_depth", 0.0)
+            p_zero_depth_limit = contact_state.get("geo_zero_velocity_penetration_depth_limit", 0.0)
+            p_zero_momentum = contact_state.get("geo_zero_velocity_overlap_momentum", 0.0)
+            p_zero_area_momentum = contact_state.get("geo_zero_velocity_capped_overlap_momentum", 0.0)
+            p_zero_excess_momentum = contact_state.get("geo_zero_velocity_excess_overlap_momentum", 0.0)
+            p_zero_effective_mpa = contact_state.get("geo_zero_velocity_effective_momentum_per_area", 0.0)
             motion_mode = contact_state.get("neo_motion_mode", "")
             internal_phase = contact_state.get("internal_momentum_phase", "")
             lock_state = contact_state.get("contact_lock_state", "free")
@@ -1449,6 +1462,13 @@ class Demo:
                 rel_normal_velocity,
             )
             zero_source = contact_state.get("geo_zero_velocity_source", "")
+            p_zero_capped = contact_state.get("geo_zero_velocity_p_zero_capped", False)
+            raw_p_zero_depth = contact_state.get("geo_zero_velocity_raw_penetration_depth", 0.0)
+            p_zero_depth_limit = contact_state.get("geo_zero_velocity_penetration_depth_limit", 0.0)
+            p_zero_momentum = contact_state.get("geo_zero_velocity_overlap_momentum", 0.0)
+            p_zero_area_momentum = contact_state.get("geo_zero_velocity_capped_overlap_momentum", 0.0)
+            p_zero_excess_momentum = contact_state.get("geo_zero_velocity_excess_overlap_momentum", 0.0)
+            p_zero_effective_mpa = contact_state.get("geo_zero_velocity_effective_momentum_per_area", 0.0)
             motion_mode = contact_state.get("neo_motion_mode", "")
             internal_phase = contact_state.get("internal_momentum_phase", "")
             lock_state = contact_state.get("contact_lock_state", "free")
@@ -1480,6 +1500,13 @@ class Demo:
                     f"block_reln={blocked_relative:.8f}",
                     f"mode={motion_mode}",
                     f"zsrc={zero_source}",
+                    f"pzcap={str(bool(p_zero_capped)).lower()}",
+                    f"pzraw={raw_p_zero_depth:.8f}",
+                    f"pzlim={p_zero_depth_limit:.8f}",
+                    f"pzmom={p_zero_momentum:.8f}",
+                    f"pzareamom={p_zero_area_momentum:.8f}",
+                    f"pzexcess={p_zero_excess_momentum:.8f}",
+                    f"pzmpa={p_zero_effective_mpa:.8f}",
                     f"phase={phase}",
                 ]
             )
@@ -1544,6 +1571,13 @@ class Demo:
             )
             last_normal_velocity = contact_state.get("last_relative_normal_velocity", normal_velocity)
             zero_source = contact_state.get("geo_zero_velocity_source", "")
+            p_zero_capped = contact_state.get("geo_zero_velocity_p_zero_capped", False)
+            raw_p_zero_depth = contact_state.get("geo_zero_velocity_raw_penetration_depth", 0.0)
+            p_zero_depth_limit = contact_state.get("geo_zero_velocity_penetration_depth_limit", 0.0)
+            p_zero_momentum = contact_state.get("geo_zero_velocity_overlap_momentum", 0.0)
+            p_zero_area_momentum = contact_state.get("geo_zero_velocity_capped_overlap_momentum", 0.0)
+            p_zero_excess_momentum = contact_state.get("geo_zero_velocity_excess_overlap_momentum", 0.0)
+            p_zero_effective_mpa = contact_state.get("geo_zero_velocity_effective_momentum_per_area", 0.0)
             motion_mode = contact_state.get("neo_motion_mode", "")
             internal_phase = contact_state.get("internal_momentum_phase", "")
             lock_state = contact_state.get("contact_lock_state", "free")
@@ -1579,6 +1613,13 @@ class Demo:
                     f"block_vn={blocked_normal:.8f}",
                     f"mode={motion_mode}",
                     f"zsrc={zero_source}",
+                    f"pzcap={str(bool(p_zero_capped)).lower()}",
+                    f"pzraw={raw_p_zero_depth:.8f}",
+                    f"pzlim={p_zero_depth_limit:.8f}",
+                    f"pzmom={p_zero_momentum:.8f}",
+                    f"pzareamom={p_zero_area_momentum:.8f}",
+                    f"pzexcess={p_zero_excess_momentum:.8f}",
+                    f"pzmpa={p_zero_effective_mpa:.8f}",
                     f"area={overlap_area:.8f}",
                     f"center_distance={center_distance:.8f}",
                     f"wall_boundary={wall_boundary:.8f}",
@@ -1618,25 +1659,7 @@ class Demo:
         if(self.config.get("plot_report", True) == True):
                 
             for index, particle in enumerate(self.base.particles):
-                starting_momentum = particle.get("starting_momentum", 0.0)
-                momentum_x = particle["mass"] * particle["vx"]
-                momentum_y = particle["mass"] * particle["vy"]
-                particle_momentum = (momentum_x * momentum_x + momentum_y * momentum_y) ** 0.5
-                momentum_delta_x = particle.get("momentum_delta_x", 0.0)
-                momentum_delta_y = particle.get("momentum_delta_y", 0.0)
-                starting_uncorrected_vx = particle.get("starting_uncorrected_vx", particle["vx"])
-                starting_uncorrected_vy = particle.get("starting_uncorrected_vy", particle["vy"])
-                line = (
-                    f"p{index} px={momentum_x:.8f} py={momentum_y:.8f} "
-                    f"|p|={particle_momentum:.8f} "
-                    f"start={starting_momentum:.8f} "
-                    f"dpx={momentum_delta_x:.8f} dpy={momentum_delta_y:.8f} "
-                    f"v=({particle['vx']:.8f},{particle['vy']:.8f}) "
-                    f"v0=({starting_uncorrected_vx:.8f},{starting_uncorrected_vy:.8f})"
-                )
-                contact_diagnostics = self.particle_contact_diagnostics(index, particle)
-                if contact_diagnostics:
-                    line = f"{line} {' '.join(contact_diagnostics)}"
+                line = f"p{index} v=({particle['vx']:.8f},{particle['vy']:.8f})"
                 surface = self.report_font.render(line, True, self.center_dot_color)
                 self.screen.blit(surface, (x, y))
                 y += 18

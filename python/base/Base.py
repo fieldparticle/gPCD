@@ -40,6 +40,7 @@ class Base:
         self.collision_stiffness_q = 1.0
         self.momentum_per_area = 0.001
         self.inverse_square_softening = 1.0
+        self.p_zero_depth_limit_fraction = 0.9
         self.neo_prediction_mode = "schedule"
         self.sim_calc = SimCalc(self)
         self.report = Report()
@@ -381,6 +382,9 @@ class Base:
     def new_neo_model(self):
         neo_model = NeoDynamics()
         neo_model.collision_stiffness_q = self.collision_stiffness_q
+        neo_model.momentum_per_area = self.momentum_per_area
+        neo_model.inverse_square_softening = self.inverse_square_softening
+        neo_model.p_zero_depth_limit_fraction = self.p_zero_depth_limit_fraction
         return neo_model
 
     def clip_zero_velocity_overlaps(self):
@@ -890,6 +894,10 @@ class Base:
             return 0.0
 
         reduced_mass = (source_mass * target_mass) / total_mass
+        capped_zero_momentum = contact_state.get("geo_zero_velocity_overlap_momentum")
+        if capped_zero_momentum is not None:
+            return max(0.0, float(capped_zero_momentum))
+
         zero_area = contact_state.get("geo_zero_velocity_overlap_area", 0.0)
         incoming_speed = contact_state.get("geo_zero_velocity_incoming_speed") or 0.0
         zero_momentum = reduced_mass * incoming_speed
@@ -1928,10 +1936,10 @@ class Base:
         return nx, ny, overlap_area, center_distance
 
     def wall_contact_offset_distance(self, radius):
-        offset = float(self.wall_contact_offset)
-        if offset < 0.0:
+        offset_fraction = float(self.wall_contact_offset)
+        if offset_fraction < 0.0:
             return 0.0
-        return min(radius, offset)
+        return min(radius, radius * offset_fraction)
 
     def wall_ghost_contact(self, source_particle, wall_flag, walls, source_velocity=None):
         if walls is None:

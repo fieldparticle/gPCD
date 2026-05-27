@@ -1,5 +1,1 @@
-ResolveStartingWallCollision.cfg
-OneParticleBoundaryTest.cfg
-TwoParticleChaseWall.cfg
-TwoParticleStuckWall.cfg
-ParticleCornerHit.cfg
+For all config files that have RUN_CONFIGURATION add wall_contact_offset = 0.015625;

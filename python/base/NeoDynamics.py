@@ -27,6 +27,7 @@ class NeoDynamics:
         self.momentum_per_area = 0.001
         self.inverse_square_softening = 1.0
         self.collision_stiffness_q = 1.0
+        self.p_zero_depth_limit_fraction = 0.9
 
     def clear_particles(self):
         self.particle_configs = []
@@ -154,9 +155,9 @@ class NeoDynamics:
         compression_progress = 1.0 - compression_velocity_fraction
         rebound_velocity_fraction = math.sqrt(rebound_fraction)
 
-        turn_impulse = incoming_relative_normal_momentum
-        rebound_impulse = 2.0 * incoming_relative_normal_momentum
-        zero_internal_normal_momentum = incoming_relative_normal_momentum
+        zero_internal_normal_momentum = zero_geometry["overlap_momentum"]
+        turn_impulse = zero_internal_normal_momentum
+        rebound_impulse = 2.0 * zero_internal_normal_momentum
         compression_stored_internal_momentum = zero_internal_normal_momentum * compression_progress
         rebound_released_internal_momentum = zero_internal_normal_momentum * rebound_velocity_fraction
         rebound_remaining_internal_momentum = max(
@@ -291,18 +292,31 @@ class NeoDynamics:
                 "incoming_speed": incoming_speed,
             }
 
-        alpha_zero = ((3.0 * reduced_mass * incoming_speed * incoming_speed) / (2.0 * stiffness_q)) ** (1.0 / 3.0)
-        alpha_zero = max(0.0, min(radius_sum, alpha_zero))
+        raw_alpha_zero = ((3.0 * reduced_mass * incoming_speed * incoming_speed) / (2.0 * stiffness_q)) ** (1.0 / 3.0)
+        alpha_zero, solution_clamped = self.capped_zero_depth(
+            raw_alpha_zero,
+            source_particle["radius"],
+            target_particle["radius"],
+        )
         center_distance = max(0.0, radius_sum - alpha_zero)
         overlap_area = self.circle_overlap_area(source_particle["radius"], target_particle["radius"], center_distance)
+        overlap_momentum = incoming_relative_normal_momentum
+        solution_source = "force_law"
+        if solution_clamped:
+            solution_source = "force_law_p_zero_capped"
         return {
             "center_distance": center_distance,
             "overlap_area": overlap_area,
-            "overlap_momentum": incoming_relative_normal_momentum,
+            "overlap_momentum": overlap_momentum,
             "penetration_depth": alpha_zero,
+            "raw_penetration_depth": raw_alpha_zero,
+            "penetration_depth_limit": self.p_zero_depth_limit(
+                source_particle["radius"],
+                target_particle["radius"],
+            ),
             "overlap_fraction": overlap_area / max_overlap_area if max_overlap_area > 0.0 else 0.0,
-            "solution_clamped": alpha_zero >= radius_sum,
-            "solution_source": "force_law",
+            "solution_clamped": solution_clamped,
+            "solution_source": solution_source,
             "stiffness_q": stiffness_q,
             "incoming_speed": incoming_speed,
         }
@@ -342,19 +356,23 @@ class NeoDynamics:
             alpha_zero = 0.0
             solution_source = "force_law_zero_speed"
         else:
-            alpha_zero = ((3.0 * reduced_mass * incoming_speed * incoming_speed) / (2.0 * stiffness_q)) ** (
+            raw_alpha_zero = ((3.0 * reduced_mass * incoming_speed * incoming_speed) / (2.0 * stiffness_q)) ** (
                 1.0 / 3.0
             )
-            alpha_zero = max(0.0, min(radius_sum, alpha_zero))
+            alpha_zero, solution_clamped = self.capped_zero_depth(
+                raw_alpha_zero,
+                source_particle["radius"],
+                target_particle["radius"],
+            )
             zero_center_distance = max(0.0, radius_sum - alpha_zero)
             zero_overlap_area = self.circle_overlap_area(
                 source_particle["radius"],
                 target_particle["radius"],
                 zero_center_distance,
             )
-            solution_source = "force_law"
+            solution_source = "force_law_p_zero_capped" if solution_clamped else "force_law"
 
-        return self.zero_state_dict(
+        zero_state = self.zero_state_dict(
             zero_overlap_area,
             zero_center_distance,
             alpha_zero,
@@ -364,6 +382,20 @@ class NeoDynamics:
             reduced_mass,
             incoming_speed,
         )
+        if incoming_speed > 0.0:
+            self.add_zero_cap_report_fields(
+                zero_state,
+                raw_alpha_zero,
+                source_particle["radius"],
+                target_particle["radius"],
+                zero_overlap_area,
+                zero_center_distance,
+                source_particle,
+                solution_clamped,
+            )
+        else:
+            zero_state["geo_zero_velocity_overlap_momentum"] = 0.0
+        return zero_state
 
     def wall_zero_velocity_state(
         self,
@@ -383,15 +415,15 @@ class NeoDynamics:
             alpha_zero = 0.0
             solution_source = "force_law_zero_speed"
         else:
-            alpha_zero = ((3.0 * particle["mass"] * incoming_speed * incoming_speed) / (2.0 * stiffness_q)) ** (
+            raw_alpha_zero = ((3.0 * particle["mass"] * incoming_speed * incoming_speed) / (2.0 * stiffness_q)) ** (
                 1.0 / 3.0
             )
-            alpha_zero = max(0.0, min(2.0 * radius, alpha_zero))
+            alpha_zero, solution_clamped = self.capped_zero_depth(raw_alpha_zero, radius, radius)
             zero_center_distance = max(0.0, 2.0 * radius - alpha_zero)
             zero_overlap_area = self.circle_overlap_area(radius, radius, zero_center_distance)
-            solution_source = "force_law_wall"
+            solution_source = "force_law_wall_p_zero_capped" if solution_clamped else "force_law_wall"
 
-        return self.zero_state_dict(
+        zero_state = self.zero_state_dict(
             zero_overlap_area,
             zero_center_distance,
             alpha_zero,
@@ -401,6 +433,85 @@ class NeoDynamics:
             particle["mass"],
             incoming_speed,
         )
+        if incoming_speed > 0.0:
+            self.add_zero_cap_report_fields(
+                zero_state,
+                raw_alpha_zero,
+                radius,
+                radius,
+                zero_overlap_area,
+                zero_center_distance,
+                particle,
+                solution_clamped,
+            )
+        else:
+            zero_state["geo_zero_velocity_overlap_momentum"] = 0.0
+        return zero_state
+
+    def p_zero_depth_limit(self, source_radius, target_radius):
+        fraction = max(0.0, min(1.0, float(self.p_zero_depth_limit_fraction)))
+        return fraction * min(source_radius, target_radius)
+
+    def capped_zero_depth(self, raw_alpha_zero, source_radius, target_radius):
+        depth_limit = self.p_zero_depth_limit(source_radius, target_radius)
+        alpha_zero = max(0.0, min(source_radius + target_radius, raw_alpha_zero))
+        if alpha_zero > depth_limit:
+            return depth_limit, True
+        return alpha_zero, False
+
+    def add_zero_cap_report_fields(
+        self,
+        zero_state,
+        raw_alpha_zero,
+        source_radius,
+        target_radius,
+        zero_overlap_area,
+        zero_center_distance,
+        source_particle,
+        solution_clamped,
+    ):
+        zero_state["geo_zero_velocity_raw_penetration_depth"] = raw_alpha_zero
+        zero_state["geo_zero_velocity_penetration_depth_limit"] = self.p_zero_depth_limit(
+            source_radius,
+            target_radius,
+        )
+        zero_state["geo_zero_velocity_p_zero_capped"] = bool(solution_clamped)
+        reduced_mass = zero_state.get("geo_zero_velocity_reduced_mass", 0.0)
+        incoming_speed = zero_state.get("geo_zero_velocity_incoming_speed", 0.0)
+        incoming_overlap_momentum = reduced_mass * incoming_speed
+        if solution_clamped:
+            capped_overlap_momentum = self.geometry_overlap_momentum(
+                zero_overlap_area,
+                zero_center_distance,
+                source_particle,
+            )
+            zero_state["geo_zero_velocity_capped_overlap_momentum"] = capped_overlap_momentum
+            zero_state["geo_zero_velocity_excess_overlap_momentum"] = max(
+                0.0,
+                incoming_overlap_momentum - capped_overlap_momentum,
+            )
+            if zero_overlap_area > 1.0e-12:
+                zero_state["geo_zero_velocity_effective_momentum_per_area"] = (
+                    incoming_overlap_momentum / zero_overlap_area
+                )
+            else:
+                zero_state["geo_zero_velocity_effective_momentum_per_area"] = 0.0
+            zero_state["geo_zero_velocity_overlap_momentum"] = incoming_overlap_momentum
+        else:
+            zero_state["geo_zero_velocity_overlap_momentum"] = incoming_overlap_momentum
+
+    def geometry_overlap_momentum(self, overlap_area, center_distance, source_particle):
+        momentum_per_area = source_particle.get(
+            "momentum_per_area",
+            source_particle.get("repulsion_force_per_area", self.momentum_per_area),
+        )
+        if momentum_per_area is None:
+            momentum_per_area = self.momentum_per_area
+        return momentum_per_area * overlap_area * self.inverse_square_weight(center_distance)
+
+    def inverse_square_weight(self, distance):
+        softening = max(self.inverse_square_softening, 1.0e-12)
+        return 1.0 / max(distance * distance, softening * softening)
 
     @staticmethod
     def zero_state_dict(

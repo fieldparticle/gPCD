@@ -1,9 +1,4 @@
-But TwoParticleChaseWall.cfg has drift
-TwoParticleChase.cfg boundary violation, but TwoParticleChaseWall does not.
-Activated the run_debug flag to tesif p_zero exceeds the max depth and if there is any drift.
-For next version--
-TwoParticleChase.cfg boundary violation is due to a high relative velocity. We are 
-goingto consider that at some depth the particle becomes a solid. New rule
+Implimented 1:
 1. Compute velocity-implied p_zero_depth.
 2. If p_zero_depth <= geometric cap:
       use normal force-law p_zero.
@@ -12,6 +7,14 @@ goingto consider that at some depth the particle becomes a solid. New rule
       compute capped p_zero_area.
       compute capped p_zero_momentum from the geometry/area rule.
       report that the cap occurred.
+	  
+Cleaned up UI to show only velocity.
+Added wall_contact_offset to cfg files for ghost wall offset.
+Implimented 1 did not work becasue we were not allocating all of the
+Incomeing momentum back into the new area. Fixed.
+
+New issues:TwoParticleChaseWall, ThreeParticleChase,TwoParticleStuckWall have drift.
+
 
 
 
