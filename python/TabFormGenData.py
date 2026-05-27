@@ -24,7 +24,8 @@ from gbase.BinaryFileUtilities import clear_files, read_particle_data
 from gbase.import_module import load_class_from_file
 from gbase.pdata import *
 from gbase.GenPQBData import *
-from runner import run_analysis
+from runner import run_analysis as old_run_analysis
+from GeoRunner import run_analysis as geo_run_analysis
 #from GenMotionData import *
 #from subprocess import Popen
 import subprocess
@@ -48,6 +49,7 @@ class TabGenData(QTabWidget):
     particle_data = None
     terminal = None
     batch_mode = False
+    use_geo_runner = False
     #******************************************************************
     # Init
     #
@@ -81,7 +83,7 @@ class TabGenData(QTabWidget):
         for ii in self.itemcfg.batch_items:
             print(f"Batch item:{ii}")
             self.CfgFile=f"{self.itemcfg.data_dir}/{ii[0]}"
-            if run_analysis(self.CfgFile, batch_mode=True, end_frame=ii[1]) == True:
+            if self.selected_run_analysis(self.CfgFile, batch_mode=True, end_frame=ii[1]) == True:
                 break
         self.batch_mode = False
     #******************************************************************
@@ -100,6 +102,14 @@ class TabGenData(QTabWidget):
             self.itemcfgFile = ConfigUtility(self.CfgFile)
             self.itemcfgFile.Create(self.bobj.log,self.CfgFile)
             self.itemcfg = self.itemcfgFile.config
+            self.use_geo_runner = bool(self.itemcfg.get("use_geo_runner", False))
+            if "RUN_CONFIGURATION" in self.itemcfg:
+                self.use_geo_runner = bool(
+                    self.itemcfg.RUN_CONFIGURATION.get(
+                        "use_geo_runner",
+                        self.use_geo_runner,
+                    )
+                )
             
         except BaseException as e:
             self.log.log(self,f"Unable to open item configurations file:{e}")
@@ -151,7 +161,20 @@ class TabGenData(QTabWidget):
         if self.batch_mode==True:
             self.do_batch()
         else:
-            return run_analysis(self.CfgFile)
+            return self.selected_run_analysis(self.CfgFile)
+
+    def selected_run_analysis(self, cfg_file, batch_mode=False, end_frame=None):
+        if self.use_geo_runner:
+            return geo_run_analysis(
+                cfg_file,
+                batch_mode=batch_mode,
+                end_frame=end_frame,
+            )
+        return old_run_analysis(
+            cfg_file,
+            batch_mode=batch_mode,
+            end_frame=end_frame,
+        )
 
     #******************************************************************
     # Generate the data

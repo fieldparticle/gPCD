@@ -145,7 +145,7 @@ void main()
 						if (duplst[dd] == 0)
 						{
 							// Set the collison flag
-							NeoAddParticleContact(SourceID, TargetID);
+							GeoAddParticleContact(SourceID, TargetID);
 							// Add the TO particle number ot the dups list.
 							duplst[dd] = TargetID;
 							// Report is verification
@@ -173,8 +173,8 @@ void main()
 			debugPrintfEXT("positionBuffer:%f",ShaderFlags.positionBuffer);
 	#endif
 	 
-	NeoProcessCollision(SourceID);
-	MoveParticle(SourceID,uint(ShaderFlags.positionBuffer),ShaderFlags.dt);
+	GeoProcessCollisions(SourceID);
+	GeoMoveParticle(SourceID,uint(ShaderFlags.positionBuffer),ShaderFlags.dt);
 	
 }
 

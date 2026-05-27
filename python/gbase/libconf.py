@@ -9,7 +9,10 @@ import collections
 import io
 import re
 
-from numpy import long
+try:
+    from numpy import long
+except ModuleNotFoundError:
+    long = int
 
 # Define an isstr() and isint() that work on both Python2 and Python3.
 # See http://stackoverflow.com/questions/11301138
