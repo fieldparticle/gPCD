@@ -6,4 +6,8 @@ git add .
 git commit -a -F cmt_msg.txt
 git push
 
+// List previous checkins
+git log --oneline
 
+// show file name chnages
+git diff --name-only

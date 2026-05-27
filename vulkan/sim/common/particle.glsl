@@ -62,7 +62,7 @@ struct Particle {
 
     lstr CornerList[8];
 
-    NeoContactState ncs[MAX_CONTACTS];
+    GeoContactState gcs[MAX_CONTACTS];
 
     uint contactCount;         // active entries in ncs
     uint colFlg;               // 1 if in collision, 0 if not

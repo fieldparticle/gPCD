@@ -1,20 +1,41 @@
-Implimented 1:
-1. Compute velocity-implied p_zero_depth.
-2. If p_zero_depth <= geometric cap:
-      use normal force-law p_zero.
-3. If p_zero_depth > geometric cap:
-      clamp p_zero_depth to cap.
-      compute capped p_zero_area.
-      compute capped p_zero_momentum from the geometry/area rule.
-      report that the cap occurred.
-	  
-Cleaned up UI to show only velocity.
-Added wall_contact_offset to cfg files for ghost wall offset.
-Implimented 1 did not work becasue we were not allocating all of the
-Incomeing momentum back into the new area. Fixed.
-
-New issues:TwoParticleChaseWall, ThreeParticleChase,TwoParticleStuckWall have drift.
+STARTING OVER WITH GEOBASE.py and GEODYNAMICS
 
 
+Issues:TwoParticleChaseWall, ThreeParticleChase,TwoParticleStuckWall have drift.
 
+Problem:wall accounting should not infer wall momentum from total particle velocity change. 
+ It should accumulate the actual wall-contact 
+ source delta produced by resolve_source_contact(...), 
+ per wall contact. That keeps wall accounting 
+ source-owned and avoids 
+ mixing particle-particle velocity 
+ changes into the wall ledger.
 
+We restored the previous commit since the above changes did not work.
+New Try:
+Migration Plan
+
+1 Add new fields beside old ones:
+	stored_contact_momentum
+	last_contact_area
+	last_contact_phase
+2. Implement a new resolver path, maybe:
+	resolve_source_contact_instant(...)
+	Use it only when a config flag is enabled:
+	instant_contact_dynamics = true
+3. Test in order:
+	TwoParticleHorizontal
+	ResolveStartingCollisions
+	ThreeParticle
+	ThreeParticleChase
+	OneParticleBoundaryTest
+	TwoParticleChaseWall
+	ParticlesInBox
+5.Once stable, remove old velocity-origin dynamics.
+The important philosophical move is:
+Velocity history leaves the model.
+Momentum reservoir stays.
+That is cleaner, more geometric, and much closer to 
+something we can port to GLSL without special cases.
+
+Noting works we are in details falling over details. I am createing a new dynmics which I use the old to create.

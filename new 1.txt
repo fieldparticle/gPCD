@@ -1,0 +1,2 @@
+ We will need a new base GeoBase.py that iterates thru the partcie list and finds collsions. That will be named isParticleContact(,SourceID, TargetID, ShaShaderFlags.positionBuffer. 
+ We also need a stru

@@ -1,0 +1,185 @@
+\section{Instant Contact Dynamics Experiment}
+
+\subsection{Purpose}
+
+The instant contact dynamics experiment attempted to remove
+\texttt{first\_contact\_velocity} from the active dynamics path.  The motivation
+was to make the collision rule more instantaneous, more geometric, and easier to
+port to GLSL.  The intended model was:
+
+\begin{itemize}
+    \item use the current source and target velocities at the current step;
+    \item compute the current relative normal velocity;
+    \item store incoming normal momentum while the contact is compressing;
+    \item return stored normal momentum while the contact is releasing;
+    \item keep prior velocity history as diagnostic/reporting data only.
+\end{itemize}
+
+\subsection{Code Changes Made}
+
+The experiment added a new runtime flag:
+
+\begin{verbatim}
+instant_contact_dynamics
+\end{verbatim}
+
+The flag was added to \texttt{Base} and read from \texttt{RUN\_CONFIGURATION} in
+\texttt{gPCD}.  Many configuration files were given an
+\texttt{instant\_contact\_dynamics} entry so the experimental path could be
+enabled or disabled per configuration.
+
+The normal source-owned path:
+
+\begin{verbatim}
+resolve_source_contact_momentum(...)
+\end{verbatim}
+
+was changed so that, when the flag was true, it routed to:
+
+\begin{verbatim}
+resolve_instant_source_contact_momentum(...)
+\end{verbatim}
+
+Wall contact prediction was also changed so that wall ghosts used the same
+instant resolver when the flag was enabled.
+
+\subsection{Instant Resolver Algorithm}
+
+The new resolver used the current source and target velocities:
+
+\begin{verbatim}
+rel_v = target_velocity - source_velocity
+rel_vn = dot(rel_v, contact_normal)
+\end{verbatim}
+
+If the contact was accumulating and the current relative normal velocity was not
+closing, the resolver returned no velocity change.
+
+The resolver then computed the zero-contact momentum using the existing
+geometric zero-velocity contact state:
+
+\begin{verbatim}
+p_zero = geo_zero_contact_momentum(...)
+\end{verbatim}
+
+For multi-contact cases, it kept the existing source-owned area weighting:
+
+\begin{verbatim}
+weighted p_zero = available source momentum * contact_area / total_source_area
+\end{verbatim}
+
+The area-scaled contact momentum was computed from current overlap:
+
+\begin{verbatim}
+p_area = geo_area_scaled_contact_momentum(overlap_area, p_zero, contact_state)
+\end{verbatim}
+
+The experiment introduced an instant stored momentum field:
+
+\begin{verbatim}
+instant_stored_internal_normal_momentum
+\end{verbatim}
+
+During compression, the target stored value was:
+
+\begin{verbatim}
+target_stored = max(stored, p_area)
+store_delta = target_stored - stored
+\end{verbatim}
+
+The actual transfer was capped by current closing momentum:
+
+\begin{verbatim}
+closing_momentum = reduced_mass * max(0, -rel_vn)
+transfer = min(store_delta, closing_momentum)
+stored += transfer
+\end{verbatim}
+
+During return, the resolver attempted to reduce stored momentum and convert it
+back into source velocity.
+
+\subsection{Additional Release Attempts}
+
+The first wall tests showed that wall rebound could become infinitely slow.  The
+contact kept accumulating because the current closing momentum became smaller
+each frame, approaching zero without reliably entering release.
+
+To address this, the experiment added a rule: if compression consumed all
+available closing momentum, mark the contact as an instantaneous zero-velocity
+point:
+
+\begin{verbatim}
+instant_zero_velocity_reached = true
+internal_momentum_phase = returning
+neo_motion_mode = releasing
+geo_zero_velocity_source = instant_velocity_zero
+\end{verbatim}
+
+The experiment also added a pending-release field:
+
+\begin{verbatim}
+instant_release_pending_normal_momentum
+\end{verbatim}
+
+The goal was to release stored momentum even when the particle stopped exactly
+at the zero point and the overlap area did not immediately shrink.
+
+\subsection{Observed Problems}
+
+\subsubsection{Wall Rebound Became Too Slow}
+
+In \texttt{TwoParticleHorizontal}, particle-wall contact stored momentum but the
+normal velocity approached zero slowly.  The contact remained in compression or
+failed to release enough stored momentum.  This showed that the simple
+instantaneous compression cap:
+
+\begin{verbatim}
+transfer = min(store_delta, closing_momentum)
+\end{verbatim}
+
+can drain velocity without giving the contact a robust return driver.
+
+\subsubsection{Stopped Contact Did Not Release}
+
+In \texttt{OneParticleBoundaryTest}, the wall contact reached about
+\texttt{0.05} stored internal momentum, which matched the expected incoming
+momentum.  However, once the particle stopped, release did not occur.  The
+contact reported \texttt{returning/releasing}, but \texttt{irel} stayed zero and
+velocity stayed zero.
+
+This revealed that the release rule was still too dependent on geometry changing
+after the zero point.  If the particle is exactly stopped, geometry does not
+advance by itself, so release must have a clear driver.
+
+\subsubsection{Release State Was Set Before Resolver Entry}
+
+Another complication was that \texttt{update\_wall\_contact\_state()} could mark
+the contact as \texttt{returning} before the resolver ran.  A transition test
+inside the resolver was therefore unreliable: by the time the resolver saw the
+state, the transition had already happened.
+
+\subsection{Why The Experiment Was Rolled Back}
+
+The instant dynamics path did not perform as well as the previous checked-in
+model.  Particle-particle rebound and wall collisions behaved better without the
+experimental branch.  The main unresolved issue is that removing velocity
+history requires a replacement return rule that is strong enough to return
+stored momentum, but not so strong that it becomes another hidden heuristic.
+
+\subsection{Open Questions}
+
+\begin{itemize}
+    \item What is the correct purely geometric return driver once a contact is
+    stopped at the zero point?
+    \item Should stored internal normal momentum be returned according to change
+    in overlap area, current relative velocity, or a separate contact state?
+    \item Can the release rule be expressed without first-contact velocity while
+    still preserving momentum in chain collisions?
+    \item How should a fixed wall ghost differ from a moving real particle, if
+    both must pass through the same source-owned resolver?
+\end{itemize}
+
+\subsection{Rollback Note}
+
+After documenting this experiment, the Python and configuration changes from the
+instant contact dynamics branch were restored to the previous checked-in state.
