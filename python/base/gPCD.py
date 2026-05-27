@@ -49,10 +49,16 @@ class Demo:
         self.report_capture_dir = Path.cwd()
         self.return_stop_flag = False
         self.config_name = ""
+        self.run_debug = False
+        self.momentum_drift_tolerance = 1.0e-8
 
     def configure(self, particle_data, run_configuration):
         self.config = {} if run_configuration is None else dict(run_configuration)
         self.config_name = self.display_config_name()
+        self.run_debug = bool(self.config.get("run_debug", False))
+        self.momentum_drift_tolerance = float(
+            self.config.get("momentum_drift_tolerance", self.momentum_drift_tolerance)
+        )
         if not self.validate_run_configuration():
             return False
         self.report_capture_dir = Path(self.config.get("data_dir", Path.cwd())) / "reports"
@@ -889,6 +895,7 @@ class Demo:
     def guardrail_errors(self):
         errors = []
         errors.extend(self.max_particle_overlap_errors())
+        errors.extend(self.zero_velocity_penetration_errors())
         for index, particle in enumerate(self.base.particles):
             if not self.base.is_active_particle(particle):
                 continue
@@ -914,7 +921,100 @@ class Demo:
                 outside.append(f"y={y:.8f}>ymax={walls['end_y']:.8f}")
             if outside:
                 errors.append(f"ERROR p{index} boundary_exceeded {' '.join(outside)}")
+        drift_error = self.momentum_drift_guardrail_error()
+        if drift_error is not None:
+            errors.append(drift_error)
         return errors
+
+    def zero_velocity_penetration_errors(self):
+        errors = []
+        tolerance = 1.0e-12
+
+        for source_index, source_particle in enumerate(self.base.particles):
+            if not self.base.is_active_particle(source_particle):
+                continue
+            source_radius = source_particle["radius"]
+            for slot in range(source_particle.get("sltnum", 0)):
+                contact_record = source_particle["ccs"][slot]
+                if contact_record.get("clflg", 0) == 0:
+                    continue
+
+                target_index = contact_record["pindex"]
+                target_particle = self.base.particles[target_index]
+                if not self.base.is_active_particle(target_particle):
+                    continue
+
+                state = self.base.source_geo_contact_state(
+                    source_particle,
+                    target_index,
+                )
+                if state is None:
+                    continue
+
+                penetration_depth = self.zero_velocity_penetration_depth(
+                    state,
+                    source_radius + target_particle["radius"],
+                )
+                max_penetration_depth = min(source_radius, target_particle["radius"])
+                if penetration_depth <= max_penetration_depth + tolerance:
+                    continue
+
+                errors.append(
+                    f"ERROR p{source_index}->p{target_index} "
+                    f"p_zero_depth={penetration_depth:.8f} "
+                    f"exceeds_max={max_penetration_depth:.8f} "
+                    f"excess={penetration_depth - max_penetration_depth:.8f}"
+                )
+
+        for particle_index, wall_flag in self.active_wall_contacts():
+            particle = self.base.particles[particle_index]
+            wall_key = (particle_index, wall_flag)
+            state = self.base.wall_contact_state.get(wall_key, {})
+            radius = particle["radius"]
+            penetration_depth = self.zero_velocity_penetration_depth(
+                state,
+                2.0 * radius,
+            )
+            max_penetration_depth = radius
+            if penetration_depth <= max_penetration_depth + tolerance:
+                continue
+
+            errors.append(
+                f"ERROR p{particle_index}->{self.wall_name(wall_flag)} "
+                f"p_zero_depth={penetration_depth:.8f} "
+                f"exceeds_max={max_penetration_depth:.8f} "
+                f"excess={penetration_depth - max_penetration_depth:.8f}"
+            )
+
+        return errors
+
+    @staticmethod
+    def zero_velocity_penetration_depth(contact_state, radius_sum):
+        penetration_depth = contact_state.get("geo_zero_velocity_penetration_depth")
+        if penetration_depth is not None:
+            return float(penetration_depth)
+
+        center_distance = contact_state.get("geo_zero_velocity_center_distance")
+        if center_distance is None:
+            return 0.0
+        return max(0.0, radius_sum - float(center_distance))
+
+    def momentum_drift_guardrail_error(self):
+        if not self.run_debug:
+            return None
+
+        diagnostics = self.momentum_diagnostic_values()
+        drift_x = diagnostics["mom_drift_px"]
+        drift_y = diagnostics["mom_drift_py"]
+        drift_mag = diagnostics["mom_drift_p"]
+        if drift_mag <= self.momentum_drift_tolerance:
+            return None
+
+        return (
+            f"ERROR momentum_drift "
+            f"px={drift_x:.8f} py={drift_y:.8f} |p|={drift_mag:.8f} "
+            f"tolerance={self.momentum_drift_tolerance:.8g}"
+        )
 
     def max_particle_overlap_errors(self):
         errors = []
