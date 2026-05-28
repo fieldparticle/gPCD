@@ -85,6 +85,63 @@ Velocity may affect momentum transfer, phase, or future position, but it does
 not make the instantaneous geometric overlap area different for the two
 particles in the same contact.
 
+\subsection{Instantaneous Geometric Goal}
+
+The long-term Geo dynamics target is an instantaneous, purely geometric
+collision model.
+
+Instantaneous means the collision response for a frame is computed from the
+current frame's particle state only:
+
+\begin{itemize}
+    \item current positions;
+    \item current velocities;
+    \item current radii and masses;
+    \item current overlap geometry;
+    \item current source-owned contact list for this frame.
+\end{itemize}
+
+Purely geometric means the response should be derived from contact geometry,
+such as center distance, normal direction, penetration depth, overlap area, and
+the distribution of overlap area across a source particle's simultaneous
+contacts.  Energy calculations and energy-named dynamics variables should be
+reserved for diagnostics only.
+
+The model should not require persistent collision-episode memory such as:
+
+\begin{itemize}
+    \item stored contact momentum reservoirs;
+    \item immutable first-contact velocity;
+    \item persistent compression/rebound phase state;
+    \item remembered alpha-zero values;
+    \item global wall or contact reservoirs shared by particles.
+\end{itemize}
+
+The only persistent particle state should be ordinary particle state, such as
+position, velocity, radius, mass, and explicitly approved per-particle fields.
+The current frame may build temporary contact information, but that temporary
+contact information should be safe to rebuild on the next frame.
+
+\subsection{Model-Preservation Warning}
+
+Before editing code, any proposed change that would move the Geo path away from
+the instantaneous, purely geometric target must be called out explicitly.
+
+Examples of changes that require warning before implementation:
+
+\begin{itemize}
+    \item adding persistent per-contact memory for dynamics;
+    \item adding a reservoir whose value survives after the frame;
+    \item using first-contact velocity as a long-lived dynamics input;
+    \item using phase history to decide future dynamics;
+    \item adding global writable memory shared by all particles;
+    \item adding a wall-specific dynamics path instead of expressing the wall as
+    contact geometry.
+\end{itemize}
+
+This warning does not forbid such changes forever, but it makes the model cost
+visible before implementation.
+
 \subsection{Control Flow Shape}
 
 The Python control-flow harness should match the compute shader shape:

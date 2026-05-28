@@ -1,15 +1,14 @@
-Add Geo dynamics scaffold and first reservoir collision prototype
+Start Geo dynamics path and document instantaneous geometry direction
 
-- Add GeoBase/GeoDynamics/GeoRunner separation for the new GLSL-shaped path
-- Add cfg-driven particle creation with AttrDict-style field access
-- Add position double buffering using PosLocA/PosLocB and ShaderFlags.positionBuffer
-- Add source-owned contact slots, contact detection, overlap-area reporting, and tunneling guardrail
-- Add GeoRunner drawing for particles, walls, overlap regions, particle labels, and error display
-- Add per-particle CSV reporting with frame ranges from RUN_CONFIGURATION.rpt_frames
-- Add constants.glsl loading for GLSL-style error/status constants
-- Document Geo conventions and current stiffness/alpha_zero collision notes
-- Prototype stored-momentum collision handling with separate stored/applied momentum fields
-
-Note: the stored-momentum reservoir prototype exposed model complexity around persistent contact state. 
-Next direction is to replace it with an instantaneous, purely geometric collision 
-model with no stored contact momentum.
+- Add GeoBase, GeoDynamics, GeoRunner, Reporting, and InLineTest scaffolding
+- Add cfg-driven particle loading with AttrDict-style field access
+- Add GLSL-shaped particle fields, push constants, constants.glsl loading, and error reporting
+- Add position double buffering with PosLocA/PosLocB and ShaderFlags.positionBuffer
+- Add GeoRunner UI for drawing particles, walls, overlap regions, labels, and errors
+- Add per-particle CSV reporting using RUN_CONFIGURATION.rpt_frames and run_debug_dir
+- Add contact detection, overlap-area calculation, tunneling guardrail, and current-frame contact lists
+- Document Geo conventions, file boundaries, naming rules, and GLSL-portability goals
+- Update ParticleGeometry.tex for the instantaneous, purely geometric model direction
+- Back out the stored-momentum reservoir collision prototype
+- Establish that future Geo collision work should avoid persistent contact memory, 
+	phase history, first-contact velocity, and global writable shared state

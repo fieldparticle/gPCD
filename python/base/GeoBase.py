@@ -50,6 +50,7 @@ class GeoBase(GeoDynamics):
         self.particles = []
         self.ShaderFlags = self.create_shader_flags()
         self.inline_test = InLineTest()
+        self.inline_test_flag = False
 
     def load_cfg_file(self, cfg_file_name):
         self.load_constants()
@@ -61,6 +62,10 @@ class GeoBase(GeoDynamics):
         self.particle_data = self.config.get("PARTICLE_DATA", {})
         self.particles = self.create_particle_array_from_cfg(self.particle_data)
         self.ShaderFlags = self.create_shader_flags_from_cfg(self.run_configuration)
+        if "in_line_obj" in self.config:
+            self.inline_test_flag = True
+            self.inline_test.Create(self.config)
+        # If there is a 
         return self.particles
 
     def load_constants(self, constants_file_name=None):
@@ -203,6 +208,8 @@ class GeoBase(GeoDynamics):
 
     def create_shader_flags(self, **fields):
         shader_flags = ShaderFlagsFields()
+        
+        self.item_cfg = shader_flags
         shader_flags.DrawInstance = fields.get("DrawInstance", 0.0)
         shader_flags.SideLength = fields.get("SideLength", 0.0)
         shader_flags.Ptot = fields.get("Ptot", 0.0)
@@ -242,7 +249,8 @@ class GeoBase(GeoDynamics):
             particle.report_compression_fraction = 0.0
             particle.report_rel_vn = 0.0
             particle.report_closing_mom = 0.0
-        self.particles = self.inline_test.StratRun(self.particles)
+        if self.inline_test_flag == True:
+            self.particles = self.inline_test.StartRun(self.particles)
         position_buffer = int(self.ShaderFlags.positionBuffer)
         self.VelRadFrame = [
             self.create_vec4(particle.VelRad.x, particle.VelRad.y, particle.VelRad.z, particle.VelRad.w)
