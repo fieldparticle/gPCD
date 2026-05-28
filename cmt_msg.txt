@@ -1,10 +1,15 @@
-Start Geo runner/dynamics scaffold
+Add Geo dynamics scaffold and first reservoir collision prototype
 
-- Add GeoRunner as the new pygame loop for the Geo path
-- Add GeoBase harness for cfg loading, particle setup, push constants, contact scan, and frame stepping
-- Add GeoDynamics GLSL-shaped hooks for contact add, collision processing, particle movement, and error returns
-- Add Reporting CSV output using rpt_frames and run_debug_dir
-- Add constants.glsl error codes and collIn-style error state
-- Add inline test hook for pre-collision particle modification
-- Add Geo conventions documentation
-- Route TwoParticleHorizontal through the new Geo runner
+- Add GeoBase/GeoDynamics/GeoRunner separation for the new GLSL-shaped path
+- Add cfg-driven particle creation with AttrDict-style field access
+- Add position double buffering using PosLocA/PosLocB and ShaderFlags.positionBuffer
+- Add source-owned contact slots, contact detection, overlap-area reporting, and tunneling guardrail
+- Add GeoRunner drawing for particles, walls, overlap regions, particle labels, and error display
+- Add per-particle CSV reporting with frame ranges from RUN_CONFIGURATION.rpt_frames
+- Add constants.glsl loading for GLSL-style error/status constants
+- Document Geo conventions and current stiffness/alpha_zero collision notes
+- Prototype stored-momentum collision handling with separate stored/applied momentum fields
+
+Note: the stored-momentum reservoir prototype exposed model complexity around persistent contact state. 
+Next direction is to replace it with an instantaneous, purely geometric collision 
+model with no stored contact momentum.

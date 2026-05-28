@@ -117,6 +117,100 @@ This memory buys persistent first-contact velocity, phase, and $A_0$.  Those
 are the values needed to prevent a stateless GLSL model from locking at the
 zero-velocity turnaround point.
 
+\section{Stiffness and Velocity at Overlap}
+
+In the old geometric model, stiffness did not directly change velocity each
+frame.  Instead, stiffness determined the penetration depth where the relative
+normal velocity should reach zero.
+
+\[
+\alpha_0 =
+\left(
+    \frac{3 \mu v_{\mathrm{in}}^2}{2 q}
+\right)^{1/3}
+\]
+
+where:
+
+\begin{itemize}[leftmargin=*]
+    \item $\alpha_0$ is the zero-velocity penetration depth,
+    \item $\mu = m_s m_t / (m_s + m_t)$ is the reduced mass,
+    \item $v_{\mathrm{in}}$ is the incoming relative normal speed,
+    \item $q$ is the contact stiffness.
+\end{itemize}
+
+The zero-velocity center distance is:
+
+\[
+d_0 = r_s + r_t - \alpha_0
+\]
+
+and the zero-velocity overlap area is:
+
+\[
+A_0 = A(d_0)
+\]
+
+For the current frame, the compression fraction is:
+
+\[
+f_c = \mathrm{clamp}\left(\frac{A}{A_0}, 0, 1\right)
+\]
+
+The velocity fraction remaining during compression is:
+
+\[
+f_v = \sqrt{1 - f_c}
+\]
+
+and the progress toward the zero-velocity point is:
+
+\[
+p_c = 1 - f_v
+\]
+
+The current compression velocity is then interpolated between the starting
+velocity and the zero-velocity-point velocity:
+
+\[
+v(A) = v_{\mathrm{start}} +
+p_c \left(v_0 - v_{\mathrm{start}}\right)
+\]
+
+In short:
+
+\[
+\text{stiffness}
+\rightarrow
+\alpha_0
+\rightarrow
+A_0
+\rightarrow
+A/A_0
+\rightarrow
+v(A)
+\]
+
+Higher stiffness produces a smaller $\alpha_0$, so the same overlap removes
+more velocity.
+
+\subsection{Chase Collision Problem Area}
+
+The problem area for chase-type collisions is the definition of:
+
+\[
+\alpha_0 =
+\text{penetration depth where relative normal velocity reaches zero}
+\]
+
+In a chase chain, the relative normal velocity of an already-active contact can
+change because another contact forms behind one of the particles.  If
+$\alpha_0$ is computed once from the original incoming relative velocity and
+then treated as fixed for the whole contact episode, the stored zero point can
+stop matching the current collision state.
+
+This is the core ambiguity: $\alpha_0$ is both a geometric target and a value
+derived from a velocity that may change during chained contacts.
 
 
 

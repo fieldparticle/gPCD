@@ -45,6 +45,41 @@ def _radius_to_pixels(radius, view_box, screen_width, screen_height):
     return max(1, int(radius * min(scale_x, scale_y)))
 
 
+def _draw_overlap_lens(screen, left_center, left_radius, right_center, right_radius):
+    min_x = max(0, min(left_center[0] - left_radius, right_center[0] - right_radius))
+    min_y = max(0, min(left_center[1] - left_radius, right_center[1] - right_radius))
+    max_x = min(screen.get_width(), max(left_center[0] + left_radius, right_center[0] + right_radius))
+    max_y = min(screen.get_height(), max(left_center[1] + left_radius, right_center[1] + right_radius))
+    width = max_x - min_x
+    height = max_y - min_y
+    if width <= 0 or height <= 0:
+        return
+
+    left_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+    right_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+    pygame.draw.circle(
+        left_surface,
+        (255, 255, 255, 255),
+        (left_center[0] - min_x, left_center[1] - min_y),
+        left_radius,
+    )
+    pygame.draw.circle(
+        right_surface,
+        (255, 255, 255, 255),
+        (right_center[0] - min_x, right_center[1] - min_y),
+        right_radius,
+    )
+
+    left_mask = pygame.mask.from_surface(left_surface)
+    right_mask = pygame.mask.from_surface(right_surface)
+    overlap_mask = left_mask.overlap_mask(right_mask, (0, 0))
+    overlap_surface = overlap_mask.to_surface(
+        setcolor=(255, 255, 255, 80),
+        unsetcolor=(0, 0, 0, 0),
+    )
+    screen.blit(overlap_surface, (min_x, min_y))
+
+
 def _draw_particles(
     screen,
     particles,
@@ -111,6 +146,7 @@ def _draw_particles(
         ),
     )
 
+    particle_screen_data = []
     for index, particle in enumerate(particles):
         if reporting is not None:
             reporting.report_particle(frame_number, particle)
@@ -121,9 +157,22 @@ def _draw_particles(
         if particle.collision_list:
             fill = (255, 140, 110)
             edge = (255, 220, 200)
+        particle_screen_data.append((index, particle, center, radius, edge))
         pygame.draw.circle(screen, fill, center, radius)
+
+    for index, particle, center, radius, _edge in particle_screen_data:
+        for target_id in particle.collision_list:
+            if target_id <= index or target_id >= len(particle_screen_data):
+                continue
+            _target_index, _target_particle, target_center, target_radius, _target_edge = particle_screen_data[target_id]
+            _draw_overlap_lens(screen, center, radius, target_center, target_radius)
+
+    particle_label_font = pygame.font.Font(None, 22)
+    for _index, particle, center, radius, edge in particle_screen_data:
         pygame.draw.circle(screen, edge, center, radius, 2)
         pygame.draw.circle(screen, (20, 26, 35), center, 3)
+        label = particle_label_font.render(str(int(particle.pnum)), True, (20, 26, 35))
+        screen.blit(label, (center[0] + 5, center[1] - 16))
 
     row_y = 10
     row_font = pygame.font.Font(None, 22)
@@ -131,7 +180,8 @@ def _draw_particles(
         row_text = (
             f"p{int(particle.pnum)} "
             f"x={particle.rx:.6f} y={particle.ry:.6f} "
-            f"vx={particle.vx:.6f} vy={particle.vy:.6f}"
+            f"vx={particle.vx:.6f} vy={particle.vy:.6f} "
+            f"oa={particle.oa:.8f}"
         )
         row = row_font.render(row_text, True, (220, 230, 240))
         screen.blit(row, (10, row_y))
