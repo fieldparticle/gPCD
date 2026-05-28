@@ -1,1 +1,3 @@
-For all config files that have RUN_CONFIGURATION add wall_contact_offset = 0.015625;
+So gPCD.py is too crowded. Make a new class ParticleUI.py Add a run fundtion like the one in gPCD.py and have it call CollisonRun every frame. Keep the escape to stop the current simulation, spacebar to pause, and s to end current simulaiton and return True to stop a batch process.
+
+In the report object each particle will have separate a csv file. For naore fields are Particle number, x,y,z,vx,vy,vz,cflg. 

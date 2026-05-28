@@ -1,2 +1,10 @@
-Added GeoBase, GeoDynmics, GeoRunner. GeoDynamics is currently one-to-one for glsl.
-Storme miving in more tomoorw
+Start Geo runner/dynamics scaffold
+
+- Add GeoRunner as the new pygame loop for the Geo path
+- Add GeoBase harness for cfg loading, particle setup, push constants, contact scan, and frame stepping
+- Add GeoDynamics GLSL-shaped hooks for contact add, collision processing, particle movement, and error returns
+- Add Reporting CSV output using rpt_frames and run_debug_dir
+- Add constants.glsl error codes and collIn-style error state
+- Add inline test hook for pre-collision particle modification
+- Add Geo conventions documentation
+- Route TwoParticleHorizontal through the new Geo runner

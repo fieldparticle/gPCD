@@ -1,0 +1,97 @@
+\section{Geo Dynamics Conventions}
+
+\subsection{Purpose}
+
+The Geo path is a clean restart of the collision dynamics code.  Its purpose is
+to build a Python implementation whose structure can be transferred to GLSL
+with minimal translation.
+
+\subsection{File Boundaries}
+
+\texttt{GeoDynamics.py} is the GLSL-portable dynamics layer.  It should contain
+only functions that correspond directly to shader-side dynamics functions.
+
+\texttt{GeoBase.py} is the Python harness.  It may load configuration files,
+create Python data structures, build particle arrays, set push constants,
+iterate particles, and call the Geo dynamics functions.
+
+\texttt{Reporting.py} is reserved for reporting and diagnostic output.  It
+should not own dynamics decisions.
+
+\subsection{Naming Convention}
+
+Functions intended to map to GLSL should use GLSL-like names and signatures
+where practical.  Current examples are:
+
+\begin{verbatim}
+GeoAddParticleContact(SourceID, TargetID)
+GeoProcessCollisions(SourceID)
+GeoMoveParticle(SourceID, positionBuffer, dt)
+isParticleContact(Frame, SourceID, TargetID, positionBuffer)
+\end{verbatim}
+
+\texttt{GeoDynamics.py} should avoid Python-only helper names unless the helper
+is also expected to exist in GLSL.
+
+\subsection{Data Convention}
+
+Particle records use field access:
+
+\begin{verbatim}
+Particle.vx
+Particle.radius
+\end{verbatim}
+
+rather than dictionary access:
+
+\begin{verbatim}
+Particle["vx"]
+\end{verbatim}
+
+The Python structures should be shaped to resemble GLSL buffers and push
+constants.  Python-only configuration parsing must not leak into
+\texttt{GeoDynamics.py}.
+
+\subsection{Control Flow Shape}
+
+The Python control-flow harness should match the compute shader shape:
+
+\begin{verbatim}
+for each SourceID:
+    build source-owned contact list
+    GeoProcessCollisions(SourceID)
+    GeoMoveParticle(SourceID, positionBuffer, dt)
+\end{verbatim}
+
+The current Python harness may use a direct all-pairs scan while the shader uses
+cell/corner occupancy lookup.  That difference belongs in \texttt{GeoBase.py},
+not \texttt{GeoDynamics.py}.
+
+\subsection{Dynamics Versus Harness}
+
+\texttt{GeoDynamics.py} should not:
+
+\begin{itemize}
+    \item read cfg files;
+    \item create particle lists from cfg files;
+    \item know about UI flags;
+    \item know about reports or capture files;
+    \item contain test harness iteration logic.
+\end{itemize}
+
+\texttt{GeoBase.py} may do those things because it is not intended to be a
+one-to-one GLSL export unit.
+
+\subsection{Current TODO}
+
+\begin{itemize}
+    \item Add a \texttt{NeoBeginContactFrame(SourceID)} equivalent or decide
+    whether contact clearing belongs in the harness.
+    \item Decide whether \texttt{isParticleContact(...)} belongs in
+    \texttt{GeoBase.py} or should be moved to a GLSL-matching dynamics/helper
+    module.
+    \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
+    \item Add duplicate contact handling only where it matches the shader model.
+    \item Implement \texttt{GeoProcessCollisions(SourceID)} incrementally.
+    \item Add reporting only through \texttt{Reporting.py}, not through dynamics.
+\end{itemize}

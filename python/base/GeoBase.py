@@ -1,7 +1,10 @@
 from gbase.AttrDictFields import *
 from gbase import libconf
 from base.GeoDynamics import GeoDynamics
+from base.InLineTest import InLineTest
 import math
+import re
+from pathlib import Path
 
 
 class ParticleFields(AttrDictFields):
@@ -20,15 +23,29 @@ class ShaderFlagsFields(AttrDictFields):
             self[attr] = value
 
 
+class CollisionInFields(AttrDictFields):
+    def __setattr__(self, attr, value):
+        if attr.startswith("_"):
+            super().__setattr__(attr, value)
+        else:
+            self[attr] = value
+
+
 class GeoBase(GeoDynamics):
     def __init__(self):
         self.config = None
         self.run_configuration = None
         self.particle_data = None
+        self.constants = AttrDictFields()
+        self.error_names = {}
+        self.collIn = self.create_collision_in()
         self.particles = []
         self.ShaderFlags = self.create_shader_flags()
+        self.inline_test = InLineTest()
 
     def load_cfg_file(self, cfg_file_name):
+        self.load_constants()
+        self.collIn.ErrorReturn = self.constants.GEO_ERROR_NONE
         with open(cfg_file_name, "r", encoding="utf-8") as cfg_file:
             self.config = libconf.load(cfg_file)
 
@@ -37,6 +54,39 @@ class GeoBase(GeoDynamics):
         self.particles = self.create_particle_array_from_cfg(self.particle_data)
         self.ShaderFlags = self.create_shader_flags_from_cfg(self.run_configuration)
         return self.particles
+
+    def load_constants(self, constants_file_name=None):
+        if constants_file_name is None:
+            constants_file_name = Path(__file__).resolve().parents[1] / "constants.glsl"
+        constants_path = Path(constants_file_name)
+        constants = AttrDictFields()
+        constants_pattern = re.compile(r"const\s+uint\s+(\w+)\s*=\s*(\d+)\s*;")
+        with constants_path.open("r", encoding="utf-8") as constants_file:
+            for line in constants_file:
+                match = constants_pattern.search(line)
+                if match is None:
+                    continue
+                constants[match.group(1)] = int(match.group(2))
+        self.constants = constants
+        self.error_names = {
+            value: name
+            for name, value in constants.items()
+            if name.startswith("GEO_ERROR_")
+        }
+        return self.constants
+
+    def ErrorDescription(self):
+        return self.error_names.get(self.collIn.ErrorReturn, "GEO_ERROR_UNKNOWN")
+
+    def create_collision_in(self):
+        coll_in = CollisionInFields()
+        coll_in.ErrorReturn = 0
+        coll_in.numParticles = 0
+        coll_in.maxCells = 0
+        coll_in.particleNumber = 0
+        coll_in.ReadWriteConflict = 0
+        coll_in.ExcessSlots = 0
+        return coll_in
 
     def create_particle(self, **fields):
         particle = ParticleFields()
@@ -115,6 +165,11 @@ class GeoBase(GeoDynamics):
         )
 
     def CollisionRun(self):
+        self.collIn.ErrorReturn = self.constants.GEO_ERROR_NONE
+        for particle in self.particles:
+            particle.collision_list = []
+        self.particles = self.inline_test.StratRun(self.particles)
+
         for source_id in range(len(self.particles)):
             for target_id in range(len(self.particles)):
                 if source_id == target_id:
@@ -125,13 +180,18 @@ class GeoBase(GeoDynamics):
                     target_id,
                     self.ShaderFlags.positionBuffer,
                 ):
-                    self.GeoAddParticleContact(source_id, target_id)
-            self.GeoProcessCollisions(source_id)
-            self.GeoMoveParticle(
+                    if not self.GeoAddParticleContact(source_id, target_id):
+                        return self.particles
+            if not self.GeoProcessCollisions(source_id):
+                return self.particles
+            if not self.GeoMoveParticle(
                 source_id,
                 self.ShaderFlags.positionBuffer,
                 self.ShaderFlags.dt,
-            )
+            ):
+                return self.particles
+
+        return self.particles
 
     def isParticleContact(self, Frame, SourceID, TargetID, positionBuffer):
         source = self.particles[SourceID]
