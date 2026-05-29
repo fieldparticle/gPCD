@@ -6,6 +6,10 @@
 const float GEO_EPSILON = 1.0e-12;
 const uint GEO_CONTACT_INACTIVE = 0u;
 const uint GEO_CONTACT_PARTICLE = 1u;
+const uint GEO_PHASE_INACTIVE = 0u;
+const uint GEO_PHASE_COMPRESSION = 1u;
+const uint GEO_PHASE_RETURNING = 2u;
+const uint GEO_CONTACT_ACTIVE_THIS_FRAME = 1u;
 const uint GEO_POSITION_BUFFER_A = 0u;
 
 struct GeoContactGeometry {
@@ -89,14 +93,27 @@ bool GeoParticleGeometry(uint SourceID, uint TargetID, out GeoContactGeometry co
     return contact.overlap_area > 0.0;
 }
 
+void GeoClearContactSlot(uint SourceID, uint slot)
+{
+    P[SourceID].contacts[slot].ids = uvec4(0u);
+    P[SourceID].contacts[slot].geom = vec4(0.0);
+    P[SourceID].contacts[slot].aux = vec4(0.0);
+}
+
 void GeoBeginContactFrame(uint SourceID)
 {
     P[SourceID].colFlg = 0u;
     P[SourceID].contactCount = 0u;
     for (uint slot = 0u; slot < MAX_CONTACTS; ++slot) {
-        P[SourceID].contacts[slot].ids = uvec4(0u);
+        if (P[SourceID].contacts[slot].ids.w != GEO_CONTACT_ACTIVE_THIS_FRAME) {
+            GeoClearContactSlot(SourceID, slot);
+            continue;
+        }
+        P[SourceID].contacts[slot].ids.w = 0u;
         P[SourceID].contacts[slot].geom = vec4(0.0);
-        P[SourceID].contacts[slot].aux = vec4(0.0);
+        P[SourceID].contacts[slot].aux.x = 0.0;
+        P[SourceID].contacts[slot].aux.y = 0.0;
+        P[SourceID].contacts[slot].aux.w = 0.0;
     }
 }
 
@@ -106,15 +123,18 @@ void GeoAddParticleContact(uint SourceID, uint TargetID)
         return;
     }
 
-    uint tracked_count = min(P[SourceID].contactCount, MAX_CONTACTS);
-    for (uint slot = 0u; slot < tracked_count; ++slot) {
+    uint contact_slot = MAX_CONTACTS;
+    uint free_slot = MAX_CONTACTS;
+    for (uint slot = 0u; slot < MAX_CONTACTS; ++slot) {
         if (P[SourceID].contacts[slot].ids.x == TargetID
             && P[SourceID].contacts[slot].ids.y == GEO_CONTACT_PARTICLE) {
-            return;
+            contact_slot = slot;
+            break;
         }
-    }
-    if (tracked_count >= MAX_CONTACTS) {
-        return;
+        if (free_slot == MAX_CONTACTS
+            && P[SourceID].contacts[slot].ids.y == GEO_CONTACT_INACTIVE) {
+            free_slot = slot;
+        }
     }
 
     GeoContactGeometry contact;
@@ -122,18 +142,30 @@ void GeoAddParticleContact(uint SourceID, uint TargetID)
         return;
     }
 
-    uint slot = tracked_count;
+    if (contact_slot == MAX_CONTACTS) {
+        if (free_slot == MAX_CONTACTS) {
+            return;
+        }
+        contact_slot = free_slot;
+        P[SourceID].contacts[contact_slot].ids = uvec4(
+            TargetID,
+            GEO_CONTACT_PARTICLE,
+            GEO_PHASE_COMPRESSION,
+            GEO_CONTACT_ACTIVE_THIS_FRAME
+        );
+        P[SourceID].contacts[contact_slot].aux.z = 0.0;
+    } else if (P[SourceID].contacts[contact_slot].ids.w == GEO_CONTACT_ACTIVE_THIS_FRAME) {
+        return;
+    }
+
     float source_radius = P[SourceID].Data.x;
     float target_radius = P[TargetID].Data.x;
-    P[SourceID].contacts[slot].ids = uvec4(TargetID, GEO_CONTACT_PARTICLE, 0u, 0u);
-    P[SourceID].contacts[slot].geom = vec4(contact.normal, contact.overlap_area);
-    P[SourceID].contacts[slot].aux = vec4(
-        contact.center_distance,
-        source_radius + target_radius - contact.center_distance,
-        0.0,
-        0.0
-    );
-    P[SourceID].contactCount = tracked_count + 1u;
+    P[SourceID].contacts[contact_slot].ids.w = GEO_CONTACT_ACTIVE_THIS_FRAME;
+    P[SourceID].contacts[contact_slot].geom = vec4(contact.normal, contact.overlap_area);
+    P[SourceID].contacts[contact_slot].aux.x = contact.center_distance;
+    P[SourceID].contacts[contact_slot].aux.y = source_radius + target_radius - contact.center_distance;
+    P[SourceID].contacts[contact_slot].aux.w = 0.0;
+    P[SourceID].contactCount = min(P[SourceID].contactCount + 1u, MAX_CONTACTS);
     P[SourceID].colFlg = 1u;
 }
 
@@ -143,7 +175,18 @@ void GeoProcessCollisions(uint SourceID)
         return;
     }
 
-    uint TargetID = P[SourceID].contacts[0].ids.x;
+    uint contact_slot = MAX_CONTACTS;
+    for (uint slot = 0u; slot < MAX_CONTACTS; ++slot) {
+        if (P[SourceID].contacts[slot].ids.w == GEO_CONTACT_ACTIVE_THIS_FRAME) {
+            contact_slot = slot;
+            break;
+        }
+    }
+    if (contact_slot == MAX_CONTACTS) {
+        return;
+    }
+
+    uint TargetID = P[SourceID].contacts[contact_slot].ids.x;
     if (TargetID >= NUMPARTS) {
         return;
     }
@@ -157,20 +200,45 @@ void GeoProcessCollisions(uint SourceID)
     vec3 target_velocity = P[TargetID].VelRad.xyz;
     float relative_normal_velocity = dot(target_velocity - source_velocity, contact.normal);
     float stiffness_q = GeoPairStiffness(SourceID, TargetID);
-    float impulse = stiffness_q * contact.overlap_area * ShaderFlags.dt;
+    float raw_impulse = stiffness_q * contact.overlap_area * ShaderFlags.dt;
+    float stored_internal_momentum = max(0.0, P[SourceID].contacts[contact_slot].aux.z);
+    float applied_impulse = 0.0;
 
-    P[SourceID].VelRad.xyz -= (impulse / GeoMass(SourceID)) * contact.normal;
+    float source_normal_velocity = dot(source_velocity, contact.normal);
+    if (P[SourceID].contacts[contact_slot].ids.z != GEO_PHASE_RETURNING
+        && relative_normal_velocity < -GEO_EPSILON) {
+        float available_momentum = max(0.0, GeoMass(SourceID) * source_normal_velocity);
+        float compression_impulse = min(raw_impulse, available_momentum);
+        applied_impulse += compression_impulse;
+        stored_internal_momentum += compression_impulse;
+        if (compression_impulse < raw_impulse) {
+            P[SourceID].contacts[contact_slot].ids.z = GEO_PHASE_RETURNING;
+        } else {
+            P[SourceID].contacts[contact_slot].ids.z = GEO_PHASE_COMPRESSION;
+        }
+    }
+
+    if (P[SourceID].contacts[contact_slot].ids.z == GEO_PHASE_RETURNING) {
+        float release_impulse = min(raw_impulse, stored_internal_momentum);
+        applied_impulse += release_impulse;
+        stored_internal_momentum -= release_impulse;
+        if (stored_internal_momentum <= GEO_EPSILON) {
+            stored_internal_momentum = 0.0;
+        }
+    }
+
+    P[SourceID].contacts[contact_slot].aux.z = stored_internal_momentum;
+
+    P[SourceID].VelRad.xyz -= (applied_impulse / GeoMass(SourceID)) * contact.normal;
     P[SourceID].VelRad.w = length(P[SourceID].VelRad.xy) > 0.0
         ? atan(P[SourceID].VelRad.y, P[SourceID].VelRad.x)
         : 0.0;
 
-    P[SourceID].contacts[0].geom = vec4(contact.normal, contact.overlap_area);
-    P[SourceID].contacts[0].aux = vec4(
-        contact.center_distance,
-        P[SourceID].Data.x + P[TargetID].Data.x - contact.center_distance,
-        relative_normal_velocity,
-        impulse
-    );
+    P[SourceID].contacts[contact_slot].geom = vec4(contact.normal, contact.overlap_area);
+    P[SourceID].contacts[contact_slot].aux.x = contact.center_distance;
+    P[SourceID].contacts[contact_slot].aux.y =
+        P[SourceID].Data.x + P[TargetID].Data.x - contact.center_distance;
+    P[SourceID].contacts[contact_slot].aux.w = applied_impulse;
 }
 
 void GeoMoveParticle(uint SourceID, uint positionBuffer, float dt)

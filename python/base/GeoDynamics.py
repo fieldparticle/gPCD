@@ -1,17 +1,13 @@
 class GeoDynamics:
-    """GLSL-shaped dynamics functions for the Geo path.
+    """GLSL-shaped dynamics functions for the Geo path."""
 
-    This file is intentionally small again.  The reservoir/phase collision
-    prototype has been backed out so the next model can be built as an
-    instantaneous, purely geometric response.
-
-    GeoBase still owns cfg loading, particle setup, contact scanning, reporting
-    fields, and the frame loop.  GeoDynamics currently owns only:
-        - GLSL-style error return helpers,
-        - per-frame contact-list registration,
-        - position double-buffered particle motion,
-        - an empty collision-processing hook.
-    """
+    GEO_EPSILON = 1.0e-12
+    GEO_CONTACT_INACTIVE = 0
+    GEO_CONTACT_PARTICLE = 1
+    GEO_PHASE_INACTIVE = 0
+    GEO_PHASE_COMPRESSION = 1
+    GEO_PHASE_RETURNING = 2
+    GEO_CONTACT_ACTIVE_THIS_FRAME = 1
 
     def GeoSetError(self, ErrorReturn):
         """Set the GLSL-style collIn error code and return False."""
@@ -38,6 +34,62 @@ class GeoDynamics:
         source_q = self.particles[SourceID].Data.y or 0.0
         target_q = self.particles[TargetID].Data.y or 0.0
         return max(0.0, 0.5 * (source_q + target_q))
+
+    def GeoContactSlots(self, SourceID):
+        """Return the source-owned persistent contact slots."""
+        particle = self.particles[SourceID]
+        if hasattr(particle, "contacts"):
+            return particle.contacts
+        return particle.gcs
+
+    def GeoClearContactSlot(self, contact_state):
+        contact_state.ids = self.create_uvec4()
+        contact_state.geom = self.create_vec4()
+        contact_state.aux = self.create_vec4()
+
+    def GeoBeginContactFrame(self, SourceID):
+        """Reset current-frame contact flags while preserving active ledgers."""
+        source = self.particles[SourceID]
+        source.collision_list = []
+        source.contactCount = 0
+        source.colFlg = 0
+        for contact_state in self.GeoContactSlots(SourceID):
+            if contact_state.ids.w != self.GEO_CONTACT_ACTIVE_THIS_FRAME:
+                self.GeoClearContactSlot(contact_state)
+                continue
+            contact_state.ids.w = 0
+            contact_state.geom = self.create_vec4()
+            contact_state.aux.x = 0.0
+            contact_state.aux.y = 0.0
+            contact_state.aux.w = 0.0
+
+    def GeoFindContactSlot(self, SourceID, TargetID):
+        for contact_state in self.GeoContactSlots(SourceID):
+            if (
+                contact_state.ids.x == TargetID
+                and contact_state.ids.y == self.GEO_CONTACT_PARTICLE
+            ):
+                return contact_state
+        return None
+
+    def GeoAllocContactSlot(self, SourceID, TargetID):
+        for contact_state in self.GeoContactSlots(SourceID):
+            if contact_state.ids.y == self.GEO_CONTACT_INACTIVE:
+                contact_state.ids.x = TargetID
+                contact_state.ids.y = self.GEO_CONTACT_PARTICLE
+                contact_state.ids.z = self.GEO_PHASE_COMPRESSION
+                contact_state.ids.w = self.GEO_CONTACT_ACTIVE_THIS_FRAME
+                contact_state.aux.z = 0.0
+                return contact_state
+        return None
+
+    def GeoContactState(self, SourceID, TargetID):
+        contact_state = self.GeoFindContactSlot(SourceID, TargetID)
+        if contact_state is None:
+            contact_state = self.GeoAllocContactSlot(SourceID, TargetID)
+        if contact_state is not None:
+            contact_state.ids.w = self.GEO_CONTACT_ACTIVE_THIS_FRAME
+        return contact_state
 
     def GeoParticleGeometry(self, SourceID, TargetID):
         """Return current contact geometry or None when there is no contact."""
@@ -76,9 +128,8 @@ class GeoDynamics:
         """Record that SourceID is in contact with TargetID this frame.
 
         Contact detection and overlap-area calculation happen in GeoBase before
-        this function is called.  This function only records the current-frame
-        contact list; it does not create persistent contact state or apply any
-        dynamics.
+        this function is called.  This function records the current-frame
+        contact list and binds it to a source-owned persistent contact slot.
         """
         if not self.GeoValidParticleID(SourceID):
             return self.GeoSetError(self.constants.GEO_ERROR_INVALID_SOURCE_ID)
@@ -91,7 +142,11 @@ class GeoDynamics:
 
         if TargetID not in particle.collision_list:
             particle.collision_list.append(TargetID)
+        contact_state = self.GeoContactState(SourceID, TargetID)
+        if contact_state is None:
+            return True
         particle.colFlg = 1
+        particle.contactCount = len(particle.collision_list)
         particle.report_contacts = len(particle.collision_list)
         particle.report_target = TargetID
         return True
@@ -124,17 +179,7 @@ class GeoDynamics:
         return True
 
     def GeoProcessCollisions(self, SourceID):
-        """Apply two-particle instantaneous geometric collision response.
-
-        This first rule supports only one contact per source particle.  The
-        response is rebuilt from current-frame geometry and velocity every
-        frame:
-
-            impulse = stiffness * overlap_area * dt
-
-        The impulse is applied along the current contact normal and does not use
-        persistent contact memory.
-        """
+        """Apply source-owned geometric response with internal momentum."""
         if not self.GeoValidParticleID(SourceID):
             return self.GeoSetError(self.constants.GEO_ERROR_INVALID_SOURCE_ID)
         source = self.particles[SourceID]
@@ -148,6 +193,9 @@ class GeoDynamics:
         contact = self.GeoParticleGeometry(SourceID, TargetID)
         if contact is None:
             return True
+        contact_state = self.GeoContactState(SourceID, TargetID)
+        if contact_state is None:
+            return True
 
         normal_x, normal_y, normal_z, overlap_area, center_distance = contact
         source_velocity = self.GeoVelocity(SourceID)
@@ -158,25 +206,59 @@ class GeoDynamics:
             + (target_velocity.z - source_velocity.z) * normal_z
         )
         stiffness_q = self.GeoPairStiffness(SourceID, TargetID)
-        impulse = stiffness_q * overlap_area * self.ShaderFlags.dt
+        raw_impulse = stiffness_q * overlap_area * self.ShaderFlags.dt
+        stored_internal_momentum = max(0.0, contact_state.aux.z)
+        applied_impulse = 0.0
 
-        source.VelRad.x -= (impulse / self.GeoMass(SourceID)) * normal_x
-        source.VelRad.y -= (impulse / self.GeoMass(SourceID)) * normal_y
-        source.VelRad.z -= (impulse / self.GeoMass(SourceID)) * normal_z
+        source_normal_velocity = (
+            source_velocity.x * normal_x
+            + source_velocity.y * normal_y
+            + source_velocity.z * normal_z
+        )
+        if (
+            contact_state.ids.z != self.GEO_PHASE_RETURNING
+            and relative_normal_velocity < -self.GEO_EPSILON
+        ):
+            available_momentum = max(0.0, self.GeoMass(SourceID) * source_normal_velocity)
+            compression_impulse = min(raw_impulse, available_momentum)
+            applied_impulse += compression_impulse
+            stored_internal_momentum += compression_impulse
+            if compression_impulse < raw_impulse:
+                contact_state.ids.z = self.GEO_PHASE_RETURNING
+            else:
+                contact_state.ids.z = self.GEO_PHASE_COMPRESSION
+
+        if contact_state.ids.z == self.GEO_PHASE_RETURNING:
+            release_impulse = min(raw_impulse, stored_internal_momentum)
+            applied_impulse += release_impulse
+            stored_internal_momentum -= release_impulse
+            if stored_internal_momentum <= self.GEO_EPSILON:
+                stored_internal_momentum = 0.0
+
+        contact_state.aux.z = stored_internal_momentum
+
+        source.VelRad.x -= (applied_impulse / self.GeoMass(SourceID)) * normal_x
+        source.VelRad.y -= (applied_impulse / self.GeoMass(SourceID)) * normal_y
+        source.VelRad.z -= (applied_impulse / self.GeoMass(SourceID)) * normal_z
         source.vx = source.VelRad.x
         source.vy = source.VelRad.y
         source.vz = source.VelRad.z
+
+        contact_state.geom = self.create_vec4(normal_x, normal_y, normal_z, overlap_area)
+        contact_state.aux.x = center_distance
+        contact_state.aux.y = source.Data.x + self.particles[TargetID].Data.x - center_distance
+        contact_state.aux.w = applied_impulse
 
         source.report_contacts = len(source.collision_list)
         source.report_target = TargetID
         source.report_center_distance = center_distance
         source.report_normal_x = normal_x
         source.report_normal_y = normal_y
-        source.report_stored_mom = 0.0
+        source.report_stored_mom = stored_internal_momentum
         source.report_alpha_zero = 0.0
         source.report_zero_area = 0.0
         source.report_compression_fraction = 0.0
         source.report_rel_vn = relative_normal_velocity
-        source.report_closing_mom = impulse
+        source.report_closing_mom = applied_impulse
         source.report_collision_stiffness_q = stiffness_q
         return True

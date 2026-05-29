@@ -1,0 +1,164 @@
+\section{Problem Evolution}
+\label{sec:problem-evolution}
+
+The intent of this section is to follow the path of dynamics evolution.
+Understanding that path makes the design issues and nomenclature visible.  It
+also helps future development because the current model contains assumptions
+about rules such as equal-radius particles, wall particles, and source-owned
+contact state.  When those rules change, it should be clear where they came
+from and why they existed.
+
+\subsection{Observed Failure - Velocity Asymmetry After Collision in TwoParticleHorizontal}
+
+\noindent\textbf{Commit hash:} \texttt{62ff53dbe45b11fb5aad8f5695d5f9513d2baf2a}
+
+The first Geo collision response used a purely frame-local overlap impulse:
+
+\begin{equation}
+J = q A \Delta t.
+\end{equation}
+
+Here $q$ is the particle-owned pair stiffness, $A$ is the current overlap area,
+and $\Delta t$ is the frame time step.  This rule was intentionally simple and
+source-owned: each shader-shaped invocation updated only the current source
+particle.
+
+In \texttt{TwoParticleHorizontal}, total momentum remained conserved because
+the two particles received equal and opposite velocity changes.  However, the
+final speeds drifted slightly high:
+
+\begin{equation}
+v = 0.05 \quad \rightarrow \quad v \approx 0.050006.
+\end{equation}
+
+This is symmetric velocity drift.  It is invisible to total momentum:
+
+\begin{equation}
+P = \sum_i m_i v_i \approx 0,
+\end{equation}
+
+but visible in kinetic energy:
+
+\begin{equation}
+K = \sum_i \frac{1}{2}m_i \lVert v_i \rVert^2.
+\end{equation}
+
+The drift appeared at the end of rebound.  The particles were already
+separating, but they were still slightly overlapped.  Because the old rule
+continued applying $qA\Delta t$ until the overlap disappeared, the last small
+overlap frames released a little extra velocity.
+
+\subsection{Rejected Pairwise Fix}
+
+A conventional pairwise elastic collision impulse can conserve both momentum
+and kinetic energy:
+
+\begin{equation}
+J =
+-\frac{(1+e)v_n}{\frac{1}{m_s}+\frac{1}{m_t}}.
+\end{equation}
+
+That approach updates both particles in one pair solve.  It is not allowed in
+the current Geo path because the GLSL execution model is source-owned: one
+invocation owns one source particle and must not write the target particle.
+
+Therefore Python may not use a pairwise write-back shortcut.  The Python Geo
+path must not become a separate reference model that fixes dynamics in a way
+the shader cannot reproduce safely.
+
+\subsection{Allowed Exception}
+
+The accepted fix is source-owned internal normal momentum.  Each source-particle
+contact slot may carry one persistent scalar:
+
+\begin{equation}
+I_{s,t} \ge 0.
+\end{equation}
+
+This value records the normal momentum removed from the source during
+compression.  It is not a shared pair reservoir and it does not write the
+target particle.
+
+In the GLSL-shaped contact state, the value is stored in:
+
+\begin{verbatim}
+P[SourceID].contacts[slot].aux.z
+\end{verbatim}
+
+\subsection{Compression Rule}
+
+The raw geometric impulse remains:
+
+\begin{equation}
+J_{raw} = q_{s,t} A_{s,t} \Delta t.
+\end{equation}
+
+During compression, the source can store only momentum that actually exists in
+the source normal motion:
+
+\begin{equation}
+J_c =
+\min\left(
+J_{raw},
+\max(0, m_s(v_s \cdot \hat{n}_{s,t}))
+\right).
+\end{equation}
+
+The source velocity is updated by:
+
+\begin{equation}
+v_s' = v_s - \frac{J_c}{m_s}\hat{n}_{s,t}.
+\end{equation}
+
+The source-owned internal momentum ledger increases by the same amount:
+
+\begin{equation}
+I_{s,t}' = I_{s,t} + J_c.
+\end{equation}
+
+\subsection{Returning Rule}
+
+When the source can no longer provide the full compression impulse, the contact
+enters the returning phase.  During returning, the source may release only
+stored internal momentum:
+
+\begin{equation}
+J_r = \min(J_{raw}, I_{s,t}).
+\end{equation}
+
+The velocity update uses the same source-owned write shape:
+
+\begin{equation}
+v_s' = v_s - \frac{J_r}{m_s}\hat{n}_{s,t}.
+\end{equation}
+
+The ledger is reduced:
+
+\begin{equation}
+I_{s,t}' = \max(0, I_{s,t} - J_r).
+\end{equation}
+
+This cap prevents the last tiny-overlap frame from releasing more momentum than
+it stored during compression.
+
+\subsection{Result}
+
+For \texttt{TwoParticleHorizontal}, the internal momentum ledger drains to zero
+at the end of contact and the kinetic energy returns to the starting value:
+
+\begin{verbatim}
+start_ke=0.002500000000000000
+final_ke=0.002500000000000000
+ke_drift=-8.67e-19
+p1 vx=-0.050000000000000
+p2 vx=+0.050000000000000
+\end{verbatim}
+
+The fix preserves the current GLSL architecture:
+
+\begin{itemize}[leftmargin=*]
+    \item each invocation still owns only one source particle;
+    \item the target particle is read-only;
+    \item the carried value is source-owned contact state;
+    \item rebound cannot release more momentum than compression stored.
+\end{itemize}

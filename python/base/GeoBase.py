@@ -127,7 +127,8 @@ class GeoBase(GeoDynamics):
         particle.VelRad = self.create_vec4(vx, vy, vz, 0.0)
         particle.Data = self.create_vec4(radius, fields.get("collision_stiffness_q", 0.0), 0.0, fields.get("state_flg", 1.0))
         particle.parms = self.create_vec4(mass, 0.0, 0.0, 0.0)
-        particle.gcs = [self.create_geo_contact_state() for _ in range(16)]
+        particle.contacts = [self.create_geo_contact_state() for _ in range(16)]
+        particle.gcs = particle.contacts
         particle.contactCount = 0
         particle.colFlg = 0
         particle.rx = rx
@@ -176,9 +177,8 @@ class GeoBase(GeoDynamics):
     def create_geo_contact_state(self):
         contact_state = ParticleFields()
         contact_state.ids = self.create_uvec4()
-        contact_state.vel = self.create_vec4()
         contact_state.geom = self.create_vec4()
-        contact_state.mom = self.create_vec4()
+        contact_state.aux = self.create_vec4()
         return contact_state
 
     def create_particle_from_cfg(self, particle_name, particle_cfg):
@@ -259,8 +259,8 @@ class GeoBase(GeoDynamics):
         if self.senario:
             self.senario.BeforeContactScan(self.particles)
 
-        for particle in self.particles:
-            particle.collision_list = []
+        for particle_index, particle in enumerate(self.particles):
+            self.GeoBeginContactFrame(particle_index)
             particle.oa = 0.0
             particle.max_penetration_depth = 0.0
             particle.report_contacts = 0

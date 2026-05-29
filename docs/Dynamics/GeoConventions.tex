@@ -122,6 +122,34 @@ position, velocity, radius, mass, and explicitly approved per-particle fields.
 The current frame may build temporary contact information, but that temporary
 contact information should be safe to rebuild on the next frame.
 
+\subsection{Approved Source-Owned Internal Momentum Exception}
+
+The Geo path may carry one source-owned internal normal momentum value per
+active contact slot.  This is an explicit exception to the fully stateless
+geometric target because the current overlap-area impulse needs a ledger to
+avoid releasing more momentum than it removed during compression.
+
+The exception is constrained:
+
+\begin{itemize}[leftmargin=*]
+    \item the value is owned by the source particle's contact slot;
+    \item it is not a shared pair reservoir;
+    \item it must not write the target particle;
+    \item it may be used only to cap source-owned rebound/release impulse;
+    \item it must remain representable in the GLSL \texttt{ContactState}
+    structure.
+\end{itemize}
+
+In the current GLSL-shaped layout, the carried value is:
+
+\begin{verbatim}
+P[SourceID].contacts[slot].aux.z
+\end{verbatim}
+
+This field stores source-owned internal normal momentum.  It exists to prevent
+symmetric velocity drift while preserving the source-owned shader execution
+model.
+
 \subsection{Model-Preservation Warning}
 
 Before editing code, any proposed change that would move the Geo path away from
@@ -142,6 +170,31 @@ Examples of changes that require warning before implementation:
 This warning does not forbid such changes forever, but it makes the model cost
 visible before implementation.
 
+\subsection{Documenting Problem Evolution}
+
+When a dynamics rule changes, the reason for the change should be recorded in
+the problem-evolution document.  That document is the design history for the
+Geo path.  It should explain how the problem was observed, which fixes were
+rejected, which rule or exception was accepted, and what result verified the
+change.
+
+New entries should follow this pattern:
+
+\begin{itemize}[leftmargin=*]
+    \item identify the observed failure by test or symptom;
+    \item include the commit hash associated with the change;
+    \item describe rejected fixes when they would violate the GLSL execution
+    model;
+    \item state any convention, rule, or exception that was added;
+    \item describe the implemented algorithm in equations or direct procedural
+    terms;
+    \item record the verification result that shows the issue was resolved.
+\end{itemize}
+
+The purpose is not only to document the current code.  It is also to preserve
+the assumptions behind that code so future work can deliberately keep, revise,
+or remove those assumptions.
+
 \subsection{Control Flow Shape}
 
 The Python control-flow harness should match the compute shader shape:
@@ -156,6 +209,40 @@ for each SourceID:
 The current Python harness may use a direct all-pairs scan while the shader uses
 cell/corner occupancy lookup.  That difference belongs in \texttt{GeoBase.py},
 not \texttt{GeoDynamics.py}.
+
+\subsection{No Pairwise Write-Back Shortcut}
+
+The Geo Python implementation must not use a pairwise dynamics shortcut that
+cannot be exported to the current GLSL execution model.
+
+The active shader shape is source-owned: one invocation owns one source
+particle.  Therefore a Geo dynamics function may write only the current source
+particle's state.  It must not solve a pair by directly updating both
+particles:
+
+\begin{verbatim}
+solve_pair(source, target):
+    P[source].velocity = ...
+    P[target].velocity = ...   // forbidden in GeoDynamics.py
+\end{verbatim}
+
+This rule applies even when a pairwise update would be physically cleaner in
+Python.  Python is not allowed to become a separate reference model that fixes
+collisions in a way Vulkan cannot reproduce.  If the shader cannot safely do
+the write pattern, the Python Geo path cannot do it either.
+
+Allowed alternatives must preserve source-owned execution.  Examples include:
+
+\begin{itemize}[leftmargin=*]
+    \item computing a source-owned response from source-owned contact data;
+    \item using read-only frame-start snapshots of target state;
+    \item accumulating source-owned diagnostic values;
+    \item designing an explicit GLSL-compatible staged pass before adding the
+    equivalent Python implementation.
+\end{itemize}
+
+Any proposal that needs one contact solve to write both particles must first
+change the GLSL architecture, not just the Python model.
 
 \subsection{Dynamics Versus Harness}
 
@@ -172,16 +259,12 @@ not \texttt{GeoDynamics.py}.
 \texttt{GeoBase.py} may do those things because it is not intended to be a
 one-to-one GLSL export unit.
 
-\subsection{Current TODO}
+\subsection{Current Standing Rules}
 
-\begin{itemize}
-    \item Add a \texttt{NeoBeginContactFrame(SourceID)} equivalent or decide
-    whether contact clearing belongs in the harness.
-    \item Decide whether \texttt{isParticleContact(...)} belongs in
-    \texttt{GeoBase.py} or should be moved to a GLSL-matching dynamics/helper
-    module.
-    \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
-    \item Add duplicate contact handling only where it matches the shader model.
-    \item Implement \texttt{GeoProcessCollisions(SourceID)} incrementally.
-    \item Add reporting only through \texttt{Reporting.py}, not through dynamics.
+\begin{itemize}[leftmargin=*]
+    \item Keep \texttt{GeoDynamics.py} one-to-one with GLSL export.
+    \item Add contact handling only where it matches the shader model.
+    \item Add reporting only through \texttt{Reporting.py}, not through
+    dynamics.
+    \item Record dynamics-rule changes in \texttt{ProblemEvolution.tex}.
 \end{itemize}

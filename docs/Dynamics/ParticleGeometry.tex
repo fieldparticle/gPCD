@@ -1,170 +1,320 @@
-\section{Particle Geometry} \label{New Fundamental}
+\section{Particle Geometry}
+\label{sec:particle-geometry}
 
-The Geo model treats collision response as a current-frame geometric operation.
-The response is computed from the state that exists in the current simulation
-step:
+This note records the current Geo particle contact model.  It intentionally
+describes the code we have now, not the older Neo-style compression/rebound
+model.  The current implementation is an instantaneous, frame-local geometric
+response:
 
 \begin{itemize}[leftmargin=*]
-    \item current particle positions,
-    \item current particle velocities,
-    \item current contact normal,
-    \item current penetration depth,
-    \item current overlap area,
-    \item and the source particle's simultaneous contact areas.
+    \item contact state is rebuilt each frame,
+    \item overlap area is computed from current particle geometry,
+    \item pair stiffness is owned by the particles,
+    \item the collision response applies a normal impulse derived from overlap
+    area, stiffness, and a source-owned internal momentum ledger,
+    \item particles are then moved with double-buffered positions.
 \end{itemize}
 
-The model should not require a remembered first-contact velocity, a stored
-turnaround depth, or a persistent compression/rebound phase.  Those quantities
-may be useful diagnostics, but they are not required dynamics state in the
-instantaneous geometric model.
+No first-contact velocity, stored turnaround depth, or global collision
+stiffness parameter is part of the current Geo dynamics.  The one approved
+persistent contact value is source-owned internal normal momentum, carried in
+the source particle's contact slot.
 
-\section{Current Relative Normal Velocity}
+\section{Particle State}
+\label{sec:particle-state}
 
-For a source particle $s$ and target particle $t$, let the current contact
-normal be:
-
-\begin{equation}
-\begin{aligned}
-\hat{n}_{s,t}
-=
-\frac{x_t - x_s}{\lVert x_t - x_s \rVert}
-\end{aligned}
-\end{equation}
-
-The current relative normal velocity is:
+For particle $i$, the fields used by the current model are:
 
 \begin{equation}
 \begin{aligned}
-v_n
-=
-(v_t - v_s) \cdot \hat{n}_{s,t}
+x_i &= (x_i,y_i,z_i), \\
+v_i &= (v_{x,i},v_{y,i},v_{z,i}), \\
+r_i &= \text{particle radius}, \\
+m_i &= \text{particle mass}, \\
+q_i &= \text{particle-owned collision stiffness}.
 \end{aligned}
 \end{equation}
 
-With this sign convention:
+In the GLSL-shaped particle layout these map to:
 
 \begin{itemize}[leftmargin=*]
-    \item $v_n < 0$ means the source and target are closing,
+    \item current position: \texttt{PosLocA.xyz} or \texttt{PosLocB.xyz},
+    selected by \texttt{ShaderFlags.positionBuffer},
+    \item velocity: \texttt{VelRad.xyz},
+    \item radius: \texttt{Data.x},
+    \item collision stiffness: \texttt{Data.y},
+    \item mass: \texttt{parms.x}.
+\end{itemize}
+
+The starting diagnostics shown by the runner are read-only values computed from
+the initial particle state.  They are not written back into the dynamics.
+
+\section{Contact Geometry}
+\label{sec:contact-geometry}
+
+For source particle $s$ and target particle $t$:
+
+\begin{equation}
+\begin{aligned}
+\Delta x_{s,t} &= x_t - x_s, \\
+d_{s,t} &= \lVert \Delta x_{s,t} \rVert.
+\end{aligned}
+\end{equation}
+
+The particles are in contact when:
+
+\begin{equation}
+d_{s,t} \le r_s + r_t.
+\end{equation}
+
+When $d_{s,t} > 0$, the source-to-target unit normal is:
+
+\begin{equation}
+\hat{n}_{s,t} = \frac{\Delta x_{s,t}}{d_{s,t}}.
+\end{equation}
+
+When the centers are coincident, the current Python implementation uses the
+fallback normal:
+
+\begin{equation}
+\hat{n}_{s,t} = (1,0,0).
+\end{equation}
+
+The penetration depth used for diagnostics and guardrails is:
+
+\begin{equation}
+\delta_{s,t} = r_s + r_t - d_{s,t}.
+\end{equation}
+
+\section{Circle Overlap Area}
+\label{sec:circle-overlap-area}
+
+The current particle runner uses the standard two-circle overlap area for the
+contact area $A_{s,t}$.  If the circles do not overlap:
+
+\begin{equation}
+A_{s,t} = 0.
+\end{equation}
+
+If one circle fully contains the other:
+
+\begin{equation}
+A_{s,t} = \pi \min(r_s,r_t)^2.
+\end{equation}
+
+Otherwise:
+
+\begin{equation}
+\begin{aligned}
+a_s &=
+\frac{d^2 + r_s^2 - r_t^2}{2 d r_s}, \\
+a_t &=
+\frac{d^2 + r_t^2 - r_s^2}{2 d r_t}, \\
+T &=
+\frac{1}{2}
+\sqrt{
+(-d+r_s+r_t)(d+r_s-r_t)(d-r_s+r_t)(d+r_s+r_t)
+}, \\
+A_{s,t} &=
+r_s^2 \cos^{-1}(a_s)
++ r_t^2 \cos^{-1}(a_t)
+- T.
+\end{aligned}
+\end{equation}
+
+In code, $a_s$ and $a_t$ are clamped into $[-1,1]$ before applying
+$\cos^{-1}$ to avoid floating point domain errors.
+
+\section{Relative Normal Velocity}
+\label{sec:relative-normal-velocity}
+
+The relative normal velocity is:
+
+\begin{equation}
+v_n = (v_t - v_s) \cdot \hat{n}_{s,t}.
+\end{equation}
+
+With the current normal convention:
+
+\begin{itemize}[leftmargin=*]
+    \item $v_n < 0$ means the particles are closing,
     \item $v_n = 0$ means there is no relative normal motion,
-    \item $v_n > 0$ means the source and target are separating.
+    \item $v_n > 0$ means the particles are separating.
 \end{itemize}
 
-The collision response uses this current-frame value.  It is not the velocity
-from the first frame of a collision episode.
+The current first Geo rule records $v_n$ for reporting, but the impulse formula
+does not yet gate on $v_n$.  This is an important known limitation: separating
+contacts may still receive an overlap-area impulse while they remain
+geometrically overlapped.
 
-\section{Overlap Geometry}
+\section{Particle-Owned Pair Stiffness}
+\label{sec:pair-stiffness}
 
-For two circular particles, the current overlap area is:
+Collision stiffness is particle owned.  There is no active global
+\texttt{NEO\_COLLISION\_STIFFNESS\_Q} or
+\texttt{GEO\_COLLISION\_STIFFNESS\_Q} in the current Geo path.
 
-\begin{equation}
-\begin{aligned}
-A_{s,t} = A(r_s, r_t, d)
-\end{aligned}
-\end{equation}
-
-where $r_s$ and $r_t$ are the particle radii and $d$ is the current center
-distance.
-
-The overlap area is a geometric property of the contact.  The source-side and
-target-side overlap areas are the same area:
+For a pair $(s,t)$, the current stiffness is the average of the two particle
+fields:
 
 \begin{equation}
-\begin{aligned}
-A_{s,t} = A_{t,s}
-\end{aligned}
+q_{s,t} = \max\left(0,\frac{q_s + q_t}{2}\right).
 \end{equation}
 
-Velocities can change the response, but they do not change the instantaneous
-geometric overlap area.
+\section{Current One-Contact Response}
+\label{sec:current-one-contact-response}
 
-\section{Geometric Response}
+The current implementation handles only the simple case where a source particle
+has exactly one contact in the current frame.  If the source has zero contacts
+or more than one contact, \texttt{GeoProcessCollisions} returns without applying
+a collision response for that source.
 
-The current-frame geometric response should be a function of overlap area,
-current relative normal velocity, stiffness, and source-area weighting:
+For one contact, the raw geometric impulse budget is:
 
 \begin{equation}
-\begin{aligned}
-\Delta v_{s,t}
-=
-G(A_{s,t}, v_n, Q, w_{s,t})
-\end{aligned}
+J_{raw} = q_{s,t} A_{s,t} \Delta t.
 \end{equation}
 
-where:
+Each source-owned contact slot carries internal normal momentum:
+
+\begin{equation}
+I_{s,t} \ge 0.
+\end{equation}
+
+During compression, the source can store only momentum actually removed from
+the source particle's normal motion:
+
+\begin{equation}
+J_c = \min\left(J_{raw}, \max(0, m_s(v_s \cdot \hat{n}_{s,t}))\right).
+\end{equation}
+
+The stored internal momentum is increased by $J_c$:
+
+\begin{equation}
+I_{s,t}' = I_{s,t} + J_c.
+\end{equation}
+
+When compression reaches the point where the source can no longer give the full
+raw impulse, the contact slot enters the returning phase.  During returning,
+the source may release only stored internal momentum:
+
+\begin{equation}
+J_r = \min(J_{raw}, I_{s,t}).
+\end{equation}
+
+The stored value is then reduced:
+
+\begin{equation}
+I_{s,t}' = \max(0, I_{s,t} - J_r).
+\end{equation}
+
+The applied impulse for the source step is:
+
+\begin{equation}
+J_{applied} = J_c + J_r.
+\end{equation}
+
+The source particle velocity update is:
+
+\begin{equation}
+v_s' = v_s - \frac{J_{applied}}{m_s}\hat{n}_{s,t}.
+\end{equation}
+
+The target particle is not updated by the source call.  Instead, the target
+will later be processed as a source particle and will apply its own symmetric
+source-side update if it also sees exactly one contact.  This source-by-source
+application is the current algorithm and is one reason we are watching kinetic
+energy drift closely.
+
+The Python implementation must keep this source-owned write shape unless the
+GLSL architecture changes first.  A Python-only pair solve that writes both
+particles is forbidden because it would hide a dynamics rule that the shader
+cannot reproduce safely.
+
+\section{Frame Algorithm}
+\label{sec:frame-algorithm}
+
+For each simulation frame:
+
+\begin{enumerate}[leftmargin=*]
+    \item Clear each particle's current contact list and reporting fields.
+    Contact slots that were active on the previous frame are kept long enough
+    to preserve their source-owned internal momentum if the same contact is
+    active again.
+    \item Copy the frame-start velocities into \texttt{VelRadFrame}.  Collision
+    processing reads relative velocity from this frame-start snapshot.
+    \item For each ordered pair $(s,t)$, test current-position overlap.
+    \item If the pair overlaps, add $t$ to $s$'s current contact list.
+    \item For each source particle $s$:
+    \begin{enumerate}[leftmargin=*]
+        \item If $s$ has exactly one contact, compute geometry, stiffness, and
+        the source-owned internal momentum limited impulse.
+        \item Apply the source velocity update.
+        \item Move $s$ into the inactive position buffer using the updated
+        velocity and $\Delta t$.
+    \end{enumerate}
+    \item Flip \texttt{ShaderFlags.positionBuffer}.
+    \item Sync the convenience aliases \texttt{rx}, \texttt{ry}, and
+    \texttt{rz} from the newly active position buffer.
+\end{enumerate}
+
+The position update is:
+
+\begin{equation}
+x_i^{new} = x_i^{old} + v_i' \Delta t.
+\end{equation}
+
+\section{Reporting Diagnostics}
+\label{sec:reporting-diagnostics}
+
+The runner now reports frame number, simulation time, total momentum, and
+kinetic energy.  These diagnostics are observational only.
+
+Total momentum:
+
+\begin{equation}
+P = \sum_i m_i v_i.
+\end{equation}
+
+Total kinetic energy:
+
+\begin{equation}
+K = \sum_i \frac{1}{2}m_i \lVert v_i \rVert^2.
+\end{equation}
+
+Momentum drift is useful for detecting asymmetric errors:
+
+\begin{equation}
+\Delta P = P_{current} - P_{start}.
+\end{equation}
+
+Kinetic energy drift is the general detector for symmetric velocity drift:
+
+\begin{equation}
+\Delta K = K_{current} - K_{start}.
+\end{equation}
+
+For example, if two equal-mass particles drift from speeds $0.05$ to
+$0.050006$ in opposite directions, total momentum can still be conserved while
+$\Delta K$ reveals the speed growth.
+
+\section{Known Limitations}
+\label{sec:known-limitations}
+
+The current Geo rule is intentionally simple and incomplete:
 
 \begin{itemize}[leftmargin=*]
-    \item $A_{s,t}$ is the current overlap area,
-    \item $v_n$ is the current relative normal velocity,
-    \item $Q$ is the stiffness parameter,
-    \item $w_{s,t}$ is the source-owned area weight for this contact.
+    \item Multi-contact response is not distributed across contacts yet.
+    \item The impulse is based on overlap area, stiffness, and $\Delta t$; it
+    uses source-owned internal momentum to cap rebound/release, but it does not
+    yet solve multi-contact energy distribution.
+    \item The source and target are not updated together in one pair solve.
+    Pairwise write-back is intentionally forbidden under the current GLSL
+    source-owned execution model.
+    \item The response is not guaranteed to conserve kinetic energy.
+    \item Wall response is not part of this particle-pair geometry note.
 \end{itemize}
 
-The exact form of $G$ is the next dynamics decision.  The important convention
-is that $G$ must be computed from the current frame.  It should not depend on
-stored first-contact values.
-
-\section{Source-Owned Area Weighting}
-
-A source particle may contact multiple targets in the same frame.  The source
-particle's total current overlap area is:
-
-\begin{equation}
-\begin{aligned}
-A_s^{total}
-=
-\sum_{t \in C_s} A_{s,t}
-\end{aligned}
-\end{equation}
-
-where $C_s$ is the current contact set for source particle $s$.
-
-The area weight for one contact is:
-
-\begin{equation}
-\begin{aligned}
-w_{s,t}
-=
-\frac{A_{s,t}}{A_s^{total}}
-\end{aligned}
-\end{equation}
-
-when $A_s^{total} > 0$.
-
-These weights keep the source particle from responding to each contact as if it
-were the only contact.  In a multi-contact frame, the source response must be
-distributed across the current overlap areas.
-
-\section{Legacy Turnaround Formulas}
-
-Previous notes used an incoming collision velocity $v_{in}$ and a stored
-turnaround depth:
-
-\begin{equation}
-\begin{aligned}
-\alpha_0
-=
-\left(\frac{3\mu v_{in}^2}{2Q}\right)^{1/3}
-\end{aligned}
-\end{equation}
-
-This formula remains useful as a diagnostic or comparison curve.  In the new
-Geo model, however, $\alpha_0$ should not be stored as persistent dynamics
-state.  If a zero-velocity or turnaround estimate is needed, it should be
-derived from the current frame and treated as temporary diagnostic information.
-
-\section{Starting In Contact}
-
-When particles start in contact, the response should still be computed from the
-current frame:
-
-\begin{itemize}[leftmargin=*]
-    \item current overlap area,
-    \item current relative normal velocity,
-    \item stiffness,
-    \item and current source-area weights.
-\end{itemize}
-
-The simulation should not need to infer an earlier collision history.  If the
-starting overlap is too deep for the selected geometric response rule, that is a
-guardrail or configuration issue, not a reason to create hidden collision
-history.
+These limitations are expected at this stage.  The current reporting exists so
+we can see momentum conservation, kinetic energy drift, and tunneling behavior
+while iterating on the next response rule.

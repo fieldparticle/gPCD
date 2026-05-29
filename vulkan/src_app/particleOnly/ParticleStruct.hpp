@@ -14,7 +14,7 @@ struct lstr {
 struct ContactState {
 	glm::uvec4 ids;   // x=target particle index, yzw=reserved/contact metadata
 	glm::vec4 geom;   // xyz=current contact normal, w=current overlap area
-	glm::vec4 aux;    // x=center distance, y=penetration depth, zw=reserved
+	glm::vec4 aux;    // x=center distance, y=penetration depth, z=stored internal normal momentum, w=last impulse
 };
 
 struct Particle {

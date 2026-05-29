@@ -1,9 +1,12 @@
-Improve GeoRunner capture diagnostics
+Stabilize Geo rebound with source-owned internal momentum
 
-- Clear stale CSV report files when starting a new reporting run
-- Move GeoRunner CSV writes out of the draw path so paused redraws do not duplicate frames
-- Add fixed-width UI reporting for frame, sim time, total momentum, kinetic energy, and particles
-- Add momentum and kinetic-energy diagnostics to CSV captures
-- Trim particle capture CSVs to currently reported fields
-- Remove noisy per-frame export prints from Reporting
-- Clear Cap*.csv files from legacy capture directories on startup
+Add a GLSL-compatible internal momentum ledger to Geo contact slots so rebound
+cannot release more momentum than compression stored. Preserve the source-owned
+execution model by avoiding pairwise write-back while fixing the symmetric
+velocity drift seen in TwoParticleHorizontal.
+
+Regenerate GeoDynamics.glsl from the Python export path and update the particle
+contact-state comments to document aux.z as stored internal normal momentum.
+Refresh the dynamics documentation with current particle-geometry equations,
+Geo conventions, export structure, and a ProblemEvolution history entry for the
+velocity-drift fix.
