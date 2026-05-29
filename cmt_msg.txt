@@ -1,12 +1,15 @@
-Stabilize Geo rebound with source-owned internal momentum
+Add basic symmetric Geo multi-contact response
 
-Add a GLSL-compatible internal momentum ledger to Geo contact slots so rebound
-cannot release more momentum than compression stored. Preserve the source-owned
-execution model by avoiding pairwise write-back while fixing the symmetric
-velocity drift seen in TwoParticleHorizontal.
+Implement source-owned multi-contact collision handling by weighting each
+active contact by overlap area and capping compression with both source and
+target contact context. Keep one internal momentum ledger per contact slot,
+sum contact impulse vectors, and apply one source velocity update.
 
 Regenerate GeoDynamics.glsl from the Python export path and update the particle
-contact-state comments to document aux.z as stored internal normal momentum.
-Refresh the dynamics documentation with current particle-geometry equations,
-Geo conventions, export structure, and a ProblemEvolution history entry for the
-velocity-drift fix.
+geometry documentation for the new weighted multi-contact rule. Add
+contacts.csv capture output plus per-particle internal_mom reporting so
+multi-contact frames can be cross-referenced with momentum and particle CSVs.
+
+Require run_debug_dir for GeoRunner capture output and add explicit capture
+paths for ThreeParticle and ThreeParticleChase. Document the change in
+ProblemEvolution as basic symmetric multi-particle functionality.

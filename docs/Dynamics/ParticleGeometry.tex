@@ -161,37 +161,63 @@ fields:
 q_{s,t} = \max\left(0,\frac{q_s + q_t}{2}\right).
 \end{equation}
 
-\section{Current One-Contact Response}
-\label{sec:current-one-contact-response}
+\section{Current Source-Owned Contact Response}
+\label{sec:current-source-owned-contact-response}
 
-The current implementation handles only the simple case where a source particle
-has exactly one contact in the current frame.  If the source has zero contacts
-or more than one contact, \texttt{GeoProcessCollisions} returns without applying
-a collision response for that source.
+The current implementation handles one or more particle contacts for a source
+particle.  If the source has zero contacts, \texttt{GeoProcessCollisions}
+returns without applying a collision response for that source.
 
-For one contact, the raw geometric impulse budget is:
+For each contact $k$ between source $s$ and target $t_k$, the raw geometric
+impulse budget is:
 
 \begin{equation}
-J_{raw} = q_{s,t} A_{s,t} \Delta t.
+J_{raw,k} = q_{s,t_k} A_{s,t_k} \Delta t.
+\end{equation}
+
+For multi-contact frames, the source's active overlap area is:
+
+\begin{equation}
+A_{s,total} = \sum_j A_{s,t_j}.
+\end{equation}
+
+Each contact receives a geometric area weight:
+
+\begin{equation}
+w_{s,k} =
+\frac{A_{s,t_k}}{A_{s,total}}.
 \end{equation}
 
 Each source-owned contact slot carries internal normal momentum:
 
 \begin{equation}
-I_{s,t} \ge 0.
+I_{s,t_k} \ge 0.
 \end{equation}
 
 During compression, the source can store only momentum actually removed from
-the source particle's normal motion:
+the source particle's normal motion.  In a multi-contact frame, that available
+source momentum is shared across contacts by area weight.  The same contact is
+also capped by the target's read-only contact context so a one-contact target
+cannot overspend against a multi-contact source:
 
 \begin{equation}
-J_c = \min\left(J_{raw}, \max(0, m_s(v_s \cdot \hat{n}_{s,t}))\right).
+P_{s,k} = w_{s,k} P_{s,available},
+\qquad
+P_{t,k} = w_{t,k} P_{t,available},
+\qquad
+P_{k,cap} = \min(P_{s,k}, P_{t,k}).
 \end{equation}
 
-The stored internal momentum is increased by $J_c$:
+The compression impulse is then:
 
 \begin{equation}
-I_{s,t}' = I_{s,t} + J_c.
+J_{c,k} = \min\left(J_{raw,k}, P_{k,cap}\right).
+\end{equation}
+
+The stored internal momentum is increased by $J_{c,k}$:
+
+\begin{equation}
+I_{s,t_k}' = I_{s,t_k} + J_{c,k}.
 \end{equation}
 
 When compression reaches the point where the source can no longer give the full
@@ -199,32 +225,38 @@ raw impulse, the contact slot enters the returning phase.  During returning,
 the source may release only stored internal momentum:
 
 \begin{equation}
-J_r = \min(J_{raw}, I_{s,t}).
+J_{r,k} = \min(J_{raw,k}, I_{s,t_k}).
 \end{equation}
 
 The stored value is then reduced:
 
 \begin{equation}
-I_{s,t}' = \max(0, I_{s,t} - J_r).
+I_{s,t_k}' = \max(0, I_{s,t_k} - J_{r,k}).
 \end{equation}
 
-The applied impulse for the source step is:
+The applied impulse for each contact is:
 
 \begin{equation}
-J_{applied} = J_c + J_r.
+J_{applied,k} = J_{c,k} + J_{r,k}.
 \end{equation}
 
-The source particle velocity update is:
+Contact impulses are accumulated as one source-owned momentum vector:
 
 \begin{equation}
-v_s' = v_s - \frac{J_{applied}}{m_s}\hat{n}_{s,t}.
+\Delta \mathbf{p}_s =
+-\sum_k J_{applied,k}\hat{n}_{s,t_k}.
+\end{equation}
+
+The source particle velocity update is applied once:
+
+\begin{equation}
+v_s' = v_s + \frac{\Delta \mathbf{p}_s}{m_s}.
 \end{equation}
 
 The target particle is not updated by the source call.  Instead, the target
-will later be processed as a source particle and will apply its own symmetric
-source-side update if it also sees exactly one contact.  This source-by-source
-application is the current algorithm and is one reason we are watching kinetic
-energy drift closely.
+will later be processed as a source particle and will apply its own source-side
+update.  This source-by-source application is the current algorithm and is one
+reason we are watching kinetic energy drift closely.
 
 The Python implementation must keep this source-owned write shape unless the
 GLSL architecture changes first.  A Python-only pair solve that writes both
@@ -247,9 +279,10 @@ For each simulation frame:
     \item If the pair overlaps, add $t$ to $s$'s current contact list.
     \item For each source particle $s$:
     \begin{enumerate}[leftmargin=*]
-        \item If $s$ has exactly one contact, compute geometry, stiffness, and
-        the source-owned internal momentum limited impulse.
-        \item Apply the source velocity update.
+        \item If $s$ has active contacts, compute geometry, stiffness, area
+        weights, and source-owned internal momentum limited impulses.
+        \item Accumulate contact impulse vectors and apply one source velocity
+        update.
         \item Move $s$ into the inactive position buffer using the updated
         velocity and $\Delta t$.
     \end{enumerate}
@@ -304,10 +337,10 @@ $\Delta K$ reveals the speed growth.
 The current Geo rule is intentionally simple and incomplete:
 
 \begin{itemize}[leftmargin=*]
-    \item Multi-contact response is not distributed across contacts yet.
     \item The impulse is based on overlap area, stiffness, and $\Delta t$; it
-    uses source-owned internal momentum to cap rebound/release, but it does not
-    yet solve multi-contact energy distribution.
+    uses source-owned internal momentum to cap rebound/release and area weights
+    to distribute multi-contact compression capacity, but it does not yet solve
+    multi-contact kinetic-energy restoration.
     \item The source and target are not updated together in one pair solve.
     Pairwise write-back is intentionally forbidden under the current GLSL
     source-owned execution model.

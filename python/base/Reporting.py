@@ -14,6 +14,7 @@ class Reporting:
         self.written_headers = set()
         self.written_momentum_frames = set()
         self.written_particle_frames = set()
+        self.written_contact_frames = set()
 
     def clear_existing_reports(self):
         for pattern in self.DEFAULT_CLEAN_PATTERNS:
@@ -57,6 +58,9 @@ class Reporting:
     def particle_report_path(self, particle):
         particle_number = int(particle.pnum)
         return self.output_dir / f"p{particle_number}.csv"
+
+    def contacts_report_path(self):
+        return self.output_dir / "contacts.csv"
 
     def report_frame_momentum(self, frame_number, momentum_summary):
         if not self.should_report_frame(frame_number):
@@ -126,6 +130,7 @@ class Reporting:
                         "x",
                         "y",
                         "vx",
+                        "internal_mom",
                         "start_total_p",
                         "start_px",
                         "start_total_py",
@@ -165,6 +170,7 @@ class Reporting:
                     particle.rx,
                     particle.ry,
                     particle.vx,
+                    getattr(particle, "report_stored_mom", 0.0),
                     momentum_summary["start_total_p"],
                     momentum_summary["start_total_px"],
                     momentum_summary["start_total_py"],
@@ -182,6 +188,145 @@ class Reporting:
                 ]
             )
         self.written_particle_frames.add(particle_frame_key)
+
+    def report_contacts(self, frame_number, particles):
+        if not self.should_report_frame(frame_number):
+            return
+        if frame_number in self.written_contact_frames:
+            return
+
+        csv_path = self.contacts_report_path()
+        write_header = csv_path not in self.written_headers
+        with csv_path.open("a", newline="", encoding="utf-8") as csv_file:
+            writer = csv.writer(csv_file)
+            if write_header:
+                writer.writerow(
+                    [
+                        "frame",
+                        "source_index",
+                        "source",
+                        "target_index",
+                        "target",
+                        "slot",
+                        "source_contact_count",
+                        "source_targets",
+                        "source_total_overlap_area",
+                        "target_total_overlap_area",
+                        "overlap_area",
+                        "source_area_weight",
+                        "target_area_weight",
+                        "phase",
+                        "stored_mom",
+                        "applied_impulse",
+                        "normal_x",
+                        "normal_y",
+                        "normal_z",
+                        "center_distance",
+                        "penetration_depth",
+                    ]
+                )
+                self.written_headers.add(csv_path)
+
+            active_by_source = self.active_contacts_by_source(particles)
+            total_overlap_by_source = {
+                source_index: sum(max(0.0, contact.geom.w) for _slot, contact in contacts)
+                for source_index, contacts in active_by_source.items()
+            }
+
+            for source_index, particle in enumerate(particles):
+                contacts = active_by_source.get(source_index, [])
+                source_targets = "|".join(
+                    str(self.particle_number_for_index(particles, contact.ids.x))
+                    for _slot, contact in contacts
+                )
+                if not contacts:
+                    writer.writerow(
+                        [
+                            frame_number,
+                            source_index,
+                            particle.pnum,
+                            "",
+                            "",
+                            "",
+                            0,
+                            "",
+                            0.0,
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                        ]
+                    )
+                    continue
+
+                source_total_overlap_area = total_overlap_by_source.get(source_index, 0.0)
+                for slot, contact in contacts:
+                    target_index = int(contact.ids.x)
+                    target_total_overlap_area = total_overlap_by_source.get(target_index, 0.0)
+                    overlap_area = max(0.0, contact.geom.w)
+                    source_area_weight = (
+                        overlap_area / source_total_overlap_area
+                        if source_total_overlap_area > 1.0e-12
+                        else 0.0
+                    )
+                    target_area_weight = (
+                        overlap_area / target_total_overlap_area
+                        if target_total_overlap_area > 1.0e-12
+                        else 0.0
+                    )
+                    writer.writerow(
+                        [
+                            frame_number,
+                            source_index,
+                            particle.pnum,
+                            target_index,
+                            self.particle_number_for_index(particles, target_index),
+                            slot,
+                            len(contacts),
+                            source_targets,
+                            source_total_overlap_area,
+                            target_total_overlap_area,
+                            overlap_area,
+                            source_area_weight,
+                            target_area_weight,
+                            contact.ids.z,
+                            contact.aux.z,
+                            contact.aux.w,
+                            contact.geom.x,
+                            contact.geom.y,
+                            contact.geom.z,
+                            contact.aux.x,
+                            contact.aux.y,
+                        ]
+                    )
+
+        self.written_contact_frames.add(frame_number)
+
+    @staticmethod
+    def active_contacts_by_source(particles):
+        active_by_source = {}
+        for source_index, particle in enumerate(particles):
+            contacts = getattr(particle, "contacts", getattr(particle, "gcs", []))
+            active_contacts = []
+            for slot, contact in enumerate(contacts):
+                if getattr(contact.ids, "w", 0) == 1 and getattr(contact.ids, "y", 0) == 1:
+                    active_contacts.append((slot, contact))
+            active_by_source[source_index] = active_contacts
+        return active_by_source
+
+    @staticmethod
+    def particle_number_for_index(particles, particle_index):
+        if 0 <= int(particle_index) < len(particles):
+            return particles[int(particle_index)].pnum
+        return ""
 
     def close(self):
         pass

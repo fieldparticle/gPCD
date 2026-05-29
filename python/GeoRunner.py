@@ -313,6 +313,7 @@ def _draw_particles(
 def _report_particles(reporting, frame_number, particles, start_diagnostics):
     motion_summary = _motion_summary(start_diagnostics, particles)
     reporting.report_frame_momentum(frame_number, motion_summary)
+    reporting.report_contacts(frame_number, particles)
     for particle in particles:
         reporting.report_particle(frame_number, particle, motion_summary)
 
@@ -330,15 +331,12 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
         senario.Create(geo.config, study_number)
     if batch_mode:
         run_configuration["end_frame"] = end_frame
-    report_dir = Path(
-        run_configuration.get(
-            "run_debug_dir",
-            Path(geo.config.get("data_dir", ".")) / "geo_reports" / geo.config.get(
-                "STUDY_NAME",
-                "GeoRun",
-            ),
+    if "run_debug_dir" not in run_configuration:
+        raise ValueError(
+            "GeoRunner requires RUN_CONFIGURATION.run_debug_dir; "
+            "capture output has no fallback directory."
         )
-    )
+    report_dir = Path(run_configuration["run_debug_dir"])
     reporting = Reporting(report_dir, run_configuration.get("rpt_frames"))
     start_diagnostics = _run_start_diagnostics(geo.particles)
 

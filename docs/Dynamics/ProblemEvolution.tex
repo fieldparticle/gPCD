@@ -162,3 +162,128 @@ The fix preserves the current GLSL architecture:
     \item the carried value is source-owned contact state;
     \item rebound cannot release more momentum than compression stored.
 \end{itemize}
+
+\subsection{Basic Symmetric Multi-Particle Functionality}
+
+\noindent\textbf{Commit hash:} \texttt{01dbdcfbb1866a703727812b06606b50e83efedf}
+
+After the two-particle internal momentum fix, the next failure was not a
+single-pair rebound problem.  It was a source-capacity problem in symmetric
+multi-particle contact.  In \texttt{ThreeParticle}, particle 1 can contact
+particles 2 and 3 at the same time.  If each contact receives the full source
+collision budget, the source spends the same momentum twice.
+
+The first rule therefore had to be:
+
+\begin{equation}
+A_{s,total} = \sum_k A_{s,k}.
+\end{equation}
+
+Each contact receives an overlap-area weight:
+
+\begin{equation}
+w_{s,k} = \frac{A_{s,k}}{A_{s,total}}.
+\end{equation}
+
+\subsection{Rejected Multi-Contact Shortcuts}
+
+Two shortcuts were rejected.  The first was averaging pair velocity
+predictions.  That was an older practical method, but it is not a clean
+geometric source-owned rule.  It hides the actual contact momentum accounting.
+
+The second was applying the source area weighting only from the source side.
+That fixed particle 1's split budget, but particles 2 and 3 each still saw a
+one-contact context and could spend a full response against particle 1.  That
+preserved the visual idea of weighting but still allowed momentum accounting to
+be inconsistent.
+
+\subsection{Accepted Symmetric Context Rule}
+
+The accepted basic rule is still source-owned, but each contact is capped by
+both sides' read-only contact context.  For a source contact $s,k$:
+
+\begin{equation}
+P_{s,k} = w_{s,k}P_{s,available}.
+\end{equation}
+
+The target context is computed the same way, but only read:
+
+\begin{equation}
+P_{t,k} = w_{t,k}P_{t,available}.
+\end{equation}
+
+The compression cap for the contact is:
+
+\begin{equation}
+P_{k,cap} = \min(P_{s,k}, P_{t,k}).
+\end{equation}
+
+The raw geometric impulse remains:
+
+\begin{equation}
+J_{raw,k} = q_{s,k} A_{s,k}\Delta t.
+\end{equation}
+
+The compression impulse is:
+
+\begin{equation}
+J_{c,k} = \min(J_{raw,k}, P_{k,cap}).
+\end{equation}
+
+Each contact slot still owns its own internal momentum ledger:
+
+\begin{equation}
+I'_{s,k} = I_{s,k} + J_{c,k}.
+\end{equation}
+
+During returning, the contact can release only its own stored momentum:
+
+\begin{equation}
+J_{r,k} = \min(J_{raw,k}, I_{s,k}).
+\end{equation}
+
+All active contact impulses are accumulated into one source-owned momentum
+change:
+
+\begin{equation}
+\Delta \mathbf{p}_s =
+-\sum_k (J_{c,k} + J_{r,k})\hat{n}_{s,k}.
+\end{equation}
+
+The source velocity is then updated once:
+
+\begin{equation}
+v_s' = v_s + \frac{\Delta \mathbf{p}_s}{m_s}.
+\end{equation}
+
+\subsection{Capture Rule}
+
+Multi-contact debugging requires seeing the contact list directly.  The capture
+system therefore records \texttt{contacts.csv} beside the existing
+\texttt{momentum.csv} and per-particle CSV files.  The contact capture is
+reporting-only.  It records the source, target, slot, overlap area, source and
+target area weights, phase, stored internal momentum, applied impulse, normal,
+center distance, and penetration depth.
+
+The per-particle capture files also include \texttt{internal\_mom}, which is
+the source particle's total stored internal momentum across its active contact
+slots.
+
+\subsection{Result}
+
+For \texttt{ThreeParticle}, the symmetric multi-contact case now preserves
+total momentum while allowing particle 1 to split its contact response across
+particles 2 and 3:
+
+\begin{verbatim}
+ThreeParticle 240 frames:
+momentum drift = -2.78e-17, 0
+ke drift       = -0.0011817683521299304
+max contacts   = 2
+\end{verbatim}
+
+This is basic symmetric multi-particle functionality.  It is not the final
+multi-contact solver.  The current rule is still dissipative, and
+\texttt{ThreeParticleChase} still exposes tunneling behavior.  Those are future
+problem-evolution entries, not reasons to abandon the source-owned weighted
+contact rule.

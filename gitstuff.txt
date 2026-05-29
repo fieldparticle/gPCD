@@ -11,3 +11,5 @@ git log --oneline
 
 // show file name chnages
 git diff --name-only
+
+problem observed → tempting fix rejected → convention/rule clarified → exception justified → implementation summarized → result captured.
