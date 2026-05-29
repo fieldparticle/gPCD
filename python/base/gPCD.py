@@ -195,9 +195,10 @@ class Demo:
 
     def clear_report_captures(self):
         self.report_capture_dir.mkdir(parents=True, exist_ok=True)
-        for report_file in self.report_capture_dir.glob("*.rpt"):
-            if report_file.is_file():
-                report_file.unlink()
+        for pattern in ("Cap*.rpt", "Cap*.csv"):
+            for report_file in self.report_capture_dir.glob(pattern):
+                if report_file.is_file():
+                    report_file.unlink()
 
     def clear_contact_snapshots(self):
         if not self.config.get("contact_snapshot_file"):

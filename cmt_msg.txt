@@ -1,19 +1,9 @@
-Export Geo dynamics with particle-owned stiffness
+Improve GeoRunner capture diagnostics
 
-- Add Geo GLSL export process documentation and include it in GeoDynamics docs
-- Add exporter that regenerates common/GeoDynamics.glsl as a disposable artifact
-- Generate GeoDynamics.glsl with Geo contact frame, contact registration, collision response, and particle motion entry points
-- Switch BoundarySpheresMotion compute shader from obsolete NeoDynamics include to generated GeoDynamics include
-- Remove Neo dynamics shader files from the active shader path
-- Rename shader/host contact storage to generic ContactState contacts[MAX_CONTACTS]
-- Align ParticleStruct.hpp, particle.glsl, and ResourceVertexParticle initialization with generic contact storage
-- Extend pdata with particle-owned collision_stiffness_q and copy it into Particle.Data.y
-- Update particle data generators to write per-particle collision stiffness
-- Remove global Geo/Neo collision stiffness constants from the Geo shader/export path
-- Clean BoundarySpheresMotion shader list to include GeoDynamics.glsl
-- Update Geo runner/config/reporting/test support for Geo collision runs and diagnostics
-- Regenerate TwoParticleHorizontal binary data with particle-owned stiffness
-
-Verified:
-- BoundarySpheresMotionP.comp compiles with glslc after export
-- Vulkan Code runs with TwoParticleHorizonal.cfg and clean rebound
+- Clear stale CSV report files when starting a new reporting run
+- Move GeoRunner CSV writes out of the draw path so paused redraws do not duplicate frames
+- Add fixed-width UI reporting for frame, sim time, total momentum, kinetic energy, and particles
+- Add momentum and kinetic-energy diagnostics to CSV captures
+- Trim particle capture CSVs to currently reported fields
+- Remove noisy per-frame export prints from Reporting
+- Clear Cap*.csv files from legacy capture directories on startup

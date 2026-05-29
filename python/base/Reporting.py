@@ -3,11 +3,23 @@ from pathlib import Path
 
 
 class Reporting:
-    def __init__(self, output_dir, rpt_frames=None):
+    DEFAULT_CLEAN_PATTERNS = ("*.csv",)
+
+    def __init__(self, output_dir, rpt_frames=None, clear_existing=True):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        if clear_existing:
+            self.clear_existing_reports()
         self.rpt_frames = self.normalized_report_frames(rpt_frames)
         self.written_headers = set()
+        self.written_momentum_frames = set()
+        self.written_particle_frames = set()
+
+    def clear_existing_reports(self):
+        for pattern in self.DEFAULT_CLEAN_PATTERNS:
+            for report_file in self.output_dir.glob(pattern):
+                if report_file.is_file():
+                    report_file.unlink()
 
     @staticmethod
     def normalized_report_frames(rpt_frames):
@@ -39,15 +51,70 @@ class Reporting:
     def should_report_frame(self, frame_number):
         return self.rpt_frames is None or frame_number in self.rpt_frames
 
+    def momentum_report_path(self):
+        return self.output_dir / "momentum.csv"
+
     def particle_report_path(self, particle):
         particle_number = int(particle.pnum)
         return self.output_dir / f"p{particle_number}.csv"
 
-    def report_particle(self, frame_number, particle):
+    def report_frame_momentum(self, frame_number, momentum_summary):
+        if not self.should_report_frame(frame_number):
+            return
+        if frame_number in self.written_momentum_frames:
+            return
+
+        csv_path = self.momentum_report_path()
+        write_header = csv_path not in self.written_headers
+        with csv_path.open("a", newline="", encoding="utf-8") as csv_file:
+            writer = csv.writer(csv_file)
+            if write_header:
+                writer.writerow(
+                    [
+                        "frame",
+                        "start_total_p",
+                        "start_px",
+                        "start_total_py",
+                        "curr_total_p",
+                        "curr_px",
+                        "curr_py",
+                        "start_ke",
+                        "curr_ke",
+                        "ke_drift",
+                        "start_rel_speed",
+                        "curr_rel_speed",
+                        "rel_speed_drift",
+                    ]
+                )
+                self.written_headers.add(csv_path)
+            writer.writerow(
+                [
+                    frame_number,
+                    momentum_summary["start_total_p"],
+                    momentum_summary["start_total_px"],
+                    momentum_summary["start_total_py"],
+                    momentum_summary["current_total_p"],
+                    momentum_summary["current_total_px"],
+                    momentum_summary["current_total_py"],
+                    momentum_summary["start_ke"],
+                    momentum_summary["curr_ke"],
+                    momentum_summary["ke_drift"],
+                    momentum_summary["start_rel_speed"],
+                    momentum_summary["curr_rel_speed"],
+                    momentum_summary["rel_speed_drift"],
+                ]
+            )
+        self.written_momentum_frames.add(frame_number)
+
+    def report_particle(self, frame_number, particle, momentum_summary=None):
         if not self.should_report_frame(frame_number):
             return
 
         csv_path = self.particle_report_path(particle)
+        particle_frame_key = (csv_path, frame_number)
+        if particle_frame_key in self.written_particle_frames:
+            return
+
         write_header = csv_path not in self.written_headers
         with csv_path.open("a", newline="", encoding="utf-8") as csv_file:
             writer = csv.writer(csv_file)
@@ -58,54 +125,63 @@ class Reporting:
                         "N",
                         "x",
                         "y",
-                        "z",
                         "vx",
+                        "start_total_p",
+                        "start_px",
+                        "start_total_py",
+                        "curr_total_p",
+                        "curr_px",
+                        "curr_py",
+                        "start_ke",
+                        "curr_ke",
+                        "ke_drift",
+                        "start_rel_speed",
+                        "curr_rel_speed",
+                        "rel_speed_drift",
                         "vy",
-                        "vz",
-                        "contacts",
                         "oa",
-                        "phase",
-                        "target",
-                        "center_distance",
-                        "normal_x",
-                        "normal_y",
-                        "stored_mom",
-                        "alpha_zero",
-                        "zero_area",
-                        "compression_fraction",
-                        "rel_vn",
-                        "closing_mom",
-                        "collision_stiffness_q",
                     ]
                 )
                 self.written_headers.add(csv_path)
+            if momentum_summary is None:
+                momentum_summary = {
+                    "start_total_px": 0.0,
+                    "start_total_py": 0.0,
+                    "start_total_p": 0.0,
+                    "current_total_px": 0.0,
+                    "current_total_py": 0.0,
+                    "current_total_p": 0.0,
+                    "start_ke": 0.0,
+                    "curr_ke": 0.0,
+                    "ke_drift": 0.0,
+                    "start_rel_speed": 0.0,
+                    "curr_rel_speed": 0.0,
+                    "rel_speed_drift": 0.0,
+                }
             writer.writerow(
                 [
                     frame_number,
                     particle.pnum,
                     particle.rx,
                     particle.ry,
-                    particle.rz,
                     particle.vx,
+                    momentum_summary["start_total_p"],
+                    momentum_summary["start_total_px"],
+                    momentum_summary["start_total_py"],
+                    momentum_summary["current_total_p"],
+                    momentum_summary["current_total_px"],
+                    momentum_summary["current_total_py"],
+                    momentum_summary["start_ke"],
+                    momentum_summary["curr_ke"],
+                    momentum_summary["ke_drift"],
+                    momentum_summary["start_rel_speed"],
+                    momentum_summary["curr_rel_speed"],
+                    momentum_summary["rel_speed_drift"],
                     particle.vy,
-                    particle.vz,
-                    particle.report_contacts,
                     particle.oa,
-                    particle.report_phase,
-                    particle.report_target,
-                    particle.report_center_distance,
-                    particle.report_normal_x,
-                    particle.report_normal_y,
-                    particle.report_stored_mom,
-                    particle.report_alpha_zero,
-                    particle.report_zero_area,
-                    particle.report_compression_fraction,
-                    particle.report_rel_vn,
-                    particle.report_closing_mom,
-                    particle.report_collision_stiffness_q,
                 ]
             )
-        print(f"exported frame {frame_number}")
+        self.written_particle_frames.add(particle_frame_key)
 
     def close(self):
         pass

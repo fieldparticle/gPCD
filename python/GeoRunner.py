@@ -1,5 +1,6 @@
 import pygame
 from pathlib import Path
+import math
 
 from base.GeoBase import GeoBase
 from base.Reporting import Reporting
@@ -80,18 +81,109 @@ def _draw_overlap_lens(screen, left_center, left_radius, right_center, right_rad
     screen.blit(overlap_surface, (min_x, min_y))
 
 
+def _particle_momentum(particle):
+    mass = float(getattr(particle, "mass", 1.0))
+    return mass * float(particle.vx), mass * float(particle.vy)
+
+
+def _particle_kinetic_energy(particle):
+    mass = float(getattr(particle, "mass", 1.0))
+    vx = float(particle.vx)
+    vy = float(particle.vy)
+    vz = float(getattr(particle, "vz", 0.0))
+    return 0.5 * mass * (vx * vx + vy * vy + vz * vz)
+
+
+def _total_momentum(particles):
+    total_x = 0.0
+    total_y = 0.0
+    for particle in particles:
+        momentum_x, momentum_y = _particle_momentum(particle)
+        total_x += momentum_x
+        total_y += momentum_y
+    return total_x, total_y
+
+
+def _total_kinetic_energy(particles):
+    return sum(_particle_kinetic_energy(particle) for particle in particles)
+
+
+def _relative_speed(particles):
+    if len(particles) < 2:
+        return 0.0
+    first = particles[0]
+    second = particles[1]
+    dvx = float(second.vx) - float(first.vx)
+    dvy = float(second.vy) - float(first.vy)
+    dvz = float(getattr(second, "vz", 0.0)) - float(getattr(first, "vz", 0.0))
+    return math.sqrt(dvx * dvx + dvy * dvy + dvz * dvz)
+
+
+def _run_start_diagnostics(particles):
+    return {
+        "total_momentum": _total_momentum(particles),
+        "ke": _total_kinetic_energy(particles),
+        "rel_speed": _relative_speed(particles),
+    }
+
+
+def _motion_summary(start_diagnostics, particles):
+    start_total_momentum = start_diagnostics["total_momentum"]
+    start_x, start_y = start_total_momentum
+    current_x, current_y = _total_momentum(particles)
+    start_ke = start_diagnostics["ke"]
+    current_ke = _total_kinetic_energy(particles)
+    start_rel_speed = start_diagnostics["rel_speed"]
+    current_rel_speed = _relative_speed(particles)
+    return {
+        "start_total_px": start_x,
+        "start_total_py": start_y,
+        "start_total_p": math.hypot(start_x, start_y),
+        "current_total_px": current_x,
+        "current_total_py": current_y,
+        "current_total_p": math.hypot(current_x, current_y),
+        "start_ke": start_ke,
+        "curr_ke": current_ke,
+        "ke_drift": current_ke - start_ke,
+        "start_rel_speed": start_rel_speed,
+        "curr_rel_speed": current_rel_speed,
+        "rel_speed_drift": current_rel_speed - start_rel_speed,
+    }
+
+
+def _momentum_row(label, momentum_x, momentum_y):
+    return (
+        f"{label:<18}"
+        f" px={momentum_x:>14.8f}"
+        f" py={momentum_y:>14.8f}"
+        f" |p|={math.hypot(momentum_x, momentum_y):>14.8f}"
+    )
+
+
+def _particle_report_row(particle):
+    return (
+        f"p{int(particle.pnum):>3}"
+        f" x={particle.rx:>13.6f}"
+        f" y={particle.ry:>13.6f}"
+        f" vx={particle.vx:>13.6f}"
+        f" vy={particle.vy:>13.6f}"
+        f" oa={particle.oa:>14.8f}"
+    )
+
+
 def _draw_particles(
     screen,
     particles,
     run_configuration,
     frame_number,
-    reporting=None,
+    start_diagnostics,
     error_return=0,
     error_description="",
 ):
     screen_width, screen_height = screen.get_size()
     view_box = _view_box(run_configuration)
     screen.fill((14, 18, 24))
+    motion_summary = _motion_summary(start_diagnostics, particles)
 
     wall_left, wall_top = _to_screen(
         float(run_configuration.get("WallXMIN", view_box[0])),
@@ -148,8 +240,6 @@ def _draw_particles(
 
     particle_screen_data = []
     for index, particle in enumerate(particles):
-        if reporting is not None:
-            reporting.report_particle(frame_number, particle)
         center = _to_screen(particle.rx, particle.ry, view_box, screen_width, screen_height)
         radius = _radius_to_pixels(particle.radius, view_box, screen_width, screen_height)
         fill = (100, 170, 255)
@@ -175,14 +265,36 @@ def _draw_particles(
         screen.blit(label, (center[0] + 5, center[1] - 16))
 
     row_y = 10
-    row_font = pygame.font.Font(None, 22)
+    row_font = pygame.font.SysFont("consolas", 18)
+    sim_time = frame_number * float(run_configuration.get("dt", 0.0))
+    status_row = f"frame={frame_number:>8} time={sim_time:>14.8f}"
+    row = row_font.render(status_row, True, (220, 230, 240))
+    screen.blit(row, (10, row_y))
+    row_y += 20
+    for row_text in (
+        _momentum_row(
+            "start_total_mom",
+            motion_summary["start_total_px"],
+            motion_summary["start_total_py"],
+        ),
+        _momentum_row(
+            "current_total_mom",
+            motion_summary["current_total_px"],
+            motion_summary["current_total_py"],
+        ),
+        (
+            f"kinetic_energy    "
+            f" start={motion_summary['start_ke']:>14.8f}"
+            f" curr={motion_summary['curr_ke']:>14.8f}"
+            f" drift={motion_summary['ke_drift']:>14.8f}"
+        ),
+    ):
+        row = row_font.render(row_text, True, (220, 230, 240))
+        screen.blit(row, (10, row_y))
+        row_y += 20
+    row_y += 6
     for particle in particles:
-        row_text = (
-            f"p{int(particle.pnum)} "
-            f"x={particle.rx:.6f} y={particle.ry:.6f} "
-            f"vx={particle.vx:.6f} vy={particle.vy:.6f} "
-            f"oa={particle.oa:.8f}"
-        )
+        row_text = _particle_report_row(particle)
         row = row_font.render(row_text, True, (220, 230, 240))
         screen.blit(row, (10, row_y))
         row_y += 20
@@ -196,6 +308,13 @@ def _draw_particles(
         screen.blit(error_text, (10, row_y + 4))
 
     pygame.display.flip()
+
+
+def _report_particles(reporting, frame_number, particles, start_diagnostics):
+    motion_summary = _motion_summary(start_diagnostics, particles)
+    reporting.report_frame_momentum(frame_number, motion_summary)
+    for particle in particles:
+        reporting.report_particle(frame_number, particle, motion_summary)
 
 
 def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_number=None):
@@ -221,6 +340,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
         )
     )
     reporting = Reporting(report_dir, run_configuration.get("rpt_frames"))
+    start_diagnostics = _run_start_diagnostics(geo.particles)
 
     pygame.init()
     screen = pygame.display.set_mode(_window_size(run_configuration))
@@ -251,6 +371,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                 geo.ShaderFlags.frameNum = frame_number
                 ##JMB Main Call to geo.CollisionRun() fro every time step
                 particles = geo.CollisionRun()
+                _report_particles(reporting, frame_number, particles, start_diagnostics)
             else:
                 particles = geo.particles
             _draw_particles(
@@ -258,7 +379,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                 particles,
                 run_configuration,
                 frame_number,
-                reporting,
+                start_diagnostics,
                 geo.collIn.ErrorReturn,
                 geo.ErrorDescription(),
             )

@@ -1,2 +1,1 @@
-The Python Geo files mostly follow the new convention shape, especially the file split and current-frame contact-list flow. The biggest problem is that the shader side is in a half-Geo, half-Neo state: Geo call names in the compute shader, Neo function definitions in the included dynamics file, and gcs/ncs structure mismatch. 
-I did not change files; this was review-only.
+So now we need to add reporting items to the UI and capture files
