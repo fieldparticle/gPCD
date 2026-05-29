@@ -24,6 +24,7 @@ class pdata(ctypes.Structure):
     - ``rx``, ``ry``, ``rz`` become ``PosLocA.xyz`` and ``PosLocB.xyz``.
     - ``vx``, ``vy``, ``vz`` become ``VelRad.xyz``.
     - ``radius`` becomes ``Data.x``.
+    - ``collision_stiffness_q`` becomes ``Data.y``.
     - ``state_flg`` becomes ``Data.w``.
     - ``molar_mass`` becomes ``parms.x``.
 
@@ -52,5 +53,6 @@ class pdata(ctypes.Structure):
         ("state_flg", ctypes.c_double),   # Lifecycle: 0 reservoir, 1 active, 2 escaped, 3 retained.
         ("molar_mass", ctypes.c_double),  # Particle mass; copied to Vulkan parms.x.
         ("temp_vel", ctypes.c_double),    # Reserved legacy/temp velocity field.
+        ("collision_stiffness_q", ctypes.c_double),  # Particle-owned collision stiffness; copied to Data.y.
         ]
         

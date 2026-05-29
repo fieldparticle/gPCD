@@ -3,7 +3,7 @@ from pathlib import Path
 
 from base.GeoBase import GeoBase
 from base.Reporting import Reporting
-
+from base.InLineTest import InLineTest
 
 def _window_size(run_configuration):
     window_size = run_configuration.get("window_size", (1000, 1000))
@@ -198,10 +198,17 @@ def _draw_particles(
     pygame.display.flip()
 
 
-def run_analysis(cfg_file, batch_mode=False, end_frame=None):
+def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_number=None):
     geo = GeoBase()
     geo.load_cfg_file(cfg_file)
     run_configuration = geo.run_configuration
+    senario = None
+    if study == True or "in_line_obj" in run_configuration:
+        senario = InLineTest()
+        geo.senario = senario
+        geo.study = study
+        geo.inline_test_flag = True
+        senario.Create(geo.config, study_number)
     if batch_mode:
         run_configuration["end_frame"] = end_frame
     report_dir = Path(
@@ -222,6 +229,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None):
 
     frame_number = 0
     frame_rate = int(run_configuration.get("frame_rate", 60))
+    exit_on_error = bool(run_configuration.get("exit_on_error", False))
     stop_frame = end_frame
     if stop_frame is None:
         configured_end_frame = run_configuration.get("end_frame", 0)
@@ -241,6 +249,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None):
 
             if not paused:
                 geo.ShaderFlags.frameNum = frame_number
+                ##JMB Main Call to geo.CollisionRun() fro every time step
                 particles = geo.CollisionRun()
             else:
                 particles = geo.particles
@@ -254,9 +263,13 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None):
                 geo.ErrorDescription(),
             )
             if geo.collIn.ErrorReturn != geo.constants.GEO_ERROR_NONE:
-                if not paused:
-                    print(f"GeoRunner paused: ErrorReturn={geo.collIn.ErrorReturn}")
-                paused = True
+                if exit_on_error:
+                    print(f"GeoRunner exiting: ErrorReturn={geo.collIn.ErrorReturn}")
+                    running = False
+                else:
+                    if not paused:
+                        print(f"GeoRunner paused: ErrorReturn={geo.collIn.ErrorReturn}")
+                    paused = True
 
             if not paused:
                 frame_number += 1

@@ -1,14 +1,19 @@
-Start Geo dynamics path and document instantaneous geometry direction
+Export Geo dynamics with particle-owned stiffness
 
-- Add GeoBase, GeoDynamics, GeoRunner, Reporting, and InLineTest scaffolding
-- Add cfg-driven particle loading with AttrDict-style field access
-- Add GLSL-shaped particle fields, push constants, constants.glsl loading, and error reporting
-- Add position double buffering with PosLocA/PosLocB and ShaderFlags.positionBuffer
-- Add GeoRunner UI for drawing particles, walls, overlap regions, labels, and errors
-- Add per-particle CSV reporting using RUN_CONFIGURATION.rpt_frames and run_debug_dir
-- Add contact detection, overlap-area calculation, tunneling guardrail, and current-frame contact lists
-- Document Geo conventions, file boundaries, naming rules, and GLSL-portability goals
-- Update ParticleGeometry.tex for the instantaneous, purely geometric model direction
-- Back out the stored-momentum reservoir collision prototype
-- Establish that future Geo collision work should avoid persistent contact memory, 
-	phase history, first-contact velocity, and global writable shared state
+- Add Geo GLSL export process documentation and include it in GeoDynamics docs
+- Add exporter that regenerates common/GeoDynamics.glsl as a disposable artifact
+- Generate GeoDynamics.glsl with Geo contact frame, contact registration, collision response, and particle motion entry points
+- Switch BoundarySpheresMotion compute shader from obsolete NeoDynamics include to generated GeoDynamics include
+- Remove Neo dynamics shader files from the active shader path
+- Rename shader/host contact storage to generic ContactState contacts[MAX_CONTACTS]
+- Align ParticleStruct.hpp, particle.glsl, and ResourceVertexParticle initialization with generic contact storage
+- Extend pdata with particle-owned collision_stiffness_q and copy it into Particle.Data.y
+- Update particle data generators to write per-particle collision stiffness
+- Remove global Geo/Neo collision stiffness constants from the Geo shader/export path
+- Clean BoundarySpheresMotion shader list to include GeoDynamics.glsl
+- Update Geo runner/config/reporting/test support for Geo collision runs and diagnostics
+- Regenerate TwoParticleHorizontal binary data with particle-owned stiffness
+
+Verified:
+- BoundarySpheresMotionP.comp compiles with glslc after export
+- Vulkan Code runs with TwoParticleHorizonal.cfg and clean rebound

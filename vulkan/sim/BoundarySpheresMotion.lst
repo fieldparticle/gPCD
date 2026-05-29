@@ -5,7 +5,8 @@ BoundarySpheresMotion/BoundarySpheresMotionP.vert
 BoundarySpheresMotion/BoundarySpheresMotionP.frag
 BoundarySpheresMotion/params.glsl
 BoundarySpheresMotion/workgroups.glsl
-BoundarySpheresMotion/debug.glslcommon/atomic.glsl
+BoundarySpheresMotion/debug.glsl
+common/atomic.glsl
 common/atomicg.glsl
 common/CollimageIndex.glsl
 common/constants.glsl
@@ -14,5 +15,4 @@ common/Lockimage.glsl
 common/particle.glsl
 common/push.glsl
 common/util.glsl
-common/move_particle.glsl
-common/NeoDynamics.glsl
+common/GeoDynamics.glsl

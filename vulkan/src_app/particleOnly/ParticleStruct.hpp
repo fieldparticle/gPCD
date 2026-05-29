@@ -7,22 +7,14 @@ constexpr uint32_t MAX_CONTACTS = 16;
 
 struct lstr {
 	uint32_t pindex;
-	uint32_t typ;
+	uint32_t ploc;
 	uint32_t fill;
 };
 
-struct NeoContactState {
-	glm::uvec4 ids;   // x=target particle index or wall flag
-	// y=type: 0=inactive, 1=particle, 2=wall
-	// z=phase: 0=inactive, 1=compression, 2=rebound
-	// w=flags
-
-	glm::vec4 vel;    // xy=source first-contact velocity
-	// zw=target first-contact velocity for particle contacts
-
-	glm::vec4 geom;   // xy=first-contact normal
-	// z=A_zero
-	// w=zero center distance
+struct ContactState {
+	glm::uvec4 ids;   // x=target particle index, yzw=reserved/contact metadata
+	glm::vec4 geom;   // xyz=current contact normal, w=current overlap area
+	glm::vec4 aux;    // x=center distance, y=penetration depth, zw=reserved
 };
 
 struct Particle {
@@ -35,9 +27,9 @@ struct Particle {
 
 	lstr CornerList[8];
 
-	NeoContactState ncs[MAX_CONTACTS];
+	ContactState contacts[MAX_CONTACTS];
 
-	uint32_t contactCount; // active entries in ncs
+	uint32_t contactCount; // active entries in contacts
 	uint32_t colFlg;       // 1 if in collision, 0 if not
 
 	float MolarMatter;     // reserved

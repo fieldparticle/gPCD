@@ -79,7 +79,15 @@ class TabGenData(QTabWidget):
     # Configuration file stuff
     # 
     ##############################################################################
+    def run_study(self):
+        count = 0
+        for ii in range(0,self.itemcfg.num_studies):
+            if self.selected_run_analysis(self.CfgFile, study=True, study_number=ii) == True:
+                break
+        self.batch_mode = False
+
     def do_batch(self):
+        count = 0
         for ii in self.itemcfg.batch_items:
             print(f"Batch item:{ii}")
             self.CfgFile=f"{self.itemcfg.data_dir}/{ii[0]}"
@@ -115,8 +123,13 @@ class TabGenData(QTabWidget):
             self.log.log(self,f"Unable to open item configurations file:{e}")
             self.hasConfig = False
             return 
+        self.study_mode = False
+        self.batch_mode = False
         if self.itemcfg.type == "batch":
             self.batch_mode = True
+            return
+        if self.itemcfg.study == True:
+            self.study_mode = True
             return
         try:
             notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
@@ -160,15 +173,18 @@ class TabGenData(QTabWidget):
     def run_analysis(self):
         if self.batch_mode==True:
             self.do_batch()
+        elif self.study_mode==True:
+            self.run_study()
         else:
             return self.selected_run_analysis(self.CfgFile)
 
-    def selected_run_analysis(self, cfg_file, batch_mode=False, end_frame=None):
+    def selected_run_analysis(self, cfg_file, batch_mode=False, study=False, study_number=None):
         if self.use_geo_runner:
             return geo_run_analysis(
                 cfg_file,
                 batch_mode=batch_mode,
-                end_frame=end_frame,
+                study=study,
+                study_number=study_number,
             )
         return old_run_analysis(
             cfg_file,
@@ -510,6 +526,7 @@ class TabGenData(QTabWidget):
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
         self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
+        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontalStiffness.cfg")
     def valueChange(self,listObj):  
         selected_items = listObj.selectedItems()
         Text = selected_items[0].text() if selected_items else ""   

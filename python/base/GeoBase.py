@@ -40,7 +40,15 @@ class CollisionInFields(AttrDictFields):
 
 
 class GeoBase(GeoDynamics):
-    def __init__(self):
+    
+    def __init__(self, senario=None):
+        ##JMB If senario is passed in then 
+        #       assign it to self.senario, otherwise set self.senario to None
+        if senario is not None:
+            self.senario = senario
+        else:
+            self.senario = None
+        self.study = senario is not None
         self.config = None
         self.run_configuration = None
         self.particle_data = None
@@ -49,8 +57,8 @@ class GeoBase(GeoDynamics):
         self.collIn = self.create_collision_in()
         self.particles = []
         self.ShaderFlags = self.create_shader_flags()
-        self.inline_test = InLineTest()
         self.inline_test_flag = False
+        self.config_error_return = None
 
     def load_cfg_file(self, cfg_file_name):
         self.load_constants()
@@ -58,13 +66,15 @@ class GeoBase(GeoDynamics):
         with open(cfg_file_name, "r", encoding="utf-8") as cfg_file:
             self.config = libconf.load(cfg_file)
 
+        self.config_error_return = None
         self.run_configuration = self.config.get("RUN_CONFIGURATION", {})
         self.particle_data = self.config.get("PARTICLE_DATA", {})
         self.particles = self.create_particle_array_from_cfg(self.particle_data)
         self.ShaderFlags = self.create_shader_flags_from_cfg(self.run_configuration)
-        if "in_line_obj" in self.config:
+        if "in_line_obj" in self.config.RUN_CONFIGURATION or self.study == True:
             self.inline_test_flag = True
-            self.inline_test.Create(self.config)
+        else:
+            self.inline_test_flag = False
         # If there is a 
         return self.particles
 
@@ -131,6 +141,7 @@ class GeoBase(GeoDynamics):
         particle.state_flg = fields.get("state_flg", 1.0)
         particle.collision_list = fields.get("collision_list", [])
         particle.oa = fields.get("oa", 0.0)
+        particle.max_penetration_depth = fields.get("max_penetration_depth", 0.0)
         particle.report_contacts = 0
         particle.report_phase = 0
         particle.report_target = 0
@@ -143,6 +154,7 @@ class GeoBase(GeoDynamics):
         particle.report_compression_fraction = 0.0
         particle.report_rel_vn = 0.0
         particle.report_closing_mom = 0.0
+        particle.report_collision_stiffness_q = 0.0
         return particle
 
     def create_vec4(self, x=0.0, y=0.0, z=0.0, w=0.0):
@@ -172,6 +184,10 @@ class GeoBase(GeoDynamics):
     def create_particle_from_cfg(self, particle_name, particle_cfg):
         particle_number = int(str(particle_name).lstrip("p") or 0)
         location = particle_cfg.get("location", {})
+        if "collision_stiffness_q" not in particle_cfg:
+            self.config_error_return = self.constants.GEO_ERROR_MISSING_COLLISION_STIFFNESS_Q
+            self.collIn.ErrorReturn = self.config_error_return
+        collision_stiffness_q = particle_cfg.get("collision_stiffness_q", 0.0)
         return self.create_particle(
             pnum=particle_number,
             rx=location.get("x1", 0.0),
@@ -182,6 +198,7 @@ class GeoBase(GeoDynamics):
             vz=particle_cfg.get("vz", 0.0),
             mass=particle_cfg.get("mass", 1.0),
             radius=particle_cfg.get("radius", 0.0),
+            collision_stiffness_q=collision_stiffness_q,
             state_flg=particle_cfg.get("state_flg", 1.0),
         )
 
@@ -234,9 +251,18 @@ class GeoBase(GeoDynamics):
 
     def CollisionRun(self):
         self.collIn.ErrorReturn = self.constants.GEO_ERROR_NONE
+        if self.config_error_return is not None:
+            self.collIn.ErrorReturn = self.config_error_return
+            return self.particles
+        ##JMB Call to the senario.BeforeContactScan() method to 
+        ##     allow the senario to modify the particles before the contact scan
+        if self.senario:
+            self.senario.BeforeContactScan(self.particles)
+
         for particle in self.particles:
             particle.collision_list = []
             particle.oa = 0.0
+            particle.max_penetration_depth = 0.0
             particle.report_contacts = 0
             particle.report_phase = 0
             particle.report_target = 0
@@ -249,9 +275,12 @@ class GeoBase(GeoDynamics):
             particle.report_compression_fraction = 0.0
             particle.report_rel_vn = 0.0
             particle.report_closing_mom = 0.0
-        if self.inline_test_flag == True:
-            self.particles = self.inline_test.StartRun(self.particles)
+            particle.report_collision_stiffness_q = particle.Data.y
+        if self.inline_test_flag == True and self.senario is not None:
+            self.particles = self.senario.StartRun(self.particles)
+
         position_buffer = int(self.ShaderFlags.positionBuffer)
+
         self.VelRadFrame = [
             self.create_vec4(particle.VelRad.x, particle.VelRad.y, particle.VelRad.z, particle.VelRad.w)
             for particle in self.particles
@@ -273,6 +302,13 @@ class GeoBase(GeoDynamics):
                     return self.particles
             if not self.GeoProcessCollisions(source_id):
                 return self.particles
+            if self.inline_test_flag == True and self.senario is not None:
+                self.senario.AfterContactScan(
+                    self.ShaderFlags.frameNum,
+                    self.particles[source_id],
+                    self.ShaderFlags.dt,
+                    self.particles[source_id].report_collision_stiffness_q,
+                )
             if not self.GeoMoveParticle(
                 source_id,
                 position_buffer,
@@ -319,6 +355,11 @@ class GeoBase(GeoDynamics):
             center_distance,
         )
         source.oa = max(source.oa, overlap_area)
+        penetration_depth = source_radius + target_radius - center_distance
+        source.max_penetration_depth = max(
+            source.max_penetration_depth,
+            penetration_depth,
+        )
         if center_distance <= source_radius:
             self.collIn.ErrorReturn = self.constants.GEO_ERROR_TUNNELING
         return True

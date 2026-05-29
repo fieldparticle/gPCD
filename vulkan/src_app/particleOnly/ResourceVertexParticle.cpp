@@ -124,7 +124,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		part.PosLocA		= glm::vec4(part_pos.rx, part_pos.ry,part_pos.rz, 0.0);
 		part.VelRad			= glm::vec4(part_pos.vx, part_pos.vy, part_pos.vz,1.0);
 		part.PosLocB		= glm::vec4(part_pos.rx, part_pos.ry, part_pos.rz, 0.0);
-		part.Data			= glm::vec4(part_pos.radius, 0.0, 0.0, part_pos.state_flg);
+		part.Data			= glm::vec4(part_pos.radius, part_pos.collision_stiffness_q, 0.0, part_pos.state_flg);
 		part.MolarMatter	= static_cast<float>(1.0);
 		part.temp_vel		= static_cast<float>(0.04);
 		part.parms			= glm::vec4(part_pos.molar_mass, 0.0, 0.0, 0.0);
@@ -132,9 +132,9 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		part.contactCount = 0;
 		for (size_t nn = 0; nn < MAX_CONTACTS; nn++)
 		{
-			part.ncs[nn].ids = glm::uvec4(0, 0, 0, 0);
-			part.ncs[nn].vel = glm::vec4(0.0, 0.0, 0.0, 0.0);
-			part.ncs[nn].geom = glm::vec4(0.0, 0.0, 0.0, 0.0);
+			part.contacts[nn].ids = glm::uvec4(0, 0, 0, 0);
+			part.contacts[nn].geom = glm::vec4(0.0, 0.0, 0.0, 0.0);
+			part.contacts[nn].aux = glm::vec4(0.0, 0.0, 0.0, 0.0);
 		}
 
 

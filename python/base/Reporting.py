@@ -75,6 +75,7 @@ class Reporting:
                         "compression_fraction",
                         "rel_vn",
                         "closing_mom",
+                        "collision_stiffness_q",
                     ]
                 )
                 self.written_headers.add(csv_path)
@@ -101,6 +102,7 @@ class Reporting:
                     particle.report_compression_fraction,
                     particle.report_rel_vn,
                     particle.report_closing_mom,
+                    particle.report_collision_stiffness_q,
                 ]
             )
         print(f"exported frame {frame_number}")

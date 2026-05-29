@@ -55,8 +55,7 @@
 #include "../common/particle.glsl"
 #include "workgroups.glsl"
 #include "../common/isParticleContactMotion.glsl"
-#include "../common/NeoDynamics.glsl"
-#include "../common/move_particle.glsl"
+#include "../common/GeoDynamics.glsl"
  
 
 ///
@@ -98,7 +97,7 @@ void main()
 	uint duplst[DUP_LIST_SIZE];
 	uint dupcnt = 0;
 	bool dupflg = false;
-	NeoBeginContactFrame(SourceID);
+	GeoBeginContactFrame(SourceID);
 	// Clear the duparray
 	for(uint kk =0; kk < DUP_LIST_SIZE; kk++)
 		duplst[kk] = 0;

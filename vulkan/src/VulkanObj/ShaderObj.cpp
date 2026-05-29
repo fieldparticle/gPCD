@@ -221,7 +221,6 @@ void  ShaderObj::WriteShaderHeader()
 			<< "const uint LockAryLen=" << m_LMO->m_MaxLoc << ";\n"
 			<< "const uint doMotion = " << motion_str << ";\n"
 			<< "const uint MAX_CELL_ARRAY_LOCATIONS =" << m_CMO->m_MaxLoc << ";\n"
-			<< "const float NEO_COLLISION_STIFFNESS_Q=" << CfgTst->GetFloat("NEO_COLLISION_STIFFNESS_Q", true) << ";\n"
 				//##JMBDont know what this is
 			<< "const uint compflag =" << compflag << ";\n"
 			<< "const uint bbound =" << m_VPO->BoundaryParticleLimit << ";\n";

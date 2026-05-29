@@ -44,5 +44,6 @@ struct pdata
 	double state_flg;	// 1 live or 0 dead
 	double molar_mass;
 	double temp_vel;
+	double collision_stiffness_q;
 
 } ;

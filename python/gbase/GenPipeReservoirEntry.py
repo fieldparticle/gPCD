@@ -181,6 +181,7 @@ class GenPipeReservoirEntry():
         reservoir_count = int(self.cfg_value(RUN_CONFIGURATION, "reservoir_particle_count", 32))
         radius = float(self.cfg_value(RUN_CONFIGURATION, "radius", 0.25))
         mass = float(self.cfg_value(RUN_CONFIGURATION, "particle_mass", 1.0))
+        collision_stiffness_q = float(self.cfg_value(RUN_CONFIGURATION, "collision_stiffness_q", 0.0))
         local_particles_in_row = self.itemcfg.num_particles_y
         local_particles_in_col = self.itemcfg.num_particles_x
         try:
@@ -198,6 +199,7 @@ class GenPipeReservoirEntry():
                     particle_struct.molar_mass = 1.0
                     particle_struct.radius = 0.25
                     particle_struct.state_flg = 1.0
+                    particle_struct.collision_stiffness_q = collision_stiffness_q
                     self.p_list.append(particle_struct)
                     
                 

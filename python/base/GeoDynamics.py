@@ -34,14 +34,9 @@ class GeoDynamics:
         return max(self.particles[ParticleID].parms.x, 1.0e-12)
 
     def GeoPairStiffness(self, SourceID, TargetID):
-        """Return pair stiffness with RUN_CONFIGURATION fallback."""
+        """Return average source/target particle-owned stiffness."""
         source_q = self.particles[SourceID].Data.y or 0.0
         target_q = self.particles[TargetID].Data.y or 0.0
-        default_q = float(self.run_configuration.get("collision_stiffness_q", 1.0))
-        if source_q <= 0.0:
-            source_q = default_q
-        if target_q <= 0.0:
-            target_q = default_q
         return max(0.0, 0.5 * (source_q + target_q))
 
     def GeoParticleGeometry(self, SourceID, TargetID):
@@ -183,4 +178,5 @@ class GeoDynamics:
         source.report_compression_fraction = 0.0
         source.report_rel_vn = relative_normal_velocity
         source.report_closing_mom = impulse
+        source.report_collision_stiffness_q = stiffness_q
         return True
