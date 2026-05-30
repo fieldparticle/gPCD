@@ -250,15 +250,41 @@ class GeoBase(GeoDynamics):
         )
 
     def CollisionRun(self):
+        if not self.GeoBeginFrame():
+            return self.particles
+
+        self.GeoApplyBeforeContactScanHook()
+        self.GeoResetFrameState()
+        self.GeoApplyStartRunHook()
+        self.GeoBuildFrameSnapshot()
+
+        if not self.GeoBuildParticleContactLists():
+            return self.particles
+
+        if not self.GeoBuildWallContactLists():
+            return self.particles
+
+        if not self.GeoResolveContacts():
+            return self.particles
+
+        if not self.GeoMoveParticles():
+            return self.particles
+
+        self.GeoEndFrame()
+        return self.particles
+
+    def GeoBeginFrame(self):
         self.collIn.ErrorReturn = self.constants.GEO_ERROR_NONE
         if self.config_error_return is not None:
             self.collIn.ErrorReturn = self.config_error_return
-            return self.particles
-        ##JMB Call to the senario.BeforeContactScan() method to 
-        ##     allow the senario to modify the particles before the contact scan
+            return False
+        return True
+
+    def GeoApplyBeforeContactScanHook(self):
         if self.senario:
             self.senario.BeforeContactScan(self.particles)
 
+    def GeoResetFrameState(self):
         for particle_index, particle in enumerate(self.particles):
             self.GeoBeginContactFrame(particle_index)
             particle.oa = 0.0
@@ -276,16 +302,29 @@ class GeoBase(GeoDynamics):
             particle.report_rel_vn = 0.0
             particle.report_closing_mom = 0.0
             particle.report_collision_stiffness_q = particle.Data.y
+
+    def GeoApplyStartRunHook(self):
         if self.inline_test_flag == True and self.senario is not None:
             self.particles = self.senario.StartRun(self.particles)
 
+    def GeoBuildFrameSnapshot(self):
         position_buffer = int(self.ShaderFlags.positionBuffer)
-
+        self.PosLocFrame = [
+            self.create_vec4(
+                self.particle_position(particle, position_buffer).x,
+                self.particle_position(particle, position_buffer).y,
+                self.particle_position(particle, position_buffer).z,
+                self.particle_position(particle, position_buffer).w,
+            )
+            for particle in self.particles
+        ]
         self.VelRadFrame = [
             self.create_vec4(particle.VelRad.x, particle.VelRad.y, particle.VelRad.z, particle.VelRad.w)
             for particle in self.particles
         ]
 
+    def GeoBuildParticleContactLists(self):
+        position_buffer = int(self.ShaderFlags.positionBuffer)
         for source_id in range(len(self.particles)):
             for target_id in range(len(self.particles)):
                 if source_id == target_id:
@@ -297,11 +336,18 @@ class GeoBase(GeoDynamics):
                     position_buffer,
                 ):
                     if not self.GeoAddParticleContact(source_id, target_id):
-                        return self.particles
+                        return False
                 if self.collIn.ErrorReturn != self.constants.GEO_ERROR_NONE:
-                    return self.particles
+                    return False
+        return True
+
+    def GeoBuildWallContactLists(self):
+        return True
+
+    def GeoResolveContacts(self):
+        for source_id in range(len(self.particles)):
             if not self.GeoProcessCollisions(source_id):
-                return self.particles
+                return False
             if self.inline_test_flag == True and self.senario is not None:
                 self.senario.AfterContactScan(
                     self.ShaderFlags.frameNum,
@@ -309,17 +355,25 @@ class GeoBase(GeoDynamics):
                     self.ShaderFlags.dt,
                     self.particles[source_id].report_collision_stiffness_q,
                 )
+        return True
+
+    def GeoMoveParticles(self):
+        position_buffer = int(self.ShaderFlags.positionBuffer)
+        for source_id in range(len(self.particles)):
             if not self.GeoMoveParticle(
                 source_id,
                 position_buffer,
                 self.ShaderFlags.dt,
             ):
-                return self.particles
+                return False
+        return True
 
+    def GeoEndFrame(self):
+        position_buffer = int(self.ShaderFlags.positionBuffer)
         self.ShaderFlags.positionBuffer = 1.0 if position_buffer == 0 else 0.0
         self.sync_particle_alias_positions(int(self.ShaderFlags.positionBuffer))
+        self.PosLocFrame = []
         self.VelRadFrame = []
-        return self.particles
 
     def sync_particle_alias_positions(self, positionBuffer):
         for particle in self.particles:
@@ -337,8 +391,12 @@ class GeoBase(GeoDynamics):
     def isParticleContact(self, Frame, SourceID, TargetID, positionBuffer):
         source = self.particles[SourceID]
         target = self.particles[TargetID]
-        source_position = self.particle_position(source, positionBuffer)
-        target_position = self.particle_position(target, positionBuffer)
+        if hasattr(self, "PosLocFrame") and self.PosLocFrame:
+            source_position = self.PosLocFrame[SourceID]
+            target_position = self.PosLocFrame[TargetID]
+        else:
+            source_position = self.particle_position(source, positionBuffer)
+            target_position = self.particle_position(target, positionBuffer)
         dx = target_position.x - source_position.x
         dy = target_position.y - source_position.y
         dz = target_position.z - source_position.z

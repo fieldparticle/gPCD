@@ -19,7 +19,9 @@ class GeoDynamics:
         return 0 <= ParticleID < len(self.particles)
 
     def GeoCurrentLocation(self, ParticleID):
-        """Read the current position from ShaderFlags.positionBuffer."""
+        """Read the frame-start position when GeoBase provides it."""
+        if hasattr(self, "PosLocFrame") and self.PosLocFrame:
+            return self.PosLocFrame[ParticleID]
         return self.particle_position(
             self.particles[ParticleID],
             int(self.ShaderFlags.positionBuffer),

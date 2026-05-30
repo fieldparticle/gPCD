@@ -1,15 +1,16 @@
-Add basic symmetric Geo multi-contact response
+Refactor Geo frame flow around instantaneous snapshots
 
-Implement source-owned multi-contact collision handling by weighting each
-active contact by overlap area and capping compression with both source and
-target contact context. Keep one internal momentum ledger per contact slot,
-sum contact impulse vectors, and apply one source velocity update.
+Make CollisionRun read as an explicit sequential stage chain with narrow frame
+steps for begin, reset, scenario hooks, snapshot creation, particle contact
+building, wall contact placeholder, contact resolution, movement, and end-frame
+cleanup.
 
-Regenerate GeoDynamics.glsl from the Python export path and update the particle
-geometry documentation for the new weighted multi-contact rule. Add
-contacts.csv capture output plus per-particle internal_mom reporting so
-multi-contact frames can be cross-referenced with momentum and particle CSVs.
+Add frame-start position snapshots alongside velocity snapshots so contact
+detection, contact geometry, relative velocity, and available momentum are all
+computed from the same instantaneous frame state. Keep writes directed to live
+source-owned particle state.
 
-Require run_debug_dir for GeoRunner capture output and add explicit capture
-paths for ThreeParticle and ThreeParticleChase. Document the change in
-ProblemEvolution as basic symmetric multi-particle functionality.
+Document the instantaneous frame snapshot rule and the sequential stage/narrow
+function programming convention, including the rule that meaningful frame
+decisions should stay visible in the main chain instead of being hidden behind
+umbrella stages.

@@ -1,0 +1,174 @@
+% !TeX root = GeoDynamics.tex
+\section{Programming Styles}
+
+When discussing software architecture, two common programming styles frequently emerge. Although there is not a universally accepted pair of names for these approaches, they are often described as \emph{control-oriented} and \emph{data-oriented} designs.
+
+\subsection{Control-Oriented (Hierarchical) Design}
+
+In this style, functions determine what happens next by directly invoking other functions within their bodies.
+
+\begin{lstlisting}[language=C++]
+void Process()
+{
+LoadData();
+
+```
+if(condition)
+    MethodA();
+else
+    MethodB();
+```
+
+}
+
+void MethodA()
+{
+...
+MethodC();
+}
+\end{lstlisting}
+
+Characteristics include:
+
+\begin{itemize}
+\item Deep call trees.
+\item Control flow is distributed among functions.
+\item Functions decide what operation occurs next.
+\item Execution resembles a hierarchy or tree structure.
+\end{itemize}
+
+Common names for this style include:
+
+\begin{itemize}
+\item Hierarchical Design
+\item Top-Down Design
+\item Control-Oriented Programming
+\item Call-Tree Architecture
+\item Procedural Decomposition
+\end{itemize}
+
+A potential drawback is that execution flow may become difficult to follow because the program continually branches into other functions.
+
+\subsection*{Call-Tree Representation}
+
+\begin{verbatim}
+Function A
+|
++-- Function B
+|   |
+|   +-- Function D
+|   |
+|   +-- Function E
+|
++-- Function C
+\end{verbatim}
+
+The primary focus is on \emph{who calls whom}.
+
+\subsection{Data-Oriented (Pipeline) Design}
+
+In this style, each function performs a specific operation and returns data to the caller. The returned data then becomes the input for the next stage.
+
+\begin{lstlisting}[language=C++]
+auto data = LoadData();
+auto particles = BuildParticles(data);
+auto collisions = DetectCollisions(particles);
+auto result = ResolveCollisions(collisions);
+\end{lstlisting}
+
+Characteristics include:
+
+\begin{itemize}
+\item Execution path is explicit.
+\item Functions have clear inputs and outputs.
+\item Easier testing and verification.
+\item Improved modularity and reuse.
+\end{itemize}
+
+Common names include:
+
+\begin{itemize}
+\item Pipeline Architecture
+\item Data-Flow Programming
+\item Functional Composition
+\item Chain of Transformations
+\item Sequential Processing
+\end{itemize}
+
+\subsubsection*{Pipeline Representation}
+
+\begin{verbatim}
+Data
+|
+v
+Stage A
+|
+v
+Stage B
+|
+v
+Stage C
+|
+v
+Result
+\end{verbatim}
+
+The primary focus is on \emph{how data moves through the system}.
+
+\subsection{Application to GPU and HPC Systems}
+
+Many high-performance computing (HPC) and GPU applications naturally adopt a pipeline architecture.
+
+For example, a particle collision detection system may be represented as:
+
+\begin{verbatim}
+Particles
+|
+v
+Broad Phase
+|
+v
+Candidate Pairs
+|
+v
+Narrow Phase
+|
+v
+Collision Resolution
+|
+v
+Updated Particles
+\end{verbatim}
+
+
+Each stage consumes data produced by the previous stage and generates data for the next stage.
+
+This architecture is common in:
+
+\begin{itemize}
+\item GPU pipelines
+\item Vulkan rendering systems
+\item Compute shader workflows
+\item Scientific computing applications
+\item Data processing frameworks
+\end{itemize}
+
+\subsection{Summary}
+
+The distinction between these approaches can be summarized as follows:
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Control-Oriented} & \textbf{Data-Oriented} \\
+\hline
+Focus on function calls & Focus on data movement \\
+Hierarchical call trees & Linear processing stages \\
+Control flow distributed & Control flow explicit \\
+Often deeper nesting & Often flatter structure \\
+Harder to parallelize & Easier to parallelize \\
+\hline
+\end{tabular}
+\end{center}
+For large simulation codes, physics engines, and GPU applications, data-oriented pipeline designs are often preferred because they make data dependencies explicit and are generally easier to reason about, profile, parallelize, and maintain.
+

@@ -273,14 +273,16 @@ For each simulation frame:
     Contact slots that were active on the previous frame are kept long enough
     to preserve their source-owned internal momentum if the same contact is
     active again.
-    \item Copy the frame-start velocities into \texttt{VelRadFrame}.  Collision
-    processing reads relative velocity from this frame-start snapshot.
-    \item For each ordered pair $(s,t)$, test current-position overlap.
+    \item Copy the frame-start positions into \texttt{PosLocFrame}.  Contact
+    geometry and contact detection read from this frame-start snapshot.
+    \item Copy the frame-start velocities into \texttt{VelRadFrame}.  Relative
+    normal velocity and available momentum read from this frame-start snapshot.
+    \item For each ordered pair $(s,t)$, test snapshot-position overlap.
     \item If the pair overlaps, add $t$ to $s$'s current contact list.
     \item For each source particle $s$:
     \begin{enumerate}[leftmargin=*]
-        \item If $s$ has active contacts, compute geometry, stiffness, area
-        weights, and source-owned internal momentum limited impulses.
+        \item If $s$ has active contacts, compute snapshot geometry, stiffness,
+        area weights, and source-owned internal momentum limited impulses.
         \item Accumulate contact impulse vectors and apply one source velocity
         update.
         \item Move $s$ into the inactive position buffer using the updated

@@ -1,2 +1,1 @@
- We will need a new base GeoBase.py that iterates thru the partcie list and finds collsions. That will be named isParticleContact(,SourceID, TargetID, ShaShaderFlags.positionBuffer. 
- We also need a stru
+In wirting code there seem to be two approaches. One the progam flow branches allot - one function calls another functin from with its body. The other is more linear and modualar. The functiona are called and return values for the next function. More like a chain. What are these called if anything
