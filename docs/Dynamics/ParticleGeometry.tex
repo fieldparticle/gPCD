@@ -202,10 +202,23 @@ contact slots may report the current value or a current-frame allocation, but
 they are not the persistent owner of the ledger.
 
 During compression, the source can store only momentum actually removed from
-the source particle's normal motion.  In a multi-contact frame, that available
-source momentum is shared across contacts by area weight.  The same contact is
-also capped by the target's read-only contact context so a one-contact target
-cannot overspend against a multi-contact source:
+the frame-start relative closing motion.  The current Geo path uses
+frame-local reduced-mass closing momentum:
+
+\begin{equation}
+\mu_{s,t_k} =
+\frac{m_s m_{t_k}}{m_s + m_{t_k}},
+\qquad
+P_{close,k} =
+\mu_{s,t_k}\max(0,-v_{n,k}).
+\end{equation}
+
+This value is not a stored \texttt{p\_zero} episode value.  It is recomputed
+from the frame-start velocity snapshot for the current contact.  In a
+multi-contact frame, the source's available closing momentum is shared across
+contacts by area weight.  The same contact is also capped by the target's
+read-only contact context so a one-contact target cannot overspend against a
+multi-contact source:
 
 \begin{equation}
 P_{s,k} = w_{s,k} P_{s,available},

@@ -37,6 +37,11 @@ class GeoDynamics:
         target_q = self.particles[TargetID].Data.y or 0.0
         return max(0.0, 0.5 * (source_q + target_q))
 
+    def GeoReducedMass(self, SourceID, TargetID):
+        source_mass = self.GeoMass(SourceID)
+        target_mass = self.GeoMass(TargetID)
+        return (source_mass * target_mass) / (source_mass + target_mass)
+
     def GeoContactSlots(self, SourceID):
         """Return the source-owned current-frame contact slots."""
         particle = self.particles[SourceID]
@@ -168,16 +173,11 @@ class GeoDynamics:
                 + (target_velocity.y - source_velocity.y) * normal_y
                 + (target_velocity.z - source_velocity.z) * normal_z
             )
-            source_normal_velocity = (
-                source_velocity.x * normal_x
-                + source_velocity.y * normal_y
-                + source_velocity.z * normal_z
-            )
             total_overlap_area += max(0.0, overlap_area)
             if relative_normal_velocity < -self.GEO_EPSILON:
-                available_source_momentum = max(
-                    available_source_momentum,
-                    self.GeoMass(SourceID) * max(0.0, source_normal_velocity),
+                available_source_momentum += (
+                    self.GeoReducedMass(SourceID, TargetID)
+                    * -relative_normal_velocity
                 )
         return total_overlap_area, available_source_momentum
 

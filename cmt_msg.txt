@@ -1,15 +1,13 @@
-Use source-owned internal momentum for indexed contacts
+Use frame-local closing momentum for chase contacts
 
-Move Geo contact state toward current-frame indexed slots while keeping
-persistent internal momentum on the source particle. Mirror the source-owned
-ledger through Data.z, preserve frame-start phase during contact resolution, and
-area-weight release so slot order does not create momentum drift.
+Replace source-normal availability with reduced-mass closing momentum computed
+from the frame-start relative normal velocity. This lets chase contacts respond
+from first overlap without reviving persistent p_zero state or pairwise
+write-back.
 
-Add contact diagnostics for impulse, normal velocity, momentum, and kinetic
-energy analysis. Update momentum/contact capture output and document the current
-particle geometry, conventions, and problem evolution.
+Document the convention-safe interpretation in ParticleGeometry,
+ProblemEvolution, and GeoConventions. TwoParticleChase now avoids extreme
+overlap while conserving momentum; ThreeParticleChase no longer tunnels but
+still exposes multi-contact momentum drift.
 
-Verified ThreeParticle and TwoParticleHorizontal preserve total momentum through
-frame 200.
-
-Next: attack ThreeParticleChase.
+Next: ThreeParticleChase momentum drift.

@@ -172,6 +172,23 @@ capacity must be shared across the current contact set by overlap-area weight.
 Slot order must not decide which contact receives the last remaining internal
 momentum.
 
+\subsection{Frame-Local Closing Momentum Convention}
+
+A closing contact may compute frame-local reduced-mass closing momentum:
+
+\begin{equation}
+P_{close} =
+\mu \max(0,-v_n),
+\qquad
+\mu = \frac{m_s m_t}{m_s + m_t}.
+\end{equation}
+
+This is allowed because it is computed from the frame-start velocity snapshot,
+current contact normal, and particle masses.  It is not a persistent
+\texttt{p\_zero} value, not first-contact memory, and not a pair reservoir.
+It may be used as a source-owned compression availability value, with the same
+current-frame area weighting rules used for multi-contact geometry.
+
 \subsection{Model-Preservation Warning}
 
 Before editing code, any proposed change that would move the Geo path away from
@@ -265,6 +282,6 @@ one-to-one GLSL export unit.
     module.
     \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
     \item Continue \texttt{GeoProcessCollisions(SourceID)} incrementally, with
-    \texttt{ThreeParticleChase} as the next active problem case.
+    \texttt{ThreeParticleChase} momentum drift as the next active problem case.
     \item Add reporting only through \texttt{Reporting.py}, not through dynamics.
 \end{itemize}

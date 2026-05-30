@@ -496,3 +496,61 @@ This keeps the important architectural rules intact:
 
 The next problem target is \texttt{ThreeParticleChase}, which should be treated
 as a new problem-evolution step after this checkpoint.
+
+\subsection{Frame-Local Closing Momentum for Chase Contacts}
+
+\noindent\textbf{Commit hash:} \texttt{5eab35fe5bd4ec7d07824b7599306549c47d5ede}
+
+The next failure was extreme overlap in chase contacts.  The simplest capture
+was \texttt{TwoParticleChase}.  Particles 1 and 2 were closing, but the
+source-normal availability test could report zero available momentum on one
+side of the contact.  The result was a long sequence of valid closing contact
+frames with no applied impulse:
+
+\begin{verbatim}
+rel_vn < 0
+weighted_available_momentum = 0
+applied_impulse = 0
+\end{verbatim}
+
+The contact response did not act until the particles were near the tunnel
+threshold.  That prevented immediate pass-through, but it allowed an
+unacceptably large overlap area.
+
+\subsection{Rejected Interpretation - Persistent p\_zero}
+
+The needed value resembles the old \texttt{p\_zero} idea, but the old
+\texttt{p\_zero} carried collision-episode meaning: zero-depth calculations,
+first-contact assumptions, and persistent state.  That does not fit the
+current Geo conventions.
+
+The accepted interpretation is strictly frame-local:
+
+\begin{equation}
+P_{close,k} =
+\mu_{s,t_k}\max(0,-v_{n,k}),
+\qquad
+\mu_{s,t_k} =
+\frac{m_s m_{t_k}}{m_s + m_{t_k}}.
+\end{equation}
+
+This value is computed from the frame-start velocity snapshot and the current
+contact normal.  It is not stored as episode memory and it does not require a
+pairwise write-back.
+
+\subsection{Result}
+
+Replacing the source-normal availability test with reduced-mass closing
+momentum made \texttt{TwoParticleChase} conservative:
+
+\begin{verbatim}
+TwoParticleChase:
+momentum drift      = numerical zero
+closest p1-p2 range = 0.4660438566522238
+radius sum          = 0.5
+\end{verbatim}
+
+\texttt{ThreeParticleChase} also has much better geometric behavior because
+the chase contact no longer waits until an extreme overlap before responding.
+However, it still has momentum drift in the multi-contact phase.  The next
+problem target is therefore \texttt{ThreeParticleChase} momentum drift.
