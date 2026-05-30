@@ -1,1 +1,15 @@
-Update docs
+Use source-owned internal momentum for indexed contacts
+
+Move Geo contact state toward current-frame indexed slots while keeping
+persistent internal momentum on the source particle. Mirror the source-owned
+ledger through Data.z, preserve frame-start phase during contact resolution, and
+area-weight release so slot order does not create momentum drift.
+
+Add contact diagnostics for impulse, normal velocity, momentum, and kinetic
+energy analysis. Update momentum/contact capture output and document the current
+particle geometry, conventions, and problem evolution.
+
+Verified ThreeParticle and TwoParticleHorizontal preserve total momentum through
+frame 200.
+
+Next: attack ThreeParticleChase.

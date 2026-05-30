@@ -38,60 +38,85 @@ class GeoDynamics:
         return max(0.0, 0.5 * (source_q + target_q))
 
     def GeoContactSlots(self, SourceID):
-        """Return the source-owned persistent contact slots."""
+        """Return the source-owned current-frame contact slots."""
         particle = self.particles[SourceID]
         if hasattr(particle, "contacts"):
             return particle.contacts
         return particle.gcs
 
+    def GeoClearContactDiagnostics(self, contact_state):
+        """Reset reporting-only contact diagnostics for the current frame."""
+        contact_state.raw_impulse = 0.0
+        contact_state.compression_impulse = 0.0
+        contact_state.release_impulse = 0.0
+        contact_state.source_available_momentum = 0.0
+        contact_state.source_available_share = 0.0
+        contact_state.target_available_momentum = 0.0
+        contact_state.target_available_share = 0.0
+        contact_state.weighted_available_momentum = 0.0
+        contact_state.source_vn = 0.0
+        contact_state.target_vn = 0.0
+        contact_state.rel_vn = 0.0
+        contact_state.delta_px = 0.0
+        contact_state.delta_py = 0.0
+        contact_state.delta_pz = 0.0
+        contact_state.source_vx_before = 0.0
+        contact_state.source_vy_before = 0.0
+        contact_state.source_vz_before = 0.0
+        contact_state.source_vx_after = 0.0
+        contact_state.source_vy_after = 0.0
+        contact_state.source_vz_after = 0.0
+        contact_state.source_ke_before = 0.0
+        contact_state.source_ke_after = 0.0
+        contact_state.source_ke_delta = 0.0
+        contact_state.contact_ke_delta_estimate = 0.0
+
     def GeoClearContactSlot(self, contact_state):
         contact_state.ids = self.create_uvec4()
         contact_state.geom = self.create_vec4()
         contact_state.aux = self.create_vec4()
+        self.GeoClearContactDiagnostics(contact_state)
+
+    def GeoSetInternalMomentum(self, SourceID, internal_momentum):
+        """Store source-owned internal momentum on the particle."""
+        particle = self.particles[SourceID]
+        particle.internal_momentum = max(0.0, internal_momentum)
+        particle.Data.z = particle.internal_momentum
+
+    def GeoInternalMomentum(self, SourceID):
+        """Return source-owned internal momentum."""
+        particle = self.particles[SourceID]
+        return max(0.0, getattr(particle, "internal_momentum", particle.Data.z))
 
     def GeoBeginContactFrame(self, SourceID):
-        """Reset current-frame contact flags while preserving active ledgers."""
+        """Reset current-frame contact slots while preserving source ledgers."""
         source = self.particles[SourceID]
         source.collision_list = []
         source.contactCount = 0
         source.colFlg = 0
         for contact_state in self.GeoContactSlots(SourceID):
-            if contact_state.ids.w != self.GEO_CONTACT_ACTIVE_THIS_FRAME:
-                self.GeoClearContactSlot(contact_state)
-                continue
-            contact_state.ids.w = 0
-            contact_state.geom = self.create_vec4()
-            contact_state.aux.x = 0.0
-            contact_state.aux.y = 0.0
-            contact_state.aux.w = 0.0
+            self.GeoClearContactSlot(contact_state)
 
-    def GeoFindContactSlot(self, SourceID, TargetID):
-        for contact_state in self.GeoContactSlots(SourceID):
-            if (
-                contact_state.ids.x == TargetID
-                and contact_state.ids.y == self.GEO_CONTACT_PARTICLE
-            ):
-                return contact_state
-        return None
-
-    def GeoAllocContactSlot(self, SourceID, TargetID):
-        for contact_state in self.GeoContactSlots(SourceID):
-            if contact_state.ids.y == self.GEO_CONTACT_INACTIVE:
-                contact_state.ids.x = TargetID
-                contact_state.ids.y = self.GEO_CONTACT_PARTICLE
-                contact_state.ids.z = self.GEO_PHASE_COMPRESSION
-                contact_state.ids.w = self.GEO_CONTACT_ACTIVE_THIS_FRAME
-                contact_state.aux.z = 0.0
-                return contact_state
-        return None
+    def GeoAppendContactSlot(self, SourceID, TargetID):
+        source = self.particles[SourceID]
+        contact_slots = self.GeoContactSlots(SourceID)
+        if source.contactCount >= len(contact_slots):
+            return None
+        contact_state = contact_slots[source.contactCount]
+        contact_state.ids.x = TargetID
+        contact_state.ids.y = self.GEO_CONTACT_PARTICLE
+        contact_state.ids.z = getattr(
+            source,
+            "internal_momentum_phase",
+            self.GEO_PHASE_COMPRESSION,
+        )
+        contact_state.ids.w = self.GEO_CONTACT_ACTIVE_THIS_FRAME
+        contact_state.aux.z = self.GeoInternalMomentum(SourceID)
+        source.contactCount += 1
+        return contact_state
 
     def GeoContactState(self, SourceID, TargetID):
-        contact_state = self.GeoFindContactSlot(SourceID, TargetID)
-        if contact_state is None:
-            contact_state = self.GeoAllocContactSlot(SourceID, TargetID)
-        if contact_state is not None:
-            contact_state.ids.w = self.GEO_CONTACT_ACTIVE_THIS_FRAME
-        return contact_state
+        return self.GeoAppendContactSlot(SourceID, TargetID)
 
     def GeoParticleGeometry(self, SourceID, TargetID):
         """Return current contact geometry or None when there is no contact."""
@@ -160,8 +185,8 @@ class GeoDynamics:
         """Record that SourceID is in contact with TargetID this frame.
 
         Contact detection and overlap-area calculation happen in GeoBase before
-        this function is called.  This function records the current-frame
-        contact list and binds it to a source-owned persistent contact slot.
+        this function is called. This function appends the current-frame contact
+        to the next indexed source-owned slot.
         """
         if not self.GeoValidParticleID(SourceID):
             return self.GeoSetError(self.constants.GEO_ERROR_INVALID_SOURCE_ID)
@@ -172,13 +197,13 @@ class GeoDynamics:
         if not hasattr(particle, "collision_list"):
             return self.GeoSetError(self.constants.GEO_ERROR_CONTACT_LIST_MISSING)
 
-        if TargetID not in particle.collision_list:
-            particle.collision_list.append(TargetID)
+        if TargetID in particle.collision_list:
+            return True
+        particle.collision_list.append(TargetID)
         contact_state = self.GeoContactState(SourceID, TargetID)
         if contact_state is None:
             return True
         particle.colFlg = 1
-        particle.contactCount = len(particle.collision_list)
         particle.report_contacts = len(particle.collision_list)
         particle.report_target = TargetID
         return True
@@ -216,21 +241,41 @@ class GeoDynamics:
             return self.GeoSetError(self.constants.GEO_ERROR_INVALID_SOURCE_ID)
         source = self.particles[SourceID]
         if not source.collision_list:
+            self.GeoSetInternalMomentum(SourceID, 0.0)
+            source.internal_momentum_phase = self.GEO_PHASE_COMPRESSION
             return True
 
         source_velocity = self.GeoVelocity(SourceID)
+        source_mass = self.GeoMass(SourceID)
+        source_vx_before = source.VelRad.x
+        source_vy_before = source.VelRad.y
+        source_vz_before = source.VelRad.z
+        source_ke_before = 0.5 * source_mass * (
+            source_vx_before * source_vx_before
+            + source_vy_before * source_vy_before
+            + source_vz_before * source_vz_before
+        )
         contact_entries = []
         total_overlap_area, available_source_momentum = self.GeoContactContext(SourceID)
+        source_internal_momentum = self.GeoInternalMomentum(SourceID)
+        source_phase_start = getattr(
+            source,
+            "internal_momentum_phase",
+            self.GEO_PHASE_COMPRESSION,
+        )
+        next_internal_momentum = source_internal_momentum
+        next_internal_phase = source_phase_start
 
-        for TargetID in source.collision_list:
+        for contact_index, TargetID in enumerate(source.collision_list):
             if not self.GeoValidParticleID(TargetID):
                 return self.GeoSetError(self.constants.GEO_ERROR_INVALID_TARGET_ID)
             contact = self.GeoParticleGeometry(SourceID, TargetID)
             if contact is None:
                 continue
-            contact_state = self.GeoContactState(SourceID, TargetID)
-            if contact_state is None:
+            contact_slots = self.GeoContactSlots(SourceID)
+            if contact_index >= len(contact_slots):
                 continue
+            contact_state = contact_slots[contact_index]
 
             normal_x, normal_y, normal_z, overlap_area, center_distance = contact
             target_velocity = self.GeoVelocity(TargetID)
@@ -244,6 +289,11 @@ class GeoDynamics:
                 + source_velocity.y * normal_y
                 + source_velocity.z * normal_z
             )
+            target_normal_velocity = (
+                target_velocity.x * normal_x
+                + target_velocity.y * normal_y
+                + target_velocity.z * normal_z
+            )
             contact_entries.append(
                 (
                     TargetID,
@@ -255,6 +305,7 @@ class GeoDynamics:
                     center_distance,
                     relative_normal_velocity,
                     source_normal_velocity,
+                    target_normal_velocity,
                 )
             )
 
@@ -268,7 +319,6 @@ class GeoDynamics:
         report_center_distance = 0.0
         report_normal_x = 0.0
         report_normal_y = 0.0
-        report_stored_mom = 0.0
         report_rel_vn = 0.0
         report_closing_mom = 0.0
         report_stiffness_q = 0.0
@@ -283,7 +333,8 @@ class GeoDynamics:
                 overlap_area,
                 center_distance,
                 relative_normal_velocity,
-                _source_normal_velocity,
+                source_normal_velocity,
+                target_normal_velocity,
             ) = entry
             area_weight = max(0.0, overlap_area / total_overlap_area)
             target_total_overlap_area, target_available_momentum = self.GeoContactContext(TargetID)
@@ -297,37 +348,76 @@ class GeoDynamics:
             source_available_share = available_source_momentum * area_weight
             target_available_share = target_available_momentum * target_area_weight
             weighted_available_momentum = min(source_available_share, target_available_share)
-            stored_internal_momentum = max(0.0, contact_state.aux.z)
+            stored_internal_momentum = next_internal_momentum
+            contact_phase = source_phase_start
             applied_impulse = 0.0
+            compression_impulse = 0.0
+            release_impulse = 0.0
 
             if (
-                contact_state.ids.z != self.GEO_PHASE_RETURNING
+                source_phase_start != self.GEO_PHASE_RETURNING
                 and relative_normal_velocity < -self.GEO_EPSILON
             ):
                 compression_impulse = min(raw_impulse, weighted_available_momentum)
                 applied_impulse += compression_impulse
                 stored_internal_momentum += compression_impulse
                 if compression_impulse < raw_impulse:
-                    contact_state.ids.z = self.GEO_PHASE_RETURNING
+                    contact_phase = self.GEO_PHASE_RETURNING
+                    next_internal_phase = self.GEO_PHASE_RETURNING
                 else:
-                    contact_state.ids.z = self.GEO_PHASE_COMPRESSION
+                    contact_phase = self.GEO_PHASE_COMPRESSION
 
-            if contact_state.ids.z == self.GEO_PHASE_RETURNING:
-                release_impulse = min(raw_impulse, stored_internal_momentum)
+            if contact_phase == self.GEO_PHASE_RETURNING:
+                release_capacity = source_internal_momentum * area_weight + compression_impulse
+                release_impulse = min(raw_impulse, release_capacity, stored_internal_momentum)
                 applied_impulse += release_impulse
                 stored_internal_momentum -= release_impulse
                 if stored_internal_momentum <= self.GEO_EPSILON:
                     stored_internal_momentum = 0.0
 
+            next_internal_momentum = stored_internal_momentum
+            contact_state.ids.z = contact_phase
             contact_state.aux.z = stored_internal_momentum
-            delta_momentum_x -= applied_impulse * normal_x
-            delta_momentum_y -= applied_impulse * normal_y
-            delta_momentum_z -= applied_impulse * normal_z
+            contact_delta_px = -applied_impulse * normal_x
+            contact_delta_py = -applied_impulse * normal_y
+            contact_delta_pz = -applied_impulse * normal_z
+            delta_momentum_x += contact_delta_px
+            delta_momentum_y += contact_delta_py
+            delta_momentum_z += contact_delta_pz
 
             contact_state.geom = self.create_vec4(normal_x, normal_y, normal_z, overlap_area)
             contact_state.aux.x = center_distance
             contact_state.aux.y = source.Data.x + self.particles[TargetID].Data.x - center_distance
             contact_state.aux.w = applied_impulse
+            contact_state.raw_impulse = raw_impulse
+            contact_state.compression_impulse = compression_impulse
+            contact_state.release_impulse = release_impulse
+            contact_state.source_available_momentum = available_source_momentum
+            contact_state.source_available_share = source_available_share
+            contact_state.target_available_momentum = target_available_momentum
+            contact_state.target_available_share = target_available_share
+            contact_state.weighted_available_momentum = weighted_available_momentum
+            contact_state.source_vn = source_normal_velocity
+            contact_state.target_vn = target_normal_velocity
+            contact_state.rel_vn = relative_normal_velocity
+            contact_state.delta_px = contact_delta_px
+            contact_state.delta_py = contact_delta_py
+            contact_state.delta_pz = contact_delta_pz
+            contact_state.source_vx_before = source_vx_before
+            contact_state.source_vy_before = source_vy_before
+            contact_state.source_vz_before = source_vz_before
+            contact_state.source_ke_before = source_ke_before
+            contact_state.contact_ke_delta_estimate = (
+                source_vx_before * contact_delta_px
+                + source_vy_before * contact_delta_py
+                + source_vz_before * contact_delta_pz
+                + (
+                    contact_delta_px * contact_delta_px
+                    + contact_delta_py * contact_delta_py
+                    + contact_delta_pz * contact_delta_pz
+                )
+                / (2.0 * source_mass)
+            )
 
             if entry_index == 0:
                 report_target = TargetID
@@ -336,22 +426,38 @@ class GeoDynamics:
                 report_normal_y = normal_y
                 report_rel_vn = relative_normal_velocity
                 report_stiffness_q = stiffness_q
-            report_stored_mom += stored_internal_momentum
             report_closing_mom += applied_impulse
 
-        source.VelRad.x += delta_momentum_x / self.GeoMass(SourceID)
-        source.VelRad.y += delta_momentum_y / self.GeoMass(SourceID)
-        source.VelRad.z += delta_momentum_z / self.GeoMass(SourceID)
+        source.VelRad.x += delta_momentum_x / source_mass
+        source.VelRad.y += delta_momentum_y / source_mass
+        source.VelRad.z += delta_momentum_z / source_mass
+        if next_internal_momentum <= self.GEO_EPSILON:
+            next_internal_momentum = 0.0
+            next_internal_phase = self.GEO_PHASE_COMPRESSION
+        source.internal_momentum_phase = next_internal_phase
+        self.GeoSetInternalMomentum(SourceID, next_internal_momentum)
         source.vx = source.VelRad.x
         source.vy = source.VelRad.y
         source.vz = source.VelRad.z
+        source_ke_after = 0.5 * source_mass * (
+            source.VelRad.x * source.VelRad.x
+            + source.VelRad.y * source.VelRad.y
+            + source.VelRad.z * source.VelRad.z
+        )
+        for _entry in contact_entries:
+            contact_state = _entry[1]
+            contact_state.source_vx_after = source.VelRad.x
+            contact_state.source_vy_after = source.VelRad.y
+            contact_state.source_vz_after = source.VelRad.z
+            contact_state.source_ke_after = source_ke_after
+            contact_state.source_ke_delta = source_ke_after - source_ke_before
 
         source.report_contacts = len(source.collision_list)
         source.report_target = report_target
         source.report_center_distance = report_center_distance
         source.report_normal_x = report_normal_x
         source.report_normal_y = report_normal_y
-        source.report_stored_mom = report_stored_mom
+        source.report_stored_mom = self.GeoInternalMomentum(SourceID)
         source.report_alpha_zero = 0.0
         source.report_zero_area = 0.0
         source.report_compression_fraction = 0.0

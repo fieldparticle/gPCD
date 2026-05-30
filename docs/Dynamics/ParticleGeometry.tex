@@ -18,8 +18,9 @@ response:
 
 No first-contact velocity, stored turnaround depth, or global collision
 stiffness parameter is part of the current Geo dynamics.  The one approved
-persistent contact value is source-owned internal normal momentum, carried in
-the source particle's contact slot.
+persistent dynamics value is source-owned internal normal momentum, carried on
+the source particle.  Contact slots are current-frame indexed records; they do
+not own persistent dynamics memory.
 
 \section{Particle State}
 \label{sec:particle-state}
@@ -44,6 +45,7 @@ In the GLSL-shaped particle layout these map to:
     \item velocity: \texttt{VelRad.xyz},
     \item radius: \texttt{Data.x},
     \item collision stiffness: \texttt{Data.y},
+    \item source-owned internal momentum: \texttt{Data.z},
     \item mass: \texttt{parms.x}.
 \end{itemize}
 
@@ -189,11 +191,15 @@ w_{s,k} =
 \frac{A_{s,t_k}}{A_{s,total}}.
 \end{equation}
 
-Each source-owned contact slot carries internal normal momentum:
+The source particle carries one total internal normal momentum ledger:
 
 \begin{equation}
-I_{s,t_k} \ge 0.
+I_s \ge 0.
 \end{equation}
+
+This is source-owned particle memory, mirrored in \texttt{Data.z}.  The active
+contact slots may report the current value or a current-frame allocation, but
+they are not the persistent owner of the ledger.
 
 During compression, the source can store only momentum actually removed from
 the source particle's normal motion.  In a multi-contact frame, that available
@@ -215,24 +221,27 @@ The compression impulse is then:
 J_{c,k} = \min\left(J_{raw,k}, P_{k,cap}\right).
 \end{equation}
 
-The stored internal momentum is increased by $J_{c,k}$:
+The source-owned internal momentum is increased by $J_{c,k}$:
 
 \begin{equation}
-I_{s,t_k}' = I_{s,t_k} + J_{c,k}.
+I_s' = I_s + J_{c,k}.
 \end{equation}
 
 When compression reaches the point where the source can no longer give the full
-raw impulse, the contact slot enters the returning phase.  During returning,
-the source may release only stored internal momentum:
+raw impulse, the source enters the returning phase.  During returning, the
+source may release only stored internal momentum.  Because $I_s$ is a shared
+source ledger, release capacity is also distributed across the source's current
+contacts by area weight:
 
 \begin{equation}
-J_{r,k} = \min(J_{raw,k}, I_{s,t_k}).
+J_{r,k} =
+\min\left(J_{raw,k}, w_{s,k}I_s + J_{c,k}, I_s\right).
 \end{equation}
 
-The stored value is then reduced:
+The source-owned stored value is then reduced:
 
 \begin{equation}
-I_{s,t_k}' = \max(0, I_{s,t_k} - J_{r,k}).
+I_s' = \max(0, I_s - J_{r,k}).
 \end{equation}
 
 The applied impulse for each contact is:
@@ -270,16 +279,16 @@ cannot reproduce safely.
 For each simulation frame:
 
 \begin{enumerate}[leftmargin=*]
-    \item Clear each particle's current contact list and reporting fields.
-    Contact slots that were active on the previous frame are kept long enough
-    to preserve their source-owned internal momentum if the same contact is
-    active again.
+    \item Clear each particle's current contact list, current-frame contact
+    slots, and reporting fields.  The particle-owned internal momentum ledger
+    is preserved on the source particle.
     \item Copy the frame-start positions into \texttt{PosLocFrame}.  Contact
     geometry and contact detection read from this frame-start snapshot.
     \item Copy the frame-start velocities into \texttt{VelRadFrame}.  Relative
     normal velocity and available momentum read from this frame-start snapshot.
     \item For each ordered pair $(s,t)$, test snapshot-position overlap.
-    \item If the pair overlaps, add $t$ to $s$'s current contact list.
+    \item If the pair overlaps, add $t$ to $s$'s current contact list using the
+    next indexed contact slot.
     \item For each source particle $s$:
     \begin{enumerate}[leftmargin=*]
         \item If $s$ has active contacts, compute snapshot geometry, stiffness,
@@ -347,6 +356,8 @@ The current Geo rule is intentionally simple and incomplete:
     \item The source and target are not updated together in one pair solve.
     Pairwise write-back is intentionally forbidden under the current GLSL
     source-owned execution model.
+    \item Contact slot indices are not contact identity.  They are rebuilt from
+    the current frame's contact list.
     \item The response is not guaranteed to conserve kinetic energy.
     \item Wall response is not part of this particle-pair geometry note.
 \end{itemize}

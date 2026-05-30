@@ -127,30 +127,50 @@ contact information should be safe to rebuild on the next frame.
 \subsection{Approved Source-Owned Internal Momentum Exception}
 
 The Geo path may carry one source-owned internal normal momentum value per
-active contact slot.  This is an explicit exception to the fully stateless
-geometric target because the current overlap-area impulse needs a ledger to
-avoid releasing more momentum than it removed during compression.
+particle.  This is an explicit exception to the fully stateless geometric
+target because the current overlap-area impulse needs a ledger to avoid
+releasing more momentum than it removed during compression.
 
 The exception is constrained:
 
 \begin{itemize}[leftmargin=*]
-    \item the value is owned by the source particle's contact slot;
+    \item the value is owned by the source particle, not by a contact slot;
     \item it is not a shared pair reservoir;
+    \item it is not a per-contact reservoir;
     \item it must not write the target particle;
     \item it may be used only to cap source-owned rebound/release impulse;
-    \item it must remain representable in the GLSL \texttt{ContactState}
-    structure.
+    \item it must remain representable in the GLSL-shaped particle structure.
 \end{itemize}
 
 In the current GLSL-shaped layout, the carried value is:
 
 \begin{verbatim}
-P[SourceID].contacts[slot].aux.z
+P[SourceID].Data.z
 \end{verbatim}
 
-This field stores source-owned internal normal momentum.  It exists to prevent
-symmetric velocity drift while preserving the source-owned shader execution
-model.
+This field stores source-owned internal normal momentum.  Contact slots may
+report the current value or current-frame allocation, but slot index is not
+contact identity and must not own persistent dynamics memory.
+
+\subsection{Contact Slot Convention}
+
+Contact slots are current-frame indexed records.  When a contact is discovered,
+the next slot is the source particle's current contact count:
+
+\begin{verbatim}
+slot = P[SourceID].contactCount
+P[SourceID].contactCount += 1
+\end{verbatim}
+
+The slot records the current frame's source, target, normal, overlap area,
+phase report, and diagnostics.  It must not be searched by target in order to
+preserve dynamics memory.  Persistent source-owned memory belongs on the
+particle.
+
+When a source-owned total ledger is released across multiple contacts, release
+capacity must be shared across the current contact set by overlap-area weight.
+Slot order must not decide which contact receives the last remaining internal
+momentum.
 
 \subsection{Model-Preservation Warning}
 
@@ -170,7 +190,8 @@ Examples of changes that require warning before implementation:
 \end{itemize}
 
 This warning does not forbid such changes forever, but it makes the model cost
-visible before implementation.
+visible before implementation.  The current internal momentum exception is
+source-particle memory, not per-contact memory.
 
 \subsection{Control Flow Shape}
 
@@ -239,13 +260,11 @@ one-to-one GLSL export unit.
 \subsection{Current TODO}
 
 \begin{itemize}
-    \item Add a \texttt{NeoBeginContactFrame(SourceID)} equivalent or decide
-    whether contact clearing belongs in the harness.
     \item Decide whether \texttt{isParticleContact(...)} belongs in
     \texttt{GeoBase.py} or should be moved to a GLSL-matching dynamics/helper
     module.
     \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
-    \item Add duplicate contact handling only where it matches the shader model.
-    \item Implement \texttt{GeoProcessCollisions(SourceID)} incrementally.
+    \item Continue \texttt{GeoProcessCollisions(SourceID)} incrementally, with
+    \texttt{ThreeParticleChase} as the next active problem case.
     \item Add reporting only through \texttt{Reporting.py}, not through dynamics.
 \end{itemize}

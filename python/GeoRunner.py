@@ -282,6 +282,11 @@ def _draw_particles(
             motion_summary["current_total_px"],
             motion_summary["current_total_py"],
         ),
+        _momentum_row(
+            "drift",
+            motion_summary["start_total_px"] - motion_summary["current_total_px"],
+            motion_summary["start_total_py"] - motion_summary["current_total_py"],
+        ),
         (
             f"kinetic_energy    "
             f" start={motion_summary['start_ke']:>14.8f}"

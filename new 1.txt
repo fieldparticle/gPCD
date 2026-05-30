@@ -1,1 +1,1 @@
-In wirting code there seem to be two approaches. One the progam flow branches allot - one function calls another functin from with its body. The other is more linear and modualar. The functiona are called and return values for the next function. More like a chain. What are these called if anything
+TwoParticleHorizontal works. Need to start on ThreeParticle. captured 0 to 200 when thay all have rebound. drift 

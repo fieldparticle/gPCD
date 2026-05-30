@@ -69,8 +69,8 @@ the shader cannot reproduce safely.
 
 \subsection{Allowed Exception}
 
-The accepted fix is source-owned internal normal momentum.  Each source-particle
-contact slot may carry one persistent scalar:
+The accepted fix at this stage was source-owned internal normal momentum.
+Initially this was carried in each source-particle contact slot:
 
 \begin{equation}
 I_{s,t} \ge 0.
@@ -80,11 +80,15 @@ This value records the normal momentum removed from the source during
 compression.  It is not a shared pair reservoir and it does not write the
 target particle.
 
-In the GLSL-shaped contact state, the value is stored in:
+In that first implementation, the GLSL-shaped contact state stored the value in:
 
 \begin{verbatim}
 P[SourceID].contacts[slot].aux.z
 \end{verbatim}
+
+This was later superseded by the source-particle ledger described in the
+``Source-Owned Internal Momentum Ledger'' entry.  The historical point remains
+important: the value was source-owned, not a shared pair write-back.
 
 \subsection{Compression Rule}
 
@@ -231,7 +235,7 @@ The compression impulse is:
 J_{c,k} = \min(J_{raw,k}, P_{k,cap}).
 \end{equation}
 
-Each contact slot still owns its own internal momentum ledger:
+At this stage each contact slot still owned its own internal momentum ledger:
 
 \begin{equation}
 I'_{s,k} = I_{s,k} + J_{c,k}.
@@ -242,6 +246,10 @@ During returning, the contact can release only its own stored momentum:
 \begin{equation}
 J_{r,k} = \min(J_{raw,k}, I_{s,k}).
 \end{equation}
+
+This per-slot ownership was later replaced.  The current rule keeps contact
+slots as current-frame indexed records and stores the persistent internal
+momentum on the source particle.
 
 All active contact impulses are accumulated into one source-owned momentum
 change:
@@ -389,3 +397,102 @@ still reaches GEO_ERROR_TUNNELING at frame 70
 
 This change is Python-side only.  GLSL export should be updated only on an
 explicit export request, after the Python model is stable enough to checkpoint.
+
+\subsection{Source-Owned Internal Momentum Ledger}
+
+\noindent\textbf{Commit hash:} \texttt{486861f09a0118c1db62ea540f3848ec12e28bfc}
+
+The basic symmetric multi-particle rule still carried internal momentum in
+each contact slot.  That made contact slot identity too important.  Under the
+instantaneous frame model, the current contact list should be rebuilt each
+frame, and the next contact slot should simply be the next indexed slot:
+
+\begin{verbatim}
+slot = source.contactCount
+source.contactCount += 1
+\end{verbatim}
+
+The persistent value is not the contact slot.  It is the source particle's
+internal compressed state.  Therefore the accepted model moved internal
+momentum to source-owned particle memory:
+
+\begin{equation}
+I_s \ge 0.
+\end{equation}
+
+In the Python model this is exposed as \texttt{particle.internal\_momentum} and
+mirrored into \texttt{Data.z} for the GLSL-shaped particle layout.  The source
+also carries a source-owned phase flag, \texttt{internal\_momentum\_phase}.
+
+\subsection{Observed Failure - Shared Ledger Spent Sequentially}
+
+After moving from per-slot ledgers to one source-owned ledger, the first
+implementation spent and changed that ledger inside the contact loop.  This
+created momentum drift in \texttt{ThreeParticle}.  At frame 105, particle 1 had
+two contacts.  The first contact changed the source phase to returning before
+the second contact was processed:
+
+\begin{verbatim}
+source 1, slot 0: compression + release
+source 1, slot 1: release only
+\end{verbatim}
+
+The opposing source particles still saw one-contact compression contexts.  The
+result was no longer symmetric, and total momentum drift appeared.
+
+The fix was to make the source phase a frame-start read for every contact in
+the source's current contact list.  The next source momentum and phase are
+computed locally and committed once after all contacts are processed:
+
+\begin{equation}
+\text{read phase} = \phi_s^{frame-start},
+\qquad
+\text{write phase} = \phi_s^{next}.
+\end{equation}
+
+\subsection{Observed Failure - Tail Release Bias}
+
+The frame-start phase fix removed the large drift, but a smaller drift appeared
+near the end of returning.  At frame 120, particle 1 had a tiny internal
+momentum balance left.  Slot 0 consumed the remaining ledger before slot 1
+could release its share.  Because the normals were symmetric, spending the tail
+on only one slot introduced a small net transverse impulse.
+
+The accepted rule is that a source-owned total ledger must be shared across the
+source's current contacts by overlap-area weight during release, just as source
+compression capacity is shared during compression:
+
+\begin{equation}
+J_{r,k} =
+\min\left(J_{raw,k}, w_{s,k}I_s + J_{c,k}, I_s\right).
+\end{equation}
+
+This keeps the source-owned memory model while preventing the indexed slot
+order from deciding which contact receives the last remaining internal
+momentum.
+
+\subsection{Result}
+
+After the source-owned ledger and area-weighted release fix:
+
+\begin{verbatim}
+TwoParticleHorizontal 200 frames:
+momentum drift = 0
+
+ThreeParticle 200 frames:
+max momentum drift = 4.16e-17
+final momentum     = (0.05, 0.0)
+\end{verbatim}
+
+This keeps the important architectural rules intact:
+
+\begin{itemize}[leftmargin=*]
+    \item contact slots are current-frame indexed records;
+    \item persistent internal momentum belongs to the source particle;
+    \item target particles remain read-only during a source solve;
+    \item source phase and frame snapshots are read consistently for the frame;
+    \item source-owned release is shared across simultaneous contacts by area.
+\end{itemize}
+
+The next problem target is \texttt{ThreeParticleChase}, which should be treated
+as a new problem-evolution step after this checkpoint.

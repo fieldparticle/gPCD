@@ -127,6 +127,8 @@ class GeoBase(GeoDynamics):
         particle.VelRad = self.create_vec4(vx, vy, vz, 0.0)
         particle.Data = self.create_vec4(radius, fields.get("collision_stiffness_q", 0.0), 0.0, fields.get("state_flg", 1.0))
         particle.parms = self.create_vec4(mass, 0.0, 0.0, 0.0)
+        particle.internal_momentum = particle.Data.z
+        particle.internal_momentum_phase = self.GEO_PHASE_COMPRESSION
         particle.contacts = [self.create_geo_contact_state() for _ in range(16)]
         particle.gcs = particle.contacts
         particle.contactCount = 0
@@ -179,6 +181,7 @@ class GeoBase(GeoDynamics):
         contact_state.ids = self.create_uvec4()
         contact_state.geom = self.create_vec4()
         contact_state.aux = self.create_vec4()
+        self.GeoClearContactDiagnostics(contact_state)
         return contact_state
 
     def create_particle_from_cfg(self, particle_name, particle_cfg):
