@@ -176,6 +176,7 @@ def _draw_particles(
     particles,
     run_configuration,
     frame_number,
+    test_file_name,
     start_diagnostics,
     error_return=0,
     error_description="",
@@ -267,7 +268,7 @@ def _draw_particles(
     row_y = 10
     row_font = pygame.font.SysFont("consolas", 18)
     sim_time = frame_number * float(run_configuration.get("dt", 0.0))
-    status_row = f"frame={frame_number:>8} time={sim_time:>14.8f}"
+    status_row = f"frame={frame_number:>8} time={sim_time:>14.8f} test={test_file_name}"
     row = row_font.render(status_row, True, (220, 230, 240))
     screen.blit(row, (10, row_y))
     row_y += 20
@@ -326,6 +327,7 @@ def _report_particles(reporting, frame_number, particles, start_diagnostics):
 def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_number=None):
     geo = GeoBase()
     geo.load_cfg_file(cfg_file)
+    test_file_name = Path(cfg_file).name
     run_configuration = geo.run_configuration
     senario = None
     if study == True or "in_line_obj" in run_configuration:
@@ -382,6 +384,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                 particles,
                 run_configuration,
                 frame_number,
+                test_file_name,
                 start_diagnostics,
                 geo.collIn.ErrorReturn,
                 geo.ErrorDescription(),

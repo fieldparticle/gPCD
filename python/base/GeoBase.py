@@ -129,6 +129,8 @@ class GeoBase(GeoDynamics):
         particle.parms = self.create_vec4(mass, 0.0, 0.0, 0.0)
         particle.internal_momentum = particle.Data.z
         particle.internal_momentum_phase = self.GEO_PHASE_COMPRESSION
+        particle.contact_internal_momentum = {}
+        particle.contact_internal_phase = {}
         particle.contacts = [self.create_geo_contact_state() for _ in range(16)]
         particle.gcs = particle.contacts
         particle.contactCount = 0
@@ -265,6 +267,9 @@ class GeoBase(GeoDynamics):
             return self.particles
 
         if not self.GeoBuildWallContactLists():
+            return self.particles
+
+        if not self.GeoPlanContactImpulses():
             return self.particles
 
         if not self.GeoResolveContacts():

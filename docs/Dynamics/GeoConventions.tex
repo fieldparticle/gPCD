@@ -109,7 +109,9 @@ the distribution of overlap area across a source particle's simultaneous
 contacts.  Energy calculations and energy-named dynamics variables should be
 reserved for diagnostics only.
 
-The model should not require persistent collision-episode memory such as:
+The model should not require persistent collision-episode memory except for
+explicitly approved exceptions such as the current contact-owned internal
+momentum ledger.  Unapproved examples include:
 
 \begin{itemize}
     \item stored contact momentum reservoirs;
@@ -124,33 +126,44 @@ position, velocity, radius, mass, and explicitly approved per-particle fields.
 The current frame may build temporary contact information, but that temporary
 contact information should be safe to rebuild on the next frame.
 
-\subsection{Approved Source-Owned Internal Momentum Exception}
+\subsection{Approved Contact-Owned Internal Momentum Exception}
 
-The Geo path may carry one source-owned internal normal momentum value per
-particle.  This is an explicit exception to the fully stateless geometric
-target because the current overlap-area impulse needs a ledger to avoid
-releasing more momentum than it removed during compression.
+The Geo path may carry contact-owned internal normal momentum ledgers under
+the source particle.  This is an explicit exception to the fully stateless
+geometric target because the current overlap-area impulse needs a ledger to
+avoid releasing more momentum than it removed during compression.
 
 The exception is constrained:
 
 \begin{itemize}[leftmargin=*]
-    \item the value is owned by the source particle, not by a contact slot;
-    \item it is not a shared pair reservoir;
-    \item it is not a per-contact reservoir;
+    \item each value is owned by the source particle and keyed by the current
+    target particle;
+    \item it is not a shared pair reservoir and does not allow target writes;
+    \item it is not owned by the indexed contact slot;
+    \item stale target keys must be pruned when the contact is no longer active;
     \item it must not write the target particle;
     \item it may be used only to cap source-owned rebound/release impulse;
-    \item it must remain representable in the GLSL-shaped particle structure.
+    \item the source particle may report the sum of active ledgers as total
+    internal momentum.
 \end{itemize}
 
-In the current GLSL-shaped layout, the carried value is:
+In the current Python layout, the contact ledgers are:
+
+\begin{verbatim}
+P[SourceID].contact_internal_momentum[TargetID]
+P[SourceID].contact_internal_phase[TargetID]
+\end{verbatim}
+
+The GLSL-shaped particle field:
 
 \begin{verbatim}
 P[SourceID].Data.z
 \end{verbatim}
 
-This field stores source-owned internal normal momentum.  Contact slots may
-report the current value or current-frame allocation, but slot index is not
-contact identity and must not own persistent dynamics memory.
+reports the source particle's total active internal normal momentum, computed
+as the sum of its contact ledgers.  The current Python model has therefore
+moved ahead of the GLSL storage shape; GLSL export must not be regenerated for
+this change until an equivalent shader-side representation is designed.
 
 \subsection{Contact Slot Convention}
 
@@ -163,14 +176,15 @@ P[SourceID].contactCount += 1
 \end{verbatim}
 
 The slot records the current frame's source, target, normal, overlap area,
-phase report, and diagnostics.  It must not be searched by target in order to
-preserve dynamics memory.  Persistent source-owned memory belongs on the
-particle.
+phase report, and diagnostics.  Slot index is not contact identity and must
+not own persistent dynamics memory.  Persistent contact memory, when allowed
+by the exception above, belongs under the source particle and is keyed by
+target identity, not by slot index.
 
-When a source-owned total ledger is released across multiple contacts, release
-capacity must be shared across the current contact set by overlap-area weight.
-Slot order must not decide which contact receives the last remaining internal
-momentum.
+Slot order must not decide which contact receives internal momentum.  Any
+frame-local contact response that uses persistent ledgers must first build the
+current contact set and then plan the unordered-pair impulse from snapshot
+data before source-owned writes are applied.
 
 \subsection{Frame-Local Closing Momentum Convention}
 
@@ -208,7 +222,8 @@ Examples of changes that require warning before implementation:
 
 This warning does not forbid such changes forever, but it makes the model cost
 visible before implementation.  The current internal momentum exception is
-source-particle memory, not per-contact memory.
+contact-owned memory stored under the source particle; it remains source-owned
+for writes, but it is no longer a single source-total dynamics ledger.
 
 \subsection{Control Flow Shape}
 
@@ -217,7 +232,13 @@ The Python control-flow harness should match the compute shader shape:
 \begin{verbatim}
 for each SourceID:
     build source-owned contact list
+
+GeoPlanContactImpulses()
+
+for each SourceID:
     GeoProcessCollisions(SourceID)
+
+for each SourceID:
     GeoMoveParticle(SourceID, positionBuffer, dt)
 \end{verbatim}
 
@@ -274,6 +295,29 @@ change the GLSL architecture, not just the Python model.
 \texttt{GeoBase.py} may do those things because it is not intended to be a
 one-to-one GLSL export unit.
 
+\subsection{Project Update Convention}
+
+When the phrase \emph{update project} is used during Geo dynamics work, it
+means the project record should be brought current before check-in.  The update
+includes:
+
+\begin{itemize}[leftmargin=*]
+    \item generate a commit message for the current completed work;
+    \item update \texttt{GeoConventions.tex} when the work changes a rule,
+    boundary, workflow, or modeling convention;
+    \item update \texttt{ParticleGeometry.tex} when the work changes equations,
+    data fields, contact geometry, impulse logic, or the active algorithm;
+    \item update \texttt{ProblemEvolution.tex} when the work resolves,
+    exposes, or reframes a dynamics problem;
+    \item update \texttt{ProgrammingStyle.tex} when the work changes the
+    accepted control-flow shape, staging style, function-narrowing rule, or
+    debugging/programming practice.
+\end{itemize}
+
+The documentation update should describe the current implementation and the
+reason for the change.  Old material should be removed or clearly superseded
+when it no longer describes the active Geo path.
+
 \subsection{Current TODO}
 
 \begin{itemize}
@@ -282,6 +326,7 @@ one-to-one GLSL export unit.
     module.
     \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
     \item Continue \texttt{GeoProcessCollisions(SourceID)} incrementally, with
-    \texttt{ThreeParticleChase} momentum drift as the next active problem case.
+    \texttt{ThreeParticleChase} kinetic-energy drift and wall/out-of-bounds
+    behavior as the next active problem case.
     \item Add reporting only through \texttt{Reporting.py}, not through dynamics.
 \end{itemize}

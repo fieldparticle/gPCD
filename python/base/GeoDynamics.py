@@ -91,7 +91,64 @@ class GeoDynamics:
     def GeoInternalMomentum(self, SourceID):
         """Return source-owned internal momentum."""
         particle = self.particles[SourceID]
+        contact_momentum = getattr(particle, "contact_internal_momentum", None)
+        if contact_momentum is not None:
+            return sum(max(0.0, momentum) for momentum in contact_momentum.values())
         return max(0.0, getattr(particle, "internal_momentum", particle.Data.z))
+
+    def GeoSyncInternalMomentum(self, SourceID):
+        """Update the source total from contact-owned ledgers."""
+        self.GeoSetInternalMomentum(SourceID, self.GeoInternalMomentum(SourceID))
+
+    def GeoContactInternalMomentum(self, SourceID, TargetID):
+        source = self.particles[SourceID]
+        ledgers = getattr(source, "contact_internal_momentum", None)
+        if ledgers is None:
+            source.contact_internal_momentum = {}
+            ledgers = source.contact_internal_momentum
+        return max(0.0, ledgers.get(TargetID, 0.0))
+
+    def GeoSetContactInternalMomentum(self, SourceID, TargetID, internal_momentum):
+        source = self.particles[SourceID]
+        if not hasattr(source, "contact_internal_momentum"):
+            source.contact_internal_momentum = {}
+        internal_momentum = max(0.0, internal_momentum)
+        if internal_momentum <= self.GEO_EPSILON:
+            source.contact_internal_momentum.pop(TargetID, None)
+        else:
+            source.contact_internal_momentum[TargetID] = internal_momentum
+        self.GeoSyncInternalMomentum(SourceID)
+
+    def GeoContactInternalPhase(self, SourceID, TargetID):
+        source = self.particles[SourceID]
+        phases = getattr(source, "contact_internal_phase", None)
+        if phases is None:
+            source.contact_internal_phase = {}
+            phases = source.contact_internal_phase
+        return phases.get(TargetID, self.GEO_PHASE_COMPRESSION)
+
+    def GeoSetContactInternalPhase(self, SourceID, TargetID, phase):
+        source = self.particles[SourceID]
+        if not hasattr(source, "contact_internal_phase"):
+            source.contact_internal_phase = {}
+        if phase == self.GEO_PHASE_COMPRESSION and self.GeoContactInternalMomentum(SourceID, TargetID) <= self.GEO_EPSILON:
+            source.contact_internal_phase.pop(TargetID, None)
+        else:
+            source.contact_internal_phase[TargetID] = phase
+
+    def GeoPruneInactiveContactLedgers(self, SourceID):
+        """Keep contact memory tied to contacts active in the current frame."""
+        source = self.particles[SourceID]
+        active_targets = set(getattr(source, "collision_list", []))
+        if hasattr(source, "contact_internal_momentum"):
+            for TargetID in list(source.contact_internal_momentum.keys()):
+                if TargetID not in active_targets:
+                    source.contact_internal_momentum.pop(TargetID, None)
+        if hasattr(source, "contact_internal_phase"):
+            for TargetID in list(source.contact_internal_phase.keys()):
+                if TargetID not in active_targets:
+                    source.contact_internal_phase.pop(TargetID, None)
+        self.GeoSyncInternalMomentum(SourceID)
 
     def GeoBeginContactFrame(self, SourceID):
         """Reset current-frame contact slots while preserving source ledgers."""
@@ -110,13 +167,9 @@ class GeoDynamics:
         contact_state = contact_slots[source.contactCount]
         contact_state.ids.x = TargetID
         contact_state.ids.y = self.GEO_CONTACT_PARTICLE
-        contact_state.ids.z = getattr(
-            source,
-            "internal_momentum_phase",
-            self.GEO_PHASE_COMPRESSION,
-        )
+        contact_state.ids.z = self.GeoContactInternalPhase(SourceID, TargetID)
         contact_state.ids.w = self.GEO_CONTACT_ACTIVE_THIS_FRAME
-        contact_state.aux.z = self.GeoInternalMomentum(SourceID)
+        contact_state.aux.z = self.GeoContactInternalMomentum(SourceID, TargetID)
         source.contactCount += 1
         return contact_state
 
@@ -181,6 +234,141 @@ class GeoDynamics:
                 )
         return total_overlap_area, available_source_momentum
 
+    @staticmethod
+    def GeoScaledImpulseParts(compression_impulse, release_impulse, planned_impulse):
+        candidate_impulse = compression_impulse + release_impulse
+        if candidate_impulse <= 1.0e-12:
+            return 0.0, 0.0
+        scale = max(0.0, min(1.0, planned_impulse / candidate_impulse))
+        return compression_impulse * scale, release_impulse * scale
+
+    def GeoDirectedContactCandidate(
+        self,
+        SourceID,
+        TargetID,
+        source_total_overlap_area,
+        available_source_momentum,
+        contact_internal_momentum,
+        contact_phase_start,
+    ):
+        contact = self.GeoParticleGeometry(SourceID, TargetID)
+        if contact is None or source_total_overlap_area <= self.GEO_EPSILON:
+            return None
+
+        normal_x, normal_y, normal_z, overlap_area, center_distance = contact
+        source_velocity = self.GeoVelocity(SourceID)
+        target_velocity = self.GeoVelocity(TargetID)
+        relative_normal_velocity = (
+            (target_velocity.x - source_velocity.x) * normal_x
+            + (target_velocity.y - source_velocity.y) * normal_y
+            + (target_velocity.z - source_velocity.z) * normal_z
+        )
+        target_total_overlap_area, target_available_momentum = self.GeoContactContext(TargetID)
+        area_weight = max(0.0, overlap_area / source_total_overlap_area)
+        target_area_weight = (
+            max(0.0, overlap_area / target_total_overlap_area)
+            if target_total_overlap_area > self.GEO_EPSILON
+            else 0.0
+        )
+        raw_impulse = (
+            self.GeoPairStiffness(SourceID, TargetID)
+            * overlap_area
+            * self.ShaderFlags.dt
+        )
+        source_available_share = available_source_momentum * area_weight
+        target_available_share = target_available_momentum * target_area_weight
+        weighted_available_momentum = min(source_available_share, target_available_share)
+        compression_impulse = 0.0
+        release_impulse = 0.0
+        stored_internal_momentum = contact_internal_momentum
+        contact_phase = contact_phase_start
+
+        if (
+            contact_phase_start != self.GEO_PHASE_RETURNING
+            and relative_normal_velocity < -self.GEO_EPSILON
+        ):
+            compression_impulse = min(raw_impulse, weighted_available_momentum)
+            stored_internal_momentum += compression_impulse
+            contact_phase = (
+                self.GEO_PHASE_RETURNING
+                if compression_impulse < raw_impulse
+                else self.GEO_PHASE_COMPRESSION
+            )
+
+        if contact_phase == self.GEO_PHASE_RETURNING:
+            release_capacity = contact_internal_momentum + compression_impulse
+            release_impulse = min(raw_impulse, release_capacity, stored_internal_momentum)
+            stored_internal_momentum -= release_impulse
+            if stored_internal_momentum <= self.GEO_EPSILON:
+                stored_internal_momentum = 0.0
+
+        return {
+            "candidate_impulse": compression_impulse + release_impulse,
+            "compression_impulse": compression_impulse,
+            "release_impulse": release_impulse,
+            "stored_internal_momentum": stored_internal_momentum,
+            "phase": contact_phase,
+            "raw_impulse": raw_impulse,
+        }
+
+    def GeoPlanContactImpulses(self):
+        """Plan one frame-local impulse magnitude for each unordered pair."""
+        directed_candidates = {}
+        for SourceID, source in enumerate(self.particles):
+            if not source.collision_list:
+                continue
+            total_overlap_area, available_source_momentum = self.GeoContactContext(SourceID)
+            for TargetID in source.collision_list:
+                candidate = self.GeoDirectedContactCandidate(
+                    SourceID,
+                    TargetID,
+                    total_overlap_area,
+                    available_source_momentum,
+                    self.GeoContactInternalMomentum(SourceID, TargetID),
+                    self.GeoContactInternalPhase(SourceID, TargetID),
+                )
+                if candidate is None:
+                    continue
+                directed_candidates[(SourceID, TargetID)] = candidate
+
+        planned = {}
+        handled_pairs = set()
+        for SourceID, TargetID in directed_candidates:
+            pair_key = tuple(sorted((SourceID, TargetID)))
+            if pair_key in handled_pairs:
+                continue
+            handled_pairs.add(pair_key)
+            source_candidate = directed_candidates.get((SourceID, TargetID))
+            target_candidate = directed_candidates.get((TargetID, SourceID))
+            if target_candidate is None:
+                planned_impulse = source_candidate["candidate_impulse"]
+            else:
+                planned_impulse = min(
+                    source_candidate["candidate_impulse"],
+                    target_candidate["candidate_impulse"],
+                )
+            for DirectedSourceID, DirectedTargetID in (
+                (SourceID, TargetID),
+                (TargetID, SourceID),
+            ):
+                candidate = directed_candidates.get((DirectedSourceID, DirectedTargetID))
+                if candidate is None:
+                    continue
+                compression_impulse, release_impulse = self.GeoScaledImpulseParts(
+                    candidate["compression_impulse"],
+                    candidate["release_impulse"],
+                    planned_impulse,
+                )
+                planned[(DirectedSourceID, DirectedTargetID)] = {
+                    "applied_impulse": compression_impulse + release_impulse,
+                    "compression_impulse": compression_impulse,
+                    "release_impulse": release_impulse,
+                    "phase": candidate["phase"],
+                }
+
+        self.GeoPlannedContactImpulses = planned
+        return True
+
     def GeoAddParticleContact(self, SourceID, TargetID):
         """Record that SourceID is in contact with TargetID this frame.
 
@@ -240,9 +428,8 @@ class GeoDynamics:
         if not self.GeoValidParticleID(SourceID):
             return self.GeoSetError(self.constants.GEO_ERROR_INVALID_SOURCE_ID)
         source = self.particles[SourceID]
+        self.GeoPruneInactiveContactLedgers(SourceID)
         if not source.collision_list:
-            self.GeoSetInternalMomentum(SourceID, 0.0)
-            source.internal_momentum_phase = self.GEO_PHASE_COMPRESSION
             return True
 
         source_velocity = self.GeoVelocity(SourceID)
@@ -257,14 +444,6 @@ class GeoDynamics:
         )
         contact_entries = []
         total_overlap_area, available_source_momentum = self.GeoContactContext(SourceID)
-        source_internal_momentum = self.GeoInternalMomentum(SourceID)
-        source_phase_start = getattr(
-            source,
-            "internal_momentum_phase",
-            self.GEO_PHASE_COMPRESSION,
-        )
-        next_internal_momentum = source_internal_momentum
-        next_internal_phase = source_phase_start
 
         for contact_index, TargetID in enumerate(source.collision_list):
             if not self.GeoValidParticleID(TargetID):
@@ -348,14 +527,16 @@ class GeoDynamics:
             source_available_share = available_source_momentum * area_weight
             target_available_share = target_available_momentum * target_area_weight
             weighted_available_momentum = min(source_available_share, target_available_share)
-            stored_internal_momentum = next_internal_momentum
-            contact_phase = source_phase_start
+            contact_internal_momentum = self.GeoContactInternalMomentum(SourceID, TargetID)
+            contact_phase_start = self.GeoContactInternalPhase(SourceID, TargetID)
+            stored_internal_momentum = contact_internal_momentum
+            contact_phase = contact_phase_start
             applied_impulse = 0.0
             compression_impulse = 0.0
             release_impulse = 0.0
 
             if (
-                source_phase_start != self.GEO_PHASE_RETURNING
+                contact_phase_start != self.GEO_PHASE_RETURNING
                 and relative_normal_velocity < -self.GEO_EPSILON
             ):
                 compression_impulse = min(raw_impulse, weighted_available_momentum)
@@ -363,19 +544,34 @@ class GeoDynamics:
                 stored_internal_momentum += compression_impulse
                 if compression_impulse < raw_impulse:
                     contact_phase = self.GEO_PHASE_RETURNING
-                    next_internal_phase = self.GEO_PHASE_RETURNING
                 else:
                     contact_phase = self.GEO_PHASE_COMPRESSION
 
             if contact_phase == self.GEO_PHASE_RETURNING:
-                release_capacity = source_internal_momentum * area_weight + compression_impulse
+                release_capacity = contact_internal_momentum + compression_impulse
                 release_impulse = min(raw_impulse, release_capacity, stored_internal_momentum)
                 applied_impulse += release_impulse
                 stored_internal_momentum -= release_impulse
                 if stored_internal_momentum <= self.GEO_EPSILON:
                     stored_internal_momentum = 0.0
 
-            next_internal_momentum = stored_internal_momentum
+            planned_impulse = getattr(self, "GeoPlannedContactImpulses", {}).get(
+                (SourceID, TargetID)
+            )
+            if planned_impulse is not None:
+                compression_impulse = planned_impulse["compression_impulse"]
+                release_impulse = planned_impulse["release_impulse"]
+                applied_impulse = planned_impulse["applied_impulse"]
+                contact_phase = planned_impulse["phase"]
+                stored_internal_momentum = max(
+                    0.0,
+                    contact_internal_momentum + compression_impulse - release_impulse,
+                )
+
+            self.GeoSetContactInternalMomentum(SourceID, TargetID, stored_internal_momentum)
+            if stored_internal_momentum <= self.GEO_EPSILON:
+                contact_phase = self.GEO_PHASE_COMPRESSION
+            self.GeoSetContactInternalPhase(SourceID, TargetID, contact_phase)
             contact_state.ids.z = contact_phase
             contact_state.aux.z = stored_internal_momentum
             contact_delta_px = -applied_impulse * normal_x
@@ -431,11 +627,7 @@ class GeoDynamics:
         source.VelRad.x += delta_momentum_x / source_mass
         source.VelRad.y += delta_momentum_y / source_mass
         source.VelRad.z += delta_momentum_z / source_mass
-        if next_internal_momentum <= self.GEO_EPSILON:
-            next_internal_momentum = 0.0
-            next_internal_phase = self.GEO_PHASE_COMPRESSION
-        source.internal_momentum_phase = next_internal_phase
-        self.GeoSetInternalMomentum(SourceID, next_internal_momentum)
+        self.GeoSyncInternalMomentum(SourceID)
         source.vx = source.VelRad.x
         source.vy = source.VelRad.y
         source.vz = source.VelRad.z

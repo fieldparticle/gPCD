@@ -24,7 +24,6 @@ from gbase.BinaryFileUtilities import clear_files, read_particle_data
 from gbase.import_module import load_class_from_file
 from gbase.pdata import *
 from gbase.GenPQBData import *
-from runner import run_analysis as old_run_analysis
 from GeoRunner import run_analysis as geo_run_analysis
 #from GenMotionData import *
 #from subprocess import Popen
@@ -49,7 +48,6 @@ class TabGenData(QTabWidget):
     particle_data = None
     terminal = None
     batch_mode = False
-    use_geo_runner = False
     #******************************************************************
     # Init
     #
@@ -110,15 +108,6 @@ class TabGenData(QTabWidget):
             self.itemcfgFile = ConfigUtility(self.CfgFile)
             self.itemcfgFile.Create(self.bobj.log,self.CfgFile)
             self.itemcfg = self.itemcfgFile.config
-            self.use_geo_runner = bool(self.itemcfg.get("use_geo_runner", False))
-            if "RUN_CONFIGURATION" in self.itemcfg:
-                self.use_geo_runner = bool(
-                    self.itemcfg.RUN_CONFIGURATION.get(
-                        "use_geo_runner",
-                        self.use_geo_runner,
-                    )
-                )
-            
         except BaseException as e:
             self.log.log(self,f"Unable to open item configurations file:{e}")
             self.hasConfig = False
@@ -178,17 +167,12 @@ class TabGenData(QTabWidget):
         else:
             return self.selected_run_analysis(self.CfgFile)
 
-    def selected_run_analysis(self, cfg_file, batch_mode=False, study=False, study_number=None):
-        if self.use_geo_runner:
-            return geo_run_analysis(
-                cfg_file,
-                batch_mode=batch_mode,
-                study=study,
-                study_number=study_number,
-            )
-        return old_run_analysis(
+    def selected_run_analysis(self, cfg_file, batch_mode=False, study=False, study_number=None, end_frame=None):
+        return geo_run_analysis(
             cfg_file,
             batch_mode=batch_mode,
+            study=study,
+            study_number=study_number,
             end_frame=end_frame,
         )
 

@@ -1,13 +1,19 @@
-Use frame-local closing momentum for chase contacts
+Adopt Geo-only runs and contact-owned impulse planning
 
-Replace source-normal availability with reduced-mass closing momentum computed
-from the frame-start relative normal velocity. This lets chase contacts respond
-from first overlap without reviving persistent p_zero state or pairwise
-write-back.
+Switch the UI run path to GeoRunner only and leave the old runner in place
+as reference. Normalize dynamics cfgs with study defaults, required report
+directories, and particle-owned collision stiffness values.
 
-Document the convention-safe interpretation in ParticleGeometry,
-ProblemEvolution, and GeoConventions. TwoParticleChase now avoids extreme
-overlap while conserving momentum; ThreeParticleChase no longer tunnels but
-still exposes multi-contact momentum drift.
+Add the active test cfg name to the GeoRunner UI status row.
 
-Next: ThreeParticleChase momentum drift.
+Introduce frame-local unordered-pair impulse planning so directed source-owned
+writes use a shared planned impulse magnitude. Move internal momentum from a
+single source-total dynamics ledger to contact-owned ledgers keyed by target
+under the source particle, while reporting the source total through Data.z.
+
+Update Geo dynamics documentation to define the project update convention,
+record the current contact-ledger exception, refresh ParticleGeometry equations
+and frame algorithm, and add the ProblemEvolution entry for pair planning.
+
+Next: resolve ThreeParticleChase kinetic-energy drift and the exposed
+out-of-bounds/wall behavior.

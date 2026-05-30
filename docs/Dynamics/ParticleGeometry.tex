@@ -12,14 +12,15 @@ response:
     \item overlap area is computed from current particle geometry,
     \item pair stiffness is owned by the particles,
     \item the collision response applies a normal impulse derived from overlap
-    area, stiffness, and a source-owned internal momentum ledger,
+    area, stiffness, and source-owned contact internal momentum ledgers,
     \item particles are then moved with double-buffered positions.
 \end{itemize}
 
 No first-contact velocity, stored turnaround depth, or global collision
-stiffness parameter is part of the current Geo dynamics.  The one approved
-persistent dynamics value is source-owned internal normal momentum, carried on
-the source particle.  Contact slots are current-frame indexed records; they do
+stiffness parameter is part of the current Geo dynamics.  The approved
+persistent dynamics exception is contact-owned internal normal momentum stored
+under the source particle and keyed by target particle.  Contact slots are
+current-frame indexed records; they report current-frame contact state but do
 not own persistent dynamics memory.
 
 \section{Particle State}
@@ -45,7 +46,7 @@ In the GLSL-shaped particle layout these map to:
     \item velocity: \texttt{VelRad.xyz},
     \item radius: \texttt{Data.x},
     \item collision stiffness: \texttt{Data.y},
-    \item source-owned internal momentum: \texttt{Data.z},
+    \item total active source internal momentum report: \texttt{Data.z},
     \item mass: \texttt{parms.x}.
 \end{itemize}
 
@@ -145,10 +146,10 @@ With the current normal convention:
     \item $v_n > 0$ means the particles are separating.
 \end{itemize}
 
-The current first Geo rule records $v_n$ for reporting, but the impulse formula
-does not yet gate on $v_n$.  This is an important known limitation: separating
-contacts may still receive an overlap-area impulse while they remain
-geometrically overlapped.
+The current Geo rule uses $v_n$ to determine closing momentum available for
+compression.  Returning contacts may still receive release impulse while they
+remain geometrically overlapped, but release is capped by the contact-owned
+internal momentum ledger.
 
 \section{Particle-Owned Pair Stiffness}
 \label{sec:pair-stiffness}
@@ -191,15 +192,23 @@ w_{s,k} =
 \frac{A_{s,t_k}}{A_{s,total}}.
 \end{equation}
 
-The source particle carries one total internal normal momentum ledger:
+The source particle carries contact-owned internal normal momentum ledgers:
 
 \begin{equation}
-I_s \ge 0.
+I_{s,t_k} \ge 0.
 \end{equation}
 
-This is source-owned particle memory, mirrored in \texttt{Data.z}.  The active
-contact slots may report the current value or a current-frame allocation, but
-they are not the persistent owner of the ledger.
+This is source-owned writable memory keyed by target identity.  It is not
+shared pair memory, and it is not owned by the current-frame slot index.  The
+source particle's \texttt{Data.z} value is the reported total:
+
+\begin{equation}
+I_s = \sum_k I_{s,t_k}.
+\end{equation}
+
+When a target is no longer in the source's current contact list, that target's
+ledger is pruned.  This prevents stale contact history from being released
+into an unrelated later contact.
 
 During compression, the source can store only momentum actually removed from
 the frame-start relative closing motion.  The current Geo path uses
@@ -234,27 +243,25 @@ The compression impulse is then:
 J_{c,k} = \min\left(J_{raw,k}, P_{k,cap}\right).
 \end{equation}
 
-The source-owned internal momentum is increased by $J_{c,k}$:
+The contact-owned internal momentum is increased by $J_{c,k}$:
 
 \begin{equation}
-I_s' = I_s + J_{c,k}.
+I_{s,t_k}' = I_{s,t_k} + J_{c,k}.
 \end{equation}
 
 When compression reaches the point where the source can no longer give the full
 raw impulse, the source enters the returning phase.  During returning, the
-source may release only stored internal momentum.  Because $I_s$ is a shared
-source ledger, release capacity is also distributed across the source's current
-contacts by area weight:
+source may release only the stored internal momentum for that same contact:
 
 \begin{equation}
 J_{r,k} =
-\min\left(J_{raw,k}, w_{s,k}I_s + J_{c,k}, I_s\right).
+\min\left(J_{raw,k}, I_{s,t_k} + J_{c,k}, I_{s,t_k}'\right).
 \end{equation}
 
-The source-owned stored value is then reduced:
+The contact-owned stored value is then reduced:
 
 \begin{equation}
-I_s' = \max(0, I_s - J_{r,k}).
+I_{s,t_k}' = \max(0, I_{s,t_k}' - J_{r,k}).
 \end{equation}
 
 The applied impulse for each contact is:
@@ -278,8 +285,11 @@ v_s' = v_s + \frac{\Delta \mathbf{p}_s}{m_s}.
 
 The target particle is not updated by the source call.  Instead, the target
 will later be processed as a source particle and will apply its own source-side
-update.  This source-by-source application is the current algorithm and is one
-reason we are watching kinetic energy drift closely.
+update.  Before source-owned writes are applied, the current implementation
+plans one frame-local impulse magnitude per unordered pair from snapshot data.
+Each directed source side then applies the planned value through its own
+source-owned write.  This preserves momentum symmetry but does not yet
+guarantee kinetic-energy conservation.
 
 The Python implementation must keep this source-owned write shape unless the
 GLSL architecture changes first.  A Python-only pair solve that writes both
@@ -293,8 +303,8 @@ For each simulation frame:
 
 \begin{enumerate}[leftmargin=*]
     \item Clear each particle's current contact list, current-frame contact
-    slots, and reporting fields.  The particle-owned internal momentum ledger
-    is preserved on the source particle.
+    slots, and reporting fields.  Contact-owned internal momentum ledgers are
+    preserved under the source particle until their target contact is inactive.
     \item Copy the frame-start positions into \texttt{PosLocFrame}.  Contact
     geometry and contact detection read from this frame-start snapshot.
     \item Copy the frame-start velocities into \texttt{VelRadFrame}.  Relative
@@ -302,15 +312,19 @@ For each simulation frame:
     \item For each ordered pair $(s,t)$, test snapshot-position overlap.
     \item If the pair overlaps, add $t$ to $s$'s current contact list using the
     next indexed contact slot.
+    \item Plan one impulse magnitude per unordered contact pair from snapshot
+    data.  Each directed side contributes a candidate compression/release
+    impulse, and the unordered pair uses the lower candidate magnitude.
     \item For each source particle $s$:
     \begin{enumerate}[leftmargin=*]
         \item If $s$ has active contacts, compute snapshot geometry, stiffness,
-        area weights, and source-owned internal momentum limited impulses.
+        area weights, planned impulses, and contact-owned internal momentum
+        updates.
         \item Accumulate contact impulse vectors and apply one source velocity
         update.
-        \item Move $s$ into the inactive position buffer using the updated
-        velocity and $\Delta t$.
     \end{enumerate}
+    \item Move all particles into the inactive position buffer using their
+    updated velocities and $\Delta t$.
     \item Flip \texttt{ShaderFlags.positionBuffer}.
     \item Sync the convenience aliases \texttt{rx}, \texttt{ry}, and
     \texttt{rz} from the newly active position buffer.
@@ -363,14 +377,15 @@ The current Geo rule is intentionally simple and incomplete:
 
 \begin{itemize}[leftmargin=*]
     \item The impulse is based on overlap area, stiffness, and $\Delta t$; it
-    uses source-owned internal momentum to cap rebound/release and area weights
-    to distribute multi-contact compression capacity, but it does not yet solve
-    multi-contact kinetic-energy restoration.
+    uses contact-owned internal momentum to cap rebound/release and area
+    weights to distribute multi-contact compression capacity, but it does not
+    yet solve multi-contact kinetic-energy restoration.
     \item The source and target are not updated together in one pair solve.
     Pairwise write-back is intentionally forbidden under the current GLSL
     source-owned execution model.
-    \item Contact slot indices are not contact identity.  They are rebuilt from
-    the current frame's contact list.
+    \item Contact slot indices are not contact identity.  Persistent contact
+    ledgers are keyed by target under the source particle, while slots are
+    rebuilt from the current frame's contact list.
     \item The response is not guaranteed to conserve kinetic energy.
     \item Wall response is not part of this particle-pair geometry note.
 \end{itemize}

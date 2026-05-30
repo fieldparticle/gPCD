@@ -247,9 +247,12 @@ During returning, the contact can release only its own stored momentum:
 J_{r,k} = \min(J_{raw,k}, I_{s,k}).
 \end{equation}
 
-This per-slot ownership was later replaced.  The current rule keeps contact
-slots as current-frame indexed records and stores the persistent internal
-momentum on the source particle.
+This per-slot ownership was later replaced.  First, internal momentum moved to
+one source-total particle ledger.  Later, after the chase cases exposed that a
+single source-total ledger was too coarse, the active Python model changed to
+contact-owned ledgers stored under the source particle and keyed by target.
+The contact slot remains a current-frame indexed record, not the owner of
+persistent dynamics memory.
 
 All active contact impulses are accumulated into one source-owned momentum
 change:
@@ -488,11 +491,17 @@ This keeps the important architectural rules intact:
 
 \begin{itemize}[leftmargin=*]
     \item contact slots are current-frame indexed records;
-    \item persistent internal momentum belongs to the source particle;
+    \item at this stage, persistent internal momentum belongs to the source
+    particle;
     \item target particles remain read-only during a source solve;
     \item source phase and frame snapshots are read consistently for the frame;
     \item source-owned release is shared across simultaneous contacts by area.
 \end{itemize}
+
+This source-total ledger rule was later superseded by contact-owned ledgers
+keyed by target under the source particle.  The source-total rule remains in
+the record because it explains why slot identity could not own persistent
+memory and why stale contact history became visible in chase cases.
 
 The next problem target is \texttt{ThreeParticleChase}, which should be treated
 as a new problem-evolution step after this checkpoint.
@@ -553,4 +562,91 @@ radius sum          = 0.5
 \texttt{ThreeParticleChase} also has much better geometric behavior because
 the chase contact no longer waits until an extreme overlap before responding.
 However, it still has momentum drift in the multi-contact phase.  The next
-problem target is therefore \texttt{ThreeParticleChase} momentum drift.
+problem target at that stage was therefore \texttt{ThreeParticleChase}
+momentum drift.  The following entry records that fix and the kinetic-energy
+problem it exposed.
+
+\subsection{Frame-Local Pair Planning and Contact-Owned Ledgers}
+
+\noindent\textbf{Commit hash:} \texttt{49b81b5162815932d9b05dcc69059ef1edc68034}
+
+The next failure in \texttt{ThreeParticleChase} was total momentum drift during
+multi-contact chase frames.  The underlying issue was that each directed source
+side could still arrive at a slightly different compression or release amount.
+Those differences were small, but once source-owned writes were applied they
+were enough to move total momentum.
+
+\subsubsection{Top-Level Fix}
+
+The accepted fix was to separate planning from application:
+
+\begin{verbatim}
+Build frame snapshot
+Build contact lists
+Compute planned impulse per unordered pair from snapshot data
+Apply planned impulses through source-owned writes
+Move particles
+\end{verbatim}
+
+For an unordered pair $(a,b)$, each directed side computes a candidate impulse
+from snapshot geometry, snapshot velocity, overlap-area weighting, and its own
+contact ledger.  The pair then chooses one planned magnitude:
+
+\begin{equation}
+J_{plan,a,b}
+=
+\min\left(J_{candidate,a\rightarrow b},
+          J_{candidate,b\rightarrow a}\right).
+\end{equation}
+
+Both directed source writes use that same planned magnitude.  This keeps the
+GLSL-shaped ownership rule: the source invocation writes only the source
+particle, but the impulse magnitude is pair-symmetric before either source is
+updated.
+
+\subsubsection{Ledger Change}
+
+The source-total internal momentum ledger solved slot-order drift, but it was
+too coarse for sequential or overlapping contacts.  A later contact could
+inherit momentum stored by an earlier contact, and that made starting-overlap
+and chase cases harder to reason about.
+
+The current Python model therefore stores internal momentum under the source
+particle, keyed by target particle:
+
+\begin{verbatim}
+particle.contact_internal_momentum[TargetID]
+particle.contact_internal_phase[TargetID]
+\end{verbatim}
+
+The contact slot still does not own persistent memory.  The slot is rebuilt
+each frame and reports the active target's ledger value.  When a target is no
+longer in the source's current contact list, that target ledger is pruned.
+The source particle's \texttt{Data.z} is now a total report value:
+
+\begin{equation}
+I_s = \sum_t I_{s,t}.
+\end{equation}
+
+\subsubsection{Current Result}
+
+The planning change removed the measured momentum drift in the active
+multi-particle tests:
+
+\begin{verbatim}
+ThreeParticle 150 frames:
+max momentum drift = 6.94e-18
+final KE drift     = -2.4771967621966314e-04
+
+ThreeParticleChase 750-frame attempt:
+max momentum drift = 4.16e-17
+final KE drift     = -1.0677932798014234e-03
+first error        = frame 464, GEO_ERROR_PARTICLE_OUT_OF_BOUNDS
+\end{verbatim}
+
+This shows that pair planning fixed the momentum symmetry problem, but it did
+not solve kinetic-energy balance.  The stronger rebound also exposed the next
+problem: wall or boundary behavior must be handled explicitly rather than being
+hidden by damping.  The next work should start with
+\texttt{ThreeParticleChase} kinetic-energy drift and the out-of-bounds/wall
+case.
