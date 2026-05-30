@@ -1,16 +1,1 @@
-Refactor Geo frame flow around instantaneous snapshots
-
-Make CollisionRun read as an explicit sequential stage chain with narrow frame
-steps for begin, reset, scenario hooks, snapshot creation, particle contact
-building, wall contact placeholder, contact resolution, movement, and end-frame
-cleanup.
-
-Add frame-start position snapshots alongside velocity snapshots so contact
-detection, contact geometry, relative velocity, and available momentum are all
-computed from the same instantaneous frame state. Keep writes directed to live
-source-owned particle state.
-
-Document the instantaneous frame snapshot rule and the sequential stage/narrow
-function programming convention, including the rule that meaningful frame
-decisions should stay visible in the main chain instead of being hidden behind
-umbrella stages.
+Update docs

@@ -1,3 +1,5 @@
+
+% !TeX root = GeoDynamics.tex
 \section{Geo Dynamics Conventions}
 
 \subsection{Purpose}
@@ -122,42 +124,6 @@ position, velocity, radius, mass, and explicitly approved per-particle fields.
 The current frame may build temporary contact information, but that temporary
 contact information should be safe to rebuild on the next frame.
 
-\subsection{Instantaneous Frame Snapshot Rule}
-
-The collision response for a frame must not depend on velocity changes induced
-earlier in the same frame by other contacts.  Those changes are schedule
-artifacts, not instantaneous state.  If two executions see the same frame-start
-positions, velocities, radii, masses, contact geometry, and approved
-source-owned carried state, they must compute the same dynamics result
-independent of source invocation order.
-
-This means collision-induced velocity changes are not a separate dynamics
-input.  A frame is treated as one possible instantaneous state that could have
-come from many prior histories.  The response may use:
-
-\begin{itemize}[leftmargin=*]
-    \item frame-start positions for contact geometry;
-    \item frame-start velocities for relative normal velocity and available
-    momentum;
-    \item current radii, masses, and particle-owned stiffness;
-    \item current-frame contact sets and overlap-area weights;
-    \item explicitly approved source-owned carried state, such as the
-    contact-slot internal normal momentum value.
-\end{itemize}
-
-The response must not use:
-
-\begin{itemize}[leftmargin=*]
-    \item a target velocity already modified by another source invocation in
-    the same frame;
-    \item an intra-frame contact response as if it were collision history;
-    \item source-order side effects to decide compression, return, or release.
-\end{itemize}
-
-Python may satisfy this rule with a frame-start velocity snapshot such as
-\texttt{VelRadFrame}.  GLSL must provide an equivalent frame-start read path
-before multi-contact behavior can be considered shader-equivalent.
-
 \subsection{Approved Source-Owned Internal Momentum Exception}
 
 The Geo path may carry one source-owned internal normal momentum value per
@@ -206,31 +172,6 @@ Examples of changes that require warning before implementation:
 This warning does not forbid such changes forever, but it makes the model cost
 visible before implementation.
 
-\subsection{Documenting Problem Evolution}
-
-When a dynamics rule changes, the reason for the change should be recorded in
-the problem-evolution document.  That document is the design history for the
-Geo path.  It should explain how the problem was observed, which fixes were
-rejected, which rule or exception was accepted, and what result verified the
-change.
-
-New entries should follow this pattern:
-
-\begin{itemize}[leftmargin=*]
-    \item identify the observed failure by test or symptom;
-    \item include the commit hash associated with the change;
-    \item describe rejected fixes when they would violate the GLSL execution
-    model;
-    \item state any convention, rule, or exception that was added;
-    \item describe the implemented algorithm in equations or direct procedural
-    terms;
-    \item record the verification result that shows the issue was resolved.
-\end{itemize}
-
-The purpose is not only to document the current code.  It is also to preserve
-the assumptions behind that code so future work can deliberately keep, revise,
-or remove those assumptions.
-
 \subsection{Control Flow Shape}
 
 The Python control-flow harness should match the compute shader shape:
@@ -245,95 +186,6 @@ for each SourceID:
 The current Python harness may use a direct all-pairs scan while the shader uses
 cell/corner occupancy lookup.  That difference belongs in \texttt{GeoBase.py},
 not \texttt{GeoDynamics.py}.
-
-\subsection{Sequential Stage And Narrow Function Rule}
-
-Geo frame processing should use a sequential, data-oriented stage chain.  The
-stage chain owns the visible decisions about what kind of work happens next.
-The narrow functions called by the chain should each perform one kind of
-activity.
-
-For example, a frame-level chain may decide:
-
-\begin{verbatim}
-build frame snapshot
-build particle contact lists
-build wall contact lists
-resolve particle contacts
-resolve wall contacts
-move particles
-report diagnostics
-\end{verbatim}
-
-The functions inside those stages should stay narrow:
-
-\begin{itemize}[leftmargin=*]
-    \item \texttt{isParticleContact(...)} answers only whether two particles
-    are touching in the current snapshot;
-    \item \texttt{isWallContact(...)} answers only whether a particle touches a
-    wall or wall particle in the current snapshot;
-    \item \texttt{GeoAddParticleContact(...)} records a particle contact only;
-    \item \texttt{GeoAddWallContact(...)} records a wall contact only;
-    \item geometry functions compute geometry only;
-    \item impulse functions compute impulse values only;
-    \item apply functions write the source-owned state only.
-\end{itemize}
-
-The narrower the split, the more situations can share the same downstream
-dynamics.  Particle-particle contacts, wall contacts, and wall ghost-particle
-contacts should differ only where they truly differ.  Usually that is contact
-determination and contact creation:
-
-\begin{verbatim}
-isParticleContact(...)
-isWallContact(...)
-GeoAddParticleContact(...)
-GeoAddWallContact(...)
-\end{verbatim}
-
-After a contact has been expressed as source-owned contact state, later stages
-should be shared whenever possible:
-
-\begin{verbatim}
-GeoContactGeometry(...)
-GeoContactContext(...)
-GeoContactWeight(...)
-GeoCompressionImpulse(...)
-GeoReturnImpulse(...)
-GeoApplySourceImpulse(...)
-\end{verbatim}
-
-This prevents the code from growing separate particle and wall dynamics paths
-when both contacts can use the same response rule.  If a situation needs a
-different narrow function, add that narrow function at the point of real
-difference instead of cloning a broad stage.
-
-Do not add an umbrella stage when it only hides useful frame flow.  For
-example, this is less clear:
-
-\begin{verbatim}
-GeoBuildContactLists()
-\end{verbatim}
-
-than leaving the meaningful decisions visible in the main chain:
-
-\begin{verbatim}
-GeoBuildParticleContactLists()
-GeoBuildWallContactLists()
-\end{verbatim}
-
-Umbrella functions are allowed only when they remove real duplication or hide
-mechanics that are not relevant to understanding the frame sequence.
-
-This style makes the program easier to step through, easier to debug, and
-easier to learn.  If a contact list is wrong, the defect should be local to the
-contact-detection or contact-recording stage.  If an impulse is wrong, the
-defect should be local to the context, weighting, or impulse stage.  Decisions
-about which narrow functions are called should remain visible in the stage
-chain instead of being hidden inside broad helper functions.
-
-This rule applies to the Geo dynamics path and its frame harness.  Unrelated
-Python utilities do not need to be rewritten to match this style.
 
 \subsection{No Pairwise Write-Back Shortcut}
 
@@ -384,12 +236,16 @@ change the GLSL architecture, not just the Python model.
 \texttt{GeoBase.py} may do those things because it is not intended to be a
 one-to-one GLSL export unit.
 
-\subsection{Current Standing Rules}
+\subsection{Current TODO}
 
-\begin{itemize}[leftmargin=*]
-    \item Keep \texttt{GeoDynamics.py} one-to-one with GLSL export.
-    \item Add contact handling only where it matches the shader model.
-    \item Add reporting only through \texttt{Reporting.py}, not through
-    dynamics.
-    \item Record dynamics-rule changes in \texttt{ProblemEvolution.tex}.
+\begin{itemize}
+    \item Add a \texttt{NeoBeginContactFrame(SourceID)} equivalent or decide
+    whether contact clearing belongs in the harness.
+    \item Decide whether \texttt{isParticleContact(...)} belongs in
+    \texttt{GeoBase.py} or should be moved to a GLSL-matching dynamics/helper
+    module.
+    \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
+    \item Add duplicate contact handling only where it matches the shader model.
+    \item Implement \texttt{GeoProcessCollisions(SourceID)} incrementally.
+    \item Add reporting only through \texttt{Reporting.py}, not through dynamics.
 \end{itemize}

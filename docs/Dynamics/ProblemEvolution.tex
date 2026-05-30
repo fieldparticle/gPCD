@@ -1,3 +1,4 @@
+% !TeX root = GeoDynamics.tex
 \section{Problem Evolution}
 \label{sec:problem-evolution}
 
@@ -287,3 +288,104 @@ multi-contact solver.  The current rule is still dissipative, and
 \texttt{ThreeParticleChase} still exposes tunneling behavior.  Those are future
 problem-evolution entries, not reasons to abandon the source-owned weighted
 contact rule.
+
+\subsection{Instantaneous Frame Snapshot and Sequential Frame Chain}
+
+\noindent\textbf{Commit hash:} \texttt{674b92348cb2a72e4d5681d614b14f04551a4484}
+
+After basic symmetric multi-particle contact was working, the next design issue
+was not a new collision equation.  It was the meaning of the frame itself.  If
+the model is instantaneous, then the collision response must be computed from
+one frame-start state, not from values changed earlier in the same frame by
+another source particle.
+
+The problematic idea was ``collision-induced velocity changes.''  Treating
+those changes as special inputs makes the model depend on intra-frame history:
+
+\begin{verbatim}
+source 1 changes velocity
+source 2 reads that changed velocity
+source 2 computes a different contact response
+\end{verbatim}
+
+That is a schedule artifact.  The same instantaneous state could have come from
+many prior histories, so the response must not depend on which particle was
+processed first.
+
+\subsection{Accepted Snapshot Rule}
+
+The accepted rule is to build a frame-start snapshot before contact processing
+changes any particle state:
+
+\begin{itemize}[leftmargin=*]
+    \item \texttt{PosLocFrame} stores frame-start positions;
+    \item \texttt{VelRadFrame} stores frame-start velocities.
+\end{itemize}
+
+Contact detection and contact geometry read from \texttt{PosLocFrame}.  Relative
+normal velocity and available momentum read from \texttt{VelRadFrame}.  Collision
+response still writes to the live source-owned particle state:
+
+\begin{equation}
+\text{read} = \text{frame-start snapshot},
+\qquad
+\text{write} = \text{live source state}.
+\end{equation}
+
+This preserves the instantaneous interpretation of the frame while still
+allowing the frame to produce updated velocities and positions.
+
+\subsection{Sequential Stage Rule}
+
+The frame harness was also reshaped to make the program flow visible.  The
+preferred style is a sequential, data-oriented stage chain with narrow
+functions.  The main chain owns the decisions about which stages run:
+
+\begin{verbatim}
+GeoBeginFrame()
+GeoApplyBeforeContactScanHook()
+GeoResetFrameState()
+GeoApplyStartRunHook()
+GeoBuildFrameSnapshot()
+GeoBuildParticleContactLists()
+GeoBuildWallContactLists()
+GeoResolveContacts()
+GeoMoveParticles()
+GeoEndFrame()
+\end{verbatim}
+
+This is easier to step through and debug because each stage has a clear kind of
+activity.  It also keeps meaningful frame decisions visible.  For example,
+\texttt{GeoBuildParticleContactLists()} and \texttt{GeoBuildWallContactLists()}
+remain separate calls in the main chain instead of being hidden behind a broad
+\texttt{GeoBuildContactLists()} umbrella.
+
+\subsection{Result}
+
+The Python Geo path now treats each frame as a snapshot-driven pipeline:
+
+\begin{verbatim}
+frame-start particles
+-> frame snapshots
+-> particle contact lists
+-> contact resolution
+-> moved particles
+\end{verbatim}
+
+The known test behavior remained stable:
+
+\begin{verbatim}
+TwoParticleHorizontal:
+momentum drift = 0
+ke drift       = -8.67e-19 after rebound
+
+ThreeParticle 240 frames:
+momentum drift = -2.78e-17, 0
+ke drift       = -0.0011817683521299304
+
+ThreeParticleChase:
+still reaches GEO_ERROR_TUNNELING at frame 70
+\end{verbatim}
+
+This change is Python-side only.  GLSL export should be updated only on an
+explicit export request, after the Python model is stable enough to checkpoint.
