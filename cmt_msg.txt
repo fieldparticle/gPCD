@@ -1,17 +1,19 @@
-Add multi-contact KE drift shadow diagnostics
+Add elastic target and vector-ledger diagnostics for KE drift
 
-Document and instrument the current three-particle kinetic-energy drift work.
+Extend the multi-contact KE investigation with diagnostic-only shadow paths.
 
-- Clear existing CSV captures at GeoRunner startup and report the cleared count
-- Add source-level contact KE diagnostics to contacts.csv
-- Add diagnostic-only source-scaled shadow impulse estimates
-- Add diagnostic-only compression/rebound direction tracking
-- Add vector-rebound shadow estimates for stored-direction release checks
-- Record that rebound direction drift was ruled out for current ThreeParticle cases
-- Update ParticleGeometry, GeoConventions, and ProblemEvolution with the session findings
+- Keep actual Geo dynamics unchanged
+- Add elastic hard-contact target diagnostics as a durable KE/momentum compass
+- Add target-ratio shadow diagnostics and record why they fail for rebound
+- Add vector internal momentum shadow diagnostics
+- Correct vector-internal release direction to match baseline two-particle behavior
+- Report new target_elastic, target_ratio, and vector_internal fields in contacts.csv
+- Update ProblemEvolution, ParticleGeometry, and GeoConventions with current findings
 
-Current result:
+Current findings:
 - Two-particle cases remain momentum/KE conservative
-- ThreeParticle and ThreeParticleChase remain momentum conservative
-- Three-particle KE loss is not explained by rebound direction drift
-- Next target is coupled multi-contact impulse magnitude allocation
+- ThreeParticle and ThreeParticleChase remain momentum conservative with KE drift
+- Elastic target predicts zero KE drift as expected, but is a reference target only
+- Target-ratio allocation is invalid for rebound
+- Simple vector internal momentum does not improve three-particle KE drift
+- Best remaining lead is coupled multi-contact impulse magnitude selection

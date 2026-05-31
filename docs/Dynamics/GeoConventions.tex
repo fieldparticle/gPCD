@@ -305,6 +305,9 @@ dynamics.  Current examples are:
 \begin{verbatim}
 shadow_*
 vector_shadow_*
+target_elastic_*
+target_ratio_*
+vector_internal_*
 \end{verbatim}
 
 The applied dynamics remain authoritative.  A shadow result may be promoted
@@ -318,9 +321,15 @@ only after a project update records:
     execution model.
 \end{itemize}
 
-The current vector-rebound shadow diagnostic ruled out rebound direction drift
-as the primary cause of three-particle kinetic-energy loss.  It is not a
-dynamics fix.
+The \texttt{target\_elastic\_*} diagnostic is a special case: it is intended
+to be a durable reference compass rather than a proposed soft-response rule.
+It may be kept permanently to compare the current frame against an elastic
+hard-contact target.  It must still remain read-only.
+
+The current shadow diagnostics have ruled out rebound direction drift,
+target-ratio allocation, and a simple vector internal momentum ledger as
+complete fixes for three-particle kinetic-energy loss.  They are not dynamics
+fixes unless promoted by a later project update.
 
 \subsection{Dynamics Versus Harness}
 
@@ -370,7 +379,8 @@ when it no longer describes the active Geo path.
     \item Continue \texttt{GeoProcessCollisions(SourceID)} incrementally, with
     multi-contact kinetic-energy drift as the next active dynamics problem.
     The current evidence points to coupled impulse magnitude allocation, not
-    rebound direction drift.
+    rebound direction drift, target-ratio allocation, or a simple vector
+    internal momentum ledger.
     \item Treat wall/out-of-bounds behavior as a separate problem after the
     particle-particle multi-contact rule is stable.
     \item Add reporting only through \texttt{Reporting.py}, not through dynamics.

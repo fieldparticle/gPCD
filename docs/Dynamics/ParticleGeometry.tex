@@ -425,14 +425,21 @@ collision response.  They do not change particle velocity, internal momentum,
 phase, position, or contact ownership.  They exist so proposed multi-contact
 rules can be compared against the active dynamics before promotion.
 
-The current captures include two shadow families:
+The current captures include several diagnostic families:
 
 \begin{itemize}[leftmargin=*]
     \item a source-scaled shadow, which scales a source's already-weighted
     compression candidates as a set before pair compatibility;
     \item a vector-rebound shadow, which records the direction used during
     compression and estimates rebound release along that remembered direction
-    when it remains compatible with the current contact normal.
+    when it remains compatible with the current contact normal;
+    \item an elastic target compass, reported as \texttt{target\_elastic\_*},
+    which solves the active closing contact graph as an elastic hard-contact
+    problem for comparison only;
+    \item a target-ratio shadow, which tests whether the current soft impulse
+    total should be redistributed using elastic target impulse ratios;
+    \item a vector-internal shadow, which stores source compression momentum
+    delta vectors per contact and estimates rebound from that vector ledger.
 \end{itemize}
 
 For the current batch tests, the vector-rebound diagnostic showed that rebound
@@ -444,6 +451,21 @@ direction drift is not the main source of three-particle kinetic-energy loss:
 
 Therefore the active unresolved problem is the selection of simultaneous
 multi-contact impulse magnitudes, not the rebound direction.
+
+The elastic target compass is intended to remain a long-term diagnostic.  It
+answers a reference question:
+
+\begin{quote}
+Given the current frame's active closing contact graph, what would an elastic
+hard-contact result require?
+\end{quote}
+
+It is not the current Geo dynamics rule and should not be directly applied as
+an overlap-area response.  The target-ratio and vector-internal shadows are
+experiments.  Current captures show that target-ratio allocation is invalid for
+rebound because separating contacts have no closing hard-contact target, and a
+simple vector internal momentum ledger does not improve the three-particle
+kinetic-energy drift.
 
 \section{Known Limitations}
 \label{sec:known-limitations}
@@ -464,8 +486,9 @@ The current Geo rule is intentionally simple and incomplete:
     \item The response is not guaranteed to conserve kinetic energy.
     Current diagnostics show that the remaining loss in
     \texttt{ThreeParticle} and \texttt{ThreeParticleChase} is not explained by
-    rebound direction drift; it is more likely caused by multi-contact impulse
-    allocation.
+    rebound direction drift, target-ratio allocation, or a simple vector
+    internal momentum ledger.  The best current lead is coupled multi-contact
+    impulse magnitude selection.
     \item Wall response is not part of this particle-pair geometry note.
 \end{itemize}
 

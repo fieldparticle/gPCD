@@ -791,6 +791,124 @@ Therefore the current evidence says the kinetic-energy loss is not primarily
 caused by rebound direction drift.  Compression and rebound directions are
 nearly identical in the tested cases.
 
+\subsubsection{Elastic Target Compass}
+
+\noindent\textbf{Current analysis commit hash:} \texttt{1deca36ba0f17e82b690b3b80f058a378d2bab5a}
+
+The next diagnostic was not a proposed dynamics rule.  It was a permanent
+comparison target.  For each frame, the active closing contact graph is treated
+as an elastic hard-contact problem.  The diagnostic solves for contact impulses
+that would make the post-contact relative normal velocities satisfy an elastic
+response:
+
+\begin{equation}
+v_{n,i}^{after} = -v_{n,i}^{before}.
+\end{equation}
+
+The solve is coupled over the active contact graph.  Momentum is conserved by
+construction because each target contact impulse is equal and opposite across
+the unordered pair.  The result is recorded in \texttt{target\_elastic\_*}
+fields.
+
+For the batch cases, the elastic target predicted essentially zero net
+kinetic-energy drift:
+
+\begin{verbatim}
+TwoParticleHorizontal: target KE ~= 0
+TwoParticleAngled:     target KE ~= 0
+TwoParticleChase:      target KE ~= 0
+ThreeParticle:         target KE ~= 0
+ThreeParticleChase:    target KE ~= 0
+\end{verbatim}
+
+This does not mean the current soft overlap model should directly apply the
+target impulse each frame.  The target impulse is the full hard-contact
+correction for the instantaneous frame.  The current model is an incremental
+compression/rebound model driven by overlap area and stored internal momentum.
+The target is therefore a compass: it tells us what an ideal elastic frame
+would require, but it is not automatically the Geo response.
+
+\subsubsection{Target-Ratio Shadow Rejection}
+
+The elastic target was then used to test a contact allocation idea.  The
+diagnostic kept the current source's total soft applied impulse but redistributed
+that total across contacts using the elastic target impulse ratios.
+
+This did not improve the model.  It was especially bad during rebound because
+the hard-contact target only exists for closing contacts.  During rebound, the
+contacts are separating, so there is no closing target impulse to allocate:
+
+\begin{verbatim}
+ThreeParticle:
+actual KE      = -0.00024771967622
+target ratio   = -0.0022586921383
+
+ThreeParticleChase:
+actual KE      = -0.000400429449764
+target ratio   = -0.010000167615
+\end{verbatim}
+
+The phase split made the failure clear.  In symmetric \texttt{ThreeParticle},
+the compression ratio matched the current split, but rebound collapsed because
+there was no elastic closing target during release:
+
+\begin{verbatim}
+ThreeParticle compression:
+actual = -0.00226287573954
+ratio  = -0.00226287573954
+
+ThreeParticle release:
+actual = +0.00201097246208
+ratio  =  0
+\end{verbatim}
+
+Therefore target ratios are not a direct rebound allocation rule.
+
+\subsubsection{Vector Internal Momentum Shadow}
+
+The next experiment tested whether the internal momentum ledger should carry
+vector history instead of only a scalar amount.  A shadow ledger was added:
+
+\begin{verbatim}
+particle.contact_vector_internal_delta[TargetID]
+\end{verbatim}
+
+This stores the source compression momentum delta vector accumulated for the
+contact.  The first attempted sign convention released the opposite of that
+stored vector.  That failed even for two-particle baselines, proving the sign
+was wrong.  The corrected convention releases along the stored compression
+delta direction and drains the stored vector by subtracting the released
+portion.
+
+With the corrected sign, the vector-internal shadow matches the two-particle
+baselines:
+
+\begin{verbatim}
+TwoParticleHorizontal: vecInternal ~= 0
+TwoParticleAngled:     vecInternal ~= 0
+TwoParticleChase:      vecInternal ~= 0
+\end{verbatim}
+
+However, it does not fix the three-particle cases:
+
+\begin{verbatim}
+ThreeParticle:
+actual       = -0.00024771967622
+sourceShadow = -0.000228391853378
+vecInternal  = -0.000339237337509
+
+ThreeParticleChase:
+actual       = -0.000400429449764
+sourceShadow = -0.000350215634333
+vecInternal  = -0.000400429449764
+\end{verbatim}
+
+This rules out simple vector internal momentum as the next dynamics rule.  It
+is a useful diagnostic, but the best improvement remains the source-scaled
+shadow.  The unresolved issue is still coupled multi-contact impulse magnitude
+selection, not rebound direction, target-ratio allocation, or a simple vector
+ledger replacement.
+
 \subsubsection{Current Interpretation}
 
 The remaining problem is impulse allocation in simultaneous multi-contact
@@ -813,6 +931,8 @@ momentum, but it can still produce the wrong balanced exchange:
 
 The next dynamics work should therefore focus on the coupled selection of
 multi-contact impulse magnitudes.  The useful question is no longer whether the
-stored momentum is returned along the right direction; it is whether the
-simultaneous contact group chooses the right impulse amounts for each contact
-while preserving the source-owned GLSL write rule.
+stored momentum is returned along the right direction, whether hard-contact
+target ratios should be copied into rebound, or whether a simple vector ledger
+is enough.  The remaining question is whether the simultaneous contact group
+chooses the right impulse amounts for each contact while preserving the
+source-owned GLSL write rule.
