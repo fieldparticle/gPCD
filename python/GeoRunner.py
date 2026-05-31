@@ -345,6 +345,10 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
         )
     report_dir = Path(run_configuration["run_debug_dir"])
     reporting = Reporting(report_dir, run_configuration.get("rpt_frames"))
+    print(
+        f"GeoRunner cleared {reporting.cleared_report_count} "
+        f"capture file(s): {report_dir}"
+    )
     start_diagnostics = _run_start_diagnostics(geo.particles)
 
     pygame.init()

@@ -650,3 +650,169 @@ problem: wall or boundary behavior must be handled explicitly rather than being
 hidden by damping.  The next work should start with
 \texttt{ThreeParticleChase} kinetic-energy drift and the out-of-bounds/wall
 case.
+
+\subsection{Multi-Contact Kinetic-Energy Drift Diagnostics}
+
+\noindent\textbf{Commit hash:} \texttt{f9e97e61c7550de3f9f3b2bd07c6ced8dd558d00}
+
+After frame-local pair planning removed total momentum drift, the remaining
+problem was kinetic-energy drift in the three-particle cases.  The important
+observation was that total momentum could be correct while the contact impulse
+exchange was still physically wrong:
+
+\begin{equation}
+\sum_i \Delta \mathbf{p}_i \approx 0,
+\qquad
+\sum_i \Delta K_i \ne 0.
+\end{equation}
+
+This reframed the problem.  The first question was no longer whether
+\texttt{ThreeParticle} and \texttt{ThreeParticleChase} lost total momentum.
+They did not.  The question became where the balanced but wrong momentum
+exchange was introduced.
+
+\subsubsection{Capture and Cleanup Foundation}
+
+The capture path was tightened first.  New runs now clear existing
+\texttt{*.csv} capture files from the configured \texttt{run\_debug\_dir}
+before writing new rows.  The runner also prints the number of cleared capture
+files and the directory path.  This prevents old capture rows from being
+mistaken for current-run data, especially when a run is stopped manually before
+the configured end frame.
+
+The active batch comparison set is:
+
+\begin{verbatim}
+TwoParticleHorizontal
+TwoParticleAngled
+TwoParticleChase
+ThreeParticle
+ThreeParticleChase
+\end{verbatim}
+
+The two-particle cases remain useful baselines because they conserve both
+momentum and kinetic energy under the current model.
+
+\subsubsection{Source-Level Energy Diagnostics}
+
+The first diagnostic layer added source-level impulse accounting to
+\texttt{contacts.csv}.  For each source and frame, the capture records the net
+source momentum change, the kinetic-energy change implied by that net impulse,
+the sum of contact-by-contact kinetic-energy estimates, and the cross term
+between the source net impulse and the per-contact estimates.
+
+This showed that the final kinetic-energy drift equals the cumulative contact
+response.  It was not introduced by position movement or reporting:
+
+\begin{verbatim}
+ThreeParticle:
+actual final KE drift = -0.00024771967622
+
+ThreeParticleChase:
+actual final KE drift = -0.000400429449764
+\end{verbatim}
+
+Momentum drift stayed at floating-point noise.
+
+\subsubsection{Shadow Planner Rule}
+
+One proposed fix was to adjust source contact candidates by evaluating the
+source net impulse before pair planning.  This was too risky to promote
+directly.  The accepted workflow for this stage is a shadow planner: compute
+alternative impulse plans beside the real dynamics, record their predicted
+effect, and do not change particle motion.
+
+The applied dynamics therefore remain:
+
+\begin{verbatim}
+directed candidates
+unordered pair-compatible plan
+source-owned velocity writes
+\end{verbatim}
+
+The shadow path is diagnostics only.
+
+\subsubsection{Source-Scaled Shadow Planner}
+
+The first shadow experiment kept the already-weighted contact candidates but
+scaled a source's compression candidates as a set before pair compatibility was
+computed.  The idea was to preserve the source-level net impulse intent better
+than independent pair-local clipping.
+
+The shadow result improved the predicted kinetic-energy loss but did not
+eliminate it:
+
+\begin{verbatim}
+ThreeParticle:
+actual KE estimate = -0.00024771967622
+source shadow      = -0.000228391853378
+
+ThreeParticleChase:
+actual KE estimate = -0.000400429449764
+source shadow      = -0.000350215634333
+\end{verbatim}
+
+This means source-level scaling points in a useful direction, but it is not a
+complete model.  The remaining error still indicates a coupled multi-contact
+allocation problem.
+
+\subsubsection{Vector-Rebound Shadow Diagnostic}
+
+The next theory was that rebound might be returning stored momentum along a
+different direction than compression stored it.  To test this without changing
+dynamics, each contact now records a compression direction and a current rebound
+direction.  The diagnostic also computes a vector-shadow estimate in which
+release is returned along the remembered compression direction when that
+direction remains compatible with the current normal.
+
+The diagnostic ruled this theory out for the active tests:
+
+\begin{verbatim}
+ThreeParticle rebound_dir_dot:
+0.99937 .. 1.0
+
+ThreeParticleChase rebound_dir_dot:
+1.0 .. 1.0
+\end{verbatim}
+
+The vector-shadow estimate did not improve the energy drift:
+
+\begin{verbatim}
+ThreeParticle:
+actual KE estimate = -0.00024771967622
+vector shadow      = -0.00027207492979
+
+ThreeParticleChase:
+actual KE estimate = -0.000400429449764
+vector shadow      = -0.000400429449764
+\end{verbatim}
+
+Therefore the current evidence says the kinetic-energy loss is not primarily
+caused by rebound direction drift.  Compression and rebound directions are
+nearly identical in the tested cases.
+
+\subsubsection{Current Interpretation}
+
+The remaining problem is impulse allocation in simultaneous multi-contact
+frames.  In \texttt{ThreeParticle}, particle 1 contacts particles 2 and 3 at
+the same time.  Particle 1 has a two-contact source context, while particles 2
+and 3 each have a one-contact context.  Source-local area weighting gives a
+reasonable candidate split, but pair compatibility still reconciles contacts
+one unordered pair at a time.
+
+That pair-compatible value is currently conservative.  It preserves total
+momentum, but it can still produce the wrong balanced exchange:
+
+\begin{equation}
+\Delta \mathbf{p}_1
+=
+-(\Delta \mathbf{p}_2 + \Delta \mathbf{p}_3),
+\qquad
+\Delta K_{group} < 0.
+\end{equation}
+
+The next dynamics work should therefore focus on the coupled selection of
+multi-contact impulse magnitudes.  The useful question is no longer whether the
+stored momentum is returned along the right direction; it is whether the
+simultaneous contact group chooses the right impulse amounts for each contact
+while preserving the source-owned GLSL write rule.

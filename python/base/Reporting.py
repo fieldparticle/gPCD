@@ -3,13 +3,14 @@ from pathlib import Path
 
 
 class Reporting:
-    DEFAULT_CLEAN_PATTERNS = ("*.csv",)
+    CAPTURE_FILE_SUFFIX = ".csv"
 
     def __init__(self, output_dir, rpt_frames=None, clear_existing=True):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.cleared_report_count = 0
         if clear_existing:
-            self.clear_existing_reports()
+            self.cleared_report_count = self.clear_existing_reports()
         self.rpt_frames = self.normalized_report_frames(rpt_frames)
         self.written_headers = set()
         self.written_momentum_frames = set()
@@ -17,10 +18,15 @@ class Reporting:
         self.written_contact_frames = set()
 
     def clear_existing_reports(self):
-        for pattern in self.DEFAULT_CLEAN_PATTERNS:
-            for report_file in self.output_dir.glob(pattern):
-                if report_file.is_file():
-                    report_file.unlink()
+        deleted_count = 0
+        for report_file in self.output_dir.iterdir():
+            if (
+                report_file.is_file()
+                and report_file.suffix.lower() == self.CAPTURE_FILE_SUFFIX
+            ):
+                report_file.unlink()
+                deleted_count += 1
+        return deleted_count
 
     @staticmethod
     def normalized_report_frames(rpt_frames):
@@ -228,6 +234,43 @@ class Reporting:
             "source_ke_after",
             "source_ke_delta",
             "contact_ke_delta_estimate",
+            "source_net_delta_px",
+            "source_net_delta_py",
+            "source_net_delta_pz",
+            "source_net_ke_delta_estimate",
+            "source_contact_ke_delta_sum",
+            "source_ke_cross_term",
+            "source_ke_residual",
+            "shadow_applied_impulse",
+            "shadow_compression_impulse",
+            "shadow_release_impulse",
+            "shadow_delta_px",
+            "shadow_delta_py",
+            "shadow_delta_pz",
+            "shadow_contact_ke_delta_estimate",
+            "shadow_source_net_delta_px",
+            "shadow_source_net_delta_py",
+            "shadow_source_net_delta_pz",
+            "shadow_source_net_ke_delta_estimate",
+            "shadow_source_contact_ke_delta_sum",
+            "shadow_source_ke_cross_term",
+            "compression_dir_x",
+            "compression_dir_y",
+            "compression_dir_z",
+            "rebound_current_dir_x",
+            "rebound_current_dir_y",
+            "rebound_current_dir_z",
+            "rebound_dir_dot",
+            "vector_shadow_delta_px",
+            "vector_shadow_delta_py",
+            "vector_shadow_delta_pz",
+            "vector_shadow_contact_ke_delta_estimate",
+            "vector_shadow_source_net_delta_px",
+            "vector_shadow_source_net_delta_py",
+            "vector_shadow_source_net_delta_pz",
+            "vector_shadow_source_net_ke_delta_estimate",
+            "vector_shadow_source_contact_ke_delta_sum",
+            "vector_shadow_source_ke_cross_term",
         ]
         with csv_path.open("a", newline="", encoding="utf-8") as csv_file:
             writer = csv.writer(csv_file)
@@ -358,6 +401,43 @@ class Reporting:
                             getattr(contact, "source_ke_after", 0.0),
                             getattr(contact, "source_ke_delta", 0.0),
                             getattr(contact, "contact_ke_delta_estimate", 0.0),
+                            getattr(contact, "source_net_delta_px", 0.0),
+                            getattr(contact, "source_net_delta_py", 0.0),
+                            getattr(contact, "source_net_delta_pz", 0.0),
+                            getattr(contact, "source_net_ke_delta_estimate", 0.0),
+                            getattr(contact, "source_contact_ke_delta_sum", 0.0),
+                            getattr(contact, "source_ke_cross_term", 0.0),
+                            getattr(contact, "source_ke_residual", 0.0),
+                            getattr(contact, "shadow_applied_impulse", 0.0),
+                            getattr(contact, "shadow_compression_impulse", 0.0),
+                            getattr(contact, "shadow_release_impulse", 0.0),
+                            getattr(contact, "shadow_delta_px", 0.0),
+                            getattr(contact, "shadow_delta_py", 0.0),
+                            getattr(contact, "shadow_delta_pz", 0.0),
+                            getattr(contact, "shadow_contact_ke_delta_estimate", 0.0),
+                            getattr(contact, "shadow_source_net_delta_px", 0.0),
+                            getattr(contact, "shadow_source_net_delta_py", 0.0),
+                            getattr(contact, "shadow_source_net_delta_pz", 0.0),
+                            getattr(contact, "shadow_source_net_ke_delta_estimate", 0.0),
+                            getattr(contact, "shadow_source_contact_ke_delta_sum", 0.0),
+                            getattr(contact, "shadow_source_ke_cross_term", 0.0),
+                            getattr(contact, "compression_dir_x", 0.0),
+                            getattr(contact, "compression_dir_y", 0.0),
+                            getattr(contact, "compression_dir_z", 0.0),
+                            getattr(contact, "rebound_current_dir_x", 0.0),
+                            getattr(contact, "rebound_current_dir_y", 0.0),
+                            getattr(contact, "rebound_current_dir_z", 0.0),
+                            getattr(contact, "rebound_dir_dot", 0.0),
+                            getattr(contact, "vector_shadow_delta_px", 0.0),
+                            getattr(contact, "vector_shadow_delta_py", 0.0),
+                            getattr(contact, "vector_shadow_delta_pz", 0.0),
+                            getattr(contact, "vector_shadow_contact_ke_delta_estimate", 0.0),
+                            getattr(contact, "vector_shadow_source_net_delta_px", 0.0),
+                            getattr(contact, "vector_shadow_source_net_delta_py", 0.0),
+                            getattr(contact, "vector_shadow_source_net_delta_pz", 0.0),
+                            getattr(contact, "vector_shadow_source_net_ke_delta_estimate", 0.0),
+                            getattr(contact, "vector_shadow_source_contact_ke_delta_sum", 0.0),
+                            getattr(contact, "vector_shadow_source_ke_cross_term", 0.0),
                             contact.geom.x,
                             contact.geom.y,
                             contact.geom.z,

@@ -75,6 +75,43 @@ class GeoDynamics:
         contact_state.source_ke_after = 0.0
         contact_state.source_ke_delta = 0.0
         contact_state.contact_ke_delta_estimate = 0.0
+        contact_state.source_net_delta_px = 0.0
+        contact_state.source_net_delta_py = 0.0
+        contact_state.source_net_delta_pz = 0.0
+        contact_state.source_net_ke_delta_estimate = 0.0
+        contact_state.source_contact_ke_delta_sum = 0.0
+        contact_state.source_ke_cross_term = 0.0
+        contact_state.source_ke_residual = 0.0
+        contact_state.shadow_applied_impulse = 0.0
+        contact_state.shadow_compression_impulse = 0.0
+        contact_state.shadow_release_impulse = 0.0
+        contact_state.shadow_delta_px = 0.0
+        contact_state.shadow_delta_py = 0.0
+        contact_state.shadow_delta_pz = 0.0
+        contact_state.shadow_contact_ke_delta_estimate = 0.0
+        contact_state.shadow_source_net_delta_px = 0.0
+        contact_state.shadow_source_net_delta_py = 0.0
+        contact_state.shadow_source_net_delta_pz = 0.0
+        contact_state.shadow_source_net_ke_delta_estimate = 0.0
+        contact_state.shadow_source_contact_ke_delta_sum = 0.0
+        contact_state.shadow_source_ke_cross_term = 0.0
+        contact_state.compression_dir_x = 0.0
+        contact_state.compression_dir_y = 0.0
+        contact_state.compression_dir_z = 0.0
+        contact_state.rebound_current_dir_x = 0.0
+        contact_state.rebound_current_dir_y = 0.0
+        contact_state.rebound_current_dir_z = 0.0
+        contact_state.rebound_dir_dot = 0.0
+        contact_state.vector_shadow_delta_px = 0.0
+        contact_state.vector_shadow_delta_py = 0.0
+        contact_state.vector_shadow_delta_pz = 0.0
+        contact_state.vector_shadow_contact_ke_delta_estimate = 0.0
+        contact_state.vector_shadow_source_net_delta_px = 0.0
+        contact_state.vector_shadow_source_net_delta_py = 0.0
+        contact_state.vector_shadow_source_net_delta_pz = 0.0
+        contact_state.vector_shadow_source_net_ke_delta_estimate = 0.0
+        contact_state.vector_shadow_source_contact_ke_delta_sum = 0.0
+        contact_state.vector_shadow_source_ke_cross_term = 0.0
 
     def GeoClearContactSlot(self, contact_state):
         contact_state.ids = self.create_uvec4()
@@ -136,6 +173,29 @@ class GeoDynamics:
         else:
             source.contact_internal_phase[TargetID] = phase
 
+    def GeoContactCompressionDirection(self, SourceID, TargetID):
+        source = self.particles[SourceID]
+        directions = getattr(source, "contact_compression_direction", None)
+        if directions is None:
+            source.contact_compression_direction = {}
+            directions = source.contact_compression_direction
+        return directions.get(TargetID, None)
+
+    def GeoSetContactCompressionDirection(self, SourceID, TargetID, direction):
+        source = self.particles[SourceID]
+        if not hasattr(source, "contact_compression_direction"):
+            source.contact_compression_direction = {}
+        dir_x, dir_y, dir_z = direction
+        magnitude = (dir_x * dir_x + dir_y * dir_y + dir_z * dir_z) ** 0.5
+        if magnitude <= self.GEO_EPSILON:
+            source.contact_compression_direction.pop(TargetID, None)
+            return
+        source.contact_compression_direction[TargetID] = (
+            dir_x / magnitude,
+            dir_y / magnitude,
+            dir_z / magnitude,
+        )
+
     def GeoPruneInactiveContactLedgers(self, SourceID):
         """Keep contact memory tied to contacts active in the current frame."""
         source = self.particles[SourceID]
@@ -148,6 +208,10 @@ class GeoDynamics:
             for TargetID in list(source.contact_internal_phase.keys()):
                 if TargetID not in active_targets:
                     source.contact_internal_phase.pop(TargetID, None)
+        if hasattr(source, "contact_compression_direction"):
+            for TargetID in list(source.contact_compression_direction.keys()):
+                if TargetID not in active_targets:
+                    source.contact_compression_direction.pop(TargetID, None)
         self.GeoSyncInternalMomentum(SourceID)
 
     def GeoBeginContactFrame(self, SourceID):
@@ -309,28 +373,91 @@ class GeoDynamics:
             "stored_internal_momentum": stored_internal_momentum,
             "phase": contact_phase,
             "raw_impulse": raw_impulse,
+            "normal_x": normal_x,
+            "normal_y": normal_y,
+            "normal_z": normal_z,
         }
 
-    def GeoPlanContactImpulses(self):
-        """Plan one frame-local impulse magnitude for each unordered pair."""
-        directed_candidates = {}
-        for SourceID, source in enumerate(self.particles):
-            if not source.collision_list:
-                continue
-            total_overlap_area, available_source_momentum = self.GeoContactContext(SourceID)
-            for TargetID in source.collision_list:
-                candidate = self.GeoDirectedContactCandidate(
-                    SourceID,
-                    TargetID,
-                    total_overlap_area,
-                    available_source_momentum,
-                    self.GeoContactInternalMomentum(SourceID, TargetID),
-                    self.GeoContactInternalPhase(SourceID, TargetID),
-                )
-                if candidate is None:
-                    continue
-                directed_candidates[(SourceID, TargetID)] = candidate
+    def GeoAdjustSourceContactCandidates(self, SourceID, source_candidates):
+        """Scale compression so contact intent matches source net effect."""
+        velocity = self.GeoVelocity(SourceID)
+        mass = self.GeoMass(SourceID)
+        compression_delta_x = 0.0
+        compression_delta_y = 0.0
+        compression_delta_z = 0.0
+        contact_quadratic_ke = 0.0
+        for candidate in source_candidates:
+            compression_impulse = candidate["compression_impulse"]
+            contact_delta_x = -compression_impulse * candidate["normal_x"]
+            contact_delta_y = -compression_impulse * candidate["normal_y"]
+            contact_delta_z = -compression_impulse * candidate["normal_z"]
+            compression_delta_x += contact_delta_x
+            compression_delta_y += contact_delta_y
+            compression_delta_z += contact_delta_z
+            contact_quadratic_ke += (
+                contact_delta_x * contact_delta_x
+                + contact_delta_y * contact_delta_y
+                + contact_delta_z * contact_delta_z
+            ) / (2.0 * mass)
 
+        candidate_net_compression = (
+            compression_delta_x * compression_delta_x
+            + compression_delta_y * compression_delta_y
+            + compression_delta_z * compression_delta_z
+        ) ** 0.5
+        if candidate_net_compression <= self.GEO_EPSILON:
+            return
+
+        linear_ke = (
+            velocity.x * compression_delta_x
+            + velocity.y * compression_delta_y
+            + velocity.z * compression_delta_z
+        )
+        net_quadratic_ke = (
+            compression_delta_x * compression_delta_x
+            + compression_delta_y * compression_delta_y
+            + compression_delta_z * compression_delta_z
+        ) / (2.0 * mass)
+        contact_intended_ke = linear_ke + contact_quadratic_ke
+        source_net_ke = linear_ke + net_quadratic_ke
+        if source_net_ke + self.GEO_EPSILON >= contact_intended_ke:
+            return
+
+        compression_scale = 1.0
+        if net_quadratic_ke <= self.GEO_EPSILON:
+            if linear_ke < -self.GEO_EPSILON:
+                compression_scale = contact_intended_ke / linear_ke
+        else:
+            discriminant = (
+                linear_ke * linear_ke
+                + 4.0 * net_quadratic_ke * contact_intended_ke
+            )
+            if discriminant >= 0.0:
+                sqrt_discriminant = discriminant ** 0.5
+                roots = (
+                    (-linear_ke - sqrt_discriminant) / (2.0 * net_quadratic_ke),
+                    (-linear_ke + sqrt_discriminant) / (2.0 * net_quadratic_ke),
+                )
+                valid_roots = [
+                    root
+                    for root in roots
+                    if -self.GEO_EPSILON <= root <= 1.0 + self.GEO_EPSILON
+                ]
+                if valid_roots:
+                    compression_scale = max(0.0, min(1.0, min(valid_roots)))
+        compression_scale = max(
+            0.0,
+            min(1.0, compression_scale),
+        )
+        for candidate in source_candidates:
+            candidate["compression_impulse"] *= compression_scale
+            candidate["candidate_impulse"] = (
+                candidate["compression_impulse"]
+                + candidate["release_impulse"]
+            )
+
+    def GeoBuildPairCompatiblePlan(self, directed_candidates):
+        """Build pair-compatible directed impulses from directed candidates."""
         planned = {}
         handled_pairs = set()
         for SourceID, TargetID in directed_candidates:
@@ -366,7 +493,51 @@ class GeoDynamics:
                     "phase": candidate["phase"],
                 }
 
-        self.GeoPlannedContactImpulses = planned
+        return planned
+
+    def GeoCopyDirectedCandidates(self, directed_candidates):
+        return {
+            candidate_key: dict(candidate)
+            for candidate_key, candidate in directed_candidates.items()
+        }
+
+    def GeoAdjustDirectedCandidatesBySource(self, directed_candidates):
+        candidates_by_source = {}
+        for SourceID, _TargetID in directed_candidates:
+            candidates_by_source.setdefault(SourceID, []).append(
+                directed_candidates[(SourceID, _TargetID)]
+            )
+        for SourceID, source_candidates in candidates_by_source.items():
+            self.GeoAdjustSourceContactCandidates(SourceID, source_candidates)
+
+    def GeoPlanContactImpulses(self):
+        """Plan applied impulses and a diagnostic-only shadow plan."""
+        directed_candidates = {}
+        for SourceID, source in enumerate(self.particles):
+            if not source.collision_list:
+                continue
+            total_overlap_area, available_source_momentum = self.GeoContactContext(SourceID)
+            for TargetID in source.collision_list:
+                candidate = self.GeoDirectedContactCandidate(
+                    SourceID,
+                    TargetID,
+                    total_overlap_area,
+                    available_source_momentum,
+                    self.GeoContactInternalMomentum(SourceID, TargetID),
+                    self.GeoContactInternalPhase(SourceID, TargetID),
+                )
+                if candidate is None:
+                    continue
+                directed_candidates[(SourceID, TargetID)] = candidate
+
+        self.GeoPlannedContactImpulses = self.GeoBuildPairCompatiblePlan(
+            directed_candidates
+        )
+        shadow_candidates = self.GeoCopyDirectedCandidates(directed_candidates)
+        self.GeoAdjustDirectedCandidatesBySource(shadow_candidates)
+        self.GeoShadowPlannedContactImpulses = self.GeoBuildPairCompatiblePlan(
+            shadow_candidates
+        )
         return True
 
     def GeoAddParticleContact(self, SourceID, TargetID):
@@ -494,6 +665,15 @@ class GeoDynamics:
         delta_momentum_x = 0.0
         delta_momentum_y = 0.0
         delta_momentum_z = 0.0
+        source_contact_ke_delta_sum = 0.0
+        shadow_delta_momentum_x = 0.0
+        shadow_delta_momentum_y = 0.0
+        shadow_delta_momentum_z = 0.0
+        shadow_source_contact_ke_delta_sum = 0.0
+        vector_shadow_delta_momentum_x = 0.0
+        vector_shadow_delta_momentum_y = 0.0
+        vector_shadow_delta_momentum_z = 0.0
+        vector_shadow_source_contact_ke_delta_sum = 0.0
         report_target = 0
         report_center_distance = 0.0
         report_normal_x = 0.0
@@ -568,6 +748,19 @@ class GeoDynamics:
                     contact_internal_momentum + compression_impulse - release_impulse,
                 )
 
+            shadow_planned_impulse = getattr(
+                self,
+                "GeoShadowPlannedContactImpulses",
+                {},
+            ).get((SourceID, TargetID))
+            shadow_compression_impulse = 0.0
+            shadow_release_impulse = 0.0
+            shadow_applied_impulse = 0.0
+            if shadow_planned_impulse is not None:
+                shadow_compression_impulse = shadow_planned_impulse["compression_impulse"]
+                shadow_release_impulse = shadow_planned_impulse["release_impulse"]
+                shadow_applied_impulse = shadow_planned_impulse["applied_impulse"]
+
             self.GeoSetContactInternalMomentum(SourceID, TargetID, stored_internal_momentum)
             if stored_internal_momentum <= self.GEO_EPSILON:
                 contact_phase = self.GEO_PHASE_COMPRESSION
@@ -580,6 +773,56 @@ class GeoDynamics:
             delta_momentum_x += contact_delta_px
             delta_momentum_y += contact_delta_py
             delta_momentum_z += contact_delta_pz
+            shadow_contact_delta_px = -shadow_applied_impulse * normal_x
+            shadow_contact_delta_py = -shadow_applied_impulse * normal_y
+            shadow_contact_delta_pz = -shadow_applied_impulse * normal_z
+            shadow_delta_momentum_x += shadow_contact_delta_px
+            shadow_delta_momentum_y += shadow_contact_delta_py
+            shadow_delta_momentum_z += shadow_contact_delta_pz
+            if compression_impulse > self.GEO_EPSILON:
+                self.GeoSetContactCompressionDirection(
+                    SourceID,
+                    TargetID,
+                    (-normal_x, -normal_y, -normal_z),
+                )
+            compression_direction = self.GeoContactCompressionDirection(
+                SourceID,
+                TargetID,
+            )
+            if compression_direction is None:
+                compression_direction = (-normal_x, -normal_y, -normal_z)
+            compression_dir_x, compression_dir_y, compression_dir_z = compression_direction
+            rebound_current_dir_x = -normal_x
+            rebound_current_dir_y = -normal_y
+            rebound_current_dir_z = -normal_z
+            rebound_dir_dot = (
+                compression_dir_x * rebound_current_dir_x
+                + compression_dir_y * rebound_current_dir_y
+                + compression_dir_z * rebound_current_dir_z
+            )
+            if release_impulse > self.GEO_EPSILON and rebound_dir_dot > 0.0:
+                vector_release_dir_x = compression_dir_x
+                vector_release_dir_y = compression_dir_y
+                vector_release_dir_z = compression_dir_z
+            else:
+                vector_release_dir_x = rebound_current_dir_x
+                vector_release_dir_y = rebound_current_dir_y
+                vector_release_dir_z = rebound_current_dir_z
+            vector_shadow_contact_delta_px = (
+                -compression_impulse * normal_x
+                + release_impulse * vector_release_dir_x
+            )
+            vector_shadow_contact_delta_py = (
+                -compression_impulse * normal_y
+                + release_impulse * vector_release_dir_y
+            )
+            vector_shadow_contact_delta_pz = (
+                -compression_impulse * normal_z
+                + release_impulse * vector_release_dir_z
+            )
+            vector_shadow_delta_momentum_x += vector_shadow_contact_delta_px
+            vector_shadow_delta_momentum_y += vector_shadow_contact_delta_py
+            vector_shadow_delta_momentum_z += vector_shadow_contact_delta_pz
 
             contact_state.geom = self.create_vec4(normal_x, normal_y, normal_z, overlap_area)
             contact_state.aux.x = center_distance
@@ -614,6 +857,51 @@ class GeoDynamics:
                 )
                 / (2.0 * source_mass)
             )
+            source_contact_ke_delta_sum += contact_state.contact_ke_delta_estimate
+            contact_state.shadow_applied_impulse = shadow_applied_impulse
+            contact_state.shadow_compression_impulse = shadow_compression_impulse
+            contact_state.shadow_release_impulse = shadow_release_impulse
+            contact_state.shadow_delta_px = shadow_contact_delta_px
+            contact_state.shadow_delta_py = shadow_contact_delta_py
+            contact_state.shadow_delta_pz = shadow_contact_delta_pz
+            contact_state.shadow_contact_ke_delta_estimate = (
+                source_vx_before * shadow_contact_delta_px
+                + source_vy_before * shadow_contact_delta_py
+                + source_vz_before * shadow_contact_delta_pz
+                + (
+                    shadow_contact_delta_px * shadow_contact_delta_px
+                    + shadow_contact_delta_py * shadow_contact_delta_py
+                    + shadow_contact_delta_pz * shadow_contact_delta_pz
+                )
+                / (2.0 * source_mass)
+            )
+            shadow_source_contact_ke_delta_sum += (
+                contact_state.shadow_contact_ke_delta_estimate
+            )
+            contact_state.compression_dir_x = compression_dir_x
+            contact_state.compression_dir_y = compression_dir_y
+            contact_state.compression_dir_z = compression_dir_z
+            contact_state.rebound_current_dir_x = rebound_current_dir_x
+            contact_state.rebound_current_dir_y = rebound_current_dir_y
+            contact_state.rebound_current_dir_z = rebound_current_dir_z
+            contact_state.rebound_dir_dot = rebound_dir_dot
+            contact_state.vector_shadow_delta_px = vector_shadow_contact_delta_px
+            contact_state.vector_shadow_delta_py = vector_shadow_contact_delta_py
+            contact_state.vector_shadow_delta_pz = vector_shadow_contact_delta_pz
+            contact_state.vector_shadow_contact_ke_delta_estimate = (
+                source_vx_before * vector_shadow_contact_delta_px
+                + source_vy_before * vector_shadow_contact_delta_py
+                + source_vz_before * vector_shadow_contact_delta_pz
+                + (
+                    vector_shadow_contact_delta_px * vector_shadow_contact_delta_px
+                    + vector_shadow_contact_delta_py * vector_shadow_contact_delta_py
+                    + vector_shadow_contact_delta_pz * vector_shadow_contact_delta_pz
+                )
+                / (2.0 * source_mass)
+            )
+            vector_shadow_source_contact_ke_delta_sum += (
+                contact_state.vector_shadow_contact_ke_delta_estimate
+            )
 
             if entry_index == 0:
                 report_target = TargetID
@@ -636,13 +924,95 @@ class GeoDynamics:
             + source.VelRad.y * source.VelRad.y
             + source.VelRad.z * source.VelRad.z
         )
+        source_net_ke_delta_estimate = (
+            source_vx_before * delta_momentum_x
+            + source_vy_before * delta_momentum_y
+            + source_vz_before * delta_momentum_z
+            + (
+                delta_momentum_x * delta_momentum_x
+                + delta_momentum_y * delta_momentum_y
+                + delta_momentum_z * delta_momentum_z
+            )
+            / (2.0 * source_mass)
+        )
+        source_ke_delta = source_ke_after - source_ke_before
+        source_ke_cross_term = (
+            source_net_ke_delta_estimate - source_contact_ke_delta_sum
+        )
+        shadow_source_net_ke_delta_estimate = (
+            source_vx_before * shadow_delta_momentum_x
+            + source_vy_before * shadow_delta_momentum_y
+            + source_vz_before * shadow_delta_momentum_z
+            + (
+                shadow_delta_momentum_x * shadow_delta_momentum_x
+                + shadow_delta_momentum_y * shadow_delta_momentum_y
+                + shadow_delta_momentum_z * shadow_delta_momentum_z
+            )
+            / (2.0 * source_mass)
+        )
+        shadow_source_ke_cross_term = (
+            shadow_source_net_ke_delta_estimate
+            - shadow_source_contact_ke_delta_sum
+        )
+        vector_shadow_source_net_ke_delta_estimate = (
+            source_vx_before * vector_shadow_delta_momentum_x
+            + source_vy_before * vector_shadow_delta_momentum_y
+            + source_vz_before * vector_shadow_delta_momentum_z
+            + (
+                vector_shadow_delta_momentum_x * vector_shadow_delta_momentum_x
+                + vector_shadow_delta_momentum_y * vector_shadow_delta_momentum_y
+                + vector_shadow_delta_momentum_z * vector_shadow_delta_momentum_z
+            )
+            / (2.0 * source_mass)
+        )
+        vector_shadow_source_ke_cross_term = (
+            vector_shadow_source_net_ke_delta_estimate
+            - vector_shadow_source_contact_ke_delta_sum
+        )
         for _entry in contact_entries:
             contact_state = _entry[1]
             contact_state.source_vx_after = source.VelRad.x
             contact_state.source_vy_after = source.VelRad.y
             contact_state.source_vz_after = source.VelRad.z
             contact_state.source_ke_after = source_ke_after
-            contact_state.source_ke_delta = source_ke_after - source_ke_before
+            contact_state.source_ke_delta = source_ke_delta
+            contact_state.source_net_delta_px = delta_momentum_x
+            contact_state.source_net_delta_py = delta_momentum_y
+            contact_state.source_net_delta_pz = delta_momentum_z
+            contact_state.source_net_ke_delta_estimate = source_net_ke_delta_estimate
+            contact_state.source_contact_ke_delta_sum = source_contact_ke_delta_sum
+            contact_state.source_ke_cross_term = source_ke_cross_term
+            contact_state.source_ke_residual = (
+                source_ke_delta - source_net_ke_delta_estimate
+            )
+            contact_state.shadow_source_net_delta_px = shadow_delta_momentum_x
+            contact_state.shadow_source_net_delta_py = shadow_delta_momentum_y
+            contact_state.shadow_source_net_delta_pz = shadow_delta_momentum_z
+            contact_state.shadow_source_net_ke_delta_estimate = (
+                shadow_source_net_ke_delta_estimate
+            )
+            contact_state.shadow_source_contact_ke_delta_sum = (
+                shadow_source_contact_ke_delta_sum
+            )
+            contact_state.shadow_source_ke_cross_term = shadow_source_ke_cross_term
+            contact_state.vector_shadow_source_net_delta_px = (
+                vector_shadow_delta_momentum_x
+            )
+            contact_state.vector_shadow_source_net_delta_py = (
+                vector_shadow_delta_momentum_y
+            )
+            contact_state.vector_shadow_source_net_delta_pz = (
+                vector_shadow_delta_momentum_z
+            )
+            contact_state.vector_shadow_source_net_ke_delta_estimate = (
+                vector_shadow_source_net_ke_delta_estimate
+            )
+            contact_state.vector_shadow_source_contact_ke_delta_sum = (
+                vector_shadow_source_contact_ke_delta_sum
+            )
+            contact_state.vector_shadow_source_ke_cross_term = (
+                vector_shadow_source_ke_cross_term
+            )
 
         source.report_contacts = len(source.collision_list)
         source.report_target = report_target

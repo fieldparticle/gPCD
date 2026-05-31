@@ -154,6 +154,18 @@ P[SourceID].contact_internal_momentum[TargetID]
 P[SourceID].contact_internal_phase[TargetID]
 \end{verbatim}
 
+The Python diagnostics may also remember a source-owned compression direction
+for the same target key:
+
+\begin{verbatim}
+P[SourceID].contact_compression_direction[TargetID]
+\end{verbatim}
+
+This value is diagnostic-only in the current model.  It may be used to compare
+stored compression direction against rebound direction, but it must not change
+the applied impulse unless a later project update explicitly promotes a new
+dynamics rule.
+
 The GLSL-shaped particle field:
 
 \begin{verbatim}
@@ -280,6 +292,36 @@ Allowed alternatives must preserve source-owned execution.  Examples include:
 Any proposal that needs one contact solve to write both particles must first
 change the GLSL architecture, not just the Python model.
 
+\subsection{Shadow Diagnostic Convention}
+
+Shadow dynamics are allowed only as diagnostics.  A shadow path may compute an
+alternate impulse plan or kinetic-energy estimate beside the applied dynamics,
+but it must not write particle velocity, position, internal momentum, phase, or
+contact ownership.
+
+Shadow diagnostics must be clearly named and reported separately from applied
+dynamics.  Current examples are:
+
+\begin{verbatim}
+shadow_*
+vector_shadow_*
+\end{verbatim}
+
+The applied dynamics remain authoritative.  A shadow result may be promoted
+only after a project update records:
+
+\begin{itemize}[leftmargin=*]
+    \item what problem it solves;
+    \item what tests support it;
+    \item what convention changes are required;
+    \item how the same rule can be represented in the GLSL source-owned
+    execution model.
+\end{itemize}
+
+The current vector-rebound shadow diagnostic ruled out rebound direction drift
+as the primary cause of three-particle kinetic-energy loss.  It is not a
+dynamics fix.
+
 \subsection{Dynamics Versus Harness}
 
 \texttt{GeoDynamics.py} should not:
@@ -326,7 +368,10 @@ when it no longer describes the active Geo path.
     module.
     \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
     \item Continue \texttt{GeoProcessCollisions(SourceID)} incrementally, with
-    \texttt{ThreeParticleChase} kinetic-energy drift and wall/out-of-bounds
-    behavior as the next active problem case.
+    multi-contact kinetic-energy drift as the next active dynamics problem.
+    The current evidence points to coupled impulse magnitude allocation, not
+    rebound direction drift.
+    \item Treat wall/out-of-bounds behavior as a separate problem after the
+    particle-particle multi-contact rule is stable.
     \item Add reporting only through \texttt{Reporting.py}, not through dynamics.
 \end{itemize}

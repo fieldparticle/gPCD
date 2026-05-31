@@ -1,0 +1,14 @@
+% !TeX root = main.tex
+\section{Introduction} \label{intro}
+
+Engineering particle systems have experienced near-exponential growth in published research over the past two decades (see \figo{NumberPapersParticle_zhu2007}).  Particle-based methods have found success across a wide range of disciplines, including \textit{computer graphics animation} (CGA) in games and entertainment \citep{ericson2004}, molecular dynamics  \cite{anderson2008}, computer aided design ({CAD}) \cite{bronson2012}, N-Body systems \cite{visser2023}, virtual surgery \cite{Kim2006a}, astrophysics \cite{PhantomSmoothedParticle}, plasma flows, \cite{romanenko2019,gupta2017}, pharmaceuticals \cite{Mansour2015}, suspensions \cite{butler2018}, and crack propagation \cite{Vesga2007} - just to name a few. Furthermore, techniques such as the Discrete Element Method (DEM) and Smoothed Particle Hydrodynamics (SPH) can be combined with other particle-based approaches and computational fluid dynamics (CFD) to study multiphase and multiscale flows \cite{Young2022,he2018}. These methods are well-suited for handling complex topological changes, boundaries, self-collisions, and large deformations \cite{wang2020,adami2012}.
+
+The broader application of particle systems to high speed thermo-fluid flows is limited by the computational burden of collision detection, especially in our area of interest \anon{ \cite{sherif1998c,sherif2000a,lear2000a}}. We present a method for accelerating particle collision detection (PCD), enabling real-time testing of millions of particles and simultaneous rendering of particles as points.  
+
+%\input{inc/NumberPapersParticle_zhu2007.tex}
+
+Our graphical particle collision detection method, gPCD, is modeled on the graphics processing unit (GPU) pixel rendering process. The design is tractable, exact, and is executed exclusively on the GPU (\textit{GPU Driven}). gPCD does not introduce new data structures or algorithms but organizes existing ones to maximize GPU parallelism. While the organization itself is not known to be novel, it is considered a strong foundation for future enhancements in GPU software and hardware. Further, the approach is not confined to the GPU as it can be utilized in any parallel system.
+
+We developed a suite of applications to generate data, verify, and analyze performance. We suggest a non-dimensional metric to enable performance comparisons across different CPU-GPU combinations. This utility will allow us to rate the system as we, or others, experiment with improvements. 
+
+\input {inc/A_BACKGROUND.tex}

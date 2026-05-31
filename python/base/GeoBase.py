@@ -131,6 +131,7 @@ class GeoBase(GeoDynamics):
         particle.internal_momentum_phase = self.GEO_PHASE_COMPRESSION
         particle.contact_internal_momentum = {}
         particle.contact_internal_phase = {}
+        particle.contact_compression_direction = {}
         particle.contacts = [self.create_geo_contact_state() for _ in range(16)]
         particle.gcs = particle.contacts
         particle.contactCount = 0

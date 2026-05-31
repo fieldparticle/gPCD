@@ -1,0 +1,48 @@
+\section{Advantages}
+
+\subsection{Distribution Independence}
+
+The gPCD method is effective for dispersed, sparse, dense, static, and fast-moving particle populations. Because occupancy assignment is determined directly from the instantaneous particle geometry, the method does not rely on temporal coherence, cached neighbor lists, or motion-history assumptions. Consequently, performance remains stable when particles are widely separated, rapidly translating, or undergoing frequent redistribution.
+
+This allows scarce, mobile, and stationary particle systems to be processed with comparable efficiency, provided local cell occupancy remains bounded.
+
+\subsection{Constant-Time Cell Access}
+
+Memory access to an individual cell remains constant-time,
+
+\[
+\mathcal{O}(1),
+\]
+
+because each cell is addressed through deterministic index mapping rather than through iterative search or hierarchical traversal. Cell retrieval therefore remains predictable and independent of the total number of cells.
+
+Although the total storage capacity of the cell array may scale as
+
+\[
+\mathcal{O}(N^3),
+\]
+
+for a three-dimensional domain discretization, this increase in global memory allocation does not affect per-access lookup cost.
+
+\subsection{Broad-Phase and Graphics Concurrency}
+
+Broad-phase occupancy generation is executed concurrently with graphics-pipeline activity through the vertex and fragment stages. As a result, collision candidate generation is overlapped with normal rendering operations rather than requiring an entirely separate preprocessing pass.
+
+This hybrid use of rasterization and compute resources improves hardware utilization and reduces the effective standalone overhead of broad-phase processing.
+
+\subsection{Bounded Neighbor Search}
+
+Under the particle-size constraint,
+
+\[
+d_p \leq 1,
+\]
+
+each particle may intersect no more than eight neighboring cells. This imposes a deterministic upper bound on per-particle cell references and creates predictable memory-access behavior during narrow-phase processing.
+
+\subsection{Duplicate-Resistant Candidate Evaluation}
+
+The method removes both corner duplicates and repeated particle-pair duplicates through local per-thread duplicate filtering. This reduces redundant collision checks without requiring global synchronization, improving narrow-phase efficiency and preserving parallel scalability.
+
+
+

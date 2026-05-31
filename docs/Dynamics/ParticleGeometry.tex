@@ -315,6 +315,8 @@ For each simulation frame:
     \item Plan one impulse magnitude per unordered contact pair from snapshot
     data.  Each directed side contributes a candidate compression/release
     impulse, and the unordered pair uses the lower candidate magnitude.
+    Diagnostic-only shadow plans may also be computed at this stage, but they
+    must not change the applied source velocity.
     \item For each source particle $s$:
     \begin{enumerate}[leftmargin=*]
         \item If $s$ has active contacts, compute snapshot geometry, stiffness,
@@ -370,6 +372,79 @@ For example, if two equal-mass particles drift from speeds $0.05$ to
 $0.050006$ in opposite directions, total momentum can still be conserved while
 $\Delta K$ reveals the speed growth.
 
+\subsection{Contact Energy Diagnostics}
+
+The contact capture file records the source-level momentum and kinetic-energy
+effect of the contact response.  For a source particle $s$, the applied
+contact impulses produce:
+
+\begin{equation}
+\Delta \mathbf{p}_s =
+\sum_k \Delta \mathbf{p}_{s,k}.
+\end{equation}
+
+The source-level kinetic-energy estimate from the net impulse is:
+
+\begin{equation}
+\Delta K_{s,net}
+=
+\mathbf{v}_s \cdot \Delta \mathbf{p}_s
++
+\frac{\lVert \Delta \mathbf{p}_s \rVert^2}{2m_s}.
+\end{equation}
+
+The capture also records the sum of contact-by-contact estimates:
+
+\begin{equation}
+\Delta K_{s,contacts}
+=
+\sum_k
+\left(
+\mathbf{v}_s \cdot \Delta \mathbf{p}_{s,k}
++
+\frac{\lVert \Delta \mathbf{p}_{s,k} \rVert^2}{2m_s}
+\right).
+\end{equation}
+
+The difference is reported as a source cross term:
+
+\begin{equation}
+\Delta K_{s,cross}
+=
+\Delta K_{s,net} - \Delta K_{s,contacts}.
+\end{equation}
+
+This is reporting-only.  It is used to see when simultaneous contact impulses
+interact as a source-level vector sum instead of independent scalar contact
+events.
+
+\subsection{Shadow Diagnostics}
+
+Shadow diagnostics are alternate impulse estimates computed beside the real
+collision response.  They do not change particle velocity, internal momentum,
+phase, position, or contact ownership.  They exist so proposed multi-contact
+rules can be compared against the active dynamics before promotion.
+
+The current captures include two shadow families:
+
+\begin{itemize}[leftmargin=*]
+    \item a source-scaled shadow, which scales a source's already-weighted
+    compression candidates as a set before pair compatibility;
+    \item a vector-rebound shadow, which records the direction used during
+    compression and estimates rebound release along that remembered direction
+    when it remains compatible with the current contact normal.
+\end{itemize}
+
+For the current batch tests, the vector-rebound diagnostic showed that rebound
+direction drift is not the main source of three-particle kinetic-energy loss:
+
+\begin{equation}
+\hat{d}_{compression}\cdot\hat{d}_{rebound} \approx 1.
+\end{equation}
+
+Therefore the active unresolved problem is the selection of simultaneous
+multi-contact impulse magnitudes, not the rebound direction.
+
 \section{Known Limitations}
 \label{sec:known-limitations}
 
@@ -387,6 +462,10 @@ The current Geo rule is intentionally simple and incomplete:
     ledgers are keyed by target under the source particle, while slots are
     rebuilt from the current frame's contact list.
     \item The response is not guaranteed to conserve kinetic energy.
+    Current diagnostics show that the remaining loss in
+    \texttt{ThreeParticle} and \texttt{ThreeParticleChase} is not explained by
+    rebound direction drift; it is more likely caused by multi-contact impulse
+    allocation.
     \item Wall response is not part of this particle-pair geometry note.
 \end{itemize}
 

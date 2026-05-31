@@ -1,0 +1,703 @@
+\section{Document Conventions and Research Governance}
+
+This document serves as the authoritative reference for terminology,
+notation, technical claims, algorithm descriptions, and publication
+standards used throughout the gPCD and Field Particle Method research
+program. When conflicts arise between a manuscript and this document,
+this document shall take precedence until formally revised.
+
+\subsection{Purpose}
+
+The purpose of this document is to:
+
+\begin{itemize}
+\item Maintain consistency across all manuscripts.
+\item Prevent reintroduction of retired concepts.
+\item Ensure technical claims remain supported by evidence.
+\item Standardize notation and terminology.
+\item Distinguish established results from future work.
+\item Preserve continuity as the research evolves.
+\end{itemize}
+
+\subsection{Primary Contribution}
+
+\textit{Pending manuscript review. This section will contain the
+authoritative statement of the primary contribution of the paper and
+shall be completed after all major review items have been resolved.}
+
+\subsection{Abstract Requirements}
+
+The abstract shall be written after completion of the manuscript
+review process.
+
+The abstract shall answer the following questions:
+
+\begin{enumerate}
+\item What problem is addressed?
+\item What is the primary contribution?
+\item How does the method operate?
+\item What results were demonstrated?
+\item Why are the results significant?
+\end{enumerate}
+
+The abstract shall not introduce terminology, concepts, or claims
+that are not subsequently developed and supported within the manuscript.
+
+\subsection{Paper Scope}
+
+The current manuscript is exclusively a particle collision-detection
+paper describing the gPCD framework.
+
+Topics that belong within the scope of this manuscript include:
+
+\begin{itemize}
+\item Broad-phase collision detection.
+\item Cell-array occupancy generation.
+\item Rasterization-based occupancy construction.
+\item Duplicate elimination.
+\item Narrow-phase collision evaluation.
+\item Computational complexity.
+\item GPU implementation.
+\item Performance and scalability.
+\end{itemize}
+
+Topics that are explicitly outside the scope of this manuscript include:
+
+\begin{itemize}
+\item Field Particle Method dynamics.
+\item Internal momentum representation.
+\item Thermodynamic modeling.
+\item Pressure and temperature formulation.
+\item Phase-change modeling.
+\item Converging-diverging nozzle analysis.
+\item Choking behavior.
+\item Flow diagnostics.
+\end{itemize}
+
+Such topics may be referenced only when necessary to provide context and
+shall not be presented as primary contributions of the manuscript.
+
+
+\subsection{Revision Procedure}
+
+Before major modifications are made to any manuscript:
+
+\begin{enumerate}
+\item Proposed terminology changes shall be reviewed against this document.
+\item New technical claims shall be added here before being incorporated into manuscripts.
+\item Retired concepts shall be recorded in Section~\ref{sec:retired_concepts}.
+\item Publication-specific deviations shall be documented and justified.
+\end{enumerate}
+
+%================================================================================
+\section{Approved Terminology}
+
+\subsection{Symbols}
+\begin{tabular}{|l|c|}
+\hline
+Topic & Status \\
+\hline
+$P$ & number of particles\\
+$S$ & side length of cubic cell array\\
+$C$ & total number of cells = $S^3$\\
+$r$ & particle radius\\
+$(i,j,k)$ & integer cell coordinates\\
+$I$ & flattened cell index\\
+\hline
+\end{tabular}
+
+\subsection{Symbol Conventions}
+
+The gPCD framework utilizes three coordinate systems and one indexing
+system. Distinguishing between these representations is essential for
+understanding occupancy construction and complexity analysis.
+
+\subsubsection{Physical Particle Coordinates}
+
+Particle positions are represented in continuous physical space using
+floating-point coordinates,
+
+\begin{equation}
+(x,y,z).
+\end{equation}
+
+These coordinates correspond to the particle center location and are
+used for geometric calculations.
+
+\subsubsection{Cell Coordinates}
+
+Cell coordinates are obtained by rounding physical coordinates to the
+nearest integer cell location,
+
+\begin{equation}
+(X,Y,Z).
+\end{equation}
+
+The cell coordinates are stored as unsigned integers and identify the
+cell occupied by a particle corner.
+
+Valid cell coordinates satisfy
+
+\begin{equation}
+X \geq 1,
+\qquad
+Y \geq 1,
+\qquad
+Z \geq 1.
+\end{equation}
+
+A coordinate value of zero is reserved as an invalid location.
+
+\begin{equation}
+X=0,;Y=0,;\text{or};Z=0
+\end{equation}
+
+indicates that the coordinate does not reference a valid cell.
+
+\subsubsection{Flattened Cell Index}
+
+The integer cell coordinates are converted to a one-dimensional
+flattened index,
+
+\begin{equation}
+I.
+\end{equation}
+
+The flattened index uniquely identifies a cell within the cell array
+and is stored as an unsigned integer.
+
+The value
+
+\begin{equation}
+I = 0
+\end{equation}
+
+is reserved as an invalid index.
+
+\subsubsection{Cell Array Dimensions}
+
+The dimensions of the cell array are represented by
+
+\begin{equation}
+(S_x,S_y,S_z),
+\end{equation}
+
+where each quantity denotes the number of cells in the corresponding
+coordinate direction.
+
+The total number of cells is therefore
+
+\begin{equation}
+C = S_x S_y S_z.
+\end{equation}
+
+For cubic cell arrays,
+
+\begin{equation}
+S_x = S_y = S_z = S,
+\end{equation}
+
+and the total cell count becomes
+
+\begin{equation}
+C = S^3.
+\end{equation}
+
+Consequently, cell-array memory requirements scale as
+
+\begin{equation}
+\mathcal{O}(S^3).
+\end{equation}
+
+\subsubsection{Storage Conventions}
+
+The value zero is reserved as a sentinel value throughout the gPCD
+framework.
+
+\begin{itemize}
+\item A cell coordinate value of zero indicates an invalid cell location.
+\item A flattened index of zero indicates an invalid cell index.
+\item An occupancy-list entry of zero indicates an empty array location.
+\end{itemize}
+
+As a result, valid cells and valid occupancy entries begin at one.
+
+\subsubsection{Coordinate Transformation Pipeline}
+
+Occupancy construction follows the transformation sequence
+
+\begin{equation}
+(x,y,z)
+;\rightarrow;
+(X,Y,Z)
+;\rightarrow;
+I,
+\end{equation}
+
+where floating-point particle coordinates are rounded to integer cell
+coordinates and subsequently converted into flattened cell indices for
+occupancy insertion.
+
+
+
+\subsection{Bounding Volume Terminology}
+
+The term AABB (Axis-Aligned Bounding Box) shall be used throughout all
+manuscripts. Any occurrence of AARB shall be treated as a typographical
+error and corrected to AABB.
+
+\subsection{Graphics Pipeline Execution}
+
+The graphics pipeline shall be described as performing
+concurrent point-particle rendering and broad-phase occupancy
+generation. The term ``hierarchical parallelism'' shall not
+be used to describe gPCD execution.
+
+Vertex and fragment invocations are treated as independent
+stages of the graphics pipeline and not as a nested or
+parent-child execution hierarchy.
+\subsection{gPCD}
+
+The term \textbf{gPCD} refers to the GPU-driven particle collision detection
+system consisting of:
+
+\begin{itemize}
+\item Graphics-pipeline broad-phase occupancy generation.
+\item Cell-array collision candidate construction.
+\item Compute-shader narrow-phase collision evaluation.
+\item Fully GPU-resident execution.
+\end{itemize}
+
+\subsection{Broad Phase}
+
+The broad phase refers exclusively to occupancy generation and collision
+candidate identification using the cell-array structure.
+
+\subsection{Narrow Phase}
+
+The narrow phase refers exclusively to exact collision testing and collision
+resolution performed within compute shaders.
+
+\subsection{Cell Array}
+
+The term \textbf{cell array} shall be used instead of spatial grid whenever
+referring to the gPCD occupancy structure.
+
+\section{Related Work Objectives}
+
+The Background and Related Work section shall establish the context
+necessary to evaluate the novelty and performance of gPCD.
+
+The section shall:
+
+\begin{enumerate}
+\item Introduce broad-phase collision-detection methodologies.
+\item Summarize GPU-based collision-detection approaches.
+\item Identify limitations or distinctions relevant to gPCD.
+\item Explain how gPCD differs from existing approaches.
+\end{enumerate}
+
+The section shall not function as a comprehensive literature survey.
+Its purpose is to provide sufficient context for evaluating the
+organizational and algorithmic contributions of the framework.
+\end{document}
+
+
+%================================================================================
+\section{Experimental Claims}
+
+The Experimental Results section shall validate the effectiveness of the
+gPCD framework rather than establish novelty.
+
+Experimental evidence shall support the following claims:
+
+\begin{enumerate}
+\item The framework processes large particle counts efficiently.
+\item The framework reaches a stable throughput-limited operating regime.
+\item The framework exhibits near-linear scaling behavior.
+\end{enumerate}
+
+Throughput, time-per-particle, curvature analysis, and log-log
+regression shall be treated as complementary measurements supporting
+these claims rather than as independent studies.
+
+Performance results shall be presented as evidence supporting the
+organizational and algorithmic contributions of the framework.
+
+
+%================================================================================
+\section{Complexity Claims}
+
+The gPCD framework exhibits distinct access, computational, and storage
+complexities. These quantities shall be treated independently throughout
+the manuscript.
+
+The complexity analysis assumes a fixed maximum particle size
+consistent with the eight-cell occupancy constraint.
+
+\subsection{Access Complexity}
+
+Cell lookup is performed through direct conversion of integer cell
+coordinates into a flattened cell index. No search, traversal, or
+hierarchical lookup is required. Consequently, cell access complexity is
+
+\begin{equation}
+\mathcal{O}(1).
+\end{equation}
+
+Similarly, each particle corner is processed independently using a fixed
+sequence of coordinate rounding and index generation operations.
+Therefore, corner evaluation complexity is
+
+\begin{equation}
+\mathcal{O}(1).
+\end{equation}
+
+\subsection{Computational Complexity}
+
+Each particle contributes a fixed number of corner evaluations. Since
+the gPCD framework evaluates exactly eight corners per particle, the
+cost of occupancy generation scales linearly with the number of
+particles (P),
+
+\begin{equation}
+\mathcal{O}(8P)=\mathcal{O}(P).
+\end{equation}
+
+Because broad-phase occupancy construction is composed entirely of these
+fixed corner evaluations, broad-phase construction complexity is also
+
+\begin{equation}
+\mathcal{O}(P).
+\end{equation}
+
+\subsection{Storage Complexity}
+
+Storage complexity is determined by the dimensions of the cell array and
+is independent of particle count.
+
+For a cell array with dimensions
+
+\begin{equation}
+(S_x,S_y,S_z),
+\end{equation}
+
+the total number of cells is
+
+\begin{equation}
+C=S_xS_yS_z.
+\end{equation}
+
+Therefore, cell-array memory requirements scale as
+
+\begin{equation}
+\mathcal{O}(S_xS_yS_z).
+\end{equation}
+
+For cubic domains,
+
+\begin{equation}
+S_x=S_y=S_z=S,
+\end{equation}
+
+yielding
+
+\begin{equation}
+C=S^3,
+\end{equation}
+
+and consequently
+
+\begin{equation}
+\mathcal{O}(S^3).
+\end{equation}
+
+\subsection{Complexity Convention}
+
+The manuscript shall distinguish between:
+
+\begin{itemize}
+\item \textbf{Access Complexity} -- the cost of retrieving or updating a
+cell location.
+\item \textbf{Computational Complexity} -- the cost of processing
+particles and constructing occupancy information.
+\item \textbf{Storage Complexity} -- the memory required to store the
+cell array.
+\end{itemize}
+
+Statements regarding constant-time cell access shall not be interpreted
+as statements regarding memory growth. The gPCD framework provides
+constant-time cell access,
+
+\begin{equation}
+\mathcal{O}(1),
+\end{equation}
+
+while cell-array storage grows according to
+
+\begin{equation}
+\mathcal{O}(S^3)
+\end{equation}
+
+for cubic domains.
+
+%================================================================================
+
+\section{Novelty Statement}
+
+The primary novelty of gPCD lies in the use of rasterization-based
+occupancy generation for broad-phase collision detection. The method
+constructs the occupancy structure as part of the graphics pipeline,
+allowing point-particle rendering and collision-candidate generation
+to proceed concurrently within a fully GPU-resident workflow.
+
+The novelty of the manuscript shall not be attributed to cell arrays,
+uniform grids, AABBs, rasterization, fragment shaders, compute shaders,
+or broad-phase/narrow-phase decomposition individually, as these
+concepts are established within the literature.
+
+\subsection{Novelty Classification}
+
+The manuscript shall distinguish between:
+
+\begin{enumerate}
+\item Established components,
+\item Organizational contributions, and
+\item Performance outcomes.
+\end{enumerate}
+
+Established components may contribute significantly to performance
+without constituting the primary novelty of the manuscript.
+
+The primary novelty of gPCD is expected to arise from the organization
+and interaction of established components within a rasterization-based,
+GPU-resident collision-detection workflow.
+
+Performance results shall be treated as validation of the organization
+rather than as novelty by themselves.
+
+\subsection{Primary Organizational Contribution}
+
+The primary organizational contribution of gPCD is the integration of
+broad-phase occupancy generation into the graphics pipeline itself.
+Rasterization is used as the mechanism by which occupancy information
+is generated and collision candidates are constructed.
+
+Because occupancy generation occurs during rasterization,
+point-particle rendering and broad-phase construction proceed
+concurrently. This concurrency is considered a consequence of the
+organizational design rather than a separate contribution.
+
+The novelty of the method arises from the organization of established
+graphics-pipeline components into a collision-detection workflow rather
+than from the individual components themselves.
+\newpage
+\lstset{
+  language=TeX,
+  basicstyle=\ttfamily,
+}
+
+\begin{lstlisting}
+
+Primary Organizational Contribution
+|
++-- Graphics pipeline integrated into collision detection
+	|
+	+-- Rasterization generates occupancy information
+    |
+    +-- Rendering becomes part of the algorithm
+    |
+    +-- Supporting Algorithmic Contribution
+        |
+        +-- Corner-based occupancy construction
+            |
+            +-- Corner rounding
+            +-- Integer cell coordinates
+            +-- Flattened indexing
+            |
+            +-- Emergent Properties
+                |
+                +-- Fixed eight-cell occupancy guarantee
+                +-- Bounded occupancy generation
+                +-- Predictable workload
+
+Methodological Requirements
+|
++-- Atomics
++-- Duplicate elimination
++-- Memory structure
+
+Performance Outcomes
+|
++-- Throughput
++-- Near-linear scaling
++-- GPU residency
+
+\end{lstlisting}
+\subsection{Candidate Supporting Contributions}
+
+\begin{itemize}
+\item Fixed eight-cell occupancy constraint.
+\item Corner-based occupancy construction through coordinate
+      rounding and cell indexing.
+\end{itemize}
+
+gPCD constructs cell occupancy through a corner-based formulation in
+which particle corner coordinates are rounded to integer cell
+coordinates and converted to flattened cell indices. Occupancy
+generation is therefore reduced to a fixed set of corner evaluations
+rather than cell-overlap traversal or neighborhood discovery.
+
+The resulting occupancy-construction procedure is simple, bounded, and
+well suited to massively parallel execution. Although atomic operations
+are required during occupancy insertion, the fixed-size formulation
+provides predictable computational behavior and contributes to the
+overall efficiency of the broad-phase algorithm.
+
+
+\subsubsection{Supporting Contributions}
+
+
+\begin{itemize}
+\item Corner-based occupancy construction through corner-coordinate
+      rounding and flattened indexing.
+\item Fixed eight-cell occupancy guarantee arising from the occupancy
+      construction formulation and particle-size constraint.
+\end{itemize}
+
+\subsection{Contribution Hierarchy}
+\begin{lstlisting}
+Organizational Contributions->Algorithmic Contributions
+->Emergent Properties->Methodological Requirements
+->Performance Outcomes
+\end{lstlisting}
+
+%================================================================================
+\section{Methodological Requirements}
+
+\subsection{Correctness Mechanisms}
+
+Certain algorithmic components exist to ensure correctness of the
+occupancy-generation process and shall not be treated as primary
+novel contributions.
+
+Examples include duplicate-elimination procedures required to
+remove repeated occupancy and collision evaluations generated by
+the occupancy-construction methodology.
+
+\subsection{Memory}
+%Place holder
+
+%================================================================================
+\section{Approved Technical Claims}
+
+The following statements are currently approved for publication use.
+
+\begin{itemize}
+\item gPCD is fully GPU resident.
+\item Broad-phase occupancy generation occurs during graphics-pipeline execution.
+\item Point-particle rendering and broad-phase occupancy generation occur concurrently.
+\item A particle may occupy at most eight cells.
+\item Cell-array indexing provides constant-time cell access.
+\item The system demonstrates near-linear scaling over the tested range.
+\end{itemize}
+
+%================================================================================
+\section{Retired Concepts}
+\label{sec:retired_concepts}
+
+The following concepts are considered obsolete and shall not be reintroduced
+without formal revision of this document.
+
+\begin{itemize}
+\item Hierarchical GPU execution.
+\item Hierarchical broad-phase processing.
+\item Hierarchical occupancy generation.
+\item Nested graphics-pipeline execution.
+\item Unsupported novelty claims.
+\item Unverified overlap claims presented as measured results.
+\end{itemize}
+
+%================================================================================
+\section{Writing Standards}
+
+\begin{itemize}
+\item Manuscripts shall follow ACM formatting conventions unless otherwise required.
+\item Equations shall be numbered when referenced.
+\item Variables shall be defined upon first use.
+\item Technical claims shall be supported by either derivation, measurement, or citation.
+\item Future work shall be clearly separated from demonstrated results.
+\end{itemize}
+
+%================================================================================
+\section{Research Separation}
+
+\subsection{gPCD Paper}
+
+The gPCD paper shall focus on:
+
+\begin{itemize}
+\item Collision detection.
+\item Graphics-pipeline occupancy generation.
+\item Cell-array construction.
+\item GPU performance.
+\item Scalability.
+\end{itemize}
+
+\subsection{Field Particle Method Paper}
+
+The Field Particle Method paper shall focus on:
+
+\begin{itemize}
+\item Geometric dynamics.
+\item Internal momentum representation.
+\item Thermo-fluid behavior.
+\item Boundary-condition treatment.
+\item Physical interpretation of emergent behavior.
+\end{itemize}
+
+\subsection{Active Manuscript Rule}
+
+Only the current manuscript shall be used when evaluating terminology,
+technical claims, notation, and structure. Archived files, legacy drafts,
+and historical manuscripts shall not be used as evidence for current
+terminology decisions.
+
+Historical files may be consulted only for recovering lost content or
+tracking the evolution of a concept.
+
+\subsection{Item 1 Status}
+
+\textbf{Resolved.}
+
+The term ``hierarchical parallelism'' has been retired as a description
+of gPCD. The graphics pipeline shall instead be described as performing
+concurrent point-particle rendering and broad-phase occupancy generation.
+
+Acceptable terminology includes:
+
+\begin{itemize}
+\item Graphics-pipeline parallelism
+\item Concurrent rendering and occupancy generation
+\item Rasterization-based occupancy generation
+\item GPU-resident broad-phase construction
+\end{itemize}
+
+
+\section{Manuscript Review Status}
+
+\begin{tabular}{|l|c|}
+\hline
+Topic & Status \\
+\hline
+Hierarchical Parallelism  &     Resolved \\
+AABB Terminology          &    Resolved \\
+Paper Scope                &   Resolved\\
+Novelty Structure          &   Resolved\\
+Contribution Hierarchy     &   Resolved\\
+Complexity Discussion  &       Resolved\\
+Experimental Claims     &      Pending\\
+Primary Contribution   &       Pending\\
+Abstract                &      Pending\\
+\hline
+\end{tabular}

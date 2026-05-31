@@ -1,0 +1,93 @@
+
+\section{Methodology}
+
+\subsection{Overview}
+
+gPCD exploits the inherent parallelism of the graphics pipeline to perform broad-phase occupancy generation concurrently with point-particle rendering. Each particle is processed independently within the graphics pipeline, allowing the occupancy structure required for collision detection to be constructed while the particle representation is simultaneously rendered.
+
+The method is based on a uniform spatial subdivision in which particles are mapped to a fixed Cartesian cell array. Particle occupancy is determined through corner-based placement of an axis-aligned bounding region (AARB), producing a potentially colliding set (PCS) that is subsequently refined through exact distance-based collision checks.
+
+\subsection{Spatial Cell Array}
+
+The simulation domain is partitioned into a uniform grid of cubic cells of dimension
+
+\[
+1 \times 1 \times 1
+\]
+
+Each cell is identified by integer coordinates $(i,j,k)$ corresponding to its center location. For memory-efficient addressing, the three-dimensional cell coordinate is transformed into a single linear index,
+
+\[
+I = i + N_x \left(j + N_y k\right)
+\]
+
+where $N_x$ and $N_y$ are the grid dimensions in the $x$- and $y$-directions. The cell array is therefore stored as a contiguous one-dimensional structure.
+
+Each cell contains a fixed-length particle occupancy list storing the indices of particles wholly or partially contained in that cell. The maximum list length is determined from the largest allowable local occupancy.
+
+\subsection{Particle Representation}
+
+A particle structure array of length equal to the total number of particles is maintained in GPU memory. Each particle stores geometric and kinematic properties together with a corner-location array of length eight.
+
+Each particle is enclosed by an axis-aligned bounding region (AARB) possessing eight corners. These corners are used exclusively for spatial occupancy assignment. A particle diameter constraint is imposed such that
+
+\[
+d_p \leq 1
+\]
+
+which guarantees that a particle may intersect no more than eight neighboring cells. The worst-case configuration occurs when a particle lies at a common vertex shared by eight cells.
+
+\subsection{Broad-Phase Collision Candidate Generation}
+
+Broad-phase processing is executed concurrently with normal graphics-pipeline activity. Each particle is submitted as a vertex to the vertex shader. For every particle, the vertex stage generates eight corner-specific fragment invocations corresponding to the eight AARB corners.
+
+Each fragment invocation receives a unique corner identifier
+
+\[
+c \in \{0,1,\dots,7\}
+\]
+
+which maps directly to the associated entry in the particle corner-location array. Because each invocation writes only to its assigned corner slot, write conflicts are avoided without atomic operations.
+
+For each corner, the corresponding cell index is computed and the particle identifier is inserted into that cell's occupancy list. 
+
+The resulting populated cell array defines the potentially colliding set (PCS).
+
+\subsection{Narrow-Phase Collision Detection}
+
+The PCS is transferred directly to the compute pipeline. A compute shader launches one thread per particle. For a source particle $p$, the thread iterates over the eight entries of its corner-location array and retrieves the corresponding occupied cells.
+
+For each candidate particle $q$ listed in those cells, an exact geometric collision test is performed. For spherical particles, contact is determined by
+
+\[
+\|\mathbf{x}_p - \mathbf{x}_q\| < r_p + r_q
+\]
+
+where $\mathbf{x}$ denotes particle position and $r$ particle radius. Other geometric tests may be substituted for non-spherical particles.
+
+Only candidates contained in shared cells are tested, substantially reducing the number of pairwise checks relative to all-to-all search.
+
+\subsection{Duplicate Elimination}
+
+Two sources of duplicate collision candidates arise naturally:
+
+\begin{enumerate}
+    \item Corner duplicates: multiple corners of the same particle occupy the same cell.
+    \item Particle duplicates: the same particle pair appears in multiple shared cells.
+\end{enumerate}
+
+To remove redundant tests, each compute invocation maintains a local duplicate-cache array storing previously processed target particle identifiers. Before testing a candidate $q$, the cache is queried. If $q$ has already been processed, the candidate is skipped; otherwise, the identifier is inserted and testing proceeds.
+
+This local strategy removes redundant collision checks without requiring inter-thread synchronization or global memory barriers.
+
+\subsection{Computational Characteristics}
+
+Under the particle-size constraint, each particle references at most eight cells, yielding bounded neighbor-search complexity per particle. Let $m$ denote the average number of occupants per visited cell. The expected narrow-phase cost per particle is
+
+\[
+\mathcal{O}(8m) = \mathcal{O}(m)
+\]
+
+leading to an overall complexity approximately linear in particle count for bounded occupancy distributions.
+
+Because broad-phase occupancy assignment is overlapped with graphics execution, its effective standalone overhead is reduced relative to separate compute-only preprocessing passes.

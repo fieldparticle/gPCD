@@ -1,19 +1,17 @@
-Adopt Geo-only runs and contact-owned impulse planning
+Add multi-contact KE drift shadow diagnostics
 
-Switch the UI run path to GeoRunner only and leave the old runner in place
-as reference. Normalize dynamics cfgs with study defaults, required report
-directories, and particle-owned collision stiffness values.
+Document and instrument the current three-particle kinetic-energy drift work.
 
-Add the active test cfg name to the GeoRunner UI status row.
+- Clear existing CSV captures at GeoRunner startup and report the cleared count
+- Add source-level contact KE diagnostics to contacts.csv
+- Add diagnostic-only source-scaled shadow impulse estimates
+- Add diagnostic-only compression/rebound direction tracking
+- Add vector-rebound shadow estimates for stored-direction release checks
+- Record that rebound direction drift was ruled out for current ThreeParticle cases
+- Update ParticleGeometry, GeoConventions, and ProblemEvolution with the session findings
 
-Introduce frame-local unordered-pair impulse planning so directed source-owned
-writes use a shared planned impulse magnitude. Move internal momentum from a
-single source-total dynamics ledger to contact-owned ledgers keyed by target
-under the source particle, while reporting the source total through Data.z.
-
-Update Geo dynamics documentation to define the project update convention,
-record the current contact-ledger exception, refresh ParticleGeometry equations
-and frame algorithm, and add the ProblemEvolution entry for pair planning.
-
-Next: resolve ThreeParticleChase kinetic-energy drift and the exposed
-out-of-bounds/wall behavior.
+Current result:
+- Two-particle cases remain momentum/KE conservative
+- ThreeParticle and ThreeParticleChase remain momentum conservative
+- Three-particle KE loss is not explained by rebound direction drift
+- Next target is coupled multi-contact impulse magnitude allocation

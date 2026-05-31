@@ -1,1 +1,41 @@
-So now we need to add reporting items to the UI and capture files
+\begin{verbatium}
+Primary Organizational Contribution
+¦
++-- Graphics pipeline integrated into collision detection
+¦   ¦
+¦   +-- Rasterization generates occupancy information
+¦   ¦
+¦   +-- Rendering becomes part of the algorithm
+¦
++-- Supporting Contribution
+¦   ¦
+¦   +-- Corner-based occupancy construction
+¦       ¦
+¦       +-- Corner rounding
+¦       ¦
+¦       +-- Integer cell coordinates
+¦       ¦
+¦       +-- Flattened indexing
+¦
++-- Emergent Properties
+¦   ¦
+¦   +-- Fixed eight-cell occupancy guarantee
+¦   ¦
+¦   +-- Predictable broad-phase workload
+¦
++-- Methodological Requirements
+¦   ¦
+¦   +-- Atomics
+¦   ¦
+¦   +-- Duplicate elimination
+¦   ¦
+¦   +-- Memory structure
+¦
++-- Performance Outcomes
+    ¦
+    +-- Throughput
+    ¦
+    +-- Scaling
+    ¦
+    +-- GPU residency
+\end{verbatium}
