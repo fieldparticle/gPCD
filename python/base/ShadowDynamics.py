@@ -1,5 +1,5 @@
-﻿class GeoDynamics:
-    """GLSL-shaped dynamics functions for the Geo path."""
+﻿class ShadowDynamics:
+    """GLSL-shaped dynamics functions for the shadow path."""
 
     GEO_EPSILON = 1.0e-12
     GEO_CONTACT_INACTIVE = 0
@@ -701,3 +701,4 @@
         source.report_closing_mom = report_closing_mom
         source.report_collision_stiffness_q = report_stiffness_q
         return True
+

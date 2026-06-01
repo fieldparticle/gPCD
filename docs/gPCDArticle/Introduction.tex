@@ -19,9 +19,12 @@ the graphics pipeline. This work presents gPCD, a GPU-resident
 collision-detection framework consisting of broad-phase and narrow-phase
 stages. The primary contribution is a broad-phase formulation that
 integrates occupancy generation directly into the graphics pipeline
-through corner-based occupancy construction. Rasterization therefore
-participates in occupancy generation, making rendering an active
-component of the collision-detection process. A conventional narrow
-phase evaluates the resulting collision candidates. Experimental
-results demonstrate efficient processing of large particle counts,
-stable throughput-limited operation, and near-linear scaling behavior.
+through corner-based occupancy construction. Occupancy generation is
+performed within the vertex stage during graphics-pipeline execution,
+allowing broad-phase construction and rendering to proceed concurrently
+on the GPU. A conventional narrow phase evaluates the resulting
+collision candidates. Experimental results demonstrate efficient
+processing of large particle counts, stable throughput-limited
+operation, and near-linear scaling behavior.
+
+

@@ -1,2 +1,21 @@
 % !TeX root = main.tex
 \section{Complexity}
+
+The computational complexity of gPCD is determined by the occupancy
+generation process, candidate construction, and narrow-phase collision
+evaluation. Because occupancy construction is performed independently
+for each particle and each particle contributes a bounded number of
+occupancy evaluations, the broad phase exhibits linear scaling with
+respect to particle count.
+
+Let $N$ denote the number of particles, $K$ denote the number of
+candidate collision pairs generated during broad-phase construction,
+and $S$ denote the side length of the cubic cell array.
+
+\input{ComplexityTable}
+
+
+\subsection{Occupancy Generation}
+\subsection{Candidate Construction}
+\subsection{Storage Requirements}
+\subsection{Overall Complexity}

@@ -1,21 +1,15 @@
 % !TeX root = main.tex
 \newpage
-```latex
-% !TeX root = main.tex
-\newpage
 \section{Background and Related Work}
 
-Collision-detection systems generally consist of broad-phase and
-narrow-phase stages that together identify and evaluate potential
-particle interactions. Over time, numerous methodologies and execution
-architectures have been proposed to improve collision-detection
-performance, particularly for large-scale particle simulations. These
-approaches differ not only in the data structures used to generate
-collision candidates, but also in where collision detection is
-performed and how it interacts with the rendering pipeline. This
-section reviews the fundamental components of collision-detection
-frameworks, summarizes common execution architectures, and identifies
-the architectural gap addressed by the gPCD framework.
+Numerous methodologies and execution architectures have been proposed
+to improve collision-detection performance, particularly for large-scale
+particle simulations. These approaches differ not only in the data
+structures used to generate collision candidates, but also in where
+collision detection is performed and how it interacts with the rendering
+pipeline. This section reviews common collision-detection
+methodologies, execution architectures, and rendering strategies, and
+identifies the architectural gap addressed by the gPCD framework.
 
 \subsection{Collision-Detection Frameworks}
 
@@ -85,6 +79,12 @@ simultaneously supporting rendering operations?
 
 \subsection{Gap in Existing Methods}
 
+Broad-phase occupancy generation serves as the foundation upon which
+candidate construction and subsequent narrow-phase evaluation are built.
+Since every particle must participate in this process during each
+simulation step, the organization of occupancy generation can have a
+substantial impact on the overall collision-detection pipeline.
+
 Existing collision-detection research has produced a wide variety of
 broad-phase methodologies and execution architectures. These approaches
 differ in how collision candidates are generated and where collision
@@ -108,13 +108,13 @@ given to the possibility of integrating occupancy generation directly
 into the graphics pipeline itself.
 
 The architectural gap addressed by this work is therefore the absence of
-a collision-detection framework in which rasterization participates
-directly in broad-phase occupancy generation. The gPCD framework
-addresses this gap by integrating occupancy construction into the
-graphics pipeline, allowing rasterization to generate occupancy
-information while simultaneously supporting particle rendering.
+a collision-detection framework in which broad-phase occupancy
+generation forms an integral part of graphics-pipeline execution. The
+gPCD framework addresses this gap by integrating occupancy construction
+directly into the graphics pipeline, allowing broad-phase occupancy
+generation and particle rendering to proceed concurrently on the GPU.
 
 The following section presents the methodology underlying the gPCD
-framework and describes the rasterization-based occupancy generation
+framework and describes the graphics-pipeline occupancy-generation
 process used to construct broad-phase collision candidates.
 

@@ -1,8 +1,13 @@
-Update p-zero shadow to direct parabolic target
+Separate shadow dynamics and document parabolic response path
 
-- change diagnostic p-zero shadow from square-root response to direct parabolic contact-progress target
-- keep p-zero work diagnostic-only after backing out the first applied promotion attempt
-- document that p-zero should be part of one continuous target-ledger impulse rule, not a separate escape branch
-- update Geo conventions, particle geometry, and problem evolution with the current p-zero/rebound findings
+Split shadow experimentation into the standalone ShadowBase/ShadowDynamics
+path and remove the old in-place shadow/parabolic/vector diagnostic fields
+from live and shadow dynamics. Keep live GeoDynamics clean while shadow
+captures write through *_s.csv reporting.
 
-Next: rerun captures and plots to compare the direct parabolic shadow against KE and internal momentum curves.
+Update GeoConventions, ParticleGeometry, and ProblemEvolution to record the
+new shadow-object convention, the completed cleanup checkpoint, and the next
+step: apply parabolic velocity response in ShadowDynamics and change the
+compression-to-rebound flip logic to velocity magnitude with tolerance.
+
+Next: implement parabolic velocity response in ShadowDynamics.

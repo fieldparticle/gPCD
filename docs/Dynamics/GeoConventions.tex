@@ -292,27 +292,24 @@ Allowed alternatives must preserve source-owned execution.  Examples include:
 Any proposal that needs one contact solve to write both particles must first
 change the GLSL architecture, not just the Python model.
 
-\subsection{Shadow Diagnostic Convention}
+\subsection{Shadow Dynamics Convention}
 
-Shadow dynamics are allowed only as diagnostics.  A shadow path may compute an
-alternate impulse plan or kinetic-energy estimate beside the applied dynamics,
-but it must not write particle velocity, position, internal momentum, phase, or
-contact ownership.
-
-Shadow diagnostics must be clearly named and reported separately from applied
-dynamics.  Current examples are:
+Shadow dynamics are experimental dynamics, not applied live dynamics.  The
+shadow path must run as a separate object from the live path:
 
 \begin{verbatim}
-shadow_*
-vector_shadow_*
-target_elastic_*
-target_ratio_*
-vector_internal_*
-parabolic_*
+GeoBase + GeoDynamics       -> live object
+ShadowBase + ShadowDynamics -> shadow object
 \end{verbatim}
 
-The applied dynamics remain authoritative.  A shadow result may be promoted
-only after a project update records:
+The shadow object may write its own particle velocity, position, internal
+momentum, contact phase, and contact ownership because those writes affect only
+the shadow particle state.  It must not mutate live particles or live
+contact ledgers.  Shadow reports must use the \texttt{*_s.csv} suffix so live
+and shadow captures can be compared without sharing files.
+
+The applied live dynamics remain authoritative.  A shadow result may be
+promoted only after a project update records:
 
 \begin{itemize}[leftmargin=*]
     \item what problem it solves;
@@ -322,24 +319,23 @@ only after a project update records:
     execution model.
 \end{itemize}
 
-The \texttt{target\_elastic\_*} diagnostic is a special case: it is intended
-to be a durable reference compass rather than a proposed soft-response rule.
-It may be kept permanently to compare the current frame against an elastic
-hard-contact target.  It must still remain read-only.
+The \texttt{target\_elastic\_*} diagnostic remains a special case: it is a
+durable reference compass rather than a proposed soft-response rule.  It may be
+kept permanently to compare the current frame against an elastic hard-contact
+target, but it should be reported through the shadow/reporting path rather
+than embedded in live \texttt{GeoDynamics.py}.
 
-The current shadow diagnostics have ruled out rebound direction drift,
-target-ratio allocation, and a simple vector internal momentum ledger as
-complete fixes for three-particle kinetic-energy loss.  A later diagnostic
-found that a fixed-reference p-zero internal momentum target is the strongest
-lead, but the first attempt to promote that target into applied dynamics
-introduced abrupt p-zero and rebound decision branches.  The promoted change
-was backed out.  The current accepted state keeps p-zero work diagnostic-only
-until the impulse rule can be expressed as one continuous contact-progress
-model.
+Historical in-place shadow families such as \texttt{shadow\_*},
+\texttt{vector\_shadow\_*}, \texttt{target\_ratio\_*},
+\texttt{vector\_internal\_*}, and \texttt{parabolic\_*} have been removed from
+the live dynamics path.  Future experiments belong in
+\texttt{ShadowDynamics.py}.  The current accepted next experiment is the
+fixed-reference p-zero/contact-progress response with a velocity-magnitude
+flip tolerance.
 
 \subsection{Fixed P-Zero Shadow Convention}
 
-A parabolic p-zero shadow may carry a diagnostic-only contact reference:
+A parabolic p-zero shadow may carry a contact-owned shadow reference:
 
 \begin{verbatim}
 particle.contact_parabolic_zero_reference[TargetID]
@@ -359,11 +355,106 @@ parabolic target:
 I^{shadow}_{k} = P_{0,k}\left(1-\left(1-f_k\right)^2\right).
 \end{equation}
 
-The shadow impulse is the difference between this target and the stored
-internal momentum.  This memory is allowed because it is diagnostic-only and
-contact-owned, like the existing vector-internal shadow ledger.  It must be
-pruned when the contact is no longer active.  It must not write applied
-velocity, position, phase, or actual internal momentum.
+The shadow impulse is the difference between this target and the stored shadow
+internal momentum.  This memory is allowed because it belongs to the separate
+shadow object.  It must be pruned when the contact is no longer active.
+
+\subsection{Standalone Parabolic Response Implementation}
+
+The next parabolic-response implementation belongs in
+\texttt{ShadowDynamics.py}, not inside live \texttt{GeoDynamics.py}.  The live
+and shadow simulations should be separate objects created from the same cfg
+data:
+
+\begin{verbatim}
+GeoBase + GeoDynamics       -> live object
+ShadowBase + ShadowDynamics -> shadow object
+\end{verbatim}
+
+The shadow object may write its own velocity, position, contact phase, and
+internal momentum because those writes affect only the shadow particle state
+and are reported to \texttt{*_s.csv} files.  The live object remains
+authoritative for the UI and normal reports.
+
+The parabolic response is a contact-owned target-ledger rule.  For each
+directed contact \(k\), compute the current-frame normal velocity:
+
+\begin{equation}
+v_{n,k} = (v_{target}-v_{source})\cdot n_k.
+\end{equation}
+
+When a contact first has closing normal momentum, store the p-zero reference:
+
+\begin{equation}
+P_{0,k} = \mu_k \max(0,-v_{n,k}),
+\end{equation}
+
+and compute the corresponding p-zero overlap area \(A_{0,k}\) from the same
+area/stiffness/\(\Delta t\) relation used by the geometry model.  This
+reference is fixed for the active contact.  It must not be recomputed from the
+current internal momentum ledger.
+
+For each frame, compute:
+
+\begin{equation}
+f_k = \operatorname{clamp}(A_k/A_{0,k},0,1),
+\qquad
+I^{target}_{k} = P_{0,k}\left(1-\left(1-f_k\right)^2\right).
+\end{equation}
+
+The planned contact impulse is the ledger delta:
+
+\begin{equation}
+\Delta I_k = I^{target}_{k} - I^{current}_{k}.
+\end{equation}
+
+Positive \(\Delta I_k\) stores internal momentum and applies compression.
+Negative \(\Delta I_k\) releases internal momentum and applies rebound.  The
+velocity update still follows the source-owned rule:
+
+\begin{equation}
+\Delta p_{source,k} = -\Delta I_k n_k.
+\end{equation}
+
+The compression-to-rebound transition is phase-owned, not a separate geometry
+branch.  A contact in \texttt{COMPRESSION} may flip to \texttt{RETURNING} when
+its normal velocity reaches the p-zero tolerance:
+
+\begin{equation}
+|v_{n,k}| \leq \epsilon_v,
+\qquad
+\epsilon_v = (P_{0,k}/\mu_k)q_v.
+\end{equation}
+
+At that instant, the residual normal momentum is:
+
+\begin{equation}
+P^{residual}_{k} = \mu_k |v_{n,k}|.
+\end{equation}
+
+This residual is diagnostic until the exact ledger accounting is chosen.  The
+important rule is that once a contact enters \texttt{RETURNING}, it remains
+\texttt{RETURNING} until its contact-owned internal momentum drains or the
+contact ends.  The rebound side must not request new compression merely because
+the overlap fraction is still large.
+
+The implementation must keep the functions narrow:
+
+\begin{itemize}[leftmargin=*]
+    \item build the shadow frame snapshot;
+    \item build shadow contact lists;
+    \item update p-zero references;
+    \item compute parabolic target ledgers;
+    \item compute source-owned impulse deltas;
+    \item apply shadow velocity writes;
+    \item move shadow particles;
+    \item report to \texttt{*_s.csv}.
+\end{itemize}
+
+The old in-\texttt{GeoDynamics.py} shadow diagnostics are historical
+scaffolding and have been removed from the live path.  The next implementation
+step is to add the parabolic velocity response to \texttt{ShadowDynamics.py}
+and record its values in \texttt{contacts\_s.csv}.
 
 \subsection{Dynamics Versus Harness}
 
@@ -410,13 +501,12 @@ when it no longer describes the active Geo path.
     \texttt{GeoBase.py} or should be moved to a GLSL-matching dynamics/helper
     module.
     \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
-    \item Continue \texttt{GeoProcessCollisions(SourceID)} incrementally, with
-    multi-contact kinetic-energy drift as the next active dynamics problem.
-    The current evidence points to a fixed-reference p-zero/contact-progress
-    target for contact internal momentum as the next candidate, not rebound
-    direction drift, target-ratio allocation, or a simple vector internal
-    momentum ledger.  The next applied attempt should avoid separate p-zero
-    escape branches and instead compute one continuous target-ledger delta.
+    \item Keep live \texttt{GeoDynamics.py} clean while the next response rule
+    is tested in \texttt{ShadowDynamics.py}.
+    \item Apply the next parabolic velocity-response experiment in
+    \texttt{ShadowDynamics.py}: use a fixed p-zero/contact-progress target for
+    contact internal momentum and change the compression-to-rebound flip logic
+    to velocity magnitude with tolerance.
     \item Treat wall/out-of-bounds behavior as a separate problem after the
     particle-particle multi-contact rule is stable.
     \item Add reporting only through \texttt{Reporting.py}, not through dynamics.

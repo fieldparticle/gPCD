@@ -1,0 +1,35 @@
+\begingroup
+\begin{figure*}[ht]
+\centering
+\hspace{-.05in}
+	\begin{subfigure}[b]{0.32\textwidth}
+		\includegraphics[width=\textwidth]{A_PQBS_V_PQBR.png}
+		\subcaption[]{random v sequential}
+		\label{fig:A_PQBS_V_PQBR}
+	\end{subfigure}
+\hspace{-.05in}
+	\begin{subfigure}[b]{0.32\textwidth}
+		\includegraphics[width=\textwidth]{A_PQBR_THROUGH_PUT_ALL.png}
+		\subcaption[]{throughput}
+		\label{fig:A_PQBR_THROUGH_PUT_ALL}
+	\end{subfigure}
+\hspace{-.05in}
+	\begin{subfigure}[b]{0.32\textwidth}
+		\includegraphics[width=\textwidth]{A_PQBR_TIME_PERP_ALL.png}
+		\subcaption[]{time per particle}
+		\label{fig:A_PQBR_TIME_PERP_ALL}
+	\end{subfigure}
+\hspace{-.05in}
+\caption[TITLE:PQBR Performance Plots]{(a) A plot of randomly ordered particles performance (red squares) versus
+sequentially ordered particles (blue circles). The random performance 
+increases disproportionately with sequential performance as the number of 
+particles increase.
+(b) A log-log plot of throughput for graphics, compute, and total. The saturated point plateau's after $N=$\numprint{\APQBRTIMEPERPALLstartval{}} particles shown in the plot as a black vertical dashed line. (c) time per particle for graphics, compute, total starting at, N=\numprint{\APQBRTIMEPERPALLstartval{}}, for the start of the heavily saturated range. Graphics stabilizes at $\APQBRTIMEPERPALLGraphicsstabilzes{}  \pm \APQBRTIMEPERPALLGraphicsstdval{} $ $\sfrac{ns}{particle}$, compute at $\APQBRTIMEPERPALLComputestabilzes{} \pm \APQBRTIMEPERPALLComputestdval{}$ $\sfrac{ns}{particle}$ for a total stabilization at $\APQBRTIMEPERPALLTotalstabilzes{} \pm \APQBRTIMEPERPALLTotalstdval{}$ $\sfrac{ns}{particle}$. }
+\Description[TITLE:PQBR Performance Plots]{(a) A plot of randomly ordered particles performance (red squares) versus
+sequentially ordered particles (blue circles). The random performance 
+increases disproportionately with sequential performance as the number of 
+particles increase.
+(b) A log-log plot of throughput for graphics, compute, and total. The saturated point plateau's after $N=$\numprint{\APQBRTIMEPERPALLstartval{}} particles shown in the plot as a black vertical dashed line. (c) time per particle for graphics, compute, total starting at, N=\numprint{\APQBRTIMEPERPALLstartval{}}, for the start of the heavily saturated range. Graphics stabilizes at $\APQBRTIMEPERPALLGraphicsstabilzes{}  \pm \APQBRTIMEPERPALLGraphicsstdval{} $ $\sfrac{ns}{particle}$, compute at $\APQBRTIMEPERPALLComputestabilzes{} \pm \APQBRTIMEPERPALLComputestdval{}$ $\sfrac{ns}{particle}$ for a total stabilization at $\APQBRTIMEPERPALLTotalstabilzes{} \pm \APQBRTIMEPERPALLTotalstdval{}$ $\sfrac{ns}{particle}$. }
+\label{fig:A_PQBR_THROUGHPUT_AND_TPP}
+\end{figure*}
+\endgroup

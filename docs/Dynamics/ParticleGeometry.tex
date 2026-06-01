@@ -418,32 +418,22 @@ This is reporting-only.  It is used to see when simultaneous contact impulses
 interact as a source-level vector sum instead of independent scalar contact
 events.
 
-\subsection{Shadow Diagnostics}
+\subsection{Shadow Dynamics}
 
-Shadow diagnostics are alternate impulse estimates computed beside the real
-collision response.  They do not change particle velocity, internal momentum,
-phase, position, or contact ownership.  They exist so proposed multi-contact
-rules can be compared against the active dynamics before promotion.
+Shadow dynamics are alternate response rules evaluated by a separate shadow
+simulation object.  The live object remains
+\texttt{GeoBase + GeoDynamics}; the shadow object is
+\texttt{ShadowBase + ShadowDynamics}.  Both are initialized from the same
+configuration data, but after initialization their particles, ledgers, phases,
+velocities, positions, and reports are separate.  Shadow reports use
+\texttt{*_s.csv}.
 
-The current captures include several diagnostic families:
-
-\begin{itemize}[leftmargin=*]
-    \item a source-scaled shadow, which scales a source's already-weighted
-    compression candidates as a set before pair compatibility;
-    \item a vector-rebound shadow, which records the direction used during
-    compression and estimates rebound release along that remembered direction
-    when it remains compatible with the current contact normal;
-    \item an elastic target compass, reported as \texttt{target\_elastic\_*},
-    which solves the active closing contact graph as an elastic hard-contact
-    problem for comparison only;
-    \item a target-ratio shadow, which tests whether the current soft impulse
-    total should be redistributed using elastic target impulse ratios;
-    \item a vector-internal shadow, which stores source compression momentum
-    delta vectors per contact and estimates rebound from that vector ledger;
-    \item a parabolic p-zero shadow, which stores a fixed p-zero reference for
-    each directed contact and computes the contact's target internal momentum
-    from the current overlap fraction.
-\end{itemize}
+Earlier in-place diagnostic families have served their purpose and are no
+longer part of live \texttt{GeoDynamics.py}.  Those historical families
+included source-scaled shadows, vector-rebound shadows, target-ratio shadows,
+vector-internal shadows, and the first p-zero/parabolic shadow fields.  Future
+alternate response rules should be implemented in \texttt{ShadowDynamics.py}
+so they can mutate shadow state without touching live state.
 
 For the current batch tests, the vector-rebound diagnostic showed that rebound
 direction drift is not the main source of three-particle kinetic-energy loss:
@@ -470,7 +460,7 @@ rebound because separating contacts have no closing hard-contact target, and a
 simple vector internal momentum ledger does not improve the three-particle
 kinetic-energy drift.
 
-The parabolic p-zero shadow is the current strongest diagnostic lead.  When a
+The parabolic p-zero response is the current strongest shadow lead.  When a
 contact first has closing normal momentum, the shadow stores
 
 \begin{equation}
@@ -494,10 +484,8 @@ I^{shadow}_{k}
 P_{0,k}\left(1-\left(1-f_k\right)^2\right).
 \end{equation}
 
-The diagnostic records the implied shadow compression and release increments,
-but the applied dynamics still use the current planned impulses.  The important
-distinction is that the curve itself is a target ledger, while the shadow
-impulse is only the frame delta:
+The important distinction is that the curve itself is a target ledger, while
+the shadow impulse is only the frame delta:
 
 \begin{equation}
 \Delta I^{shadow}_{k}=I^{shadow}_{k}-I^{current}_{k}.
@@ -505,8 +493,16 @@ impulse is only the frame delta:
 
 A previous attempt to promote this idea directly added p-zero release and
 returning-phase branches to the applied path.  That made the decision tree too
-abrupt and was backed out.  The diagnostic remains useful because it isolates
-the desired contact-progress shape without changing velocity.
+abrupt and was backed out.  The next shadow implementation should instead use
+one continuous target-ledger response and change the compression-to-rebound
+flip to a velocity-magnitude tolerance:
+
+\begin{equation}
+|v_{n,k}| \leq \epsilon_v .
+\end{equation}
+
+Once a shadow contact flips to returning, it should remain returning until the
+contact-owned shadow internal momentum drains or the contact ends.
 
 \section{Known Limitations}
 \label{sec:known-limitations}
@@ -529,8 +525,8 @@ The current Geo rule is intentionally simple and incomplete:
     \texttt{ThreeParticle} and \texttt{ThreeParticleChase} is not explained by
     rebound direction drift, target-ratio allocation, or a simple vector
     internal momentum ledger.  The best current lead is a fixed-reference
-    p-zero/contact-progress target, still implemented only as a shadow
-    diagnostic.
+    p-zero/contact-progress target to be implemented next in
+    \texttt{ShadowDynamics.py}, with velocity-magnitude flip tolerance.
     \item Wall response is not part of this particle-pair geometry note.
 \end{itemize}
 

@@ -1,6 +1,6 @@
 from gbase.AttrDictFields import *
 from gbase import libconf
-from base.GeoDynamics import GeoDynamics
+from base.ShadowDynamics import ShadowDynamics
 from base.InLineTest import InLineTest
 import math
 import re
@@ -39,7 +39,7 @@ class CollisionInFields(AttrDictFields):
             self[attr] = value
 
 
-class GeoBase(GeoDynamics):
+class ShadowBase(ShadowDynamics):
     
     def __init__(self, senario=None):
         ##JMB If senario is passed in then 

@@ -1,7 +1,135 @@
 % !TeX root = main.tex
+\newpage
 \section{Methodology}
 
-\subsection{Cell Array}
-\subsection{Occupancy Generation}
-\subsection{Duplicate Elimination}
-\subsection{Narrow Phase}
+The gPCD framework integrates broad-phase occupancy generation directly
+into the graphics pipeline. Rather than treating rendering as a
+downstream consumer of simulation state, occupancy construction is
+performed during graphics-pipeline execution within the vertex stage.
+The resulting occupancy information is then used to construct collision
+candidates for subsequent narrow-phase evaluation.
+
+\subsection{Framework Overview}
+
+\input{PipelinePlot}
+
+
+Figure~\ref{fig:gpcd_dataflow} illustrates the high-level organization
+of the gPCD framework. The framework consists of a graphics-pipeline
+broad phase and a compute-shader narrow phase. Particle state is first 
+processed by the graphics pipeline, where graphics-pipeline occupancy 
+generation constructs cell occupancy information from particle geometry.
+The resulting occupancy data are stored within a uniform cell array and
+used to construct candidate collision pairs. These candidates are then
+evaluated within a compute shader during narrow-phase collision
+detection.
+\input{CellSpans}
+
+
+\subsection{Graphics-Pipeline Occupancy Generation}
+
+Broad-phase occupancy generation is implemented within the vertex stage
+of the graphics pipeline. Each particle independently evaluates its
+occupancy contribution and determines the cell locations required for
+broad-phase construction. The resulting occupancy information is stored
+within the cell-array structure and subsequently used to construct
+candidate collision pairs for narrow-phase evaluation.
+
+
+\subsection{Corner-Based Occupancy Construction}
+
+Each particle is represented by an axis-aligned bounding box (AABB).
+Occupancy generation is performed by evaluating the eight corners of the
+AABB and determining the cell locations intersected by the particle.
+The resulting corner locations define the occupancy contribution of the
+particle within the cell array.
+
+Let $(x,y,z)$ denote the floating-point particle position and let
+$r$ denote the particle radius. The eight corner locations are
+constructed as
+
+\begin{equation}
+\mathbf{x}_c =
+\mathbf{x}
++
+(\pm r,\pm r,\pm r),
+\end{equation}
+
+where $c \in \{0,\ldots,7\}$ identifies one of the eight AABB corners.
+
+Each corner location is subsequently converted to a cell coordinate and
+used to determine particle occupancy within the cell array.
+
+The corner-based formulation guarantees that particle occupancy can be
+determined through a fixed number of evaluations independent of particle
+count. Because the particle radius is constrained such that a particle
+may intersect at most eight neighboring cells, occupancy construction
+remains bounded by the eight AABB corner locations.
+
+\subsection{Cell Addressing and Flattening}
+
+Each corner location is mapped to a cell coordinate within the uniform
+cell array. Let $(x,y,z)$ denote a floating-point corner location and
+let $(X,Y,Z)$ denote the corresponding unsigned integer cell
+coordinates. Cell coordinates are obtained by rounding the corner
+location to the nearest integer cell center,
+
+\begin{equation}
+X = \mathrm{round}(x),
+\qquad
+Y = \mathrm{round}(y),
+\qquad
+Z = \mathrm{round}(z).
+\end{equation}
+
+Cell coordinates are restricted to positive integer values such that
+the valid cell domain begins at $(1,1,1)$ rather than $(0,0,0)$.
+Coordinates containing a zero-valued component are invalid.
+This convention prevents corner evaluations associated with particles
+located adjacent to domain boundaries from producing negative cell
+coordinates during occupancy construction.
+
+The resulting cell coordinate triplet is converted into a flattened cell
+index for storage within the occupancy structure. Let $S$ denote the
+side length of the cubic cell array. The flattened index is
+
+\begin{equation}
+I = X + YS + ZS^2.
+\end{equation}
+
+The flattened index serves as the primary cell identifier throughout
+the gPCD collision-detection pipeline. In addition to directly
+addressing the corresponding occupancy list within the cell array, the
+flattened representation reduces cell-reference storage from a
+three-component coordinate tuple to a single integer identifier. Once
+computed, the index is used throughout occupancy construction,
+candidate generation, and narrow-phase evaluation without requiring
+reconstruction of the original cell coordinates.
+
+\subsection{Potentially Colliding Set Construction}
+
+The populated cell array constitutes the potentially colliding set
+(PCS) used during narrow-phase evaluation. Each occupied cell contains
+the identifiers of particles whose corner locations map to that cell.
+Consequently, occupancy generation directly constructs the PCS without
+requiring a separate candidate-construction stage.
+
+Because a particle may occupy multiple cells and a collision may be
+represented within multiple neighboring occupancy lists, occupancy
+duplication and collision duplication can arise within the PCS.
+Figure~\ref{fig:occupancy_duplication} illustrates these effects. The
+resulting PCS is subsequently traversed during narrow-phase collision
+evaluation.
+
+
+\subsection{Narrow-Phase Evaluation}
+
+The candidate pairs generated during broad-phase construction are
+evaluated within a compute shader during narrow-phase collision
+detection. Each candidate pair is processed independently to determine
+whether a collision exists between the corresponding particles.
+
+Because occupancy construction may generate duplicate candidate pairs,
+narrow-phase evaluation operates on the potentially colliding set
+generated during candidate construction. The resulting collision set is
+subsequently used by the particle dynamics system.

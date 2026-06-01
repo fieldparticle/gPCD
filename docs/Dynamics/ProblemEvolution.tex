@@ -1103,3 +1103,43 @@ target internal momentum - current internal momentum -> planned impulse
 In that form, positive \(\Delta I\) means compression and negative
 \(\Delta I\) means rebound.  The applied code should not need a separate
 ``kick'' at p-zero.
+
+\subsubsection{Standalone Shadow Dynamics Checkpoint}
+
+After the backed-out promotion attempt, the shadow work was separated from the
+live dynamics path.  The checkpoint for this cleanup began from commit
+\texttt{3dc5296}.
+
+The code now follows the object split:
+
+\begin{verbatim}
+GeoBase + GeoDynamics       -> live object
+ShadowBase + ShadowDynamics -> shadow object
+\end{verbatim}
+
+Both objects are created from the same configuration data, but they own
+separate particle lists, contact ledgers, phases, velocities, positions, and
+reporting streams.  The shadow path reports to \texttt{*_s.csv}.  The old
+in-\texttt{GeoDynamics.py} shadow/parabolic/vector diagnostic fields were
+removed from both live and shadow dynamics so the next experiment can be
+implemented cleanly in \texttt{ShadowDynamics.py}.
+
+The next step is to apply the parabolic velocity response in the shadow path:
+
+\begin{verbatim}
+contact geometry -> contact progress -> target internal momentum
+target internal momentum - current internal momentum -> planned impulse
+planned impulse -> shadow velocity update
+\end{verbatim}
+
+The compression-to-rebound flip should change from a branch-heavy p-zero
+escape rule to a velocity-magnitude tolerance:
+
+\begin{equation}
+|v_{n,k}| \leq \epsilon_v .
+\end{equation}
+
+Once a contact enters the returning phase, that phase should persist until the
+shadow contact-owned internal momentum drains or the contact ends.  This keeps
+p-zero as part of the continuous response curve rather than as a separate
+special-case kick.

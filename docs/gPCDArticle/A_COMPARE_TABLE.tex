@@ -1,0 +1,31 @@
+\begin{table}[ht]
+\addtolength{\tabcolsep}{-0.1em}
+\caption{Details of PCD performance improvements from 1995 to 2025. The \textbf{Type} column identifies the collision object type. \textit{md} is a multi-body method that performs collision detection for objects more complex than particles. \textit{p} identifies methods that are exclusively PCD. \textbf{e2e} supplies the type of end-to-end processing. \textit{bn} means broad and narrow, while \textit{bnr} indicates broad, narrow, and render. \textbf{tpp} is the time per particle in nanoseconds. The \textbf{Estimate} column provides more detail on how the performance of each method was calculated.}
+\label{tab:A_COMPARE_TABLE}
+\fontsize{6}{6}\selectfont
+\renewcommand{\arraystretch}{1.100000}
+\begin{center}
+\begin{tabular}
+{l l l l l l l l l }
+\hline \\ 
+\makecell{\makecell{Author}}&\makecell{\makecell{Year}}&\makecell{\makecell{N}}&\makecell{\makecell{tpp (ns)}}&\makecell{\makecell{e2e}}&\makecell{\makecell{GPU/CPU}}&\makecell{\makecell{Type}}&\makecell{\makecell{Equipment}}&\makecell{\makecell{Estimate}}\\ \hline \\ 
+Cohen & 1995 & 400,000 & 57500.0 & bn & cpu & mb & HP-9000/750 & \makecell[l]{1000 ring models of 400 faces. \\400,000 in 23 seconds.}\\[0.075in] 
+Latta & 2004 & 1,000,000 & 33.33 & bnr & gpu & p & NVIDIA Quadro K6000 & \makecell[l]{1E6 particles in 1/(30fps) \\or 33 ms.}\\[0.075in] 
+Kipfer & 2004 & 256,000 & 390.0 & bnr & gpu & p & ATI 9800Pro  & \makecell[l]{256,000 particles in 33 ms.}\\[0.075in] 
+Coming & 2005 & 64,000 & 15625.0 & bn & cpu & mb & AMD Opteron 246  & \makecell[l]{1000 ring models of 64 triangles. \\ 64,000 entities  in 1 second.}\\[0.075in] 
+Jang & 2008 & 38,000 & 84473.0 & bn & gpu-cpu & mb & NVIDIA GeForce 8800GTS & \makecell[l]{38,000 triangles in 3.21 seconds.}\\[0.075in] 
+Zhang & 2008 & 127,452 & 289.31 & bnr & gpu & p & NVIDIA Geforce 8800GTX  & \makecell[l]{127,452 particles in 1/(27.12 fps)}\\[0.075in] 
+Anderson & 2008 & 125,000 & 1400.0 & bn & gpu & p & NVIDIA GeForce 8800GTX  & \makecell[l]{125,000 particles in 50 ms.}\\[0.075in] 
+Liu & 2010 & 960,000 & 167.7 & bn & gpu & p & NVIDIA Tesla C1060  & \makecell[l]{960,000 particles in 161 ms.}\\[0.075in] 
+Morvan & 2012 & 218,000 & 16600.0 & bn & gpu & mb & NVIDIA Geforce GTX 480  & \makecell[l]{218,000 entities in 3.619 seconds.}\\[0.075in] 
+Govender & 2015 & 36,000,000 & 943.02 & bn & gpu & p & NVIDIA Quadro K6000  & \makecell[l]{36E6 broad, 262E3 narrow particles \\in  1.11 seconds. }\\[0.075in] 
+Joselli & 2015 & 1,048,576 & 12.36 & bn & gpu & p & NVIDIA Geforce GTX 580  & \makecell[l]{218,000 triangles with \\175,000 vertices.}\\[0.075in] 
+Franklin & 2017 & 10,000,000 & 33.0 & bn & gpu & p & NVIDIA GeForce GTX Titan X & \makecell[l]{10E6 entities in 33 ms.}\\[0.075in] 
+Wang & 2020 & 984,018 & 2540.0 & bn & gpu & p & NVIDIA Quadro RTX2080  & \makecell[l]{984,018 particles in 2.5 seconds}\\[0.075in] 
+Mittal & 2020 & 210,000 & 16.5 & bn & gpu & p & NVIDIA Tesla P100  & \makecell[l]{210,000 particles in 9.9 ms multiplied \\by 0.35 estimated GPU time.}\\[0.075in] 
+Bell & 2025 & 11,088,896 & 7.62 & bnr & gpu & p & NVIDIA RTX 3500 ADA Gen & \makecell[l]{11E6 particles in 84.71 ms.}\\[0.075in] 
+\hline
+\end{tabular}
+\end{center}
+\Description[TITLE:Cell Sizes Table]{Details of PCD performance improvements from 1995 to 2025. The \textbf{Type} column identifies the collision object type. \textit{md} is a multi-body method that performs collision detection for objects more complex than particles. \textit{p} identifies methods that are exclusively PCD. \textbf{e2e} supplies the type of end-to-end processing. \textit{bn} means broad and narrow, while \textit{bnr} indicates broad, narrow, and render. \textbf{tpp} is the time per particle in nanoseconds. The \textbf{Estimate} column provides more detail on how the performance of each method was calculated.}
+\end{table}

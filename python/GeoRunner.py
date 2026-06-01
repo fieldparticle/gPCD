@@ -3,6 +3,7 @@ from pathlib import Path
 import math
 
 from base.GeoBase import GeoBase
+from base.ShadowBase import ShadowBase
 from base.Reporting import Reporting
 from base.InLineTest import InLineTest
 
@@ -362,6 +363,8 @@ def _report_particles(reporting, frame_number, particles, start_diagnostics):
 def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_number=None):
     geo = GeoBase()
     geo.load_cfg_file(cfg_file)
+    shadow = ShadowBase()
+    shadow.load_cfg_file(cfg_file)
     test_file_name = Path(cfg_file).name
     run_configuration = geo.run_configuration
     senario = None
@@ -371,6 +374,11 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
         geo.study = study
         geo.inline_test_flag = True
         senario.Create(geo.config, study_number)
+        shadow_senario = InLineTest()
+        shadow.senario = shadow_senario
+        shadow.study = study
+        shadow.inline_test_flag = True
+        shadow_senario.Create(shadow.config, study_number)
     if batch_mode:
         run_configuration["end_frame"] = end_frame
     if "run_debug_dir" not in run_configuration:
@@ -380,11 +388,18 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
         )
     report_dir = Path(run_configuration["run_debug_dir"])
     reporting = Reporting(report_dir, run_configuration.get("rpt_frames"))
+    reporting_s = Reporting(
+        report_dir,
+        run_configuration.get("rpt_frames"),
+        clear_existing=False,
+        file_suffix="_s",
+    )
     print(
         f"GeoRunner cleared {reporting.cleared_report_count} "
         f"capture file(s): {report_dir}"
     )
     start_diagnostics = _run_start_diagnostics(geo.particles)
+    shadow_start_diagnostics = _run_start_diagnostics(shadow.particles)
 
     pygame.init()
     screen = pygame.display.set_mode(_window_size(run_configuration))
@@ -413,9 +428,17 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
 
             if not paused:
                 geo.ShaderFlags.frameNum = frame_number
-                ##JMB Main Call to geo.CollisionRun() fro every time step
+                shadow.ShaderFlags.frameNum = frame_number
+                ##JMB Main Call to geo.CollisionRun() 
                 particles = geo.CollisionRun()
                 _report_particles(reporting, frame_number, particles, start_diagnostics)
+                sparticles = shadow.CollisionRun()
+                _report_particles(
+                    reporting_s,
+                    frame_number,
+                    sparticles,
+                    shadow_start_diagnostics,
+                )
             else:
                 particles = geo.particles
             _draw_particles(

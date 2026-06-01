@@ -1,3 +1,66 @@
+% !TeX root = main.tex
+
+\subsection*{Audience and Explanation Level}
+
+The target audience for this manuscript consists primarily of ACM
+Transactions on Graphics (TOG) reviewers, computer graphics
+researchers, GPU-computing researchers, and collision-detection
+specialists.
+
+Assume familiarity with standard graphics and GPU-computing concepts,
+including but not limited to:
+
+\begin{itemize}
+\item graphics pipelines,
+\item vertex and fragment shaders,
+\item compute shaders,
+\item shader storage buffer objects (SSBOs),
+\item GPU residency,
+\item broad-phase collision detection,
+\item narrow-phase collision detection, and
+\item common spatial data structures.
+\end{itemize}
+
+Consequently, methodology sections should focus on explaining the
+novel contributions of gPCD rather than providing tutorial-level
+descriptions of established graphics concepts.
+
+Writing Rule:
+
+\begin{quote}
+Explain novelty. Reference common knowledge.
+\end{quote}
+
+When drafting methodology sections, ask:
+
+\begin{enumerate}
+\item Is this sentence explaining graphics concepts already known to the
+target audience?
+\item Or is this sentence explaining what is unique about gPCD?
+\end{enumerate}
+
+If the material can be found in a standard graphics or GPU-programming
+textbook, it likely does not belong in the methodology. If the material
+describes a design decision, organizational principle, or algorithmic
+component unique to gPCD, it likely does belong in the methodology.
+
+\section*{Drafting Note}
+
+The conventions contained in this document are maintained as part of the
+working manuscript during the rough-draft and revision stages. Their
+purpose is to preserve notation consistency, terminology decisions,
+architectural interpretations, and reviewer-driven revisions throughout
+development.
+
+Items contained in this document are not necessarily intended for
+publication. As the manuscript matures, notation and terminology should
+be introduced at the point of first use within the manuscript, and
+working notes should be removed from the final submission.
+
+Consequently, this document serves as both a notation reference and a
+development history for the gPCD manuscript.
+
+
 \section{Document Conventions and Research Governance}
 
 This document serves as the authoritative reference for terminology,
@@ -53,7 +116,7 @@ Topics that belong within the scope of this manuscript include:
 \begin{itemize}
 \item Broad-phase collision detection.
 \item Cell-array occupancy generation.
-\item Rasterization-based occupancy construction.
+\item Graphics-pipeline occupancy generation.
 \item Duplicate elimination.
 \item Narrow-phase collision evaluation.
 \item Computational complexity.
@@ -92,6 +155,50 @@ Before major modifications are made to any manuscript:
 %================================================================================
 \section{Approved Terminology}
 
+\subsection{Terminology Convention: Potentially Colliding Set (PCS)}
+
+Within collision-detection literature, PCS denotes the
+\emph{Potentially Colliding Set}. Within the gPCD framework, the
+populated cell array constitutes the PCS after occupancy generation has
+been completed. Consequently, the manuscript should distinguish between
+the cell array as a data structure and the PCS as the broad-phase result
+represented by that populated structure.
+
+When discussing implementation details, prefer the terms
+\emph{cell array} and \emph{occupancy list}. The term
+\emph{Potentially Colliding Set (PCS)} should be reserved for
+discussions of broad-phase candidate generation and collision-detection
+theory.
+
+\subsection*{PCS Convention}
+
+Within the gPCD framework, occupancy generation directly constructs the
+potentially colliding set (PCS). The populated cell array therefore
+constitutes the PCS and no separate candidate-construction stage is
+performed between broad-phase occupancy generation and narrow-phase
+evaluation.
+
+\begin{equation}
+\text{Broad Phase}
+\rightarrow
+\text{Candidate Construction}
+\rightarrow
+\text{PCS}.
+\end{equation}
+
+Within the gPCD framework, occupancy generation directly constructs the
+potentially colliding set,
+
+\begin{equation}
+\text{Occupancy Generation}
+\rightarrow
+\text{PCS}.
+\end{equation}
+
+Consequently, the populated cell array constitutes the PCS and no
+separate candidate-construction stage is performed prior to
+narrow-phase evaluation.
+
 \subsection{Symbols}
 \begin{tabular}{|l|c|}
 \hline
@@ -101,7 +208,8 @@ $P$ & number of particles\\
 $S$ & side length of cubic cell array\\
 $C$ & total number of cells = $S^3$\\
 $r$ & particle radius\\
-$(i,j,k)$ & integer cell coordinates\\
+$(i,j,k)$ & floating-point cell coordinates\\
+$(X,Y,Z)$ & integer cell coordinates\\
 $I$ & flattened cell index\\
 \hline
 \end{tabular}
@@ -147,9 +255,8 @@ Z \geq 1.
 \end{equation}
 
 A coordinate value of zero is reserved as an invalid location.
-
 \begin{equation}
-X=0,;Y=0,;\text{or};Z=0
+X = 0 \;\lor\; Y = 0 \;\lor\; Z = 0.
 \end{equation}
 
 indicates that the coordinate does not reference a valid cell.
@@ -173,6 +280,15 @@ I = 0
 \end{equation}
 
 is reserved as an invalid index.
+
+\subsection{Cell Coordinate Convention}
+
+Cell coordinates are restricted to positive integer values. The valid
+cell domain therefore begins at $(1,1,1)$ rather than $(0,0,0)$.
+Coordinates containing a zero-valued component are considered invalid.
+This convention prevents corner evaluations associated with particles
+located adjacent to domain boundaries from producing negative cell
+coordinates during occupancy construction.
 
 \subsubsection{Cell Array Dimensions}
 
@@ -246,6 +362,17 @@ The term AABB (Axis-Aligned Bounding Box) shall be used throughout all
 manuscripts. Any occurrence of AARB shall be treated as a typographical
 error and corrected to AABB.
 
+\subsection*{Architecture Hierarchy}
+
+\begin{enumerate}
+    \item Graphics-Pipeline Occupancy Generation
+    \item Vertex-Stage Occupancy Construction
+    \item Corner-Based Occupancy Generation
+    \item Cell Addressing and Flattening
+    \item Potentially Colliding Set Construction
+    \item Narrow-Phase Evaluation
+\end{enumerate}
+
 
 \section{Collision-Detection Architecture}
 
@@ -302,7 +429,7 @@ they remain logically distinct processes.
 \subsection{gPCD Architecture}
 
 The gPCD framework integrates occupancy generation directly into the
-graphics pipeline. Rasterization participates in broad-phase collision
+graphics pipeline. The vertex shader participates in broad-phase collision
 detection while simultaneously supporting particle rendering.
 
 \begin{verbatim}
@@ -312,7 +439,7 @@ Simulation Data
 |       |
 |       +-- Point-Particle Rendering
 |       |
-|       +-- Rasterization-Based Occupancy Generation
+|       +-- Vertex-Based Occupancy Generation
 |               |
 |               +-- Cell-Array Occupancy
 |               |
@@ -326,7 +453,7 @@ Simulation Data
 \end{verbatim}
 
 Within gPCD, rendering is not merely a consumer of collision-detection
-results. Instead, rasterization forms part of the broad-phase
+results. Instead, the graphics pipeline forms part of the broad-phase
 collision-detection process.
 
 Collision-Detection Data-Flow Architectures
@@ -373,7 +500,7 @@ Simulation Data
     |       |
     |       +-- Point-Particle Rendering
     |       |
-    |       +-- Rasterization-Based Occupancy Generation
+    |       +-- Vertex-Based Occupancy Generation
     |               |
     |               +-- Cell-Array Occupancy
     |               |
@@ -392,10 +519,10 @@ Simulation Data
 \subsection{Architectural Classification}
 
 The primary organizational contribution of gPCD is architectural rather
-than structural. The novelty does not arise from the cell array itself,
-but from integrating occupancy generation into the graphics pipeline
-such that rasterization contributes directly to broad-phase collision
-detection.
+than structural. The novelty does not arise from the cell array itself, but from
+integrating occupancy generation into the graphics pipeline such that
+occupancy construction is performed within the vertex stage during
+broad-phase collision detection.
 
 
 
@@ -454,7 +581,7 @@ The section shall:
 The section shall not function as a comprehensive literature survey.
 Its purpose is to provide sufficient context for evaluating the
 organizational and algorithmic contributions of the framework.
-\end{document}
+
 
 
 %================================================================================
@@ -599,9 +726,9 @@ for cubic domains.
 
 \section{Novelty Statement}
 
-The primary novelty of gPCD lies in the use of rasterization-based
-occupancy generation for broad-phase collision detection. The method
-constructs the occupancy structure as part of the graphics pipeline,
+The primary novelty of gPCD lies in the integration of occupancy
+generation into the graphics pipeline for broad-phase collision
+detection.The method constructs the occupancy structure as part of the graphics pipeline,
 allowing point-particle rendering and collision-candidate generation
 to proceed concurrently within a fully GPU-resident workflow.
 
@@ -624,8 +751,8 @@ Established components may contribute significantly to performance
 without constituting the primary novelty of the manuscript.
 
 The primary novelty of gPCD is expected to arise from the organization
-and interaction of established components within a rasterization-based,
-GPU-resident collision-detection workflow.
+and interaction of established components within a graphics-pipeline
+occupancy-generation framework for GPU-resident collision detection.
 
 Performance results shall be treated as validation of the organization
 rather than as novelty by themselves.
@@ -634,13 +761,15 @@ rather than as novelty by themselves.
 
 The primary organizational contribution of gPCD is the integration of
 broad-phase occupancy generation into the graphics pipeline itself.
-Rasterization is used as the mechanism by which occupancy information
-is generated and collision candidates are constructed.
+Occupancy construction is performed within the vertex stage, where
+particle geometry is used to generate the occupancy information required
+for broad-phase collision detection.
 
-Because occupancy generation occurs during rasterization,
-point-particle rendering and broad-phase construction proceed
-concurrently. This concurrency is considered a consequence of the
-organizational design rather than a separate contribution.
+Because occupancy generation is integrated into graphics-pipeline
+execution, point-particle rendering and broad-phase construction proceed
+concurrently on the GPU. This concurrency is considered a consequence of
+the organizational design rather than a separate contribution.
+
 
 The novelty of the method arises from the organization of established
 graphics-pipeline components into a collision-detection workflow rather
@@ -657,7 +786,7 @@ Primary Organizational Contribution
 |
 +-- Graphics pipeline integrated into collision detection
 	|
-	+-- Rasterization generates occupancy information
+	+-- Vertex generates occupancy information
     |
     +-- Rendering becomes part of the algorithm
     |
@@ -726,6 +855,25 @@ Organizational Contributions->Algorithmic Contributions
 ->Performance Outcomes
 \end{lstlisting}
 
+\subsection*{Contribution Clarification}
+
+The primary organizational contribution of gPCD is the integration of
+broad-phase occupancy generation into the graphics pipeline.
+
+Occupancy construction is performed within the vertex stage of the
+graphics pipeline through corner-based occupancy generation and cell
+determination. The fragment stage remains responsible for rendering and
+visualization.
+
+Consequently, manuscript terminology should preferentially use
+\emph{graphics-pipeline occupancy generation} rather than
+\emph{rasterization-based occupancy generation}, unless a discussion
+specifically concerns rasterization itself.
+
+This distinction is important because the contribution of gPCD arises
+from the integration of collision-detection operations into the graphics
+pipeline, while occupancy construction is implemented within the vertex
+stage rather than the fragment stage.
 %================================================================================
 \section{Methodological Requirements}
 
@@ -833,7 +981,7 @@ Acceptable terminology includes:
 \begin{itemize}
 \item Graphics-pipeline parallelism
 \item Concurrent rendering and occupancy generation
-\item Rasterization-based occupancy generation
+\item Graphics Pipline-based occupancy generation
 \item GPU-resident broad-phase construction
 \end{itemize}
 
@@ -855,3 +1003,4 @@ Primary Contribution   &       Pending\\
 Abstract                &      Pending\\
 \hline
 \end{tabular}
+

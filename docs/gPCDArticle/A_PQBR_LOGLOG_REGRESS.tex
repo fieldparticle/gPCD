@@ -1,0 +1,37 @@
+\begingroup
+\begin{figure*}[ht]
+\centering
+\hspace{-.1in}
+	\begin{subfigure}[b]{0.32\textwidth}
+		\includegraphics[width=\textwidth]{A_PQBR_LOGLOG_REGRESSgms.png}
+		\subcaption[]{Graphics}
+		\label{fig:A_PQBR_LOGLOG_REGRESSgms}
+	\end{subfigure}
+\hspace{-.1in}
+	\begin{subfigure}[b]{0.32\textwidth}
+		\includegraphics[width=\textwidth]{A_PQBR_LOGLOG_REGRESScms.png}
+		\subcaption[]{Compute}
+		\label{fig:A_PQBR_LOGLOG_REGRESScms}
+	\end{subfigure}
+\hspace{-.1in}
+	\begin{subfigure}[b]{0.32\textwidth}
+		\includegraphics[width=\textwidth]{A_PQBR_LOGLOG_REGRESStot.png}
+		\subcaption[]{Total}
+		\label{fig:A_PQBR_LOGLOG_REGRESStot}
+	\end{subfigure}
+\hspace{-.1in}
+\caption[TITLE:PQBR LOG-LOG Regression]{Log--log regression of execution time $t_n$ versus particle count $N$. The measured data (circles) are fit by a straight line (solid), corresponding to a power-law model 
+$t_n = \alpha N^{b}$. The fitted slope of $b \approx 1$ confirms near-linear 
+scaling in practice, despite the $O(N^{2})$ theoretical bound of collision 
+detection. The regression achieved $R^{2} > 0.99$ for compute (\APQBRLOGLOGREGRESScmsrtwosat{}) and graphics (\APQBRLOGLOGREGRESSgmsrtwosat{}) indicating that the throughput follows a consistent scaling law, with deviations only at small 
+$N$ due to fixed overheads before GPU saturation is reached at 
+$N \approx 10^{6}$.}
+\Description[TITLE:PQBR LOG-LOG Regression]{Log--log regression of execution time $t_n$ versus particle count $N$. The measured data (circles) are fit by a straight line (solid), corresponding to a power-law model 
+$t_n = \alpha N^{b}$. The fitted slope of $b \approx 1$ confirms near-linear 
+scaling in practice, despite the $O(N^{2})$ theoretical bound of collision 
+detection. The regression achieved $R^{2} > 0.99$ for compute (\APQBRLOGLOGREGRESScmsrtwosat{}) and graphics (\APQBRLOGLOGREGRESSgmsrtwosat{}) indicating that the throughput follows a consistent scaling law, with deviations only at small 
+$N$ due to fixed overheads before GPU saturation is reached at 
+$N \approx 10^{6}$.}
+\label{fig:A_PQBR_LOGLOG_REGRESS}
+\end{figure*}
+\endgroup

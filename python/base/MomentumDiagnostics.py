@@ -15,6 +15,10 @@ MARGIN_RIGHT = 32
 MARGIN_TOP = 44
 MARGIN_BOTTOM = 56
 PANEL_GAP = 64
+REPORT_MODES = {
+    "live": "",
+    "shadow": "_s",
+}
 
 
 def _float(row, key, default=0.0):
@@ -29,8 +33,23 @@ def _read_rows(csv_path):
         return list(csv.DictReader(csv_file))
 
 
+def _report_path(report_dir, base_name, report_mode="live"):
+    suffix = REPORT_MODES.get(report_mode, "")
+    return Path(report_dir) / f"{base_name}{suffix}.csv"
+
+
+def _particle_csvs(report_dir, report_mode="live"):
+    suffix = REPORT_MODES.get(report_mode, "")
+    csvs = sorted(Path(report_dir).glob(f"p*{suffix}.csv"))
+    if suffix:
+        return csvs
+    return [csv_path for csv_path in csvs if not csv_path.stem.endswith("_s")]
+
+
 def _particle_number_from_path(csv_path):
     stem = Path(csv_path).stem
+    if stem.endswith("_s"):
+        stem = stem[:-2]
     if stem.startswith("p"):
         try:
             return int(stem[1:])
@@ -57,10 +76,10 @@ def _particle_masses_from_cfg(cfg_path):
     return masses
 
 
-def _particle_series(report_dir, cfg_path=None):
+def _particle_series(report_dir, cfg_path=None, report_mode="live"):
     masses = _particle_masses_from_cfg(cfg_path)
     series = []
-    for particle_csv in sorted(Path(report_dir).glob("p*.csv")):
+    for particle_csv in _particle_csvs(report_dir, report_mode):
         rows = _read_rows(particle_csv)
         if not rows:
             continue
@@ -176,7 +195,7 @@ def _scale_like(values, reference_values):
     ]
 
 
-def _batch_momentum_items(batch_cfg):
+def _batch_momentum_items(batch_cfg, report_mode="live"):
     batch_cfg = Path(batch_cfg)
     with batch_cfg.open("r", encoding="utf-8") as cfg_file:
         batch = libconf.load(cfg_file)
@@ -187,7 +206,7 @@ def _batch_momentum_items(batch_cfg):
         with cfg_path.open("r", encoding="utf-8") as cfg_file:
             cfg = libconf.load(cfg_file)
         report_dir = Path(cfg["RUN_CONFIGURATION"]["run_debug_dir"])
-        momentum_csv = report_dir / "momentum.csv"
+        momentum_csv = _report_path(report_dir, "momentum", report_mode)
         if not momentum_csv.exists():
             continue
         items.append(
@@ -325,6 +344,10 @@ def _draw_panel(frames, series, x_min, x_max, y_top, y_bottom, title):
     return elements
 
 
+def _report_mode_from_momentum_path(momentum_csv):
+    return "shadow" if Path(momentum_csv).stem.endswith("_s") else "live"
+
+
 def _particle_plot_series(momentum_csv, cfg_path=None):
     items = []
     colors = [
@@ -335,7 +358,10 @@ def _particle_plot_series(momentum_csv, cfg_path=None):
         "#bebada",
         "#b3de69",
     ]
-    for index, particle in enumerate(_particle_series(Path(momentum_csv).parent, cfg_path)):
+    report_mode = _report_mode_from_momentum_path(momentum_csv)
+    for index, particle in enumerate(
+        _particle_series(Path(momentum_csv).parent, cfg_path, report_mode)
+    ):
         color = colors[index % len(colors)]
         particle_label = f"p{particle['particle_number']}"
         style = _particle_style(particle["particle_number"])
@@ -345,14 +371,16 @@ def _particle_plot_series(momentum_csv, cfg_path=None):
 
 
 def _particle_by_number(momentum_csv, cfg_path, particle_number):
-    for particle in _particle_series(Path(momentum_csv).parent, cfg_path):
+    report_mode = _report_mode_from_momentum_path(momentum_csv)
+    for particle in _particle_series(Path(momentum_csv).parent, cfg_path, report_mode):
         if particle["particle_number"] == particle_number:
             return particle
     return None
 
 
 def _contact_series(momentum_csv, source_number, target_number, frames, field_name):
-    contacts_csv = Path(momentum_csv).with_name("contacts.csv")
+    report_mode = _report_mode_from_momentum_path(momentum_csv)
+    contacts_csv = _report_path(Path(momentum_csv).parent, "contacts", report_mode)
     values_by_frame = {frame: 0.0 for frame in frames}
     if not contacts_csv.exists():
         return [0.0 for _frame in frames]
@@ -368,7 +396,8 @@ def _contact_series(momentum_csv, source_number, target_number, frames, field_na
 
 
 def _source_contact_series(momentum_csv, source_number, frames, field_name):
-    contacts_csv = Path(momentum_csv).with_name("contacts.csv")
+    report_mode = _report_mode_from_momentum_path(momentum_csv)
+    contacts_csv = _report_path(Path(momentum_csv).parent, "contacts", report_mode)
     values_by_frame = {frame: 0.0 for frame in frames}
     if not contacts_csv.exists():
         return [0.0 for _frame in frames]
@@ -599,9 +628,9 @@ def plot_momentum_diagnostics(momentum_csv, output_svg=None, title=None, cfg_pat
     return output_svg
 
 
-def plot_batch(batch_cfg):
+def plot_batch(batch_cfg, report_mode="live"):
     outputs = []
-    for item in _batch_momentum_items(batch_cfg):
+    for item in _batch_momentum_items(batch_cfg, report_mode):
         outputs.append(
             plot_momentum_diagnostics(
                 item["momentum_csv"],
@@ -624,6 +653,7 @@ def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     for particle in _particle_series(
         Path(item["momentum_csv"]).parent,
         item.get("cfg_path"),
+        _report_mode_from_momentum_path(item["momentum_csv"]),
     ):
         particle_label = f"p{particle['particle_number']}"
         style = _particle_style(particle["particle_number"])
@@ -650,7 +680,7 @@ def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
             visible=visible,
         )
     top_axis.set_ylabel("particle value")
-    top_axis.set_title(item["name"])
+    top_axis.set_title(f"{item['name']} ({item.get('report_mode', 'live')})")
     top_axis.grid(True, alpha=0.3)
     top_axis.legend(loc="best")
 
@@ -748,11 +778,13 @@ def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     bottom_axis.grid(True, alpha=0.3)
     bottom_axis.legend(loc="best")
 
-    fig.canvas.manager.set_window_title(f"Momentum Diagnostics - {item['name']}")
+    fig.canvas.manager.set_window_title(
+        f"Momentum Diagnostics - {item['name']} ({item.get('report_mode', 'live')})"
+    )
     fig.canvas.draw_idle()
 
 
-def show_batch_menu(batch_cfg):
+def show_batch_menu(batch_cfg, report_mode="live"):
     try:
         import matplotlib.pyplot as plt
         from matplotlib.widgets import CheckButtons, RadioButtons
@@ -762,16 +794,29 @@ def show_batch_menu(batch_cfg):
             "Run with .venv\\Scripts\\python.exe or install matplotlib."
         ) from exc
 
-    items = _batch_momentum_items(batch_cfg)
+    current_report_mode = {"mode": report_mode}
+    items = _batch_momentum_items(batch_cfg, current_report_mode["mode"])
     if not items:
-        raise ValueError(f"No momentum.csv files found for {batch_cfg}")
+        raise ValueError(
+            f"No momentum CSV files found for {batch_cfg} in {current_report_mode['mode']} mode"
+        )
+    for item in items:
+        item["report_mode"] = current_report_mode["mode"]
 
     fig, axes = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
     fig.subplots_adjust(left=0.32, hspace=0.44)
-    menu_axis = fig.add_axes([0.03, 0.28, 0.24, 0.56])
+    menu_axis = fig.add_axes([0.03, 0.35, 0.24, 0.49])
     labels = [item["name"] for item in items]
     radio = RadioButtons(menu_axis, labels, active=0)
     menu_axis.set_title("Test")
+    mode_axis = fig.add_axes([0.03, 0.24, 0.24, 0.08])
+    mode_labels = list(REPORT_MODES.keys())
+    mode_radio = RadioButtons(
+        mode_axis,
+        mode_labels,
+        active=mode_labels.index(current_report_mode["mode"]),
+    )
+    mode_axis.set_title("Report")
     particle_visible = {"p1": True, "p2": True, "p3": True}
     particle_axis = fig.add_axes([0.03, 0.08, 0.24, 0.14])
     particle_checks = CheckButtons(
@@ -780,14 +825,31 @@ def show_batch_menu(batch_cfg):
         list(particle_visible.values()),
     )
     particle_axis.set_title("Particles")
-    selected_item = {"item": items[0]}
+    selected_item = {"item": items[0], "name": items[0]["name"]}
 
     def select(label):
         for item in items:
             if item["name"] == label:
                 selected_item["item"] = item
+                selected_item["name"] = label
                 _draw_matplotlib_axes(fig, axes, item, particle_visible)
                 return
+
+    def select_mode(label):
+        current_report_mode["mode"] = label
+        new_items = _batch_momentum_items(batch_cfg, label)
+        for item in new_items:
+            item["report_mode"] = label
+        if not new_items:
+            return
+        items[:] = new_items
+        selected_name = selected_item.get("name")
+        selected_item["item"] = next(
+            (item for item in items if item["name"] == selected_name),
+            items[0],
+        )
+        selected_item["name"] = selected_item["item"]["name"]
+        _draw_matplotlib_axes(fig, axes, selected_item["item"], particle_visible)
 
     def toggle_particle(label):
         particle_visible[label] = not particle_visible[label]
@@ -798,6 +860,7 @@ def show_batch_menu(batch_cfg):
         fig.canvas.draw_idle()
 
     radio.on_clicked(select)
+    mode_radio.on_clicked(select_mode)
     particle_checks.on_clicked(toggle_particle)
     _draw_matplotlib_axes(fig, axes, selected_item["item"], particle_visible)
     plt.show()
@@ -823,13 +886,19 @@ def main():
         action="store_true",
         help="Write SVG files instead of showing the matplotlib menu.",
     )
+    parser.add_argument(
+        "--report-mode",
+        choices=sorted(REPORT_MODES.keys()),
+        default="live",
+        help="Choose live CSV files or shadow *_s.csv files.",
+    )
     args = parser.parse_args()
     path = Path(args.path)
     if args.show or (path.suffix.lower() == ".cfg" and not args.svg):
-        show_batch_menu(path)
+        show_batch_menu(path, args.report_mode)
         return
     if path.suffix.lower() == ".cfg":
-        outputs = plot_batch(path)
+        outputs = plot_batch(path, args.report_mode)
     else:
         outputs = [plot_momentum_diagnostics(path)]
     for output in outputs:
