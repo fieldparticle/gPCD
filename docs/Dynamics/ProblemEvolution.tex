@@ -977,6 +977,19 @@ momentum.  That produced a curve that tried to become parabolic but flattened
 into a constant, because the reference was being redefined from the value being
 measured.
 
+A later review separated two ideas that had been mixed together:
+
+\begin{itemize}[leftmargin=*]
+    \item the p-zero reference, which defines the maximum-compression contact
+    state;
+    \item the target curve used to move the internal momentum ledger toward
+    that state.
+\end{itemize}
+
+The useful diagnostic question became whether the applied impulse should be the
+difference between the current internal momentum and a direct contact-progress
+target, rather than a raw area impulse clipped by available momentum.
+
 \subsubsection{Fix}
 
 A diagnostic-only fixed-reference p-zero shadow was added.  For each directed
@@ -994,12 +1007,34 @@ P_{0,k} = \mu_k \max(0,-v_{n,k}).
 
 The corresponding p-zero overlap area \(A_{0,k}\) is computed from the
 force-law relation.  During the active contact, the shadow uses this fixed
-reference to compute:
+reference to compute the progress variable:
+
+\begin{equation}
+f_k = \operatorname{clamp}(A_k/A_{0,k},0,1).
+\end{equation}
+
+The original fixed-reference shadow used:
 
 \begin{equation}
 I^{shadow}_{k}
 =
 P_{0,k}\left(1-\sqrt{1-\operatorname{clamp}(A_k/A_{0,k},0,1)}\right).
+\end{equation}
+
+The current diagnostic shadow has been changed to a direct parabolic target:
+
+\begin{equation}
+I^{shadow}_{k}
+=
+P_{0,k}\left(1-\left(1-f_k\right)^2\right).
+\end{equation}
+
+The shadow impulse is then:
+
+\begin{equation}
+\Delta I^{shadow}_{k}
+=
+I^{shadow}_{k}-I^{current}_{k}.
 \end{equation}
 
 The shadow records:
@@ -1025,9 +1060,11 @@ diagnostics.
 
 \subsubsection{Current Result}
 
-With the fixed reference, the parabolic p-zero shadow matches the kinetic
-energy shape.  This is the strongest current evidence that the next applied
-dynamics change should move away from frame-local
+With the fixed reference, the p-zero shadow matches the kinetic-energy shape
+closely enough to remain the strongest current lead.  The latest diagnostic
+uses the direct parabolic target above so the plotted shadow value is explicitly
+a contact-progress target.  This is the strongest current evidence that the
+next applied dynamics change should move away from frame-local
 
 \begin{verbatim}
 compression_impulse = min(raw_impulse, weighted_available_momentum)
@@ -1043,3 +1080,26 @@ toward a target-ledger impulse:
 This has not been promoted to the applied dynamics yet.  The current checkpoint
 keeps the p-zero/parabolic result as a shadow diagnostic so the project can be
 checked in before the larger model change.
+
+\subsubsection{Backed-Out Promotion Attempt}
+
+After the fixed p-zero shadow looked promising, a first promotion attempt used
+the target ledger to choose applied compression/release impulses.  It fixed the
+two-particle horizontal p-zero stall only by adding special turnaround and
+returning-phase branches.  Those branches made the decision tree too abrupt:
+the path depended on separate tests for closing, returning, exact p-zero,
+source coupling, and pair compatibility.
+
+That promotion was backed out to commit \texttt{3296158}.  The lesson from the
+failed attempt is that p-zero should not be a separate escape rule.  The next
+attempt should treat p-zero as part of a single continuous contact-progress
+function:
+
+\begin{verbatim}
+contact geometry -> contact progress -> target internal momentum
+target internal momentum - current internal momentum -> planned impulse
+\end{verbatim}
+
+In that form, positive \(\Delta I\) means compression and negative
+\(\Delta I\) means rebound.  The applied code should not need a separate
+``kick'' at p-zero.

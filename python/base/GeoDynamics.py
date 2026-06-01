@@ -480,7 +480,7 @@ class GeoDynamics:
             min(1.0, overlap_area / zero_overlap_area),
         )
         target_internal_momentum = zero_internal_momentum * (
-            1.0 - (1.0 - overlap_fraction) ** 0.5
+            1.0 - (1.0 - overlap_fraction) ** 2.0
         )
         delta_impulse = target_internal_momentum - contact_internal_momentum
         compression_impulse = max(0.0, delta_impulse)

@@ -330,10 +330,12 @@ hard-contact target.  It must still remain read-only.
 The current shadow diagnostics have ruled out rebound direction drift,
 target-ratio allocation, and a simple vector internal momentum ledger as
 complete fixes for three-particle kinetic-energy loss.  A later diagnostic
-found that a fixed-reference p-zero/parabolic internal momentum target matches
-the kinetic-energy curve much more closely.  This is still a shadow result:
-it does not become a dynamics rule until a project update promotes it and
-records the GLSL-compatible applied algorithm.
+found that a fixed-reference p-zero internal momentum target is the strongest
+lead, but the first attempt to promote that target into applied dynamics
+introduced abrupt p-zero and rebound decision branches.  The promoted change
+was backed out.  The current accepted state keeps p-zero work diagnostic-only
+until the impulse rule can be expressed as one continuous contact-progress
+model.
 
 \subsection{Fixed P-Zero Shadow Convention}
 
@@ -349,10 +351,19 @@ p-zero overlap area computed from the current-frame snapshot.  The shadow then
 uses that fixed reference for the rest of the active contact instead of
 recomputing the reference from the growing internal momentum ledger.
 
-This memory is allowed because it is diagnostic-only and contact-owned, like
-the existing vector-internal shadow ledger.  It must be pruned when the contact
-is no longer active.  It must not write applied velocity, position, phase, or
-actual internal momentum.
+The current p-zero diagnostic target uses the fixed overlap fraction
+\(f_k = \operatorname{clamp}(A_k/A_{0,k},0,1)\) and maps it through the direct
+parabolic target:
+
+\begin{equation}
+I^{shadow}_{k} = P_{0,k}\left(1-\left(1-f_k\right)^2\right).
+\end{equation}
+
+The shadow impulse is the difference between this target and the stored
+internal momentum.  This memory is allowed because it is diagnostic-only and
+contact-owned, like the existing vector-internal shadow ledger.  It must be
+pruned when the contact is no longer active.  It must not write applied
+velocity, position, phase, or actual internal momentum.
 
 \subsection{Dynamics Versus Harness}
 
@@ -401,10 +412,11 @@ when it no longer describes the active Geo path.
     \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
     \item Continue \texttt{GeoProcessCollisions(SourceID)} incrementally, with
     multi-contact kinetic-energy drift as the next active dynamics problem.
-    The current evidence points to a fixed-reference p-zero/parabolic target
-    for contact internal momentum as the next candidate, not rebound direction
-    drift, target-ratio allocation, or a simple vector internal momentum
-    ledger.
+    The current evidence points to a fixed-reference p-zero/contact-progress
+    target for contact internal momentum as the next candidate, not rebound
+    direction drift, target-ratio allocation, or a simple vector internal
+    momentum ledger.  The next applied attempt should avoid separate p-zero
+    escape branches and instead compute one continuous target-ledger delta.
     \item Treat wall/out-of-bounds behavior as a separate problem after the
     particle-particle multi-contact rule is stable.
     \item Add reporting only through \texttt{Reporting.py}, not through dynamics.
