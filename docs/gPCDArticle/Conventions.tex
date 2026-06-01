@@ -246,6 +246,159 @@ The term AABB (Axis-Aligned Bounding Box) shall be used throughout all
 manuscripts. Any occurrence of AARB shall be treated as a typographical
 error and corrected to AABB.
 
+
+\section{Collision-Detection Architecture}
+
+The manuscript shall distinguish between collision-detection algorithms
+and collision-detection architectures.
+
+A collision-detection framework consists of broad-phase and narrow-phase
+stages. The broad phase generates collision candidates, while the
+narrow phase evaluates those candidates and determines whether a
+collision exists.
+
+\subsection{Traditional Architectures}
+
+Traditional collision-detection systems typically perform broad-phase
+and narrow-phase operations independently of the rendering pipeline.
+Collision-detection results are subsequently transferred to the
+rendering system for visualization.
+
+\begin{verbatim}
+Simulation Data
+|
++-- Broad Phase
+|
++-- Narrow Phase
+|
++-- Rendering Pipeline
+|
++-- Visual Output
+\end{verbatim}
+
+Rendering functions primarily as a consumer of simulation state and
+does not participate directly in collision detection.
+
+\subsection{GPU-Resident Architectures}
+
+GPU-resident approaches perform broad-phase and narrow-phase operations
+on the GPU while maintaining a separate rendering pipeline.
+
+\begin{verbatim}
+Simulation Data
+|
++-- GPU Broad Phase
+|
++-- GPU Narrow Phase
+|
++-- GPU Rendering Pipeline
+|
++-- Visual Output
+\end{verbatim}
+
+Although collision detection and rendering execute on the same device,
+they remain logically distinct processes.
+
+\subsection{gPCD Architecture}
+
+The gPCD framework integrates occupancy generation directly into the
+graphics pipeline. Rasterization participates in broad-phase collision
+detection while simultaneously supporting particle rendering.
+
+\begin{verbatim}
+Simulation Data
+|
++-- Graphics Pipeline
+|       |
+|       +-- Point-Particle Rendering
+|       |
+|       +-- Rasterization-Based Occupancy Generation
+|               |
+|               +-- Cell-Array Occupancy
+|               |
+|               +-- Collision Candidates
+|
++-- Compute Pipeline
+|
++-- Narrow-Phase Collision Evaluation
+|
++-- Collision Results
+\end{verbatim}
+
+Within gPCD, rendering is not merely a consumer of collision-detection
+results. Instead, rasterization forms part of the broad-phase
+collision-detection process.
+
+Collision-Detection Data-Flow Architectures
+\lstset{
+  language=TeX,
+  basicstyle=\ttfamily,
+}
+
+\begin{lstlisting}
+
+1. CPU-Resident / CPU-Driven Pipeline
+
+Simulation Data
+    |
+    +-- CPU Broad Phase
+    |
+    +-- CPU Narrow Phase
+    |
+    +-- Particle/Geometry Transfer
+    |
+    +-- GPU Rendering Pipeline
+            |
+            +-- Visual Output
+
+
+2. GPU-Assisted or GPU-Resident Pipeline
+
+Simulation Data
+    |
+    +-- GPU Broad Phase
+    |
+    +-- GPU Narrow Phase
+    |
+    +-- GPU Rendering Pipeline
+            |
+            +-- Visual Output
+
+
+3. gPCD Pipeline
+
+Simulation Data
+    |
+    +-- Graphics Pipeline
+    |       |
+    |       +-- Point-Particle Rendering
+    |       |
+    |       +-- Rasterization-Based Occupancy Generation
+    |               |
+    |               +-- Cell-Array Occupancy
+    |               |
+    |               +-- Collision Candidates
+    |
+    +-- Compute Pipeline
+            |
+            +-- Narrow-Phase Collision Evaluation
+            |
+            +-- Collision Results
+
+\subsection{gPCD}
+\end{lstlisting}
+
+
+\subsection{Architectural Classification}
+
+The primary organizational contribution of gPCD is architectural rather
+than structural. The novelty does not arise from the cell array itself,
+but from integrating occupancy generation into the graphics pipeline
+such that rasterization contributes directly to broad-phase collision
+detection.
+
+
+
 \subsection{Graphics Pipeline Execution}
 
 The graphics pipeline shall be described as performing
@@ -256,7 +409,8 @@ be used to describe gPCD execution.
 Vertex and fragment invocations are treated as independent
 stages of the graphics pipeline and not as a nested or
 parent-child execution hierarchy.
-\subsection{gPCD}
+
+
 
 The term \textbf{gPCD} refers to the GPU-driven particle collision detection
 system consisting of:

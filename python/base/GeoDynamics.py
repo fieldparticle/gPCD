@@ -147,6 +147,14 @@ class GeoDynamics:
         contact_state.vector_internal_source_net_ke_delta_estimate = 0.0
         contact_state.vector_internal_source_contact_ke_delta_sum = 0.0
         contact_state.vector_internal_source_ke_cross_term = 0.0
+        contact_state.parabolic_zero_overlap_area = 0.0
+        contact_state.parabolic_overlap_fraction = 0.0
+        contact_state.parabolic_zero_internal_mom = 0.0
+        contact_state.parabolic_target_internal_mom = 0.0
+        contact_state.parabolic_delta_impulse = 0.0
+        contact_state.parabolic_compression_impulse = 0.0
+        contact_state.parabolic_release_impulse = 0.0
+        contact_state.parabolic_remaining_internal_mom = 0.0
 
     def GeoClearContactSlot(self, contact_state):
         contact_state.ids = self.create_uvec4()
@@ -254,6 +262,35 @@ class GeoDynamics:
                 delta_z,
             )
 
+    def GeoContactParabolicZeroReference(self, SourceID, TargetID):
+        source = self.particles[SourceID]
+        references = getattr(source, "contact_parabolic_zero_reference", None)
+        if references is None:
+            source.contact_parabolic_zero_reference = {}
+            references = source.contact_parabolic_zero_reference
+        return references.get(TargetID, None)
+
+    def GeoSetContactParabolicZeroReference(
+        self,
+        SourceID,
+        TargetID,
+        zero_internal_momentum,
+        zero_overlap_area,
+    ):
+        source = self.particles[SourceID]
+        if not hasattr(source, "contact_parabolic_zero_reference"):
+            source.contact_parabolic_zero_reference = {}
+        if (
+            zero_internal_momentum <= self.GEO_EPSILON
+            or zero_overlap_area <= self.GEO_EPSILON
+        ):
+            source.contact_parabolic_zero_reference.pop(TargetID, None)
+            return
+        source.contact_parabolic_zero_reference[TargetID] = (
+            zero_internal_momentum,
+            zero_overlap_area,
+        )
+
     def GeoPruneInactiveContactLedgers(self, SourceID):
         """Keep contact memory tied to contacts active in the current frame."""
         source = self.particles[SourceID]
@@ -274,6 +311,10 @@ class GeoDynamics:
             for TargetID in list(source.contact_vector_internal_delta.keys()):
                 if TargetID not in active_targets:
                     source.contact_vector_internal_delta.pop(TargetID, None)
+        if hasattr(source, "contact_parabolic_zero_reference"):
+            for TargetID in list(source.contact_parabolic_zero_reference.keys()):
+                if TargetID not in active_targets:
+                    source.contact_parabolic_zero_reference.pop(TargetID, None)
         self.GeoSyncInternalMomentum(SourceID)
 
     def GeoBeginContactFrame(self, SourceID):
@@ -367,6 +408,93 @@ class GeoDynamics:
             return 0.0, 0.0
         scale = max(0.0, min(1.0, planned_impulse / candidate_impulse))
         return compression_impulse * scale, release_impulse * scale
+
+    def GeoZeroOverlapAreaFromMomentum(self, SourceID, TargetID, internal_momentum):
+        """Diagnostic p-zero overlap from current-frame momentum and geometry."""
+        reduced_mass = self.GeoReducedMass(SourceID, TargetID)
+        stiffness_q = self.GeoPairStiffness(SourceID, TargetID)
+        if (
+            internal_momentum <= self.GEO_EPSILON
+            or reduced_mass <= self.GEO_EPSILON
+            or stiffness_q <= self.GEO_EPSILON
+        ):
+            return 0.0
+        incoming_speed = internal_momentum / reduced_mass
+        alpha_zero = (
+            (3.0 * reduced_mass * incoming_speed * incoming_speed)
+            / (2.0 * stiffness_q)
+        ) ** (1.0 / 3.0)
+        source_radius = self.particles[SourceID].Data.x
+        target_radius = self.particles[TargetID].Data.x
+        center_distance = max(0.0, source_radius + target_radius - alpha_zero)
+        return self.particle_overlap_area(
+            source_radius,
+            target_radius,
+            center_distance,
+        )
+
+    def GeoParabolicContactShadow(
+        self,
+        SourceID,
+        TargetID,
+        overlap_area,
+        relative_normal_velocity,
+        contact_internal_momentum,
+    ):
+        reduced_mass = self.GeoReducedMass(SourceID, TargetID)
+        closing_momentum = reduced_mass * max(0.0, -relative_normal_velocity)
+        zero_reference = self.GeoContactParabolicZeroReference(SourceID, TargetID)
+        if zero_reference is None and closing_momentum > self.GEO_EPSILON:
+            zero_internal_momentum = closing_momentum
+            zero_overlap_area = self.GeoZeroOverlapAreaFromMomentum(
+                SourceID,
+                TargetID,
+                zero_internal_momentum,
+            )
+            self.GeoSetContactParabolicZeroReference(
+                SourceID,
+                TargetID,
+                zero_internal_momentum,
+                zero_overlap_area,
+            )
+        elif zero_reference is not None:
+            zero_internal_momentum, zero_overlap_area = zero_reference
+        else:
+            zero_internal_momentum = 0.0
+            zero_overlap_area = 0.0
+
+        if zero_overlap_area <= self.GEO_EPSILON:
+            return {
+                "zero_overlap_area": 0.0,
+                "overlap_fraction": 0.0,
+                "zero_internal_mom": zero_internal_momentum,
+                "target_internal_mom": 0.0,
+                "delta_impulse": -contact_internal_momentum,
+                "compression_impulse": 0.0,
+                "release_impulse": contact_internal_momentum,
+                "remaining_internal_mom": 0.0,
+            }
+
+        overlap_fraction = max(
+            0.0,
+            min(1.0, overlap_area / zero_overlap_area),
+        )
+        target_internal_momentum = zero_internal_momentum * (
+            1.0 - (1.0 - overlap_fraction) ** 0.5
+        )
+        delta_impulse = target_internal_momentum - contact_internal_momentum
+        compression_impulse = max(0.0, delta_impulse)
+        release_impulse = max(0.0, -delta_impulse)
+        return {
+            "zero_overlap_area": zero_overlap_area,
+            "overlap_fraction": overlap_fraction,
+            "zero_internal_mom": zero_internal_momentum,
+            "target_internal_mom": target_internal_momentum,
+            "delta_impulse": delta_impulse,
+            "compression_impulse": compression_impulse,
+            "release_impulse": release_impulse,
+            "remaining_internal_mom": target_internal_momentum,
+        }
 
     def GeoDirectedContactCandidate(
         self,
@@ -985,6 +1113,38 @@ class GeoDynamics:
             target_ratio_source_total_impulse += applied_impulse
             if target_elastic is not None:
                 target_ratio_source_total_weight += target_elastic["impulse"]
+
+            parabolic_shadow = self.GeoParabolicContactShadow(
+                SourceID,
+                TargetID,
+                overlap_area,
+                relative_normal_velocity,
+                contact_internal_momentum,
+            )
+            contact_state.parabolic_zero_overlap_area = parabolic_shadow[
+                "zero_overlap_area"
+            ]
+            contact_state.parabolic_overlap_fraction = parabolic_shadow[
+                "overlap_fraction"
+            ]
+            contact_state.parabolic_zero_internal_mom = parabolic_shadow[
+                "zero_internal_mom"
+            ]
+            contact_state.parabolic_target_internal_mom = parabolic_shadow[
+                "target_internal_mom"
+            ]
+            contact_state.parabolic_delta_impulse = parabolic_shadow[
+                "delta_impulse"
+            ]
+            contact_state.parabolic_compression_impulse = parabolic_shadow[
+                "compression_impulse"
+            ]
+            contact_state.parabolic_release_impulse = parabolic_shadow[
+                "release_impulse"
+            ]
+            contact_state.parabolic_remaining_internal_mom = parabolic_shadow[
+                "remaining_internal_mom"
+            ]
 
             self.GeoSetContactInternalMomentum(SourceID, TargetID, stored_internal_momentum)
             if stored_internal_momentum <= self.GEO_EPSILON:

@@ -308,6 +308,7 @@ vector_shadow_*
 target_elastic_*
 target_ratio_*
 vector_internal_*
+parabolic_*
 \end{verbatim}
 
 The applied dynamics remain authoritative.  A shadow result may be promoted
@@ -328,8 +329,30 @@ hard-contact target.  It must still remain read-only.
 
 The current shadow diagnostics have ruled out rebound direction drift,
 target-ratio allocation, and a simple vector internal momentum ledger as
-complete fixes for three-particle kinetic-energy loss.  They are not dynamics
-fixes unless promoted by a later project update.
+complete fixes for three-particle kinetic-energy loss.  A later diagnostic
+found that a fixed-reference p-zero/parabolic internal momentum target matches
+the kinetic-energy curve much more closely.  This is still a shadow result:
+it does not become a dynamics rule until a project update promotes it and
+records the GLSL-compatible applied algorithm.
+
+\subsection{Fixed P-Zero Shadow Convention}
+
+A parabolic p-zero shadow may carry a diagnostic-only contact reference:
+
+\begin{verbatim}
+particle.contact_parabolic_zero_reference[TargetID]
+\end{verbatim}
+
+The reference is set when the directed contact first has closing normal
+momentum.  It stores the zero internal normal momentum and the corresponding
+p-zero overlap area computed from the current-frame snapshot.  The shadow then
+uses that fixed reference for the rest of the active contact instead of
+recomputing the reference from the growing internal momentum ledger.
+
+This memory is allowed because it is diagnostic-only and contact-owned, like
+the existing vector-internal shadow ledger.  It must be pruned when the contact
+is no longer active.  It must not write applied velocity, position, phase, or
+actual internal momentum.
 
 \subsection{Dynamics Versus Harness}
 
@@ -378,9 +401,10 @@ when it no longer describes the active Geo path.
     \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
     \item Continue \texttt{GeoProcessCollisions(SourceID)} incrementally, with
     multi-contact kinetic-energy drift as the next active dynamics problem.
-    The current evidence points to coupled impulse magnitude allocation, not
-    rebound direction drift, target-ratio allocation, or a simple vector
-    internal momentum ledger.
+    The current evidence points to a fixed-reference p-zero/parabolic target
+    for contact internal momentum as the next candidate, not rebound direction
+    drift, target-ratio allocation, or a simple vector internal momentum
+    ledger.
     \item Treat wall/out-of-bounds behavior as a separate problem after the
     particle-particle multi-contact rule is stable.
     \item Add reporting only through \texttt{Reporting.py}, not through dynamics.

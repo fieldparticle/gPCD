@@ -439,7 +439,10 @@ The current captures include several diagnostic families:
     \item a target-ratio shadow, which tests whether the current soft impulse
     total should be redistributed using elastic target impulse ratios;
     \item a vector-internal shadow, which stores source compression momentum
-    delta vectors per contact and estimates rebound from that vector ledger.
+    delta vectors per contact and estimates rebound from that vector ledger;
+    \item a parabolic p-zero shadow, which stores a fixed p-zero reference for
+    each directed contact and computes the contact's target internal momentum
+    from the current overlap fraction.
 \end{itemize}
 
 For the current batch tests, the vector-rebound diagnostic showed that rebound
@@ -467,6 +470,36 @@ rebound because separating contacts have no closing hard-contact target, and a
 simple vector internal momentum ledger does not improve the three-particle
 kinetic-energy drift.
 
+The parabolic p-zero shadow is the current strongest diagnostic lead.  When a
+contact first has closing normal momentum, the shadow stores
+
+\begin{equation}
+P_{0,k} = \mu_k \max(0,-v_{n,k})
+\end{equation}
+
+and computes the corresponding p-zero overlap area \(A_{0,k}\) from the same
+force-law relation used by the old geometry model.  During the active contact,
+the shadow does not recompute this reference from the growing internal
+momentum ledger.  It uses the fixed overlap fraction
+
+\begin{equation}
+f_k = \operatorname{clamp}\left(\frac{A_k}{A_{0,k}},0,1\right)
+\end{equation}
+
+and the target internal momentum
+
+\begin{equation}
+I^{shadow}_{k}
+=
+P_{0,k}\left(1-\sqrt{1-f_k}\right).
+\end{equation}
+
+The diagnostic records the implied shadow compression and release increments,
+but the applied dynamics still use the current planned impulses.  Recent plots
+show that this fixed-reference shadow tracks the kinetic-energy curve, while a
+shadow that recomputes \(P_0\) from the current internal ledger flattens into a
+constant and is not useful.
+
 \section{Known Limitations}
 \label{sec:known-limitations}
 
@@ -487,8 +520,9 @@ The current Geo rule is intentionally simple and incomplete:
     Current diagnostics show that the remaining loss in
     \texttt{ThreeParticle} and \texttt{ThreeParticleChase} is not explained by
     rebound direction drift, target-ratio allocation, or a simple vector
-    internal momentum ledger.  The best current lead is coupled multi-contact
-    impulse magnitude selection.
+    internal momentum ledger.  The best current lead is a fixed-reference
+    p-zero/parabolic contact target, still implemented only as a shadow
+    diagnostic.
     \item Wall response is not part of this particle-pair geometry note.
 \end{itemize}
 

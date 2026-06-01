@@ -1,19 +1,10 @@
-Add elastic target and vector-ledger diagnostics for KE drift
+Add fixed p-zero shadow diagnostics for KE profile
 
-Extend the multi-contact KE investigation with diagnostic-only shadow paths.
+- add diagnostic-only parabolic p-zero contact shadow with fixed per-contact reference
+- record parabolic shadow target, compression, release, and p-zero fields in contacts.csv
+- add KE timing capture fields and MomentumDiagnostics plot-data CSV exports
+- extend diagnostics plots with p1 momentum, compression/release, and parabolic target series
+- document fixed-reference p-zero shadow as the current lead for multi-contact KE drift
+- update Geo conventions, particle geometry, and problem evolution before model promotion
 
-- Keep actual Geo dynamics unchanged
-- Add elastic hard-contact target diagnostics as a durable KE/momentum compass
-- Add target-ratio shadow diagnostics and record why they fail for rebound
-- Add vector internal momentum shadow diagnostics
-- Correct vector-internal release direction to match baseline two-particle behavior
-- Report new target_elastic, target_ratio, and vector_internal fields in contacts.csv
-- Update ProblemEvolution, ParticleGeometry, and GeoConventions with current findings
-
-Current findings:
-- Two-particle cases remain momentum/KE conservative
-- ThreeParticle and ThreeParticleChase remain momentum conservative with KE drift
-- Elastic target predicts zero KE drift as expected, but is a reference target only
-- Target-ratio allocation is invalid for rebound
-- Simple vector internal momentum does not improve three-particle KE drift
-- Best remaining lead is coupled multi-contact impulse magnitude selection
+Next: evaluate promoting the fixed p-zero target from shadow diagnostics to applied impulse planning.

@@ -133,6 +133,7 @@ class GeoBase(GeoDynamics):
         particle.contact_internal_phase = {}
         particle.contact_compression_direction = {}
         particle.contact_vector_internal_delta = {}
+        particle.contact_parabolic_zero_reference = {}
         particle.contacts = [self.create_geo_contact_state() for _ in range(16)]
         particle.gcs = particle.contacts
         particle.contactCount = 0
@@ -264,6 +265,7 @@ class GeoBase(GeoDynamics):
         self.GeoResetFrameState()
         self.GeoApplyStartRunHook()
         self.GeoBuildFrameSnapshot()
+        self.GeoRecordFrameStartDiagnostics()
 
         if not self.GeoBuildParticleContactLists():
             return self.particles
@@ -276,6 +278,7 @@ class GeoBase(GeoDynamics):
 
         if not self.GeoResolveContacts():
             return self.particles
+        self.GeoRecordAfterResolveDiagnostics()
 
         if not self.GeoMoveParticles():
             return self.particles
@@ -332,6 +335,30 @@ class GeoBase(GeoDynamics):
             self.create_vec4(particle.VelRad.x, particle.VelRad.y, particle.VelRad.z, particle.VelRad.w)
             for particle in self.particles
         ]
+
+    def GeoParticleKineticEnergy(self, particle_index, velocity=None):
+        if velocity is None:
+            velocity = self.particles[particle_index].VelRad
+        mass = self.GeoMass(particle_index)
+        return 0.5 * mass * (
+            velocity.x * velocity.x
+            + velocity.y * velocity.y
+            + velocity.z * velocity.z
+        )
+
+    def GeoRecordFrameStartDiagnostics(self):
+        for particle_index, particle in enumerate(self.particles):
+            velocity = self.VelRadFrame[particle_index]
+            particle.report_frame_start_ke = self.GeoParticleKineticEnergy(
+                particle_index,
+                velocity,
+            )
+
+    def GeoRecordAfterResolveDiagnostics(self):
+        for particle_index, particle in enumerate(self.particles):
+            particle.report_after_resolve_ke = self.GeoParticleKineticEnergy(
+                particle_index,
+            )
 
     def GeoBuildParticleContactLists(self):
         position_buffer = int(self.ShaderFlags.positionBuffer)

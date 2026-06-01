@@ -108,6 +108,23 @@ def _total_kinetic_energy(particles):
     return sum(_particle_kinetic_energy(particle) for particle in particles)
 
 
+def _total_report_kinetic_energy(particles, field_name):
+    return sum(float(getattr(particle, field_name, 0.0)) for particle in particles)
+
+
+def _total_internal_momentum(particles):
+    total_internal_momentum = 0.0
+    for particle in particles:
+        total_internal_momentum += float(
+            getattr(
+                particle,
+                "internal_momentum",
+                getattr(getattr(particle, "Data", object()), "z", 0.0),
+            )
+        )
+    return total_internal_momentum
+
+
 def _relative_speed(particles):
     if len(particles) < 2:
         return 0.0
@@ -131,8 +148,13 @@ def _motion_summary(start_diagnostics, particles):
     start_total_momentum = start_diagnostics["total_momentum"]
     start_x, start_y = start_total_momentum
     current_x, current_y = _total_momentum(particles)
+    current_total_p = math.hypot(current_x, current_y)
+    total_internal_momentum = _total_internal_momentum(particles)
+    curr_plus_internal_mom = current_total_p + total_internal_momentum
     start_ke = start_diagnostics["ke"]
     current_ke = _total_kinetic_energy(particles)
+    frame_start_ke = _total_report_kinetic_energy(particles, "report_frame_start_ke")
+    after_resolve_ke = _total_report_kinetic_energy(particles, "report_after_resolve_ke")
     start_rel_speed = start_diagnostics["rel_speed"]
     current_rel_speed = _relative_speed(particles)
     return {
@@ -141,9 +163,16 @@ def _motion_summary(start_diagnostics, particles):
         "start_total_p": math.hypot(start_x, start_y),
         "current_total_px": current_x,
         "current_total_py": current_y,
-        "current_total_p": math.hypot(current_x, current_y),
+        "current_total_p": current_total_p,
+        "total_internal_mom": total_internal_momentum,
+        "curr_plus_internal_mom": curr_plus_internal_mom,
+        "start_minus_curr_plus_internal_mom": (
+            math.hypot(start_x, start_y) - curr_plus_internal_mom
+        ),
         "start_ke": start_ke,
         "curr_ke": current_ke,
+        "frame_start_ke": frame_start_ke,
+        "after_resolve_ke": after_resolve_ke,
         "ke_drift": current_ke - start_ke,
         "start_rel_speed": start_rel_speed,
         "curr_rel_speed": current_rel_speed,
@@ -167,7 +196,7 @@ def _particle_report_row(particle):
         f" y={particle.ry:>13.6f}"
         f" vx={particle.vx:>13.6f}"
         f" vy={particle.vy:>13.6f}"
-        f" oa={particle.oa:>14.8f}"
+        f" int_mom={getattr(particle, 'report_stored_mom', 0.0):>14.8f}"
     )
 
 
@@ -282,6 +311,12 @@ def _draw_particles(
             "current_total_mom",
             motion_summary["current_total_px"],
             motion_summary["current_total_py"],
+        ),
+        (
+            f"internal_mom      "
+            f" total={motion_summary['total_internal_mom']:>14.8f}"
+            f" curr+int={motion_summary['curr_plus_internal_mom']:>14.8f}"
+            f" drift={motion_summary['start_minus_curr_plus_internal_mom']:>14.8f}"
         ),
         _momentum_row(
             "drift",
