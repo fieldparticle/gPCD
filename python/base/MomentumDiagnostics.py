@@ -76,6 +76,20 @@ def _particle_masses_from_cfg(cfg_path):
     return masses
 
 
+def _run_dt_from_cfg(cfg_path):
+    if cfg_path is None:
+        return None
+    cfg_path = Path(cfg_path)
+    if not cfg_path.exists():
+        return None
+    with cfg_path.open("r", encoding="utf-8") as cfg_file:
+        cfg = libconf.load(cfg_file)
+    run_cfg = cfg.get("RUN_CONFIGURATION", {})
+    if "dt" not in run_cfg:
+        return None
+    return float(run_cfg["dt"])
+
+
 def _particle_series(report_dir, cfg_path=None, report_mode="live"):
     masses = _particle_masses_from_cfg(cfg_path)
     series = []
@@ -160,7 +174,11 @@ def _momentum_series(momentum_csv):
     return {
         "frames": [int(_float(row, "frame")) for row in rows],
         "start_total": [_float(row, "start_total_p") for row in rows],
+        "start_px": [_float(row, "start_px") for row in rows],
+        "start_py": [_float(row, "start_total_py") for row in rows],
         "current_total": [_float(row, "curr_total_p") for row in rows],
+        "current_px": [_float(row, "curr_px") for row in rows],
+        "current_py": [_float(row, "curr_py") for row in rows],
         "internal_total": internal_total,
         "current_plus_internal": [
             _float(row, "curr_plus_internal_mom")
@@ -451,6 +469,56 @@ def _write_panel_data_with_extra(output_dir, panel_name, frames, series, extra_s
     return _write_panel_data(output_dir, panel_name, frames, [*series, *extra_series])
 
 
+def _latest(series, name):
+    values = series.get(name, [])
+    return values[-1] if values else 0.0
+
+
+def _draw_totals_panel(axis, item, series):
+    frame = _latest(series, "frames")
+    mode = item.get("report_mode", _report_mode_from_momentum_path(item["momentum_csv"]))
+    dt = _run_dt_from_cfg(item.get("cfg_path"))
+    time_text = f"  time {frame * dt:.12g}" if dt is not None else ""
+    lines = [
+        f"{item['name']}  {mode}  frame {frame}{time_text}",
+        (
+            "start "
+            f"p={_latest(series, 'start_total'):.12g} "
+            f"px={_latest(series, 'start_px'):.12g} "
+            f"py={_latest(series, 'start_py'):.12g}"
+        ),
+        (
+            "current "
+            f"p={_latest(series, 'current_total'):.12g} "
+            f"px={_latest(series, 'current_px'):.12g} "
+            f"py={_latest(series, 'current_py'):.12g}"
+        ),
+        (
+            "internal "
+            f"p={_latest(series, 'internal_total'):.12g} "
+            f"curr+internal={_latest(series, 'current_plus_internal'):.12g} "
+            f"drift={_latest(series, 'momentum_balance'):.12g}"
+        ),
+        (
+            "KE "
+            f"current={_latest(series, 'current_ke'):.12g} "
+            f"drift={_latest(series, 'ke_drift'):.12g}"
+        ),
+    ]
+    axis.clear()
+    axis.set_axis_off()
+    axis.text(
+        0.01,
+        0.5,
+        "\n".join(lines),
+        transform=axis.transAxes,
+        va="center",
+        ha="left",
+        family="monospace",
+        fontsize=10,
+    )
+
+
 def plot_momentum_diagnostics(momentum_csv, output_svg=None, title=None, cfg_path=None):
     momentum_csv = Path(momentum_csv)
     series_data = _momentum_series(momentum_csv)
@@ -644,7 +712,8 @@ def plot_batch(batch_cfg, report_mode="live"):
 def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     series = _momentum_series(item["momentum_csv"])
     frames = series["frames"]
-    top_axis, middle_axis, bottom_axis = axes
+    totals_axis, top_axis, middle_axis, bottom_axis = axes
+    _draw_totals_panel(totals_axis, item, series)
     top_axis.clear()
     middle_axis.clear()
     bottom_axis.clear()
@@ -803,8 +872,14 @@ def show_batch_menu(batch_cfg, report_mode="live"):
     for item in items:
         item["report_mode"] = current_report_mode["mode"]
 
-    fig, axes = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
-    fig.subplots_adjust(left=0.32, hspace=0.44)
+    fig, axes = plt.subplots(
+        4,
+        1,
+        figsize=(12, 11),
+        sharex=False,
+        gridspec_kw={"height_ratios": [0.9, 2.0, 2.0, 2.0]},
+    )
+    fig.subplots_adjust(left=0.32, hspace=0.48)
     menu_axis = fig.add_axes([0.03, 0.35, 0.24, 0.49])
     labels = [item["name"] for item in items]
     radio = RadioButtons(menu_axis, labels, active=0)
@@ -853,10 +928,10 @@ def show_batch_menu(batch_cfg, report_mode="live"):
 
     def toggle_particle(label):
         particle_visible[label] = not particle_visible[label]
-        for line in axes[0].lines:
+        for line in axes[1].lines:
             if line.get_label().startswith(f"{label} "):
                 line.set_visible(particle_visible[label])
-        axes[0].legend(loc="best")
+        axes[1].legend(loc="best")
         fig.canvas.draw_idle()
 
     radio.on_clicked(select)

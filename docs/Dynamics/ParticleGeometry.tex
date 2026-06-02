@@ -460,8 +460,9 @@ rebound because separating contacts have no closing hard-contact target, and a
 simple vector internal momentum ledger does not improve the three-particle
 kinetic-energy drift.
 
-The parabolic p-zero response is the current strongest shadow lead.  When a
-contact first has closing normal momentum, the shadow stores
+The fixed-reference p-zero response was the strongest shadow lead before the
+current velocity-progress experiment.  In that version, when a contact first
+had closing normal momentum, the shadow stored
 
 \begin{equation}
 P_{0,k} = \mu_k \max(0,-v_{n,k})
@@ -501,8 +502,40 @@ flip to a velocity-magnitude tolerance:
 |v_{n,k}| \leq \epsilon_v .
 \end{equation}
 
+The current shadow implementation keeps the parabolic target-ledger idea but
+removes geometric p-zero from compression control.  The contact stores an
+initial closing normal speed \(v_{0,k}\), computes velocity progress from the
+current/predicted normal speed, and uses:
+
+\begin{equation}
+f_k = 1-\operatorname{clamp}(s_k/v_{0,k},0,1),
+\qquad
+I^{target}_{k}
+=
+\mu_k v_{0,k}\left(1-\left(1-f_k\right)^2\right).
+\end{equation}
+
+The frame impulse is still:
+
+\begin{equation}
+\Delta I_k = I^{target}_{k}-I^{current}_{k}.
+\end{equation}
+
+Compression uses a predicted post-impulse closing speed so head-on contacts
+can begin storing internal momentum.  Rebound uses a predicted separating
+speed so a returning contact can begin releasing internal momentum.  The flip
+from compression to returning is based on velocity magnitude:
+
+\begin{equation}
+v_{close,k} \leq 0.01v_{0,k}.
+\end{equation}
+
 Once a shadow contact flips to returning, it should remain returning until the
-contact-owned shadow internal momentum drains or the contact ends.
+contact-owned shadow internal momentum drains or the contact ends.  This
+velocity-progress rule fixed the all-zero shadow response in
+\texttt{TwoParticleHorizontal}; the remaining limitation is the long release
+tail, where particles separate slowly and stored internal momentum drains only
+after many frames.
 
 \section{Known Limitations}
 \label{sec:known-limitations}
@@ -524,9 +557,10 @@ The current Geo rule is intentionally simple and incomplete:
     Current diagnostics show that the remaining loss in
     \texttt{ThreeParticle} and \texttt{ThreeParticleChase} is not explained by
     rebound direction drift, target-ratio allocation, or a simple vector
-    internal momentum ledger.  The best current lead is a fixed-reference
-    p-zero/contact-progress target to be implemented next in
-    \texttt{ShadowDynamics.py}, with velocity-magnitude flip tolerance.
+    internal momentum ledger.  The current shadow lead is a velocity-progress
+    target implemented in \texttt{ShadowDynamics.py}.  It starts compression
+    correctly in \texttt{TwoParticleHorizontal}, but rebound timing/strength
+    still needs work.
     \item Wall response is not part of this particle-pair geometry note.
 \end{itemize}
 

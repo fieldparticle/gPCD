@@ -329,9 +329,9 @@ Historical in-place shadow families such as \texttt{shadow\_*},
 \texttt{vector\_shadow\_*}, \texttt{target\_ratio\_*},
 \texttt{vector\_internal\_*}, and \texttt{parabolic\_*} have been removed from
 the live dynamics path.  Future experiments belong in
-\texttt{ShadowDynamics.py}.  The current accepted next experiment is the
-fixed-reference p-zero/contact-progress response with a velocity-magnitude
-flip tolerance.
+\texttt{ShadowDynamics.py}.  The current shadow experiment uses a
+velocity-reference progress variable instead of a geometric p-zero overlap
+reference.
 
 \subsection{Fixed P-Zero Shadow Convention}
 
@@ -452,9 +452,68 @@ The implementation must keep the functions narrow:
 \end{itemize}
 
 The old in-\texttt{GeoDynamics.py} shadow diagnostics are historical
-scaffolding and have been removed from the live path.  The next implementation
-step is to add the parabolic velocity response to \texttt{ShadowDynamics.py}
-and record its values in \texttt{contacts\_s.csv}.
+scaffolding and have been removed from the live path.  The parabolic
+velocity-progress experiment now lives in \texttt{ShadowDynamics.py} and is
+reported through \texttt{contacts\_s.csv}.
+
+\subsection{Velocity-Progress Shadow Response}
+
+The current shadow implementation removes geometric p-zero from compression
+control.  Each directed contact stores a contact-owned velocity reference:
+
+\begin{verbatim}
+particle.contact_velocity_reference[TargetID]
+\end{verbatim}
+
+The reference is set from the first closing normal speed:
+
+\begin{equation}
+v_{0,k} = \max(0,-v_{n,k}).
+\end{equation}
+
+The parabolic response then uses velocity progress rather than overlap
+progress.  During compression, the progress uses a predicted post-impulse
+closing speed so a perfectly head-on collision can start moving even before
+the measured relative velocity has changed:
+
+\begin{equation}
+s_k = \max\left(0,\; v_{close,k} - J^{seed}_k/\mu_k\right).
+\end{equation}
+
+During rebound, the progress uses the predicted separating speed:
+
+\begin{equation}
+s_k = v_{separate,k} + J^{seed}_k/\mu_k.
+\end{equation}
+
+The progress and target internal momentum are:
+
+\begin{equation}
+f_k = 1-\operatorname{clamp}(s_k/v_{0,k},0,1),
+\qquad
+I^{target}_{k}
+=
+\mu_k v_{0,k}\left(1-\left(1-f_k\right)^2\right).
+\end{equation}
+
+The planned impulse remains the target-ledger delta:
+
+\begin{equation}
+\Delta I_k = I^{target}_{k}-I^{current}_{k}.
+\end{equation}
+
+Positive \(\Delta I_k\) stores internal momentum.  Negative \(\Delta I_k\)
+releases internal momentum.  The compression-to-rebound flip is based on
+velocity magnitude:
+
+\begin{equation}
+v_{close,k} \leq 0.01v_{0,k}.
+\end{equation}
+
+This rule fixed the all-zero shadow dynamics seen in
+\texttt{TwoParticleHorizontal}.  The current remaining issue is rebound
+quality: the contact can carry a long release tail instead of promptly
+returning the stored internal momentum to velocity.
 
 \subsection{Dynamics Versus Harness}
 
@@ -503,10 +562,10 @@ when it no longer describes the active Geo path.
     \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
     \item Keep live \texttt{GeoDynamics.py} clean while the next response rule
     is tested in \texttt{ShadowDynamics.py}.
-    \item Apply the next parabolic velocity-response experiment in
-    \texttt{ShadowDynamics.py}: use a fixed p-zero/contact-progress target for
-    contact internal momentum and change the compression-to-rebound flip logic
-    to velocity magnitude with tolerance.
+    \item Continue the parabolic velocity-progress experiment in
+    \texttt{ShadowDynamics.py}.  Compression now produces nonzero shadow
+    dynamics in \texttt{TwoParticleHorizontal}; the next fix is rebound
+    strength/timing so stored internal momentum returns without a long tail.
     \item Treat wall/out-of-bounds behavior as a separate problem after the
     particle-particle multi-contact rule is stable.
     \item Add reporting only through \texttt{Reporting.py}, not through dynamics.

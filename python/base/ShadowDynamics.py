@@ -144,6 +144,24 @@
         else:
             source.contact_internal_phase[TargetID] = phase
 
+    def GeoContactVelocityReference(self, SourceID, TargetID):
+        source = self.particles[SourceID]
+        references = getattr(source, "contact_velocity_reference", None)
+        if references is None:
+            source.contact_velocity_reference = {}
+            references = source.contact_velocity_reference
+        return max(0.0, references.get(TargetID, 0.0))
+
+    def GeoSetContactVelocityReference(self, SourceID, TargetID, velocity_reference):
+        source = self.particles[SourceID]
+        if not hasattr(source, "contact_velocity_reference"):
+            source.contact_velocity_reference = {}
+        velocity_reference = max(0.0, velocity_reference)
+        if velocity_reference <= self.GEO_EPSILON:
+            source.contact_velocity_reference.pop(TargetID, None)
+        else:
+            source.contact_velocity_reference[TargetID] = velocity_reference
+
     def GeoPruneInactiveContactLedgers(self, SourceID):
         """Keep contact memory tied to contacts active in the current frame."""
         source = self.particles[SourceID]
@@ -156,6 +174,10 @@
             for TargetID in list(source.contact_internal_phase.keys()):
                 if TargetID not in active_targets:
                     source.contact_internal_phase.pop(TargetID, None)
+        if hasattr(source, "contact_velocity_reference"):
+            for TargetID in list(source.contact_velocity_reference.keys()):
+                if TargetID not in active_targets:
+                    source.contact_velocity_reference.pop(TargetID, None)
         self.GeoSyncInternalMomentum(SourceID)
 
     def GeoBeginContactFrame(self, SourceID):
@@ -250,6 +272,76 @@
         scale = max(0.0, min(1.0, planned_impulse / candidate_impulse))
         return compression_impulse * scale, release_impulse * scale
 
+    def GeoVelocityProgressImpulse(
+        self,
+        SourceID,
+        TargetID,
+        relative_normal_velocity,
+        contact_internal_momentum,
+        contact_phase_start,
+        raw_impulse,
+        weighted_available_momentum,
+    ):
+        reduced_mass = self.GeoReducedMass(SourceID, TargetID)
+        closing_speed = max(0.0, -relative_normal_velocity)
+        velocity_reference = self.GeoContactVelocityReference(SourceID, TargetID)
+
+        if velocity_reference <= self.GEO_EPSILON and closing_speed > self.GEO_EPSILON:
+            velocity_reference = closing_speed
+            self.GeoSetContactVelocityReference(SourceID, TargetID, velocity_reference)
+
+        if velocity_reference <= self.GEO_EPSILON or reduced_mass <= self.GEO_EPSILON:
+            return 0.0, 0.0, contact_internal_momentum, self.GEO_PHASE_COMPRESSION
+
+        velocity_tolerance = velocity_reference * 0.01
+        contact_phase = contact_phase_start
+        if (
+            contact_phase == self.GEO_PHASE_COMPRESSION
+            and closing_speed <= velocity_tolerance
+            and contact_internal_momentum > self.GEO_EPSILON
+        ):
+            contact_phase = self.GEO_PHASE_RETURNING
+
+        if contact_phase == self.GEO_PHASE_RETURNING:
+            separating_speed = max(0.0, relative_normal_velocity)
+            seed_impulse = min(raw_impulse, contact_internal_momentum)
+            speed_for_progress = separating_speed + seed_impulse / reduced_mass
+        else:
+            seed_impulse = 0.0
+            if closing_speed > self.GEO_EPSILON:
+                seed_impulse = min(raw_impulse, weighted_available_momentum)
+            speed_for_progress = max(0.0, closing_speed - seed_impulse / reduced_mass)
+        velocity_progress = 1.0 - (
+            min(speed_for_progress, velocity_reference)
+            / velocity_reference
+        )
+        velocity_progress = max(0.0, min(1.0, velocity_progress))
+        target_internal_momentum = reduced_mass * velocity_reference * (
+            1.0 - (1.0 - velocity_progress) ** 2.0
+        )
+        delta_impulse = target_internal_momentum - contact_internal_momentum
+
+        if contact_phase == self.GEO_PHASE_RETURNING:
+            compression_impulse = 0.0
+            release_impulse = min(contact_internal_momentum, max(0.0, -delta_impulse))
+        else:
+            compression_impulse = max(0.0, delta_impulse)
+            release_impulse = 0.0
+
+        stored_internal_momentum = max(
+            0.0,
+            contact_internal_momentum + compression_impulse - release_impulse,
+        )
+        if stored_internal_momentum <= self.GEO_EPSILON:
+            contact_phase = self.GEO_PHASE_COMPRESSION
+
+        return (
+            compression_impulse,
+            release_impulse,
+            stored_internal_momentum,
+            contact_phase,
+        )
+
     def GeoDirectedContactCandidate(
         self,
         SourceID,
@@ -286,29 +378,25 @@
         source_available_share = available_source_momentum * area_weight
         target_available_share = target_available_momentum * target_area_weight
         weighted_available_momentum = min(source_available_share, target_available_share)
-        compression_impulse = 0.0
-        release_impulse = 0.0
-        stored_internal_momentum = contact_internal_momentum
-        contact_phase = contact_phase_start
-
-        if (
-            contact_phase_start != self.GEO_PHASE_RETURNING
-            and relative_normal_velocity < -self.GEO_EPSILON
-        ):
-            compression_impulse = min(raw_impulse, weighted_available_momentum)
-            stored_internal_momentum += compression_impulse
-            contact_phase = (
-                self.GEO_PHASE_RETURNING
-                if compression_impulse < raw_impulse
-                else self.GEO_PHASE_COMPRESSION
-            )
-
-        if contact_phase == self.GEO_PHASE_RETURNING:
-            release_capacity = contact_internal_momentum + compression_impulse
-            release_impulse = min(raw_impulse, release_capacity, stored_internal_momentum)
-            stored_internal_momentum -= release_impulse
-            if stored_internal_momentum <= self.GEO_EPSILON:
-                stored_internal_momentum = 0.0
+        (
+            compression_impulse,
+            release_impulse,
+            stored_internal_momentum,
+            contact_phase,
+        ) = self.GeoVelocityProgressImpulse(
+            SourceID,
+            TargetID,
+            relative_normal_velocity,
+            contact_internal_momentum,
+            contact_phase_start,
+            raw_impulse,
+            weighted_available_momentum,
+        )
+        compression_impulse = min(compression_impulse, weighted_available_momentum)
+        stored_internal_momentum = max(
+            0.0,
+            contact_internal_momentum + compression_impulse - release_impulse,
+        )
 
         return {
             "candidate_impulse": compression_impulse + release_impulse,

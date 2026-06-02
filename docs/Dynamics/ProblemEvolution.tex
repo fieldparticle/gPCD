@@ -1143,3 +1143,75 @@ Once a contact enters the returning phase, that phase should persist until the
 shadow contact-owned internal momentum drains or the contact ends.  This keeps
 p-zero as part of the continuous response curve rather than as a separate
 special-case kick.
+
+\subsubsection{Velocity-Progress Shadow Response}
+
+After reviewing p-zero again, the model was reframed.  Rebound should be
+detected from relative normal velocity, not from a predicted geometric
+maximum-compression point.  The geometric p-zero reference was therefore
+removed from the current shadow compression rule and replaced with a
+contact-owned velocity reference.
+
+For each directed contact, the shadow stores the first closing normal speed:
+
+\begin{equation}
+v_{0,k}=\max(0,-v_{n,k}).
+\end{equation}
+
+The progress variable is based on the current or predicted normal speed:
+
+\begin{equation}
+f_k = 1-\operatorname{clamp}(s_k/v_{0,k},0,1).
+\end{equation}
+
+The target internal momentum remains parabolic:
+
+\begin{equation}
+I^{target}_{k}
+=
+\mu_kv_{0,k}\left(1-\left(1-f_k\right)^2\right),
+\qquad
+\Delta I_k=I^{target}_{k}-I^{current}_{k}.
+\end{equation}
+
+A perfectly head-on two-particle collision exposed a bootstrap problem:
+because the measured relative velocity had not changed yet, the first
+velocity-progress target was zero and the shadow produced no dynamics in
+\texttt{TwoParticleHorizontal}.  The current shadow rule fixes that by using a
+predicted post-impulse speed.  During compression:
+
+\begin{equation}
+s_k = \max(0,\;v_{close,k}-J^{seed}_k/\mu_k).
+\end{equation}
+
+During rebound:
+
+\begin{equation}
+s_k = v_{separate,k}+J^{seed}_k/\mu_k.
+\end{equation}
+
+The flip from compression to returning is based on velocity magnitude:
+
+\begin{equation}
+v_{close,k} \leq 0.01v_{0,k}.
+\end{equation}
+
+\subsubsection{Current Result}
+
+The shadow path now produces nonzero contact impulses and internal momentum
+for \texttt{TwoParticleHorizontal}; the earlier all-zero shadow dynamics are
+fixed.  \texttt{ThreeParticle} also continues to produce shadow contact data.
+
+The result is not yet a final response rule.  \texttt{TwoParticleHorizontal}
+still shows a long rebound tail: the particles begin separating, but stored
+internal momentum drains slowly instead of returning cleanly to velocity.  The
+next problem is therefore rebound strength/timing under the velocity-progress
+target, not compression startup.
+
+\subsubsection{Diagnostics Update}
+
+\texttt{MomentumDiagnostics.py} now includes a top totals panel in the
+interactive plot window.  The panel mirrors the UI totals that are hard to see
+while reviewing plots: frame, total time, start/current momentum, internal
+momentum, current plus internal momentum, drift, current kinetic energy, and
+kinetic-energy drift.

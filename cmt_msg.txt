@@ -1,13 +1,18 @@
-Separate shadow dynamics and document parabolic response path
+Add velocity-progress shadow response diagnostics
 
-Split shadow experimentation into the standalone ShadowBase/ShadowDynamics
-path and remove the old in-place shadow/parabolic/vector diagnostic fields
-from live and shadow dynamics. Keep live GeoDynamics clean while shadow
-captures write through *_s.csv reporting.
+Implement a shadow-only parabolic velocity-progress response in
+ShadowDynamics. Store a per-contact velocity reference, compute target
+internal momentum from relative-normal velocity progress, and add predicted
+compression/rebound seed speeds so head-on contacts produce nonzero shadow
+dynamics.
+
+Add a totals panel to MomentumDiagnostics so plot windows show frame/time,
+momentum balance, internal momentum, and KE drift without needing the UI.
 
 Update GeoConventions, ParticleGeometry, and ProblemEvolution to record the
-new shadow-object convention, the completed cleanup checkpoint, and the next
-step: apply parabolic velocity response in ShadowDynamics and change the
-compression-to-rebound flip logic to velocity magnitude with tolerance.
+move away from geometric p-zero compression control, the fixed
+TwoParticleHorizontal shadow startup issue, and the remaining long rebound
+tail.
 
-Next: implement parabolic velocity response in ShadowDynamics.
+Next: fix rebound strength/timing so velocity-progress shadow contacts return
+stored internal momentum cleanly.
