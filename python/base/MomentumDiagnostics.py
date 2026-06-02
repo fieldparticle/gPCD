@@ -188,6 +188,7 @@ def _momentum_series(momentum_csv):
             _float(row, "start_minus_curr_plus_internal_mom")
             for row in rows
         ],
+        "start_ke": [_float(row, "start_ke") for row in rows],
         "current_ke": current_ke,
         "negative_current_ke": negative_current_ke,
         "negative_current_ke_scaled": _scale_like(
@@ -480,34 +481,40 @@ def _draw_totals_panel(axis, item, series):
     frame = _latest(series, "frames")
     mode = item.get("report_mode", _report_mode_from_momentum_path(item["momentum_csv"]))
     dt = _run_dt_from_cfg(item.get("cfg_path"))
-    time_text = f"  time {frame * dt:.12g}" if dt is not None else ""
+    time_text = f"time={frame * dt:>13.8g}" if dt is not None else ""
+    def field(label, value):
+        return f"{label}={value:>14.8g}"
+
     lines = [
-        f"{item['name']}  {mode}  frame {frame}{time_text}",
-        (
-            "start "
-            f"p={_latest(series, 'start_total'):.12g} "
-            f"px={_latest(series, 'start_px'):.12g} "
-            f"py={_latest(series, 'start_py'):.12g}"
-        ),
-        (
-            "current "
-            f"p={_latest(series, 'current_total'):.12g} "
-            f"px={_latest(series, 'current_px'):.12g} "
-            f"py={_latest(series, 'current_py'):.12g}"
-        ),
-        (
-            "internal "
-            f"p={_latest(series, 'internal_total'):.12g} "
-            f"curr+internal={_latest(series, 'current_plus_internal'):.12g} "
-            f"drift={_latest(series, 'momentum_balance'):.12g}"
-        ),
-        (
-            "KE "
-            f"current={_latest(series, 'current_ke'):.12g} "
-            f"drift={_latest(series, 'ke_drift'):.12g} "
-            f"v_rel={_latest(series, 'v_rel'):.12g} "
-            f"raw_impulse={_latest(series, 'raw_impulse'):.12g}"
-        ),
+        f"{item['name']}  {mode}  frame={int(frame):>8} {time_text}",
+        "start   "
+        + field("p", _latest(series, "start_total"))
+        + " "
+        + field("px", _latest(series, "start_px"))
+        + " "
+        + field("py", _latest(series, "start_py")),
+        "current "
+        + field("p", _latest(series, "current_total"))
+        + " "
+        + field("px", _latest(series, "current_px"))
+        + " "
+        + field("py", _latest(series, "current_py")),
+        "internal "
+        + field("p", _latest(series, "internal_total"))
+        + " "
+        + field("curr+int", _latest(series, "current_plus_internal"))
+        + " "
+        + field("drift", _latest(series, "momentum_balance")),
+        "KE      "
+        + field("start", _latest(series, "start_ke"))
+        + " "
+        + field("current", _latest(series, "current_ke"))
+        + " "
+        + field("drift", _latest(series, "ke_drift")),
+        "contact "
+        + field("v_rel", _latest(series, "v_rel"))
+        + " "
+        + field("raw_impulse", _latest(series, "raw_impulse")),
     ]
     axis.clear()
     axis.set_axis_off()

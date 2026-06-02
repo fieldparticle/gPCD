@@ -162,6 +162,24 @@
         else:
             source.contact_velocity_reference[TargetID] = velocity_reference
 
+    def GeoContactReboundReference(self, SourceID, TargetID):
+        source = self.particles[SourceID]
+        references = getattr(source, "contact_rebound_reference", None)
+        if references is None:
+            source.contact_rebound_reference = {}
+            references = source.contact_rebound_reference
+        return max(0.0, references.get(TargetID, 0.0))
+
+    def GeoSetContactReboundReference(self, SourceID, TargetID, rebound_reference):
+        source = self.particles[SourceID]
+        if not hasattr(source, "contact_rebound_reference"):
+            source.contact_rebound_reference = {}
+        rebound_reference = max(0.0, rebound_reference)
+        if rebound_reference <= self.GEO_EPSILON:
+            source.contact_rebound_reference.pop(TargetID, None)
+        else:
+            source.contact_rebound_reference[TargetID] = rebound_reference
+
     def GeoPruneInactiveContactLedgers(self, SourceID):
         """Keep contact memory tied to contacts active in the current frame."""
         source = self.particles[SourceID]
@@ -178,6 +196,10 @@
             for TargetID in list(source.contact_velocity_reference.keys()):
                 if TargetID not in active_targets:
                     source.contact_velocity_reference.pop(TargetID, None)
+        if hasattr(source, "contact_rebound_reference"):
+            for TargetID in list(source.contact_rebound_reference.keys()):
+                if TargetID not in active_targets:
+                    source.contact_rebound_reference.pop(TargetID, None)
         self.GeoSyncInternalMomentum(SourceID)
 
     def GeoBeginContactFrame(self, SourceID):
@@ -301,10 +323,17 @@
             and contact_internal_momentum > self.GEO_EPSILON
         ):
             contact_phase = self.GEO_PHASE_RETURNING
+            self.GeoSetContactReboundReference(
+                SourceID,
+                TargetID,
+                contact_internal_momentum,
+            )
 
         if contact_phase == self.GEO_PHASE_RETURNING:
             compression_impulse = 0.0
             release_impulse = self.GeoReboundProfileImpulse(
+                SourceID,
+                TargetID,
                 contact_internal_momentum,
                 raw_impulse,
             )
@@ -343,6 +372,7 @@
         )
         if stored_internal_momentum <= self.GEO_EPSILON:
             contact_phase = self.GEO_PHASE_COMPRESSION
+            self.GeoSetContactReboundReference(SourceID, TargetID, 0.0)
 
         return (
             compression_impulse,
@@ -351,10 +381,30 @@
             contact_phase,
         )
 
-    def GeoReboundProfileImpulse(self, contact_internal_momentum, raw_impulse):
-        """Return stored momentum through the current rebound profile."""
+    def GeoReboundProfileImpulse(
+        self,
+        SourceID,
+        TargetID,
+        contact_internal_momentum,
+        raw_impulse,
+    ):
+        """Return stored momentum through the parabolic rebound profile."""
         if contact_internal_momentum <= self.GEO_EPSILON:
             return 0.0
+        rebound_reference = self.GeoContactReboundReference(SourceID, TargetID)
+        if rebound_reference <= self.GEO_EPSILON:
+            rebound_reference = contact_internal_momentum
+            self.GeoSetContactReboundReference(SourceID, TargetID, rebound_reference)
+        release_seed = raw_impulse if raw_impulse > self.GEO_EPSILON else contact_internal_momentum
+        released_momentum = max(0.0, rebound_reference - contact_internal_momentum)
+        release_progress = min(
+            1.0,
+            (released_momentum + release_seed) / rebound_reference,
+        )
+        remaining_target = rebound_reference * (1.0 - release_progress) ** 2.0
+        release_impulse = max(0.0, contact_internal_momentum - remaining_target)
+        if release_impulse > self.GEO_EPSILON:
+            return min(contact_internal_momentum, release_impulse)
         if raw_impulse <= self.GEO_EPSILON:
             return contact_internal_momentum
         return min(contact_internal_momentum, raw_impulse)

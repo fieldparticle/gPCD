@@ -426,7 +426,7 @@ simulation object.  The live object remains
 \texttt{ShadowBase + ShadowDynamics}.  Both are initialized from the same
 configuration data, but after initialization their particles, ledgers, phases,
 velocities, positions, and reports are separate.  Shadow reports use
-\texttt{*_s.csv}.
+%\texttt{*_s.csv}.
 
 Earlier in-place diagnostic families have served their purpose and are no
 longer part of live \texttt{GeoDynamics.py}.  Those historical families
@@ -460,9 +460,8 @@ rebound because separating contacts have no closing hard-contact target, and a
 simple vector internal momentum ledger does not improve the three-particle
 kinetic-energy drift.
 
-The fixed-reference p-zero response was the strongest shadow lead before the
-current velocity-progress experiment.  In that version, when a contact first
-had closing normal momentum, the shadow stored
+The parabolic p-zero response is the current strongest shadow lead.  When a
+contact first has closing normal momentum, the shadow stores
 
 \begin{equation}
 P_{0,k} = \mu_k \max(0,-v_{n,k})
@@ -502,49 +501,17 @@ flip to a velocity-magnitude tolerance:
 |v_{n,k}| \leq \epsilon_v .
 \end{equation}
 
-The current shadow implementation keeps the parabolic target-ledger idea but
-removes geometric p-zero from compression control.  The contact stores an
-initial closing normal speed \(v_{0,k}\), computes velocity progress from the
-current/predicted normal speed, and uses:
+Once a shadow contact flips to returning, it should remain returning until the
+contact-owned shadow internal momentum drains or the contact ends.
 
-\begin{equation}
-f_k = 1-\operatorname{clamp}(s_k/v_{0,k},0,1),
-\qquad
-I^{target}_{k}
-=
-\mu_k v_{0,k}\left(1-\left(1-f_k\right)^2\right).
-\end{equation}
-
-The frame impulse is still:
-
-\begin{equation}
-\Delta I_k = I^{target}_{k}-I^{current}_{k}.
-\end{equation}
-
-Compression uses a predicted post-impulse closing speed so head-on contacts
-can begin storing internal momentum.  The flip from compression to returning is
-based on velocity magnitude:
-
-\begin{equation}
-v_{close,k} \leq 0.01v_{0,k}.
-\end{equation}
-
-Once a shadow contact flips to returning, rebound is driven directly from the
-stored contact-owned internal momentum:
-
-\begin{equation}
-J^{release}_k = \min(I^{current}_k,J^{raw}_k),
-\qquad
-J^{raw}_k = q_k A_k \Delta t.
-\end{equation}
-
-This direct release fixed the long stored-momentum tail in
-\texttt{TwoParticleHorizontal}; internal momentum now drains promptly.  The
-remaining limitation is that the rebound internal-momentum curve changes
-shape.  Compression stores momentum through the velocity-progress parabola,
-but rebound drains through the raw overlap impulse profile.  The next shadow
-experiment should store the maximum internal momentum at the flip and use a
-parabolic remaining-momentum target for rebound.
+The latest shadow result shows that draining the scalar internal momentum
+ledger is not sufficient for angled contacts.  In \texttt{TwoParticleAngled},
+the ledger reaches zero but the final kinetic energy remains low.  Because
+energy is diagnostic-only, the next rule should not target energy directly.
+Instead, the parabolic target should be imposed on relative normal velocity or
+normal momentum.  The scalar internal momentum ledger then acts as the rebound
+budget, while the actual impulse is chosen from the difference between current
+and target normal momentum.
 
 \section{Known Limitations}
 \label{sec:known-limitations}
@@ -563,13 +530,11 @@ The current Geo rule is intentionally simple and incomplete:
     ledgers are keyed by target under the source particle, while slots are
     rebuilt from the current frame's contact list.
     \item The response is not guaranteed to conserve kinetic energy.
-    Current diagnostics show that the remaining loss in
-    \texttt{ThreeParticle} and \texttt{ThreeParticleChase} is not explained by
-    rebound direction drift, target-ratio allocation, or a simple vector
-    internal momentum ledger.  The current shadow lead is a velocity-progress
-    target implemented in \texttt{ShadowDynamics.py}.  It starts compression
-    correctly in \texttt{TwoParticleHorizontal} and direct release drains the
-    ledger, but rebound is not yet shape-compatible with compression.
+    Current diagnostics show that a scalar internal-momentum parabola can
+    drain fully while angled-contact kinetic energy remains low.  The current
+    shadow lead is to impose the parabolic target on relative normal
+    velocity/normal momentum, while using contact-owned internal momentum only
+    as the rebound budget.
     \item Wall response is not part of this particle-pair geometry note.
 \end{itemize}
 

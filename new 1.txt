@@ -4,3 +4,5 @@ or release must be driven directly by stored internal momentum and the rebound p
 A more parabolic rebound profile could be:
 release_fraction = 1.0 - contact_internal_momentum / max_internal_momentum
 release_impulse = contact_internal_momentum * profile_gain
+
+So lets start with TwoParticle angled. KE drift = -2E-6. 

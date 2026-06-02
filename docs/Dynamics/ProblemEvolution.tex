@@ -1144,147 +1144,48 @@ shadow contact-owned internal momentum drains or the contact ends.  This keeps
 p-zero as part of the continuous response curve rather than as a separate
 special-case kick.
 
-\subsubsection{Velocity-Progress Shadow Response}
+\subsubsection{Normal Velocity Target Direction}
 
-After reviewing p-zero again, the model was reframed.  Rebound should be
-detected from relative normal velocity, not from a predicted geometric
-maximum-compression point.  The geometric p-zero reference was therefore
-removed from the current shadow compression rule and replaced with a
-contact-owned velocity reference.
-
-For each directed contact, the shadow stores the first closing normal speed:
-
-\begin{equation}
-v_{0,k}=\max(0,-v_{n,k}).
-\end{equation}
-
-The progress variable is based on the current or predicted normal speed:
-
-\begin{equation}
-f_k = 1-\operatorname{clamp}(s_k/v_{0,k},0,1).
-\end{equation}
-
-The target internal momentum remains parabolic:
-
-\begin{equation}
-I^{target}_{k}
-=
-\mu_kv_{0,k}\left(1-\left(1-f_k\right)^2\right),
-\qquad
-\Delta I_k=I^{target}_{k}-I^{current}_{k}.
-\end{equation}
-
-A perfectly head-on two-particle collision exposed a bootstrap problem:
-because the measured relative velocity had not changed yet, the first
-velocity-progress target was zero and the shadow produced no dynamics in
-\texttt{TwoParticleHorizontal}.  The current shadow rule fixes that by using a
-predicted post-impulse speed.  During compression:
-
-\begin{equation}
-s_k = \max(0,\;v_{close,k}-J^{seed}_k/\mu_k).
-\end{equation}
-
-During rebound:
-
-\begin{equation}
-s_k = v_{separate,k}+J^{seed}_k/\mu_k.
-\end{equation}
-
-The flip from compression to returning is based on velocity magnitude:
-
-\begin{equation}
-v_{close,k} \leq 0.01v_{0,k}.
-\end{equation}
-
-\subsubsection{Current Result}
-
-The shadow path now produces nonzero contact impulses and internal momentum
-for \texttt{TwoParticleHorizontal}; the earlier all-zero shadow dynamics are
-fixed.  \texttt{ThreeParticle} also continues to produce shadow contact data.
-
-The result is not yet a final response rule.  \texttt{TwoParticleHorizontal}
-still shows a long rebound tail: the particles begin separating, but stored
-internal momentum drains slowly instead of returning cleanly to velocity.  The
-next problem is therefore rebound strength/timing under the velocity-progress
-target, not compression startup.
-
-\subsubsection{Diagnostics Update}
-
-\texttt{MomentumDiagnostics.py} now includes a top totals panel in the
-interactive plot window.  The panel mirrors the UI totals that are hard to see
-while reviewing plots: frame, total time, start/current momentum, internal
-momentum, current plus internal momentum, drift, current kinetic energy, and
-kinetic-energy drift.
-
-\subsubsection{Direct Ledger-Driven Rebound}
-
-The velocity-progress shadow fixed compression startup, but the first rebound
-version still asked the velocity-progress target to fall before releasing
-stored internal momentum.  In \texttt{TwoParticleHorizontal}, the contact did
-flip to returning, but release remained zero because the target internal
-momentum stayed near the stored ledger value.
-
-The next shadow change separated the phases:
-
-\begin{itemize}[leftmargin=*]
-    \item compression uses the velocity-progress parabolic target;
-    \item returning releases directly from stored contact internal momentum.
-\end{itemize}
-
-The first direct rebound profile is:
-
-\begin{equation}
-J^{release}_k = \min(I^{current}_k,J^{raw}_k),
-\qquad
-J^{raw}_k = q_k A_k \Delta t.
-\end{equation}
-
-If current overlap has ended and \(J^{raw}_k\) is zero, the shadow drains the
-remaining internal momentum so a closed contact cannot keep a stale ledger.
-
-This fixed the long stored-momentum tail in
-\texttt{TwoParticleHorizontal}.  The shadow drains internal momentum by about
-frame 81 instead of carrying it for hundreds of frames.  However, the final
-rebound speed is still too small: the test returns roughly \(0.02826\) instead
-of the original \(0.05\).  The internal-momentum curve now changes shape at
-rebound because compression is velocity-progress parabolic while rebound is
-raw-overlap driven.
-
-The current conclusion is that direct ledger-driven release is structurally
-right, but the rebound profile is not yet right.  The next shadow experiment
-should store the maximum internal momentum at the flip:
+The latest shadow tests improved \texttt{TwoParticleHorizontal}: the
+contact-owned rebound reference drains internal momentum and restores the
+horizontal rebound speed.  However, \texttt{TwoParticleAngled} still loses
+kinetic energy after rebound.  The capture files show the loss after the
+shadow contact has ended:
 
 \begin{verbatim}
-particle.contact_rebound_reference[TargetID]
+momentum_s.csv:
+total_internal_mom = 0
+ke_drift           < 0
 \end{verbatim}
 
-and use a parabolic remaining-momentum target during rebound:
+The particle files show that the loss is symmetric: both particles end with
+the same reduced kinetic energy.  This means the current problem is not
+unbalanced momentum between particles.  It is that the scalar internal
+momentum profile is not producing the intended final velocity magnitude when
+the contact normal changes during an angled collision.
 
-\begin{equation}
-I^{remaining}_{target,k}
-=
-I^{max}_{k}\left(1-f^{rebound}_{k}\right)^2,
-\qquad
-J^{release}_k
-=
-I^{current}_{k}-I^{remaining}_{target,k}.
-\end{equation}
+This does not change the convention that energy is diagnostic only.  The next
+shadow direction should still be velocity/momentum based.  The issue is where
+the parabolic profile is imposed.
 
-This would make rebound controlled by the contact-owned stored budget rather
-than by the shrinking overlap-area impulse.
-
-\subsubsection{Capture Schema Update}
-
-The capture files were trimmed to remove fields that are no longer part of the
-future diagnostic surface.  Particle files now keep particle-local state and
-particle-local kinetic-energy checkpoints.  Momentum files keep global totals
-and add the sequential pair diagnostics:
+The current shadow rule imposes the parabola on stored internal momentum:
 
 \begin{verbatim}
-v_rel
-raw_impulse
+progress -> target_internal_momentum
+target_internal_momentum - current_internal_momentum -> impulse
 \end{verbatim}
 
-These use the same rule: for two particles the pair is the other particle; for
-more than two particles the representative pair is particle 1 to the next
-sequential particle, particle 2.
+The next test should impose the profile on relative normal velocity or normal
+momentum:
+
+\begin{verbatim}
+progress -> target_relative_normal_velocity
+current_normal_momentum -> target_normal_momentum
+target_normal_momentum - current_normal_momentum -> impulse
+\end{verbatim}
+
+For compression this means reducing the current closing normal momentum toward
+a target closing normal momentum.  For rebound this means increasing the
+separating normal momentum toward a target separating normal momentum, while
+still capping release by the contact-owned internal momentum ledger.  Kinetic
+energy remains an output diagnostic, not a dynamics input.

@@ -1,22 +1,13 @@
-Add velocity-progress shadow rebound diagnostics
+Document normal-momentum shadow target direction
 
-Implement direct ledger-driven rebound in ShadowDynamics so returning contacts
-release from stored internal momentum instead of waiting for the velocity
-progress target to fall. This fixes the long stored-momentum tail in
-TwoParticleHorizontal, while exposing the next issue: rebound now drains
-through raw overlap impulse and is not shape-compatible with the parabolic
-compression profile.
+Update dynamics documentation with the latest shadow result: the rebound
+reference drains scalar internal momentum, but TwoParticleAngled still loses
+kinetic energy after the ledger reaches zero. Record that energy remains
+diagnostic-only and the next shadow experiment should impose the parabolic
+profile on relative normal velocity/normal momentum instead of scalar internal
+momentum.
 
-Trim capture schemas by removing obsolete relative-speed, repeated global
-particle fields, and stale parabolic diagnostic columns. Add representative
-v_rel and raw_impulse to momentum.csv/momentum_s.csv using the sequential
-particle rule.
+Keep contact-owned internal momentum as the rebound budget/cap, not the shaped
+dynamics target. Also clean up the shadow report typo in ProblemEvolution.
 
-Extend MomentumDiagnostics with a top totals panel and particle visibility
-controls for all plot panels.
-
-Update GeoConventions, ParticleGeometry, and ProblemEvolution with the current
-shadow findings and next step.
-
-Next: add a contact rebound reference and parabolic remaining-momentum rebound
-profile.
+Next: implement a shadow normal-momentum target for compression and rebound.

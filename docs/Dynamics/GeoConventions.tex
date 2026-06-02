@@ -522,6 +522,30 @@ the first direct rebound profile drains it through current raw overlap impulse.
 The next rebound experiment should store the internal momentum at flip and use
 a parabolic remaining-momentum target for rebound.
 
+\subsection{Normal Velocity Target Shadow Direction}
+
+Energy remains diagnostic-only.  The next shadow experiment must not use
+kinetic energy as a dynamics input.  The latest angled two-particle result
+shows that a parabolic scalar internal-momentum ledger can drain completely
+while the final kinetic energy remains low.  The next target should therefore
+be contact normal velocity or normal momentum, not total scalar internal
+momentum.
+
+For compression, the shadow should compute a target closing normal velocity
+and apply only the normal impulse needed to move from the current closing
+normal momentum toward that target.  For rebound, the shadow should compute a
+target separating normal velocity and release only enough stored internal
+momentum to move toward that normal-momentum target:
+
+\begin{equation}
+J_k =
+p^{target}_{n,k} - p^{current}_{n,k}.
+\end{equation}
+
+The contact-owned internal momentum ledger still caps rebound.  Kinetic energy
+is then used only to judge whether the velocity/momentum rule restored the
+expected collision behavior.
+
 \subsection{Dynamics Versus Harness}
 
 \texttt{GeoDynamics.py} should not:
@@ -571,9 +595,9 @@ when it no longer describes the active Geo path.
     is tested in \texttt{ShadowDynamics.py}.
     \item Continue the parabolic velocity-progress experiment in
     \texttt{ShadowDynamics.py}.  Compression now produces nonzero shadow
-    dynamics and direct release drains the ledger; the next fix is a parabolic
-    rebound profile so release is shape-compatible with compression and
-    restores velocity/kinetic energy.
+    dynamics and direct release drains the ledger; the next test is to impose
+    the parabolic target on relative normal velocity/normal momentum rather
+    than on scalar internal momentum.
     \item Treat wall/out-of-bounds behavior as a separate problem after the
     particle-particle multi-contact rule is stable.
     \item Add reporting only through \texttt{Reporting.py}, not through dynamics.
