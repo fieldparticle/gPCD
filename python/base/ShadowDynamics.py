@@ -306,6 +306,7 @@
     ):
         reduced_mass = self.GeoReducedMass(SourceID, TargetID)
         closing_speed = max(0.0, -relative_normal_velocity)
+        separating_speed = max(0.0, relative_normal_velocity)
         velocity_reference = self.GeoContactVelocityReference(SourceID, TargetID)
 
         if velocity_reference <= self.GEO_EPSILON and closing_speed > self.GEO_EPSILON:
@@ -331,12 +332,27 @@
 
         if contact_phase == self.GEO_PHASE_RETURNING:
             compression_impulse = 0.0
-            release_impulse = self.GeoReboundProfileImpulse(
-                SourceID,
-                TargetID,
-                contact_internal_momentum,
-                raw_impulse,
+            release_seed = raw_impulse if raw_impulse > self.GEO_EPSILON else contact_internal_momentum
+            released_momentum = max(
+                0.0,
+                self.GeoContactReboundReference(SourceID, TargetID)
+                - contact_internal_momentum,
             )
+            rebound_reference = self.GeoContactReboundReference(SourceID, TargetID)
+            if rebound_reference <= self.GEO_EPSILON:
+                rebound_reference = contact_internal_momentum
+                self.GeoSetContactReboundReference(SourceID, TargetID, rebound_reference)
+            release_progress = min(
+                1.0,
+                (released_momentum + release_seed) / rebound_reference,
+            )
+            target_separating_speed = velocity_reference * release_progress
+            current_normal_momentum = reduced_mass * separating_speed
+            target_normal_momentum = reduced_mass * target_separating_speed
+            release_impulse = max(0.0, target_normal_momentum - current_normal_momentum)
+            release_impulse = min(contact_internal_momentum, release_impulse)
+            if release_impulse <= self.GEO_EPSILON and raw_impulse <= self.GEO_EPSILON:
+                release_impulse = contact_internal_momentum
             stored_internal_momentum = max(
                 0.0,
                 contact_internal_momentum - release_impulse,
@@ -359,11 +375,13 @@
             / velocity_reference
         )
         velocity_progress = max(0.0, min(1.0, velocity_progress))
-        target_internal_momentum = reduced_mass * velocity_reference * (
-            1.0 - (1.0 - velocity_progress) ** 2.0
+        target_closing_speed = velocity_reference * (1.0 - velocity_progress)
+        current_normal_momentum = reduced_mass * closing_speed
+        target_normal_momentum = reduced_mass * target_closing_speed
+        compression_impulse = max(
+            0.0,
+            current_normal_momentum - target_normal_momentum,
         )
-        delta_impulse = target_internal_momentum - contact_internal_momentum
-        compression_impulse = max(0.0, delta_impulse)
         release_impulse = 0.0
 
         stored_internal_momentum = max(

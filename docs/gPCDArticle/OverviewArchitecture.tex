@@ -1,0 +1,15 @@
+\begin{figure}[h!]
+\centering
+\includegraphics[width=\textwidth]{OverviewArchitecture.png}
+\caption{
+(a) Traditional architectures separate rendering and collision
+detection into distinct processes. Rendering consumes simulation state,
+while occupancy generation is performed through dedicated
+collision-detection operations. (b) The gPCD framework integrates
+broad-phase occupancy generation directly into the graphics pipeline,
+allowing occupancy construction and rendering to proceed concurrently
+while producing the potentially colliding set used during narrow-phase
+evaluation.
+}
+\label{fig:overview_architecture}
+\end{figure}

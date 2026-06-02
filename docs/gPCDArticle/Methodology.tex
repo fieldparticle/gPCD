@@ -2,27 +2,23 @@
 \newpage
 \section{Methodology}
 
-The gPCD framework integrates broad-phase occupancy generation directly
-into the graphics pipeline. Rather than treating rendering as a
-downstream consumer of simulation state, occupancy construction is
-performed during graphics-pipeline execution within the vertex stage.
-The resulting occupancy information is then used to construct collision
-candidates for subsequent narrow-phase evaluation.
+The gPCD framework addresses the architectural gap identified in the
+previous section by integrating broad-phase occupancy generation
+directly into the graphics pipeline. The resulting framework allows
+occupancy construction and rendering to proceed concurrently while
+producing the potentially colliding set used during narrow-phase
+evaluation.
 
 \subsection{Framework Overview}
 
-\input{PipelinePlot}
 
+Figure~\ref{fig:overview_architecture}(a) illustrates the conventional
+organization in which rendering and collision detection operate as
+separate processes. Figure~\ref{fig:overview_architecture}(b) shows the
+gPCD framework, where broad-phase occupancy generation is integrated
+directly into the graphics pipeline, allowing occupancy construction and
+rendering to proceed concurrently.
 
-Figure~\ref{fig:gpcd_dataflow} illustrates the high-level organization
-of the gPCD framework. The framework consists of a graphics-pipeline
-broad phase and a compute-shader narrow phase. Particle state is first 
-processed by the graphics pipeline, where graphics-pipeline occupancy 
-generation constructs cell occupancy information from particle geometry.
-The resulting occupancy data are stored within a uniform cell array and
-used to construct candidate collision pairs. These candidates are then
-evaluated within a compute shader during narrow-phase collision
-detection.
 \input{CellSpans}
 
 
@@ -117,19 +113,46 @@ requiring a separate candidate-construction stage.
 Because a particle may occupy multiple cells and a collision may be
 represented within multiple neighboring occupancy lists, occupancy
 duplication and collision duplication can arise within the PCS.
-Figure~\ref{fig:occupancy_duplication} illustrates these effects. The
+Figure~\ref{fig:CellSpans} illustrates these effects. The
 resulting PCS is subsequently traversed during narrow-phase collision
 evaluation.
 
 
 \subsection{Narrow-Phase Evaluation}
 
-The candidate pairs generated during broad-phase construction are
-evaluated within a compute shader during narrow-phase collision
-detection. Each candidate pair is processed independently to determine
-whether a collision exists between the corresponding particles.
+Each particle maintains an array of eight corner-cell identifiers,
 
-Because occupancy construction may generate duplicate candidate pairs,
-narrow-phase evaluation operates on the potentially colliding set
-generated during candidate construction. The resulting collision set is
-subsequently used by the particle dynamics system.
+\begin{equation}
+\texttt{cornerCell}[8],
+\end{equation}
+
+where each entry stores the flattened cell index associated with one
+AABB corner. These indices are generated during occupancy construction
+and retained for subsequent narrow-phase evaluation.
+
+During narrow-phase execution, each particle traverses its
+\texttt{cornerCell} array. For each stored cell identifier, the
+corresponding occupancy list is accessed directly through the flattened
+cell index. The source particle is then compared against all particles
+occupying that cell to determine contact.
+
+During traversal of the \texttt{cornerCell} array, multiple corners of a
+source particle may reference the same occupied cell. These corner
+duplicates correspond to repeated cell accesses by the same particle and
+are discarded before collision evaluation.
+
+After duplicate cell references have been removed, the source particle
+is compared against all particles occupying each remaining cell.
+Because a particle pair may be encountered through multiple occupied
+cells, collision duplicates may still arise during evaluation.
+
+To prevent duplicate collision evaluations, each particle maintains a
+collision list containing the identifiers of particles with which a
+collision has already been registered during the current evaluation
+step. When a collision between a source particle and a target particle
+is detected, the identifier of the target particle is stored in the
+source particle's collision list. Subsequent interaction evaluations
+consult the collision list before performing collision determination.
+If the target particle identifier is already present, the interaction
+is classified as a duplicate and is discarded.
+

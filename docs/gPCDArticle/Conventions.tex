@@ -1,6 +1,108 @@
 % !TeX root = main.tex
+\newpage
+\section{Manuscript Outline}
+\begin{verbatim}
+Abstract
+    What was done?
+    Why is it important?
+    What was achieved?
 
-\subsection*{Audience and Explanation Level}
+1. Introduction
+    What problem is being solved?
+    Why does it matter?
+    What is the contribution?
+
+2. Background and Related Work
+    What must the reader know first?
+
+    2.1 Broad-Phase Collision Detection
+        What is occupancy generation and why is it needed?
+
+    2.2 Rendering and Collision Detection
+        How have rendering and collision detection traditionally
+        been organized?
+
+    2.3 Gap in Existing Methods
+        What architectural capability is missing?
+
+3. Methodology
+    How does gPCD work?
+
+    3.1 Framework Overview
+        What is the overall architecture?
+
+    3.2 Graphics-Pipeline Occupancy Generation
+        How is occupancy generated?
+
+    3.3 Corner-Based Occupancy Construction
+        How are corners used to populate cells?
+
+    3.4 Cell Addressing and Flattening
+        How are cells identified and accessed?
+
+    3.5 PCS Construction
+        How is the potentially colliding set formed?
+
+    3.6 Narrow-Phase Evaluation
+        How are collisions evaluated?
+
+4. Complexity Analysis
+    How should the framework scale?
+
+    4.1 Occupancy Generation
+        Cost of broad-phase occupancy generation.
+
+    4.2 Narrow-Phase Evaluation
+        Cost of collision evaluation.
+
+    4.3 Storage Requirements
+        Memory requirements of the architecture.
+
+    4.4 Overall Complexity
+        Combined computational and storage complexity.
+
+5. Experimental Setup
+    What was tested?
+
+    5.1 Hardware and Software
+        Evaluation platform.
+
+    5.2 Benchmark Configuration
+        Test conditions and parameters.
+
+    5.3 Benchmark Datasets
+        Particle counts and benchmark-density figures.
+
+6. Results
+    What happened?
+
+    6.1 Throughput
+        Measured particle throughput.
+
+    6.2 Time per Particle
+        Scaling efficiency.
+
+    6.3 Scaling Behavior
+        Regression analysis and scaling trends.
+
+7. Discussion
+    Why did it happen?
+
+    7.1 Interpretation of Scaling
+        Meaning of measured scaling.
+
+    7.2 Saturation Behavior
+        GPU saturation and throughput limits.
+
+    7.3 Comparison to Prior Work
+        Relative performance and architectural differences.
+
+8. Conclusions
+    What should the reader remember?
+
+\end{verbatim}
+
+\section{Audience and Explanation Level}
 
 The target audience for this manuscript consists primarily of ACM
 Transactions on Graphics (TOG) reviewers, computer graphics
@@ -44,7 +146,7 @@ textbook, it likely does not belong in the methodology. If the material
 describes a design decision, organizational principle, or algorithmic
 component unique to gPCD, it likely does belong in the methodology.
 
-\section*{Drafting Note}
+\section{Drafting Note}
 
 The conventions contained in this document are maintained as part of the
 working manuscript during the rough-draft and revision stages. Their
@@ -60,7 +162,7 @@ working notes should be removed from the final submission.
 Consequently, this document serves as both a notation reference and a
 development history for the gPCD manuscript.
 
-
+%================================================================================
 \section{Document Conventions and Research Governance}
 
 This document serves as the authoritative reference for terminology,
@@ -140,6 +242,23 @@ Topics that are explicitly outside the scope of this manuscript include:
 Such topics may be referenced only when necessary to provide context and
 shall not be presented as primary contributions of the manuscript.
 
+\subsection{Section Responsibilities}
+
+Each major section of the manuscript is intended to answer a distinct
+question.
+
+\begin{itemize}
+\item Methodology: What does the algorithm do?
+\item Complexity Analysis: How should the algorithm scale?
+\item Experimental Setup: How was the algorithm evaluated?
+\item Results: What performance was observed?
+\item Discussion: Why was this behavior observed and what are its implications?
+\item Conclusions: What should the reader take away from the work?
+\end{itemize}
+
+To avoid redundancy, complexity analysis, performance measurements, and
+interpretation are separated into their respective sections whenever
+possible.
 
 \subsection{Revision Procedure}
 
@@ -361,9 +480,10 @@ occupancy insertion.
 The term AABB (Axis-Aligned Bounding Box) shall be used throughout all
 manuscripts. Any occurrence of AARB shall be treated as a typographical
 error and corrected to AABB.
+%================================================================================
+\section{Document Structure}
 
-\subsection*{Architecture Hierarchy}
-
+\subsection{Architecture Hierarchy}
 \begin{enumerate}
     \item Graphics-Pipeline Occupancy Generation
     \item Vertex-Stage Occupancy Construction
@@ -373,7 +493,7 @@ error and corrected to AABB.
     \item Narrow-Phase Evaluation
 \end{enumerate}
 
-
+%================================================================================
 \section{Collision-Detection Architecture}
 
 The manuscript shall distinguish between collision-detection algorithms
@@ -383,6 +503,30 @@ A collision-detection framework consists of broad-phase and narrow-phase
 stages. The broad phase generates collision candidates, while the
 narrow phase evaluates those candidates and determines whether a
 collision exists.
+
+\subsection*{Cell-Array Architecture}
+
+The gPCD cell array is organized as a fixed-size occupancy structure.
+Let $S$ denote the side length of the cubic cell array and let $W$
+denote the occupancy-list width assigned to each cell. The cell array
+therefore contains
+
+\begin{equation}
+S^3
+\end{equation}
+
+cells, each capable of storing up to $W$ occupancy entries.
+
+Consequently, the cell array may be viewed as a two-dimensional storage
+structure consisting of a cell dimension of length $S^3$ and an
+occupancy dimension of width $W$,
+
+\begin{equation}
+\text{Cell Array} \equiv [S^3][W].
+\end{equation}
+
+The parameter $W$ is a fixed implementation constant selected to
+accommodate the maximum expected occupancy within a cell.
 
 \subsection{Traditional Architectures}
 
@@ -563,6 +707,29 @@ resolution performed within compute shaders.
 
 The term \textbf{cell array} shall be used instead of spatial grid whenever
 referring to the gPCD occupancy structure.
+
+\subsection*{Cell-Array Architecture}
+
+The gPCD cell array consists of a fixed number of cells and a fixed
+occupancy-list width per cell. Let $S$ denote the side length of the
+cubic cell array and let $W$ denote the occupancy-list width assigned
+to each cell.
+
+The total number of cells is
+
+\begin{equation}
+S^3.
+\end{equation}
+
+Each cell stores up to $W$ occupancy entries, yielding a conceptual
+storage organization of
+
+\begin{equation}
+\text{Cell Array} \equiv [S^3][W].
+\end{equation}
+
+The parameter $W$ is a fixed implementation constant selected to
+accommodate the maximum expected occupancy within a cell.
 
 \section{Related Work Objectives}
 

@@ -1,21 +1,312 @@
 % !TeX root = main.tex
+
+\section{Figures}
+
+Figures are classified according to their role within the manuscript.
+Each figure type is intended to support a specific section of the paper
+and should be placed where it contributes most directly to the reader's
+understanding.
+
+\begin{table}[h!]
+\centering
+\caption{Figure classification and recommended placement.}
+\label{tab:figure_classification}
+\begin{tabular}{p{3.0cm} p{6.5cm} p{3.0cm}}
+\hline
+\textbf{Figure Type} & \textbf{Purpose} & \textbf{Typical Section} \\
+\hline
+
+Architecture Figure &
+Describes system organization, workflow, or data flow. &
+Methodology \\
+
+Benchmark-Dataset Figure & Illustrates benchmark configurations, datasets, particle distributions,
+or test environments used during evaluation. & Experimental Setup \\
+
+Performance Figure &
+Presents measured results such as timing, throughput, scaling,
+efficiency, or resource utilization. &
+Results \\
+
+Interpretation Figure & Provides explanation of observed behavior, comparison of trends, or
+discussion of performance characteristics. & Discussion \\
+
+\hline
+\end{tabular}
+\end{table}
+
+The purpose of this classification is to maintain a clear distinction
+between describing the framework, defining the evaluation, presenting
+measurements, and interpreting results. Figures should generally appear
+in the section corresponding to their primary role within the paper.
+
+Examples within this work include architectural overview diagrams in
+the Methodology section, benchmark-density visualizations in
+Experimental Setup, throughput and timing plots in Results, and
+saturation or scaling interpretations in Discussion.
+
+\begin{table}[h!]
+\centering
+\caption{Current figure inventory and recommended placement within the manuscript.}
+\label{tab:figure_inventory}
+\begin{tabular}{p{4.0cm} p{3.5cm} p{3.5cm}}
+\hline
+\textbf{Figure} & \textbf{Type} & \textbf{Section} \\
+\hline
+
+OverviewArchitecture &
+Architecture Figure &
+Methodology \\
+
+Corner Occupancy / Duplicate Collision Figure &
+Methodology Figure &
+Methodology \\
+
+Cell Flattening Figure (if added) &
+Methodology Figure &
+Methodology \\
+
+Benchmark Particle Density Figure &
+Benchmark/Dataset Figure &
+Experimental Setup \\
+
+Throughput Plots &
+Performance Figure &
+Results \\
+
+Time-per-Particle Plots &
+Performance Figure &
+Results \\
+
+Scaling Fits &
+Performance Figure &
+Results \\
+
+Saturation Explanation Figure (if added) &
+Interpretation Figure &
+Discussion \\
+
+\hline
+\end{tabular}
+\end{table}
+
+\section{Comparative Analysis}
+
+The present work explicitly accounts for occupancy generation,
+occupancy-list traversal, narrow-phase evaluation, and storage
+requirements. This level of decomposition is intended to provide a
+clear correspondence between the implemented framework and the reported
+complexity results.
+
 \section{Complexity}
 
-The computational complexity of gPCD is determined by the occupancy
-generation process, candidate construction, and narrow-phase collision
-evaluation. Because occupancy construction is performed independently
-for each particle and each particle contributes a bounded number of
-occupancy evaluations, the broad phase exhibits linear scaling with
-respect to particle count.
+The computational complexity of gPCD is determined primarily by
+broad-phase occupancy generation and narrow-phase collision evaluation.
+Because occupancy construction is performed independently for each
+particle and each particle contributes a bounded number of occupancy
+evaluations, the broad phase exhibits linear scaling with respect to
+particle count.
 
-Let $N$ denote the number of particles, $K$ denote the number of
-candidate collision pairs generated during broad-phase construction,
-and $S$ denote the side length of the cubic cell array.
+
+Let $S$ denote the side length of the cubic cell array and let $W$
+denote the fixed occupancy-list width assigned to each cell. The cell
+array therefore contains $S^3$ cells, each capable of storing up to $W$
+particle-corner occupancy entries.
+
+The cell-array storage requirement is
+
+\begin{equation}
+M_{\mathrm{cell}} = O(S^3 W),
+\end{equation}
+
+where $W$ is the fixed occupancy-list width per cell. Since $W$ is a
+constant implementation parameter, the storage requirement reduces to
+
+\begin{equation}
+M_{\mathrm{cell}} = O(S^3).
+\end{equation}
 
 \input{ComplexityTable}
 
 
+
+
 \subsection{Occupancy Generation}
-\subsection{Candidate Construction}
+
+Broad-phase occupancy generation is performed once per particle. Each
+particle contributes a fixed number of corner evaluations, corresponding
+to the eight corners of its axis-aligned bounding box. Since the number
+of corner evaluations does not depend on the total number of particles,
+the occupancy-generation cost per particle is constant.
+
+Let $c_{\mathrm{occ}}$ denote the bounded cost associated with corner
+evaluation, cell determination, index computation, and occupancy-list
+insertion for a single particle. The total occupancy-generation cost is
+
+\begin{equation}
+T_{\mathrm{occ}}(N) = c_{\mathrm{occ}} N .
+\end{equation}
+
+Therefore, broad-phase occupancy generation scales linearly with the
+number of particles,
+
+\begin{equation}
+T_{\mathrm{occ}}(N) = O(N).
+\end{equation}
+
+The populated cell array produced by this process constitutes the
+potentially colliding set used during narrow-phase evaluation. Thus, no
+separate candidate-construction stage is required between occupancy
+generation and the narrow phase.
+
+\subsection{Narrow-Phase Evaluation}
+
+The potentially colliding set produced during broad-phase occupancy
+generation is evaluated within a compute shader during narrow-phase
+collision detection. Each occupied cell is processed independently and
+particle interactions are evaluated only among particles contained
+within the corresponding occupancy list.
+
+Each occupancy list contains at most $W$ entries, where $W$ is a fixed
+implementation parameter. Traversal of an occupancy list therefore
+requires $O(W)$ operations per occupied cell. Since $W$ is a fixed
+implementation parameter, occupancy-list traversal contributes a
+constant cost to each cell evaluation.
+
+Let $K$ denote the total number of interaction evaluations performed
+during narrow-phase execution. Since each interaction evaluation
+requires bounded work, the total narrow-phase cost is
+
+\begin{equation}
+T_{\mathrm{np}}(K)=O(K).
+\end{equation}
+
+The value of $K$ depends on particle distribution and occupancy within
+the populated cell array. Consequently, narrow-phase complexity is
+determined by the number of particle interactions represented within
+the potentially colliding set rather than by the total number of
+particles alone.
+
+
 \subsection{Storage Requirements}
+
+The storage requirements of gPCD consist primarily of particle storage
+and cell-array storage. Particle storage scales linearly with the 
+number of particles,
+
+\begin{equation}
+M_{\mathrm{particle}} = O(N).
+\end{equation}
+
+Let $N$ denote the number of particles, $S$
+denote the side length of the cubic cell array, and $W$ denote the
+fixed occupancy-list width assigned to each cell.
+
+The cell array contains
+
+\begin{equation}
+S^3
+\end{equation}
+
+cells, each capable of storing up to $W$ particle-corner occupancy entries. The total
+cell-array capacity is therefore
+
+\begin{equation}
+M_{\mathrm{cell}} = S^3W.
+\end{equation}
+
+The corresponding storage complexity is
+
+\begin{equation}
+M_{\mathrm{cell}} = O(S^3W).
+\end{equation}
+
+Since $W$ is a fixed implementation parameter,
+
+\begin{equation}
+M_{\mathrm{cell}} = O(S^3).
+\end{equation}
+
+The total storage requirement of the framework is the sum of particle
+storage and cell-array storage,
+
+\begin{equation}
+M_{\mathrm{total}}
+=
+M_{\mathrm{particle}}
++
+M_{\mathrm{cell}}.
+\end{equation}
+
+The resulting storage complexity is
+
+\begin{equation}
+M_{\mathrm{total}}
+=
+O(N + S^3W).
+\end{equation}
+
+For fixed occupancy-list width,
+
+\begin{equation}
+M_{\mathrm{total}}
+=
+O(N + S^3).
+\end{equation}
+
+Although the cell-array storage requirement scales with the total
+number of cells, occupancy generation does not require traversal of the
+entire cell array. Each particle computes a flattened cell index and
+directly accesses the corresponding occupancy list. Consequently,
+cell-array storage complexity and occupancy-generation complexity are
+independent quantities.
+
+
 \subsection{Overall Complexity}
+
+The computational complexity of gPCD is determined by the combined
+costs of broad-phase occupancy generation and narrow-phase collision
+evaluation. From the preceding analysis,
+
+\begin{equation}
+T_{\mathrm{occ}}(N) = O(N)
+\end{equation}
+
+and
+
+\begin{equation}
+T_{\mathrm{np}}(K) = O(K),
+\end{equation}
+
+where $N$ is the number of particles and $K$ is the number of particle
+interactions evaluated during narrow-phase execution.
+
+The resulting computational complexity of the framework is therefore
+
+\begin{equation}
+T_{\mathrm{gPCD}}=O(N + K).
+\end{equation}
+
+Similarly, the total storage requirement is the sum of particle storage
+and cell-array storage,
+
+\begin{equation}
+M_{\mathrm{gPCD}}=O(N + S^3W),
+\end{equation}
+
+where $S$ is the side length of the cubic cell array and $W$ is the
+fixed occupancy-list width assigned to each cell. For fixed occupancy
+width, the storage complexity reduces to
+
+\begin{equation}
+M_{\mathrm{gPCD}}=O(N + S^3).
+\end{equation}
+
+Consequently, broad-phase occupancy generation scales linearly with
+particle count, while narrow-phase cost depends on the number of
+particle interactions represented within the potentially colliding set.
+
+The storage requirement of the cell array scales with the total number
+of cells, $O(S^3W)$. However, occupancy generation performs direct
+cell access through flattened indexing and therefore scales with
+particle count rather than cell-array size.

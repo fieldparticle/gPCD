@@ -513,6 +513,28 @@ normal momentum.  The scalar internal momentum ledger then acts as the rebound
 budget, while the actual impulse is chosen from the difference between current
 and target normal momentum.
 
+The normal-velocity shadow result restored both two-particle horizontal and
+two-particle angled cases.  The remaining failure is now isolated to
+multi-contact source allocation.  In \texttt{ThreeParticle}, particle 1 has two
+simultaneous symmetric contacts.  Particle 2 and particle 3 each have one
+dominant contact and their internal momentum profiles look correct.  Particle
+1's stored internal momentum, however, peaks near the sum of its two contact
+ledgers rather than the weighted source-level capacity:
+
+\begin{equation}
+I_{1}^{expected}
+\approx
+w_{12} I_{12} + w_{13} I_{13},
+\qquad
+w_{12}+w_{13}=1.
+\end{equation}
+
+For the symmetric capture, \(I_2\) and \(I_3\) peak near \(0.03408681\), so a
+half-weighted source result should also be near \(0.03408681\).  The observed
+particle 1 peak is approximately \(0.06160446\).  This shows that
+multi-contact storage must be solved at the source level before distributing
+per-contact impulses.
+
 \section{Known Limitations}
 \label{sec:known-limitations}
 
@@ -530,11 +552,10 @@ The current Geo rule is intentionally simple and incomplete:
     ledgers are keyed by target under the source particle, while slots are
     rebuilt from the current frame's contact list.
     \item The response is not guaranteed to conserve kinetic energy.
-    Current diagnostics show that a scalar internal-momentum parabola can
-    drain fully while angled-contact kinetic energy remains low.  The current
-    shadow lead is to impose the parabolic target on relative normal
-    velocity/normal momentum, while using contact-owned internal momentum only
-    as the rebound budget.
+    The normal-velocity shadow target restores the current two-particle
+    horizontal and angled cases, but \texttt{ThreeParticle} still loses kinetic
+    energy because particle 1's simultaneous contact storage is too large and
+    its release must be allocated as one source-level vector result.
     \item Wall response is not part of this particle-pair geometry note.
 \end{itemize}
 

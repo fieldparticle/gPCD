@@ -221,6 +221,7 @@ def _batch_momentum_items(batch_cfg, report_mode="live"):
     with batch_cfg.open("r", encoding="utf-8") as cfg_file:
         batch = libconf.load(cfg_file)
     base_dir = Path(batch["data_dir"])
+    frame_window = _frame_window_from_config(batch.get("frames"))
     items = []
     for cfg_name, _end_frame in batch["batch_items"]:
         cfg_path = base_dir / cfg_name
@@ -235,9 +236,39 @@ def _batch_momentum_items(batch_cfg, report_mode="live"):
                 "name": cfg.get("STUDY_NAME", cfg_path.stem),
                 "cfg_path": cfg_path,
                 "momentum_csv": momentum_csv,
+                "frame_window": frame_window,
             }
         )
     return items
+
+
+def _frame_window_from_config(frames_config):
+    if not frames_config:
+        return None
+    frame_item = frames_config[0] if isinstance(frames_config, list) else frames_config
+    if isinstance(frame_item, str):
+        frame_item = frame_item.strip()
+        if ":" in frame_item:
+            start_frame, end_frame = frame_item.split(":", 1)
+            return int(start_frame.strip()), int(end_frame.strip())
+        frame_number = int(frame_item)
+        return frame_number, frame_number
+    frame_number = int(frame_item)
+    return frame_number, frame_number
+
+
+def _axis_frame_window(item, frames):
+    frame_window = item.get("frame_window")
+    if frame_window is not None:
+        return frame_window
+    return min(frames), max(frames)
+
+
+def _apply_frame_window(axis, item, frames):
+    if not frames:
+        return
+    frame_min, frame_max = _axis_frame_window(item, frames)
+    axis.set_xlim(frame_min, frame_max)
 
 
 def _scale(values, output_min, output_max):
@@ -449,6 +480,12 @@ def _plot_column_name(label):
     )
 
 
+def _csv_number(value):
+    if value == "":
+        return ""
+    return f"{float(value):.8f}"
+
+
 def _write_panel_data(output_dir, panel_name, frames, series):
     csv_path = Path(output_dir) / f"MomentumDiagnostics_{panel_name}.csv"
     with csv_path.open("w", newline="", encoding="utf-8") as csv_file:
@@ -459,7 +496,9 @@ def _write_panel_data(output_dir, panel_name, frames, series):
                 [
                     frame,
                     *[
-                        item[2][row_index] if row_index < len(item[2]) else ""
+                        _csv_number(item[2][row_index])
+                        if row_index < len(item[2])
+                        else ""
                         for item in series
                     ],
                 ]
@@ -481,40 +520,66 @@ def _draw_totals_panel(axis, item, series):
     frame = _latest(series, "frames")
     mode = item.get("report_mode", _report_mode_from_momentum_path(item["momentum_csv"]))
     dt = _run_dt_from_cfg(item.get("cfg_path"))
-    time_text = f"time={frame * dt:>13.8g}" if dt is not None else ""
-    def field(label, value):
-        return f"{label}={value:>14.8g}"
+    time_text = f"time={frame * dt:>13.8f}" if dt is not None else ""
+
+    def table_number(value):
+        if value is None:
+            return f"{'':>14}"
+        return f"{value:>14.8f}"
+
+    def table_row(label, total=None, px=None, py=None, combined=None, drift=None):
+        return (
+            f"{label:<12}"
+            f"{table_number(total)} "
+            f"{table_number(px)} "
+            f"{table_number(py)} "
+            f"{table_number(combined)} "
+            f"{table_number(drift)}"
+        )
+
+    table_header = (
+        f"{'metric':<12}"
+        f"{'total':>14} "
+        f"{'px':>14} "
+        f"{'py':>14} "
+        f"{'curr+int':>14} "
+        f"{'drift':>14}"
+    )
 
     lines = [
         f"{item['name']}  {mode}  frame={int(frame):>8} {time_text}",
-        "start   "
-        + field("p", _latest(series, "start_total"))
-        + " "
-        + field("px", _latest(series, "start_px"))
-        + " "
-        + field("py", _latest(series, "start_py")),
-        "current "
-        + field("p", _latest(series, "current_total"))
-        + " "
-        + field("px", _latest(series, "current_px"))
-        + " "
-        + field("py", _latest(series, "current_py")),
-        "internal "
-        + field("p", _latest(series, "internal_total"))
-        + " "
-        + field("curr+int", _latest(series, "current_plus_internal"))
-        + " "
-        + field("drift", _latest(series, "momentum_balance")),
-        "KE      "
-        + field("start", _latest(series, "start_ke"))
-        + " "
-        + field("current", _latest(series, "current_ke"))
-        + " "
-        + field("drift", _latest(series, "ke_drift")),
-        "contact "
-        + field("v_rel", _latest(series, "v_rel"))
-        + " "
-        + field("raw_impulse", _latest(series, "raw_impulse")),
+        table_header,
+        table_row(
+            "start_p",
+            _latest(series, "start_total"),
+            _latest(series, "start_px"),
+            _latest(series, "start_py"),
+        ),
+        table_row(
+            "current_p",
+            _latest(series, "current_total"),
+            _latest(series, "current_px"),
+            _latest(series, "current_py"),
+            drift=_latest(series, "start_total") - _latest(series, "current_total"),
+        ),
+        table_row(
+            "internal_p",
+            _latest(series, "internal_total"),
+            combined=_latest(series, "current_plus_internal"),
+            drift=_latest(series, "momentum_balance"),
+        ),
+        table_row(
+            "KE",
+            _latest(series, "start_ke"),
+            combined=_latest(series, "current_ke"),
+            drift=_latest(series, "ke_drift"),
+        ),
+        "",
+        table_row(
+            "contact",
+            _latest(series, "v_rel"),
+            _latest(series, "raw_impulse"),
+        ),
     ]
     axis.clear()
     axis.set_axis_off()
@@ -698,9 +763,10 @@ def plot_batch(batch_cfg, report_mode="live"):
 def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     series = _momentum_series(item["momentum_csv"])
     frames = series["frames"]
-    totals_axis, top_axis, middle_axis, bottom_axis = axes
+    totals_axis, top_axis, internal_axis, middle_axis, bottom_axis = axes
     _draw_totals_panel(totals_axis, item, series)
     top_axis.clear()
+    internal_axis.clear()
     middle_axis.clear()
     bottom_axis.clear()
     particle_visible = particle_visible or {}
@@ -739,6 +805,29 @@ def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     top_axis.set_title(f"{item['name']} ({item.get('report_mode', 'live')})")
     top_axis.grid(True, alpha=0.3)
     top_axis.legend(loc="best")
+    _apply_frame_window(top_axis, item, frames)
+
+    for particle in particles:
+        particle_label = f"p{particle['particle_number']}"
+        style = _particle_style(particle["particle_number"])
+        markevery = max(1, len(particle["frames"]) // 24)
+        visible = particle_visible.get(particle_label, True)
+        internal_axis.plot(
+            particle["frames"],
+            particle["internal_momentum"],
+            label=f"{particle_label} internal_mom",
+            linewidth=2,
+            linestyle=style["linestyle"],
+            marker=style["marker"],
+            markevery=markevery,
+            visible=visible,
+        )
+    internal_axis.axhline(0.0, color="black", linewidth=1, alpha=0.5)
+    internal_axis.set_ylabel("internal mom")
+    internal_axis.set_title("Particle Internal Momentum")
+    internal_axis.grid(True, alpha=0.3)
+    internal_axis.legend(loc="best")
+    _apply_frame_window(internal_axis, item, frames)
 
     visible_particles = [
         particle
@@ -803,6 +892,7 @@ def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     middle_axis.set_ylabel("diagnostic value")
     middle_axis.grid(True, alpha=0.3)
     middle_axis.legend(loc="best")
+    _apply_frame_window(middle_axis, item, frames)
 
     if visible_particles:
         for particle in visible_particles:
@@ -864,6 +954,7 @@ def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     bottom_axis.set_ylabel("diagnostic value")
     bottom_axis.grid(True, alpha=0.3)
     bottom_axis.legend(loc="best")
+    _apply_frame_window(bottom_axis, item, frames)
 
     fig.canvas.manager.set_window_title(
         f"Momentum Diagnostics - {item['name']} ({item.get('report_mode', 'live')})"
@@ -890,12 +981,18 @@ def show_batch_menu(batch_cfg, report_mode="live"):
     for item in items:
         item["report_mode"] = current_report_mode["mode"]
 
-    fig, axes = plt.subplots(
+    fig = plt.figure(figsize=(14, 11))
+    grid = fig.add_gridspec(
         4,
-        1,
-        figsize=(12, 11),
-        sharex=False,
-        gridspec_kw={"height_ratios": [0.9, 2.0, 2.0, 2.0]},
+        2,
+        height_ratios=[0.9, 2.0, 2.0, 2.0],
+    )
+    axes = (
+        fig.add_subplot(grid[0, :]),
+        fig.add_subplot(grid[1, 0]),
+        fig.add_subplot(grid[1, 1]),
+        fig.add_subplot(grid[2, :]),
+        fig.add_subplot(grid[3, :]),
     )
     fig.subplots_adjust(left=0.32, hspace=0.48)
     menu_axis = fig.add_axes([0.03, 0.35, 0.24, 0.49])

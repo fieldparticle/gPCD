@@ -255,12 +255,31 @@ def _motion_summary(start_diagnostics, particles, dt=0.0):
     }
 
 
-def _momentum_row(label, momentum_x, momentum_y):
+def _table_number(value):
+    if value is None:
+        return f"{'':>14}"
+    return f"{value:>14.8f}"
+
+
+def _summary_table_row(label, total=None, px=None, py=None, combined=None, drift=None):
     return (
-        f"{label:<18}"
-        f" px={momentum_x:>14.8f}"
-        f" py={momentum_y:>14.8f}"
-        f" |p|={math.hypot(momentum_x, momentum_y):>14.8f}"
+        f"{label:<12}"
+        f"{_table_number(total)} "
+        f"{_table_number(px)} "
+        f"{_table_number(py)} "
+        f"{_table_number(combined)} "
+        f"{_table_number(drift)}"
+    )
+
+
+def _summary_table_header():
+    return (
+        f"{'metric':<12}"
+        f"{'total':>14} "
+        f"{'px':>14} "
+        f"{'py':>14} "
+        f"{'curr+int':>14} "
+        f"{'drift':>14}"
     )
 
 
@@ -381,32 +400,31 @@ def _draw_particles(
     screen.blit(row, (10, row_y))
     row_y += 20
     for row_text in (
-        _momentum_row(
-            "start_total_mom",
+        _summary_table_header(),
+        _summary_table_row(
+            "start_p",
+            motion_summary["start_total_p"],
             motion_summary["start_total_px"],
             motion_summary["start_total_py"],
         ),
-        _momentum_row(
-            "current_total_mom",
+        _summary_table_row(
+            "current_p",
+            motion_summary["current_total_p"],
             motion_summary["current_total_px"],
             motion_summary["current_total_py"],
+            drift=motion_summary["start_total_p"] - motion_summary["current_total_p"],
         ),
-        (
-            f"internal_mom      "
-            f" total={motion_summary['total_internal_mom']:>14.8f}"
-            f" curr+int={motion_summary['curr_plus_internal_mom']:>14.8f}"
-            f" drift={motion_summary['start_minus_curr_plus_internal_mom']:>14.8f}"
+        _summary_table_row(
+            "internal_p",
+            motion_summary["total_internal_mom"],
+            combined=motion_summary["curr_plus_internal_mom"],
+            drift=motion_summary["start_minus_curr_plus_internal_mom"],
         ),
-        _momentum_row(
-            "drift",
-            motion_summary["start_total_px"] - motion_summary["current_total_px"],
-            motion_summary["start_total_py"] - motion_summary["current_total_py"],
-        ),
-        (
-            f"kinetic_energy    "
-            f" start={motion_summary['start_ke']:>14.8f}"
-            f" curr={motion_summary['curr_ke']:>14.8f}"
-            f" drift={motion_summary['ke_drift']:>14.8f}"
+        _summary_table_row(
+            "KE",
+            motion_summary["start_ke"],
+            combined=motion_summary["curr_ke"],
+            drift=motion_summary["ke_drift"],
         ),
     ):
         row = row_font.render(row_text, True, (220, 230, 240))

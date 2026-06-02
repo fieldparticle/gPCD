@@ -1,4 +1,5 @@
 import csv
+import math
 from pathlib import Path
 
 
@@ -69,6 +70,12 @@ class Reporting:
     def contacts_report_path(self):
         return self.output_dir / f"contacts{self.file_suffix}.csv"
 
+    @staticmethod
+    def csv_number(value):
+        if value == "":
+            return ""
+        return f"{float(value):.8f}"
+
     def report_frame_momentum(self, frame_number, momentum_summary):
         if not self.should_report_frame(frame_number):
             return
@@ -105,22 +112,22 @@ class Reporting:
             writer.writerow(
                 [
                     frame_number,
-                    momentum_summary["start_total_p"],
-                    momentum_summary["start_total_px"],
-                    momentum_summary["start_total_py"],
-                    momentum_summary["current_total_p"],
-                    momentum_summary["current_total_px"],
-                    momentum_summary["current_total_py"],
-                    momentum_summary["total_internal_mom"],
-                    momentum_summary["curr_plus_internal_mom"],
-                    momentum_summary["start_minus_curr_plus_internal_mom"],
-                    momentum_summary["start_ke"],
-                    momentum_summary["curr_ke"],
-                    momentum_summary["frame_start_ke"],
-                    momentum_summary["after_resolve_ke"],
-                    momentum_summary["ke_drift"],
-                    momentum_summary["v_rel"],
-                    momentum_summary["raw_impulse"],
+                    self.csv_number(momentum_summary["start_total_p"]),
+                    self.csv_number(momentum_summary["start_total_px"]),
+                    self.csv_number(momentum_summary["start_total_py"]),
+                    self.csv_number(momentum_summary["current_total_p"]),
+                    self.csv_number(momentum_summary["current_total_px"]),
+                    self.csv_number(momentum_summary["current_total_py"]),
+                    self.csv_number(momentum_summary["total_internal_mom"]),
+                    self.csv_number(momentum_summary["curr_plus_internal_mom"]),
+                    self.csv_number(momentum_summary["start_minus_curr_plus_internal_mom"]),
+                    self.csv_number(momentum_summary["start_ke"]),
+                    self.csv_number(momentum_summary["curr_ke"]),
+                    self.csv_number(momentum_summary["frame_start_ke"]),
+                    self.csv_number(momentum_summary["after_resolve_ke"]),
+                    self.csv_number(momentum_summary["ke_drift"]),
+                    self.csv_number(momentum_summary["v_rel"]),
+                    self.csv_number(momentum_summary["raw_impulse"]),
                 ]
             )
         self.written_momentum_frames.add(frame_number)
@@ -156,13 +163,13 @@ class Reporting:
                 [
                     frame_number,
                     particle.pnum,
-                    particle.rx,
-                    particle.ry,
-                    particle.vx,
-                    particle.vy,
-                    getattr(particle, "report_stored_mom", 0.0),
-                    getattr(particle, "report_frame_start_ke", 0.0),
-                    getattr(particle, "report_after_resolve_ke", 0.0),
+                    self.csv_number(particle.rx),
+                    self.csv_number(particle.ry),
+                    self.csv_number(particle.vx),
+                    self.csv_number(particle.vy),
+                    self.csv_number(getattr(particle, "report_stored_mom", 0.0)),
+                    self.csv_number(getattr(particle, "report_frame_start_ke", 0.0)),
+                    self.csv_number(getattr(particle, "report_after_resolve_ke", 0.0)),
                 ]
             )
         self.written_particle_frames.add(particle_frame_key)
@@ -179,6 +186,7 @@ class Reporting:
             "raw_impulse",
             "compression_impulse",
             "release_impulse",
+            "planned_impulse_to_target",
             "source_available_momentum",
             "source_available_share",
             "target_available_momentum",
@@ -203,6 +211,7 @@ class Reporting:
             "source_net_delta_px",
             "source_net_delta_py",
             "source_net_delta_pz",
+            "source_net_impulse_mag",
             "source_net_ke_delta_estimate",
             "source_contact_ke_delta_sum",
             "source_ke_cross_term",
@@ -262,7 +271,7 @@ class Reporting:
                             "",
                             0,
                             "",
-                            0.0,
+                            self.csv_number(0.0),
                             "",
                             "",
                             "",
@@ -295,6 +304,14 @@ class Reporting:
                         if target_total_overlap_area > 1.0e-12
                         else 0.0
                     )
+                    source_net_delta_px = getattr(contact, "source_net_delta_px", 0.0)
+                    source_net_delta_py = getattr(contact, "source_net_delta_py", 0.0)
+                    source_net_delta_pz = getattr(contact, "source_net_delta_pz", 0.0)
+                    source_net_impulse_mag = math.sqrt(
+                        source_net_delta_px * source_net_delta_px
+                        + source_net_delta_py * source_net_delta_py
+                        + source_net_delta_pz * source_net_delta_pz
+                    )
                     writer.writerow(
                         [
                             frame_number,
@@ -305,50 +322,52 @@ class Reporting:
                             slot,
                             len(contacts),
                             source_targets,
-                            source_total_overlap_area,
-                            target_total_overlap_area,
-                            overlap_area,
-                            source_area_weight,
-                            target_area_weight,
+                            self.csv_number(source_total_overlap_area),
+                            self.csv_number(target_total_overlap_area),
+                            self.csv_number(overlap_area),
+                            self.csv_number(source_area_weight),
+                            self.csv_number(target_area_weight),
                             contact.ids.z,
-                            contact.aux.z,
-                            contact.aux.w,
-                            getattr(contact, "raw_impulse", 0.0),
-                            getattr(contact, "compression_impulse", 0.0),
-                            getattr(contact, "release_impulse", 0.0),
-                            getattr(contact, "source_available_momentum", 0.0),
-                            getattr(contact, "source_available_share", 0.0),
-                            getattr(contact, "target_available_momentum", 0.0),
-                            getattr(contact, "target_available_share", 0.0),
-                            getattr(contact, "weighted_available_momentum", 0.0),
-                            getattr(contact, "source_vn", 0.0),
-                            getattr(contact, "target_vn", 0.0),
-                            getattr(contact, "rel_vn", 0.0),
-                            getattr(contact, "delta_px", 0.0),
-                            getattr(contact, "delta_py", 0.0),
-                            getattr(contact, "delta_pz", 0.0),
-                            getattr(contact, "source_vx_before", 0.0),
-                            getattr(contact, "source_vy_before", 0.0),
-                            getattr(contact, "source_vz_before", 0.0),
-                            getattr(contact, "source_vx_after", 0.0),
-                            getattr(contact, "source_vy_after", 0.0),
-                            getattr(contact, "source_vz_after", 0.0),
-                            getattr(contact, "source_ke_before", 0.0),
-                            getattr(contact, "source_ke_after", 0.0),
-                            getattr(contact, "source_ke_delta", 0.0),
-                            getattr(contact, "contact_ke_delta_estimate", 0.0),
-                            getattr(contact, "source_net_delta_px", 0.0),
-                            getattr(contact, "source_net_delta_py", 0.0),
-                            getattr(contact, "source_net_delta_pz", 0.0),
-                            getattr(contact, "source_net_ke_delta_estimate", 0.0),
-                            getattr(contact, "source_contact_ke_delta_sum", 0.0),
-                            getattr(contact, "source_ke_cross_term", 0.0),
-                            getattr(contact, "source_ke_residual", 0.0),
-                            contact.geom.x,
-                            contact.geom.y,
-                            contact.geom.z,
-                            contact.aux.x,
-                            contact.aux.y,
+                            self.csv_number(contact.aux.z),
+                            self.csv_number(contact.aux.w),
+                            self.csv_number(getattr(contact, "raw_impulse", 0.0)),
+                            self.csv_number(getattr(contact, "compression_impulse", 0.0)),
+                            self.csv_number(getattr(contact, "release_impulse", 0.0)),
+                            self.csv_number(contact.aux.w),
+                            self.csv_number(getattr(contact, "source_available_momentum", 0.0)),
+                            self.csv_number(getattr(contact, "source_available_share", 0.0)),
+                            self.csv_number(getattr(contact, "target_available_momentum", 0.0)),
+                            self.csv_number(getattr(contact, "target_available_share", 0.0)),
+                            self.csv_number(getattr(contact, "weighted_available_momentum", 0.0)),
+                            self.csv_number(getattr(contact, "source_vn", 0.0)),
+                            self.csv_number(getattr(contact, "target_vn", 0.0)),
+                            self.csv_number(getattr(contact, "rel_vn", 0.0)),
+                            self.csv_number(getattr(contact, "delta_px", 0.0)),
+                            self.csv_number(getattr(contact, "delta_py", 0.0)),
+                            self.csv_number(getattr(contact, "delta_pz", 0.0)),
+                            self.csv_number(getattr(contact, "source_vx_before", 0.0)),
+                            self.csv_number(getattr(contact, "source_vy_before", 0.0)),
+                            self.csv_number(getattr(contact, "source_vz_before", 0.0)),
+                            self.csv_number(getattr(contact, "source_vx_after", 0.0)),
+                            self.csv_number(getattr(contact, "source_vy_after", 0.0)),
+                            self.csv_number(getattr(contact, "source_vz_after", 0.0)),
+                            self.csv_number(getattr(contact, "source_ke_before", 0.0)),
+                            self.csv_number(getattr(contact, "source_ke_after", 0.0)),
+                            self.csv_number(getattr(contact, "source_ke_delta", 0.0)),
+                            self.csv_number(getattr(contact, "contact_ke_delta_estimate", 0.0)),
+                            self.csv_number(source_net_delta_px),
+                            self.csv_number(source_net_delta_py),
+                            self.csv_number(source_net_delta_pz),
+                            self.csv_number(source_net_impulse_mag),
+                            self.csv_number(getattr(contact, "source_net_ke_delta_estimate", 0.0)),
+                            self.csv_number(getattr(contact, "source_contact_ke_delta_sum", 0.0)),
+                            self.csv_number(getattr(contact, "source_ke_cross_term", 0.0)),
+                            self.csv_number(getattr(contact, "source_ke_residual", 0.0)),
+                            self.csv_number(contact.geom.x),
+                            self.csv_number(contact.geom.y),
+                            self.csv_number(contact.geom.z),
+                            self.csv_number(contact.aux.x),
+                            self.csv_number(contact.aux.y),
                         ]
                     )
 

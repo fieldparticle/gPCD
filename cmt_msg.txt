@@ -1,13 +1,15 @@
-Document normal-momentum shadow target direction
+Advance shadow diagnostics for normal-velocity response
 
-Update dynamics documentation with the latest shadow result: the rebound
-reference drains scalar internal momentum, but TwoParticleAngled still loses
-kinetic energy after the ledger reaches zero. Record that energy remains
-diagnostic-only and the next shadow experiment should impose the parabolic
-profile on relative normal velocity/normal momentum instead of scalar internal
-momentum.
+- change ShadowDynamics to target relative normal velocity/normal momentum
+  before converting to impulse
+- add fixed-width UI and MomentumDiagnostics summary tables
+- limit reported numeric precision to 8 decimal places
+- add contact diagnostics for planned per-target impulse and source net impulse
+- read batch frame windows in MomentumDiagnostics and add a parallel internal
+  momentum plot for particle comparison
+- document the normal-velocity shadow result and the remaining ThreeParticle
+  source-level multi-contact storage/allocation problem
 
-Keep contact-owned internal momentum as the rebound budget/cap, not the shaped
-dynamics target. Also clean up the shadow report typo in ProblemEvolution.
-
-Next: implement a shadow normal-momentum target for compression and rebound.
+Next: solve source-level multi-contact storage allocation so p1 storage is
+weighted across simultaneous contacts instead of accumulating near the sum of
+p2 and p3 contact ledgers.

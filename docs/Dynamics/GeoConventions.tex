@@ -546,6 +546,51 @@ The contact-owned internal momentum ledger still caps rebound.  Kinetic energy
 is then used only to judge whether the velocity/momentum rule restored the
 expected collision behavior.
 
+\subsection{Source-Level Multi-Contact Storage Allocation}
+
+For a source with multiple simultaneous contacts, contact-owned ledgers must
+not be allowed to recreate full independent storage for each contact.  The
+source's compression capacity for the frame is a coupled source-level value.
+It may be distributed across contacts, but the distributed storage must not
+exceed the source-level target.
+
+For a symmetric two-contact source, if the two target contacts have equal
+weight, the expected source storage is:
+
+\begin{equation}
+I_s
+\approx
+w_1 I_{s,1} + w_2 I_{s,2},
+\qquad
+w_1+w_2=1.
+\end{equation}
+
+The diagnostic \texttt{ThreeParticle} result shows that storing the apparent
+sum of the two contact ledgers overstates particle 1's internal momentum.  In
+that case particle 2 and particle 3 each peak at approximately
+\texttt{0.03408681}, while particle 1 peaks near \texttt{0.06160446}.  The
+expected symmetric source result is closer to:
+
+\begin{verbatim}
+0.5 * p2_peak + 0.5 * p3_peak
+\end{verbatim}
+
+The rule going forward is therefore:
+
+\begin{enumerate}[leftmargin=*]
+    \item build contact candidates from the frame snapshot;
+    \item compute the source-level storage/release target for the active
+    contact set;
+    \item distribute that source-level target across contacts by the current
+    frame's weights;
+    \item apply source-owned velocity writes from the resulting vector sum.
+\end{enumerate}
+
+The scalar internal momentum budget and the vector impulse direction are
+separate concepts.  The scalar ledger records how much stored momentum remains;
+the velocity update must use a vector impulse chosen from the coupled source
+contact set.
+
 \subsection{Dynamics Versus Harness}
 
 \texttt{GeoDynamics.py} should not:
@@ -594,10 +639,9 @@ when it no longer describes the active Geo path.
     \item Keep live \texttt{GeoDynamics.py} clean while the next response rule
     is tested in \texttt{ShadowDynamics.py}.
     \item Continue the parabolic velocity-progress experiment in
-    \texttt{ShadowDynamics.py}.  Compression now produces nonzero shadow
-    dynamics and direct release drains the ledger; the next test is to impose
-    the parabolic target on relative normal velocity/normal momentum rather
-    than on scalar internal momentum.
+    \texttt{ShadowDynamics.py}.  The normal-velocity target restores the
+    two-particle horizontal and angled cases in shadow.  The next test is
+    source-level multi-contact storage/allocation for \texttt{ThreeParticle}.
     \item Treat wall/out-of-bounds behavior as a separate problem after the
     particle-particle multi-contact rule is stable.
     \item Add reporting only through \texttt{Reporting.py}, not through dynamics.

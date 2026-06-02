@@ -1189,3 +1189,67 @@ a target closing normal momentum.  For rebound this means increasing the
 separating normal momentum toward a target separating normal momentum, while
 still capping release by the contact-owned internal momentum ledger.  Kinetic
 energy remains an output diagnostic, not a dynamics input.
+
+\subsubsection{Normal Velocity Shadow Result and Source Allocation Finding}
+
+At checkpoint \texttt{2252dd1}, the shadow path was updated so the parabolic
+profile targets relative normal velocity rather than scalar internal momentum.
+The shadow still converts the velocity target to a normal impulse through
+reduced mass, so the dynamics input remains momentum based:
+
+\begin{verbatim}
+progress -> target_relative_normal_velocity
+current_normal_momentum -> target_normal_momentum
+target_normal_momentum - current_normal_momentum -> impulse
+\end{verbatim}
+
+This produced a strong two-particle result:
+
+\begin{verbatim}
+TwoParticleHorizontal: KE returns to start
+TwoParticleAngled:     KE returns to start
+\end{verbatim}
+
+\texttt{ThreeParticle} still loses kinetic energy even though total momentum
+and total internal momentum balance at the end of the reported window:
+
+\begin{verbatim}
+start_total_p        = 0.05000000
+curr_total_p         = 0.05000000
+total_internal_mom   = 0.00000000
+KE drift             = -0.00024861
+\end{verbatim}
+
+The new diagnostic plots and contact captures show why.  Particle 2 and
+particle 3 each have a single dominant contact and their profiles look
+correct.  Particle 1 has two symmetric contacts.  At peak storage, particle 2
+and particle 3 each reach approximately:
+
+\begin{verbatim}
+p2 internal_mom peak = 0.03408681
+p3 internal_mom peak = 0.03408681
+\end{verbatim}
+
+If particle 1's source compression capacity were shared symmetrically, its
+total internal momentum would be expected to peak near:
+
+\begin{verbatim}
+0.5 * p2_peak + 0.5 * p3_peak = 0.03408681
+\end{verbatim}
+
+Instead, particle 1 peaks higher:
+
+\begin{verbatim}
+p1 internal_mom peak = 0.06160446
+\end{verbatim}
+
+This means the current shadow is still storing too much scalar internal
+momentum for a simultaneous multi-contact source.  In addition, when particle
+1 releases to particle 2 and particle 3, the two contact-normal impulses
+vector-sum; the transverse components cancel and only the shared source-level
+component contributes to particle 1's final velocity.
+
+Therefore the remaining problem is not basic rebound and not a simple missing
+scalar ledger.  The next rule must compute a source-level multi-contact
+storage/allocation target first, then distribute compatible per-contact
+impulses from that source-level result.
