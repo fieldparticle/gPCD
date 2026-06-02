@@ -522,20 +522,29 @@ The frame impulse is still:
 \end{equation}
 
 Compression uses a predicted post-impulse closing speed so head-on contacts
-can begin storing internal momentum.  Rebound uses a predicted separating
-speed so a returning contact can begin releasing internal momentum.  The flip
-from compression to returning is based on velocity magnitude:
+can begin storing internal momentum.  The flip from compression to returning is
+based on velocity magnitude:
 
 \begin{equation}
 v_{close,k} \leq 0.01v_{0,k}.
 \end{equation}
 
-Once a shadow contact flips to returning, it should remain returning until the
-contact-owned shadow internal momentum drains or the contact ends.  This
-velocity-progress rule fixed the all-zero shadow response in
-\texttt{TwoParticleHorizontal}; the remaining limitation is the long release
-tail, where particles separate slowly and stored internal momentum drains only
-after many frames.
+Once a shadow contact flips to returning, rebound is driven directly from the
+stored contact-owned internal momentum:
+
+\begin{equation}
+J^{release}_k = \min(I^{current}_k,J^{raw}_k),
+\qquad
+J^{raw}_k = q_k A_k \Delta t.
+\end{equation}
+
+This direct release fixed the long stored-momentum tail in
+\texttt{TwoParticleHorizontal}; internal momentum now drains promptly.  The
+remaining limitation is that the rebound internal-momentum curve changes
+shape.  Compression stores momentum through the velocity-progress parabola,
+but rebound drains through the raw overlap impulse profile.  The next shadow
+experiment should store the maximum internal momentum at the flip and use a
+parabolic remaining-momentum target for rebound.
 
 \section{Known Limitations}
 \label{sec:known-limitations}
@@ -559,8 +568,8 @@ The current Geo rule is intentionally simple and incomplete:
     rebound direction drift, target-ratio allocation, or a simple vector
     internal momentum ledger.  The current shadow lead is a velocity-progress
     target implemented in \texttt{ShadowDynamics.py}.  It starts compression
-    correctly in \texttt{TwoParticleHorizontal}, but rebound timing/strength
-    still needs work.
+    correctly in \texttt{TwoParticleHorizontal} and direct release drains the
+    ledger, but rebound is not yet shape-compatible with compression.
     \item Wall response is not part of this particle-pair geometry note.
 \end{itemize}
 

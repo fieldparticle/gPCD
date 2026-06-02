@@ -480,12 +480,6 @@ the measured relative velocity has changed:
 s_k = \max\left(0,\; v_{close,k} - J^{seed}_k/\mu_k\right).
 \end{equation}
 
-During rebound, the progress uses the predicted separating speed:
-
-\begin{equation}
-s_k = v_{separate,k} + J^{seed}_k/\mu_k.
-\end{equation}
-
 The progress and target internal momentum are:
 
 \begin{equation}
@@ -502,18 +496,31 @@ The planned impulse remains the target-ledger delta:
 \Delta I_k = I^{target}_{k}-I^{current}_{k}.
 \end{equation}
 
-Positive \(\Delta I_k\) stores internal momentum.  Negative \(\Delta I_k\)
-releases internal momentum.  The compression-to-rebound flip is based on
-velocity magnitude:
+Positive \(\Delta I_k\) stores internal momentum during compression.  Rebound
+is not controlled by the compression target.  Once a contact is returning, the
+release impulse is driven directly by the stored internal momentum and a
+rebound profile.  The first rebound profile is:
+
+\begin{equation}
+J^{release}_k = \min(I^{current}_k,J^{raw}_k).
+\end{equation}
+
+If \(J^{raw}_k\) has fallen to zero while stored internal momentum remains, the
+shadow drains the remaining stored momentum.  This prevents a contact from
+keeping internal momentum after the contact geometry has ended.  The
+compression-to-rebound flip is based on velocity magnitude:
 
 \begin{equation}
 v_{close,k} \leq 0.01v_{0,k}.
 \end{equation}
 
 This rule fixed the all-zero shadow dynamics seen in
-\texttt{TwoParticleHorizontal}.  The current remaining issue is rebound
-quality: the contact can carry a long release tail instead of promptly
-returning the stored internal momentum to velocity.
+\texttt{TwoParticleHorizontal}.  Direct stored-ledger release also removed the
+long stored-momentum tail.  The current remaining issue is shape mismatch:
+compression stores internal momentum through a velocity-progress parabola, but
+the first direct rebound profile drains it through current raw overlap impulse.
+The next rebound experiment should store the internal momentum at flip and use
+a parabolic remaining-momentum target for rebound.
 
 \subsection{Dynamics Versus Harness}
 
@@ -564,8 +571,9 @@ when it no longer describes the active Geo path.
     is tested in \texttt{ShadowDynamics.py}.
     \item Continue the parabolic velocity-progress experiment in
     \texttt{ShadowDynamics.py}.  Compression now produces nonzero shadow
-    dynamics in \texttt{TwoParticleHorizontal}; the next fix is rebound
-    strength/timing so stored internal momentum returns without a long tail.
+    dynamics and direct release drains the ledger; the next fix is a parabolic
+    rebound profile so release is shape-compatible with compression and
+    restores velocity/kinetic energy.
     \item Treat wall/out-of-bounds behavior as a separate problem after the
     particle-particle multi-contact rule is stable.
     \item Add reporting only through \texttt{Reporting.py}, not through dynamics.

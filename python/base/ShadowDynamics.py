@@ -303,14 +303,28 @@
             contact_phase = self.GEO_PHASE_RETURNING
 
         if contact_phase == self.GEO_PHASE_RETURNING:
-            separating_speed = max(0.0, relative_normal_velocity)
-            seed_impulse = min(raw_impulse, contact_internal_momentum)
-            speed_for_progress = separating_speed + seed_impulse / reduced_mass
-        else:
-            seed_impulse = 0.0
-            if closing_speed > self.GEO_EPSILON:
-                seed_impulse = min(raw_impulse, weighted_available_momentum)
-            speed_for_progress = max(0.0, closing_speed - seed_impulse / reduced_mass)
+            compression_impulse = 0.0
+            release_impulse = self.GeoReboundProfileImpulse(
+                contact_internal_momentum,
+                raw_impulse,
+            )
+            stored_internal_momentum = max(
+                0.0,
+                contact_internal_momentum - release_impulse,
+            )
+            if stored_internal_momentum <= self.GEO_EPSILON:
+                contact_phase = self.GEO_PHASE_COMPRESSION
+            return (
+                compression_impulse,
+                release_impulse,
+                stored_internal_momentum,
+                contact_phase,
+            )
+
+        seed_impulse = 0.0
+        if closing_speed > self.GEO_EPSILON:
+            seed_impulse = min(raw_impulse, weighted_available_momentum)
+        speed_for_progress = max(0.0, closing_speed - seed_impulse / reduced_mass)
         velocity_progress = 1.0 - (
             min(speed_for_progress, velocity_reference)
             / velocity_reference
@@ -320,13 +334,8 @@
             1.0 - (1.0 - velocity_progress) ** 2.0
         )
         delta_impulse = target_internal_momentum - contact_internal_momentum
-
-        if contact_phase == self.GEO_PHASE_RETURNING:
-            compression_impulse = 0.0
-            release_impulse = min(contact_internal_momentum, max(0.0, -delta_impulse))
-        else:
-            compression_impulse = max(0.0, delta_impulse)
-            release_impulse = 0.0
+        compression_impulse = max(0.0, delta_impulse)
+        release_impulse = 0.0
 
         stored_internal_momentum = max(
             0.0,
@@ -341,6 +350,14 @@
             stored_internal_momentum,
             contact_phase,
         )
+
+    def GeoReboundProfileImpulse(self, contact_internal_momentum, raw_impulse):
+        """Return stored momentum through the current rebound profile."""
+        if contact_internal_momentum <= self.GEO_EPSILON:
+            return 0.0
+        if raw_impulse <= self.GEO_EPSILON:
+            return contact_internal_momentum
+        return min(contact_internal_momentum, raw_impulse)
 
     def GeoDirectedContactCandidate(
         self,

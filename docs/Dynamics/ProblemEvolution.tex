@@ -1215,3 +1215,76 @@ interactive plot window.  The panel mirrors the UI totals that are hard to see
 while reviewing plots: frame, total time, start/current momentum, internal
 momentum, current plus internal momentum, drift, current kinetic energy, and
 kinetic-energy drift.
+
+\subsubsection{Direct Ledger-Driven Rebound}
+
+The velocity-progress shadow fixed compression startup, but the first rebound
+version still asked the velocity-progress target to fall before releasing
+stored internal momentum.  In \texttt{TwoParticleHorizontal}, the contact did
+flip to returning, but release remained zero because the target internal
+momentum stayed near the stored ledger value.
+
+The next shadow change separated the phases:
+
+\begin{itemize}[leftmargin=*]
+    \item compression uses the velocity-progress parabolic target;
+    \item returning releases directly from stored contact internal momentum.
+\end{itemize}
+
+The first direct rebound profile is:
+
+\begin{equation}
+J^{release}_k = \min(I^{current}_k,J^{raw}_k),
+\qquad
+J^{raw}_k = q_k A_k \Delta t.
+\end{equation}
+
+If current overlap has ended and \(J^{raw}_k\) is zero, the shadow drains the
+remaining internal momentum so a closed contact cannot keep a stale ledger.
+
+This fixed the long stored-momentum tail in
+\texttt{TwoParticleHorizontal}.  The shadow drains internal momentum by about
+frame 81 instead of carrying it for hundreds of frames.  However, the final
+rebound speed is still too small: the test returns roughly \(0.02826\) instead
+of the original \(0.05\).  The internal-momentum curve now changes shape at
+rebound because compression is velocity-progress parabolic while rebound is
+raw-overlap driven.
+
+The current conclusion is that direct ledger-driven release is structurally
+right, but the rebound profile is not yet right.  The next shadow experiment
+should store the maximum internal momentum at the flip:
+
+\begin{verbatim}
+particle.contact_rebound_reference[TargetID]
+\end{verbatim}
+
+and use a parabolic remaining-momentum target during rebound:
+
+\begin{equation}
+I^{remaining}_{target,k}
+=
+I^{max}_{k}\left(1-f^{rebound}_{k}\right)^2,
+\qquad
+J^{release}_k
+=
+I^{current}_{k}-I^{remaining}_{target,k}.
+\end{equation}
+
+This would make rebound controlled by the contact-owned stored budget rather
+than by the shrinking overlap-area impulse.
+
+\subsubsection{Capture Schema Update}
+
+The capture files were trimmed to remove fields that are no longer part of the
+future diagnostic surface.  Particle files now keep particle-local state and
+particle-local kinetic-energy checkpoints.  Momentum files keep global totals
+and add the sequential pair diagnostics:
+
+\begin{verbatim}
+v_rel
+raw_impulse
+\end{verbatim}
+
+These use the same rule: for two particles the pair is the other particle; for
+more than two particles the representative pair is particle 1 to the next
+sequential particle, particle 2.

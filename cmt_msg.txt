@@ -1,18 +1,22 @@
-Add velocity-progress shadow response diagnostics
+Add velocity-progress shadow rebound diagnostics
 
-Implement a shadow-only parabolic velocity-progress response in
-ShadowDynamics. Store a per-contact velocity reference, compute target
-internal momentum from relative-normal velocity progress, and add predicted
-compression/rebound seed speeds so head-on contacts produce nonzero shadow
-dynamics.
+Implement direct ledger-driven rebound in ShadowDynamics so returning contacts
+release from stored internal momentum instead of waiting for the velocity
+progress target to fall. This fixes the long stored-momentum tail in
+TwoParticleHorizontal, while exposing the next issue: rebound now drains
+through raw overlap impulse and is not shape-compatible with the parabolic
+compression profile.
 
-Add a totals panel to MomentumDiagnostics so plot windows show frame/time,
-momentum balance, internal momentum, and KE drift without needing the UI.
+Trim capture schemas by removing obsolete relative-speed, repeated global
+particle fields, and stale parabolic diagnostic columns. Add representative
+v_rel and raw_impulse to momentum.csv/momentum_s.csv using the sequential
+particle rule.
 
-Update GeoConventions, ParticleGeometry, and ProblemEvolution to record the
-move away from geometric p-zero compression control, the fixed
-TwoParticleHorizontal shadow startup issue, and the remaining long rebound
-tail.
+Extend MomentumDiagnostics with a top totals panel and particle visibility
+controls for all plot panels.
 
-Next: fix rebound strength/timing so velocity-progress shadow contacts return
-stored internal momentum cleanly.
+Update GeoConventions, ParticleGeometry, and ProblemEvolution with the current
+shadow findings and next step.
+
+Next: add a contact rebound reference and parabolic remaining-momentum rebound
+profile.

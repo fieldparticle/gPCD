@@ -137,6 +137,78 @@ def _relative_speed(particles):
     return math.sqrt(dvx * dvx + dvy * dvy + dvz * dvz)
 
 
+def _sequential_contact_v_rel(particles):
+    if len(particles) < 2:
+        return 0.0
+    source = particles[0]
+    target = particles[1]
+    dx = float(target.rx) - float(source.rx)
+    dy = float(target.ry) - float(source.ry)
+    dz = float(getattr(target, "rz", 0.0)) - float(getattr(source, "rz", 0.0))
+    distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+    if distance <= 1.0e-12:
+        return 0.0
+    normal_x = dx / distance
+    normal_y = dy / distance
+    normal_z = dz / distance
+    dvx = float(target.vx) - float(source.vx)
+    dvy = float(target.vy) - float(source.vy)
+    dvz = float(getattr(target, "vz", 0.0)) - float(getattr(source, "vz", 0.0))
+    return dvx * normal_x + dvy * normal_y + dvz * normal_z
+
+
+def _circle_overlap_area(source_radius, target_radius, center_distance):
+    if center_distance <= 0.0:
+        return math.pi * min(source_radius, target_radius) ** 2
+    if center_distance >= source_radius + target_radius:
+        return 0.0
+    if center_distance <= abs(source_radius - target_radius):
+        return math.pi * min(source_radius, target_radius) ** 2
+
+    source_term = (
+        center_distance * center_distance
+        + source_radius * source_radius
+        - target_radius * target_radius
+    ) / (2.0 * center_distance * source_radius)
+    target_term = (
+        center_distance * center_distance
+        + target_radius * target_radius
+        - source_radius * source_radius
+    ) / (2.0 * center_distance * target_radius)
+    source_term = max(-1.0, min(1.0, source_term))
+    target_term = max(-1.0, min(1.0, target_term))
+    source_area = source_radius * source_radius * math.acos(source_term)
+    target_area = target_radius * target_radius * math.acos(target_term)
+    triangle_area = 0.5 * math.sqrt(
+        max(
+            0.0,
+            (-center_distance + source_radius + target_radius)
+            * (center_distance + source_radius - target_radius)
+            * (center_distance - source_radius + target_radius)
+            * (center_distance + source_radius + target_radius),
+        )
+    )
+    return source_area + target_area - triangle_area
+
+
+def _sequential_contact_raw_impulse(particles, dt):
+    if len(particles) < 2:
+        return 0.0
+    source = particles[0]
+    target = particles[1]
+    dx = float(target.rx) - float(source.rx)
+    dy = float(target.ry) - float(source.ry)
+    dz = float(getattr(target, "rz", 0.0)) - float(getattr(source, "rz", 0.0))
+    center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+    source_radius = float(getattr(source, "radius", getattr(source.Data, "x", 0.0)))
+    target_radius = float(getattr(target, "radius", getattr(target.Data, "x", 0.0)))
+    overlap_area = _circle_overlap_area(source_radius, target_radius, center_distance)
+    source_q = float(getattr(getattr(source, "Data", object()), "y", 0.0) or 0.0)
+    target_q = float(getattr(getattr(target, "Data", object()), "y", 0.0) or 0.0)
+    stiffness_q = max(0.0, 0.5 * (source_q + target_q))
+    return stiffness_q * overlap_area * float(dt)
+
+
 def _run_start_diagnostics(particles):
     return {
         "total_momentum": _total_momentum(particles),
@@ -145,7 +217,7 @@ def _run_start_diagnostics(particles):
     }
 
 
-def _motion_summary(start_diagnostics, particles):
+def _motion_summary(start_diagnostics, particles, dt=0.0):
     start_total_momentum = start_diagnostics["total_momentum"]
     start_x, start_y = start_total_momentum
     current_x, current_y = _total_momentum(particles)
@@ -175,6 +247,8 @@ def _motion_summary(start_diagnostics, particles):
         "frame_start_ke": frame_start_ke,
         "after_resolve_ke": after_resolve_ke,
         "ke_drift": current_ke - start_ke,
+        "v_rel": _sequential_contact_v_rel(particles),
+        "raw_impulse": _sequential_contact_raw_impulse(particles, dt),
         "start_rel_speed": start_rel_speed,
         "curr_rel_speed": current_rel_speed,
         "rel_speed_drift": current_rel_speed - start_rel_speed,
@@ -214,7 +288,11 @@ def _draw_particles(
     screen_width, screen_height = screen.get_size()
     view_box = _view_box(run_configuration)
     screen.fill((14, 18, 24))
-    motion_summary = _motion_summary(start_diagnostics, particles)
+    motion_summary = _motion_summary(
+        start_diagnostics,
+        particles,
+        run_configuration.get("dt", 0.0),
+    )
 
     wall_left, wall_top = _to_screen(
         float(run_configuration.get("WallXMIN", view_box[0])),
@@ -352,8 +430,8 @@ def _draw_particles(
     pygame.display.flip()
 
 
-def _report_particles(reporting, frame_number, particles, start_diagnostics):
-    motion_summary = _motion_summary(start_diagnostics, particles)
+def _report_particles(reporting, frame_number, particles, start_diagnostics, dt):
+    motion_summary = _motion_summary(start_diagnostics, particles, dt)
     reporting.report_frame_momentum(frame_number, motion_summary)
     reporting.report_contacts(frame_number, particles)
     for particle in particles:
@@ -431,13 +509,20 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                 shadow.ShaderFlags.frameNum = frame_number
                 ##JMB Main Call to geo.CollisionRun() 
                 particles = geo.CollisionRun()
-                _report_particles(reporting, frame_number, particles, start_diagnostics)
+                _report_particles(
+                    reporting,
+                    frame_number,
+                    particles,
+                    start_diagnostics,
+                    geo.ShaderFlags.dt,
+                )
                 sparticles = shadow.CollisionRun()
                 _report_particles(
                     reporting_s,
                     frame_number,
                     sparticles,
                     shadow_start_diagnostics,
+                    shadow.ShaderFlags.dt,
                 )
             else:
                 particles = geo.particles

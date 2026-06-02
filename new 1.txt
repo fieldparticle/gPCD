@@ -1,1 +1,6 @@
-TwoParticleHorizontal works. Need to start on ThreeParticle. captured 0 to 200 when thay all have rebound. drift 
+once phase == RETURNING, the target internal momentum must decrease as separation progresses,
+or release must be driven directly by stored internal momentum and the rebound profile.
+
+A more parabolic rebound profile could be:
+release_fraction = 1.0 - contact_internal_momentum / max_internal_momentum
+release_impulse = contact_internal_momentum * profile_gain

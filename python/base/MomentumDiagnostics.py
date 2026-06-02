@@ -195,6 +195,8 @@ def _momentum_series(momentum_csv):
             internal_total,
         ),
         "ke_drift": [_float(row, "ke_drift") for row in rows],
+        "v_rel": [_float(row, "v_rel") for row in rows],
+        "raw_impulse": [_float(row, "raw_impulse") for row in rows],
     }
 
 
@@ -502,7 +504,9 @@ def _draw_totals_panel(axis, item, series):
         (
             "KE "
             f"current={_latest(series, 'current_ke'):.12g} "
-            f"drift={_latest(series, 'ke_drift'):.12g}"
+            f"drift={_latest(series, 'ke_drift'):.12g} "
+            f"v_rel={_latest(series, 'v_rel'):.12g} "
+            f"raw_impulse={_latest(series, 'raw_impulse'):.12g}"
         ),
     ]
     axis.clear()
@@ -543,28 +547,8 @@ def plot_momentum_diagnostics(momentum_csv, output_svg=None, title=None, cfg_pat
         bottom_frames,
         "release_impulse",
     )
-    p1_parabolic_target = _source_contact_series(
-        momentum_csv,
-        1,
-        bottom_frames,
-        "parabolic_target_internal_mom",
-    )
-    p1_parabolic_compression = _source_contact_series(
-        momentum_csv,
-        1,
-        bottom_frames,
-        "parabolic_compression_impulse",
-    )
-    p1_parabolic_release = _source_contact_series(
-        momentum_csv,
-        1,
-        bottom_frames,
-        "parabolic_release_impulse",
-    )
     p1_cumulative_compression = _running_total(p1_compression)
     p1_cumulative_release = _running_total(p1_release)
-    p1_cumulative_parabolic_compression = _running_total(p1_parabolic_compression)
-    p1_cumulative_parabolic_release = _running_total(p1_parabolic_release)
     top_series = _particle_plot_series(momentum_csv, cfg_path)
     middle_series = (
         [
@@ -584,7 +568,6 @@ def plot_momentum_diagnostics(momentum_csv, output_svg=None, title=None, cfg_pat
             ("p1 internal_mom", "#fdb462", p1["internal_momentum"]),
             ("p1 cumulative_compression", "#fb8072", p1_cumulative_compression),
             ("p1 cumulative_release", "#80b1d3", p1_cumulative_release),
-            ("p1 parabolic_target_internal_mom", "#b3de69", p1_parabolic_target),
             ("p1 -KE scaled", "#bebada", p1["negative_ke_scaled"]),
         ]
         if p1
@@ -603,10 +586,6 @@ def plot_momentum_diagnostics(momentum_csv, output_svg=None, title=None, cfg_pat
         [
             ("p1 compression_impulse", "", p1_compression),
             ("p1 release_impulse", "", p1_release),
-            ("p1 parabolic_compression_impulse", "", p1_parabolic_compression),
-            ("p1 parabolic_release_impulse", "", p1_parabolic_release),
-            ("p1 cumulative_parabolic_compression", "", p1_cumulative_parabolic_compression),
-            ("p1 cumulative_parabolic_release", "", p1_cumulative_parabolic_release),
             ("p1 curr_ke", "", [-value for value in p1["negative_ke"]]),
         ]
         if p1
@@ -718,12 +697,13 @@ def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     middle_axis.clear()
     bottom_axis.clear()
     particle_visible = particle_visible or {}
-
-    for particle in _particle_series(
+    particles = _particle_series(
         Path(item["momentum_csv"]).parent,
         item.get("cfg_path"),
         _report_mode_from_momentum_path(item["momentum_csv"]),
-    ):
+    )
+
+    for particle in particles:
         particle_label = f"p{particle['particle_number']}"
         style = _particle_style(particle["particle_number"])
         markevery = max(1, len(particle["frames"]) // 24)
@@ -753,30 +733,57 @@ def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     top_axis.grid(True, alpha=0.3)
     top_axis.legend(loc="best")
 
-    p1 = _particle_by_number(item["momentum_csv"], item.get("cfg_path"), 1)
-    if p1:
-        middle_axis.plot(
-            p1["frames"],
-            p1["internal_momentum"],
-            label="p1 internal_mom",
-            linewidth=2,
-        )
-        middle_axis.plot(
-            p1["frames"],
-            p1["particle_pv"],
-            label="p1 pv",
-            linewidth=2,
-        )
-        middle_axis.plot(
-            p1["frames"],
-            p1["particle_start_minus_pv"],
-            label="p1 start_minus_pv",
-            linewidth=2,
-        )
-        middle_axis.set_title("p1 Internal Momentum vs Velocity Momentum")
+    visible_particles = [
+        particle
+        for particle in particles
+        if particle_visible.get(f"p{particle['particle_number']}", True)
+    ]
+    if visible_particles:
+        for particle in visible_particles:
+            particle_label = f"p{particle['particle_number']}"
+            style = _particle_style(particle["particle_number"])
+            markevery = max(1, len(particle["frames"]) // 24)
+            middle_axis.plot(
+                particle["frames"],
+                particle["internal_momentum"],
+                label=f"{particle_label} internal_mom",
+                linewidth=2,
+                linestyle=style["linestyle"],
+                marker=style["marker"],
+                markevery=markevery,
+            )
+            middle_axis.plot(
+                particle["frames"],
+                particle["particle_pv"],
+                label=f"{particle_label} pv",
+                linewidth=2,
+                linestyle=style["linestyle"],
+                marker=style["marker"],
+                markevery=markevery,
+            )
+            middle_axis.plot(
+                particle["frames"],
+                particle["particle_start_minus_pv"],
+                label=f"{particle_label} start_minus_pv",
+                linewidth=2,
+                linestyle=style["linestyle"],
+                marker=style["marker"],
+                markevery=markevery,
+            )
+        middle_axis.set_title("Particle Internal Momentum vs Velocity Momentum")
     else:
-        middle_axis.plot(frames, series["internal_total"], label="total_internal_mom", linewidth=2)
-        middle_axis.plot(frames, series["negative_current_ke"], label="-curr_ke", linewidth=2)
+        middle_axis.plot(
+            frames,
+            series["internal_total"],
+            label="total_internal_mom",
+            linewidth=2,
+        )
+        middle_axis.plot(
+            frames,
+            series["negative_current_ke"],
+            label="-curr_ke",
+            linewidth=2,
+        )
         middle_axis.plot(
             frames,
             series["negative_current_ke_scaled"],
@@ -790,57 +797,61 @@ def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     middle_axis.grid(True, alpha=0.3)
     middle_axis.legend(loc="best")
 
-    if p1:
-        p1_compression = _source_contact_series(
-            item["momentum_csv"],
-            1,
-            p1["frames"],
-            "compression_impulse",
-        )
-        p1_release = _source_contact_series(
-            item["momentum_csv"],
-            1,
-            p1["frames"],
-            "release_impulse",
-        )
-        p1_parabolic_target = _source_contact_series(
-            item["momentum_csv"],
-            1,
-            p1["frames"],
-            "parabolic_target_internal_mom",
-        )
-        bottom_axis.plot(
-            p1["frames"],
-            p1["internal_momentum"],
-            label="p1 internal_mom",
-            linewidth=2,
-        )
-        bottom_axis.plot(
-            p1["frames"],
-            _running_total(p1_compression),
-            label="p1 cumulative_compression",
-            linewidth=2,
-        )
-        bottom_axis.plot(
-            p1["frames"],
-            _running_total(p1_release),
-            label="p1 cumulative_release",
-            linewidth=2,
-        )
-        bottom_axis.plot(
-            p1["frames"],
-            p1_parabolic_target,
-            label="p1 parabolic_target_internal_mom",
-            linewidth=2,
-        )
-        bottom_axis.plot(
-            p1["frames"],
-            p1["negative_ke_scaled"],
-            label="p1 -KE scaled",
-            linewidth=2,
-            linestyle="--",
-        )
-        bottom_axis.set_title("p1 Internal Momentum vs Cumulative Compression/Release")
+    if visible_particles:
+        for particle in visible_particles:
+            particle_number = particle["particle_number"]
+            particle_label = f"p{particle_number}"
+            style = _particle_style(particle_number)
+            markevery = max(1, len(particle["frames"]) // 24)
+            compression = _source_contact_series(
+                item["momentum_csv"],
+                particle_number,
+                particle["frames"],
+                "compression_impulse",
+            )
+            release = _source_contact_series(
+                item["momentum_csv"],
+                particle_number,
+                particle["frames"],
+                "release_impulse",
+            )
+            bottom_axis.plot(
+                particle["frames"],
+                particle["internal_momentum"],
+                label=f"{particle_label} internal_mom",
+                linewidth=2,
+                linestyle=style["linestyle"],
+                marker=style["marker"],
+                markevery=markevery,
+            )
+            bottom_axis.plot(
+                particle["frames"],
+                _running_total(compression),
+                label=f"{particle_label} cumulative_compression",
+                linewidth=2,
+                linestyle=style["linestyle"],
+                marker=style["marker"],
+                markevery=markevery,
+            )
+            bottom_axis.plot(
+                particle["frames"],
+                _running_total(release),
+                label=f"{particle_label} cumulative_release",
+                linewidth=2,
+                linestyle=style["linestyle"],
+                marker=style["marker"],
+                markevery=markevery,
+            )
+            bottom_axis.plot(
+                particle["frames"],
+                particle["negative_ke_scaled"],
+                label=f"{particle_label} -KE scaled",
+                linewidth=2,
+                linestyle="--",
+                marker=style["marker"],
+                markevery=markevery,
+            )
+        bottom_axis.set_title("Particle Internal Momentum vs Cumulative Compression/Release")
     bottom_axis.axhline(0.0, color="black", linewidth=1, alpha=0.5)
     bottom_axis.set_xlabel("frame")
     bottom_axis.set_ylabel("diagnostic value")
@@ -928,11 +939,7 @@ def show_batch_menu(batch_cfg, report_mode="live"):
 
     def toggle_particle(label):
         particle_visible[label] = not particle_visible[label]
-        for line in axes[1].lines:
-            if line.get_label().startswith(f"{label} "):
-                line.set_visible(particle_visible[label])
-        axes[1].legend(loc="best")
-        fig.canvas.draw_idle()
+        _draw_matplotlib_axes(fig, axes, selected_item["item"], particle_visible)
 
     radio.on_clicked(select)
     mode_radio.on_clicked(select_mode)
