@@ -111,6 +111,13 @@ class ShadowBase(ShadowDynamics):
         coll_in.ExcessSlots = 0
         return coll_in
 
+    @staticmethod
+    ##JMB Future common helper: move to ShadowCommon.py when shared geometry
+    # and GLSL-coordinate utilities are split out of ShadowBase.
+    def GeoVelocityAngle(vx, vy):
+        """Return the GLSL VelRad.w velocity angle for an xy velocity."""
+        return math.atan2(vy, vx) if vx != 0.0 or vy != 0.0 else 0.0
+
     def create_particle(self, **fields):
         particle = ParticleFields()
         particle.pnum = fields.get("pnum", 0)
@@ -122,9 +129,10 @@ class ShadowBase(ShadowDynamics):
         vz = fields.get("vz", 0.0)
         mass = fields.get("mass", fields.get("molar_mass", 1.0))
         radius = fields.get("radius", 0.0)
+        velocity_angle = self.GeoVelocityAngle(vx, vy)
         particle.PosLocA = self.create_vec4(rx, ry, rz, 0.0)
         particle.PosLocB = self.create_vec4(rx, ry, rz, 1.0)
-        particle.VelRad = self.create_vec4(vx, vy, vz, 0.0)
+        particle.VelRad = self.create_vec4(vx, vy, vz, velocity_angle)
         particle.Data = self.create_vec4(radius, fields.get("collision_stiffness_q", 0.0), 0.0, fields.get("state_flg", 1.0))
         particle.parms = self.create_vec4(mass, 0.0, 0.0, 0.0)
         particle.internal_momentum = particle.Data.z
@@ -257,33 +265,96 @@ class ShadowBase(ShadowDynamics):
     def CollisionRun(self):
         if not self.GeoBeginFrame():
             return self.particles
-
+        if(self.ShaderFlags.frameNum==79):   
+            print("Frame 80: Starting collision run with {} particles.".format(len(self.particles)))
+        # GeoApplyBeforeContactScanHook is where the senario can adjust particle 
+        # state before contact detection.  
+        # This is useful for test harnesses that need 
+        # to manipulate particle state after the frame-local 
+        # reset and before contact lists are built.
         self.GeoApplyBeforeContactScanHook()
+        # GeoResetFrameState clears per-frame state such as 
+        # contact lists and report fields, but does not clear 
+        # persistent state such as particle positions or 
+        # contact-owned internal momentum.  This allows 
+        # the frame-local reset to be decoupled from the 
+        # persistent state that the shadow dynamics prunes or drains across frames.
         self.GeoResetFrameState()
+        # GeoApplyStartRunHook is where the inline test 
+        # can adjust particle state after the frame-local 
+        # reset and before the frame snapshot is built.  
+        # This allows inline tests to manipulate the particle 
+        # list and state seen by the rest of the frame, including 
+        # diagnostics, contact detection, planning, resolution, and motion.
         self.GeoApplyStartRunHook()
+        # The frame snapshot captures the particle state at the 
+        # start of contact detection, which is used for contact 
+        # detection and planning.  This allows the shadow dynamics to 
+        # preserve the particle state at the start of contact detection 
+        # for use in scenario hooks and diagnostics, even as contact 
+        # resolution and motion update the particle state during the frame.
         self.GeoBuildFrameSnapshot()
+        # Record diagnostics for the start of the frame.
         self.GeoRecordFrameStartDiagnostics()
-
-        if not self.GeoBuildParticleContactLists():
+        # GeoDetectContact detects contacts between particles and
+        # builds contact lists for each particle.  This is the first stage 
+        # of the frame where the collision input (particle state) is used to 
+        # produce collision output (contact lists).
+        if not self.GeoDetectContact():
             return self.particles
-
+        # GeoBuildWallContactLists detects contacts between particles and walls and
+        # builds contact lists for each particle.  This is the second stage of the 
+        # frame where the collision input (particle state) is used to produce 
+        # collision output (contact lists).  This
         if not self.GeoBuildWallContactLists():
             return self.particles
 
+        # GeoResolveContacts processes the contact lists for each particle 
+        # to resolve collisions.  This is the third stage of the frame 
+        # where the collision input (contact lists) is used to produce 
+        # collision output (updated particle state).  
+        # This is also the stage where the optional inline 
+        # test AfterContactScan hook executes, allowing 
+        # inline tests to manipulate particle state after 
+        # contact detection and before motion.
+        ##JMB Currently the shape of python and glsl is wrong. 
+        ## GeoContactContext is reading contact geopmetry from the 
+        ## particle list and not just the contact slots.  
+        ## The longer-term cleanup is even better:
+        ##  GeoDetectContact stores geometry into contact slots
+        ##  GeoPlanContactImpulses reads contact slots
+        ##  GeoContactContext never recomputes contact geometry
         if not self.GeoPlanContactImpulses():
             return self.particles
-
+        #  GeoResolveContacts processes the contact lists for each particle 
+        # to resolve collisions.
         if not self.GeoResolveContacts():
             return self.particles
-        self.GeoRecordAfterResolveDiagnostics()
 
+        # Record diagnostics for after contact resolution and before motion.
+        self.GeoRecordAfterResolveDiagnostics()
+        # GeoMoveParticles updates particle positions 
+        # based on their velocities and the time step.
         if not self.GeoMoveParticles():
             return self.particles
-
+        # GeoEndFrame finalizes the frame by syncing particle 
+        # positions to the current position buffer and clearing 
+        # frame-local state.  This allows the shadow dynamics to 
+        # maintain separate position buffers for contact detection 
+        # and motion, and to preserve the particle state at the 
+        # end of the frame for use in scenario hooks and diagnostics.
         self.GeoEndFrame()
         return self.particles
 
     def GeoBeginFrame(self):
+        """Start a shadow dynamics frame and validate configuration state.
+
+        Each shadow frame begins with a clean runtime error value.  If cfg
+        loading found a persistent configuration error, restore that error and
+        return False so CollisionRun exits before contact detection, planning,
+        resolution, or motion.  This does not reset particle state or contact
+        ledgers; it only gates whether the frame is allowed to run.
+        """
         self.collIn.ErrorReturn = self.constants.GEO_ERROR_NONE
         if self.config_error_return is not None:
             self.collIn.ErrorReturn = self.config_error_return
@@ -291,10 +362,37 @@ class ShadowBase(ShadowDynamics):
         return True
 
     def GeoApplyBeforeContactScanHook(self):
+        """Run the optional scenario hook before shadow contact scanning.
+
+        This hook is called after GeoBeginFrame() and before frame reset,
+        snapshot building, and contact-list construction.  When a scenario
+        object is attached, its BeforeContactScan(particles) callback can make
+        test-harness adjustments to the shadow particle list before contacts
+        are detected for the frame.  If no scenario is attached, this stage is
+        a no-op.
+        """
         if self.senario:
             self.senario.BeforeContactScan(self.particles)
 
     def GeoResetFrameState(self):
+        """Reset shadow per-frame contact and reporting state.
+
+        This clears state that must be rebuilt from the current shadow frame:
+        current-frame contact slots/list/count, overlap and penetration
+        accumulators, and report fields consumed by UI/capture output.  It
+        does not clear persistent shadow dynamics memory such as
+        contact-owned internal momentum, contact phase, velocity references,
+        or rebound references; those survive across frames until the shadow
+        dynamics prunes or drains them.
+
+        For each shadow particle this function:
+        - calls GeoBeginContactFrame(), which clears the current-frame contact
+          list, contact count, and reusable contact slots;
+        - resets overlap and maximum penetration measurements;
+        - resets report fields so the current frame can repopulate them;
+        - copies particle-owned collision stiffness from Data.y into the
+          report field.
+        """
         for particle_index, particle in enumerate(self.particles):
             self.GeoBeginContactFrame(particle_index)
             particle.oa = 0.0
@@ -314,10 +412,33 @@ class ShadowBase(ShadowDynamics):
             particle.report_collision_stiffness_q = particle.Data.y
 
     def GeoApplyStartRunHook(self):
+        """Run the optional inline-test StartRun hook for this frame.
+
+        This hook executes after frame-local state has been reset and before
+        the frame snapshot is built.  When inline-test mode is active and a
+        scenario object is attached, senario.StartRun(particles) may adjust or
+        replace the particle list used by the rest of the frame.  If inline
+        testing is not active, or no scenario is attached, this stage is a
+        no-op.
+        """
         if self.inline_test_flag == True and self.senario is not None:
             self.particles = self.senario.StartRun(self.particles)
-
+    
     def GeoBuildFrameSnapshot(self):
+        """Capture frame-start positions and velocities for dynamics logic.
+
+        The snapshot freezes the state that contact geometry and relative
+        velocity calculations should read for this frame.  Position data is
+        copied from the currently active position buffer selected by
+        ShaderFlags.positionBuffer.  Velocity data is copied from each
+        particle's current VelRad value.
+
+        Later stages may update particle velocities or move particles, but
+        functions that read PosLocFrame or VelRadFrame continue to see this
+        frame-start state.  This keeps contact detection, contact weighting,
+        and impulse planning based on one consistent moment rather than on
+        partially updated particle state.
+        """
         position_buffer = int(self.ShaderFlags.positionBuffer)
         self.PosLocFrame = [
             self.create_vec4(
@@ -328,6 +449,14 @@ class ShadowBase(ShadowDynamics):
             )
             for particle in self.particles
         ]
+        ##JMB Huge model break. This would require 
+        ## Frame-start VelRad snapshot: x/y/z are velocity components, and w
+        ## is the velocity angle used by particle.glsl.
+        ## Solution is to store in parms
+        ## parms.x = mass
+        ## parms.y = frame_start_vx
+        ## parms.z = frame_start_vy
+        ## parms.w = frame_start_vz
         self.VelRadFrame = [
             self.create_vec4(particle.VelRad.x, particle.VelRad.y, particle.VelRad.z, particle.VelRad.w)
             for particle in self.particles
@@ -344,6 +473,13 @@ class ShadowBase(ShadowDynamics):
         )
 
     def GeoRecordFrameStartDiagnostics(self):
+        """Record per-particle kinetic energy at the frame-start snapshot.
+
+        This uses VelRadFrame, not the mutable particle.VelRad, so the report
+        captures kinetic energy before contact resolution changes velocities.
+        The value is stored on each particle as report_frame_start_ke and is
+        later written to the particle capture files.
+        """
         for particle_index, particle in enumerate(self.particles):
             velocity = self.VelRadFrame[particle_index]
             particle.report_frame_start_ke = self.GeoParticleKineticEnergy(
@@ -357,7 +493,19 @@ class ShadowBase(ShadowDynamics):
                 particle_index,
             )
 
-    def GeoBuildParticleContactLists(self):
+    def GeoDetectContact(self):
+        """Build directed particle-particle contact lists for this frame.
+
+        Every particle is treated as a source, and every other particle is
+        tested as a possible target.  Contact detection reads the frame-start
+        position snapshot through isParticleContact(), then
+        GeoAddParticleContact() records the directed source-owned contact.
+
+        The result is a per-source collision_list/contact slot set that later
+        planning and resolution stages can process without pairwise write-back.
+        The function returns False immediately if contact insertion or contact
+        detection sets a collision error.
+        """
         position_buffer = int(self.ShaderFlags.positionBuffer)
         for source_id in range(len(self.particles)):
             for target_id in range(len(self.particles)):
@@ -369,6 +517,9 @@ class ShadowBase(ShadowDynamics):
                     target_id,
                     position_buffer,
                 ):
+                    # A detected contact is recorded as a directed,
+                    # source-owned contact.  The target will get its own
+                    # directed entry when it becomes the source in this loop.
                     if not self.GeoAddParticleContact(source_id, target_id):
                         return False
                 if self.collIn.ErrorReturn != self.constants.GEO_ERROR_NONE:
@@ -417,6 +568,8 @@ class ShadowBase(ShadowDynamics):
             particle.rz = position.z
 
     @staticmethod
+    ##JMB Future common helper: move to ShadowCommon.py when particle buffer
+    # access helpers are split out of ShadowBase.
     def particle_position(particle, positionBuffer):
         if int(positionBuffer) == 0:
             return particle.PosLocA
@@ -457,7 +610,23 @@ class ShadowBase(ShadowDynamics):
         return True
 
     @staticmethod
+    ##JMB Future common helper: move to ShadowCommon.py when shared geometry
+    # utilities are split out of ShadowBase.
     def particle_overlap_area(source_radius, target_radius, center_distance):
+        """Return the circular overlap area of two particles.
+
+        The inputs are the two radii and the distance between particle centers.
+        The function handles three geometric cases:
+
+        - coincident centers or full containment: use the smaller circle area;
+        - separated circles: return zero;
+        - partial overlap: use the standard two-circle lens area formula.
+
+        This is static because it is pure geometry.  It does not read particle
+        objects, frame state, contact ledgers, or configuration data, and it
+        does not mutate simulation state.  Keeping it static makes that
+        independence explicit and keeps the calculation easy to port to GLSL.
+        """
         if center_distance <= 0.0:
             return math.pi * min(source_radius, target_radius) ** 2
         if center_distance >= source_radius + target_radius:

@@ -1,5 +1,140 @@
+
 % !TeX root = main.tex
 \newpage
+\section{Performance Regions}
+
+Throughout this work, throughput curves are interpreted in terms of
+three performance regions:
+
+\begin{enumerate}
+
+\item \textbf{Utilization Region}
+
+The utilization region corresponds to low particle counts where GPU
+resources are not yet fully utilized. In this region, throughput
+increases rapidly as particle count increases because additional work
+improves parallel occupancy and hardware utilization.
+
+\item \textbf{Peak Throughput Region}
+
+The peak throughput region corresponds to the neighborhood surrounding
+the maximum measured throughput. Within this region, the framework
+achieves its highest particle-processing rate and transitions from
+utilization-limited behavior toward throughput-limited behavior.
+
+\item \textbf{Throughput-Limited Region}
+
+The throughput-limited region corresponds to particle counts beyond the
+peak throughput region. In this region, additional particles no longer
+increase throughput and may produce a gradual decline in throughput as
+execution costs continue to grow.
+
+\end{enumerate}
+
+Observed transition locations are benchmark dependent and are
+identified directly from measured throughput curves rather than imposed
+a priori.
+
+
+\newpage
+\section{Figures}
+
+Figures are classified according to their role within the manuscript.
+Each figure type is intended to support a specific section of the paper
+and should be placed where it contributes most directly to the reader's
+understanding.
+
+\begin{table}[h!]
+\centering
+\caption{Figure classification and recommended placement.}
+\label{tab:figure_classification}
+\begin{tabular}{p{3.0cm} p{6.5cm} p{3.0cm}}
+\hline
+\textbf{Figure Type} & \textbf{Purpose} & \textbf{Typical Section} \\
+\hline
+
+Architecture Figure &
+Describes system organization, workflow, or data flow. &
+Methodology \\
+
+Benchmark-Dataset Figure & Illustrates benchmark configurations, datasets, particle distributions,
+or test environments used during evaluation. & Experimental Setup \\
+
+Performance Figure &
+Presents measured results such as timing, throughput, scaling,
+efficiency, or resource utilization. &
+Results \\
+
+Interpretation Figure & Provides explanation of observed behavior, comparison of trends, or
+discussion of performance characteristics. & Discussion \\
+
+\hline
+\end{tabular}
+\end{table}
+
+The purpose of this classification is to maintain a clear distinction
+between describing the framework, defining the evaluation, presenting
+measurements, and interpreting results. Figures should generally appear
+in the section corresponding to their primary role within the paper.
+
+Examples within this work include architectural overview diagrams in
+the Methodology section, benchmark-density visualizations in
+Experimental Setup, throughput and timing plots in Results, and
+saturation or scaling interpretations in Discussion.
+
+\begin{table}[h!]
+\centering
+\caption{Current figure inventory and recommended placement within the manuscript.}
+\label{tab:figure_inventory}
+\begin{tabular}{p{4.0cm} p{3.5cm} p{3.5cm}}
+\hline
+\textbf{Figure} & \textbf{Type} & \textbf{Section} \\
+\hline
+
+OverviewArchitecture &
+Architecture Figure &
+Methodology \\
+
+Corner Occupancy / Duplicate Collision Figure &
+Methodology Figure &
+Methodology \\
+
+Cell Flattening Figure (if added) &
+Methodology Figure &
+Methodology \\
+
+Benchmark Particle Density Figure &
+Benchmark/Dataset Figure &
+Experimental Setup \\
+
+Throughput Plots &
+Performance Figure &
+Results \\
+
+Time-per-Particle Plots &
+Performance Figure &
+Results \\
+
+Scaling Fits &
+Performance Figure &
+Results \\
+
+Saturation Explanation Figure (if added) &
+Interpretation Figure &
+Discussion \\
+
+\hline
+\end{tabular}
+\end{table}
+
+\section{Comparative Analysis}
+
+The present work explicitly accounts for occupancy generation,
+occupancy-list traversal, narrow-phase evaluation, and storage
+requirements. This level of decomposition is intended to provide a
+clear correspondence between the implemented framework and the reported
+complexity results.
+
 \section{Manuscript Outline}
 \begin{verbatim}
 Abstract
@@ -493,6 +628,25 @@ error and corrected to AABB.
     \item Narrow-Phase Evaluation
 \end{enumerate}
 
+\subsection{Numerical Placeholders}
+
+During manuscript development, unresolved numerical values should be
+represented using
+\begin{verbatim}
+    \nc{Field Name}
+\end{verbatim}
+rather than hard-coded values.
+
+Examples:
+\begin{verbatim}
+    \nc{Maximum Particle Count}
+    \nc{Peak Throughput}
+    \nc{Scaling Exponent}
+    \nc{Time per Particle}
+\end{verbatim}
+Placeholders allow prose development to proceed independently of
+numerical refinement and provide a visible checklist of values that
+must be finalized before submission.
 %================================================================================
 \section{Collision-Detection Architecture}
 

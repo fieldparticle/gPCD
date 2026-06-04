@@ -9,17 +9,87 @@
 \usepackage{algorithm}
 \usepackage{listings}
 % Subcaption for subplot
- \usepackage{subcaption}
- 
+\usepackage{subcaption}
+\usepackage{numprint}
+\npthousandsep{,}
+\usepackage{makecell}
+\usepackage{booktabs}
+\usepackage{xfrac}
+
+\newcommand{\nc}[1]{!#1!}
+\newcommand{\mmrr}{\textit{\textbf{$mmrr$}}}
+\newcommand{\arrt}{\textit{\textbf{$arr_T$}}}
+\newcommand\Description[2][]{}
+
+\newcommand{\figo}[1]{fig.~\ref{fig:#1}}
+\newcommand{\Figo}[1]{Fig.~\ref{fig:#1}}
+\newcommand{\figob}[2]{fig.~\ref{fig:#1}-(#2)}
+\newcommand{\Tigo}[1]{Table~\ref{tab:#1}}
+
+% Keywords command
+\providecommand{\keywords}[1]
+{
+  \small	
+  \textbf{\textit{Keywords---}} #1
+}
+\input{LatexValsDataBase.tex}
+
 \title{A GPU Driven Graphical Particle Collision Detection Method- gPCD}
 \author{}
 \date{}
 
 \begin{document}
+\begin{abstract}
+
+Broad-phase collision detection is a fundamental component of
+particle-based simulation systems and is often a dominant contributor
+to overall computational cost. Existing GPU-resident approaches
+typically perform occupancy generation and candidate construction as
+dedicated collision-detection operations, while rendering remains a
+consumer of simulation state. This separation limits the ability of the
+graphics pipeline to contribute directly to collision detection.
+
+This work presents the graphics-based Parallel Collision Detection
+(gPCD) framework, a GPU-resident collision-detection architecture that
+integrates broad-phase occupancy generation directly into the graphics
+pipeline. The proposed framework allows occupancy construction and
+rendering to proceed concurrently while generating the potentially
+colliding set used during narrow-phase evaluation. A detailed
+complexity analysis is presented in which occupancy generation,
+candidate construction, narrow-phase evaluation, and storage
+requirements are examined independently.
+
+Experimental evaluation demonstrates high particle throughput and
+near-linear scaling across graphics, compute, and total execution
+times. Log--log regression produced scaling exponents close to unity,
+while curvature analysis indicated only minor departures from linear
+behavior over the evaluated benchmark range. Additional locality
+studies showed that memory organization affects implementation
+efficiency while preserving the underlying asymptotic behavior of the
+framework.
+
+The results demonstrate that graphics-pipeline occupancy generation
+provides a viable execution architecture for large-scale particle
+collision detection and enables particle-system scales traditionally
+associated with high-performance computing environments to be achieved
+on a single CPU--GPU system.
+
+\end{abstract}
+
+\keywords{
+collision detection,
+GPU computing,
+parallel algorithms,
+particle simulation,
+graphics pipeline,
+real-time simulation
+}
+
 \input{Introduction}
 \input{RelatedWork}
 \input{Methodology}
 \input{Complexity}
+\input{ExperimentalSetup}
 \input{ExperimentalResults}
 \input{Discussion}
 \input{Conclusions}

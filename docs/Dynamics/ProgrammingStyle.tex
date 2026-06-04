@@ -172,3 +172,26 @@ Harder to parallelize & Easier to parallelize \\
 \end{center}
 For large simulation codes, physics engines, and GPU applications, data-oriented pipeline designs are often preferred because they make data dependencies explicit and are generally easier to reason about, profile, parallelize, and maintain.
 
+\subsection{Generated Source Flowcharts}
+
+For the Geo and shadow dynamics work, the sequential stage chain should be
+documented with a generated flowchart when the source structure becomes hard to
+hold in memory.  The flowchart is not a substitute for narrow functions; it is a
+debugging and navigation aid that makes the stage order visible.
+
+The current source-flow generator is:
+
+\begin{verbatim}
+python/base/SourceFlowChart.py
+\end{verbatim}
+
+It emits DOT, SVG, PDF, and PNG artifacts under
+\texttt{docs/Dynamics/generated}.  The DOT file preserves the graph source, the
+SVG can carry interactive source links, and the PDF is used as the stable LaTeX
+figure.  The generator should be updated when function names, stage order, or
+major source handoffs change.
+
+This preserves the same programming rule used by the code: the primary flow is
+explicit, generated documentation follows that flow, and helpers are shown as
+supporting calls rather than hidden control-flow owners.
+

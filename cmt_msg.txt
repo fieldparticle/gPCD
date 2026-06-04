@@ -1,15 +1,12 @@
-Advance shadow diagnostics for normal-velocity response
+Document shadow source flow and generated flowchart
 
-- change ShadowDynamics to target relative normal velocity/normal momentum
-  before converting to impulse
-- add fixed-width UI and MomentumDiagnostics summary tables
-- limit reported numeric precision to 8 decimal places
-- add contact diagnostics for planned per-target impulse and source net impulse
-- read batch frame windows in MomentumDiagnostics and add a parallel internal
-  momentum plot for particle comparison
-- document the normal-velocity shadow result and the remaining ThreeParticle
-  source-level multi-contact storage/allocation problem
+- add SourceDocumentation with staged shadow dynamics flow and function notes
+- add SourceFlowChart generator for DOT/SVG/PDF/PNG source-flow diagrams
+- link SVG nodes to VS Code source locations with function line targets
+- include generated flowchart PDF in GeoDynamics documentation
+- document source-flowchart conventions and update-project expectations
+- record shadow source-documentation checkpoint in ProblemEvolution
+- mark shared ShadowBase helpers as future ShadowCommon candidates
+- clean stale generated flowchart output from python/base
 
-Next: solve source-level multi-contact storage allocation so p1 storage is
-weighted across simultaneous contacts instead of accumulating near the sum of
-p2 and p3 contact ledgers.
+Next: implement source-level multi-contact storage/allocation in ShadowDynamics

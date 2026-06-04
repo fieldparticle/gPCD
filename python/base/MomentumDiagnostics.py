@@ -763,11 +763,19 @@ def plot_batch(batch_cfg, report_mode="live"):
 def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     series = _momentum_series(item["momentum_csv"])
     frames = series["frames"]
-    totals_axis, top_axis, internal_axis, middle_axis, bottom_axis = axes
+    (
+        totals_axis,
+        top_axis,
+        internal_axis,
+        middle_axis,
+        p1_contact_axis,
+        bottom_axis,
+    ) = axes
     _draw_totals_panel(totals_axis, item, series)
     top_axis.clear()
     internal_axis.clear()
     middle_axis.clear()
+    p1_contact_axis.clear()
     bottom_axis.clear()
     particle_visible = particle_visible or {}
     particles = _particle_series(
@@ -828,6 +836,107 @@ def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     internal_axis.grid(True, alpha=0.3)
     internal_axis.legend(loc="best")
     _apply_frame_window(internal_axis, item, frames)
+
+    p1_to_p2_stored = _contact_series(
+        item["momentum_csv"],
+        1,
+        2,
+        frames,
+        "stored_mom",
+    )
+    p1_to_p3_stored = _contact_series(
+        item["momentum_csv"],
+        1,
+        3,
+        frames,
+        "stored_mom",
+    )
+    p1_to_p2_impulse = _contact_series(
+        item["momentum_csv"],
+        1,
+        2,
+        frames,
+        "planned_impulse_to_target",
+    )
+    p1_to_p3_impulse = _contact_series(
+        item["momentum_csv"],
+        1,
+        3,
+        frames,
+        "planned_impulse_to_target",
+    )
+    p1_net_dx = _source_contact_series(
+        item["momentum_csv"],
+        1,
+        frames,
+        "source_net_delta_px",
+    )
+    p1_net_dy = _source_contact_series(
+        item["momentum_csv"],
+        1,
+        frames,
+        "source_net_delta_py",
+    )
+    p1_contact_axis.plot(
+        frames,
+        p1_to_p2_stored,
+        label="p1->p2 stored_mom",
+        linewidth=2,
+        color="#fb8072",
+    )
+    p1_contact_axis.plot(
+        frames,
+        p1_to_p3_stored,
+        label="p1->p3 stored_mom",
+        linewidth=2,
+        color="#80b1d3",
+    )
+    p1_contact_axis.plot(
+        frames,
+        [a + b for a, b in zip(p1_to_p2_stored, p1_to_p3_stored)],
+        label="p1 stored sum",
+        linewidth=2,
+        color="#222222",
+        linestyle="--",
+    )
+    p1_contact_axis.plot(
+        frames,
+        p1_to_p2_impulse,
+        label="p1->p2 applied_impulse",
+        linewidth=1.8,
+        color="#fb8072",
+        linestyle=":",
+    )
+    p1_contact_axis.plot(
+        frames,
+        p1_to_p3_impulse,
+        label="p1->p3 applied_impulse",
+        linewidth=1.8,
+        color="#80b1d3",
+        linestyle=":",
+    )
+    p1_contact_axis.plot(
+        frames,
+        p1_net_dx,
+        label="p1 source_net_delta_px",
+        linewidth=2,
+        color="#b3de69",
+        linestyle="-.",
+    )
+    p1_contact_axis.plot(
+        frames,
+        p1_net_dy,
+        label="p1 source_net_delta_py",
+        linewidth=2,
+        color="#bebada",
+        linestyle="-.",
+    )
+    p1_contact_axis.axhline(0.0, color="black", linewidth=1, alpha=0.5)
+    p1_contact_axis.set_ylabel("momentum")
+    p1_contact_axis.set_title("p1 Ledger -> Applied Impulse -> Net Delta")
+    p1_contact_axis.grid(True, alpha=0.3)
+    p1_contact_axis.legend(loc="upper right")
+    _apply_frame_window(p1_contact_axis, item, frames)
 
     visible_particles = [
         particle
@@ -991,7 +1100,8 @@ def show_batch_menu(batch_cfg, report_mode="live"):
         fig.add_subplot(grid[0, :]),
         fig.add_subplot(grid[1, 0]),
         fig.add_subplot(grid[1, 1]),
-        fig.add_subplot(grid[2, :]),
+        fig.add_subplot(grid[2, 0]),
+        fig.add_subplot(grid[2, 1]),
         fig.add_subplot(grid[3, :]),
     )
     fig.subplots_adjust(left=0.32, hspace=0.48)

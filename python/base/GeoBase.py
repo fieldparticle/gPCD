@@ -295,6 +295,22 @@ class GeoBase(GeoDynamics):
             self.senario.BeforeContactScan(self.particles)
 
     def GeoResetFrameState(self):
+        """Reset live per-frame state before building the frame snapshot.
+
+        This function clears only frame-local/contact-scan state.  It does not
+        clear persistent dynamics memory such as source/contact internal
+        momentum ledgers or contact phases.
+
+        For each particle it:
+        - calls GeoBeginContactFrame(), which clears the current-frame contact
+          list, contact count, and reusable contact slots;
+        - clears overlap/penetration accumulators used by this frame's contact
+          search;
+        - clears report fields that will be repopulated by contact detection
+          and contact resolution;
+        - preserves the configured particle-owned collision stiffness by
+          copying particle.Data.y into the report field.
+        """
         for particle_index, particle in enumerate(self.particles):
             self.GeoBeginContactFrame(particle_index)
             particle.oa = 0.0

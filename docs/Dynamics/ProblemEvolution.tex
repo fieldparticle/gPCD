@@ -358,7 +358,7 @@ GeoApplyBeforeContactScanHook()
 GeoResetFrameState()
 GeoApplyStartRunHook()
 GeoBuildFrameSnapshot()
-GeoBuildParticleContactLists()
+GeoDetectContact()
 GeoBuildWallContactLists()
 GeoResolveContacts()
 GeoMoveParticles()
@@ -367,7 +367,7 @@ GeoEndFrame()
 
 This is easier to step through and debug because each stage has a clear kind of
 activity.  It also keeps meaningful frame decisions visible.  For example,
-\texttt{GeoBuildParticleContactLists()} and \texttt{GeoBuildWallContactLists()}
+\texttt{GeoDetectContact()} and \texttt{GeoBuildWallContactLists()}
 remain separate calls in the main chain instead of being hidden behind a broad
 \texttt{GeoBuildContactLists()} umbrella.
 
@@ -1119,7 +1119,7 @@ ShadowBase + ShadowDynamics -> shadow object
 
 Both objects are created from the same configuration data, but they own
 separate particle lists, contact ledgers, phases, velocities, positions, and
-reporting streams.  The shadow path reports to \texttt{*_s.csv}.  The old
+reporting streams.  The shadow path reports to .  The old
 in-\texttt{GeoDynamics.py} shadow/parabolic/vector diagnostic fields were
 removed from both live and shadow dynamics so the next experiment can be
 implemented cleanly in \texttt{ShadowDynamics.py}.
@@ -1230,7 +1230,7 @@ p2 internal_mom peak = 0.03408681
 p3 internal_mom peak = 0.03408681
 \end{verbatim}
 
-If particle 1's source compression capacity were shared symmetrically, its
+If particle 1s source compression capacity were shared symmetrically, its
 total internal momentum would be expected to peak near:
 
 \begin{verbatim}
@@ -1247,9 +1247,84 @@ This means the current shadow is still storing too much scalar internal
 momentum for a simultaneous multi-contact source.  In addition, when particle
 1 releases to particle 2 and particle 3, the two contact-normal impulses
 vector-sum; the transverse components cancel and only the shared source-level
-component contributes to particle 1's final velocity.
+component contributes to particle 1s final velocity.
 
 Therefore the remaining problem is not basic rebound and not a simple missing
 scalar ledger.  The next rule must compute a source-level multi-contact
 storage/allocation target first, then distribute compatible per-contact
 impulses from that source-level result.
+
+\subsection{Shadow Source Documentation and Flowchart Checkpoint}
+
+\subsubsection{Problem}
+
+The shadow path had become useful enough to step through, but the code was hard
+to navigate from memory.  The work had split into:
+
+\begin{verbatim}
+ShadowBase      -> frame chain, snapshots, contact detection, movement
+ShadowDynamics  -> contact context, impulse planning, collision resolution
+\end{verbatim}
+
+That split is correct, but it exposed a documentation problem.  If the source
+flow is not visible, it is too easy to lose the GLSL-shaped staging rule and
+accidentally add a full particle scan, a pairwise write-back shortcut, or a
+helper in the wrong layer.
+
+\subsubsection{Fix}
+
+A new source-documentation layer was added:
+
+\begin{verbatim}
+docs/Dynamics/SourceDocumentation.tex
+python/base/SourceFlowChart.py
+docs/Dynamics/generated/ShadowSourceFlow.dot
+docs/Dynamics/generated/ShadowSourceFlow.svg
+docs/Dynamics/generated/ShadowSourceFlow.pdf
+docs/Dynamics/generated/ShadowSourceFlow.png
+\end{verbatim}
+
+\texttt{SourceDocumentation.tex} records the staged flow and function-level
+notes for the shadow path.  The flowchart generator builds the same source flow
+as Graphviz DOT, then renders browser and document artifacts.  The SVG is the
+interactive version.  Its function nodes link to the current source functions
+with \texttt{vscode://file/...:line:1} URLs, so clicking a node can open the
+implementation directly in VS Code.  The PDF is the stable LaTeX figure used by
+\texttt{SourceDocumentation.tex}.
+
+The flowchart makes the intended pipeline explicit:
+
+\begin{verbatim}
+CollisionRun
+-> frame setup
+-> frame snapshot
+-> contact detection
+-> impulse planning
+-> source-owned collision resolution
+-> motion
+-> frame end
+\end{verbatim}
+
+\subsubsection{Current Result}
+
+This checkpoint does not change the dynamics equations.  It changes the project
+process.  The shadow implementation now has a navigable source map that supports
+stepper debugging and helps preserve the rule that planning consumes detected
+contacts rather than rediscovering contacts.
+
+The source-flow documentation also identified a small common-helper seam:
+
+\begin{verbatim}
+GeoVelocityAngle
+particle_position
+particle_overlap_area
+\end{verbatim}
+
+These helpers remain in \texttt{ShadowBase.py} for now, but they are marked as
+future \texttt{ShadowCommon.py} candidates because both CPU shadow code and
+future GLSL export need the same low-level geometry/buffer operations.
+
+The next dynamics step remains unchanged: implement the source-level
+multi-contact storage/allocation target in \texttt{ShadowDynamics.py}, then test
+whether particle 1 in \texttt{ThreeParticle} stores the weighted source-level
+amount instead of the sum of independent one-contact ledgers.

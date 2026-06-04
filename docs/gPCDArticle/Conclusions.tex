@@ -1,2 +1,38 @@
 % !TeX root = main.tex
-\section{Conclusions}
+\section{Conclusion and Future Work}
+
+This work presented the graphics-based Parallel Collision Detection
+(gPCD) framework, a collision-detection architecture that integrates
+broad-phase occupancy generation directly into the graphics pipeline.
+Unlike traditional approaches that treat rendering as a consumer of
+simulation state, the proposed framework allows occupancy construction
+and rendering to proceed concurrently while producing the potentially
+colliding set used during narrow-phase evaluation.
+
+A detailed complexity analysis was presented in which occupancy
+generation, candidate construction, narrow-phase evaluation, and
+storage requirements were examined independently. Experimental results
+demonstrated high particle throughput and near-linear scaling across
+graphics, compute, and total execution times. Log--log regression and
+curvature analyses further showed that the measured scaling behavior is
+consistent with the complexity analysis. Additional locality studies
+demonstrated that memory organization affects performance through
+implementation efficiency while preserving the underlying asymptotic
+behavior of the framework.
+
+The results suggest that graphics-pipeline occupancy generation
+provides a viable alternative execution architecture for large-scale
+particle collision detection. The demonstrated particle counts indicate
+that a single CPU--GPU system is capable of supporting particle-system
+scales traditionally associated with high-performance computing
+environments.
+
+Future work will focus on extending the framework to larger GPU
+configurations, multi-GPU execution, and distributed computing
+environments. While the present work focuses on collision-detection
+performance, the framework has already been applied within
+particle-based thermo-fluid simulations, where preliminary studies have
+produced promising results and novel physical observations. Future work
+will investigate these applications in greater depth and evaluate the
+role of graphics-pipeline occupancy generation in large-scale
+thermo-fluid and multiphysics simulations.

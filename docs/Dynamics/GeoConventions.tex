@@ -305,7 +305,7 @@ ShadowBase + ShadowDynamics -> shadow object
 The shadow object may write its own particle velocity, position, internal
 momentum, contact phase, and contact ownership because those writes affect only
 the shadow particle state.  It must not mutate live particles or live
-contact ledgers.  Shadow reports must use the \texttt{*_s.csv} suffix so live
+contact ledgers.  Shadow reports must use the \texttt{s.csv} suffix so live
 and shadow captures can be compared without sharing files.
 
 The applied live dynamics remain authoritative.  A shadow result may be
@@ -373,7 +373,7 @@ ShadowBase + ShadowDynamics -> shadow object
 
 The shadow object may write its own velocity, position, contact phase, and
 internal momentum because those writes affect only the shadow particle state
-and are reported to \texttt{*_s.csv} files.  The live object remains
+and are reported to .csv files.  The live object remains
 authoritative for the UI and normal reports.
 
 The parabolic response is a contact-owned target-ledger rule.  For each
@@ -448,7 +448,7 @@ The implementation must keep the functions narrow:
     \item compute source-owned impulse deltas;
     \item apply shadow velocity writes;
     \item move shadow particles;
-    \item report to \texttt{*_s.csv}.
+    \item report to s.csv.
 \end{itemize}
 
 The old in-\texttt{GeoDynamics.py} shadow diagnostics are historical
@@ -623,18 +623,46 @@ includes:
     \item update \texttt{ProgrammingStyle.tex} when the work changes the
     accepted control-flow shape, staging style, function-narrowing rule, or
     debugging/programming practice.
+    \item update \texttt{SourceDocumentation.tex} and regenerate the source
+    flowchart when the work changes the shadow frame chain, stage order,
+    documented function names, or source-navigation structure.
 \end{itemize}
 
 The documentation update should describe the current implementation and the
 reason for the change.  Old material should be removed or clearly superseded
 when it no longer describes the active Geo path.
 
+\subsection{Source Flowchart Convention}
+
+The source-flow diagram is generated, not hand-edited.  The generator lives in:
+
+\begin{verbatim}
+python/base/SourceFlowChart.py
+\end{verbatim}
+
+It writes the current artifacts to:
+
+\begin{verbatim}
+docs/Dynamics/generated/ShadowSourceFlow.dot
+docs/Dynamics/generated/ShadowSourceFlow.svg
+docs/Dynamics/generated/ShadowSourceFlow.pdf
+docs/Dynamics/generated/ShadowSourceFlow.png
+\end{verbatim}
+
+The DOT file is the readable graph source.  The SVG is the interactive browser
+version and may contain \texttt{vscode://file/...:line:1} source links.  The PDF
+is the stable LaTeX figure included by \texttt{SourceDocumentation.tex}.  The
+LaTeX documentation should include the generated PDF with
+\texttt{\textbackslash includegraphics}, not depend on SVG conversion during the
+LaTeX build.
+
 \subsection{Current TODO}
 
 \begin{itemize}
-    \item Decide whether \texttt{isParticleContact(...)} belongs in
-    \texttt{GeoBase.py} or should be moved to a GLSL-matching dynamics/helper
-    module.
+    \item Keep \texttt{GeoVelocityAngle}, \texttt{particle\_position}, and
+    \texttt{particle\_overlap\_area} marked as future
+    \texttt{ShadowCommon.py} candidates until the shared helper module is
+    created.
     \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
     \item Keep live \texttt{GeoDynamics.py} clean while the next response rule
     is tested in \texttt{ShadowDynamics.py}.

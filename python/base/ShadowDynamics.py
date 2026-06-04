@@ -39,6 +39,20 @@
         return max(0.0, 0.5 * (source_q + target_q))
 
     def GeoReducedMass(self, SourceID, TargetID):
+        """Return the two-particle reduced mass for a contact pair.
+
+        Reduced mass converts relative normal velocity into contact normal
+        momentum:
+
+            p_n = mu * v_n
+
+        where:
+
+            mu = (m_source * m_target) / (m_source + m_target)
+
+        The mass values come from the GLSL-shaped particle parms.x field via
+        GeoMass().
+        """
         source_mass = self.GeoMass(SourceID)
         target_mass = self.GeoMass(TargetID)
         return (source_mass * target_mass) / (source_mass + target_mass)
@@ -229,7 +243,21 @@
         return self.GeoAppendContactSlot(SourceID, TargetID)
 
     def GeoParticleGeometry(self, SourceID, TargetID):
-        """Return current contact geometry or None when there is no contact."""
+        """Return frame-snapshot contact geometry for a source-target pair.
+
+        Positions are read through GeoCurrentLocation(), so this geometry is
+        based on the frame-start snapshot when one exists.  If the two particle
+        radii do not overlap, return None.
+
+        When a contact exists, return:
+
+        (normal_x, normal_y, normal_z, overlap_area, center_distance)
+
+        The normal points from the source center toward the target center.
+        overlap_area is the circular overlap area used by the current
+        geometric impulse rule.  If the centers coincide, the normal defaults
+        to +x so the response has a deterministic direction.
+        """
         source_position = self.GeoCurrentLocation(SourceID)
         target_position = self.GeoCurrentLocation(TargetID)
         dx = target_position.x - source_position.x
@@ -255,30 +283,54 @@
         )
         return normal_x, normal_y, normal_z, overlap_area, center_distance
 
-    def GeoVelocity(self, ParticleID):
-        """Read frame-start velocity when GeoBase provides it."""
+    def GeoStartFrameVelocity(self, ParticleID):
+        """Read the particle velocity from the frame-start snapshot."""
         if hasattr(self, "VelRadFrame") and self.VelRadFrame:
             return self.VelRadFrame[ParticleID]
         return self.particles[ParticleID].VelRad
 
     def GeoContactContext(self, SourceID):
-        source_velocity = self.GeoVelocity(SourceID)
+        """Return source-level contact context for the current frame.
+
+        The context is computed from the frame snapshot, not from partially
+        updated particle state.  It consumes the already-built source
+        collision_list and accumulates:
+
+        - total_overlap_area: the sum of positive overlap areas for all current
+          contacts touching this source;
+        - available_source_momentum: the sum of reduced-mass closing normal
+          momentum for contacts whose relative normal velocity is closing.
+
+        Later planning uses total_overlap_area to compute contact weights and
+        available_source_momentum to limit how much source compression capacity
+        can be distributed across the source's active contacts.
+        """
+        source_velocity = self.GeoStartFrameVelocity(SourceID)
         total_overlap_area = 0.0
         available_source_momentum = 0.0
-        for TargetID in range(len(self.particles)):
-            if TargetID == SourceID:
-                continue
+        for TargetID in self.particles[SourceID].collision_list:
+            # Get the current frame contact geometry. 
+            #  If the geometry is invalid, skip this contact.
+            # geoetry is normal_x, normal_y, normal_z, overlap_area,
+            # _center_distance
             contact = self.GeoParticleGeometry(SourceID, TargetID)
             if contact is None:
                 continue
             normal_x, normal_y, normal_z, overlap_area, _center_distance = contact
-            target_velocity = self.GeoVelocity(TargetID)
+            # Get the starting frame velocity snapshot for the target.  
+            target_velocity = self.GeoStartFrameVelocity(TargetID)
+            # Calcuate the relative normal velocity from the frame-start snapshot.
             relative_normal_velocity = (
                 (target_velocity.x - source_velocity.x) * normal_x
                 + (target_velocity.y - source_velocity.y) * normal_y
                 + (target_velocity.z - source_velocity.z) * normal_z
             )
+            # Sum the positive overlap area for all contacts.  
+            # This is used to compute contact weights for distributing the source's 
+            # available momentum across
             total_overlap_area += max(0.0, overlap_area)
+            # For contacts that are closing (negative relative normal velocity), 
+            # sum the available source momentum.
             if relative_normal_velocity < -self.GEO_EPSILON:
                 available_source_momentum += (
                     self.GeoReducedMass(SourceID, TargetID)
@@ -294,6 +346,7 @@
         scale = max(0.0, min(1.0, planned_impulse / candidate_impulse))
         return compression_impulse * scale, release_impulse * scale
 
+
     def GeoVelocityProgressImpulse(
         self,
         SourceID,
@@ -304,6 +357,19 @@
         raw_impulse,
         weighted_available_momentum,
     ):
+        """Convert relative normal velocity progress into contact impulses.
+
+        This function owns the compression/rebound decision for one directed
+        source-target contact.  It reads the contact's persistent velocity
+        reference and phase, then returns the scalar compression impulse,
+        rebound release impulse, updated internal momentum, and updated phase.
+
+        Compression uses the current closing normal velocity relative to the
+        stored velocity reference.  Rebound uses the stored internal momentum
+        and rebound reference to release momentum back into velocity.  No
+        particle velocity is written here; the returned impulses are still part
+        of planning and are applied later by contact resolution.
+        """
         reduced_mass = self.GeoReducedMass(SourceID, TargetID)
         closing_speed = max(0.0, -relative_normal_velocity)
         separating_speed = max(0.0, relative_normal_velocity)
@@ -427,7 +493,7 @@
             return contact_internal_momentum
         return min(contact_internal_momentum, raw_impulse)
 
-    def GeoDirectedContactCandidate(
+    def GeoCalculatePairContact(
         self,
         SourceID,
         TargetID,
@@ -436,33 +502,81 @@
         contact_internal_momentum,
         contact_phase_start,
     ):
+        """Build one directed source-to-target impulse candidate.
+
+        A directed candidate is the proposed response for one source particle
+        writing only itself because it is in contact with one target particle.
+        The reverse direction, TargetID -> SourceID, is built separately when
+        the target is processed as a source.
+
+        This function:
+        - recomputes the current frame contact geometry for this active
+          source-target pair;
+        - computes relative normal velocity from the frame-start velocity
+          snapshot;
+        - computes source and target area weights from each particle's current
+          contact context;
+        - computes the raw overlap/stiffness impulse;
+        - limits compression by the weighted source/target available momentum;
+        - asks GeoVelocityProgressImpulse() for compression, release, updated
+          stored internal momentum, and contact phase.
+
+        The returned dictionary is still a candidate.  It is not applied
+        directly.  GeoBuildPairCompatiblePlan() later reconciles this directed
+        candidate with the opposite directed candidate so both source-owned
+        writes use compatible scalar impulses.
+        """
         contact = self.GeoParticleGeometry(SourceID, TargetID)
         if contact is None or source_total_overlap_area <= self.GEO_EPSILON:
             return None
-
+        # Calulate relative velocity for this pair
         normal_x, normal_y, normal_z, overlap_area, center_distance = contact
-        source_velocity = self.GeoVelocity(SourceID)
-        target_velocity = self.GeoVelocity(TargetID)
+        source_velocity = self.GeoStartFrameVelocity(SourceID)
+        target_velocity = self.GeoStartFrameVelocity(TargetID)
         relative_normal_velocity = (
             (target_velocity.x - source_velocity.x) * normal_x
             + (target_velocity.y - source_velocity.y) * normal_y
             + (target_velocity.z - source_velocity.z) * normal_z
         )
+
+        # Get the target's contact context for area weighting and momentum limiting.
         target_total_overlap_area, target_available_momentum = self.GeoContactContext(TargetID)
+        # The area weight is the fraction of the source's total overlap area 
+        # that this contact represents.
         area_weight = max(0.0, overlap_area / source_total_overlap_area)
+        # The target area weight is the fraction of the target's total overlap area
         target_area_weight = (
             max(0.0, overlap_area / target_total_overlap_area)
             if target_total_overlap_area > self.GEO_EPSILON
             else 0.0
         )
+        # The raw impulse is the GLSL-shaped stiffness-area 
+        # impulse without any velocity or momentum limiting applied.  
+        # It is used as a seed for the velocity-progress-based 
+        # compression and release impulses, and it is also 
+        # reported for diagnostics.
         raw_impulse = (
             self.GeoPairStiffness(SourceID, TargetID)
             * overlap_area
             * self.ShaderFlags.dt
         )
+        # The source share is this source contact's fraction of the source's
+        # available closing momentum.  The target share is a pair-compatibility
+        # cap: this directed source candidate should not claim more closing
+        # momentum than the opposite side of the same physical contact can
+        # compatibly supply.  This bounds the directed contact candidate, but
+        # it is not the same thing as solving source-level multi-contact
+        # storage allocation.
         source_available_share = available_source_momentum * area_weight
         target_available_share = target_available_momentum * target_area_weight
+        ##JMB This may not be nessesary if the velocity-progress-based impulse 
+        # is doing the limiting, but it is a sanity check to prevent 
+        # extreme impulses from bad geometry or stiffness values.
         weighted_available_momentum = min(source_available_share, target_available_share)
+        # We ask GeoVelocityProgressImpulse() to propose compression and 
+        # release impulses based on the contact phase and velocity progress, 
+        # and we also pass the weighted available momentum for it to 
+        # limit against if needed.
         (
             compression_impulse,
             release_impulse,
@@ -478,6 +592,10 @@
             weighted_available_momentum,
         )
         compression_impulse = min(compression_impulse, weighted_available_momentum)
+        # Update this directed contact's stored internal momentum ledger.
+        # Compression adds momentum into storage; rebound release removes
+        # momentum from storage.  The clamp prevents numerical noise or an
+        # over-large release from making the contact ledger negative.
         stored_internal_momentum = max(
             0.0,
             contact_internal_momentum + compression_impulse - release_impulse,
@@ -535,14 +653,39 @@
         return planned
 
     def GeoPlanContactImpulses(self):
-        """Plan applied source-owned impulses."""
+        """Build the frame's planned directed contact impulses.
+
+        A directed candidate is one proposed contact response from 
+        one source particle to one target particle.    
+        
+        This stage reads the current-frame collision lists and persistent
+        source-target contact history, but it does not write particle
+        velocities.  For each source particle, it computes source-level
+        contact context such as total overlap area and available source
+        momentum.  Then each active target is converted into a directed contact
+        candidate through GeoCalculatePairContact().
+
+        Directed candidates are keyed as (SourceID, TargetID).  After all
+        candidates are collected, GeoBuildPairCompatiblePlan() turns them into
+        pair-compatible planned impulses and stores the result in
+        GeoPlannedContactImpulses.  GeoApplyParticleResponse() later consumes
+        that plan to perform the source-owned velocity write and update contact
+        ledgers/report fields.
+        """
         directed_candidates = {}
         for SourceID, source in enumerate(self.particles):
             if not source.collision_list:
                 continue
+            # Get total overlap are and associated available source momentum 
+            # for this source particle's contact list.
             total_overlap_area, available_source_momentum = self.GeoContactContext(SourceID)
+            # Run thorugh the collision list and build a directed candidate for each target.
             for TargetID in source.collision_list:
-                candidate = self.GeoDirectedContactCandidate(
+                # The candidate construction may fail if the contact 
+                # geometry is invalid or if the contact state cannot 
+                # be initialized, so we check for None and skip 
+                # those candidates.
+                candidate = self.GeoCalculatePairContact(
                     SourceID,
                     TargetID,
                     total_overlap_area,
@@ -577,7 +720,17 @@
 
         if TargetID in particle.collision_list:
             return True
+        # The target is added to the source's collision list, but the contact state 
+        # is only initialized when the source particle processes its collision list.  
+        # This allows the source to maintain contact state across frames even when 
+        # the target is not currently in contact, and it allows the source to 
+        # avoid initializing contact state for targets that are no longer in contact.
         particle.collision_list.append(TargetID)
+        # We are carrying contact history, but not in the slot index. 
+        # We carry it by source/target identity:
+        #   source.contact_internal_momentum[TargetID]
+        #   source.contact_internal_phase[TargetID]
+        ##JMB What effect does this have on the claim of instantaniusness 
         contact_state = self.GeoContactState(SourceID, TargetID)
         if contact_state is None:
             return True
@@ -614,7 +767,40 @@
         return True
 
     def GeoProcessCollisions(self, SourceID):
-        """Apply source-owned geometric response with internal momentum."""
+        """Apply planned contact response for one source particle.
+
+        This is the source-owned collision resolution stage.  It consumes the
+        current-frame collision_list and the frame plan produced by
+        GeoPlanContactImpulses(), then writes only the source particle's
+        velocity and source-owned contact ledgers.
+
+        The function works in four broad steps:
+
+        1. Validate the source, prune inactive contact ledgers, and collect
+           current contact entries from the source collision_list.
+        2. For each active contact, read frame-start source/target velocities,
+           geometry, normal velocity diagnostics, and the planned impulse for
+           (SourceID, TargetID).
+        3. Update the source-target contact ledger and convert the scalar
+           applied impulse into a vector momentum delta along the contact
+           normal.
+        4. Sum all contact momentum deltas into one source net delta, update
+           source.VelRad, synchronize report fields, and record diagnostics.
+
+        The actual velocity write is:
+
+            source.VelRad.xyz += source_net_delta_momentum / source_mass
+
+        The frame-start velocity snapshot is used for contact-relative velocity
+        calculations, while the live source VelRad is updated only after all of
+        this source's contact deltas have been accumulated.
+
+        Current limitation: multi-contact storage/allocation is still contact
+        candidate based.  For sources such as particle 1 in ThreeParticle, the
+        next rule should compute source-level internal-momentum change once and
+        distribute it across active contacts before this resolution stage
+        applies the resulting vector sum.
+        """
         if not self.GeoValidParticleID(SourceID):
             return self.GeoSetError(self.constants.GEO_ERROR_INVALID_SOURCE_ID)
         source = self.particles[SourceID]
@@ -622,7 +808,7 @@
         if not source.collision_list:
             return True
 
-        source_velocity = self.GeoVelocity(SourceID)
+        source_velocity = self.GeoStartFrameVelocity(SourceID)
         source_mass = self.GeoMass(SourceID)
         source_vx_before = source.VelRad.x
         source_vy_before = source.VelRad.y
@@ -646,7 +832,7 @@
                 continue
             contact_state = contact_slots[contact_index]
             normal_x, normal_y, normal_z, overlap_area, center_distance = contact
-            target_velocity = self.GeoVelocity(TargetID)
+            target_velocity = self.GeoStartFrameVelocity(TargetID)
             relative_normal_velocity = (
                 (target_velocity.x - source_velocity.x) * normal_x
                 + (target_velocity.y - source_velocity.y) * normal_y
@@ -713,7 +899,15 @@
                 else 0.0
             )
             stiffness_q = self.GeoPairStiffness(SourceID, TargetID)
+            ##JMB The raw impulse is the GLSL-shaped stiffness-area impulse 
+            ## without any velocity or momentum limiting applied.
+            ## May need to weight this by the area weight to prevent 
+            # extreme impulses from bad geometry or stiffness values, 
+            # but it is also useful to report it as a diagnostic for 
+            # tuning and debugging.
             raw_impulse = stiffness_q * overlap_area * self.ShaderFlags.dt
+
+
             source_available_share = available_source_momentum * area_weight
             target_available_share = target_available_momentum * target_area_weight
             weighted_available_momentum = min(source_available_share, target_available_share)
@@ -820,6 +1014,7 @@
         source.VelRad.x += delta_momentum_x / source_mass
         source.VelRad.y += delta_momentum_y / source_mass
         source.VelRad.z += delta_momentum_z / source_mass
+        source.VelRad.w = self.GeoVelocityAngle(source.VelRad.x, source.VelRad.y)
         self.GeoSyncInternalMomentum(SourceID)
         source.vx = source.VelRad.x
         source.vy = source.VelRad.y
@@ -874,4 +1069,3 @@
         source.report_closing_mom = report_closing_mom
         source.report_collision_stiffness_q = report_stiffness_q
         return True
-

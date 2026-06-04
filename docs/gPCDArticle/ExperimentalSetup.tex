@@ -1,0 +1,52 @@
+% !TeX root = main.tex
+\section{Experimental Setup}
+
+This section describes the hardware platform, benchmark
+configurations, and performance metrics used to evaluate the gPCD
+framework.
+
+\subsection{Hardware Platform}
+
+All experiments were performed on a system equipped with
+\nc{CPU Model}, \nc{System Memory}, and an
+NVIDIA RTX 3500 Ada Generation Laptop GPU. The gPCD framework was
+implemented using Vulkan, with broad-phase occupancy generation and
+rendering executed through the graphics pipeline and narrow-phase
+evaluation executed through compute shaders.
+
+\subsection{Benchmark Configuration}
+
+Benchmark datasets consisted of randomly distributed particle
+configurations with increasing particle count while maintaining an
+approximately constant collision fraction. Particle counts ranged from
+\numprint{32} to
+\numprint{10000000} particles.
+
+
+\subsection{Performance Metrics}
+
+Performance evaluation was based on graphics execution time
+($t_g$), compute execution time ($t_c$), total execution time
+($t_t$), throughput, and time-per-particle.
+
+Throughput was computed as the number of particles processed per
+second,
+
+\begin{equation}
+T=\frac{N}{t_t},
+\end{equation}
+
+where $N$ is the number of particles and $t_t$ is the total
+execution time.
+
+Time-per-particle was computed as
+
+\begin{equation}
+t_{pp}=\frac{t_t}{N},
+\end{equation}
+
+which provides a normalized measure of execution cost independent of
+particle count.
+
+Additional benchmarks were performed to evaluate the effects of memory
+locality and collision density on framework performance.

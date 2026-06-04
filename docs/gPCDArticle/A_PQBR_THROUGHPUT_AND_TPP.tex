@@ -20,11 +20,24 @@
 		\label{fig:A_PQBR_TIME_PERP_ALL}
 	\end{subfigure}
 \hspace{-.05in}
-\caption[TITLE:PQBR Performance Plots]{(a) A plot of randomly ordered particles performance (red squares) versus
-sequentially ordered particles (blue circles). The random performance 
-increases disproportionately with sequential performance as the number of 
-particles increase.
-(b) A log-log plot of throughput for graphics, compute, and total. The saturated point plateau's after $N=$\numprint{\APQBRTIMEPERPALLstartval{}} particles shown in the plot as a black vertical dashed line. (c) time per particle for graphics, compute, total starting at, N=\numprint{\APQBRTIMEPERPALLstartval{}}, for the start of the heavily saturated range. Graphics stabilizes at $\APQBRTIMEPERPALLGraphicsstabilzes{}  \pm \APQBRTIMEPERPALLGraphicsstdval{} $ $\sfrac{ns}{particle}$, compute at $\APQBRTIMEPERPALLComputestabilzes{} \pm \APQBRTIMEPERPALLComputestdval{}$ $\sfrac{ns}{particle}$ for a total stabilization at $\APQBRTIMEPERPALLTotalstabilzes{} \pm \APQBRTIMEPERPALLTotalstdval{}$ $\sfrac{ns}{particle}$. }
+\caption[TITLE:PQBR Performance Plots]{(a) Comparison of randomly ordered particle occupancy (red squares) and
+sequentially ordered particle occupancy (blue circles). Sequential
+ordering consistently produces lower execution times throughout the
+evaluated particle range. At the largest benchmark configuration,
+random ordering increases execution time by approximately
+\nc{Locality Penalty} relative to sequential ordering, highlighting
+the importance of memory locality despite identical algorithmic
+complexity.
+(b) Log--log plot of total throughput (red), compute throughput (blue),
+and graphics throughput (black) as a function of particle count. The
+logarithmic axes permit visualization of performance trends across
+nearly three orders of magnitude in particle count. Dashed vertical
+lines indicate observed transition regions within the measured
+throughput behavior.
+
+A log-log plot of throughput for graphics, compute, and total. The saturated point plateau's after $N=$\numprint{\APQBRTIMEPERPALLstartval{}} particles shown in the plot as a black vertical dashed line. 
+
+(c) time per particle for graphics, compute, total starting at, N=\numprint{\APQBRTIMEPERPALLstartval{}}, for the start of the heavily saturated range. Graphics stabilizes at $\APQBRTIMEPERPALLGraphicsstabilzes{}  \pm \APQBRTIMEPERPALLGraphicsstdval{} $ $\sfrac{ns}{particle}$, compute at $\APQBRTIMEPERPALLComputestabilzes{} \pm \APQBRTIMEPERPALLComputestdval{}$ $\sfrac{ns}{particle}$ for a total stabilization at $\APQBRTIMEPERPALLTotalstabilzes{} \pm \APQBRTIMEPERPALLTotalstdval{}$ $\sfrac{ns}{particle}$. }
 \Description[TITLE:PQBR Performance Plots]{(a) A plot of randomly ordered particles performance (red squares) versus
 sequentially ordered particles (blue circles). The random performance 
 increases disproportionately with sequential performance as the number of 

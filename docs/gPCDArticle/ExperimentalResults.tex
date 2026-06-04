@@ -1,25 +1,138 @@
 % !TeX root = main.tex
 \section{Experimental Results}
 
+This section presents the measured performance of the gPCD framework
+using randomly distributed particle configurations of increasing size.
+Unless otherwise noted, benchmark cases maintain an approximately
+constant collision fraction while varying the total particle count.
+Performance is evaluated using throughput, time-per-particle, and
+scaling analyses to characterize the behavior of the framework across
+the tested particle range.
+
+\subsection{Memory Locality Benchmark}
+
+This benchmark evaluates the sensitivity of the gPCD framework to
+memory locality. Two occupancy configurations were considered. In the
+first configuration, cell occupancy data remained sequentially ordered
+within memory. In the second configuration, occupancy data were
+randomly distributed throughout the cell array.
+
+Figure~\ref{fig:A_PQBS_V_PQBR} compares the resulting execution times as a
+function of particle count. Sequential ordering consistently produced
+lower execution times throughout the evaluated benchmark range. The
+largest benchmark configuration required approximately
+\nc{Sequential Largest Time} ms for sequential ordering and
+\nc{Random Largest Time} ms for random ordering.
+
+Although both configurations exhibit similar scaling behavior, random
+ordering introduces a measurable performance penalty. The results
+indicate that memory locality remains an important contributor to
+overall performance despite the GPU-resident nature of the framework.
+\input{KEEP_PQBRT_TABLE_ALL}
+
 \subsection{Performance Overview}
+\Tigo{performance_summary} summarizes the principal
+performance metrics obtained during evaluation of the gPCD framework.
+The benchmark suite consisted of randomly distributed particle
+configurations of increasing size while maintaining an approximately
+constant collision fraction.
 
-        Maximum particle count
-        Maximum throughput
-        Representative execution times
+The framework successfully processed benchmark configurations
+containing up to \numprint{\APQBRTTABLEALLbka{}} particles and achieved a
+peak throughput of \nc{Peak Throughput}. Representative execution
+statistics for the largest benchmark case are also reported in
+Table~\ref{tab:performance_summary}.
 
-\subsection{Saturation Behavior}
+\input{KEEP_PQBRT_SUMMARY}
 
-        Throughput analysis
-        Time-per-particle analysis
-        Transition to throughput-limited operation
+Across the evaluated range, performance remained stable and
+exhibited the expected throughput-oriented behavior of a
+GPU-resident collision-detection framework. More detailed
+analysis of throughput trends, time-per-particle behavior,
+and scaling characteristics is presented in the following
+subsections.
+
+The benchmark measurements used throughout the subsequent
+performance analyses are provided in
+Table~\ref{tab:A_PQBRT_TABLE_ALL}.
+
+
+\input{A_PQBR_THROUGHPUT_AND_TPP}
+
+The following subsections examine throughput behavior,
+time-per-particle trends, scaling characteristics, and
+collision-fraction sensitivity in greater detail.
+
+\subsection{Throughput and Time-per-Particle Behavior}
+
+Throughput and time-per-particle provide complementary views of
+framework performance. Throughput measures the aggregate rate at which
+particles are processed, whereas time-per-particle normalizes execution
+cost by particle count and therefore provides a direct measure of
+scaling efficiency.
+
+Figure~\ref{fig:A_PQBR_THROUGHPUT_AND_TPP} presents complementary
+throughput and time-per-particle views of framework performance across
+the evaluated particle range.
+
+The throughput curve exhibits three distinct operating regions.
+At low particle counts, throughput increases rapidly with increasing
+particle count. A peak throughput region is subsequently observed,
+followed by a throughput-limited region at larger benchmark sizes.
+
+The utilization region extends approximately to
+\numprint{10000} particles, after which the
+framework enters a peak throughput region. Beyond
+\numprint{2000000} particles, throughput becomes
+throughput-limited.
 
 \subsection{Scaling Analysis}
+\input{A_PQBR_LOGLOG_REGRESS}
+Log--log regression was performed to quantify the scaling behavior of
+graphics, compute, and total execution times. A power-law model of the
+form
+\begin{equation}
+t = aN^b
+\end{equation}
+was fitted to the measured data, where $t$ is execution time, $N$ is
+particle count, $a$ is a proportionality constant, and $b$ is the
+scaling exponent.
 
-        Log-log regression
-        Curvature analysis
-        Verification of near-linear scaling
+Figure~\ref{fig:A_PQBR_LOGLOG_REGRESS} presents the resulting log--log
+regressions for graphics, compute, and total execution times. The
+measured scaling exponents were found to be
+$b_g=\nc{Graphics Slope}$,
+$b_c=\nc{Compute Slope}$, and
+$b_t=\nc{Total Slope}$.
+All three exponents remain close to unity, indicating that execution
+time increases approximately linearly with particle count throughout
+the evaluated benchmark range.
+
+The measured scaling exponents remain close to unity for graphics,
+compute, and total execution times, providing experimental support for
+the near-linear scaling behavior predicted by the complexity analysis.
+
+\subsection{Curvature Analysis}
+\input{A_PBQR_CURVATURE}
+While log--log regression quantifies the overall scaling exponent,
+curvature analysis provides a complementary measure of deviation from
+ideal linear behavior. Quadratic fits were therefore applied to the
+graphics, compute, and total execution-time measurements over the
+evaluated benchmark range.
+
+Figure~\ref{fig:A_PBQR_CURVATURE} presents the resulting quadratic fits and
+associated curvature bounds. In all cases, the fitted curves remain
+close to the measured data, indicating only minor departures from
+linear behavior. The graphics and total execution times exhibit
+particularly small curvature, while the compute measurements display
+slightly larger but still bounded deviations.
+
+The measured curvature bounds remain small relative to the overall
+execution-time trends. Combined with the log--log scaling exponents,
+these results provide additional evidence that the gPCD framework
+maintains near-linear scaling throughout the evaluated benchmark range.
 
 \subsection{Collision Fraction Benchmark}
 
-        Collision-density sensitivity
-        Broad-phase robustness
+    Collision-density sensitivity
+    Broad-phase robustness
