@@ -24,7 +24,7 @@ from gbase.BinaryFileUtilities import clear_files, read_particle_data
 from gbase.import_module import load_class_from_file
 from gbase.pdata import *
 from gbase.GenPQBData import *
-from GeoRunner import run_analysis as geo_run_analysis
+from SimulationRunner import run_analysis as simulation_run_analysis
 #from GenMotionData import *
 #from subprocess import Popen
 import subprocess
@@ -168,7 +168,7 @@ class TabGenData(QTabWidget):
             return self.selected_run_analysis(self.CfgFile)
 
     def selected_run_analysis(self, cfg_file, batch_mode=False, study=False, study_number=None, end_frame=None):
-        return geo_run_analysis(
+        return simulation_run_analysis(
             cfg_file,
             batch_mode=batch_mode,
             study=study,

@@ -167,7 +167,13 @@ class Reporting:
                     self.csv_number(particle.ry),
                     self.csv_number(particle.vx),
                     self.csv_number(particle.vy),
-                    self.csv_number(getattr(particle, "report_stored_mom", 0.0)),
+                    self.csv_number(
+                        getattr(
+                            particle,
+                            "internal_momentum",
+                            getattr(particle, "report_stored_mom", 0.0),
+                        )
+                    ),
                     self.csv_number(getattr(particle, "report_frame_start_ke", 0.0)),
                     self.csv_number(getattr(particle, "report_after_resolve_ke", 0.0)),
                 ]

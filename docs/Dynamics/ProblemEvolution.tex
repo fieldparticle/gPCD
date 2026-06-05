@@ -1348,18 +1348,18 @@ ledgers were written.
 A selectable linear experiment was added:
 
 \begin{verbatim}
-ShadowLinBase
-ShadowLinDynamics
+WeightedDynamicsBase
+WeightedDynamics
 \end{verbatim}
 
 \texttt{ParticleUtil.cfg} selects live and shadow bases through an approved
 registry, allowing the linear experiment to run independently beside another
-implementation.  \texttt{ShadowLinBase} performs naive source-target contact
+implementation.  \texttt{WeightedDynamicsBase} performs naive source-target contact
 detection, stores only target IDs in the source collision list, calls
 \texttt{ContactDynamics} after each source scan, and moves particles in a
 separate pass.
 
-\texttt{ShadowLinDynamics.ContactDynamics} now exposes the complete source
+\texttt{WeightedDynamics.ContactDynamics} now exposes the complete source
 algorithm directly:
 
 \begin{verbatim}
@@ -1392,3 +1392,56 @@ of the collision model.  The next dynamics test is the existing batch suite,
 especially \texttt{ThreeParticle} and \texttt{ThreeParticleChase}, to determine
 whether the source-only weighting and source-net impulse application preserve
 the desired momentum and kinetic-energy behavior for simultaneous contacts.
+
+\subsection{Permanent Weighted Runtime and Legacy Removal}
+
+\noindent\textbf{Starting commit hash:} \texttt{15f8eef}
+
+\subsubsection{Problem}
+
+The readable weighted implementation had become the intended permanent path,
+but execution still depended on inherited \texttt{ShadowBase},
+\texttt{ShadowDynamics}, \texttt{Geo*} frame adapters, and
+\texttt{GEO\_ERROR\_*} constants.  The runner also retained a
+\texttt{GeoRunner} identity and independently recalculated selected contact
+diagnostics.  Those dependencies obscured the actual runtime and allowed old
+and current algorithms to coexist as if both were authoritative.
+
+\subsubsection{Fix}
+
+The runtime was consolidated around \texttt{SimulationRunner} and the
+standalone \texttt{WeightedDynamics} class.  Weighted dynamics now owns its
+configuration, particle/contact structures, frame lifecycle, source-complete
+contact response, movement, diagnostics, and error state.
+
+The permanent generic frame chain is:
+
+\begin{verbatim}
+BeginFrame
+ApplyBeforeContactScanHook
+ResetFrameState
+ApplyStartRunHook
+BuildFrameSnapshot
+RecordFrameStartDiagnostics
+DetectContacts
+BuildWallContactLists
+RecordAfterResolveDiagnostics
+MoveParticles
+EndFrame
+\end{verbatim}
+
+Legacy \texttt{GeoBase}, \texttt{GeoDynamics}, \texttt{ShadowBase},
+\texttt{ShadowDynamics}, exporters, and wrapper flowchart generators were
+removed.  Active error constants now use the generic \texttt{ERROR\_*}
+family.  Runner momentum diagnostics read \texttt{rel\_vn} and
+\texttt{raw\_impulse} from the actual contact ledger instead of independently
+recalculating dynamics.
+
+\subsubsection{Current Result}
+
+\texttt{TwoParticleHorizontal} completed through frame 100 with full momentum
+and kinetic-energy recovery.  \texttt{ThreeParticle} completed through frame
+150.  For both tests, the independently initialized live and comparison
+weighted objects produced byte-identical momentum, contact, and particle
+captures.  The existing ThreeParticle kinetic-energy drift remains a model
+question; it was not introduced by the runtime consolidation.

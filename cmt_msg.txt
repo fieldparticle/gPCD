@@ -1,13 +1,13 @@
-feat(dynamics): add source-complete linear shadow implementation
+refactor(dynamics): make weighted dynamics the permanent runtime
 
-- add configurable live and shadow base registry
-- introduce independent ShadowLinBase and ShadowLinDynamics paths
-- process each source through a readable linear contact-response chain
-- calculate source-owned contact geometry, weights, impulses, and ledgers
-- vector-sum contact impulses into one source velocity write
-- keep movement as a separate double-buffered pass
-- add generated and clickable TikZ ShadowLin flowcharts
-- rebuild source documentation for all ShadowLinDynamics functions
-- update dynamics conventions, geometry equations, programming style, and problem evolution
+- replace GeoRunner with SimulationRunner
+- consolidate frame lifecycle and contact response under WeightedDynamics
+- remove Geo, Shadow, and linear-shadow runtime implementations and wrappers
+- remove obsolete Geo exporter and legacy flowchart generators
+- replace Geo and Neo prefixed constants with generic error, contact, and phase names
+- read runner contact diagnostics directly from active contact ledgers
+- configure live and comparison runs to use independent WeightedDynamics objects
+- regenerate weighted source flowcharts and update dynamics documentation
+- verify TwoParticleHorizontal and ThreeParticle captures and UI execution
 
-Next: validate ThreeParticle and ThreeParticleChase momentum and kinetic-energy behavior before promoting the linear model
+Next: diagnose the remaining ThreeParticle kinetic-energy drift

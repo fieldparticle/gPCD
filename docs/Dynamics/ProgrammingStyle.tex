@@ -174,21 +174,15 @@ For large simulation codes, physics engines, and GPU applications, data-oriented
 
 \subsection{Generated Source Flowcharts}
 
-For the Geo and shadow dynamics work, the sequential stage chain should be
+For weighted dynamics work, the sequential stage chain should be
 documented with a generated flowchart when the source structure becomes hard to
 hold in memory.  The flowchart is not a substitute for narrow functions; it is a
 debugging and navigation aid that makes the stage order visible.
 
-The current source-flow generator is:
+The current weighted source-flow generator is:
 
 \begin{verbatim}
-python/base/SourceFlowChart.py
-\end{verbatim}
-
-The current system-flow generator is:
-
-\begin{verbatim}
-python/base/SystemFlowChart.py
+python/base/WeightedDynamicsFlowChart.py
 \end{verbatim}
 
 It emits DOT, SVG, PDF, and PNG artifacts under
@@ -205,7 +199,7 @@ supporting calls rather than hidden control-flow owners.
 
 \subsection{Source-Complete Linear Dynamics}
 
-The linear shadow implementation demonstrates the preferred shape for dynamics
+The permanent weighted implementation demonstrates the preferred shape for dynamics
 that will eventually execute once per source particle in GLSL.  The top-level
 function must read like the algorithm:
 

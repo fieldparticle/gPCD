@@ -418,22 +418,13 @@ This is reporting-only.  It is used to see when simultaneous contact impulses
 interact as a source-level vector sum instead of independent scalar contact
 events.
 
-\subsection{Shadow Dynamics}
+\subsection{Permanent Weighted Dynamics}
 
-Shadow dynamics are alternate response rules evaluated by a separate shadow
-simulation object.  The live object remains
-\texttt{GeoBase + GeoDynamics}; the shadow object is
-\texttt{ShadowBase + ShadowDynamics}.  Both are initialized from the same
-configuration data, but after initialization their particles, ledgers, phases,
-velocities, positions, and reports are separate.  Shadow reports use
-%\texttt{*_s.csv}.
-
-Earlier in-place diagnostic families have served their purpose and are no
-longer part of live \texttt{GeoDynamics.py}.  Those historical families
-included source-scaled shadows, vector-rebound shadows, target-ratio shadows,
-vector-internal shadows, and the first p-zero/parabolic shadow fields.  Future
-alternate response rules should be implemented in \texttt{ShadowDynamics.py}
-so they can mutate shadow state without touching live state.
+\texttt{WeightedDynamics} is the permanent particle-contact implementation.
+The runner currently creates two independent weighted objects from the same
+configuration so their captures can be compared deterministically.  After
+initialization, particles, ledgers, phases, velocities, positions, and reports
+remain independent.
 
 For the current batch tests, the vector-rebound diagnostic showed that rebound
 direction drift is not the main source of three-particle kinetic-energy loss:
@@ -445,13 +436,11 @@ direction drift is not the main source of three-particle kinetic-energy loss:
 Therefore the active unresolved problem is the selection of simultaneous
 multi-contact impulse magnitudes, not the rebound direction.
 
-\section{Linear Shadow Contact Response}
+\section{Linear Weighted Contact Response}
 \label{sec:linear-shadow-contact-response}
 
-\texttt{ShadowLinDynamics} is the current readable experiment for applying the
-same geometric model as one source-complete chain.  It is not yet the approved
-replacement for the active Geo path, but it makes the intended per-source
-equations and ownership boundary explicit.
+\texttt{WeightedDynamics} applies the geometric model as one source-complete
+chain and is the approved permanent particle-contact path.
 
 For source \(s\), each contact \(k\) contributes overlap area \(A_k\), contact
 normal \(\mathbf{n}_k\), and relative normal velocity:

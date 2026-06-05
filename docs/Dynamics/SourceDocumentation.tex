@@ -1,25 +1,91 @@
-﻿% !TeX root = GeoDynamics.tex
+% !TeX root = GeoDynamics.tex
 \newpage
-\section{ShadowLinDynamics Source Flow}
+\section{WeightedDynamics Source Flow}
 
-\newcommand{\ShadowFunctionSection}[1]{%
-  \section{ShadowLinDynamics:#1}%
-  \label{shadowlin:#1}%
+\newcommand{\WeightedFunctionSection}[1]{%
+  \section{WeightedDynamics:#1}%
+  \label{weighted:#1}%
 }
 
-\texttt{ShadowLinDynamics} processes one source particle completely before
+\texttt{WeightedDynamics} processes one source particle completely before
 advancing to the next source.  It may read target frame-start state, but all
 dynamics writes, contact slots, collision history, and internal-momentum
 ledgers remain owned by the source particle.
 
 \begin{figure}[ht]
 \centering
-\resizebox{\textwidth}{!}{\input{ShadowLinFlowTikz}}
-\caption{Current ShadowLinDynamics function flow}
+\resizebox{\textwidth}{!}{\input{WeightedDynamicsFlowTikz}}
+\caption{Current WeightedDynamics function flow}
 \end{figure}
 
 \clearpage
-\ShadowFunctionSection{ContactDynamics}
+
+\WeightedFunctionSection{CollisionRun}
+
+\texttt{CollisionRun} is the permanent generic frame chain:
+
+\begin{verbatim}
+BeginFrame
+ApplyBeforeContactScanHook
+ResetFrameState
+ApplyStartRunHook
+BuildFrameSnapshot
+RecordFrameStartDiagnostics
+DetectContacts
+BuildWallContactLists
+RecordAfterResolveDiagnostics
+MoveParticles
+EndFrame
+\end{verbatim}
+
+Contact response is completed inside \texttt{DetectContacts}: after one source
+has scanned every possible target, it calls \texttt{ContactDynamics} before
+advancing to the next source.
+
+Correct. This is the source-owned execution model.
+For each source particle \(i\):
+Read immutable frame-start state.
+Process every detected contact \(j \in C_i\).
+Calculate each contact contribution \(\Delta\mathbf p_{ij}\).
+Sum contributions locally.
+Write only source particle \(i\).
+\[
+\Delta\mathbf p_i
+=
+\sum_{j\in C_i}\Delta\mathbf p_{ij}
+\]\[
+\mathbf p_i^{new}
+=
+\mathbf p_i^{old}+\Delta\mathbf p_i
+\]For ThreeParticle:
+\[
+\mathbf p_1^{new}
+=
+\mathbf p_1^{old}
++\Delta\mathbf p_{12}
++\Delta\mathbf p_{13}
+\]P2 and P3 independently calculate:
+\[
+\mathbf p_2^{new}
+=
+\mathbf p_2^{old}+\Delta\mathbf p_{21}
+\]\[
+\mathbf p_3^{new}
+=
+\mathbf p_3^{old}+\Delta\mathbf p_{31}
+\]The critical requirements are:
+Every source reads the same frame-start snapshot.
+P1 processes both contacts before writing its velocity.
+Contact contributions are vector-summed without source contact-count weighting.
+No source writes another particle.
+The contact rule must naturally produce compatible opposing contributions:
+\[
+\Delta\mathbf p_{ij}
+=
+-\Delta\mathbf p_{ji}
+\]Therefore, ApplySourceVelocityDelta has the correct structural shape. The likely mistake is weighting individual contact impulses before their vector sum. P1 should calculate the full source-owned reflection contribution from each contact and let vector addition produce the multi-contact result.
+
+\WeightedFunctionSection{ContactDynamics}
 
 \texttt{ContactDynamics(SourceID)} is the readable top-level dynamics chain for
 one source particle.  The source contact list must already contain the
@@ -42,7 +108,7 @@ UpdateContactLedgers
 Each stage returns immediately on failure.  The function reads target snapshot
 state but writes only source-owned state.
 
-\ShadowFunctionSection{BeginSourceContactParms}
+\WeightedFunctionSection{BeginSourceContactParms}
 
 \texttt{BeginSourceContactParms(SourceID)} resets the source-level values that
 will be rebuilt from the current contact list:
@@ -55,7 +121,7 @@ will be rebuilt from the current contact list:
 These values must be zero before individual contacts contribute their geometry
 and closing momentum.
 
-\ShadowFunctionSection{InitializeContactState}
+\WeightedFunctionSection{InitializeContactState}
 
 \texttt{InitializeContactState(SourceID, TargetID)} initializes one current
 source-target contact.  It obtains the source-owned contact slot from
@@ -63,7 +129,7 @@ source-target contact.  It obtains the source-owned contact slot from
 source's reporting target and contact count.  It returns the initialized slot,
 or \texttt{None} when initialization fails.
 
-\ShadowFunctionSection{GetContactState}
+\WeightedFunctionSection{GetContactState}
 
 \texttt{GetContactState(SourceID, TargetID)} creates and populates one
 current-frame source-owned contact slot.
@@ -73,7 +139,7 @@ persistent collision state.  It then calls \texttt{GetParticleGeometry} and
 stores the contact normal, overlap area, center distance, overlap depth, and
 stored internal momentum in the slot.
 
-\ShadowFunctionSection{AppendContactSlot}
+\WeightedFunctionSection{AppendContactSlot}
 
 \texttt{AppendContactSlot(SourceID, TargetID)} allocates the next available
 contact slot owned by the source particle.  The slot records:
@@ -89,26 +155,26 @@ contact slot owned by the source particle.  The slot records:
 The source's \texttt{contactCount} is incremented only after a slot is filled.
 The function returns \texttt{None} when the fixed slot array is full.
 
-\ShadowFunctionSection{GetContactSlots}
+\WeightedFunctionSection{GetContactSlots}
 
 \texttt{GetContactSlots(SourceID)} returns the fixed contact-slot array owned by
 the source particle.  Newer particle structures use \texttt{contacts}; the
 \texttt{gcs} fallback preserves compatibility with the current particle
 structure.
 
-\ShadowFunctionSection{GetCollisionPhase}
+\WeightedFunctionSection{GetCollisionPhase}
 
 \texttt{GetCollisionPhase(SourceID, TargetID)} reads the persistent
 source-owned phase for one contact.  Collision phases are stored by target ID.
 A contact without phase history begins in compression.
 
-\ShadowFunctionSection{GetCollisionInternalMomentum}
+\WeightedFunctionSection{GetCollisionInternalMomentum}
 
 \texttt{GetCollisionInternalMomentum(SourceID, TargetID)} reads the persistent
 internal momentum owned by one source-target contact ledger.  A missing ledger
 or target entry represents zero stored momentum.
 
-\ShadowFunctionSection{GetParticleGeometry}
+\WeightedFunctionSection{GetParticleGeometry}
 
 \texttt{GetParticleGeometry(SourceID, TargetID)} calculates current-frame
 contact geometry from frame-start particle positions.
@@ -123,14 +189,14 @@ The normal points from source to target.  The function returns \texttt{None}
 when no overlap exists.  Coincident centers use the positive x direction as a
 deterministic fallback normal.
 
-\ShadowFunctionSection{GetParticlePosition}
+\WeightedFunctionSection{GetParticlePosition}
 
 \texttt{GetParticlePosition(ParticleID)} returns the particle's frame-start
 position.  It prefers the immutable \texttt{PosLocFrame} snapshot so every
 source reads the same frame state.  When no snapshot exists, it reads the
 currently active particle position buffer.
 
-\ShadowFunctionSection{CalculateContactParms}
+\WeightedFunctionSection{CalculateContactParms}
 
 \texttt{CalculateContactParms(SourceID, TargetID, contact\_state)} calculates
 one contact's relative normal motion and contribution to source-level totals.
@@ -153,14 +219,14 @@ The relative normal velocity and closing momentum are stored in the contact
 slot.  The contact overlap area and closing momentum are also accumulated into
 the source totals.
 
-\ShadowFunctionSection{GetStartFrameVelocity}
+\WeightedFunctionSection{GetStartFrameVelocity}
 
 \texttt{GetStartFrameVelocity(ParticleID)} returns the immutable frame-start
 velocity.  It prefers \texttt{VelRadFrame}, preventing one source from observing
 another source's velocity write during the same frame.  It falls back to the
 particle's current velocity when no snapshot is available.
 
-\ShadowFunctionSection{GetReducedMass}
+\WeightedFunctionSection{GetReducedMass}
 
 \texttt{GetReducedMass(SourceID, TargetID)} returns the Newtonian reduced mass:
 
@@ -171,7 +237,7 @@ particle's current velocity when no snapshot is available.
 Masses come from the GLSL-shaped \texttt{parms.x} particle field.  An epsilon
 floor prevents a zero denominator.
 
-\ShadowFunctionSection{CalculateContactWeights}
+\WeightedFunctionSection{CalculateContactWeights}
 
 \texttt{CalculateContactWeights(SourceID)} distributes the source's available
 momentum across its current contacts using source-owned overlap-area weights:
@@ -187,7 +253,7 @@ p_{\mathrm{share},i} = p_{\mathrm{available},s} w_i.
 The source available share is stored on each contact.  This stage does not
 inspect target-owned contact state and does not apply an impulse.
 
-\ShadowFunctionSection{CalculateContactImpulses}
+\WeightedFunctionSection{CalculateContactImpulses}
 
 \texttt{CalculateContactImpulses(SourceID)} plans compression or release for
 each source-owned contact without changing velocity or persistent ledgers.
@@ -216,7 +282,7 @@ J_{\mathrm{release}}
 \min(J_{\mathrm{raw}},p_{\mathrm{internal}}).
 \end{equation}
 
-\ShadowFunctionSection{GetPairStiffness}
+\WeightedFunctionSection{GetPairStiffness}
 
 \texttt{GetPairStiffness(SourceID, TargetID)} returns the nonnegative mean of
 the source-owned and target-owned particle stiffness values:
@@ -225,7 +291,7 @@ the source-owned and target-owned particle stiffness values:
 q_{\mathrm{pair}} = \max\left(0,\frac{q_s+q_t}{2}\right).
 \end{equation}
 
-\ShadowFunctionSection{ApplySourceVelocityDelta}
+\WeightedFunctionSection{ApplySourceVelocityDelta}
 
 \texttt{ApplySourceVelocityDelta(SourceID)} converts each planned scalar
 contact impulse into a vector along the negative source-to-target normal:
@@ -247,12 +313,12 @@ All contact momentum deltas are summed before the source velocity is written:
 Only the source velocity is changed.  The function also records per-contact
 momentum deltas and source before/after diagnostics.
 
-\ShadowFunctionSection{GetParticleMass}
+\WeightedFunctionSection{GetParticleMass}
 
 \texttt{GetParticleMass(ParticleID)} reads particle mass from
 \texttt{parms.x}.  The returned value is bounded below by \texttt{EPSILON}.
 
-\ShadowFunctionSection{UpdateContactLedgers}
+\WeightedFunctionSection{UpdateContactLedgers}
 
 \texttt{UpdateContactLedgers(SourceID)} commits planned compression and release
 to persistent source-owned contact ledgers:
@@ -270,37 +336,37 @@ The function updates each contact's phase and current slot diagnostics, then
 rebuilds the source total internal momentum after all contact ledgers are
 committed.
 
-\ShadowFunctionSection{SetCollisionInternalMomentum}
+\WeightedFunctionSection{SetCollisionInternalMomentum}
 
 \texttt{SetCollisionInternalMomentum(SourceID, TargetID, internal\_momentum)}
 stores one source-owned contact internal-momentum value by target ID.  Values at
 or below \texttt{EPSILON} are removed from the ledger.
 
-\ShadowFunctionSection{SetCollisionPhase}
+\WeightedFunctionSection{SetCollisionPhase}
 
 \texttt{SetCollisionPhase(SourceID, TargetID, phase)} stores one persistent
 source-owned collision phase by target ID.  A drained compression contact is
 the default state and therefore requires no stored phase entry.
 
-\ShadowFunctionSection{SyncInternalMomentum}
+\WeightedFunctionSection{SyncInternalMomentum}
 
 \texttt{SyncInternalMomentum(SourceID)} rebuilds the source's total internal
 momentum from all source-owned contact ledgers and stores the result on the
 particle.
 
-\ShadowFunctionSection{GetInternalMomentum}
+\WeightedFunctionSection{GetInternalMomentum}
 
 \texttt{GetInternalMomentum(SourceID)} returns the sum of all stored
 source-owned contact internal momentum.  The particle total is used only as a
 compatibility fallback when no contact-ledger dictionary exists.
 
-\ShadowFunctionSection{SetInternalMomentum}
+\WeightedFunctionSection{SetInternalMomentum}
 
 \texttt{SetInternalMomentum(SourceID, internal\_momentum)} stores the source
 total internal momentum in both the runtime \texttt{internal\_momentum} field
 and the GLSL-shaped \texttt{Data.z} field.
 
-\ShadowFunctionSection{Move}
+\WeightedFunctionSection{Move}
 
 \texttt{Move(SourceID)} integrates one source particle into the inactive
 position buffer using its newly updated velocity:
@@ -313,7 +379,7 @@ The function validates the particle ID and time step, updates active-buffer
 markers, and reports a lower-bound error when the resulting position leaves the
 allowed domain.  The frame-chain owner performs the final position-buffer swap.
 
-\ShadowFunctionSection{isValidParticleID}
+\WeightedFunctionSection{isValidParticleID}
 
 \texttt{isValidParticleID(ParticleID)} returns true when the ID is within the
 current particle array:
@@ -322,7 +388,7 @@ current particle array:
 0 <= ParticleID < len(particles)
 \end{verbatim}
 
-\ShadowFunctionSection{SetError}
+\WeightedFunctionSection{SetError}
 
 \texttt{SetError(error\_code)} provides the generic linear-dynamics name for
 setting the inherited shared collision error state.  It delegates to the

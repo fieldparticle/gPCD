@@ -1,21 +1,21 @@
 
 % !TeX root = GeoDynamics.tex
-\section{Geo Dynamics Conventions}
+\section{Weighted Dynamics Conventions}
 
 \subsection{Purpose}
 
-The Geo path is a clean restart of the collision dynamics code.  Its purpose is
-to build a Python implementation whose structure can be transferred to GLSL
-with minimal translation.
+The weighted path is the permanent collision dynamics implementation.  Its
+purpose is to keep a readable Python implementation whose structure can be
+transferred to GLSL with minimal translation.
 
 \subsection{File Boundaries}
 
-\texttt{GeoDynamics.py} is the GLSL-portable dynamics layer.  It should contain
+\texttt{WeightedDynamics.py} is the GLSL-portable dynamics layer.  It should contain
 only functions that correspond directly to shader-side dynamics functions.
 
-\texttt{GeoBase.py} is the Python harness.  It may load configuration files,
+\texttt{WeightedDynamicsBase.py} is the Python harness.  It may load configuration files,
 create Python data structures, build particle arrays, set push constants,
-iterate particles, and call the Geo dynamics functions.
+iterate particles, and call the weighted dynamics functions.
 
 \texttt{Reporting.py} is reserved for reporting and diagnostic output.  It
 should not own dynamics decisions.
@@ -26,18 +26,18 @@ Functions intended to map to GLSL should use GLSL-like names and signatures
 where practical.  Current examples are:
 
 \begin{verbatim}
-GeoAddParticleContact(SourceID, TargetID)
-GeoProcessCollisions(SourceID)
-GeoMoveParticle(SourceID, positionBuffer, dt)
+InitializeContactState(SourceID, TargetID)
+ContactDynamics(SourceID)
+Move(SourceID)
 isParticleContact(Frame, SourceID, TargetID, positionBuffer)
 \end{verbatim}
 
-\texttt{GeoDynamics.py} should avoid Python-only helper names unless the helper
+\texttt{WeightedDynamics.py} should avoid Python-only helper names unless the helper
 is also expected to exist in GLSL.
 
-Before adding or renaming any Geo field, buffer, function, or constant, check
+Before adding or renaming any dynamics field, buffer, function, or constant, check
 the GLSL source files first.  The GLSL names are the naming authority for the
-Geo path:
+weighted path:
 
 \begin{verbatim}
 C:\_DJ\gPCD\vulkan\sim\common\*.glsl
@@ -45,9 +45,9 @@ C:\_DJ\gPCD\vulkan\sim\BoundarySpheresMotion\BoundarySpheresMotionP.comp
 \end{verbatim}
 
 Python names should stay coordinated with those files whenever possible.  If a
-Python-only harness name is needed, it belongs in \texttt{GeoBase.py},
-\texttt{GeoRunner.py}, or \texttt{Reporting.py}, not in
-\texttt{GeoDynamics.py}.
+Python-only harness name is needed, it belongs in \texttt{WeightedDynamicsBase.py},
+\texttt{SimulationRunner.py}, or \texttt{Reporting.py}, not in
+\texttt{WeightedDynamics.py}.
 
 \subsection{Data Convention}
 
@@ -66,7 +66,15 @@ Particle["vx"]
 
 The Python structures should be shaped to resemble GLSL buffers and push
 constants.  Python-only configuration parsing must not leak into
-\texttt{GeoDynamics.py}.
+\texttt{WeightedDynamics.py}.
+
+\subsection{Retired Legacy Names}
+
+\texttt{Geo*}, \texttt{Neo*}, and \texttt{Shadow*} runtime prefixes are
+retired.  New permanent-runtime functions use generic descriptive names.
+Runtime error constants use \texttt{ERROR\_*}.  Historical sections in this
+document may retain old names when describing problem evolution, but those
+names are not valid implementation guidance.
 
 When adding particle position, velocity, radius, collision-list, push-constant,
 or error fields, first look for the corresponding GLSL structure or function
@@ -593,7 +601,7 @@ contact set.
 
 \subsection{Dynamics Versus Harness}
 
-\texttt{GeoDynamics.py} should not:
+\texttt{WeightedDynamics.py} should not:
 
 \begin{itemize}
     \item read cfg files;
@@ -603,12 +611,12 @@ contact set.
     \item contain test harness iteration logic.
 \end{itemize}
 
-\texttt{GeoBase.py} may do those things because it is not intended to be a
+\texttt{WeightedDynamicsBase.py} may do those things because it is not intended to be a
 one-to-one GLSL export unit.
 
 \subsection{Project Update Convention}
 
-When the phrase \emph{update project} is used during Geo dynamics work, it
+When the phrase \emph{update project} is used during dynamics work, it
 means the project record should be brought current before check-in.  The update
 includes:
 
@@ -630,64 +638,33 @@ includes:
 
 The documentation update should describe the current implementation and the
 reason for the change.  Old material should be removed or clearly superseded
-when it no longer describes the active Geo path.
+when it no longer describes the active weighted path.
 
 \subsection{Source Flowchart Convention}
 
-The source-flow diagram is generated, not hand-edited.  The generator lives in:
+The permanent weighted dynamics flow is generated from:
 
 \begin{verbatim}
-python/base/SourceFlowChart.py
-\end{verbatim}
-
-The system-flow diagram is also generated, not hand-edited.  Its generator
-lives in:
-
-\begin{verbatim}
-python/base/SystemFlowChart.py
-\end{verbatim}
-
-The proposed simplified system-flow diagram is generated from:
-
-\begin{verbatim}
-python/base/ProposedSystemFlowChart.py
-\end{verbatim}
-
-The current linear shadow experiment flow is generated from:
-
-\begin{verbatim}
-python/base/ShadowLinFlowChart.py
+python/base/WeightedDynamicsFlowChart.py
 \end{verbatim}
 
 The generated artifacts are written to:
 
 \begin{verbatim}
-docs/Dynamics/generated/ShadowSourceFlow.dot
-docs/Dynamics/generated/ShadowSourceFlow.svg
-docs/Dynamics/generated/ShadowSourceFlow.pdf
-docs/Dynamics/generated/ShadowSourceFlow.png
-docs/Dynamics/generated/ShadowSystemFlow.dot
-docs/Dynamics/generated/ShadowSystemFlow.svg
-docs/Dynamics/generated/ShadowSystemFlow.pdf
-docs/Dynamics/generated/ShadowSystemFlow.png
-docs/Dynamics/generated/ShadowProposedSystemFlow.dot
-docs/Dynamics/generated/ShadowProposedSystemFlow.svg
-docs/Dynamics/generated/ShadowProposedSystemFlow.pdf
-docs/Dynamics/generated/ShadowProposedSystemFlow.png
-docs/Dynamics/generated/ShadowLinFlow.dot
-docs/Dynamics/generated/ShadowLinFlow.svg
-docs/Dynamics/generated/ShadowLinFlow.pdf
-docs/Dynamics/generated/ShadowLinFlow.png
+docs/Dynamics/generated/WeightedDynamicsFlow.dot
+docs/Dynamics/generated/WeightedDynamicsFlow.svg
+docs/Dynamics/generated/WeightedDynamicsFlow.pdf
+docs/Dynamics/generated/WeightedDynamicsFlow.png
 \end{verbatim}
 
 The DOT files are the readable Graphviz sources.  The generated SVG files may
 link to Python or documentation source files for browser and editor navigation.
 Graphviz PDF links are not reliable after inclusion in a larger LaTeX document.
-Therefore the current linear shadow documentation uses a native clickable TikZ
+Therefore the current weighted documentation uses a native clickable TikZ
 flowchart:
 
 \begin{verbatim}
-docs/Dynamics/ShadowLinFlowTikz.tex
+docs/Dynamics/WeightedDynamicsFlowTikz.tex
 \end{verbatim}
 
 Each TikZ function node links to a stable labeled section in
@@ -696,27 +673,24 @@ standalone views, while TikZ is the authoritative interactive flowchart inside
 \texttt{GeoDynamics.pdf}.  The proposed-flow chart remains a design target, not
 a statement that the code already follows that shape.
 
-\subsection{Selectable Dynamics Implementations}
+\subsection{Dynamics Selection}
 
-Alternative live and shadow implementations must be selected through the
-approved base-class registry, not arbitrary string imports.  The configured
-names are:
+Dynamics implementations must be selected through the approved class registry,
+not arbitrary string imports.  The permanent configured implementation is:
 
 \begin{verbatim}
-live_base = "..."
-shadow_base = "..."
+live_base = "WeightedDynamics"
+shadow_base = "WeightedDynamics"
 \end{verbatim}
 
-Both objects may be initialized from the same configuration, but after
-initialization their particles, contact slots, ledgers, snapshots, and dynamics
-writes must remain independent.  This permits experimental implementations such
-as \texttt{ShadowLinBase + ShadowLinDynamics} to run beside an established
-implementation without changing either implementation's source.
+Both objects are initialized from the same configuration, but their particles,
+contact slots, ledgers, snapshots, and dynamics writes remain independent.  The
+duplicate run currently verifies deterministic behavior and capture parity.
 
 \subsection{Linear Source-Complete Dynamics Convention}
 
-The linear shadow experiment establishes the preferred readable shape for a
-future per-particle GLSL invocation.  One source completes its dynamics before
+The permanent weighted implementation establishes the preferred readable shape
+for a future per-particle GLSL invocation.  One source completes its dynamics before
 the next source begins:
 
 \begin{verbatim}
@@ -735,27 +709,24 @@ mass, and stiffness.  It must not read target-owned contact lists, contact
 slots, phases, or ledgers.  It writes only source velocity and source-owned
 contact state.  Movement remains a separate pass after contact response.
 
-New linear implementation functions use generic descriptive names.  Inherited
-frame-chain adapters may retain \texttt{Geo*} names until the inherited frame
-chain is generalized.
+Dynamics and frame-chain functions use generic descriptive names.  The
+permanent runtime must not introduce \texttt{Geo*}, \texttt{Neo*}, or
+\texttt{Shadow*} prefixes.  Error constants use the generic
+\texttt{ERROR\_*} family.
 
 \subsection{Current TODO}
 
 \begin{itemize}
-    \item Keep \texttt{GeoVelocityAngle}, \texttt{particle\_position}, and
+    \item Keep \texttt{VelocityAngle}, \texttt{particle\_position}, and
     \texttt{particle\_overlap\_area} marked as future
-    \texttt{ShadowCommon.py} candidates until the shared helper module is
+    a future common-helper module candidates until the shared helper module is
     created.
-    \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
-    \item Keep live \texttt{GeoDynamics.py} clean while the next response rule
-    is tested in \texttt{ShadowDynamics.py}.
-    \item Validate \texttt{ShadowLinDynamics.py} against the two-particle and
+    \item Validate \texttt{WeightedDynamics.py} against the two-particle and
     three-particle batch captures.  The next question is whether source-only
     overlap weighting and source-net impulse application preserve momentum and
     kinetic-energy behavior for simultaneous contacts.
-    \item Continue simplifying inherited \texttt{Geo*} helpers only when a
-    generic linear function is added and filled locally.  Do not rename shared
-    framework error constants as part of the dynamics experiment.
+    \item Keep the permanent runtime free of prefixed legacy wrappers and use
+    generic \texttt{ERROR\_*} constants.
     \item Preserve the readable linear source flow:
     \begin{verbatim}
 Detect source contacts

@@ -1,0 +1,73 @@
+\begin{tikzpicture}[
+    node distance=0.34in and 0.62in,
+    function/.style={
+        draw=black!60,
+        fill=black!3,
+        rounded corners=2pt,
+        minimum width=2.25in,
+        minimum height=0.28in,
+        align=center,
+        font=\ttfamily\small
+    },
+    flow/.style={-{Stealth[length=5pt]}, draw=black!65, line width=0.45pt},
+    loop/.style={flow, rounded corners=0pt}
+]
+
+\newcommand{\FlowNode}[2]{\hyperref[weighted:#1]{\strut #2}}
+
+\node[function] (contact) {\FlowNode{ContactDynamics}{ContactDynamics}};
+\node[function, below=of contact] (begin) {\FlowNode{BeginSourceContactParms}{BeginSourceContactParms}};
+\node[function, below=of begin] (init) {\FlowNode{InitializeContactState}{InitializeContactState}};
+\node[function, below=of init] (state) {\FlowNode{GetContactState}{GetContactState}};
+\node[function, below=of state] (append) {\FlowNode{AppendContactSlot}{AppendContactSlot}};
+\node[function, below=of append] (slots) {\FlowNode{GetContactSlots}{GetContactSlots}};
+\node[function, below=of slots] (phase) {\FlowNode{GetCollisionPhase}{GetCollisionPhase}};
+\node[function, below=of phase] (collisionmom) {\FlowNode{GetCollisionInternalMomentum}{GetCollisionInternalMomentum}};
+\node[function, below=of collisionmom] (geometry) {\FlowNode{GetParticleGeometry}{GetParticleGeometry}};
+\node[function, below=of geometry] (position) {\FlowNode{GetParticlePosition}{GetParticlePosition}};
+\node[function, below=of position] (startvelocity) {\FlowNode{GetStartFrameVelocity}{GetStartFrameVelocity}};
+\node[function, below=of startvelocity] (reducedmass) {\FlowNode{GetReducedMass}{GetReducedMass}};
+\node[function, below=of reducedmass] (parms) {\FlowNode{CalculateContactParms}{CalculateContactParms}};
+
+\node[function, right=of contact] (weights) {\FlowNode{CalculateContactWeights}{CalculateContactWeights}};
+\node[function, below=of weights] (impulses) {\FlowNode{CalculateContactImpulses}{CalculateContactImpulses}};
+\node[function, below=of impulses] (stiffness) {\FlowNode{GetPairStiffness}{GetPairStiffness}};
+\node[function, below=of stiffness] (velocitydelta) {\FlowNode{ApplySourceVelocityDelta}{ApplySourceVelocityDelta}};
+\node[function, below=of velocitydelta] (mass) {\FlowNode{GetParticleMass}{GetParticleMass}};
+\node[function, below=of mass] (ledgers) {\FlowNode{UpdateContactLedgers}{UpdateContactLedgers}};
+\node[function, below=of ledgers] (setcollisionmom) {\FlowNode{SetCollisionInternalMomentum}{SetCollisionInternalMomentum}};
+\node[function, below=of setcollisionmom] (setphase) {\FlowNode{SetCollisionPhase}{SetCollisionPhase}};
+\node[function, below=of setphase] (syncmom) {\FlowNode{SyncInternalMomentum}{SyncInternalMomentum}};
+\node[function, below=of syncmom] (getmom) {\FlowNode{GetInternalMomentum}{GetInternalMomentum}};
+\node[function, below=of getmom] (setmom) {\FlowNode{SetInternalMomentum}{SetInternalMomentum}};
+
+\draw[flow] (contact) -- (begin);
+\draw[flow] (begin) -- (init);
+\draw[flow] (init) -- (state);
+\draw[flow] (state) -- (append);
+\draw[flow] (append) -- (slots);
+\draw[flow] (slots) -- (phase);
+\draw[flow] (phase) -- (collisionmom);
+\draw[flow] (collisionmom) -- (geometry);
+\draw[flow] (geometry) -- (position);
+\draw[flow] (position) -- (startvelocity);
+\draw[flow] (startvelocity) -- (reducedmass);
+\draw[flow] (reducedmass) -- (parms);
+
+\draw[loop] (parms.west) -- ++(-0.25in,0) |- node[pos=0.16,left,font=\scriptsize]{next contact} (init.west);
+\draw[flow] (parms.east) -- ++(0.28in,0) |- node[pos=0.15,right,font=\scriptsize]{all contacts} (weights.south);
+
+\draw[flow] (weights) -- (impulses);
+\draw[flow] (impulses) -- (stiffness);
+\draw[loop] (stiffness.east) -- ++(0.22in,0) |- (impulses.east);
+\draw[flow] (impulses.west) -- ++(-0.22in,0) |- (velocitydelta.west);
+\draw[flow] (velocitydelta) -- (mass);
+\draw[loop] (mass.east) -- ++(0.22in,0) |- (velocitydelta.east);
+\draw[flow] (velocitydelta.west) -- ++(-0.22in,0) |- (ledgers.west);
+\draw[flow] (ledgers) -- (setcollisionmom);
+\draw[flow] (setcollisionmom) -- (setphase);
+\draw[flow] (setphase) -- (syncmom);
+\draw[flow] (syncmom) -- (getmom);
+\draw[flow] (getmom) -- (setmom);
+
+\end{tikzpicture}
