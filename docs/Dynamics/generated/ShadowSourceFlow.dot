@@ -67,6 +67,16 @@ digraph ShadowSourceFlow {
     GeoMoveParticles [label="GeoMoveParticles", shape=box, URL="vscode://file/C:/_DJ/gPCD/python/base/ShadowBase.py:545:1", tooltip="Open GeoMoveParticles in VS Code", target="_blank"];
     GeoEndFrame [label="GeoEndFrame", shape=box, URL="vscode://file/C:/_DJ/gPCD/python/base/ShadowBase.py:556:1", tooltip="Open GeoEndFrame in VS Code", target="_blank"];
   }
+  subgraph cluster_capture {
+    label="Capture / Reporting";
+    color="#c8c8c8";
+    style="rounded";
+    _report_particles [label="_report_particles", shape=box, URL="vscode://file/C:/_DJ/gPCD/python/GeoRunner.py:505:1", tooltip="Open _report_particles in VS Code", target="_blank"];
+    report_frame_momentum [label="Reporting.report_frame_momentum", shape=box, URL="vscode://file/C:/_DJ/gPCD/python/base/Reporting.py:79:1", tooltip="Open Reporting.report_frame_momentum in VS Code", target="_blank"];
+    report_contacts [label="Reporting.report_contacts", shape=box, URL="vscode://file/C:/_DJ/gPCD/python/base/Reporting.py:177:1", tooltip="Open Reporting.report_contacts in VS Code", target="_blank"];
+    report_particle [label="Reporting.report_particle", shape=box, URL="vscode://file/C:/_DJ/gPCD/python/base/Reporting.py:135:1", tooltip="Open Reporting.report_particle in VS Code", target="_blank"];
+    CaptureCSV [label="momentum / contacts / particle CSV", shape=note];
+  }
   subgraph cluster_common {
     label="Shared Helpers";
     color="#c8c8c8";
@@ -104,4 +114,11 @@ digraph ShadowSourceFlow {
     GeoResolveContacts -> GeoProcessCollisions [label="per source"];
     GeoProcessCollisions -> GeoPlannedContactImpulses [label="read plan"];
     GeoProcessCollisions -> GeoVelocityAngle [label="VelRad.w"];
+    CollisionRun -> _report_particles [label="frame result"];
+    _report_particles -> report_frame_momentum [label="momentum.csv"];
+    _report_particles -> report_contacts [label="contacts.csv"];
+    _report_particles -> report_particle [label="pN.csv"];
+    report_frame_momentum -> CaptureCSV;
+    report_contacts -> CaptureCSV;
+    report_particle -> CaptureCSV;
 }

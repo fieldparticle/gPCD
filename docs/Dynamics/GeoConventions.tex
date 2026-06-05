@@ -640,21 +640,104 @@ The source-flow diagram is generated, not hand-edited.  The generator lives in:
 python/base/SourceFlowChart.py
 \end{verbatim}
 
-It writes the current artifacts to:
+The system-flow diagram is also generated, not hand-edited.  Its generator
+lives in:
+
+\begin{verbatim}
+python/base/SystemFlowChart.py
+\end{verbatim}
+
+The proposed simplified system-flow diagram is generated from:
+
+\begin{verbatim}
+python/base/ProposedSystemFlowChart.py
+\end{verbatim}
+
+The current linear shadow experiment flow is generated from:
+
+\begin{verbatim}
+python/base/ShadowLinFlowChart.py
+\end{verbatim}
+
+The generated artifacts are written to:
 
 \begin{verbatim}
 docs/Dynamics/generated/ShadowSourceFlow.dot
 docs/Dynamics/generated/ShadowSourceFlow.svg
 docs/Dynamics/generated/ShadowSourceFlow.pdf
 docs/Dynamics/generated/ShadowSourceFlow.png
+docs/Dynamics/generated/ShadowSystemFlow.dot
+docs/Dynamics/generated/ShadowSystemFlow.svg
+docs/Dynamics/generated/ShadowSystemFlow.pdf
+docs/Dynamics/generated/ShadowSystemFlow.png
+docs/Dynamics/generated/ShadowProposedSystemFlow.dot
+docs/Dynamics/generated/ShadowProposedSystemFlow.svg
+docs/Dynamics/generated/ShadowProposedSystemFlow.pdf
+docs/Dynamics/generated/ShadowProposedSystemFlow.png
+docs/Dynamics/generated/ShadowLinFlow.dot
+docs/Dynamics/generated/ShadowLinFlow.svg
+docs/Dynamics/generated/ShadowLinFlow.pdf
+docs/Dynamics/generated/ShadowLinFlow.png
 \end{verbatim}
 
-The DOT file is the readable graph source.  The SVG is the interactive browser
-version and may contain \texttt{vscode://file/...:line:1} source links.  The PDF
-is the stable LaTeX figure included by \texttt{SourceDocumentation.tex}.  The
-LaTeX documentation should include the generated PDF with
-\texttt{\textbackslash includegraphics}, not depend on SVG conversion during the
-LaTeX build.
+The DOT files are the readable Graphviz sources.  The generated SVG files may
+link to Python or documentation source files for browser and editor navigation.
+Graphviz PDF links are not reliable after inclusion in a larger LaTeX document.
+Therefore the current linear shadow documentation uses a native clickable TikZ
+flowchart:
+
+\begin{verbatim}
+docs/Dynamics/ShadowLinFlowTikz.tex
+\end{verbatim}
+
+Each TikZ function node links to a stable labeled section in
+\texttt{SourceDocumentation.tex}.  The generated Graphviz forms remain useful
+standalone views, while TikZ is the authoritative interactive flowchart inside
+\texttt{GeoDynamics.pdf}.  The proposed-flow chart remains a design target, not
+a statement that the code already follows that shape.
+
+\subsection{Selectable Dynamics Implementations}
+
+Alternative live and shadow implementations must be selected through the
+approved base-class registry, not arbitrary string imports.  The configured
+names are:
+
+\begin{verbatim}
+live_base = "..."
+shadow_base = "..."
+\end{verbatim}
+
+Both objects may be initialized from the same configuration, but after
+initialization their particles, contact slots, ledgers, snapshots, and dynamics
+writes must remain independent.  This permits experimental implementations such
+as \texttt{ShadowLinBase + ShadowLinDynamics} to run beside an established
+implementation without changing either implementation's source.
+
+\subsection{Linear Source-Complete Dynamics Convention}
+
+The linear shadow experiment establishes the preferred readable shape for a
+future per-particle GLSL invocation.  One source completes its dynamics before
+the next source begins:
+
+\begin{verbatim}
+BeginSourceContactParms
+for each source-owned contact:
+    InitializeContactState
+    CalculateContactParms
+CalculateContactWeights
+CalculateContactImpulses
+ApplySourceVelocityDelta
+UpdateContactLedgers
+\end{verbatim}
+
+The source may read immutable frame-start target position, velocity, radius,
+mass, and stiffness.  It must not read target-owned contact lists, contact
+slots, phases, or ledgers.  It writes only source velocity and source-owned
+contact state.  Movement remains a separate pass after contact response.
+
+New linear implementation functions use generic descriptive names.  Inherited
+frame-chain adapters may retain \texttt{Geo*} names until the inherited frame
+chain is generalized.
 
 \subsection{Current TODO}
 
@@ -666,10 +749,19 @@ LaTeX build.
     \item Keep \texttt{GeoDynamics.py} one-to-one with future GLSL export.
     \item Keep live \texttt{GeoDynamics.py} clean while the next response rule
     is tested in \texttt{ShadowDynamics.py}.
-    \item Continue the parabolic velocity-progress experiment in
-    \texttt{ShadowDynamics.py}.  The normal-velocity target restores the
-    two-particle horizontal and angled cases in shadow.  The next test is
-    source-level multi-contact storage/allocation for \texttt{ThreeParticle}.
+    \item Validate \texttt{ShadowLinDynamics.py} against the two-particle and
+    three-particle batch captures.  The next question is whether source-only
+    overlap weighting and source-net impulse application preserve momentum and
+    kinetic-energy behavior for simultaneous contacts.
+    \item Continue simplifying inherited \texttt{Geo*} helpers only when a
+    generic linear function is added and filled locally.  Do not rename shared
+    framework error constants as part of the dynamics experiment.
+    \item Preserve the readable linear source flow:
+    \begin{verbatim}
+Detect source contacts
+Complete source contact dynamics
+Move particles
+    \end{verbatim}
     \item Treat wall/out-of-bounds behavior as a separate problem after the
     particle-particle multi-contact rule is stable.
     \item Add reporting only through \texttt{Reporting.py}, not through dynamics.

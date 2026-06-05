@@ -19,6 +19,8 @@ DOT_FILE = OUTPUT_DIR / "ShadowSourceFlow.dot"
 
 SHADOW_BASE = REPO_DIR / "python" / "base" / "ShadowBase.py"
 SHADOW_DYNAMICS = REPO_DIR / "python" / "base" / "ShadowDynamics.py"
+GEO_RUNNER = REPO_DIR / "python" / "GeoRunner.py"
+REPORTING = REPO_DIR / "python" / "base" / "Reporting.py"
 
 NODE_SOURCES = {
     "CollisionRun": SHADOW_BASE,
@@ -47,16 +49,19 @@ NODE_SOURCES = {
     "particle_position": SHADOW_BASE,
     "particle_overlap_area": SHADOW_BASE,
     "GeoVelocityAngle": SHADOW_BASE,
+    "_report_particles": GEO_RUNNER,
+    "report_frame_momentum": REPORTING,
+    "report_contacts": REPORTING,
+    "report_particle": REPORTING,
 }
 
 
 def function_line(source_file: Path, function_name: str) -> int | None:
-    pattern = f"    def {function_name}("
     for line_number, line in enumerate(
         source_file.read_text(encoding="utf-8-sig").splitlines(),
         start=1,
     ):
-        if line.startswith(pattern):
+        if line.lstrip().startswith(f"def {function_name}("):
             return line_number
     return None
 
@@ -173,6 +178,17 @@ def build_dot() -> str:
             ],
         ),
         dot_cluster(
+            "capture",
+            "Capture / Reporting",
+            [
+                dot_node("_report_particles", "_report_particles"),
+                dot_node("report_frame_momentum", "Reporting.report_frame_momentum"),
+                dot_node("report_contacts", "Reporting.report_contacts"),
+                dot_node("report_particle", "Reporting.report_particle"),
+                dot_node("CaptureCSV", "momentum / contacts / particle CSV", "note"),
+            ],
+        ),
+        dot_cluster(
             "common",
             "Shared Helpers",
             [
@@ -212,6 +228,13 @@ def build_dot() -> str:
         dot_edge("GeoResolveContacts", "GeoProcessCollisions", "per source"),
         dot_edge("GeoProcessCollisions", "GeoPlannedContactImpulses", "read plan"),
         dot_edge("GeoProcessCollisions", "GeoVelocityAngle", "VelRad.w"),
+        dot_edge("CollisionRun", "_report_particles", "frame result"),
+        dot_edge("_report_particles", "report_frame_momentum", "momentum.csv"),
+        dot_edge("_report_particles", "report_contacts", "contacts.csv"),
+        dot_edge("_report_particles", "report_particle", "pN.csv"),
+        dot_edge("report_frame_momentum", "CaptureCSV"),
+        dot_edge("report_contacts", "CaptureCSV"),
+        dot_edge("report_particle", "CaptureCSV"),
     ]
 
     lines = [

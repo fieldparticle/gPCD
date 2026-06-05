@@ -4,8 +4,62 @@ import math
 
 from base.GeoBase import GeoBase
 from base.ShadowBase import ShadowBase
+from base.ShadowLinBase import ShadowLinBase
 from base.Reporting import Reporting
 from base.InLineTest import InLineTest
+from gbase import libconf
+
+
+BASE_CLASS_REGISTRY = {
+    "GeoBase": GeoBase,
+    "ShadowBase": ShadowBase,
+    "ShadowLinBase": ShadowLinBase,
+}
+
+
+def _particle_util_cfg():
+    cfg_file = Path(__file__).resolve().parent / "ParticleUtil.cfg"
+    if not cfg_file.exists():
+        return {}
+    with cfg_file.open("r") as handle:
+        return libconf.load(handle)
+
+
+def _base_class_from_config(particle_util_cfg, field_name, default_name):
+    base_name = particle_util_cfg.get(field_name, default_name)
+    if base_name not in BASE_CLASS_REGISTRY:
+        allowed_names = ", ".join(sorted(BASE_CLASS_REGISTRY))
+        raise ValueError(
+            f"ParticleUtil.cfg {field_name}={base_name!r} is not registered. "
+            f"Allowed base classes: {allowed_names}"
+        )
+    return BASE_CLASS_REGISTRY[base_name]
+
+
+def _create_configured_bases():
+    particle_util_cfg = _particle_util_cfg()
+    live_base_class = _base_class_from_config(
+        particle_util_cfg,
+        "live_base",
+        "GeoBase",
+    )
+    shadow_base_class = _base_class_from_config(
+        particle_util_cfg,
+        "shadow_base",
+        "ShadowBase",
+    )
+    return live_base_class(), shadow_base_class()
+
+
+def _display_base_from_config():
+    particle_util_cfg = _particle_util_cfg()
+    display_base = str(particle_util_cfg.get("display_base", "live")).lower()
+    if display_base not in ("live", "shadow"):
+        raise ValueError(
+            "ParticleUtil.cfg display_base must be 'live' or 'shadow'. "
+            f"Got {display_base!r}."
+        )
+    return display_base
 
 def _window_size(run_configuration):
     window_size = run_configuration.get("window_size", (1000, 1000))
@@ -457,9 +511,9 @@ def _report_particles(reporting, frame_number, particles, start_diagnostics, dt)
 
 
 def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_number=None):
-    geo = GeoBase()
+    geo, shadow = _create_configured_bases()
+    display_base = _display_base_from_config()
     geo.load_cfg_file(cfg_file)
-    shadow = ShadowBase()
     shadow.load_cfg_file(cfg_file)
     test_file_name = Path(cfg_file).name
     run_configuration = geo.run_configuration
@@ -499,7 +553,9 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
 
     pygame.init()
     screen = pygame.display.set_mode(_window_size(run_configuration))
-    pygame.display.set_caption(f"GeoRunner - {geo.config.get('STUDY_NAME', cfg_file)}")
+    pygame.display.set_caption(
+        f"GeoRunner [{display_base}] - {geo.config.get('STUDY_NAME', cfg_file)}"
+    )
     clock = pygame.time.Clock()
 
     frame_number = 0
@@ -544,15 +600,21 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                 )
             else:
                 particles = geo.particles
+                sparticles = shadow.particles
+            display_runner = shadow if display_base == "shadow" else geo
+            display_particles = sparticles if display_base == "shadow" else particles
+            display_start_diagnostics = (
+                shadow_start_diagnostics if display_base == "shadow" else start_diagnostics
+            )
             _draw_particles(
                 screen,
-                particles,
+                display_particles,
                 run_configuration,
                 frame_number,
                 test_file_name,
-                start_diagnostics,
-                geo.collIn.ErrorReturn,
-                geo.ErrorDescription(),
+                display_start_diagnostics,
+                display_runner.collIn.ErrorReturn,
+                display_runner.ErrorDescription(),
             )
             if geo.collIn.ErrorReturn != geo.constants.GEO_ERROR_NONE:
                 if exit_on_error:

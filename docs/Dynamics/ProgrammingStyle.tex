@@ -185,13 +185,57 @@ The current source-flow generator is:
 python/base/SourceFlowChart.py
 \end{verbatim}
 
+The current system-flow generator is:
+
+\begin{verbatim}
+python/base/SystemFlowChart.py
+\end{verbatim}
+
 It emits DOT, SVG, PDF, and PNG artifacts under
 \texttt{docs/Dynamics/generated}.  The DOT file preserves the graph source, the
-SVG can carry interactive source links, and the PDF is used as the stable LaTeX
-figure.  The generator should be updated when function names, stage order, or
-major source handoffs change.
+SVG can carry interactive links, and the PDF is used as the stable LaTeX figure.
+The source-flow chart links mostly to code.  The system-flow chart links mostly
+to documentation because it explains loops, decision trees, storage boundaries,
+and GLSL-shaped algorithm stages.  The generators should be updated when
+function names, stage order, decision points, or major source handoffs change.
 
 This preserves the same programming rule used by the code: the primary flow is
 explicit, generated documentation follows that flow, and helpers are shown as
 supporting calls rather than hidden control-flow owners.
+
+\subsection{Source-Complete Linear Dynamics}
+
+The linear shadow implementation demonstrates the preferred shape for dynamics
+that will eventually execute once per source particle in GLSL.  The top-level
+function must read like the algorithm:
+
+\begin{verbatim}
+initialize source totals
+for each source-owned contact:
+    initialize one contact
+    calculate one contact
+calculate source contact weights
+calculate planned contact impulses
+apply one source velocity write
+update source-owned ledgers
+\end{verbatim}
+
+Loops belong in the narrowest function that owns the sequence.  Per-contact
+functions process exactly one contact and do not hide a second contact-list
+loop.  Source-level functions may iterate the completed source contact slots
+when their result depends on the whole source contact set.
+
+This shape keeps the main decision order visible, makes stepper debugging
+practical, and exposes which functions must eventually map into a per-source
+shader invocation.  Movement remains a separate pass because every source must
+read the same frame-start positions and velocities during contact response.
+
+\subsection{Interactive Source Documentation}
+
+When the generated flow is included in the project PDF, native TikZ is preferred
+for interactive navigation.  Each function node links to a stable labeled
+function section in \texttt{SourceDocumentation.tex}.  Graphviz remains useful
+for standalone DOT, SVG, PDF, and PNG artifacts, but links embedded in a
+Graphviz PDF are not expected to survive inclusion through
+\texttt{\textbackslash includegraphics}.
 

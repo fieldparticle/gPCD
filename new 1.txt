@@ -1,8 +1,11 @@
-once phase == RETURNING, the target internal momentum must decrease as separation progresses,
-or release must be driven directly by stored internal momentum and the rebound profile.
-
-A more parabolic rebound profile could be:
-release_fraction = 1.0 - contact_internal_momentum / max_internal_momentum
-release_impulse = contact_internal_momentum * profile_gain
-
-So lets start with TwoParticle angled. KE drift = -2E-6. 
+ContactDynamics(source)
+    BeginSourceContactParms
+    per contact:
+        InitializeContactState
+        GetContactState
+        CalculateContactParms
+    EndSourceContactParms
+    CalculateContactWeights
+    CalculateContactImpulses
+    ApplySourceVelocityDelta
+    UpdateContactLedgers

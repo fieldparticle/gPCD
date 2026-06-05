@@ -1,12 +1,13 @@
-Document shadow source flow and generated flowchart
+feat(dynamics): add source-complete linear shadow implementation
 
-- add SourceDocumentation with staged shadow dynamics flow and function notes
-- add SourceFlowChart generator for DOT/SVG/PDF/PNG source-flow diagrams
-- link SVG nodes to VS Code source locations with function line targets
-- include generated flowchart PDF in GeoDynamics documentation
-- document source-flowchart conventions and update-project expectations
-- record shadow source-documentation checkpoint in ProblemEvolution
-- mark shared ShadowBase helpers as future ShadowCommon candidates
-- clean stale generated flowchart output from python/base
+- add configurable live and shadow base registry
+- introduce independent ShadowLinBase and ShadowLinDynamics paths
+- process each source through a readable linear contact-response chain
+- calculate source-owned contact geometry, weights, impulses, and ledgers
+- vector-sum contact impulses into one source velocity write
+- keep movement as a separate double-buffered pass
+- add generated and clickable TikZ ShadowLin flowcharts
+- rebuild source documentation for all ShadowLinDynamics functions
+- update dynamics conventions, geometry equations, programming style, and problem evolution
 
-Next: implement source-level multi-contact storage/allocation in ShadowDynamics
+Next: validate ThreeParticle and ThreeParticleChase momentum and kinetic-energy behavior before promoting the linear model

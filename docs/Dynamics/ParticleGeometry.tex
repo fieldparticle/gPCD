@@ -445,6 +445,78 @@ direction drift is not the main source of three-particle kinetic-energy loss:
 Therefore the active unresolved problem is the selection of simultaneous
 multi-contact impulse magnitudes, not the rebound direction.
 
+\section{Linear Shadow Contact Response}
+\label{sec:linear-shadow-contact-response}
+
+\texttt{ShadowLinDynamics} is the current readable experiment for applying the
+same geometric model as one source-complete chain.  It is not yet the approved
+replacement for the active Geo path, but it makes the intended per-source
+equations and ownership boundary explicit.
+
+For source \(s\), each contact \(k\) contributes overlap area \(A_k\), contact
+normal \(\mathbf{n}_k\), and relative normal velocity:
+
+\begin{equation}
+v_{n,k} = (\mathbf{v}_{t_k}-\mathbf{v}_s)\cdot\mathbf{n}_k.
+\end{equation}
+
+Closing momentum is calculated from reduced mass:
+
+\begin{equation}
+p_{\mathrm{closing},k} = \mu_k \max(0,-v_{n,k}).
+\end{equation}
+
+After all source contacts are known, the source assigns an overlap-area weight:
+
+\begin{equation}
+w_k = \frac{A_k}{\sum_j A_j},
+\qquad
+p_{\mathrm{share},k} = w_k \sum_j p_{\mathrm{closing},j}.
+\end{equation}
+
+The current linear planned impulse is:
+
+\begin{equation}
+J_{\mathrm{raw},k}=q_k A_k\Delta t,
+\end{equation}
+
+\begin{equation}
+J_{\mathrm{compression},k}
+=
+\min(J_{\mathrm{raw},k},p_{\mathrm{share},k})
+\quad\text{when }v_{n,k}<-\epsilon,
+\end{equation}
+
+\begin{equation}
+J_{\mathrm{release},k}
+=
+\min(J_{\mathrm{raw},k},I_k)
+\quad\text{otherwise}.
+\end{equation}
+
+The source receives one velocity write from the vector sum:
+
+\begin{equation}
+\Delta\mathbf{p}_s
+=
+\sum_k
+-(J_{\mathrm{compression},k}+J_{\mathrm{release},k})\mathbf{n}_k,
+\qquad
+\mathbf{v}'_s=\mathbf{v}_s+\frac{\Delta\mathbf{p}_s}{m_s}.
+\end{equation}
+
+After the velocity write, each source-owned contact ledger is updated:
+
+\begin{equation}
+I'_k
+=
+\max(0,I_k+J_{\mathrm{compression},k}-J_{\mathrm{release},k}).
+\end{equation}
+
+The unresolved question is whether this source-only allocation remains correct
+for simultaneous multi-contact compression and rebound.  It must be evaluated
+against the existing three-particle captures before promotion.
+
 The elastic target compass is intended to remain a long-term diagnostic.  It
 answers a reference question:
 

@@ -1,856 +1,329 @@
-% !TeX root = GeoDynamics.tex
+﻿% !TeX root = GeoDynamics.tex
 \newpage
-\section{Source Documentation}
+\section{ShadowLinDynamics Source Flow}
 
-\section{Frame Flowchart}
+\newcommand{\ShadowFunctionSection}[1]{%
+  \section{ShadowLinDynamics:#1}%
+  \label{shadowlin:#1}%
+}
 
-The shadow dynamics path is organized as a narrow staged chain.  Each stage has
-one main responsibility, and later stages consume the outputs of earlier stages
-rather than rediscovering the same information.  This is the source-level flow
-used to keep the Python implementation close to the intended GLSL structure.
+\texttt{ShadowLinDynamics} processes one source particle completely before
+advancing to the next source.  It may read target frame-start state, but all
+dynamics writes, contact slots, collision history, and internal-momentum
+ledgers remain owned by the source particle.
 
-\begin{figure}
+\begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{generated/ShadowSourceFlow.pdf}
-\caption{Shadow dynamics source flow}
+\resizebox{\textwidth}{!}{\input{ShadowLinFlowTikz}}
+\caption{Current ShadowLinDynamics function flow}
 \end{figure}
 
-\subsection{Flow Rules}
+\clearpage
+\ShadowFunctionSection{ContactDynamics}
 
-Contact detection is the only stage that builds the current-frame contact list.
-Impulse planning consumes that list; it should not perform a second full
-contact-discovery pass.  Resolution consumes the planned impulses and writes
-only the source particle.  Geometry helpers such as
-\texttt{particle\_position} and \texttt{particle\_overlap\_area} are shared
-support functions and are candidates for a future \texttt{ShadowCommon.py}
-module.
+\texttt{ContactDynamics(SourceID)} is the readable top-level dynamics chain for
+one source particle.  The source contact list must already contain the
+current-frame target IDs.
 
-\section{\texttt{ShadowBase:CollisionRun}}
-
-\texttt{CollisionRun()} is the top-level per-frame dynamics chain.  It does
-not perform collision math itself.  Its job is to call the narrow frame stages
-in order and stop immediately if any stage reports an error.  This makes the
-frame easy to step through and keeps the Python path close to the intended
-GLSL staging model.
-
-\subsection{Frame Gate}
-
-The frame begins with:
+It resets source accumulators, initializes and calculates each contact, then
+performs the source-level stages that require the complete contact set:
 
 \begin{verbatim}
-if not self.GeoBeginFrame():
-    return self.particles
+BeginSourceContactParms
+for each TargetID:
+    InitializeContactState
+    CalculateContactParms
+CalculateContactWeights
+CalculateContactImpulses
+ApplySourceVelocityDelta
+UpdateContactLedgers
 \end{verbatim}
 
-\texttt{GeoBeginFrame()} clears the runtime error code for the new frame and
-re-applies any persistent configuration error found during cfg loading.  If a
-configuration error exists, the frame exits before contact detection,
-planning, resolution, or motion.
+Each stage returns immediately on failure.  The function reads target snapshot
+state but writes only source-owned state.
 
-\subsection{Pre-Contact Hooks and Frame Reset}
+\ShadowFunctionSection{BeginSourceContactParms}
+
+\texttt{BeginSourceContactParms(SourceID)} resets the source-level values that
+will be rebuilt from the current contact list:
+
+\begin{itemize}
+    \item \texttt{total\_overlap\_area}
+    \item \texttt{available\_source\_momentum}
+\end{itemize}
+
+These values must be zero before individual contacts contribute their geometry
+and closing momentum.
+
+\ShadowFunctionSection{InitializeContactState}
+
+\texttt{InitializeContactState(SourceID, TargetID)} initializes one current
+source-target contact.  It obtains the source-owned contact slot from
+\texttt{GetContactState}, marks the source as colliding, and updates the
+source's reporting target and contact count.  It returns the initialized slot,
+or \texttt{None} when initialization fails.
+
+\ShadowFunctionSection{GetContactState}
+
+\texttt{GetContactState(SourceID, TargetID)} creates and populates one
+current-frame source-owned contact slot.
+
+The function first calls \texttt{AppendContactSlot} to record the target and
+persistent collision state.  It then calls \texttt{GetParticleGeometry} and
+stores the contact normal, overlap area, center distance, overlap depth, and
+stored internal momentum in the slot.
+
+\ShadowFunctionSection{AppendContactSlot}
+
+\texttt{AppendContactSlot(SourceID, TargetID)} allocates the next available
+contact slot owned by the source particle.  The slot records:
+
+\begin{itemize}
+    \item target particle ID;
+    \item particle-contact type;
+    \item persistent collision phase;
+    \item active-this-frame state;
+    \item previously stored internal momentum.
+\end{itemize}
+
+The source's \texttt{contactCount} is incremented only after a slot is filled.
+The function returns \texttt{None} when the fixed slot array is full.
+
+\ShadowFunctionSection{GetContactSlots}
+
+\texttt{GetContactSlots(SourceID)} returns the fixed contact-slot array owned by
+the source particle.  Newer particle structures use \texttt{contacts}; the
+\texttt{gcs} fallback preserves compatibility with the current particle
+structure.
+
+\ShadowFunctionSection{GetCollisionPhase}
+
+\texttt{GetCollisionPhase(SourceID, TargetID)} reads the persistent
+source-owned phase for one contact.  Collision phases are stored by target ID.
+A contact without phase history begins in compression.
+
+\ShadowFunctionSection{GetCollisionInternalMomentum}
+
+\texttt{GetCollisionInternalMomentum(SourceID, TargetID)} reads the persistent
+internal momentum owned by one source-target contact ledger.  A missing ledger
+or target entry represents zero stored momentum.
+
+\ShadowFunctionSection{GetParticleGeometry}
+
+\texttt{GetParticleGeometry(SourceID, TargetID)} calculates current-frame
+contact geometry from frame-start particle positions.
+
+When the two radii overlap, it returns:
 
 \begin{verbatim}
-self.GeoApplyBeforeContactScanHook()
-self.GeoResetFrameState()
-self.GeoApplyStartRunHook()
+(normal_x, normal_y, normal_z, overlap_area, center_distance)
 \end{verbatim}
 
-\texttt{GeoApplyBeforeContactScanHook()} lets an attached scenario adjust
-particles before contact scanning.  \texttt{GeoResetFrameState()} clears
-frame-local contact slots, contact lists, overlap accumulators, and report
-fields while preserving persistent contact history such as internal momentum
-and contact phase.  \texttt{GeoApplyStartRunHook()} lets inline tests adjust or
-replace the particle list before the frame snapshot is built.
+The normal points from source to target.  The function returns \texttt{None}
+when no overlap exists.  Coincident centers use the positive x direction as a
+deterministic fallback normal.
 
-\subsection{Frame Snapshot and Start Diagnostics}
+\ShadowFunctionSection{GetParticlePosition}
 
-\begin{verbatim}
-self.GeoBuildFrameSnapshot()
-self.GeoRecordFrameStartDiagnostics()
-\end{verbatim}
+\texttt{GetParticlePosition(ParticleID)} returns the particle's frame-start
+position.  It prefers the immutable \texttt{PosLocFrame} snapshot so every
+source reads the same frame state.  When no snapshot exists, it reads the
+currently active particle position buffer.
 
-\texttt{GeoBuildFrameSnapshot()} freezes frame-start positions and velocities
-into \texttt{PosLocFrame} and \texttt{VelRadFrame}.  Later stages may update
-particle velocities and positions, but contact geometry, contact weights, and
-relative velocity calculations should read the snapshot so the frame is based
-on one consistent moment.  \texttt{GeoRecordFrameStartDiagnostics()} records
-per-particle kinetic energy from the frozen velocity snapshot.
+\ShadowFunctionSection{CalculateContactParms}
 
-\subsection{Contact List Construction}
+\texttt{CalculateContactParms(SourceID, TargetID, contact\_state)} calculates
+one contact's relative normal motion and contribution to source-level totals.
 
-\begin{verbatim}
-if not self.GeoDetectContact():
-    return self.particles
-
-if not self.GeoBuildWallContactLists():
-    return self.particles
-\end{verbatim}
-
-\texttt{GeoDetectContact()} performs particle-particle contact
-detection and records directed, source-owned contact entries.  If particle 1
-contacts particle 2, the directed entry \(1\rightarrow2\) is recorded when
-particle 1 is the source; the reverse entry \(2\rightarrow1\) is recorded when
-particle 2 is the source.  \texttt{GeoBuildWallContactLists()} is the wall
-contact stage.  In the current particle-focused work, it is a placeholder.
-
-\subsection{Impulse Planning}
-
-\begin{verbatim}
-if not self.GeoPlanContactImpulses():
-    return self.particles
-\end{verbatim}
-
-\texttt{GeoPlanContactImpulses()} consumes the already-built contact lists.  It
-builds directed candidates keyed by \((SourceID, TargetID)\), computes
-source-level context such as total overlap area and available source momentum,
-and then builds a pair-compatible plan stored in
-\texttt{GeoPlannedContactImpulses}.  This stage plans scalar contact impulses;
-it does not write particle velocities.
-
-The current cleanup direction is that planning should consume contact lists
-and, longer term, contact-slot geometry.  Planning should not repeat full
-particle-list contact discovery after contact detection has already built the
-frame's contact set.
-
-\subsection{Contact Resolution}
-
-\begin{verbatim}
-if not self.GeoResolveContacts():
-    return self.particles
-
-self.GeoRecordAfterResolveDiagnostics()
-\end{verbatim}
-
-\texttt{GeoResolveContacts()} applies the planned source-owned response.  Each
-source particle writes only its own velocity and contact ledgers.  The contact
-response converts scalar planned impulses into vector momentum deltas using
-the stored contact normal, sums those deltas for the source, and then updates
-the source velocity.  After resolution, \texttt{GeoRecordAfterResolveDiagnostics()}
-records per-particle kinetic energy before motion.
-
-\subsection{Motion and End Frame}
-
-\begin{verbatim}
-if not self.GeoMoveParticles():
-    return self.particles
-
-self.GeoEndFrame()
-return self.particles
-\end{verbatim}
-
-\texttt{GeoMoveParticles()} advances particle positions using the resolved
-velocities and the configured time step.  \texttt{GeoEndFrame()} finalizes the
-frame, synchronizes public particle position fields to the active position
-buffer, clears the frame snapshots, and returns the particle list for reporting
-or the next frame.
-
-\section{\texttt{ShadowBase:GeoBuildFrameSnapshot}}
-
-\texttt{GeoBuildFrameSnapshot()} captures the frame-start particle state used
-by contact detection, contact weighting, relative velocity calculations, and
-impulse planning.  The function builds two snapshot arrays:
-
-\begin{verbatim}
-self.PosLocFrame
-self.VelRadFrame
-\end{verbatim}
-
-These arrays are copies.  Later contact resolution may change
-\texttt{particle.VelRad}, and motion may write a new position buffer, but
-functions that read the frame snapshot continue to see the state from the
-beginning of the frame.
-
-\subsection{Position Snapshot}
-
-The active position buffer is selected from:
-
-\begin{verbatim}
-position_buffer = int(self.ShaderFlags.positionBuffer)
-\end{verbatim}
-
-Each particle position is copied with:
-
-\begin{verbatim}
-self.particle_position(particle, position_buffer)
-\end{verbatim}
-
-The result is stored in \texttt{PosLocFrame}.  The copied vector preserves the
-same layout as the particle position buffers:
-
-\begin{verbatim}
-PosLocFrame[i].x = position x
-PosLocFrame[i].y = position y
-PosLocFrame[i].z = position z
-PosLocFrame[i].w = active/inactive buffer flag
-\end{verbatim}
-
-\subsection{Velocity Snapshot}
-
-Each particle velocity is copied from \texttt{particle.VelRad} into
-\texttt{VelRadFrame}.  The layout is coordinated with
-\texttt{particle.glsl}:
-
-\begin{verbatim}
-VelRadFrame[i].x = vx
-VelRadFrame[i].y = vy
-VelRadFrame[i].z = vz
-VelRadFrame[i].w = velocity angle
-\end{verbatim}
-
-\subsection{Why the Snapshot Exists}
-
-The snapshot enforces the project rule that a frame is evaluated from one
-consistent moment.  Contact detection, geometry, weighting, and planning should
-not depend on particle velocities that were already modified earlier in the
-same frame.  Source-owned writes happen later, during resolution, but those
-writes do not change what the planning-stage snapshot means.
-
-\section{\texttt{ShadowBase:GeoDetectContact}}
-
-\texttt{GeoDetectContact()} builds the directed particle-particle
-contact lists for the current frame.  This is the contact-detection stage.  It
-does not plan impulses and it does not modify velocities.
-
-\subsection{Source-Target Traversal}
-
-The function treats every particle as a possible source:
-
-\begin{verbatim}
-for source_id in range(len(self.particles)):
-    for target_id in range(len(self.particles)):
-\end{verbatim}
-
-The source is not allowed to contact itself:
-
-\begin{verbatim}
-if source_id == target_id:
-    continue
-\end{verbatim}
-
-For each remaining source-target pair, the function calls
-\texttt{isParticleContact(...)}.  That helper reads the frame-start position
-snapshot when it exists, computes center distance, compares the distance to
-the sum of particle radii, and updates overlap/penetration diagnostics for the
-source.
-
-\subsection{Directed Contact Recording}
-
-When \texttt{isParticleContact(...)} returns true, the target is recorded as a
-directed, source-owned contact:
-
-\begin{verbatim}
-self.GeoAddParticleContact(source_id, target_id)
-\end{verbatim}
-
-The directed entry \(source\rightarrow target\) means that the source will
-later plan and apply a response that writes only the source particle.  The
-reverse direction is recorded separately when the target particle becomes the
-source in the traversal.
-
-\subsection{Output}
-
-The output of this stage is each particle's current-frame contact list and
-reusable contact slots:
-
-\begin{verbatim}
-particle.collision_list
-particle.contactCount
-particle.contacts
-\end{verbatim}
-
-The contact list is frame-local and is rebuilt each frame.  Persistent contact
-history, such as internal momentum and phase, is target-keyed under the source
-particle and is not cleared by this stage.
-
-\subsection{GLSL Staging Rule}
-
-Later stages must consume the contact list produced here.  They should not
-repeat full particle-list contact discovery.  In the current cleanup,
-\texttt{GeoContactContext(SourceID)} now iterates
-\texttt{self.particles\[SourceID\].collision\_list}, which keeps planning aligned
-with the contact-detection stage.
-
-\section{\texttt{ShadowDynamics:GeoPlanContactImpulses}}
-
-\texttt{GeoPlanContactImpulses()} is the impulse-planning stage.  It consumes
-the current-frame contact lists built by contact detection and creates a
-frame-local plan of directed source-owned impulses.  This function does not
-write particle velocities, does not update contact ledgers, and does not move
-particles.  Its output is the plan that later resolution will apply.
-
-\subsection{Directed Candidate Map}
-
-The function starts with an empty dictionary:
-
-\begin{verbatim}
-directed_candidates = {}
-\end{verbatim}
-
-Each entry is keyed by:
-
-\begin{verbatim}
-(SourceID, TargetID)
-\end{verbatim}
-
-A directed candidate is one proposed response for a source particle writing
-only itself because it is contacting one target particle.  The reverse
-direction is a separate candidate.  For example, \(1\rightarrow2\) and
-\(2\rightarrow1\) are separate directed candidates because each source writes
-only its own velocity and ledgers.
-
-\subsection{Source Traversal}
-
-The planner traverses every particle as a possible source:
-
-\begin{verbatim}
-for SourceID, source in enumerate(self.particles):
-\end{verbatim}
-
-Particles with no current-frame contacts are skipped:
-
-\begin{verbatim}
-if not source.collision_list:
-    continue
-\end{verbatim}
-
-This is not contact detection.  The contact list has already been built by
-\texttt{GeoDetectContact()}.  This stage only plans responses for
-the contacts that are already active for the source.  Keeping this stage tied
-to \texttt{collision\_list} preserves the GLSL-shaped flow: detect contacts
-first, then plan only from the detected contacts.
-
-\subsection{Source-Level Context}
-
-For each active source, the planner computes:
-
-\begin{verbatim}
-total_overlap_area, available_source_momentum =
-    self.GeoContactContext(SourceID)
-\end{verbatim}
-
-\texttt{GeoContactContext(SourceID)} consumes the source's
-\texttt{collision\_list}.  It accumulates the source's total active overlap
-area and closing normal momentum available for compression.  These values are
-used to compute contact weights and to limit how much source compression
-capacity can be distributed across the source's active contacts.
-
-\subsection{Candidate Construction}
-
-For each target in the source contact list, the planner calls:
-
-\begin{verbatim}
-self.GeoCalculatePairContact(
-    SourceID,
-    TargetID,
-    total_overlap_area,
-    available_source_momentum,
-    self.GeoContactInternalMomentum(SourceID, TargetID),
-    self.GeoContactInternalPhase(SourceID, TargetID),
-)
-\end{verbatim}
-
-The candidate construction reads current contact geometry, frame-start
-relative normal velocity, contact weights, persistent source-target internal
-momentum, and persistent contact phase.  It returns a proposed compression
-impulse, release impulse, stored internal momentum, contact phase, raw impulse,
-and contact normal.  If the candidate is invalid or no longer has contact
-geometry, it returns \texttt{None} and the planner skips it.
-
-\subsection{Pair-Compatible Plan}
-
-After all directed candidates are collected, the planner reconciles opposite
-directions:
-
-\begin{verbatim}
-self.GeoPlannedContactImpulses =
-    self.GeoBuildPairCompatiblePlan(directed_candidates)
-\end{verbatim}
-
-The result is stored in \texttt{GeoPlannedContactImpulses}.  Later,
-\texttt{GeoProcessCollisions(SourceID)} consumes this plan to apply the actual
-source-owned velocity write and update contact ledgers/report fields.  Planning
-therefore decides what should be applied, while resolution decides how that
-planned scalar impulse becomes a vector velocity change for the source.
-
-\subsection{Current Limitation}
-
-The current planner computes candidates per directed contact and then makes
-them pair-compatible.  The remaining \texttt{ThreeParticle} issue shows that
-multi-contact storage/allocation also needs a source-level target: particle 1
-should not let two simultaneous contacts independently accumulate the full
-source compression history.  The next planning improvement is therefore to
-compute the source-level internal-momentum change once, then distribute that
-change across the active contacts by weight.
-
-\section{\texttt{ShadowDynamics:GeoContactContext}}
-
-\texttt{GeoContactContext(SourceID)} computes source-level contact context for
-one source particle from the current frame's detected contact list.  It is used
-by impulse planning to decide how a source's compression capacity should be
-shared across its active contacts.
-
-\subsection{Inputs and Output}
-
-The input is one source particle index:
-
-\begin{verbatim}
-SourceID
-\end{verbatim}
-
-The output is:
-
-\begin{verbatim}
-total_overlap_area, available_source_momentum
-\end{verbatim}
-
-\texttt{total\_overlap\_area} is the sum of positive overlap areas for the
-source's active contacts.  \texttt{available\_source\_momentum} is the sum of
-reduced-mass closing normal momentum for contacts that are currently closing.
-
-\subsection{Contact List Consumption}
-
-The function consumes the current-frame contact list:
-
-\begin{verbatim}
-for TargetID in self.particles[SourceID].collision_list:
-\end{verbatim}
-
-This is important for GLSL-shaped staging.  Contact detection has already
-decided which targets are active.  \texttt{GeoContactContext()} should not
-rediscover contacts by scanning the full particle array.
-
-\subsection{Geometry and Relative Normal Velocity}
-
-For each active target, the function recomputes frame-snapshot geometry:
-
-\begin{verbatim}
-contact = self.GeoParticleGeometry(SourceID, TargetID)
-\end{verbatim}
-
-If geometry is missing, the target is skipped.  Otherwise the returned normal
-and overlap area are used to compute:
-
-\begin{verbatim}
-relative_normal_velocity =
-    dot(target_velocity - source_velocity, contact_normal)
-\end{verbatim}
-
-The velocities are read through \texttt{GeoStartFrameVelocity()}, which reads
-the frame-start velocity snapshot when available.  A negative relative normal
-velocity means the source-target pair is closing.
-
-\subsection{Available Source Momentum}
-
-Closing contacts contribute:
-
-\begin{verbatim}
-reduced_mass * -relative_normal_velocity
-\end{verbatim}
-
-to \texttt{available\_source\_momentum}.  Separating contacts contribute no
-closing source momentum.  Planning later uses this value to limit compression
-and to compute weighted source capacity across simultaneous contacts.
-
-\subsection{Current Cleanup Direction}
-
-This function now consumes \texttt{collision\_list}, which fixes the immediate
-staging mismatch.  The longer-term GLSL-shaped cleanup is to store contact
-geometry during \texttt{GeoDetectContact()} and let this function read contact
-slots directly instead of recomputing geometry.
-
-\section{\texttt{ShadowDynamics:GeoParticleGeometry}}
-
-\texttt{GeoParticleGeometry(SourceID, TargetID)} returns the current
-frame-snapshot contact geometry for one directed source-target pair.  It is a
-geometry helper: it does not add contacts, plan impulses, update ledgers, or
-write velocities.
-
-\subsection{Frame-Snapshot Positions}
-
-The function reads positions through:
-
-\begin{verbatim}
-self.GeoCurrentLocation(SourceID)
-self.GeoCurrentLocation(TargetID)
-\end{verbatim}
-
-When a frame snapshot exists, \texttt{GeoCurrentLocation()} reads
-\texttt{PosLocFrame}.  This keeps geometry based on the same frame-start
-positions used by contact detection and planning.
-
-\subsection{Center Delta and Distance}
-
-The source-to-target displacement is:
-
-\begin{verbatim}
-dx = target_position.x - source_position.x
-dy = target_position.y - source_position.y
-dz = target_position.z - source_position.z
-\end{verbatim}
-
-The center distance is:
+Using frame-start source and target velocities, it calculates:
 
 \begin{equation}
-d = \sqrt{dx^2+dy^2+dz^2}.
-\end{equation}
-
-\subsection{Contact Test}
-
-The function reads radii from the particle data vector:
-
-\begin{verbatim}
-source_radius = self.particles[SourceID].Data.x
-target_radius = self.particles[TargetID].Data.x
-\end{verbatim}
-
-If:
-
-\begin{equation}
-d \geq r_s + r_t,
-\end{equation}
-
-there is no overlap and the function returns \texttt{None}.
-
-\subsection{Contact Normal}
-
-When the centers are separated, the contact normal is the normalized
-source-to-target direction:
-
-\begin{equation}
-\hat{n}_{s\rightarrow t}
+v_{\mathrm{rel},n}
 =
-\frac{(dx,dy,dz)}{d}.
+(\mathbf{v}_{t}-\mathbf{v}_{s})\cdot\mathbf{n}
 \end{equation}
 
-If the centers coincide, the normal defaults to \(+x\):
-
-\begin{verbatim}
-normal_x = 1.0
-normal_y = 0.0
-normal_z = 0.0
-\end{verbatim}
-
-This gives the response a deterministic direction for a degenerate geometry
-case.
-
-\subsection{Overlap Area}
-
-For an overlapping pair, the function computes:
-
-\begin{verbatim}
-overlap_area = self.particle_overlap_area(
-    source_radius,
-    target_radius,
-    center_distance,
-)
-\end{verbatim}
-
-This is the circular lens overlap area used by the current geometric impulse
-rule.
-
-\subsection{Return Value}
-
-When contact geometry exists, the function returns:
-
-\begin{verbatim}
-normal_x, normal_y, normal_z, overlap_area, center_distance
-\end{verbatim}
-
-Callers use the normal for relative normal velocity and vector impulse
-direction, the overlap area for weights/raw impulse, and the center distance
-for diagnostics.
-
-\section{\texttt{ShadowDynamics:GeoCalculatePairContact}}
-
-\texttt{GeoCalculatePairContact(...)} builds one proposed directed
-source-to-target contact response.  It is called during impulse planning after
-contact detection has already built the source's current-frame
-\texttt{collision\_list}.  The candidate is not applied directly; it is later
-reconciled with the opposite directed candidate by
-\texttt{GeoBuildPairCompatiblePlan()}.
-
-\subsection{Inputs}
-
-The function receives:
-
-\begin{verbatim}
-SourceID
-TargetID
-source_total_overlap_area
-available_source_momentum
-contact_internal_momentum
-contact_phase_start
-\end{verbatim}
-
-\texttt{SourceID} is the particle that will eventually write only itself.
-\texttt{TargetID} is the particle currently in directed contact with the
-source.  The source context values come from
-\texttt{GeoContactContext(SourceID)}.  The internal momentum and phase values
-are persistent source-target contact history.
-
-\subsection{Geometry and Relative Velocity}
-
-The function first recomputes the current contact geometry for the active
-source-target pair:
-
-\begin{verbatim}
-contact = self.GeoParticleGeometry(SourceID, TargetID)
-\end{verbatim}
-
-If the geometry is missing, or if the source has no positive total overlap
-area, the function returns \texttt{None}.  Otherwise it unpacks:
-
-\begin{verbatim}
-normal_x, normal_y, normal_z, overlap_area, center_distance
-\end{verbatim}
-
-The source and target velocities are read with
-\texttt{GeoStartFrameVelocity()}, so relative normal velocity is based on the
-frame-start velocity snapshot:
-
-\begin{verbatim}
-relative_normal_velocity =
-    dot(target_velocity - source_velocity, contact_normal)
-\end{verbatim}
-
-\subsection{Contact Weights}
-
-The source-side area weight is:
-
 \begin{equation}
-w_s = \frac{A_k}{A_s},
-\end{equation}
-
-where \(A_k\) is this contact's overlap area and \(A_s\) is the source's total
-active overlap area.  The target-side area weight is computed the same way from
-the target's contact context:
-
-\begin{equation}
-w_t = \frac{A_k}{A_t}.
-\end{equation}
-
-The weighted source and target available momentum shares are:
-
-\begin{verbatim}
-source_available_share = available_source_momentum * area_weight
-target_available_share = target_available_momentum * target_area_weight
-\end{verbatim}
-
-The compression limit for the directed candidate is the smaller compatible
-share:
-
-\begin{verbatim}
-weighted_available_momentum =
-    min(source_available_share, target_available_share)
-\end{verbatim}
-
-\texttt{target\_available\_share} is needed as a pair-compatibility cap.  The
-directed candidate \(SourceID\rightarrow TargetID\) should not claim more
-closing momentum than the opposite side of the same physical contact can
-compatibly supply.  This cap bounds one directed contact candidate.  It does
-not, by itself, solve source-level multi-contact storage allocation; that
-still requires computing the source-level internal-momentum change once and
-distributing it across the source's active contacts.
-
-\subsection{Raw Impulse}
-
-The raw geometric impulse comes from pair stiffness, overlap area, and the
-frame time step:
-
-\begin{verbatim}
-raw_impulse =
-    GeoPairStiffness(SourceID, TargetID) * overlap_area * dt
-\end{verbatim}
-
-This is the unconstrained overlap-area impulse before velocity progress,
-internal momentum phase, and available-momentum limits are applied.
-
-\subsection{Velocity Progress and Contact Ledger}
-
-The candidate then delegates compression/rebound choice to:
-
-\begin{verbatim}
-self.GeoVelocityProgressImpulse(...)
-\end{verbatim}
-
-That function returns:
-
-\begin{verbatim}
-compression_impulse
-release_impulse
-stored_internal_momentum
-contact_phase
-\end{verbatim}
-
-Compression is capped by \texttt{weighted\_available\_momentum}.  The stored
-internal momentum for this directed contact is then recomputed from the prior
-contact ledger plus compression minus release:
-
-\begin{equation}
-I^{new}_{s,t}
+p_{\mathrm{closing}}
 =
-\max(0, I^{old}_{s,t}+J_c-J_r).
+\mu\max(0,-v_{\mathrm{rel},n})
 \end{equation}
 
-\subsection{Return Dictionary}
+The relative normal velocity and closing momentum are stored in the contact
+slot.  The contact overlap area and closing momentum are also accumulated into
+the source totals.
 
-The returned dictionary contains the scalar candidate and the geometry needed
-by later planning:
+\ShadowFunctionSection{GetStartFrameVelocity}
+
+\texttt{GetStartFrameVelocity(ParticleID)} returns the immutable frame-start
+velocity.  It prefers \texttt{VelRadFrame}, preventing one source from observing
+another source's velocity write during the same frame.  It falls back to the
+particle's current velocity when no snapshot is available.
+
+\ShadowFunctionSection{GetReducedMass}
+
+\texttt{GetReducedMass(SourceID, TargetID)} returns the Newtonian reduced mass:
+
+\begin{equation}
+\mu = \frac{m_s m_t}{m_s + m_t}.
+\end{equation}
+
+Masses come from the GLSL-shaped \texttt{parms.x} particle field.  An epsilon
+floor prevents a zero denominator.
+
+\ShadowFunctionSection{CalculateContactWeights}
+
+\texttt{CalculateContactWeights(SourceID)} distributes the source's available
+momentum across its current contacts using source-owned overlap-area weights:
+
+\begin{equation}
+w_i = \frac{A_i}{\sum_j A_j}
+\end{equation}
+
+\begin{equation}
+p_{\mathrm{share},i} = p_{\mathrm{available},s} w_i.
+\end{equation}
+
+The source available share is stored on each contact.  This stage does not
+inspect target-owned contact state and does not apply an impulse.
+
+\ShadowFunctionSection{CalculateContactImpulses}
+
+\texttt{CalculateContactImpulses(SourceID)} plans compression or release for
+each source-owned contact without changing velocity or persistent ledgers.
+
+The geometric raw impulse is:
+
+\begin{equation}
+J_{\mathrm{raw}} = q_{\mathrm{pair}} A \Delta t.
+\end{equation}
+
+For a closing contact, compression is limited by the contact's weighted source
+momentum:
+
+\begin{equation}
+J_{\mathrm{compression}}
+=
+\min(J_{\mathrm{raw}},p_{\mathrm{weighted}}).
+\end{equation}
+
+For a non-closing contact, release is limited by stored contact internal
+momentum:
+
+\begin{equation}
+J_{\mathrm{release}}
+=
+\min(J_{\mathrm{raw}},p_{\mathrm{internal}}).
+\end{equation}
+
+\ShadowFunctionSection{GetPairStiffness}
+
+\texttt{GetPairStiffness(SourceID, TargetID)} returns the nonnegative mean of
+the source-owned and target-owned particle stiffness values:
+
+\begin{equation}
+q_{\mathrm{pair}} = \max\left(0,\frac{q_s+q_t}{2}\right).
+\end{equation}
+
+\ShadowFunctionSection{ApplySourceVelocityDelta}
+
+\texttt{ApplySourceVelocityDelta(SourceID)} converts each planned scalar
+contact impulse into a vector along the negative source-to-target normal:
+
+\begin{equation}
+\Delta\mathbf{p}_i
+=
+-(J_{\mathrm{compression},i}+J_{\mathrm{release},i})\mathbf{n}_i.
+\end{equation}
+
+All contact momentum deltas are summed before the source velocity is written:
+
+\begin{equation}
+\mathbf{v}'_s
+=
+\mathbf{v}_s+\frac{\sum_i\Delta\mathbf{p}_i}{m_s}.
+\end{equation}
+
+Only the source velocity is changed.  The function also records per-contact
+momentum deltas and source before/after diagnostics.
+
+\ShadowFunctionSection{GetParticleMass}
+
+\texttt{GetParticleMass(ParticleID)} reads particle mass from
+\texttt{parms.x}.  The returned value is bounded below by \texttt{EPSILON}.
+
+\ShadowFunctionSection{UpdateContactLedgers}
+
+\texttt{UpdateContactLedgers(SourceID)} commits planned compression and release
+to persistent source-owned contact ledgers:
+
+\begin{equation}
+p_{\mathrm{internal},i}'
+=
+\max(0,
+p_{\mathrm{internal},i}
++ J_{\mathrm{compression},i}
+- J_{\mathrm{release},i}).
+\end{equation}
+
+The function updates each contact's phase and current slot diagnostics, then
+rebuilds the source total internal momentum after all contact ledgers are
+committed.
+
+\ShadowFunctionSection{SetCollisionInternalMomentum}
+
+\texttt{SetCollisionInternalMomentum(SourceID, TargetID, internal\_momentum)}
+stores one source-owned contact internal-momentum value by target ID.  Values at
+or below \texttt{EPSILON} are removed from the ledger.
+
+\ShadowFunctionSection{SetCollisionPhase}
+
+\texttt{SetCollisionPhase(SourceID, TargetID, phase)} stores one persistent
+source-owned collision phase by target ID.  A drained compression contact is
+the default state and therefore requires no stored phase entry.
+
+\ShadowFunctionSection{SyncInternalMomentum}
+
+\texttt{SyncInternalMomentum(SourceID)} rebuilds the source's total internal
+momentum from all source-owned contact ledgers and stores the result on the
+particle.
+
+\ShadowFunctionSection{GetInternalMomentum}
+
+\texttt{GetInternalMomentum(SourceID)} returns the sum of all stored
+source-owned contact internal momentum.  The particle total is used only as a
+compatibility fallback when no contact-ledger dictionary exists.
+
+\ShadowFunctionSection{SetInternalMomentum}
+
+\texttt{SetInternalMomentum(SourceID, internal\_momentum)} stores the source
+total internal momentum in both the runtime \texttt{internal\_momentum} field
+and the GLSL-shaped \texttt{Data.z} field.
+
+\ShadowFunctionSection{Move}
+
+\texttt{Move(SourceID)} integrates one source particle into the inactive
+position buffer using its newly updated velocity:
+
+\begin{equation}
+\mathbf{x}' = \mathbf{x}+\mathbf{v}\Delta t.
+\end{equation}
+
+The function validates the particle ID and time step, updates active-buffer
+markers, and reports a lower-bound error when the resulting position leaves the
+allowed domain.  The frame-chain owner performs the final position-buffer swap.
+
+\ShadowFunctionSection{isValidParticleID}
+
+\texttt{isValidParticleID(ParticleID)} returns true when the ID is within the
+current particle array:
 
 \begin{verbatim}
-{
-    "candidate_impulse": compression_impulse + release_impulse,
-    "compression_impulse": compression_impulse,
-    "release_impulse": release_impulse,
-    "stored_internal_momentum": stored_internal_momentum,
-    "phase": contact_phase,
-    "raw_impulse": raw_impulse,
-    "normal_x": normal_x,
-    "normal_y": normal_y,
-    "normal_z": normal_z,
-}
+0 <= ParticleID < len(particles)
 \end{verbatim}
 
-\subsection{Current Limitation}
+\ShadowFunctionSection{SetError}
 
-This function still constructs a target for one directed contact at a time.
-The current \texttt{ThreeParticle} diagnosis shows that simultaneous
-multi-contact sources need a source-level storage/allocation rule before
-per-contact candidates are finalized.  In other words, the contact weights are
-available here, but the next improvement must make the source-level internal
-momentum change sum correctly across all active contacts.
-
-\section{\texttt{ShadowDynamics:GeoVelocityProgressImpulse}}
-
-\texttt{GeoVelocityProgressImpulse(...)} converts relative normal velocity
-progress into scalar contact impulses for one directed source-target contact.
-It is called during candidate construction.  It does not write particle
-velocity, does not move particles, and does not directly update the particle
-contact slot.  It returns planning values that are later reconciled and applied
-by contact resolution.
-
-\subsection{Inputs}
-
-The function receives:
-
-\begin{verbatim}
-SourceID
-TargetID
-relative_normal_velocity
-contact_internal_momentum
-contact_phase_start
-raw_impulse
-weighted_available_momentum
-\end{verbatim}
-
-\texttt{relative\_normal\_velocity} is positive when the contact is separating
-and negative when it is closing.  \texttt{contact\_internal\_momentum} and
-\texttt{contact\_phase\_start} are persistent source-target contact history.
-\texttt{raw\_impulse} is the geometric stiffness-area impulse, and
-\texttt{weighted\_available\_momentum} is the compatibility cap produced from
-source and target contact weights.
-
-\subsection{Velocity Reference}
-
-The function first computes:
-
-\begin{verbatim}
-closing_speed = max(0.0, -relative_normal_velocity)
-separating_speed = max(0.0, relative_normal_velocity)
-velocity_reference = GeoContactVelocityReference(SourceID, TargetID)
-\end{verbatim}
-
-If the contact has no stored velocity reference and the source is closing, the
-current closing speed becomes the reference.  That reference is the scale used
-to measure how far compression or rebound has progressed.
-
-\subsection{Compression to Rebound Flip}
-
-The contact remains in compression until the closing speed is near zero and
-there is stored internal momentum:
-
-\begin{verbatim}
-velocity_tolerance = velocity_reference * 0.01
-
-if phase == COMPRESSION
-   and closing_speed <= velocity_tolerance
-   and contact_internal_momentum > GEO_EPSILON:
-       phase = RETURNING
-       GeoSetContactReboundReference(...)
-\end{verbatim}
-
-The rebound reference captures the amount of internal momentum available at the
-start of return.  Once the contact is returning, release is driven from stored
-momentum rather than by continuing to compress.
-
-\subsection{Returning Branch}
-
-In the returning phase, compression is zero.  The function estimates release
-progress from the amount already released relative to the rebound reference:
-
-\begin{verbatim}
-released_momentum =
-    rebound_reference - contact_internal_momentum
-
-release_progress =
-    (released_momentum + release_seed) / rebound_reference
-\end{verbatim}
-
-That progress produces a target separating speed and target normal momentum:
-
-\begin{verbatim}
-target_separating_speed =
-    velocity_reference * release_progress
-
-target_normal_momentum =
-    reduced_mass * target_separating_speed
-\end{verbatim}
-
-The release impulse is the additional normal momentum needed to reach that
-target, clamped so it cannot release more than the contact currently stores.
-
-\subsection{Compression Branch}
-
-When the contact is still compressing, the function uses the raw impulse as a
-seed but clamps it to the weighted available momentum:
-
-\begin{verbatim}
-seed_impulse = min(raw_impulse, weighted_available_momentum)
-\end{verbatim}
-
-The seed impulse predicts the next closing speed.  That produces a velocity
-progress value between zero and one:
-
-\begin{verbatim}
-speed_for_progress =
-    closing_speed - seed_impulse / reduced_mass
-
-velocity_progress =
-    1.0 - min(speed_for_progress, velocity_reference)
-          / velocity_reference
-\end{verbatim}
-
-The compression impulse is then the normal momentum difference between the
-current closing speed and the target closing speed:
-
-\begin{verbatim}
-compression_impulse =
-    reduced_mass * closing_speed
-    - reduced_mass * target_closing_speed
-\end{verbatim}
-
-\subsection{Outputs}
-
-The function returns:
-
-\begin{verbatim}
-compression_impulse
-release_impulse
-stored_internal_momentum
-contact_phase
-\end{verbatim}
-
-These are still planning values.  \texttt{GeoCalculatePairContact(...)} may
-apply additional caps, \texttt{GeoBuildPairCompatiblePlan(...)} reconciles
-opposite directed candidates, and \texttt{GeoProcessCollisions(SourceID)}
-performs the source-owned velocity write.
+\texttt{SetError(error\_code)} provides the generic linear-dynamics name for
+setting the inherited shared collision error state.  It delegates to the
+existing frame-chain error mechanism and returns failure.

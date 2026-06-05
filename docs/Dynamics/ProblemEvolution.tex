@@ -1328,3 +1328,67 @@ The next dynamics step remains unchanged: implement the source-level
 multi-contact storage/allocation target in \texttt{ShadowDynamics.py}, then test
 whether particle 1 in \texttt{ThreeParticle} stores the weighted source-level
 amount instead of the sum of independent one-contact ledgers.
+
+\subsection{Readable Source-Complete Linear Shadow Dynamics}
+
+\noindent\textbf{Starting commit hash:} \texttt{46ac5bc}
+
+\subsubsection{Problem}
+
+The staged shadow implementation exposed the right physical questions, but its
+control flow remained difficult to follow and did not resemble a future
+per-source GLSL invocation closely enough.  Important source-level operations
+were distributed across frame stages, and helper functions sometimes hid their
+own contact-list loops.  That made it difficult to determine exactly when one
+source had complete contact information and when its velocity and persistent
+ledgers were written.
+
+\subsubsection{Fix}
+
+A selectable linear experiment was added:
+
+\begin{verbatim}
+ShadowLinBase
+ShadowLinDynamics
+\end{verbatim}
+
+\texttt{ParticleUtil.cfg} selects live and shadow bases through an approved
+registry, allowing the linear experiment to run independently beside another
+implementation.  \texttt{ShadowLinBase} performs naive source-target contact
+detection, stores only target IDs in the source collision list, calls
+\texttt{ContactDynamics} after each source scan, and moves particles in a
+separate pass.
+
+\texttt{ShadowLinDynamics.ContactDynamics} now exposes the complete source
+algorithm directly:
+
+\begin{verbatim}
+BeginSourceContactParms
+for each TargetID:
+    InitializeContactState
+    CalculateContactParms
+CalculateContactWeights
+CalculateContactImpulses
+ApplySourceVelocityDelta
+UpdateContactLedgers
+\end{verbatim}
+
+The linear implementation was filled one generic function at a time.  It reads
+frame-start target state, calculates reduced-mass closing momentum, shares the
+source available momentum by source overlap-area weight, plans compression or
+release impulses, vector-sums those impulses into one source velocity write,
+and then updates source-owned contact ledgers.
+
+\subsubsection{Current Result}
+
+The linear path now performs a complete two-particle compression and rebound
+cycle in the smoke test.  More importantly, a human reader can follow the
+source's complete dynamics sequence from one top-level function.  The source
+flow has native TikZ documentation whose function boxes link to stable labeled
+sections in \texttt{SourceDocumentation.tex}.
+
+This checkpoint establishes an implementation structure, not final validation
+of the collision model.  The next dynamics test is the existing batch suite,
+especially \texttt{ThreeParticle} and \texttt{ThreeParticleChase}, to determine
+whether the source-only weighting and source-net impulse application preserve
+the desired momentum and kinetic-energy behavior for simultaneous contacts.

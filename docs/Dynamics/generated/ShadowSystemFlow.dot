@@ -1,0 +1,125 @@
+digraph ShadowSystemFlow {
+  graph [
+    rankdir=TB,
+    compound=true,
+    bgcolor="white",
+    fontname="Consolas",
+    fontsize=11
+  ];
+  node [
+    fontname="Consolas",
+    fontsize=10,
+    style="rounded,filled",
+    color="#606060"
+  ];
+  edge [
+    fontname="Consolas",
+    fontsize=9,
+    color="#505050"
+  ];
+
+  subgraph cluster_frame_setup {
+    label="Frame Setup";
+    color="#c8c8c8";
+    style="rounded";
+    Start [label="Start Frame", shape=oval, fillcolor="#eaf8ea", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:69:1", tooltip="Open documentation for Start Frame", target="_blank"];
+    BeginFrame [label="Begin Frame", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:77:1", tooltip="Open documentation for Begin Frame", target="_blank"];
+    ResetFrame [label="Reset Frame State", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:91:1", tooltip="Open documentation for Reset Frame State", target="_blank"];
+    BuildSnapshot [label="Build Frame Snapshot", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:188:1", tooltip="Open documentation for Build Frame Snapshot", target="_blank"];
+    FrameSnapshotData [label="PosLocFrame / VelRadFrame", shape=cylinder, fillcolor="#eaf3ff", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ParticleGeometry.tex:299:1", tooltip="Open documentation for PosLocFrame / VelRadFrame", target="_blank"];
+  }
+  subgraph cluster_contact_detection {
+    label="Contact Detection";
+    color="#c8c8c8";
+    style="rounded";
+    SourceLoop [label="For each SourceID", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ProgrammingStyle.tex:68:1", tooltip="Open documentation for For each SourceID", target="_blank"];
+    SourceActive [label="Source active?", shape=diamond, fillcolor="#fff6d8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:249:1", tooltip="Open documentation for Source active?", target="_blank"];
+    TargetLoop [label="For each TargetID", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:255:1", tooltip="Open documentation for For each TargetID", target="_blank"];
+    TargetValid [label="Target valid and not source?", shape=diamond, fillcolor="#fff6d8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:255:1", tooltip="Open documentation for Target valid and not source?", target="_blank"];
+    DetectContact [label="Detect particle contact", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:249:1", tooltip="Open documentation for Detect particle contact", target="_blank"];
+    ContactDecision [label="In contact?", shape=diamond, fillcolor="#fff6d8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ParticleGeometry.tex:56:1", tooltip="Open documentation for In contact?", target="_blank"];
+    OverlapArea [label="Compute overlap area", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ParticleGeometry.tex:93:1", tooltip="Open documentation for Compute overlap area", target="_blank"];
+    AddContact [label="Add directed contact slot", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:277:1", tooltip="Open documentation for Add directed contact slot", target="_blank"];
+    ContactListData [label="collision_list / contact slots", shape=cylinder, fillcolor="#eaf3ff", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:291:1", tooltip="Open documentation for collision_list / contact slots", target="_blank"];
+  }
+  subgraph cluster_planning {
+    label="Impulse Planning";
+    color="#c8c8c8";
+    style="rounded";
+    HasContacts [label="Source has contacts?", shape=diamond, fillcolor="#fff6d8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:314:1", tooltip="Open documentation for Source has contacts?", target="_blank"];
+    ContactContext [label="Build source contact context", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:426:1", tooltip="Open documentation for Build source contact context", target="_blank"];
+    ContactLoop [label="For each contact slot", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:378:1", tooltip="Open documentation for For each contact slot", target="_blank"];
+    GeometryValid [label="Geometry valid?", shape=diamond, fillcolor="#fff6d8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:502:1", tooltip="Open documentation for Geometry valid?", target="_blank"];
+    CalcGeometry [label="Calculate contact geometry", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:502:1", tooltip="Open documentation for Calculate contact geometry", target="_blank"];
+    CalcWeights [label="Calculate source/target weights", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:657:1", tooltip="Open documentation for Calculate source/target weights", target="_blank"];
+    CalcRelVelocity [label="Calculate relative normal velocity", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ParticleGeometry.tex:132:1", tooltip="Open documentation for Calculate relative normal velocity", target="_blank"];
+    CalcRawImpulse [label="Calculate raw impulse", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:696:1", tooltip="Open documentation for Calculate raw impulse", target="_blank"];
+    PhaseDecision [label="Compression or returning?", shape=diamond, fillcolor="#fff6d8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:808:1", tooltip="Open documentation for Compression or returning?", target="_blank"];
+    Compression [label="Compute compression impulse", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:853:1", tooltip="Open documentation for Compute compression impulse", target="_blank"];
+    Returning [label="Compute release impulse", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:827:1", tooltip="Open documentation for Compute release impulse", target="_blank"];
+    BuildCandidate [label="Store directed candidate", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:736:1", tooltip="Open documentation for Store directed candidate", target="_blank"];
+    PairPlan [label="Build pair-compatible plan", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:400:1", tooltip="Open documentation for Build pair-compatible plan", target="_blank"];
+    PlanData [label="GeoPlannedContactImpulses", shape=cylinder, fillcolor="#eaf3ff", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:400:1", tooltip="Open documentation for GeoPlannedContactImpulses", target="_blank"];
+  }
+  subgraph cluster_resolution {
+    label="Source-Owned Resolution";
+    color="#c8c8c8";
+    style="rounded";
+    ResolveContacts [label="Resolve contacts for source", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:156:1", tooltip="Open documentation for Resolve contacts for source", target="_blank"];
+    ReadPlan [label="Read planned impulses", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:156:1", tooltip="Open documentation for Read planned impulses", target="_blank"];
+    VectorDelta [label="Scalar impulse -> vector delta", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ParticleGeometry.tex:168:1", tooltip="Open documentation for Scalar impulse -> vector delta", target="_blank"];
+    WriteSource [label="Write source velocity only", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/GeoConventions.tex:261:1", tooltip="Open documentation for Write source velocity only", target="_blank"];
+    UpdateLedgers [label="Update source-owned ledgers", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/GeoConventions.tex:129:1", tooltip="Open documentation for Update source-owned ledgers", target="_blank"];
+  }
+  subgraph cluster_motion {
+    label="Motion";
+    color="#c8c8c8";
+    style="rounded";
+    MoveParticle [label="Move source particle", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:172:1", tooltip="Open documentation for Move source particle", target="_blank"];
+    EndFrame [label="End Frame", shape=oval, fillcolor="#eaf8ea", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/SourceDocumentation.tex:172:1", tooltip="Open documentation for End Frame", target="_blank"];
+  }
+
+    Start -> BeginFrame;
+    BeginFrame -> ResetFrame;
+    ResetFrame -> BuildSnapshot;
+    BuildSnapshot -> FrameSnapshotData [label="write"];
+    FrameSnapshotData -> SourceLoop [label="snapshot ready"];
+    SourceLoop -> SourceActive;
+    SourceActive -> TargetLoop [label="yes"];
+    SourceActive -> MoveParticle [label="no"];
+    TargetLoop -> TargetValid;
+    TargetValid -> DetectContact [label="yes"];
+    TargetValid -> TargetLoop [label="no / next target"];
+    DetectContact -> ContactDecision;
+    ContactDecision -> OverlapArea [label="yes"];
+    ContactDecision -> TargetLoop [label="no / next target"];
+    OverlapArea -> AddContact;
+    AddContact -> ContactListData [label="write"];
+    ContactListData -> TargetLoop [label="next target"];
+    TargetLoop -> HasContacts [label="target scan done"];
+    HasContacts -> MoveParticle [label="no"];
+    HasContacts -> ContactContext [label="yes"];
+    ContactContext -> ContactLoop;
+    ContactLoop -> CalcGeometry;
+    CalcGeometry -> GeometryValid;
+    GeometryValid -> ContactLoop [label="no / next contact"];
+    GeometryValid -> CalcWeights [label="yes"];
+    CalcWeights -> CalcRelVelocity;
+    CalcRelVelocity -> CalcRawImpulse;
+    CalcRawImpulse -> PhaseDecision;
+    PhaseDecision -> Compression [label="compression"];
+    PhaseDecision -> Returning [label="returning"];
+    Compression -> BuildCandidate;
+    Returning -> BuildCandidate;
+    BuildCandidate -> ContactLoop [label="next contact"];
+    ContactLoop -> PairPlan [label="contact scan done"];
+    PairPlan -> PlanData [label="write"];
+    PlanData -> ResolveContacts;
+    ResolveContacts -> ReadPlan;
+    ReadPlan -> VectorDelta;
+    VectorDelta -> WriteSource;
+    WriteSource -> UpdateLedgers;
+    UpdateLedgers -> MoveParticle;
+    MoveParticle -> SourceLoop [label="next source"];
+    SourceLoop -> EndFrame [label="all sources done"];
+}
