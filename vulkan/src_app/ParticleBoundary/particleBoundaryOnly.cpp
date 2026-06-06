@@ -81,8 +81,8 @@ int ParticleBoundaryOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtF
 	CommandPoolObj* commandPool = new CommandPoolObj(vulkanObj, "CmdPool");
 	CommandObj* commandParticleCompute
 		= new  CommandParticleCompute(vulkanObj, "CommandParticleCompute");
-	CommandParticleBoundaryAndSpheres* commandParticleGraphicsSub
-		= new  CommandParticleBoundaryAndSpheres(vulkanObj, "CommandObjParticleGraphics");
+	CommandParticleBoundaryOnly* commandParticleGraphicsSub
+		= new  CommandParticleBoundaryOnly(vulkanObj, "CommandObjParticleGraphics");
 	PipelineGraphicsBoundary* pipelineGraphicsBoundary
 		= new PipelineGraphicsBoundary(vulkanObj, "Graphics Pipeline Boundary");
 	PipelineGraphicsParticleOnly* pipelineGraphicsParticle

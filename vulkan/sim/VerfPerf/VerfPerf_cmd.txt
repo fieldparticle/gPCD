@@ -1,0 +1,1 @@
+studyFile C:\_DJ\gPCD\vulkan\sim\VerfPerf\VerfPerf.cfg

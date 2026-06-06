@@ -1,13 +1,6 @@
-refactor(dynamics): make weighted dynamics the permanent runtime
+Modify Vulkan code to produce density diagrams
 
-- replace GeoRunner with SimulationRunner
-- consolidate frame lifecycle and contact response under WeightedDynamics
-- remove Geo, Shadow, and linear-shadow runtime implementations and wrappers
-- remove obsolete Geo exporter and legacy flowchart generators
-- replace Geo and Neo prefixed constants with generic error, contact, and phase names
-- read runner contact diagnostics directly from active contact ledgers
-- configure live and comparison runs to use independent WeightedDynamics objects
-- regenerate weighted source flowcharts and update dynamics documentation
-- verify TwoParticleHorizontal and ThreeParticle captures and UI execution
+- Created a Denity gen dat in Python
+- added particle colors, collsion colors, background color and point size.
 
 Next: diagnose the remaining ThreeParticle kinetic-energy drift

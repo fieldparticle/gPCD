@@ -92,7 +92,20 @@ class GenDataBase:
     def do_cells(self):
         pass
     def clear_files(self):
-        self.clear_files(self.itemcfg)
+        clr_path = self.itemcfg.data_dir + "/*.csv"
+        files = glob.glob(clr_path)
+        for f in files:
+            os.remove(f)
+
+        clr_path = self.itemcfg.data_dir + "/*.bin"
+        files = glob.glob(clr_path)
+        for f in files:
+            os.remove(f)
+        
+        clr_path = self.itemcfg.data_dir + "/*.tst"
+        files = glob.glob(clr_path)
+        for f in files:
+            os.remove(f)
     ##############################################################################
     # Partice calcualtions
     # 
@@ -184,6 +197,16 @@ class GenDataBase:
         except BaseException as e:
             self.log.log(self,e)
 
+    def count_partices(self,file_name):
+        count = 0
+        with open(file_name, "rb") as f:
+            while True:
+                data = f.read(28)  # Assuming each particle is 28 bytes
+                if not data:
+                    break
+                count += 1
+        return count
+
     #******************************************************************
     # Close the binary prticle file after its filled
     # cell
@@ -267,7 +290,7 @@ class GenDataBase:
         f.write(fstr)
         fstr = f"pdensity = 0;\n"
         f.write(fstr)
-        fstr = f"dispatchx = {self.select_list[self.index]['dx']};\n"
+        fstr = f"dispatchx = {self.number_particles+1};\n"
         f.write(fstr)
         fstr = f"dispatchy = {self.select_list[self.index]['dy']};\n"
         f.write(fstr)

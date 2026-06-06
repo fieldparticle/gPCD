@@ -86,7 +86,7 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
         glm::radians(rRotX),
         glm::vec3(1.0f, 0.0f, 0.0f)
     );
-
+    
     m_UBO.model = glm::translate(m_UBO.model, -center);
 
     // ============================================================
@@ -169,6 +169,7 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
         s * 10.0f
     );
 
+    //mout << "rRotZ:" << rRotZ << "," << "rRotY:" << rRotY << "," << "rRotX:" << rRotX << "," "zoom:" << ZoomX << ende;
     // Vulkan clip-space correction
     m_UBO.proj[1][1] *= -1.0f;
 

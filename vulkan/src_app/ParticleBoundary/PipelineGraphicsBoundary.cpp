@@ -101,7 +101,7 @@ void PipelineGraphicsBoundary::CreatePipeline()
        {   
            inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
            inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-           inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+           //inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
            inputAssembly.primitiveRestartEnable = VK_FALSE;
        }
 

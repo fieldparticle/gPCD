@@ -80,6 +80,11 @@ void SetCallBacks(VulkanObj* VO)
 	glfwSetKeyCallback(VO->GetGLFWWindow(), key_callback);
 	glfwSetMouseButtonCallback(VO->GetGLFWWindow(), onMouseButton);
 	QuitEvent = false;
+	rRotZ = CfgApp->GetFloat("application.initial_view.rRotZ", true);
+	rRotY = CfgApp->GetFloat("application.initial_view.rRotY", true);
+	rRotX = CfgApp->GetFloat("application.initial_view.rRotX", true);
+	ZoomX = CfgApp->GetFloat("application.initial_view.zoom", true);
+	
 }
 void onMouseButton(GLFWwindow* window, int button, int action, int mods)
 {

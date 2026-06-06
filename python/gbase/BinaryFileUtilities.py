@@ -47,6 +47,27 @@ def clear_files(itemcfg,FileName=None):
 # Reead all of the particle data
 # 
 #
+def count_all_particle_data(file_name):
+    struct_fmt = 'dddddddddddddd'
+    struct_len = struct.calcsize(struct_fmt)
+    #print(struct_len)
+    struct_unpack = struct.Struct(struct_fmt).unpack_from
+    count = 0
+    results = []
+    with open(file_name, "rb") as f:
+        while True:
+            record = pdata()
+            ret = f.readinto(record)
+            count += 1
+            if ret == 0:
+                break
+            
+    p_lst = []
+    return count
+#******************************************************************
+# Reead all of the particle data
+# 
+#
 def read_all_particle_data(file_name):
     struct_fmt = 'dddddddddddddd'
     struct_len = struct.calcsize(struct_fmt)

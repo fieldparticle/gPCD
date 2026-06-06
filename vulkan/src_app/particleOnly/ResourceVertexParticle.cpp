@@ -97,7 +97,10 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 	}
 	
 	uint32_t count = 0;
-	
+	std::string pipe_reservoir_entry = CfgTst->GetString("flow_type", false);
+	bool flow_modeling = false;
+	if (pipe_reservoir_entry.compare("pipe_reservoir_entry") == 0)
+		flow_modeling = true;
 	while (input_file.peek() != EOF)
 	{
 		input_file.read((char*)&part_pos, sizeof(part_pos));
@@ -106,8 +109,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 
 		// Check to see if this flow type is resevior before checkig the lower bounds
 		// since position is <-99,-99,-99> or  <-99,-99,1.0> in 2D
-		std::string pipe_reservoir_entry = CfgTst->GetString("flow_type", false);
-		if (pipe_reservoir_entry.compare("pipe_reservoir_entry") != 0)
+		if (flow_modeling == true)
 		{
 			if (part_pos.rx < 0.5 || part_pos.ry < 0.5 || part_pos.rz < 0.5)
 			{
@@ -150,6 +152,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		}
 	}
 	
+	mout << "========================= Read " << m_NumParticles << " From Binary =====================" << ende;
 	uint32_t sidelen = CfgTst->GetUInt("CellAryL", true);
 	m_SideLength = static_cast<float>(sidelen);
 	/*

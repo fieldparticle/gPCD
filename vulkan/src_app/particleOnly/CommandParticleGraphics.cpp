@@ -84,9 +84,13 @@ void CommandParticleGraphics::RecordCommands( uint32_t imageIndex, uint32_t curr
 	renderPassInfo.renderArea.extent = m_SCO->GetSwapExtent();
 
 	
-	VkClearValue clearValues{};
-	clearValues.color = { {0.0f, 0.0f, 0.0f, 1.0f} };
-	VkClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
+	//VkClearValue clearValues{};
+	//clearValues.color = { {1.0f, 1.0f, 1.0f, 1.0f} };
+	float clr_red = CfgApp->GetFloat("application.clear_color.red", true);
+	float clr_green = CfgApp->GetFloat("application.clear_color.red", true);
+	float clr_blue = CfgApp->GetFloat("application.clear_color.red", true);
+	float clr_alpha = CfgApp->GetFloat("application.clear_color.red", true);
+	VkClearValue clearColor = { {{clr_red, clr_green, clr_blue, clr_alpha}} };
 	renderPassInfo.clearValueCount = 1;
 	renderPassInfo.pClearValues = &clearColor;
 	if (trace_on_flag == true)

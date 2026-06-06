@@ -1,0 +1,29 @@
+\begingroup
+\begin{figure*}[ht]
+\centering
+\setlength{\fboxrule}{1pt}
+\setlength{\fboxsep}{0pt}
+\hspace{-0.1in}
+	\begin{subfigure}[b]{0.3\textwidth}
+		\fbox{\includegraphics[width=\textwidth]{p5832.pdf}}
+		\subcaption[]{Corner Duplicates}
+		\label{fig:CellSpansA}
+	\end{subfigure}
+\hspace{-0.1in}
+	\begin{subfigure}[b]{0.3\textwidth}
+		\fbox{\includegraphics[width=\textwidth]{p19638.pdf}}
+		\subcaption[]{Collision Duplicates}
+		\label{fig:CellSpansB}
+	\end{subfigure}
+\hspace{0.1in}
+\caption[TITLE:Cell Spans]{Two-dimensional illustration of occupancy and collision duplication
+arising from corner-based occupancy construction. (a) Multiple corners
+may map to the same cell, resulting in duplicate occupancy
+contributions. (b) A single collision may be represented within
+multiple neighboring cells when interacting particles span a cell
+boundary. The three-dimensional implementation follows identically
+using the eight corners of the particle AABB.}
+
+\label{fig:CellSpans}
+\end{figure*}
+\endgroup

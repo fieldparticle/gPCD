@@ -1,2 +1,0 @@
-studyFile C:\_DJ\gPCD\vulkan\sim\SimpleBoundary\SimpleBoundary.cfg
-studyFile C:\_DJ\gPCD\vulkan\sim\VerfPerf\VerfPerf.cfg

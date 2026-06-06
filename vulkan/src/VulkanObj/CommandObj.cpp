@@ -56,8 +56,11 @@ void CommandObj::Create(SwapChainObj* SCO,
 void CommandObj::Cleanup()
 {
     mout << "Deleteing Query Pool:" << m_Name << " QueryPool:" << ende;
-    if(m_PerfQueryPool != VK_NULL_HANDLE)
+    if (m_PerfQueryPool != VK_NULL_HANDLE)
+    {
         vkDestroyQueryPool(m_App->GetLogicalDevice(), m_PerfQueryPool, VK_NULL_HANDLE);
+        m_PerfQueryPool = VK_NULL_HANDLE;
+    }
 
     vkFreeCommandBuffers(m_App->GetLogicalDevice(),
         m_CPL->m_CommandPool, 1, m_CommandBuffers.data());

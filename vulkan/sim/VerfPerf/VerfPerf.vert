@@ -91,7 +91,7 @@ void main(){
 
 	
 	// Set point size 
-	gl_PointSize = 1.0;
+	gl_PointSize = point_size;
 	
 	// Apply view to location
 	//gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
@@ -235,9 +235,9 @@ void main(){
 	}
 	
 	if(uint(P[index].colFlg) == 1)
-		fragColor = vec3(1.0,0.0,0.0);	
+		fragColor = ncolcolor;	
 	else if(uint(P[index].colFlg) == 0)
-		fragColor = vec3(0.0,1.0,0.0);	
+		fragColor = colcolor;	
 	
 	
 }

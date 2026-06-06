@@ -1,8 +1,6 @@
 % !TeX root = main.tex
 \section{Discussion}
 
-\section{Discussion}
-
 \subsection{Graphics-Pipeline Occupancy Generation}
 
 Traditional collision-detection frameworks treat rendering as a
@@ -19,6 +17,14 @@ graphics-pipeline operations contribute directly to broad-phase
 collision detection. The resulting architecture enables occupancy
 generation to be performed using hardware resources that would
 otherwise be dedicated exclusively to rendering.
+
+An additional benefit of the gPCD organization is that synchronization
+is largely confined to the occupancy-generation stage. Atomic
+operations are required only when reserving slots within shared cell
+lists. Subsequent collision discovery is particle-centric and proceeds
+without the construction of a global collision-pair structure, allowing
+the narrow phase to map naturally onto massively parallel GPU
+architectures.
 
 \subsection{Scalability of the gPCD Framework}
 
@@ -56,6 +62,8 @@ memory locality appears to affect implementation efficiency rather than
 the asymptotic behavior of the framework itself.
 
 \subsection{Implications for Large-Scale Particle Simulation}
+
+\input{DensityStudies}
 
 Figure~\ref{fig:density_progression} illustrates representative
 particle densities spanning several orders of magnitude in particle

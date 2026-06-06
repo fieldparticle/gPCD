@@ -125,7 +125,7 @@ class PlotParticles():
     # plot the cells
     #                
     def plot_cells(self,cx,cy,cz):
-        R = 0.5
+        R=0.5
         pt_lst = np.zeros((8,3))
         pt_lst[0]= [cx-R,cy-R,cz-R]
         pt_lst[1]= [cx+R,cy-R,cz-R]

@@ -120,7 +120,14 @@ int main(int argc, const char* argv[]) try
 				return 1;
 			}
 		}
-		
+		else if (has_boundary == true && has_spheres == false)
+		{
+			if (ParticleBoundaryOnly(pf, nullptr, nullptr, false))
+			{
+				return 1;
+			}
+
+		}
 		else if (has_boundary == true)
 		{
 

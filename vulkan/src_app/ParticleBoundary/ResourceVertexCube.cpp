@@ -121,11 +121,11 @@ void ResourceVertexCube::MakeAxes(uint32_t sidelen)
 
 	if (basw == false)
 	{
-		minCorner = glm::vec3(0.0f, 0.0f, 0.0f);
+		minCorner = glm::vec3(0.5f, 0.5f, 0.5f);
 
-		float side = static_cast<float>(sidelen) - 1.0f;
+		float side = static_cast<float>(sidelen);
 
-		maxCorner = glm::vec3(side, side, side);
+		maxCorner = glm::vec3(side-0.5, side-0.5, side-0.5);
 	}
 	else
 	{
@@ -149,7 +149,27 @@ void ResourceVertexCube::MakeAxes(uint32_t sidelen)
 	float xmax = maxCorner.x;
 	float ymax = maxCorner.y;
 	float zmax = maxCorner.z;
+	m_CubeIndices =
+	{
+		// back face zmin
+		0, 1,
+		1, 2,
+		2, 3,
+		3, 0,
 
+		// front face zmax
+		4, 5,
+		5, 6,
+		6, 7,
+		7, 4,
+
+		// connecting edges
+		0, 4,
+		1, 5,
+		2, 6,
+		3, 7
+	};
+#if 0
 	m_CubeIndices =
 	{
 		0, 2, 1,  2, 0, 3,   // back
@@ -161,7 +181,7 @@ void ResourceVertexCube::MakeAxes(uint32_t sidelen)
 		0, 1, 5,  5, 4, 0,   // bottom
 		3, 7, 6,  6, 2, 3    // top
 	};
-
+#endif
 	glm::vec4 color(1.0f, 1.0f, 1.0f, 1.0f);
 
 	m_Axes.push_back({ { xmin, ymin, zmin, 1.0f }, color });

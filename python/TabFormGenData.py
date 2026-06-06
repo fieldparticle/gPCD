@@ -72,7 +72,9 @@ class TabGenData(QTabWidget):
         msgBox = QMessageBox()
         msgBox.setText(text)
         msgBox.exec()
-        
+    
+
+
     ##############################################################################
     # Configuration file stuff
     # 
@@ -112,14 +114,15 @@ class TabGenData(QTabWidget):
             self.log.log(self,f"Unable to open item configurations file:{e}")
             self.hasConfig = False
             return 
-        self.study_mode = False
-        self.batch_mode = False
-        if self.itemcfg.type == "batch":
-            self.batch_mode = True
-            return
-        if self.itemcfg.study == True:
-            self.study_mode = True
-            return
+        if self.itemcfg.type != "verfperf":
+            self.study_mode = False
+            self.batch_mode = False
+            if self.itemcfg.type == "batch":
+                self.batch_mode = True
+                return
+            if self.itemcfg.study == True:
+                self.study_mode = True
+                return
         try:
             notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
             subprocess.Popen([notepad_plus_plus_path, self.CfgFile])
@@ -133,7 +136,7 @@ class TabGenData(QTabWidget):
         except BaseException as e:
             self.log.log(self,f"Unable to import data generation file: error:{e}")
             return 
-
+        self.update_data_list_widget()
         self.plot_obj.create(self.itemcfg,self)
         
         # Enable to generate data
@@ -183,10 +186,12 @@ class TabGenData(QTabWidget):
          # Pass the function to execute
         self.refresh()
         index = 0
+        os.system('cls' if os.name == 'nt' else 'clear')
         self.current_test_file = 0
         self.gen_class.openSelectionsFile()
         self.gen_class.clear_files()
         self.gen_class.do_all_files_dbg()
+        self.update_data_list_widget()
     
     def refresh_dir(self,cfg_file):
         pass
@@ -205,7 +210,13 @@ class TabGenData(QTabWidget):
         files = glob.glob(files_names)
         for ii in files:
                 self.ListObj.addItem(ii)
-        
+
+    def update_data_list_widget(self):    
+        self.DataList.clear()
+        files_names = self.itemcfg.data_dir + "/*.bin"
+        files = glob.glob(files_names)
+        for ii in files:
+                self.DataList.addItem(ii)
         
     def print_output(self, s):
         print(s)
@@ -314,7 +325,7 @@ class TabGenData(QTabWidget):
     #
     def plot_particles(self):
         
-        selected_item = self.ListObj.selectedItems()
+        selected_item = self.DataList.selectedItems()
         if selected_item ==self.selected_item:
             self.plot_obj.close_plot()
         else:
@@ -323,10 +334,10 @@ class TabGenData(QTabWidget):
         if self.selected_item:
             try:
                 plot_particle_list = self.itemcfg.particle_range
-                path_name = self.selected_item[0].text()
-                file_name = os.path.basename(path_name) 
-                tst_prefix = os.path.splitext(file_name)[0]
-                tst_file = self.itemcfg.data_dir + '/' + tst_prefix + '.bin'
+                tst_file = self.selected_item[0].text()
+                #file_name = os.path.basename(path_name) 
+                #tst_prefix = os.path.splitext(file_name)[0]
+                #tst_file = self.itemcfg.data_dir + '/' + tst_prefix + '.bin'
 
                 self.particle_data = read_particle_data(tst_file, plot_particle_list)
             except BaseException as e:
@@ -382,7 +393,7 @@ class TabGenData(QTabWidget):
             ## -------------------------------------------------------------
             ## Set parent directory
             LatexcfgFile = QGroupBox("Generate/Test Particle Data")
-            self.setSize(LatexcfgFile,650,700)
+            self.setSize(LatexcfgFile,650,1000)
             self.tab_layout.addWidget(LatexcfgFile,0,0,4,2,alignment= Qt.AlignmentFlag.AlignLeft)
             
             dirgrid = QGridLayout()
@@ -472,13 +483,19 @@ class TabGenData(QTabWidget):
 
             list_label = QLabel("Data Set")
             dirgrid.addWidget(list_label,4,0,1,2)
-
+            ### COnfig Files List
             self.ListObj =  QListWidget()
             self.ListObj.setStyleSheet("background-color:  #FFFFFF")
-            self.setSize(self.ListObj,350,550)
+            self.setSize(self.ListObj,350,450)
             dirgrid.addWidget(self.ListObj,5,0,2,2)
-
             self.ListObj.itemSelectionChanged.connect(lambda: self.valueChange(self.ListObj))   
+            ### Data Files List
+            self.DataList =  QListWidget()
+            self.DataList.setStyleSheet("background-color:  #FFFFFF")
+            self.setSize(self.DataList,350,450)
+            dirgrid.addWidget(self.DataList,5,3,2,2)
+            self.DataList.itemSelectionChanged.connect(lambda: self.DataFileChange(self.DataList))   
+
 
             view_label = QLabel("Views")
             dirgrid.addWidget(view_label,7,0,1,2)
@@ -502,7 +519,7 @@ class TabGenData(QTabWidget):
         self.bobj.connect_to_output(self.terminal)
         self.plot_obj = PlotParticles()
         # update the list
-        self.update_list_widget()
+        
         for ii in self.plot_obj.views:
             self.ViewList.addItem(str(ii))
         self.log.log(self,"TabFormLatex finished Create.")        
@@ -510,6 +527,8 @@ class TabGenData(QTabWidget):
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
         self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
+        self.update_list_widget()
+        self.update_data_list_widget()
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontalStiffness.cfg")
     def valueChange(self,listObj):  
         selected_items = listObj.selectedItems()
@@ -518,3 +537,8 @@ class TabGenData(QTabWidget):
         self.refresh_dir(Text)   
         self.load_item_cfg(Text)
     
+    def DataFileChange(self,dataList):
+        selected_items = dataList.selectedItems()
+        self.DataFileText = selected_items[0].text() if selected_items else ""
+        print(f"Selected data file:{self.DataFileText}")   
+        

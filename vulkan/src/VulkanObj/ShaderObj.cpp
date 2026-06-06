@@ -39,7 +39,9 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 
 		WriteShaderHeader();
 		WriteShaderDbgHeader();
-		WriteWalls();
+		bool walls_on = CfgApp->GetBool("application.walls_on", true);
+		if (walls_on == true)
+			WriteWalls();
 		Reservoir();
 		GenWorkGroups();
 }
@@ -194,6 +196,29 @@ void  ShaderObj::WriteShaderHeader()
 		uint32_t MaxLoc = static_cast<uint32_t>(CfgTst->GetUInt("CellAryW", true)
 											  * CfgTst->GetUInt("CellAryH", true) 
 											  * CfgTst->GetUInt("CellAryL", true));
+
+		float col_red = CfgApp->GetFloat("application.col_color.red", true);
+		float col_green = CfgApp->GetFloat("application.col_color.green", true);
+		float col_blue = CfgApp->GetFloat("application.col_color.blue", true);
+		float col_alpha = CfgApp->GetFloat("application.col_color.alpha", true);
+
+		float ncol_red = CfgApp->GetFloat("application.ncol_color.red", true);
+		float ncol_green = CfgApp->GetFloat("application.ncol_color.green", true);
+		float ncol_blue = CfgApp->GetFloat("application.ncol_color.blue", true);
+		float ncol_alpha = CfgApp->GetFloat("application.ncol_color.alpha", true);
+
+		std::ostringstream col_color;
+		col_color << "vec3("
+			<< std::fixed << std::setprecision(1) << col_red << "f,"
+			<< std::fixed << std::setprecision(1) << col_green << "f,"
+			<< std::fixed << std::setprecision(1) << col_blue << "f)";
+
+		std::ostringstream ncol_color;
+		ncol_color << "vec3("
+			<< std::fixed << std::setprecision(1) << ncol_red << "f,"
+			<< std::fixed << std::setprecision(1) << ncol_green << "f,"
+			<< std::fixed << std::setprecision(1) << ncol_blue << "f)";
+			
         std::ofstream ostrm(filename);
 		if (!ostrm.is_open())
 		{
@@ -223,7 +248,10 @@ void  ShaderObj::WriteShaderHeader()
 			<< "const uint MAX_CELL_ARRAY_LOCATIONS =" << m_CMO->m_MaxLoc << ";\n"
 				//##JMBDont know what this is
 			<< "const uint compflag =" << compflag << ";\n"
-			<< "const uint bbound =" << m_VPO->BoundaryParticleLimit << ";\n";
+			<< "const uint bbound =" << m_VPO->BoundaryParticleLimit << ";\n"
+			<< "const float point_size = " << CfgApp->GetFloat("application.gl_point_size", true) << ";\n"
+			<< "vec3 ncolcolor = " << ncol_color.str() << ";\n"
+			<< "vec3 colcolor = " << col_color.str() << ";\n";
 			
 			
 		ostrm.flush();
