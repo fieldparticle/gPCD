@@ -1,6 +1,5 @@
-Modify Vulkan code to produce density diagrams
+Update gPCD document
 
-- Created a Denity gen dat in Python
-- added particle colors, collsion colors, background color and point size.
+
 
 Next: diagnose the remaining ThreeParticle kinetic-energy drift

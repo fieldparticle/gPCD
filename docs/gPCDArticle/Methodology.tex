@@ -1,5 +1,4 @@
 % !TeX root = main.tex
-\newpage
 \section{Methodology}
 
 The gPCD framework addresses the architectural gap identified in the
@@ -14,12 +13,29 @@ evaluation.
 
 Figure~\ref{fig:overview_architecture}(a) illustrates the conventional
 organization in which rendering and collision detection operate as
-separate processes. Figure~\ref{fig:overview_architecture}(b) shows the
+separate processes in many existing
+GPU-based collision-detection frameworks. Figure~\ref{fig:overview_architecture}(b) shows the
 gPCD framework, where broad-phase occupancy generation is integrated
 directly into the graphics pipeline, allowing occupancy construction and
 rendering to proceed concurrently.
 
 \input{CellSpans}
+
+\subsection{Duplicate Handling}
+
+Two forms of duplication can arise within the gPCD framework.
+Corner duplication occurs when multiple AABB corners from the same
+particle map to a common cell location during occupancy generation.
+Collision duplication occurs when the same source--target interaction is
+encountered through multiple occupied cells during PCS traversal.
+Figure~\ref{fig:CellSpans} illustrates both effects.
+
+Corner duplicates are removed during occupancy construction to prevent
+multiple insertions of the same particle identifier into a single cell
+occupancy list. Collision duplicates are removed during narrow-phase
+evaluation using source-owned collision tracking, ensuring that each
+source--target interaction is evaluated at most once.
+
 
 \subsection{Graphics-Pipeline Occupancy Generation}
 
@@ -30,36 +46,12 @@ broad-phase construction. The resulting occupancy information is stored
 within the cell-array structure and subsequently used to construct
 candidate collision pairs for narrow-phase evaluation.
 
-\subsection{Cell Array Construction}
-
-During insertion, multiple AABB corners from the same particle may map
-to the same cell. These duplicate corner references are suppressed
-during broad-phase occupancy generation so that only a single copy of
-the particle identifier is stored within a given cell occupancy list.
-Consequently, the required occupancy-list capacity is determined by the
-maximum number of unique particles that may contribute to a cell rather
-than the total number of corner insertions.
-
-For heterogeneous particle systems, the maximum occupancy is governed
-by the smallest particle radius present in the simulation. Let
-
-\begin{equation}
-r_{\min}
-=
-\min_i r_i
-\end{equation}
-
-denote the minimum particle radius. The maximum cell occupancy is then
-
-\begin{equation}
-N_{\mathrm{cell}}^{3D}=\left(\left\lfloor\frac{h+2r_{\min}}{2r_{\min}}\right\rfloor\right)^3.
-\end{equation}
-
-Consequently, the occupancy-list capacity may be determined during
-initialization directly from the smallest allowable particle diameter.
-Because all larger particles occupy greater volume, they cannot increase
-the maximum number of unique particle identifiers that may be stored
-within a cell.
+Broad-phase occupancy generation is implemented within the vertex stage
+of the graphics pipeline. Each particle independently evaluates its
+occupancy contribution and determines the cell locations required for
+broad-phase construction. The resulting occupancy information is stored
+within the cell-array structure and subsequently used to construct
+candidate collision pairs for narrow-phase evaluation.
 
 \subsection{Corner-Based Occupancy Construction}
 
@@ -84,11 +76,18 @@ where $c \in \{0,\ldots,7\}$ identifies one of the eight AABB corners.
 Each corner location is subsequently converted to a cell coordinate and
 used to determine particle occupancy within the cell array.
 
-The corner-based formulation guarantees that particle occupancy can be
-determined through a fixed number of evaluations independent of particle
-count. Because the particle radius is constrained such that a particle
-may intersect at most eight neighboring cells, occupancy construction
-remains bounded by the eight AABB corner locations.
+Because occupancy is determined from a fixed set of corner locations,
+each particle performs a bounded number of occupancy evaluations
+independent of the total particle count. Consequently, occupancy
+generation requires constant work per particle.
+
+The particle diameter is constrained not to exceed the cell width.
+Under this constraint, a particle may intersect at most eight
+neighboring cells, allowing occupancy to be determined entirely from
+the eight AABB corners. As a result, particle size may be scaled over
+the admissible range without altering the occupancy-generation
+procedure or increasing the number of occupancy evaluations required
+per particle.
 
 \subsection{Cell Addressing and Flattening}
 
@@ -106,19 +105,31 @@ Y = \mathrm{round}(y),
 Z = \mathrm{round}(z).
 \end{equation}
 
-Cell coordinates are restricted to positive integer values such that
-the valid cell domain begins at $(1,1,1)$ rather than $(0,0,0)$.
-Coordinates containing a zero-valued component are invalid.
-This convention prevents corner evaluations associated with particles
-located adjacent to domain boundaries from producing negative cell
-coordinates during occupancy construction.
-
-The resulting cell coordinate triplet is converted into a flattened cell
-index for storage within the occupancy structure. Let $S$ denote the
-side length of the cubic cell array. The flattened index is
+Cell coordinates are represented using zero-based indexing.
+However, cells containing a zero-valued coordinate component are
+reserved and are not used for occupancy generation. Consequently,
+valid occupancy cells satisfy
 
 \begin{equation}
-I = X + YS + ZS^2.
+X>0,
+\qquad
+Y>0,
+\qquad
+Z>0.
+\end{equation}
+
+This convention creates a guard layer surrounding the active domain and
+prevents AABB-corner evaluations associated with particles located near
+domain boundaries from producing negative cell coordinates during
+occupancy construction.
+
+The resulting cell coordinate triplet is converted into a flattened cell
+index for storage within the occupancy structure. Let \(W\), \(H\), and
+\(D\) denote the width, height, and depth of the cell array,
+respectively. The flattened index is
+
+\begin{equation}
+I = X + W(Y + HZ).
 \end{equation}
 
 The flattened index serves as the primary cell identifier throughout
@@ -132,25 +143,48 @@ reconstruction of the original cell coordinates.
 
 Concurrent insertion into shared cell occupancy lists requires an
 atomic reservation operation to obtain a unique slot within the target
-cell. This synchronization is localized to occupancy generation and is
-performed only during cell-array population.
+cell occupancy list. This operation provides thread-safe insertion
+during occupancy generation.
+
+\subsection{Cell Array Construction}
+
+During insertion, multiple AABB corners from the same particle may map
+to the same cell. These duplicate corner references are suppressed
+during broad-phase occupancy generation so that only a single copy of
+the particle identifier is stored within a given cell occupancy list.
+Consequently, the required occupancy-list capacity is determined by the
+maximum number of unique particles that may contribute to a cell rather
+than the total number of corner insertions.
+
+For heterogeneous particle systems, the maximum occupancy is governed
+by the smallest particle radius present in the simulation. Let
+
+\begin{equation}
+r_{\min}=\min_i r_i
+\end{equation}
+
+denote the minimum particle radius. Let \(h\) denote the uniform cell side length.
+The maximum cell occupancy is then
+
+\begin{equation}
+N_{\mathrm{cell}}^{3D}=\left(\left\lfloor\frac{h+2r_{\min}}{2r_{\min}}\right\rfloor\right)^3.
+\end{equation}
+
+Consequently, the occupancy-list capacity may be determined during
+initialization directly from the smallest allowable particle diameter.
+Because all larger particles occupy greater volume, they cannot increase
+the maximum number of unique particle identifiers that may be stored
+within a cell.
+
 
 \subsection{Potentially Colliding Set Construction}
+
 
 The populated cell array constitutes the potentially colliding set
 (PCS) used during narrow-phase evaluation. Each occupied cell contains
 the identifiers of particles whose corner locations map to that cell.
 Consequently, occupancy generation directly constructs the PCS without
 requiring a separate candidate-construction stage.
-
-%%JMB out of place
-Because a particle may occupy multiple cells and a collision may be
-represented within multiple neighboring occupancy lists, occupancy
-duplication and collision duplication can arise within the PCS.
-Figure~\ref{fig:CellSpans} illustrates these effects. The
-resulting PCS is subsequently traversed during narrow-phase collision
-evaluation.
-
 
 \subsection{Narrow-Phase Evaluation}
 
@@ -162,36 +196,25 @@ Each particle maintains an array of eight corner-cell identifiers,
 
 where each entry stores the flattened cell index associated with one
 AABB corner. These indices are generated during occupancy construction
-and retained for subsequent narrow-phase evaluation.
+and retained for narrow-phase evaluation.
 
-During narrow-phase execution, each particle traverses its
-\texttt{cornerCell} array. For each stored cell identifier, the
-corresponding occupancy list is accessed directly through the flattened
-cell index. The source particle is then compared against all particles
-occupying that cell to determine contact.
-
-Once the occupancy structure has been populated, collision discovery is
-performed independently for each source particle. Candidate neighbors
-are obtained from the occupancy lists associated with the particle's
-corner cells, eliminating the need for construction of a centralized
-collision-pair list.
-
-Corner duplicates are removed during broad-phase occupancy generation.
-Collision duplicates, which occur when the same source--target pair is
-encountered through multiple occupied cells, are removed during
-narrow-phase evaluation.
+During narrow-phase execution, each source particle independently
+traverses its \texttt{cornerCell} array and accesses the corresponding
+occupancy lists. Candidate neighbors are obtained directly from these
+lists, eliminating the need for construction of a centralized
+collision-pair list. The source particle is then compared against the
+particles referenced by each occupancy list to determine contact.
 
 To prevent duplicate collision evaluations, each particle maintains a
 collision list containing the identifiers of particles with which a
 collision has already been registered during the current evaluation
-step. When a collision between a source particle and a target particle
-is detected, the identifier of the target particle is stored in the
-source particle's collision list. Subsequent interaction evaluations
-consult the collision list before performing collision determination.
-If the target particle identifier is already present, the interaction
-is classified as a duplicate and is discarded.
+step. When a collision is detected, the target particle identifier is
+stored in the source particle's collision list. Subsequent interaction
+evaluations consult this list and discard previously evaluated
+source--target pairs.
 
-Because candidate discovery is performed independently for each source particle, 
-gPCD does not require construction of a globally shared collision-pair list. 
-This organization simplifies parallel execution and reduces synchronization 
-requirements during collision detection.
+Because candidate discovery is performed independently for each source
+particle, candidate ownership remains local throughout collision
+evaluation. This organization simplifies massively parallel execution
+and reduces synchronization requirements by avoiding construction of a
+globally shared collision-pair list.

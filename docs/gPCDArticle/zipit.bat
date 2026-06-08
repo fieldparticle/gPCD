@@ -1,7 +1,6 @@
 del *.log
 del *.bbl
 del *.blg
-del *.pdf
 del *.gz
 del *.cut
 del *.out

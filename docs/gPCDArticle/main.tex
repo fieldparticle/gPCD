@@ -12,19 +12,28 @@
 \usepackage{subcaption}
 \usepackage{numprint}
 \npthousandsep{,}
+%
 \usepackage{makecell}
+% midrule,toprule,...
 \usepackage{booktabs}
 \usepackage{xfrac}
-\usepackage{svg}
+% need this for references in *.doi
+\usepackage{hyperref}
+% Numeric citations
+\usepackage[numbers,sort&compress]{natbib}
 \newcommand{\nc}[1]{!#1!}
 \newcommand{\mmrr}{\textit{\textbf{$mmrr$}}}
 \newcommand{\arrt}{\textit{\textbf{$arr_T$}}}
 \newcommand\Description[2][]{}
-
+\newcommand{\bell}[2]{\textcolor{blue}{BELL:#1:[#2]}}
 \newcommand{\figo}[1]{fig.~\ref{fig:#1}}
 \newcommand{\Figo}[1]{Fig.~\ref{fig:#1}}
 \newcommand{\figob}[2]{fig.~\ref{fig:#1}-(#2)}
 \newcommand{\Tigo}[1]{Table~\ref{tab:#1}}
+\newcommand{\CN}{\textcolor{red}{[CitationNeeded]}}
+\captionsetup{font=footnotesize, labelfont=bf}
+\captionsetup[sub]{font=footnotesize, labelfont=bf}
+
 
 % Keywords command
 \providecommand{\keywords}[1]
@@ -93,5 +102,7 @@ real-time simulation
 \input{ExperimentalResults}
 \input{Discussion}
 \input{Conclusions}
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{ReferencesWithdoi.bib}
 \input{Conventions}
 \end{document}

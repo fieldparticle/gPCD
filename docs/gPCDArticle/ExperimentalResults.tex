@@ -31,6 +31,7 @@ overall performance despite the GPU-resident nature of the framework.
 \input{KEEP_PQBRT_TABLE_ALL}
 
 \subsection{Performance Overview}
+
 \Tigo{performance_summary} summarizes the principal
 performance metrics obtained during evaluation of the gPCD framework.
 The benchmark suite consisted of randomly distributed particle
@@ -39,11 +40,11 @@ constant collision fraction.
 
 The framework successfully processed benchmark configurations
 containing up to \numprint{\APQBRTTABLEALLbka{}} particles and achieved a
-peak throughput of \nc{Peak Throughput}. Representative execution
-statistics for the largest benchmark case are also reported in
-Table~\ref{tab:performance_summary}.
+peak throughput of \SUMMARYTHROUGHPUT{} million particles/s. 
+Representative execution statistics for the largest 
+benchmark case are also reported in Table~\ref{tab:performance_summary}.
 
-\input{KEEP_PQBRT_SUMMARY}
+\input{A_PQBRT_SUMMARY_TABLE}
 
 Across the evaluated range, performance remained stable and
 exhibited the expected throughput-oriented behavior of a
@@ -75,16 +76,39 @@ Figure~\ref{fig:A_PQBR_THROUGHPUT_AND_TPP} presents complementary
 throughput and time-per-particle views of framework performance across
 the evaluated particle range.
 
-The throughput curve exhibits three distinct operating regions.
-At low particle counts, throughput increases rapidly with increasing
-particle count. A peak throughput region is subsequently observed,
-followed by a throughput-limited region at larger benchmark sizes.
+\subsubsection{Utilization-Limited Regime}
 
-The utilization region extends approximately to
-\numprint{10000} particles, after which the
-framework enters a peak throughput region. Beyond
-\numprint{2000000} particles, throughput becomes
-throughput-limited.
+At low particle counts, throughput increases rapidly with increasing
+particle count as available GPU resources become more fully utilized.
+This regime extends to approximately
+\numprint{100000} particles.
+
+\subsubsection{Throughput-Transition Regime}
+
+Beyond \numprint{100000} particles, throughput enters a transition
+regime in which increasing occupancy and collision workload begin to
+influence performance. This regime spans particle counts between
+approximately \numprint{100000} and \numprint{2000000}.
+
+\subsubsection{Stable Large-Scale Regime}
+
+At approximately \numprint{2000000} particles, the framework reaches a
+stable large-scale operating regime characterized by nearly constant
+time-per-particle behavior. This region is used for the subsequent
+time-per-particle analysis and represents the asymptotic operating
+behavior of the framework.
+
+\subsubsection{Stable Large-Scale Regime}
+
+At approximately \numprint{2000000} particles, the framework reaches a
+stable large-scale operating regime. Although throughput continues to
+decrease gradually with increasing particle count, the corresponding
+time-per-particle curves become nearly constant. This behavior indicates
+that the framework has entered an asymptotic operating region in which
+the average processing cost per particle remains approximately
+constant. Consequently, particle counts exceeding
+\numprint{2000000} are used for the time-per-particle analysis reported
+in Figure~\ref{fig:A_PQBR_THROUGHPUT_AND_TPP}(c).
 
 \subsection{Scaling Analysis}
 \input{A_PQBR_LOGLOG_REGRESS}
@@ -101,9 +125,9 @@ scaling exponent.
 Figure~\ref{fig:A_PQBR_LOGLOG_REGRESS} presents the resulting log--log
 regressions for graphics, compute, and total execution times. The
 measured scaling exponents were found to be
-$b_g=\nc{Graphics Slope}$,
-$b_c=\nc{Compute Slope}$, and
-$b_t=\nc{Total Slope}$.
+$b_g=\APQBRLOGLOGREGRESSgmsasat{}$,
+$b_c=\APQBRLOGLOGREGRESScmsasat{}$, and
+$b_t=\APQBRLOGLOGREGRESStotasat{}$.
 All three exponents remain close to unity, indicating that execution
 time increases approximately linearly with particle count throughout
 the evaluated benchmark range.
@@ -114,7 +138,7 @@ the near-linear scaling behavior predicted by the complexity analysis.
 
 \subsection{Curvature Analysis}
 \input{A_PBQR_CURVATURE}
-While log--log regression quantifies the overall scaling exponent,
+While log-log regression quantifies the overall scaling exponent,
 curvature analysis provides a complementary measure of deviation from
 ideal linear behavior. Quadratic fits were therefore applied to the
 graphics, compute, and total execution-time measurements over the
@@ -128,11 +152,7 @@ particularly small curvature, while the compute measurements display
 slightly larger but still bounded deviations.
 
 The measured curvature bounds remain small relative to the overall
-execution-time trends. Combined with the log--log scaling exponents,
+execution-time trends. Combined with the log-log scaling exponents,
 these results provide additional evidence that the gPCD framework
 maintains near-linear scaling throughout the evaluated benchmark range.
 
-\subsection{Collision Fraction Benchmark}
-
-    Collision-density sensitivity
-    Broad-phase robustness

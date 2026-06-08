@@ -7,11 +7,16 @@ framework.
 
 \subsection{Hardware Platform}
 
-All experiments were performed on a system equipped with
-\nc{CPU Model}, \nc{System Memory}, and an
-NVIDIA RTX 3500 Ada Generation Laptop GPU. The gPCD framework was
-implemented using Vulkan, with broad-phase occupancy generation and
-rendering executed through the graphics pipeline and narrow-phase
+All experiments were conducted on a Lenovo ThinkPad P16 Gen~2 mobile
+workstation equipped with a 13th Generation Intel Core i9-13980HX
+processor and an NVIDIA RTX 3500 Ada Generation professional GPU. The
+GPU contains 5,120 CUDA cores and 12~GB of ECC GDDR6 memory with a
+192-bit memory interface providing approximately 432~GB/s of memory
+bandwidth.This configuration provides a modern mobile GPU baseline for evaluating real-time, 
+large-scale collision detection systems~\cite{hinumNVIDIARTX3500}.
+
+The gPCD framework was implemented using Vulkan, with broad-phase occupancy 
+generation and rendering executed through the graphics pipeline and narrow-phase 
 evaluation executed through compute shaders.
 
 \subsection{Benchmark Configuration}

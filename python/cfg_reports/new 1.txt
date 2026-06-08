@@ -1,3 +1,11 @@
-C:/_DJ/gPCD/python/cfg_reports
-plots_dir = "C:/_DJ/gPCDData/tex";
-tex_dir = "C:/_DJ/gPCDData/tex"
+Figure~\ref{fig} illustrates representative particle
+densities spanning several orders of magnitude in particle count. As
+particle density increases, the visual appearance transitions from
+sparse particulate systems resembling dust or aerosols to increasingly
+continuous representations characteristic of smoke, gases, liquids, and
+ultimately solid materials.
+
+provides a general framework for investigating
+physical systems across a wide range of scales and densities. The
+ability to efficiently simulate such systems is particularly important
+when studying emergent behavior, where macroscopic phenomena arise from

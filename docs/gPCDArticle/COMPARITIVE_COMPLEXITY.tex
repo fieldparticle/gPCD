@@ -1,0 +1,68 @@
+\begin{table*}[t]
+\centering
+\footnotesize
+\caption{Theoretical complexity comparison of representative broad-phase collision-detection approaches.}
+\label{tab:complexity_comparison}
+
+\begin{tabular}{l c c p{2.2in}}
+\toprule
+Method & Broad Phase & Pair Generation & Notes \\
+\midrule
+
+All-Pairs
+&
+$O(N^2)$
+&
+$O(N^2)$
+&
+Exhaustive pair evaluation.
+\\
+
+Sweep-and-Prune~\cite{capannini}
+&
+$O(N\log N)$
+&
+$O(K)$
+&
+Sorting-based overlap detection.
+\\
+
+Uniform Grid + Sort~\cite{legrand}
+&
+$O(N\log N)$
+&
+$O(N+K)$
+&
+Cell-ID generation followed by sorting.
+\\
+
+Uniform Grid + Atomic Insertion~\cite{barbieri2013}
+&
+$O(N)$
+&
+$O(N+K)$
+&
+Direct occupancy insertion using atomic operations.
+\\
+
+Spatial Hashing~\cite{hastings}
+&
+$O(N)$
+&
+$O(N+K)$
+&
+Average-case linear insertion and lookup.
+\\
+
+gPCD (this work)
+&
+$O(N)$
+&
+$O(N+K)$
+&
+Graphics-pipeline occupancy generation with duplicate-aware cell construction.
+\\
+
+\bottomrule
+\end{tabular}
+\end{table*}

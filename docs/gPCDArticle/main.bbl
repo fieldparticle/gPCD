@@ -1,0 +1,404 @@
+%%% -*-BibTeX-*-
+%%% Do NOT edit. File created by BibTeX with style
+%%% ACM-Reference-Format-Journals [18-Jan-2012].
+
+\begin{thebibliography}{27}
+
+%%% ====================================================================
+%%% NOTE TO THE USER: you can override these defaults by providing
+%%% customized versions of any of these macros before the \bibliography
+%%% command.  Each of them MUST provide its own final punctuation,
+%%% except for \shownote{} and \showURL{}.  The latter two
+%%% do not use final punctuation, in order to avoid confusing it with
+%%% the Web address.
+%%%
+%%% To suppress output of a particular field, define its macro to expand
+%%% to an empty string, or better, \unskip, like this:
+%%%
+%%% \newcommand{\showURL}[1]{\unskip}   % LaTeX syntax
+%%%
+%%% \def \showURL #1{\unskip}           % plain TeX syntax
+%%%
+%%% ====================================================================
+
+\ifx \showCODEN    \undefined \def \showCODEN     #1{\unskip}     \fi
+\ifx \showISBNx    \undefined \def \showISBNx     #1{\unskip}     \fi
+\ifx \showISBNxiii \undefined \def \showISBNxiii  #1{\unskip}     \fi
+\ifx \showISSN     \undefined \def \showISSN      #1{\unskip}     \fi
+\ifx \showLCCN     \undefined \def \showLCCN      #1{\unskip}     \fi
+\ifx \shownote     \undefined \def \shownote      #1{#1}          \fi
+\ifx \showarticletitle \undefined \def \showarticletitle #1{#1}   \fi
+\ifx \showURL      \undefined \def \showURL       {\relax}        \fi
+% The following commands are used for tagged output and should be
+% invisible to TeX
+\providecommand\bibfield[2]{#2}
+\providecommand\bibinfo[2]{#2}
+\providecommand\natexlab[1]{#1}
+\providecommand\showeprint[2][]{arXiv:#2}
+
+\bibitem[Allen and Tildesley(2017)]%
+        {allen2017}
+\bibfield{author}{\bibinfo{person}{M.~P. Allen} {and} \bibinfo{person}{D.~J.
+  Tildesley}.} \bibinfo{year}{2017}\natexlab{}.
+\newblock \bibinfo{booktitle}{\emph{Computer Simulation of Liquids}
+  (\bibinfo{edition}{second edition} ed.)}.
+\newblock \bibinfo{publisher}{Oxford University Press},
+  \bibinfo{address}{Oxford, United Kingdom}.
+\newblock
+\showISBNx{978-0-19-880319-5 978-0-19-880320-1}
+\showLCCN{QC145.2 .A43 2017}
+
+
+\bibitem[Anderson et~al\mbox{.}(2008)]%
+        {anderson2008}
+\bibfield{author}{\bibinfo{person}{Joshua~A. Anderson},
+  \bibinfo{person}{Chris~D. Lorenz}, {and} \bibinfo{person}{A. Travesset}.}
+  \bibinfo{year}{2008}\natexlab{}.
+\newblock \showarticletitle{General Purpose Molecular Dynamics Simulations
+  Fully Implemented on Graphics Processing Units}.
+\newblock \bibinfo{journal}{\emph{J. Comput. Phys.}} \bibinfo{volume}{227},
+  \bibinfo{number}{10} (\bibinfo{date}{May} \bibinfo{year}{2008}),
+  \bibinfo{pages}{5342--5359}.
+\newblock
+\showISSN{00219991}
+\href{https://doi.org/10.1016/j.jcp.2008.01.047}{doi:\nolinkurl{10.1016/j.jcp.2008.01.047}}
+
+
+\bibitem[Barbieri et~al\mbox{.}(2013)]%
+        {barbieri2013}
+\bibfield{author}{\bibinfo{person}{Davide Barbieri}, \bibinfo{person}{Valeria
+  Cardellini}, {and} \bibinfo{person}{Salvatore Filippone}.}
+  \bibinfo{year}{2013}\natexlab{}.
+\newblock \showarticletitle{Fast {{Uniform Grid Construction}} on {{GPGPUs
+  Using Atomic Operations}}}. In \bibinfo{booktitle}{\emph{Volume 25:
+  {{Parallel Computing}}: {{Accelerating Computational Science}} and
+  {{Engineering}} ({{CSE}})}}.
+\newblock
+\href{https://doi.org/10.3233/978-1-61499-381-0-295}{doi:\nolinkurl{10.3233/978-1-61499-381-0-295}}
+
+
+\bibitem[Benitez et~al\mbox{.}(2005)]%
+        {benitez2005}
+\bibfield{author}{\bibinfo{person}{A. Benitez}, \bibinfo{person}{M. Del
+  Carmen~Ramirez}, {and} \bibinfo{person}{D. Vallejo}.}
+  \bibinfo{year}{2005}\natexlab{}.
+\newblock \showarticletitle{Collision {{Detection Using Sphere-Tree
+  Construction}}}. In \bibinfo{booktitle}{\emph{15th {{International
+  Conference}} on {{Electronics}}, {{Communications}} and {{Computers}}
+  ({{CONIELECOMP}}'05)}}. \bibinfo{publisher}{IEEE}, \bibinfo{address}{Puebla,
+  Mexico}, \bibinfo{pages}{286--291}.
+\newblock
+\showISBNx{978-0-7695-2283-8}
+\href{https://doi.org/10.1109/CONIEL.2005.29}{doi:\nolinkurl{10.1109/CONIEL.2005.29}}
+
+
+\bibitem[Brodtkorb et~al\mbox{.}(2013)]%
+        {brodtkorb2013}
+\bibfield{author}{\bibinfo{person}{Andr{\'e}~R. Brodtkorb},
+  \bibinfo{person}{Trond~R. Hagen}, {and} \bibinfo{person}{Martin~L.
+  S{\ae}tra}.} \bibinfo{year}{2013}\natexlab{}.
+\newblock \showarticletitle{Graphics Processing Unit ({{GPU}}) Programming
+  Strategies and Trends in {{GPU}} Computing}.
+\newblock \bibinfo{journal}{\emph{J. Parallel and Distrib. Comput.}}
+  \bibinfo{volume}{73}, \bibinfo{number}{1} (\bibinfo{date}{Jan.}
+  \bibinfo{year}{2013}), \bibinfo{pages}{4--13}.
+\newblock
+\showISSN{07437315}
+\href{https://doi.org/10.1016/j.jpdc.2012.04.003}{doi:\nolinkurl{10.1016/j.jpdc.2012.04.003}}
+
+
+\bibitem[Capannini and Larsson({[n.\,d.]})]%
+        {capannini}
+\bibfield{author}{\bibinfo{person}{Gabriele Capannini} {and}
+  \bibinfo{person}{Thomas Larsson}.} \bibinfo{year}{[n.\,d.]}\natexlab{}.
+\newblock \showarticletitle{Output {{Sensitive Collision Detection}} for
+  {{Unisize Boxes}}}.
+\newblock  (\bibinfo{year}{[n.\,d.]}).
+\newblock
+
+
+\bibitem[Capannini and Larsson(2016)]%
+        {capannini2016}
+\bibfield{author}{\bibinfo{person}{Gabriele Capannini} {and}
+  \bibinfo{person}{Thomas Larsson}.} \bibinfo{year}{2016}\natexlab{}.
+\newblock \showarticletitle{Efficient Collision Culling by a Succinct
+  Bi-Dimensional Sweep and {{Prune}} Algorithm}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 32nd {{Spring Conference}} on
+  {{Computer Graphics}}}}. \bibinfo{publisher}{ACM},
+  \bibinfo{address}{Slomenice Slovakia}, \bibinfo{pages}{25--32}.
+\newblock
+\showISBNx{978-1-4503-4436-4}
+\href{https://doi.org/10.1145/2948628.2948640}{doi:\nolinkurl{10.1145/2948628.2948640}}
+
+
+\bibitem[Ericson(2004)]%
+        {ericson2004}
+\bibfield{author}{\bibinfo{person}{Christer Ericson}.}
+  \bibinfo{year}{2004}\natexlab{}.
+\newblock \bibinfo{booktitle}{\emph{Real-{{Time Collision Detection}}}
+  (\bibinfo{edition}{1} ed.)}.
+\newblock \bibinfo{publisher}{CRC Press}.
+\newblock
+\showISBNx{978-0-08-047414-4}
+\href{https://doi.org/10.1201/b14581}{doi:\nolinkurl{10.1201/b14581}}
+
+
+\bibitem[Evangelou et~al\mbox{.}(2023)]%
+        {Evangelou2023}
+\bibfield{author}{\bibinfo{person}{Iordanis Evangelou},
+  \bibinfo{person}{Georgios Papaioannou}, \bibinfo{person}{Konstantinos
+  Vardis}, {and} \bibinfo{person}{Anastasios Gkaravelis}.}
+  \bibinfo{year}{2023}\natexlab{}.
+\newblock \showarticletitle{A Neural Builder for Spatial Subdivision
+  Hierarchies}.
+\newblock \bibinfo{journal}{\emph{The Visual Computer}} \bibinfo{volume}{39},
+  \bibinfo{number}{8} (\bibinfo{date}{Aug.} \bibinfo{year}{2023}),
+  \bibinfo{pages}{3797--3809}.
+\newblock
+\showISSN{1432-2315}
+\href{https://doi.org/10.1007/s00371-023-02975-y}{doi:\nolinkurl{10.1007/s00371-023-02975-y}}
+
+
+\bibitem[Faure et~al\mbox{.}(2008)]%
+        {Faure2008}
+\bibfield{author}{\bibinfo{person}{Fran{\c c}ois Faure},
+  \bibinfo{person}{S{\'e}bastien Barbier}, \bibinfo{person}{J{\'e}r{\'e}mie
+  Allard}, {and} \bibinfo{person}{Florent Falipou}.}
+  \bibinfo{year}{2008}\natexlab{}.
+\newblock \showarticletitle{Image-Based Collision Detection and Response
+  between Arbitrary Volume Objects}. In
+  \bibinfo{booktitle}{\emph{Eurographics}}, Vol.~\bibinfo{volume}{1}.
+  \bibinfo{publisher}{Association of Computing Machinery},
+  \bibinfo{address}{Eurographics}, \bibinfo{pages}{156--162}.
+\newblock
+
+
+\bibitem[Franklin and Magalh{\~a}es(2017)]%
+        {franklin2017}
+\bibfield{author}{\bibinfo{person}{W.~Randolph Franklin} {and}
+  \bibinfo{person}{Salles V.~G. Magalh{\~a}es}.}
+  \bibinfo{year}{2017}\natexlab{}.
+\newblock \showarticletitle{Parallel Intersection Detection in Massive Sets of
+  Cubes}. In \bibinfo{booktitle}{\emph{Proceedings of the 6th {{ACM SIGSPATIAL
+  Workshop}} on {{Analytics}} for {{Big Geospatial Data}}}}.
+  \bibinfo{publisher}{ACM}, \bibinfo{address}{Redondo Beach CA USA},
+  \bibinfo{pages}{20--26}.
+\newblock
+\showISBNx{978-1-4503-5494-3}
+\href{https://doi.org/10.1145/3150919.3150921}{doi:\nolinkurl{10.1145/3150919.3150921}}
+
+
+\bibitem[Govender et~al\mbox{.}(2015)]%
+        {govender2015}
+\bibfield{author}{\bibinfo{person}{Nicolin Govender},
+  \bibinfo{person}{Daniel~N. Wilke}, {and} \bibinfo{person}{Schalk Kok}.}
+  \bibinfo{year}{2015}\natexlab{}.
+\newblock \showarticletitle{Collision Detection of Convex Polyhedra on the
+  {{NVIDIA GPU}} Architecture for the Discrete Element Method}.
+\newblock \bibinfo{journal}{\emph{Appl. Math. Comput.}}  \bibinfo{volume}{267}
+  (\bibinfo{date}{Sept.} \bibinfo{year}{2015}), \bibinfo{pages}{810--829}.
+\newblock
+\showISSN{00963003}
+\href{https://doi.org/10.1016/j.amc.2014.10.013}{doi:\nolinkurl{10.1016/j.amc.2014.10.013}}
+
+
+\bibitem[Harada et~al\mbox{.}(2007)]%
+        {Harada2007}
+\bibfield{author}{\bibinfo{person}{Takahiro Harada}, \bibinfo{person}{Seiichi
+  Koshizuka}, {and} \bibinfo{person}{Yoichiro Kawaguchi}.}
+  \bibinfo{year}{2007}\natexlab{}.
+\newblock \showarticletitle{Sliced Data Structure for Particle-Based
+  Simulations on {{GPUs}}}. In \bibinfo{booktitle}{\emph{Proceedings of the 5th
+  International Conference on {{Computer}} Graphics and Interactive Techniques
+  in {{Australia}} and {{Southeast Asia}}}}
+  \emph{(\bibinfo{series}{{{GRAPHITE}} '07})}. \bibinfo{publisher}{Association
+  for Computing Machinery}, \bibinfo{address}{New York, NY, USA},
+  \bibinfo{pages}{55--62}.
+\newblock
+\showISBNx{978-1-59593-912-8}
+\href{https://doi.org/10.1145/1321261.1321271}{doi:\nolinkurl{10.1145/1321261.1321271}}
+
+
+\bibitem[Hastings et~al\mbox{.}({[n.\,d.]})]%
+        {hastings}
+\bibfield{author}{\bibinfo{person}{Erin~J Hastings}, \bibinfo{person}{Jaruwan
+  Mesit}, {and} \bibinfo{person}{Ratan~K Guha}.}
+  \bibinfo{year}{[n.\,d.]}\natexlab{}.
+\newblock \showarticletitle{Optimization of {{Large-Scale}}, {{Real-Time
+  Simulations}} by {{Spatial Hashing}}}.
+\newblock  (\bibinfo{year}{[n.\,d.]}).
+\newblock
+
+
+\bibitem[He et~al\mbox{.}(2018)]%
+        {he2018}
+\bibfield{author}{\bibinfo{person}{Yi He}, \bibinfo{person}{Andrew~E. Bayly},
+  \bibinfo{person}{Ali Hassanpour}, \bibinfo{person}{Frans Muller},
+  \bibinfo{person}{Ke Wu}, {and} \bibinfo{person}{Dongmin Yang}.}
+  \bibinfo{year}{2018}\natexlab{}.
+\newblock \showarticletitle{A {{GPU-based}} Coupled {{SPH-DEM}} Method for
+  Particle-Fluid Flow with Free Surfaces}.
+\newblock \bibinfo{journal}{\emph{Powder Technology}}  \bibinfo{volume}{338}
+  (\bibinfo{date}{Oct.} \bibinfo{year}{2018}), \bibinfo{pages}{548--562}.
+\newblock
+\showISSN{00325910}
+\href{https://doi.org/10.1016/j.powtec.2018.07.043}{doi:\nolinkurl{10.1016/j.powtec.2018.07.043}}
+
+
+\bibitem[Hinum({[n.\,d.]})]%
+        {hinumNVIDIARTX3500}
+\bibfield{author}{\bibinfo{person}{Klaus Hinum}.}
+  \bibinfo{year}{[n.\,d.]}\natexlab{}.
+\newblock \bibinfo{title}{{{NVIDIA RTX}} 3500 {{Ada Generation Laptop GPU}} -
+  {{Benchmarks}} and {{Specs}}}.
+\newblock
+  \bibinfo{howpublished}{https://www.notebookcheck.net/NVIDIA-RTX-3500-Ada-Generation-Laptop-GPU-Benchmarks-and-Specs.744890.0.html}.
+\newblock
+
+
+\bibitem[Jang and Han(2008)]%
+        {Jang2008a}
+\bibfield{author}{\bibinfo{person}{Hanyoung Jang} {and}
+  \bibinfo{person}{JungHyun Han}.} \bibinfo{year}{2008}\natexlab{}.
+\newblock \showarticletitle{Fast Collision Detection Using the {{A-buffer}}}.
+\newblock \bibinfo{journal}{\emph{The Visual Computer}} \bibinfo{volume}{24},
+  \bibinfo{number}{7-9} (\bibinfo{date}{July} \bibinfo{year}{2008}),
+  \bibinfo{pages}{659--667}.
+\newblock
+\showISSN{0178-2789, 1432-2315}
+\href{https://doi.org/10.1007/s00371-008-0246-8}{doi:\nolinkurl{10.1007/s00371-008-0246-8}}
+
+
+\bibitem[Jansen et~al\mbox{.}(2018)]%
+        {jansen2018}
+\bibfield{author}{\bibinfo{person}{O. Jansen}, \bibinfo{person}{E.
+  {d'Humi{\`e}res}}, \bibinfo{person}{X. Ribeyre}, \bibinfo{person}{S.
+  Jequier}, {and} \bibinfo{person}{V.T. Tikhonchuk}.}
+  \bibinfo{year}{2018}\natexlab{}.
+\newblock \showarticletitle{Tree Code for Collision Detection of Large Numbers
+  of Particles Applied to the {{Breit}}--{{Wheeler}} Process}.
+\newblock \bibinfo{journal}{\emph{J. Comput. Phys.}}  \bibinfo{volume}{355}
+  (\bibinfo{date}{Feb.} \bibinfo{year}{2018}), \bibinfo{pages}{582--596}.
+\newblock
+\showISSN{00219991}
+\href{https://doi.org/10.1016/j.jcp.2017.11.021}{doi:\nolinkurl{10.1016/j.jcp.2017.11.021}}
+
+
+\bibitem[Joselli et~al\mbox{.}(2015)]%
+        {joselli2015}
+\bibfield{author}{\bibinfo{person}{Mark Joselli}, \bibinfo{person}{Jos{\'e}
+  Ricardo Da~S. Junior}, \bibinfo{person}{Esteban~W. Clua},
+  \bibinfo{person}{Anselmo Montenegro}, \bibinfo{person}{Marcos Lage}, {and}
+  \bibinfo{person}{Paulo Pagliosa}.} \bibinfo{year}{2015}\natexlab{}.
+\newblock \showarticletitle{Neighborhood Grid: {{A}} Novel Data Structure for
+  Fluids Animation with {{GPU}} Computing}.
+\newblock \bibinfo{journal}{\emph{J. Parallel and Distrib. Comput.}}
+  \bibinfo{volume}{75} (\bibinfo{date}{Jan.} \bibinfo{year}{2015}),
+  \bibinfo{pages}{20--28}.
+\newblock
+\showISSN{07437315}
+\href{https://doi.org/10.1016/j.jpdc.2014.10.009}{doi:\nolinkurl{10.1016/j.jpdc.2014.10.009}}
+
+
+\bibitem[Kipfer et~al\mbox{.}(2004)]%
+        {kipfer2004}
+\bibfield{author}{\bibinfo{person}{Peter Kipfer}, \bibinfo{person}{Mark Segal},
+  {and} \bibinfo{person}{R{\"u}diger Westermann}.}
+  \bibinfo{year}{2004}\natexlab{}.
+\newblock \showarticletitle{{{UberFlow}}: {{A GPU-Based Particle Engine}}}.
+\newblock \bibinfo{journal}{\emph{Graphics Hardware}} (\bibinfo{year}{2004}).
+\newblock
+\href{https://doi.org/10.1145/1186223.1186253}{doi:\nolinkurl{10.1145/1186223.1186253}}
+
+
+\bibitem[Latta(2004)]%
+        {latta2004}
+\bibfield{author}{\bibinfo{person}{Lutz Latta}.}
+  \bibinfo{year}{2004}\natexlab{}.
+\newblock \showarticletitle{Building a {{Million Particle System}}}. In
+  \bibinfo{booktitle}{\emph{{{UBM TechWeb}}}}. \bibinfo{publisher}{Massive
+  Development GmbH}, \bibinfo{address}{San Jose Convention Center San Jose,
+  California}.
+\newblock
+
+
+\bibitem[Le~Grand(2007)]%
+        {legrand}
+\bibfield{author}{\bibinfo{person}{Scott Le~Grand}.}
+  \bibinfo{year}{2007}\natexlab{}.
+\newblock \bibinfo{title}{Chapter 32. {{Broad-Phase Collision Detection}} with
+  \textbar{} {{NVIDIA Developer}}}.
+\newblock
+
+
+\bibitem[Liu et~al\mbox{.}(2010)]%
+        {Liu2010}
+\bibfield{author}{\bibinfo{person}{Fuchang Liu}, \bibinfo{person}{Takahiro
+  Harada}, \bibinfo{person}{Youngeun Lee}, {and} \bibinfo{person}{Young~J.
+  Kim}.} \bibinfo{year}{2010}\natexlab{}.
+\newblock \showarticletitle{Real-Time Collision Culling of a Million Bodies on
+  Graphics Processing Units}. In \bibinfo{booktitle}{\emph{{{ACM SIGGRAPH
+  Asia}} 2010 Papers on - {{SIGGRAPH ASIA}} '10}}. \bibinfo{publisher}{ACM
+  Press}, \bibinfo{address}{Seoul, South Korea}, \bibinfo{pages}{1}.
+\newblock
+\showISBNx{978-1-4503-0439-9}
+\href{https://doi.org/10.1145/1882262.1866180}{doi:\nolinkurl{10.1145/1882262.1866180}}
+
+
+\bibitem[Meakin and Xu(2009)]%
+        {Meakin2009}
+\bibfield{author}{\bibinfo{person}{Paul Meakin} {and} \bibinfo{person}{Zhijie
+  Xu}.} \bibinfo{year}{2009}\natexlab{}.
+\newblock \showarticletitle{Dissipative {{Particle Dynamics}} and Other
+  Particle Methods for Multiphase Fluid Flow in Fractured and Porous Media}.
+\newblock \bibinfo{journal}{\emph{Progress in Computational Fluid Dynamics, An
+  International Journal}} \bibinfo{volume}{9}, \bibinfo{number}{6/7}
+  (\bibinfo{year}{2009}), \bibinfo{pages}{399}.
+\newblock
+\showISSN{1468-4349, 1741-5233}
+\href{https://doi.org/10.1504/PCFD.2009.027371}{doi:\nolinkurl{10.1504/PCFD.2009.027371}}
+
+
+\bibitem[Mittal et~al\mbox{.}(2023)]%
+        {MIttal2023}
+\bibfield{author}{\bibinfo{person}{Aman Mittal}, \bibinfo{person}{Narasimha
+  Mangadoddy}, {and} \bibinfo{person}{Raja Banerjee}.}
+  \bibinfo{year}{2023}\natexlab{}.
+\newblock \showarticletitle{Development of Three-Dimensional {{GPU DEM}}
+  Code--Benchmarking, Validation, and Application in Mineral Processing}.
+\newblock \bibinfo{journal}{\emph{Computational Particle Mechanics}}
+  \bibinfo{volume}{10}, \bibinfo{number}{6} (\bibinfo{date}{Nov.}
+  \bibinfo{year}{2023}), \bibinfo{pages}{1533--1556}.
+\newblock
+\showISSN{2196-4378, 2196-4386}
+\href{https://doi.org/10.1007/s40571-023-00571-4}{doi:\nolinkurl{10.1007/s40571-023-00571-4}}
+
+
+\bibitem[O{\~n}ate and Owen(2011)]%
+        {onate2011}
+\bibfield{editor}{\bibinfo{person}{Eugenio O{\~n}ate} {and}
+  \bibinfo{person}{Roger Owen}} (Eds.). \bibinfo{year}{2011}\natexlab{}.
+\newblock \bibinfo{booktitle}{\emph{Particle-{{Based Methods}}:
+  {{Fundamentals}} and {{Applications}}}}. \bibinfo{series}{Computational
+  {{Methods}} in {{Applied Sciences}}}, Vol.~\bibinfo{volume}{25}.
+\newblock \bibinfo{publisher}{Springer Netherlands},
+  \bibinfo{address}{Dordrecht}.
+\newblock
+\showISBNx{978-94-007-0734-4 978-94-007-0735-1}
+
+
+\bibitem[Zhang et~al\mbox{.}(2008)]%
+        {zhang2008}
+\bibfield{author}{\bibinfo{person}{Yanci Zhang}, \bibinfo{person}{Barbara
+  Solenthaler}, {and} \bibinfo{person}{Renato Pajarola}.}
+  \bibinfo{year}{2008}\natexlab{}.
+\newblock \showarticletitle{Adaptive Sampling and Rendering of Fluids on the
+  {{GPU}}}. In \bibinfo{booktitle}{\emph{Proceedings of the {{Fifth
+  Eurographics}} / {{IEEE VGTC}} Conference on {{Point-Based Graphics}}}}
+  \emph{(\bibinfo{series}{{{SPBG}}'08})}. \bibinfo{publisher}{Eurographics
+  Association}, \bibinfo{address}{Goslar, DEU}, \bibinfo{pages}{137--146}.
+\newblock
+\showISBNx{978-3-905674-12-5}
+
+
+\end{thebibliography}

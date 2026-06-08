@@ -1,18 +1,25 @@
-\begin{table}[t]
-\caption{Performance summary for randomly distributed particle configurations.}
-\label{tab:performance_summary}
-\centering
-\begin{tabular}{lr}
-\toprule
-\textbf{Metric} & \textbf{Value} \
-\midrule
-Maximum Particle Count & \APQBRTTABLEALLMaxParticles \
-Maximum Collision Count & \APQBRTTABLEALLMaxCollisions \
-Peak Throughput (particles/s) & \APQBRTTABLEALLPeakThroughput \
-Peak Frame Rate (FPS) & \APQBRTTABLEALLPeakFPS \
-Largest-Case Compute Time (ms) & \APQBRTTABLEALLMaxComputems \
-Largest-Case Graphics Time (ms) & \APQBRTTABLEALLMaxGraphicsms \
-Largest-Case Total Time (ms) & \APQBRTTABLEALLMaxTotalms \
-\bottomrule
+\begin{table}[ht]
+\addtolength{\tabcolsep}{-0.1em}
+\caption{Performance table listing number of particles, number collisions, total frame rate, compute frame time, $t_c$, graphics frame time, $t_g$, total time, $t_t$, and total applications render rate ratio, $arr_T$. $arr_T$ is based on an \mmrr{} of \APQBRTTABLEALLmmrr{}.}
+\label{tab:A_PQBRT_TABLE_ALL}
+\fontsize{6}{6}\selectfont
+\renewcommand{\arraystretch}{1.600000}
+\begin{center}
+\begin{tabular}
+{l l l l l l l }
+\hline \\ 
+\makecell{\makecell{Number \\ of\\particles}}&\makecell{\makecell{Collisons}}&\makecell{\makecell{Frames\\ per\\second }}&\makecell{\makecell{$t_c$\\time \\ (ms)}}&\makecell{\makecell{$t_g$\\time \\ (ms)}}&\makecell{\makecell{$t_t$\\time \\ (ms)}}&\makecell{\makecell{\arrt{}}}\\ \hline \\ 
+32 & 16 & 5836.70 & 0.00 & 0.00 & 0.01 & 0.02\\
+98304 & 49152 & 1638.65 & 0.33 & 0.08 & 0.42 & 0.75\\
+934912 & 467456 & 143.97 & 5.41 & 0.86 & 6.27 & 11.38\\
+2245632 & 1122816 & 59.04 & 13.67 & 2.30 & 15.97 & 29.02\\
+2900992 & 1450496 & 46.91 & 17.80 & 3.08 & 20.88 & 37.94\\
+4523008 & 2261504 & 30.20 & 28.26 & 5.11 & 33.37 & 60.63\\
+5178368 & 2589184 & 26.63 & 32.09 & 5.94 & 38.03 & 69.10\\
+8528896 & 4264448 & 16.83 & 53.47 & 10.55 & 64.02 & 116.32\\
+10064896 & 5032448 & 14.18 & 63.14 & 12.83 & 75.97 & 138.03\\
+\hline
 \end{tabular}
+\end{center}
+\Description[TITLE:PQB Select Data Sets Table]{Performance table listing number of particles, number collisions, total frame rate, compute frame time, $t_c$, graphics frame time, $t_g$, total time, $t_t$, and total applications render rate ratio, $arr_T$. $arr_T$ is based on an \mmrr{} of \APQBRTTABLEALLmmrr{}}
 \end{table}

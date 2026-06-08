@@ -2,6 +2,7 @@ from gbase.utilities import *
 import random
 from gbase.GenDataBase import *
 from gbase.pdata import *
+import time
 class GenPQBData(GenDataBase):
 
     
@@ -183,6 +184,9 @@ class GenPQBData(GenDataBase):
         self.openSelectionsFile()
         for index in range(len(self.select_list)):
             self.gen_data_base(index)
+            time.sleep(5)
+            print(f"Sleeping: Done with index {index}")
+
     #******************************************************************
     # Calulate the cell and particle propeties of the study
     #

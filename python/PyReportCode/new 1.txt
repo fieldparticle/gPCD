@@ -1,0 +1,19 @@
+\caption[TITLE:PQBR Performance Plots]{(a) Comparison of randomly ordered particle occupancy (red squares) and
+sequentially ordered particle occupancy (blue circles). Sequential ordering consistently produces lower execution times throughout the
+evaluated particle range. At the largest benchmark configuration, random ordering increases execution time by approximately
+\nc{Locality Penalty} relative to sequential ordering, highlighting the importance of memory locality despite identical algorithmic
+complexity. (b) Log-log plot of total throughput (red), compute throughput (blue),and graphics throughput (black) as a function of particle count. The logarithmic axes permit visualization of performance trends across nearly three orders of magnitude in particle count. Dashed vertical
+lines indicate observed transition regions within the measured throughput behavior. The saturated point plateau's after $N=$\numprint{\APQBRTIMEPERPALLstartval{}} particles shown in the plot as a black vertical dashed line. 
+(c) time per particle for graphics, compute, total starting at, N=\numprint{\APQBRTIMEPERPALLstartval{}}, for the start of the heavily saturated range. Graphics stabilizes at $\APQBRTIMEPERPALLGraphicsstabilzes{}  \pm \APQBRTIMEPERPALLGraphicsstdval{} $ $\sfrac{ns}{particle}$, compute at $\APQBRTIMEPERPALLComputestabilzes{} \pm \APQBRTIMEPERPALLComputestdval{}$ $\sfrac{ns}{particle}$ for a total stabilization at $\APQBRTIMEPERPALLTotalstabilzes{} \pm \APQBRTIMEPERPALLTotalstdval{}$ $\sfrac{ns}{particle}$. }
+| Author          |              N | TPP (ns) |
+| --------------- | -------------: | -------: |
+| Latta (2004)    |      1,000,000 |    33.33 |
+| Kipfer (2004)   |        256,000 |    390.0 |
+| Zhang (2008)    |        127,452 |   289.31 |
+| Anderson (2008) |        125,000 |   1400.0 |
+| Liu (2010)      |        960,000 |    167.7 |
+| Govender (2015) |     36,000,000 |    943.0 |
+| Joselli (2015)  |      1,048,576 |    12.36 |
+| Franklin (2017) |     10,000,000 |     33.0 |
+| Mittal (2020)   |        210,000 |     16.5 |
+| **Bell (2025)** | **11,088,896** | **7.62** |

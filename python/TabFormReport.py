@@ -204,8 +204,12 @@ class TabFormReport(QTabWidget):
                 try:
                     self.table_code_class = CLS(self.itemcfg,self.bobj)
                     table = self.table_code_class.run() 
-                    self.report_obj = ReportLatexTable(self,self.itemcfg)
-                    self.report_obj.save_latex(table)
+                    if table is not None:
+                        self.report_obj = ReportLatexTable(self,self.itemcfg)
+                        self.report_obj.save_latex(table)
+                    else:
+                        self.preview_dialog(self.table_code_class.tex_output_name)
+                        return
                 except BaseException as e:
                     print(f"Run table code class failed:{e}")
                     return

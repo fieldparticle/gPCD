@@ -55,7 +55,7 @@ however, sequential ordering provides improved memory locality and
 therefore reduces execution time.
 
 The approximately parallel trends observed in
-Figure~\ref{fig:locality} suggest that locality primarily influences
+Figure~\ref{fig:A_PQBS_V_PQBR} suggest that locality primarily influences
 the constant factor associated with memory access rather than the
 underlying scaling characteristics of the framework. Consequently,
 memory locality appears to affect implementation efficiency rather than
@@ -65,16 +65,30 @@ the asymptotic behavior of the framework itself.
 
 \input{DensityStudies}
 
-Figure~\ref{fig:density_progression} illustrates representative
-particle densities spanning several orders of magnitude in particle
-count. At low densities, particle distributions visually resemble dust
-or sparse aerosols. Increasing density produces smoke- and fog-like
-appearances before transitioning toward dense gaseous, liquid, and
-solid-like representations.
+Figure~\ref{fig:DensityGraphs} illustrates the increase in spatial
+resolution achievable through increasing particle count. At
+5,832 particles, the discrete nature of the particle representation
+remains visually apparent. In contrast, the 2,985,984-particle
+configuration approaches a visually continuous representation while
+retaining an explicitly discrete particle formulation. This increase in
+particle density substantially expands the range of physical phenomena
+that can be investigated using particle-based methods. Applications
+include rain, hail, smoke, fog, vapor, photonic ray tracing, sediment
+transport, granular materials, liquids, solids, crack propagation, and
+other systems in which macroscopic behavior emerges from large numbers
+of interacting discrete entities.
+
+Despite the substantial increase in particle density, configurations
+containing approximately three million particles remain interactive,
+sustaining roughly 50 frames per second on the evaluation platform.
+This suggests that high-density particle representations can be studied
+while retaining sufficient computational capacity for particle
+dynamics, force evaluation, and other simulation operations beyond
+collision detection.
 
 These visualizations provide intuition regarding the practical scale of
 particle systems that can be represented using the framework. The particle 
-counts demonstrated in this work suggest that a single CPU--GPU system is 
+counts demonstrated in this work suggest that a single CPU-GPU system is 
 capable of supporting particle-system scales that
 have traditionally been associated with high-performance computing
 (HPC) resources.

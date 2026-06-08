@@ -1,30 +1,62 @@
 % !TeX root = main.tex
 \section{Introduction}
 
-Collision detection is a fundamental component of particle simulation,
-computer graphics, and physics-based modeling. Applications such as
-granular media, molecular dynamics, discrete element methods, and
-particle-based fluid simulation may require the evaluation of millions
-of particles within a single timestep. A naive all-pairs
-collision-detection strategy exhibits quadratic complexity with respect
-to particle count, resulting in approximately $(10^{12})$ pairwise
-comparisons for a system containing one million particles. Consequently,
-collision detection often becomes the dominant computational expense,
-motivating the continued development of scalable broad-phase
-collision-detection algorithms for large-scale simulation.
+Particle-based methods provide a natural framework for modeling systems
+composed of discrete interacting entities. Such methods are widely used
+to study solids, fluids, granular materials, multiphase flows, molecular
+systems, and a broad range of engineering and scientific applications 
+\cite{Meakin2009,onate2011,allen2017}
+Unlike continuum approaches, particle methods directly represent
+individual interacting elements, allowing macroscopic behavior to emerge
+from local interactions. This capability makes particle simulations
+particularly valuable for studying systems in which complex collective
+behavior arises from large numbers of discrete constituents.
 
-Existing broad-phase methods typically generate occupancy information
-through dedicated collision-detection stages that remain separate from
-the graphics pipeline. This work presents gPCD, a GPU-resident
-collision-detection framework consisting of broad-phase and narrow-phase
-stages. The primary contribution is a broad-phase formulation that
-integrates occupancy generation directly into the graphics pipeline
-through corner-based occupancy construction. Occupancy generation is
-performed within the vertex stage during graphics-pipeline execution,
-allowing broad-phase construction and rendering to proceed concurrently
-on the GPU. A conventional narrow phase evaluates the resulting
-collision candidates. Experimental results demonstrate efficient
-processing of large particle counts, stable throughput-limited
-operation, and near-linear scaling behavior.
+Beyond their traditional role in engineering analysis, particle
+simulations also serve as tools for scientific discovery. The emergence
+of previously unobserved physical behavior often requires the direct
+simulation of large numbers of interacting particles. While modern
+machine-learning methods can effectively learn from existing datasets,
+they remain fundamentally dependent upon representative training data.
+Consequently, high-fidelity particle simulations continue to play a
+critical role in generating new physical insights, producing training
+datasets, and investigating phenomena that have not yet been fully
+characterized through experiment or analysis.
+
+As simulation fidelity increases, the number of particles required to
+accurately represent physical systems may grow into the millions or
+billions. Higher particle counts enable finer spatial resolution,
+improved representation of complex geometries, and the investigation of
+phenomena spanning a broad range of scales, from dilute particulate
+systems to dense continuum-like materials. However, these benefits come
+at the cost of substantially increased computational requirements,
+making efficient particle-processing algorithms a critical component of
+large-scale particle simulation.
+
+One of the primary limitations of large-scale particle simulation is the
+cost of collision detection. A naïve all-to-all collision search scales
+as $(O(N^2))$, making direct evaluation impractical for large particle
+counts. Broad-phase collision-detection algorithms reduce this cost
+\cite{ericson2004} by restricting collision testing to nearby
+particles; however, efficient broad-phase construction remains a
+significant challenge for massively parallel implementations.
+
+Modern graphics processing units (GPUs) provide substantial
+computational throughput and memory bandwidth, making them attractive
+platforms for particle simulation. Despite these advances, generating and
+maintaining spatial occupancy structures efficiently at large scales
+remains a fundamental bottleneck.
+
+This paper presents GPU-driven high-performance graphics particle collision
+detection (gPCD), a collision-detection framework that leverages the
+graphics pipeline to generate particle occupancy information and
+construct a uniform cell-array representation suitable for massively
+parallel collision processing. By organizing occupancy generation around
+particle corner locations and exploiting GPU rasterization hardware,
+gPCD enables efficient broad-phase construction while maintaining a
+simple and scalable data structure. The resulting framework supports
+high particle counts on a single CPU--GPU system and provides a
+foundation for future large-scale particle simulation applications.
+
 
 

@@ -135,11 +135,11 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
         self.vals_list[f"{prefix_name}{name}"] = 'Compute'
         
       self.vals_list[f"{prefix_name}{name}satval"] = f"{N0}"
-      self.vals_list[f"{prefix_name}{name}ball"] = f"{a_all:0.2f}"
-      self.vals_list[f"{prefix_name}{name}aall"] = f"{b_all:0.2f}"
-      self.vals_list[f"{prefix_name}{name}rtwoall"] = f"{r2_all:0.2f}"
-      self.vals_list[f"{prefix_name}{name}bsat"] = f"{a_sat:0.2f}"
-      self.vals_list[f"{prefix_name}{name}asat"] = f"{b_sat:0.2f}"
+      self.vals_list[f"{prefix_name}{name}ball"] = f"{a_all:0.4f}"
+      self.vals_list[f"{prefix_name}{name}aall"] = f"{b_all:0.4f}"
+      self.vals_list[f"{prefix_name}{name}rtwoall"] = f"{r2_all:0.4f}"
+      self.vals_list[f"{prefix_name}{name}bsat"] = f"{a_sat:0.4f}"
+      self.vals_list[f"{prefix_name}{name}asat"] = f"{b_sat:0.4f}"
       self.vals_list[f"{prefix_name}{name}rtwosat"] = f"{r2_sat:0.4f}"
       self.vals_list[f"{prefix_name}{name}aq"] = f"{a_q:0.4e}"
       self.vals_list[f"{prefix_name}{name}bq"] = f"{b_q:0.4e}"

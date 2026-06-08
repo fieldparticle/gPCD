@@ -7,7 +7,7 @@ import re
 from gbase.AttrDictFields import *
 from gbase.ConfigUtility import *
 from gbase.ValuesDataBase import *
-from gbase.gPCDData import gPCDData
+from gbase.gPCDData import *
 class A_PQBRT_TABLE_ALL():
 
     def __init__(self,itemcfg,base):

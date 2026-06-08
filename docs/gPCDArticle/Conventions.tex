@@ -1,42 +1,257 @@
 
 % !TeX root = main.tex
 \newpage
-\section{Performance Regions}
+\clearpage
+\begin{center}
+\Large\textbf{Conventions Section\\ (included only in rough draft. For documenting standards, outline, and rules)}
+\end{center}
+\section{Manuscript Outline}
 
-Throughout this work, throughput curves are interpreted in terms of
-three performance regions:
+\begin{verbatim}
+Abstract
+What was done?
+Why is it important?
+What was achieved?
+
+1. Introduction
+   Why are particle systems important?
+   What are particle systems used for?
+   Why are large particle systems computationally limited?
+   What is the contribution of gPCD?
+
+2. Background and Related Work
+   What must the reader know first?
+
+   2.1 Broad-Phase Collision Detection
+   What is occupancy generation and why is it needed?
+
+   2.2 Rendering and Collision Detection
+   How have rendering and collision detection traditionally
+   been organized?
+
+   2.3 GPU Occupancy Structures
+   Uniform grids, spatial hashing, and related approaches.
+
+   2.4 Gap in Existing Methods
+   What architectural capability is missing?
+
+3. Methodology
+   How does gPCD work?
+
+   3.1 Framework Overview
+   Overall architecture.
+
+   3.2 Graphics-Pipeline Occupancy Generation
+   Broad-phase construction using the graphics pipeline.
+
+   3.3 Corner-Based Occupancy Construction
+   Corner generation and occupancy insertion.
+
+   3.4 Duplicate Corner Suppression
+   Preventing multiple insertions of the same particle
+   into a cell occupancy list.
+
+   3.5 Cell Construction and Occupancy Capacity
+   Occupancy-list sizing from particle geometry.
+
+   3.6 Cell Addressing and Flattening
+   Cell indexing and memory access.
+
+   3.7 PCS Construction
+   Formation of the potentially colliding set.
+
+   3.8 Source-Owned Narrow-Phase Evaluation
+   Collision evaluation suitable for massively
+   parallel execution.
+
+4. Complexity Analysis
+   How should the framework scale?
+
+   4.1 Occupancy Generation
+   Broad-phase complexity.
+
+   4.2 PCS Construction
+   Cost of candidate generation.
+
+   4.3 Narrow-Phase Evaluation
+   Collision-processing complexity.
+
+   4.4 Storage Requirements
+   Memory requirements and occupancy-list sizing.
+
+   4.5 Overall Complexity
+   Combined computational and storage complexity.
+
+5. Experimental Setup
+   What was tested?
+
+   5.1 Hardware and Software
+   Evaluation platform.
+
+   5.2 Benchmark Configuration
+   Test conditions and parameters.
+
+   5.3 Benchmark Datasets
+   Particle counts and benchmark-density studies.
+
+   5.4 Performance Metrics
+   Throughput, time-per-particle, and ARR metrics.
+
+6. Results
+   What happened?
+
+   6.1 Throughput
+   Measured particle throughput.
+
+   6.2 Time per Particle
+   Saturation behavior and scaling efficiency.
+
+   6.3 Scaling Behavior
+   Regression analysis and scaling trends.
+
+   6.4 Locality Analysis
+   Random versus sequential occupancy ordering.
+
+   6.5 Density Studies
+   Representative particle densities and achievable
+   simulation scales.
+
+   6.6 Comparison to Prior Work
+   Relative performance and throughput.
+
+7. Discussion
+   Why did it happen?
+
+   7.1 Interpretation of Scaling
+   Meaning of measured scaling behavior.
+
+   7.2 Saturation Behavior
+   Utilization, saturation, and throughput-limited
+   operating regions.
+
+   7.3 Memory Locality
+   Impact of occupancy ordering on performance.
+
+   7.4 Implications for Large-Scale Particle Simulation
+   Significance for engineering, scientific discovery,
+   and future particle-based applications.
+
+8. Conclusions
+   What should the reader remember?
+
+   Contributions.
+   Key performance results.
+   Practical implications.
+   Future work.
+   \end{verbatim}
+
+\subsection{Purpose}
+
+The purpose of this document is to:
+
+\begin{itemize}
+\item Maintain consistency across all manuscripts.
+\item Prevent reintroduction of retired concepts.
+\item Ensure technical claims remain supported by evidence.
+\item Standardize notation and terminology.
+\item Distinguish established results from future work.
+\item Preserve continuity as the research evolves.
+\end{itemize}
+
+\subsection{Primary Contribution}
+
+The principal architectural features of gPCD are:
+
+\begin{itemize}
+\item Graphics-pipeline generation of broad-phase occupancy information.
+\item Duplicate-aware cell construction that prevents redundant particle occupancy entries.
+\item Analytically bounded occupancy-list sizing derived from particle geometry.
+\item Source-owned narrow-phase collision evaluation suitable for massively parallel execution.
+\item Demonstrated scalability to more than ten million particles on a single CPU-GPU system.
+\end{itemize}
+
+
+\subsection{Abstract Requirements}
+
+The abstract shall be written after completion of the manuscript
+review process.
+
+The abstract shall answer the following questions:
 
 \begin{enumerate}
-
-\item \textbf{Utilization Region}
-
-The utilization region corresponds to low particle counts where GPU
-resources are not yet fully utilized. In this region, throughput
-increases rapidly as particle count increases because additional work
-improves parallel occupancy and hardware utilization.
-
-\item \textbf{Peak Throughput Region}
-
-The peak throughput region corresponds to the neighborhood surrounding
-the maximum measured throughput. Within this region, the framework
-achieves its highest particle-processing rate and transitions from
-utilization-limited behavior toward throughput-limited behavior.
-
-\item \textbf{Throughput-Limited Region}
-
-The throughput-limited region corresponds to particle counts beyond the
-peak throughput region. In this region, additional particles no longer
-increase throughput and may produce a gradual decline in throughput as
-execution costs continue to grow.
-
+\item What problem is addressed?
+\item What is the primary contribution?
+\item How does the method operate?
+\item What results were demonstrated?
+\item Why are the results significant?
 \end{enumerate}
 
-Observed transition locations are benchmark dependent and are
-identified directly from measured throughput curves rather than imposed
-a priori.
+The abstract shall not introduce terminology, concepts, or claims
+that are not subsequently developed and supported within the manuscript.
 
+\subsection{Paper Scope}
 
-\newpage
+The current manuscript is exclusively a particle collision-detection
+paper describing the gPCD framework.
+
+Topics that belong within the scope of this manuscript include:
+
+\begin{itemize}
+\item Broad-phase collision detection.
+\item Cell-array occupancy generation.
+\item Graphics-pipeline occupancy generation.
+\item Duplicate elimination.
+\item Narrow-phase collision evaluation.
+\item Computational complexity.
+\item GPU implementation.
+\item Performance and scalability.
+\end{itemize}
+
+Topics that are explicitly outside the scope of this manuscript include:
+
+\begin{itemize}
+\item Field Particle Method dynamics.
+\item Internal momentum representation.
+\item Thermodynamic modeling.
+\item Pressure and temperature formulation.
+\item Phase-change modeling.
+\item Converging-diverging nozzle analysis.
+\item Choking behavior.
+\item Flow diagnostics.
+\end{itemize}
+
+Such topics may be referenced only when necessary to provide context and
+shall not be presented as primary contributions of the manuscript.
+
+\subsection{Section Responsibilities}
+
+Each major section of the manuscript is intended to answer a distinct
+question.
+
+\begin{itemize}
+\item Methodology: What does the algorithm do?
+\item Complexity Analysis: How should the algorithm scale?
+\item Experimental Setup: How was the algorithm evaluated?
+\item Results: What performance was observed?
+\item Discussion: Why was this behavior observed and what are its implications?
+\item Conclusions: What should the reader take away from the work?
+\end{itemize}
+
+To avoid redundancy, complexity analysis, performance measurements, and
+interpretation are separated into their respective sections whenever
+possible.
+
+\subsection{Revision Procedure}
+
+Before major modifications are made to any manuscript:
+
+\begin{enumerate}
+\item Proposed terminology changes shall be reviewed against this document.
+\item New technical claims shall be added here before being incorporated into manuscripts.
+\item Retired concepts shall be recorded in Section~\ref{sec:retired_concepts}.
+\item Publication-specific deviations shall be documented and justified.
+\end{enumerate}
+
 \section{Figures}
 
 Figures are classified according to their role within the manuscript.
@@ -127,115 +342,302 @@ Discussion \\
 \end{tabular}
 \end{table}
 
+\section{Performance Regions}
+
+Throughout this work, throughput curves are interpreted in terms of
+three performance regions:
+
+\begin{enumerate}
+
+\item \textbf{Utilization Region}
+
+The utilization region corresponds to low particle counts where GPU
+resources are not yet fully utilized. In this region, throughput
+increases rapidly as particle count increases because additional work
+improves parallel occupancy and hardware utilization.
+
+\item \textbf{Peak Throughput Region}
+
+The peak throughput region corresponds to the neighborhood surrounding
+the maximum measured throughput. Within this region, the framework
+achieves its highest particle-processing rate and transitions from
+utilization-limited behavior toward throughput-limited behavior.
+
+\item \textbf{Throughput-Limited Region}
+
+The throughput-limited region corresponds to particle counts beyond the
+peak throughput region. In this region, additional particles no longer
+increase throughput and may produce a gradual decline in throughput as
+execution costs continue to grow.
+
+\end{enumerate}
+
+Observed transition locations are benchmark dependent and are
+identified directly from measured throughput curves rather than imposed
+a priori.
+
+\subsection{Sequential vs Random Percent increase}
+
+The percent increase comparison is calculated by \ref{pci}
+\begin{equation}
+\label{pci}
+P_{\mathrm{locality}}
+=
+\frac{t_{\mathrm{random}}-t_{\mathrm{sequential}}}
+     {t_{\mathrm{sequential}}}
+\times 100\%.
+\end{equation}
+
+\newpage
 \section{Comparative Analysis}
 
-The present work explicitly accounts for occupancy generation,
-occupancy-list traversal, narrow-phase evaluation, and storage
-requirements. This level of decomposition is intended to provide a
-clear correspondence between the implemented framework and the reported
-complexity results.
+\section{Comparative Analysis}
 
-\section{Manuscript Outline}
-\begin{verbatim}
-Abstract
-    What was done?
-    Why is it important?
-    What was achieved?
+The time-per-particle (TPP) values reported in
+Table~\ref{tab:tpp_comparison} were derived from performance metrics
+reported in the corresponding publications. Because the surveyed works
+span multiple decades, hardware platforms, benchmark configurations,
+and particle-processing architectures, the resulting values should be
+interpreted as approximate indicators of reported particle-processing
+efficiency rather than direct performance rankings.
 
-1. Introduction
-    What problem is being solved?
-    Why does it matter?
-    What is the contribution?
+For each reference, the reported particle count (N), execution time
+(t), frame rate, or throughput metric was extracted from the
+publication and converted to a common time-per-particle metric using
 
-2. Background and Related Work
-    What must the reader know first?
+\begin{equation}\mathrm{TPP}=\frac{t}{N},\end{equation}
 
-    2.1 Broad-Phase Collision Detection
-        What is occupancy generation and why is it needed?
+where (t) is expressed in nanoseconds and (N) is the number of
+particles processed.
 
-    2.2 Rendering and Collision Detection
-        How have rendering and collision detection traditionally
-        been organized?
+The following subsections document the source data and calculations
+used to construct Table~\ref{tab:tpp_comparison}.
 
-    2.3 Gap in Existing Methods
-        What architectural capability is missing?
+\subsection{Latta (2004)}
 
-3. Methodology
-    How does gPCD work?
+Reference:
+\cite{latta}
 
-    3.1 Framework Overview
-        What is the overall architecture?
+Reported Metrics:
 
-    3.2 Graphics-Pipeline Occupancy Generation
-        How is occupancy generated?
+\begin{itemize}
+\item Particle count:
+\item Reported execution time:
+\item Reported frame rate:
+\item Hardware:
+\end{itemize}
 
-    3.3 Corner-Based Occupancy Construction
-        How are corners used to populate cells?
+Calculation:
 
-    3.4 Cell Addressing and Flattening
-        How are cells identified and accessed?
+\begin{equation}
+\mathrm{TPP}_{Latta}=33.33;\mathrm{ns/particle}.
+\end{equation}
 
-    3.5 PCS Construction
-        How is the potentially colliding set formed?
+Comments:
 
-    3.6 Narrow-Phase Evaluation
-        How are collisions evaluated?
+\begin{itemize}
+\item
+\end{itemize}
 
-4. Complexity Analysis
-    How should the framework scale?
+\subsection{Kipfer (2004)}
 
-    4.1 Occupancy Generation
-        Cost of broad-phase occupancy generation.
+Reference:
+\cite{kipfer}
 
-    4.2 Narrow-Phase Evaluation
-        Cost of collision evaluation.
+Reported Metrics:
 
-    4.3 Storage Requirements
-        Memory requirements of the architecture.
+\begin{itemize}
+\item Particle count:
+\item Reported execution time:
+\item Reported frame rate:
+\item Hardware:
+\end{itemize}
 
-    4.4 Overall Complexity
-        Combined computational and storage complexity.
+Calculation:
 
-5. Experimental Setup
-    What was tested?
+\begin{equation}
+\mathrm{TPP}_{Kipfer}=390.00;\mathrm{ns/particle}.
+\end{equation}
 
-    5.1 Hardware and Software
-        Evaluation platform.
+Comments:
 
-    5.2 Benchmark Configuration
-        Test conditions and parameters.
+\begin{itemize}
+\item
+\end{itemize}
 
-    5.3 Benchmark Datasets
-        Particle counts and benchmark-density figures.
+\subsection{Zhang (2008)}
 
-6. Results
-    What happened?
+Reference:
+\cite{zhang}
 
-    6.1 Throughput
-        Measured particle throughput.
+Reported Metrics:
 
-    6.2 Time per Particle
-        Scaling efficiency.
+\begin{itemize}
+\item Particle count:
+\item Reported execution time:
+\item Reported frame rate:
+\item Hardware:
+\end{itemize}
 
-    6.3 Scaling Behavior
-        Regression analysis and scaling trends.
+Calculation:
 
-7. Discussion
-    Why did it happen?
+\begin{equation}
+\mathrm{TPP}_{Zhang}=\mathrm{ns/particle}.
+\end{equation}
 
-    7.1 Interpretation of Scaling
-        Meaning of measured scaling.
+\subsection{Anderson (2008)}
 
-    7.2 Saturation Behavior
-        GPU saturation and throughput limits.
+Reference:
+\cite{anderson}
 
-    7.3 Comparison to Prior Work
-        Relative performance and architectural differences.
+Reported Metrics:
 
-8. Conclusions
-    What should the reader remember?
+\begin{itemize}
+\item Particle count:
+\item Reported execution time:
+\item Reported frame rate:
+\item Hardware:
+\end{itemize}
 
-\end{verbatim}
+Calculation:
+
+\begin{equation}
+\mathrm{TPP}_{Anderson}=1400.00;\mathrm{ns/particle}.
+\end{equation}
+
+\subsection{Liu (2010)}
+
+Reference:
+\cite{liu}
+
+Reported Metrics:
+
+\begin{itemize}
+\item Particle count:
+\item Reported execution time:
+\item Reported frame rate:
+\item Hardware:
+\end{itemize}
+
+Calculation:
+
+\begin{equation}
+\mathrm{TPP}_{Liu}=167.70;\mathrm{ns/particle}.
+\end{equation}
+
+\subsection{Govender (2015)}
+
+Reference:
+\cite{govender}
+
+Reported Metrics:
+
+\begin{itemize}
+\item Particle count:
+\item Reported execution time:
+\item Reported frame rate:
+\item Hardware:
+\end{itemize}
+
+Calculation:
+
+\begin{equation}
+\mathrm{TPP}_{Govender}=943.00;\mathrm{ns/particle}.
+\end{equation}
+
+\subsection{Joselli (2015)}
+
+Reference:
+\cite{joselli}
+
+Reported Metrics:
+
+\begin{itemize}
+\item Particle count:
+\item Reported execution time:
+\item Reported frame rate:
+\item Hardware:
+\end{itemize}
+
+Calculation:
+
+\begin{equation}
+\mathrm{TPP}_{Joselli}=\mathrm{ns/particle}.
+\end{equation}
+
+\subsection{Franklin (2017)}
+
+Reference:
+\cite{franklin}
+
+Reported Metrics:
+
+\begin{itemize}
+\item Particle count:
+\item Reported execution time:
+\item Reported frame rate:
+\item Hardware:
+\end{itemize}
+
+Calculation:
+
+\begin{equation}
+\mathrm{TPP}_{Franklin}=33.00;\mathrm{ns/particle}.
+\end{equation}
+
+\subsection{Mittal (2020)}
+
+Reference:
+\cite{mittal}
+
+Reported Metrics:
+
+\begin{itemize}
+\item Particle count:
+\item Reported execution time:
+\item Reported frame rate:
+\item Hardware:
+\end{itemize}
+
+Calculation:
+
+\begin{equation}
+\mathrm{TPP}_{Mittal}=16.50;\mathrm{ns/particle}.
+\end{equation}
+
+\subsection{Bell (2025)}
+
+Reported Metrics:
+
+\begin{itemize}
+\item Particle count:
+\numprint{11088896}
+\item Total execution time:
+84.47 ms
+\item Hardware:
+RTX 3500 Ada Generation Laptop GPU
+\end{itemize}
+
+Calculation:
+
+\begin{equation}
+\mathrm{TPP}_{Bell}=\frac{84.47\times10^{6}}{\numprint{11088896}}=7.62;\mathrm{ns/particle}.
+\end{equation}
+
+Comments:
+
+\begin{itemize}
+\item Includes occupancy generation, occupancy-list traversal,
+narrow-phase evaluation, and rendering.
+\item Reported using measured execution time from the complete
+framework.
+\end{itemize}
+
+
+
+\subsection{Uniform Grids}
+Q: Uniform grids with direct insertion are also O(N).
+A: The contribution is not a new asymptotic complexity class. The contribution is graphics-pipeline occupancy generation, duplicate-aware occupancy construction, and a GPU-driven architecture that achieves O(N) broad-phase generation while maintaining favorable memory locality."
 
 \section{Audience and Explanation Level}
 
@@ -306,105 +708,6 @@ standards used throughout the gPCD and Field Particle Method research
 program. When conflicts arise between a manuscript and this document,
 this document shall take precedence until formally revised.
 
-\subsection{Purpose}
-
-The purpose of this document is to:
-
-\begin{itemize}
-\item Maintain consistency across all manuscripts.
-\item Prevent reintroduction of retired concepts.
-\item Ensure technical claims remain supported by evidence.
-\item Standardize notation and terminology.
-\item Distinguish established results from future work.
-\item Preserve continuity as the research evolves.
-\end{itemize}
-
-\subsection{Primary Contribution}
-
-\textit{Pending manuscript review. This section will contain the
-authoritative statement of the primary contribution of the paper and
-shall be completed after all major review items have been resolved.}
-
-\subsection{Abstract Requirements}
-
-The abstract shall be written after completion of the manuscript
-review process.
-
-The abstract shall answer the following questions:
-
-\begin{enumerate}
-\item What problem is addressed?
-\item What is the primary contribution?
-\item How does the method operate?
-\item What results were demonstrated?
-\item Why are the results significant?
-\end{enumerate}
-
-The abstract shall not introduce terminology, concepts, or claims
-that are not subsequently developed and supported within the manuscript.
-
-\subsection{Paper Scope}
-
-The current manuscript is exclusively a particle collision-detection
-paper describing the gPCD framework.
-
-Topics that belong within the scope of this manuscript include:
-
-\begin{itemize}
-\item Broad-phase collision detection.
-\item Cell-array occupancy generation.
-\item Graphics-pipeline occupancy generation.
-\item Duplicate elimination.
-\item Narrow-phase collision evaluation.
-\item Computational complexity.
-\item GPU implementation.
-\item Performance and scalability.
-\end{itemize}
-
-Topics that are explicitly outside the scope of this manuscript include:
-
-\begin{itemize}
-\item Field Particle Method dynamics.
-\item Internal momentum representation.
-\item Thermodynamic modeling.
-\item Pressure and temperature formulation.
-\item Phase-change modeling.
-\item Converging-diverging nozzle analysis.
-\item Choking behavior.
-\item Flow diagnostics.
-\end{itemize}
-
-Such topics may be referenced only when necessary to provide context and
-shall not be presented as primary contributions of the manuscript.
-
-\subsection{Section Responsibilities}
-
-Each major section of the manuscript is intended to answer a distinct
-question.
-
-\begin{itemize}
-\item Methodology: What does the algorithm do?
-\item Complexity Analysis: How should the algorithm scale?
-\item Experimental Setup: How was the algorithm evaluated?
-\item Results: What performance was observed?
-\item Discussion: Why was this behavior observed and what are its implications?
-\item Conclusions: What should the reader take away from the work?
-\end{itemize}
-
-To avoid redundancy, complexity analysis, performance measurements, and
-interpretation are separated into their respective sections whenever
-possible.
-
-\subsection{Revision Procedure}
-
-Before major modifications are made to any manuscript:
-
-\begin{enumerate}
-\item Proposed terminology changes shall be reviewed against this document.
-\item New technical claims shall be added here before being incorporated into manuscripts.
-\item Retired concepts shall be recorded in Section~\ref{sec:retired_concepts}.
-\item Publication-specific deviations shall be documented and justified.
-\end{enumerate}
 
 %================================================================================
 \section{Approved Terminology}

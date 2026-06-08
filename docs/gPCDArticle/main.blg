@@ -1,0 +1,86 @@
+This is BibTeX, Version 0.99e
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: main.aux
+Reallocating 'name_of_file' (item size: 1) to 21 items.
+The style file: ACM-Reference-Format.bst
+Reallocating 'name_of_file' (item size: 1) to 22 items.
+Reallocating 'singl_function' (item size: 4) to 100 items.
+Reallocating 'singl_function' (item size: 4) to 100 items.
+Reallocating 'wiz_functions' (item size: 4) to 6000 items.
+Database file #1: ReferencesWithdoi.bib
+Warning--I didn't find a database entry for "latta"
+Warning--I didn't find a database entry for "kipfer"
+Warning--I didn't find a database entry for "zhang"
+Warning--I didn't find a database entry for "anderson"
+Warning--I didn't find a database entry for "liu"
+Warning--I didn't find a database entry for "govender"
+Warning--I didn't find a database entry for "joselli"
+Warning--I didn't find a database entry for "franklin"
+Warning--I didn't find a database entry for "mittal"
+Reallocating 'singl_function' (item size: 4) to 100 items.
+Reallocating 'wiz_functions' (item size: 4) to 9000 items.
+Reallocating 'glb_str_end' (item size: 4) to 20 items.
+Reallocating 'glb_str_ptr' (item size: 4) to 20 items.
+Reallocating 'global_strs' (item size: 1) to 4000000 items.
+Reallocating 'singl_function' (item size: 4) to 100 items.
+Warning--empty publisher in barbieri2013
+Warning--empty address in barbieri2013
+Warning--page numbers missing in both pages and numpages fields in barbieri2013
+Warning--empty year in capannini
+Warning--using n.d. in capannini
+Warning--no journal in capannini
+Warning--no number and no volume in capannini
+Warning--page numbers missing in both pages and numpages fields in capannini
+Warning--empty address in ericson2004
+Warning--empty year in hastings
+Warning--using n.d. in hastings
+Warning--no journal in hastings
+Warning--no number and no volume in hastings
+Warning--page numbers missing in both pages and numpages fields in hastings
+Warning--empty year in hinumNVIDIARTX3500
+Warning--using n.d. in hinumNVIDIARTX3500
+Warning--no number and no volume in kipfer2004
+Warning--page numbers missing in both pages and numpages fields in kipfer2004
+Warning--page numbers missing in both pages and numpages fields in latta2004
+You've used 27 entries,
+            6273 wiz_defined-function locations,
+            1729 strings with 24318 characters,
+and the built_in function-call counts, 29249 in all, are:
+= -- 3626
+> -- 870
+< -- 0
++ -- 290
+- -- 303
+* -- 2159
+:= -- 2810
+add.period$ -- 136
+call.type$ -- 27
+change.case$ -- 187
+chr.to.int$ -- 27
+cite$ -- 46
+duplicate$ -- 2659
+empty$ -- 1885
+format.name$ -- 395
+if$ -- 7065
+int.to.chr$ -- 2
+int.to.str$ -- 1
+missing$ -- 102
+newline$ -- 283
+num.names$ -- 190
+pop$ -- 1052
+preamble$ -- 1
+purify$ -- 386
+quote$ -- 0
+skip$ -- 926
+stack$ -- 0
+substring$ -- 2193
+swap$ -- 261
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 583
+warning$ -- 19
+while$ -- 172
+width$ -- 0
+write$ -- 593
+(There were 28 warnings)
