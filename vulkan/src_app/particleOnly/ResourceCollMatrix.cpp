@@ -49,8 +49,8 @@ void ResourceCollMatrix::Create(uint32_t BindPoint, ResourceVertexParticle* part
                                         * (CfgTst->GetUInt("CellAryL", true)));
 
 
-    m_BufSize = (m_MaxLoc*sizeof(uint32_t))*(CfgTst->GetInt("cell_occupancy_list_size", true));
-    mout << "MEMALLOC:ResourceCollMatrix V2:" << m_BufSize << ende;    
+    m_BufSize = (m_MaxLoc*sizeof(uint32_t))*8*(CfgTst->GetInt("cell_occupancy_list_size", true));
+    mout << "Collision Matrix Size:" << m_BufSize << ende;    
     
     uint32_t elements = m_BufSize / sizeof(uint32_t);
     uint32_t locations = elements / CfgTst->GetInt("cell_occupancy_list_size", true);

@@ -33,17 +33,17 @@
 #version 460
 #extension GL_ARB_separate_shader_objects : enable
 //#extension GL_ARB_shading_language_420pack : enable
-#include "../VerfPerf/debug.glsl"
+#include "debug.glsl"
 #if defined(DEBUG)
 	#extension GL_EXT_debug_printf : enable
 #endif
-//#extension GL_EXT_scalar_block_layout :enable
+#extension GL_EXT_scalar_block_layout :enable
 //#extension GL_KHR_memory_scope_semantics:enable
 //#extension GL_EXT_shader_atomic_float:enable
 //#extension GL_KHR_shader_subgroup_basic:enable
 
 
-#include "../VerfPerf/params.glsl"
+#include "params.glsl"
 #include "../common/constants.glsl"
 #include "../common/util.glsl"
 #include "../common/push.glsl"

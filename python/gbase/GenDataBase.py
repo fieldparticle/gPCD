@@ -10,7 +10,7 @@ import numpy as np
 import ctypes
 import math
 from gbase.ConfigUtility import *
-from gbase.BinaryFileUtilities import read_all_particle_data, read_particle_data
+from gbase.BinaryFileUtilities import *
 from gbase.utilities import *
 from gbase.pdata import *
 from abc import ABC, abstractmethod
@@ -91,7 +91,10 @@ class GenDataBase:
     #
     def do_cells(self):
         pass
+    
     def clear_files(self):
+        clear_files(self.itemcfg)    
+        '''
         clr_path = self.itemcfg.data_dir + "/*.csv"
         files = glob.glob(clr_path)
         for f in files:
@@ -106,6 +109,7 @@ class GenDataBase:
         files = glob.glob(clr_path)
         for f in files:
             os.remove(f)
+        '''
     ##############################################################################
     # Partice calcualtions
     # 
@@ -197,7 +201,7 @@ class GenDataBase:
         except BaseException as e:
             self.log.log(self,e)
 
-    def count_partices(self,file_name):
+    def count_particles(self,file_name):
         count = 0
         with open(file_name, "rb") as f:
             while True:
@@ -205,6 +209,7 @@ class GenDataBase:
                 if not data:
                     break
                 count += 1
+        print(f"Total particles in file {file_name}: {count}")
         return count
 
     #******************************************************************

@@ -95,7 +95,6 @@ void ResourceAtomicGraphics::createBuffers()
 }
 void ResourceAtomicGraphics::PushMem(uint32_t currentBuffer)
 {
-	return;
 	m_collisionStruct.ErrorReturn = 0;
 	m_collisionStruct.numParticles = 0;
 	vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, &m_collisionStruct, m_Allocation[currentBuffer],

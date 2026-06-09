@@ -124,9 +124,9 @@ public:
 		
    
 	std::vector<void*>              	m_BuffersMapped={};
-	uint32_t							m_BufSize=0;
+	uint64_t							m_BufSize=0;
 	void*								m_data=nullptr;
-	uint32_t							m_NumElements=0;
+	uint64_t							m_NumElements=0;
 	VkDescriptorType					m_VkType = {};
 	std::string							m_PiplineName = {};
 	VkPushConstantRange						m_PushConstant{};

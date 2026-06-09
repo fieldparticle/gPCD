@@ -109,7 +109,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 
 		// Check to see if this flow type is resevior before checkig the lower bounds
 		// since position is <-99,-99,-99> or  <-99,-99,1.0> in 2D
-		if (flow_modeling == true)
+		if (true)
 		{
 			if (part_pos.rx < 0.5 || part_pos.ry < 0.5 || part_pos.rz < 0.5)
 			{
@@ -171,6 +171,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 	mout << "Particle Read:" << m_NumParticles << " Side Length =" << m_SideLength << " ParticleStruct Size:" 
 		<< styrsz << ende;
 
+	uint32_t sizeParta = sizeof(Particle);
 	m_BufSize = sizeof(Particle) * m_NumParticles;
 
 	mout << "MEMALLOC:ResourceVertexParticle:" << m_BufSize << ende;
@@ -187,7 +188,20 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		throw std::runtime_error(objtxt.str().c_str());
 	}
 
-
+	if (m_BufSize != m_Particles.size() * sizeof(Particle))
+	{
+		std::ostringstream  objtxt;
+		size_t num_p = m_Particles.size();
+		size_t psize = m_Particles.size() * sizeof(Particle);
+		size_t struct_size = sizeof(Particle);
+		objtxt << m_Name << "ResourceVertexParticle::Buffer size Mismatch: BufSize:"
+			<< m_BufSize
+			<< " Size from particle array:" 
+			<<  psize 
+			<< " num parts from structure:"
+			<< num_p
+			<< std::ends;
+	}
 #if 0
 	int rem = sizeof(Particle) % 16;
 	if (rem != 0)
@@ -219,33 +233,35 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 	m_Allocation.resize(m_thisFramesBuffered);
 	VkBuffer buf = {};
 
-	for (size_t i = 0; i < m_thisFramesBuffered; i++)
-	{
-		objtxt << m_Name << " Number:" << i << std::ends;
-		m_App->VMACreateDeviceBuffer(m_BufSize,
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			m_Buffers[i], m_Allocation[i], objtxt.str());
+	uint32_t i = 0;
+	objtxt << m_Name << " Number:" << i << std::ends;
+	m_App->VMACreateDeviceBuffer(m_BufSize,
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		m_Buffers[i], m_Allocation[i], objtxt.str());
+
+	
+	m_BufferInfo[i].buffer = m_Buffers[i];
+	m_BufferInfo[i].offset = 0;
+	uint32_t sizePart = sizeof(Particle);
+	m_BufferInfo[i].range = m_BufSize;
+
+	m_DescriptorWrite[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	m_DescriptorWrite[i].dstBinding = m_BindPoint;
+	m_DescriptorWrite[i].dstArrayElement = 0;
+	m_DescriptorWrite[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	m_DescriptorWrite[i].descriptorCount = 1;
+	m_DescriptorWrite[i].pBufferInfo = &m_BufferInfo[i];
+	objtxt.clear();
 
 
-		m_BufferInfo[i].buffer = m_Buffers[i];
-		m_BufferInfo[i].offset = 0;
-		m_BufferInfo[i].range = sizeof(Particle) * m_Particles.size();
-
-		m_DescriptorWrite[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		m_DescriptorWrite[i].dstBinding = m_BindPoint;
-		m_DescriptorWrite[i].dstArrayElement = 0;
-		m_DescriptorWrite[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		m_DescriptorWrite[i].descriptorCount = 1;
-		m_DescriptorWrite[i].pBufferInfo = &m_BufferInfo[i];
-		objtxt.clear();
-
-	}
 	vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, m_Particles.data(), m_Allocation[0],
 		0, m_BufSize);
 	m_Particles.clear();
+	std::vector<Particle> empty;
+	m_Particles.swap(empty);
     
 }
 

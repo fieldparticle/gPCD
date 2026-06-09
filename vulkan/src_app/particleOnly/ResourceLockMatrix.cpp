@@ -49,7 +49,8 @@ void ResourceLockMatrix::Create(uint32_t BindPoint, ResourceVertexParticle* part
     m_MaxLoc = static_cast<uint32_t>((CfgTst->GetUInt("CellAryW", true)) 
                                     * (CfgTst->GetUInt("CellAryH", true)) 
                                     * (CfgTst->GetUInt("CellAryL", true)));
-    m_BufSize = m_MaxLoc*sizeof(uint32_t);
+    size_t uin32_size = sizeof(uint32_t);
+    m_BufSize = m_MaxLoc*sizeof(uint32_t)*8;
     mout << "MEMALLOC:ResourceLockMatrix V2:" << m_BufSize << ende;    
     createLayout();
     std::vector<uint32_t> idxloc;

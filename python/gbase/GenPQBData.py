@@ -3,6 +3,7 @@ import random
 from gbase.GenDataBase import *
 from gbase.pdata import *
 import time
+from gbase.BinaryFileUtilities import *
 class GenPQBData(GenDataBase):
 
     
@@ -166,6 +167,12 @@ class GenPQBData(GenDataBase):
         particle_struct.rx = rx
         particle_struct.ry = ry
         particle_struct.rz = rz
+        if (rx < 0.5 or ry < 0.5 or rz < 0.5):
+            print(f"Error: Particle {particle_struct.pnum} at <{rx},{ry},{rz}> is out of bounds for side length {self.side_length}")
+            return 4
+        if (test_ArrayToIndex(rx,ry,rz,self.side_length,self.side_length**3) == -1):
+            print(f"Error: Particle {particle_struct.pnum} at <{rx},{ry},{rz}> is out of bounds for side length {self.side_length}")
+            return 4
         particle_struct.radius = self.radius
         w_list.append(particle_struct)
         self.particle_count+=1
@@ -234,7 +241,7 @@ class GenPQBData(GenDataBase):
         if self.itemcfg.particle_enumeration == 'random':
             self.rand_data = self.gen_random_numbers_in_range(1, self.number_particles+1, self.number_particles)    
         if self.itemcfg.particle_enumeration == 'scale':
-            self.last_max_scale = self.number_particles+1
+            self.last_max_scale = self.number_particles
         self.collision_count = 0
         ret = 0
         self.w_list = []
@@ -270,6 +277,8 @@ class GenPQBData(GenDataBase):
                                         self.write_bin_file(self.w_list)
                                         #print(f"{self.collsion_count_check}")
                                     return 0
+                                elif ret == 4:
+                                    return 4
                                 if len(self.w_list) >= self.itemcfg.write_block_len:
                                     self.write_bin_file(self.w_list)
                                     self.w_list.clear()

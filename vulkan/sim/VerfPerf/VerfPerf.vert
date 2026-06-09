@@ -5,7 +5,7 @@
 #if defined(DEBUG)
 	#extension GL_EXT_debug_printf : enable
 #endif
-//#extension GL_EXT_scalar_block_layout :enable
+#extension GL_EXT_scalar_block_layout :enable
 
 
 #include "params.glsl"
@@ -82,11 +82,9 @@ void main(){
 	}
 #endif
 
-	if(index == 0)
-	{
-		collIn.numParticles = 0;
-		return;
-	}	
+#ifdef DEBUG
+	atomicAdd(collIn.numParticles,1);	
+#endif
 
 
 	
@@ -108,6 +106,11 @@ void main(){
 	float cy 		= P[index].PosLocA.y;
 	float cz 		= P[index].PosLocA.z;
 	float R			= P[index].PosLocA.w;
+	
+	if(cx < 0.5 || cy < 0.5 || cz < 0.5)
+		debugPrintfEXT("Invalid Particle slot>F:%u,P:%d,loc:<%0.2f,%0.2f,%0.2f>",
+		uint(ShaderFlags.frameNum),index,P[index].PosLocA.x,P[index].PosLocA.y,P[index].PosLocA.z);
+		
 	
 	uint duplist[8];
 	uint dupcntr = 0;
@@ -143,9 +146,6 @@ void main(){
 //################### Populate the cell array with this particles corners
 //#################################################################
 	//Need this to get the number particles count correct (?!)
-#ifdef DEBUG
-	atomicAdd(collIn.numParticles,1);	
-#endif
 
 	// Traverse the particles corner array if there is not a global error 
 	// which is stored in the 0th partcle parms emlent

@@ -220,6 +220,8 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 					aprCount++;
 				}
 
+				
+
 				// If it has been 60 second or the amoint set in series length write the perf data
 				// and return.
 				if (aprCount == seriesLength && seriesLength != 0)

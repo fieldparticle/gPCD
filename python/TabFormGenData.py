@@ -20,7 +20,7 @@ import time
 from gbase.PlotParticles import *
 import struct
 import ctypes
-from gbase.BinaryFileUtilities import clear_files, read_particle_data
+from gbase.BinaryFileUtilities import *
 from gbase.import_module import load_class_from_file
 from gbase.pdata import *
 from gbase.GenPQBData import *
@@ -232,11 +232,11 @@ class TabGenData(QTabWidget):
     # List a subset of particles to chgeck location and numers
     #
     def list_particles(self):
-        selected_item = self.ListObj.selectedItems()
+        selected_item = self.DataList.selectedItems()
         self.selected_item = selected_item
         if self.selected_item:
            #print(selected_item[0].text())
-           self.gen_class.list_particles(selected_item[0].text())
+           count_all_particle_data(selected_item[0].text())
 
         else:
             self.no_selection()
@@ -245,7 +245,7 @@ class TabGenData(QTabWidget):
     # 
     ##############################################################################
     def test_index_array(self):
-        selected_item = self.ListObj.selectedItems()
+        selected_item = self.DataList.selectedItems()
         self.selected_item = selected_item
         if self.selected_item:
            #print(selected_item[0].text())

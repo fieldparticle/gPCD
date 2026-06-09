@@ -35,12 +35,12 @@
 class ResourceVertexParticle : public ResourceVertexObj
 {
     public:
-		uint32_t				m_MaxColls = 0;
+		uint64_t				m_MaxColls = 0;
 		float					m_SideLength = 0;
 		float					m_Radius = 0.2f;
-		uint32_t				BoundaryParticleLimit = 0;
+		uint64_t				BoundaryParticleLimit = 0;
 		std::vector<Particle>	m_Particles;
-		uint32_t				m_NumParticles = 0;
+		uint64_t				m_NumParticles = 0;
 
 		ResourceVertexParticle(VulkanObj *App, std::string Name):
 					ResourceVertexObj(App, Name)

@@ -133,12 +133,12 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 			<< " Num Particles:"
 			<< uint32_t(m_collisionStruct.numParticles)
 			<< " Actual Thread Count:"
-			<< m_collisionStruct.holdPidx
+			<< uint32_t(m_collisionStruct.holdPidx)
 			<< " Actual Collision Count:"
-			<< m_collisionStruct.CollisionCount
+			<< uint32_t(m_collisionStruct.CollisionCount)
 			<< "\n"
 			<< " Calculated Collision Count:"
-			<< uint32_t(m_collisionStruct.numParticles)*0.5
+			<< uint32_t(m_collisionStruct.numParticles*0.5)
 			<< " Calculated Thread Count:"
 			<< uint32_t(m_collisionStruct.numParticles)
 			<< ende;

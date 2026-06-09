@@ -63,6 +63,7 @@ def count_all_particle_data(file_name):
                 break
             
     p_lst = []
+    print(f"Total particles in file {file_name}: {count}")
     return count
 #******************************************************************
 # Reead all of the particle data
@@ -115,3 +116,35 @@ def read_particle_data(file_name,particle_range):
             
     p_lst = []
     return results
+
+def test_ArrayToIndex(x,y,z,side_length,max_loc):
+    # This is the count of cells which is 1 greater than side length
+    w = side_length
+    h = side_length
+    indxLoc = 0
+    rx = round(x)
+    ry = round(y)
+    rz = round(z)
+    try :
+        indxLoc =  rx + w * (ry + h * rz)
+    except BaseException as e:
+        print("At Array to index:{e}")
+    if indxLoc >= max_loc:
+        print(f"Index out of bounds: {indxLoc} >= {max_loc}")
+        return -1
+    return 0
+'''
+    uint w = WIDTH;
+    uint h = HEIGHT;
+    uint d = DEPTH;
+
+    if (loc.x >= w || loc.y >= h || loc.z >= d) {
+        return npos;
+    }
+
+    uint indxLoc = loc.x + w * (loc.y + h * loc.z);
+    if (indxLoc >= MAX_CELL_ARRAY_LOCATIONS) {
+        return npos;
+    }
+    return indxLoc;
+    '''

@@ -1,5 +1,6 @@
-Update gPCD document
+Serious Memory problems in graphics
 
+- Fixed graphics
+- Compute not getting collisons
 
-
-Next: diagnose the remaining ThreeParticle kinetic-energy drift
+Next: fix compute collision deteection

@@ -706,6 +706,8 @@ int glsl(std::vector<std::string>& InputArgs, std::vector<char>& OutPutSPV)
   
   OutPutSPV = SPVBinVector;
   SPVBinVector.clear();
+  std::vector<char> empty;
+  SPVBinVector.swap(empty);
   compiler.OutputMessages();
   return success ? 0 : 1;
 }
