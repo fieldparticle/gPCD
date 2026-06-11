@@ -27,7 +27,7 @@ struct Particle {
 
 	lstr CornerList[8];
 
-	ContactState contacts[MAX_CONTACTS];
+	//ContactState contacts[MAX_CONTACTS];
 
 	uint32_t contactCount; // active entries in contacts
 	uint32_t colFlg;       // 1 if in collision, 0 if not

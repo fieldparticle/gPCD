@@ -26,6 +26,13 @@ without the construction of a global collision-pair structure, allowing
 the narrow phase to map naturally onto massively parallel GPU
 architectures.
 
+The observed throughput, time-per-particle, log--log regression, and
+curvature results are all consistent with the theoretical O(N)
+occupancy-generation behavior developed in the complexity analysis.
+Although implementation-specific effects influence absolute execution
+times, the measured trends indicate that no dominant super-linear
+behavior emerged over the evaluated benchmark range.
+
 \subsection{Scalability of the gPCD Framework}
 
 The performance analyses collectively indicate that the gPCD framework

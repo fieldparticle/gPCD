@@ -128,13 +128,13 @@ class GenPQBData(GenDataBase):
                 rx = 0.5 + sep + 0.25*self.radius + self.center_line_length*col+xx
                 self.collsions_in_cell_count+=1
                 self.collision_count+=1
-                particle_struct.ptype = 1
+                particle_struct.ptype = 0
                 self.switch_col = False
             else:
                 rx = 0.5 + sep + self.radius + self.center_line_length*col+xx
                 self.collsions_in_cell_count+=1
                 self.collision_count+=1
-                particle_struct.ptype = 1
+                particle_struct.ptype = 0
                 self.switch_col = True
         else:
             particle_struct.ptype = 0
@@ -222,7 +222,7 @@ class GenPQBData(GenDataBase):
             cell_index = pu.ArrayToIndex(self.max_cell_location)
             self.log.log(self,f"max_cell_index = <{cell_index}> total cells ")
         self.log.log(self,f"Collisions per cell:{self.num_collisions_per_cell}. Collsion pairs per cell:{self.num_collisions_per_cell/2}")
-        
+        self.log.log(self,f"Total Particles: {self.particle_count},Calculated Collisions:{self.tot_num_collsions}, Counted Collsions:{self.collision_count}")
         
         self.log.log(self,f"Total Particles: {self.particle_count},Calculated Collisions:{self.tot_num_collsions}, Counted Collsions:{self.collision_count}")
         self.log.log(self,"=========================================================\n")

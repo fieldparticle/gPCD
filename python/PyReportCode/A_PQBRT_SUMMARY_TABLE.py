@@ -16,7 +16,7 @@ class A_PQBRT_SUMMARY_TABLE():
         self.include = []
         self.vals_list = AttrDictFields()
         self.prefix_name = self.itemcfg.name.replace('_','')
-        update_gpcd_data(base,self.itemcfg)
+        
         
        
     def replace_between_delimiters(self,text, start_delimiter, end_delimiter, replacement_string):
@@ -39,10 +39,10 @@ class A_PQBRT_SUMMARY_TABLE():
             return
 
         self.df = pd.read_csv(self.itemcfg.input_data_file)
-        self.df["loadedp"] = pd.to_numeric(self.df['loadedp'], downcast='integer', errors='coerce')
+        self.df["expectedp"] = pd.to_numeric(self.df['expectedp'], downcast='integer', errors='coerce')
 
-        N = self.df['loadedp']
-        self.max_particle_count = self.df['loadedp'].max()
+        N = self.df['expectedp']
+        self.max_particle_count = self.df['expectedp'].max()
         self.max_collisons  = self.df['expectedc'].max()
 
         self.cms = self.df['cms'].max()*1000.0

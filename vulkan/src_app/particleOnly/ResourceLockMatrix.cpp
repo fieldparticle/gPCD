@@ -50,8 +50,10 @@ void ResourceLockMatrix::Create(uint32_t BindPoint, ResourceVertexParticle* part
                                     * (CfgTst->GetUInt("CellAryH", true)) 
                                     * (CfgTst->GetUInt("CellAryL", true)));
     size_t uin32_size = sizeof(uint32_t);
-    m_BufSize = m_MaxLoc*sizeof(uint32_t)*8;
-    mout << "MEMALLOC:ResourceLockMatrix V2:" << m_BufSize << ende;    
+    m_BufSize = m_MaxLoc*sizeof(uint32_t);
+    mout << "ResourceLockMatrix: Buffer Size (bytes):" << m_BufSize 
+        << " for number locations:" << m_MaxLoc 
+        << " for sidelen:" << CfgTst->GetUInt("CellAryW", true)  << ende;
     createLayout();
     std::vector<uint32_t> idxloc;
    
@@ -123,7 +125,7 @@ void ResourceLockMatrix::CreateBuffers()
 
         m_BufferInfo[i].buffer = m_Buffers[i];
         m_BufferInfo[i].offset = 0;
-        m_BufferInfo[i].range = m_BufSize;
+        m_BufferInfo[i].range = VK_WHOLE_SIZE;
 
         m_DescriptorWrite[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         m_DescriptorWrite[i].dstBinding = m_BindPoint;

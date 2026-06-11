@@ -14,7 +14,7 @@ class A_PQBR_TIME_PERP_ALL(PlotterClass):
     def __init__(self,itemcfg,base):
         super().__init__(itemcfg,base)
         self.df = None
-        update_gpcd_data(base,self.itemcfg)
+        
         
     def run(self):
         if not os.path.exists(self.itemcfg.input_data_file):
@@ -24,7 +24,7 @@ class A_PQBR_TIME_PERP_ALL(PlotterClass):
         df = pd.read_csv(self.itemcfg.input_data_file, skiprows=range(1,28))
 
         # Ensure required columns exist
-        required = {"loadedp", "gms", "cms"}
+        required = {"expectedp", "gms", "cms"}
         missing = required - set(df.columns)
         if missing:
             raise ValueError(f"CSV is missing required columns: {sorted(missing)}")
@@ -33,9 +33,9 @@ class A_PQBR_TIME_PERP_ALL(PlotterClass):
         df["total"] = df["gms"] + df["cms"]
 
         # Compute time per particle in ns
-        df["gms_tpp_ns"]   = df["gms"]   / df["loadedp"] * 1e9
-        df["cms_tpp_ns"]   = df["cms"]   / df["loadedp"] * 1e9
-        df["total_tpp_ns"] = df["total"] / df["loadedp"] * 1e9
+        df["gms_tpp_ns"]   = df["gms"]   / df["expectedp"] * 1e9
+        df["cms_tpp_ns"]   = df["cms"]   / df["expectedp"] * 1e9
+        df["total_tpp_ns"] = df["total"] / df["expectedp"] * 1e9
 
         # --- Stabilization Analysis ---
         # We'll use the last k% of data to estimate "plateau" values
@@ -53,19 +53,19 @@ class A_PQBR_TIME_PERP_ALL(PlotterClass):
             self.vals_list[f"{self.prefix_name}{label}stabilzes"] = f"{mean_val:.2f}"
             self.vals_list[f"{self.prefix_name}{label}stdval"] = f"{std_val:.2f}"
             print(f"{label} stabilization: {mean_val:.2f} ± {std_val:.2f} ns/particle")
-        self.vals_list[f"{self.prefix_name}startval"] = f"{int(float(df['loadedp'][0]))}"
+        self.vals_list[f"{self.prefix_name}startval"] = f"{int(float(df['expectedp'][0]))}"
         plt,fig,ax = self.__new_figure__()
         # --- Plot ---
         fdct = self.__get_line_format_dict__(1)
-        plt.plot(df["loadedp"], df["gms_tpp_ns"],**fdct)
+        plt.plot(df["expectedp"], df["gms_tpp_ns"],**fdct)
         fdct = self.__get_line_format_dict__(2)
-        plt.plot(df["loadedp"], df["cms_tpp_ns"],**fdct)
+        plt.plot(df["expectedp"], df["cms_tpp_ns"],**fdct)
         fdct = self.__get_line_format_dict__(3)
-        plt.plot(df["loadedp"], df["total_tpp_ns"],**fdct)
+        plt.plot(df["expectedp"], df["total_tpp_ns"],**fdct)
 
         # Add stabilization reference lines
         for label, (mean_val, std_val) in stabilization.items():
-            plt.hlines(mean_val, xmin=df["loadedp"].min(), xmax=df["loadedp"].max(),
+            plt.hlines(mean_val, xmin=df["expectedp"].min(), xmax=df["expectedp"].max(),
                     colors="gray", linestyles="--", alpha=0.7,
                     label=f"{label} plateau ≈ {mean_val:.2f} ns")
 

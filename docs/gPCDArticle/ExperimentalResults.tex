@@ -17,18 +17,30 @@ first configuration, cell occupancy data remained sequentially ordered
 within memory. In the second configuration, occupancy data were
 randomly distributed throughout the cell array.
 
-Figure~\ref{fig:A_PQBS_V_PQBR} compares the resulting execution times as a
-function of particle count. Sequential ordering consistently produced
-lower execution times throughout the evaluated benchmark range. The
-largest benchmark configuration required approximately
-\nc{Sequential Largest Time} ms for sequential ordering and
-\nc{Random Largest Time} ms for random ordering.
+Figure~\ref{fig:A_PQBS_V_PQBR} compares the resulting execution times as
+a function of particle count. Sequential ordering consistently
+produced lower execution times throughout the evaluated benchmark
+range. The figure also presents the execution-time difference between
+the two configurations, defined as the random-ordering execution time
+minus the sequential-ordering execution time.
 
-Although both configurations exhibit similar scaling behavior, random
-ordering introduces a measurable performance penalty. The results
-indicate that memory locality remains an important contributor to
-overall performance despite the GPU-resident nature of the framework.
-\input{KEEP_PQBRT_TABLE_ALL}
+Both configurations exhibit approximately linear scaling behavior;
+however, the execution-time difference increases approximately
+linearly with particle count. A linear regression of the difference
+curve produced a slope of \PPBQDiffSlope\ ms per million particles,
+indicating that the performance impact of random memory access grows
+proportionally with problem size. Because both configurations execute
+the same collision-detection algorithm and differ only in the ordering
+of occupancy data, the observed performance gap is attributed
+primarily to memory-locality effects.
+
+These results indicate that memory locality remains an important
+contributor to overall performance despite the GPU-resident nature of
+the framework. While memory locality does not alter the algorithmic
+complexity of the method, it influences the constant factors that
+govern practical execution time.
+
+\input{A_PQBRT_TABLE_ALL}
 
 \subsection{Performance Overview}
 

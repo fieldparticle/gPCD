@@ -14,15 +14,26 @@ from gbase.ConfigUtility import *
 from PyQt6.QtWidgets import QFileDialog, QGroupBox,QMessageBox
 from  gbase.msg_box import *
 
-def update_gpcd_data(bobj,itemcfg):
-    gpcddata = gPCDData(bobj,itemcfg)
+def update_gpcd_data_pbqrt(bobj,config):
+    gpcddata = gPCDData(bobj,config)
     data_parms = AttrDictFields()
-    data_parms["source_dir"] = itemcfg.input_data_dir
-    data_parms["target_dir"] = itemcfg.output_summary_dir
-    data_parms["compute_type"] = itemcfg.compute_type
-    data_parms["summary_file_name"] = itemcfg.input_data_file
-    data_parms["mode"] = itemcfg.mode
+    data_parms["source_dir"] = config.pbqrt_src
+    data_parms["target_dir"] = config.pbqrt_out
+    data_parms["compute_type"] = config.pbqrt_minmax
+    data_parms["summary_file_name"] = config.pbqrt
+    data_parms["mode"] = config.pbqrt_mode
     gpcddata.assign_data(data_parms)
+
+def update_gpcd_data_pbqt(bobj,config):
+    gpcddata = gPCDData(bobj,config)
+    data_parms = AttrDictFields()
+    data_parms["source_dir"] = config.pbqt_src
+    data_parms["target_dir"] = config.pbqt_out
+    data_parms["compute_type"] = config.pbqt_minmax
+    data_parms["summary_file_name"] = config.pbqt
+    data_parms["mode"] = config.pbqt_mode
+    gpcddata.assign_data(data_parms)
+
 
 class gPCDData():
 
@@ -322,7 +333,7 @@ class gPCDData():
             cpums_old = 0.0
             cms_old = 0.0
             gms_old = 0.0
-            self.do_mmrr()
+            #self.do_mmrr()
             data_file = file_dict.target_dir + "/" + ii + "R.csv"
             mean = stddev = fps = cpums = cms = gms = cell_count = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = mmrr = 0
             fps_list = []
@@ -349,6 +360,7 @@ class gPCDData():
                             gms_old = gms
                         if count == 1:
                             loadedp = float(col['loadedp'])
+                            expectedp = float(col['expectedp'])
                             expectedc = int(col['expectedc'])
                             sidelen = int(col['sidelen'])
                             if 'cell_count' in col:
@@ -380,7 +392,7 @@ class gPCDData():
             cpums_old = 1000.0
             cms_old = 1000.0
             gms_old = 1000.0
-            self.do_mmrr()
+            #self.do_mmrr()
             data_file = file_dict.target_dir + "/" + ii + "R.csv"
             mean = stddev = fps = cpums = cms = gms = cell_count = expectedp = loadedp = shaderp_comp = shaderp_grph = expectedc = shaderc = sidelen = count = mmrr = 0
             fps_list = []

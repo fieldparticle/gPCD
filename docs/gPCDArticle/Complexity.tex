@@ -24,7 +24,9 @@ T_{\mathrm{occ}}(N)=c_{\mathrm{occ}}N=O(N).
 \end{equation}
 
 Because occupancy lists are accessed directly through flattened cell
-indices, insertion and retrieval remain (O(1)) operations.
+indices, cell lookup requires constant-time addressing. Under the fixed
+occupancy-width assumptions used by the framework, insertion and
+retrieval therefore require bounded work per operation.
 
 \subsection{Narrow-Phase Evaluation}
 

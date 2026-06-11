@@ -14,7 +14,7 @@ class A_PBQR_CURVATURE(PlotterClass):
         
     def __init__(self,itemcfg,base):
         super().__init__(itemcfg,base)
-        update_gpcd_data(base,self.itemcfg)
+        
 
     def curvature_thresholds(self,a, b, c, eps=0.01, dT=1e-5):
     
@@ -158,7 +158,7 @@ class A_PBQR_CURVATURE(PlotterClass):
 
         print(f"Start row:10 for val:{data_list[0][0]}")
         transposed = list(zip(*data_list))
-        pc = np.array(transposed[6]).astype(float)
+        pc = np.array(transposed[5]).astype(float)
         particle_counts = [int(numeric_string) for numeric_string in pc]
 
         gms = np.array(transposed[4]).astype(float)

@@ -14,7 +14,7 @@ class A_PQBRT_DATA_ALL():
         self.include = []
         self.vals_list = AttrDictFields()
         self.prefix_name = self.itemcfg.name.replace('_','')
-        update_gpcd_data(base,self.itemcfg)
+        
         
        
     def replace_between_delimiters(self,text, start_delimiter, end_delimiter, replacement_string):

@@ -249,7 +249,7 @@ void  ShaderObj::WriteShaderHeader()
 				//##JMBDont know what this is
 			<< "const uint compflag =" << compflag << ";\n"
 			<< "const uint bbound =" << m_VPO->BoundaryParticleLimit << ";\n"
-			<< "const float point_size = " << CfgApp->GetFloat("application.gl_point_size", true) << ";\n"
+			<< "const float point_size = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.gl_point_size", true) << ";\n"
 			<< "vec3 ncolcolor = " << ncol_color.str() << ";\n"
 			<< "vec3 colcolor = " << col_color.str() << ";\n";
 			

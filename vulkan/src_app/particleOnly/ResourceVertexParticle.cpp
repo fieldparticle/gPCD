@@ -132,13 +132,14 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		part.parms			= glm::vec4(part_pos.molar_mass, 0.0, 0.0, 0.0);
 		part.colFlg			= 0;
 		part.contactCount = 0;
+#if 0
 		for (size_t nn = 0; nn < MAX_CONTACTS; nn++)
 		{
 			part.contacts[nn].ids = glm::uvec4(0, 0, 0, 0);
 			part.contacts[nn].geom = glm::vec4(0.0, 0.0, 0.0, 0.0);
 			part.contacts[nn].aux = glm::vec4(0.0, 0.0, 0.0, 0.0);
 		}
-
+#endif
 
 		if (part_pos.ptype == 1.0)
 			BoundaryParticleLimit++;
@@ -168,13 +169,21 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 
 	m_App->m_SideLength = static_cast<uint32_t>(m_SideLength);
 	size_t styrsz = sizeof(Particle);
-	mout << "Particle Read:" << m_NumParticles << " Side Length =" << m_SideLength << " ParticleStruct Size:" 
-		<< styrsz << ende;
+	size_t spdata = sizeof(pdata);
+	
 
 	uint32_t sizeParta = sizeof(Particle);
-	m_BufSize = sizeof(Particle) * m_NumParticles;
+	//m_BufSize = static_cast<uint64_t>(sizeof(Particle)) * m_NumParticles;
+	m_BufSize = static_cast<uint64_t>(sizeof(Particle)) * m_NumParticles;
+	mout << "Particle Read:" << m_NumParticles
+		<< " Side Length =" << m_SideLength
+		<< " ParticleStruct Size:" << styrsz
+		<< " Particle Vector Size:" << m_Particles.size()
+		<< " Total Memory:" << m_BufSize
+		<< " maxStorageBufferRange:" << m_App->m_DevProp.limits.maxStorageBufferRange
+		<< " Pdata Size:" << spdata
+		<< " Size of bin File:" << spdata * m_NumParticles << ende;
 
-	mout << "MEMALLOC:ResourceVertexParticle:" << m_BufSize << ende;
 	m_App->m_Numparticles = m_NumParticles;
 
 	// Check number of particles match - add 1 for null particle
@@ -236,16 +245,17 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 	uint32_t i = 0;
 	objtxt << m_Name << " Number:" << i << std::ends;
 	m_App->VMACreateDeviceBuffer(m_BufSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		m_Buffers[i], m_Allocation[i], objtxt.str());
 
 	
 	m_BufferInfo[i].buffer = m_Buffers[i];
 	m_BufferInfo[i].offset = 0;
 	uint32_t sizePart = sizeof(Particle);
+	// This is in bytes
 	m_BufferInfo[i].range = m_BufSize;
 
 	m_DescriptorWrite[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -253,7 +263,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 	m_DescriptorWrite[i].dstArrayElement = 0;
 	m_DescriptorWrite[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	m_DescriptorWrite[i].descriptorCount = 1;
-	m_DescriptorWrite[i].pBufferInfo = &m_BufferInfo[i];
+	m_DescriptorWrite[i].pBufferInfo = &m_BufferInfo[0];
 	objtxt.clear();
 
 
@@ -297,7 +307,6 @@ ResourceVertexParticle::GetAttributeDescriptions()
 	ad.location = 0;
 	ad.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	ad.offset = offsetof(Particle, PosLocA);
-
 	m_AttributeDescriptions.push_back(ad);
 
 	ad.binding = m_BindPoint;

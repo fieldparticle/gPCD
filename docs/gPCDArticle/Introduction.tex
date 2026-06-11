@@ -58,5 +58,13 @@ simple and scalable data structure. The resulting framework supports
 high particle counts on a single CPU--GPU system and provides a
 foundation for future large-scale particle simulation applications.
 
-
+The primary contribution of this work is not a new spatial data
+structure, but a new execution architecture. The proposed graphics-based
+Parallel Collision Detection (gPCD) framework integrates broad-phase
+occupancy generation directly into the graphics pipeline, allowing
+rendering and occupancy construction to proceed concurrently while
+producing the potentially colliding set used for narrow-phase
+evaluation. This organization enables collision-detection work to be
+performed using graphics-pipeline resources that are traditionally
+dedicated exclusively to rendering.
 

@@ -2,5 +2,9 @@ Serious Memory problems in graphics
 
 - Fixed graphics
 - Compute not getting collisons
-
-Next: fix compute collision deteection
+- fixed ssbo limits
+- reran tests
+- Fixed plots and tables
+- Updated article 
+	fix sequential vs random
+	start detailed outline with paragraghs, bullets, and puropse

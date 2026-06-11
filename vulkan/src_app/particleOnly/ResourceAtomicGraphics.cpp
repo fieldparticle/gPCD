@@ -121,6 +121,9 @@ void ResourceAtomicGraphics::PullMem(uint32_t currentBuffer)
 			mout << objtxt.str().c_str() << ende;
 			objtxt.str("");
 			objtxt.clear();
+			if (m_collisionStruct.ErrorReturn != 0 && m_collisionStruct.ErrorReturn != 2 && m_collisionStruct.ErrorReturn != 3)
+				m_App->m_quit_event = 2;
+
 			if (m_collisionStruct.ErrorReturn == 2)
 			{
 				m_App->m_quit_event = 2;

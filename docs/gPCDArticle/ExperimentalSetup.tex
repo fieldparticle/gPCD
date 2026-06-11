@@ -1,4 +1,7 @@
 % !TeX root = main.tex
+
+
+
 \section{Experimental Setup}
 
 This section describes the hardware platform, benchmark
@@ -19,6 +22,46 @@ The gPCD framework was implemented using Vulkan, with broad-phase occupancy
 generation and rendering executed through the graphics pipeline and narrow-phase 
 evaluation executed through compute shaders.
 
+\subsection{Maximum Particle Capacity}
+
+The maximum number of particles that can be represented in a single
+simulation is constrained by the available storage-buffer capacity of
+the graphics device. Let $M_{\max}$ denote the maximum addressable
+storage-buffer range supported by the device and let $S_p$ denote the
+memory footprint of a single particle. The corresponding upper bound on
+the particle count is
+
+\begin{equation}
+N_{\max}=\left\lfloor\frac{M_{\max}}{S_p}\right\rfloor.
+\end{equation}
+
+This relationship was used to determine the largest particle counts
+considered during testing. As the particle structure size increases,
+the maximum achievable particle count decreases proportionally.
+Conversely, reducing the memory footprint of the particle structure
+increases the maximum problem size that can be represented within a
+single storage buffer. Consequently, all test cases were selected to
+remain below the storage-buffer capacity limit imposed by the target
+hardware.
+
+\subsection{Verification and Performance Evaluation}
+
+Because gPCD performs exact collision detection, verification and
+performance evaluations were conducted as separate stages. Each test
+case was first executed in a verification mode to validate particle
+counts, cell occupancy generation, and collision counts. Verification
+runs were used to ensure that all particles were processed correctly
+and that all collision events were detected and counted as expected.
+
+Following successful verification, the same configurations were
+executed in performance mode to measure execution time, throughput,
+and time-per-particle scaling. Performance measurements were therefore
+obtained only after the correctness of the collision-detection results
+had been established. This procedure ensured that all reported
+performance metrics correspond to validated collision-detection
+outcomes.
+
+
 \subsection{Benchmark Configuration}
 
 Benchmark datasets consisted of randomly distributed particle
@@ -26,7 +69,6 @@ configurations with increasing particle count while maintaining an
 approximately constant collision fraction. Particle counts ranged from
 \numprint{32} to
 \numprint{10000000} particles.
-\bell{add}{gpcd is an exact collision detection method.tests are run in verification mode first to verify particle and collision counts and then in performance mode to measure peerformance}
 
 \subsection{Performance Metrics}
 

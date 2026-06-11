@@ -304,7 +304,7 @@ void CommandParticleBoundaryOnly::RecordSubPassParticle(uint32_t imageindex, uin
 		sfl);
 
 
-	uint16_t vnum = dvo->m_NumElements;
+	uint64_t vnum = dvo->m_NumElements;
 	vkCmdDraw(m_CommandBuffers[currentBuffer], vnum, 1, 0, 0);
 	
 }

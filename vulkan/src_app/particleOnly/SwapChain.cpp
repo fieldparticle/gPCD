@@ -238,8 +238,8 @@ VkPresentModeKHR SwapChain::ChooseSwapPresentMode(const std::vector<VkPresentMod
 			return availablePresentMode;
 		}
 	}
-
-    return VK_PRESENT_MODE_FIFO_KHR;
+	/// IMMEDIATE presents as fast as possible and does not wait for monitor refresh.
+    return VK_PRESENT_MODE_IMMEDIATE_KHR;
 }
 void SwapChain::Cleanup()
 	{

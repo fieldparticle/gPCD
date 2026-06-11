@@ -17,7 +17,7 @@ except ModuleNotFoundError:
 # Define an isstr() and isint() that work on both Python2 and Python3.
 # See http://stackoverflow.com/questions/11301138
 LONGTYPE = long
-''' try:
+try:
     basestring  # attempt to evaluate basestring
 
     def isstr(s):
@@ -37,7 +37,7 @@ except NameError:
         return isinstance(i, int)
 
     LONGTYPE = int
-'''
+
 # Bounds to determine when an "L" suffix should be used during dump().
 SMALL_INT_MIN = -2**31
 SMALL_INT_MAX = 2**31 - 1

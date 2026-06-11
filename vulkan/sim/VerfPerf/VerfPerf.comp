@@ -38,6 +38,7 @@
 	#extension GL_EXT_debug_printf : enable
 #endif
 #extension GL_EXT_scalar_block_layout :enable
+#extension GL_ARB_gpu_shader_int64 : enable
 //#extension GL_KHR_memory_scope_semantics:enable
 //#extension GL_EXT_shader_atomic_float:enable
 //#extension GL_KHR_shader_subgroup_basic:enable
@@ -61,7 +62,7 @@
 
 void main()  
 {
-
+	
 	// Get invocation id which is particle numbner
 	uint index = gl_GlobalInvocationID.x;
 	if(index == 0)

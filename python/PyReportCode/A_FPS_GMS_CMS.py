@@ -12,7 +12,7 @@ class A_FPS_GMS_CMS(PlotterClass):
     # Allocates prefix_name
     def __init__(self,itemcfg,base):
         super().__init__(itemcfg,base)
-        update_gpcd_data(base,self.itemcfg)
+        
 
     def do_linear_fit(self,N,ydata):
         popt,cov=curve_fit(linearFunc,N,ydata)
@@ -73,7 +73,7 @@ class A_FPS_GMS_CMS(PlotterClass):
                 print(f"CSV file load failed:{e}")
                 return
             self.df = pd.read_csv(file_name)
-            N = self.df['loadedp']
+            N = self.df['expectedp']
             rcms = self.df['cms']
             rgms = self.df['gms']            
             rboth = np.add(rcms,rgms)

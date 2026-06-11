@@ -1,7 +1,7 @@
 from gbase.ReportClass import *
 import os
 import inspect
-
+import pandas as pd
 import re
 from gbase.AttrDictFields import *
 from gbase.ConfigUtility import *

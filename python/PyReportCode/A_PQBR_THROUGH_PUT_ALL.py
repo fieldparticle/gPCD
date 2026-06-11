@@ -28,13 +28,13 @@ class A_PQBR_THROUGH_PUT_ALL(PlotterClass):
   def __init__(self,itemcfg,base):
         super().__init__(itemcfg,base)
         self.df = None
-        update_gpcd_data(base,self.itemcfg)
+        
         
   def run(self):
 
       df = self.__open_data_file__()
       # Ensure required columns exist
-      required = {"loadedp", "gms", "cms"}
+      required = {"expectedp", "gms", "cms"}
       missing = required - set(df.columns)
       if missing:
           raise ValueError(f"CSV is missing required columns: {sorted(missing)}")
@@ -44,23 +44,23 @@ class A_PQBR_THROUGH_PUT_ALL(PlotterClass):
       # df["cms"] = df["cms"] / 1000.0
 
       # Throughput (million particles per second, Mpps)
-      df["graphics_throughput_mpps"] = (df["loadedp"] / df["gms"]) / 1e6
-      df["compute_throughput_mpps"]  = (df["loadedp"] / df["cms"]) / 1e6
+      df["graphics_throughput_mpps"] = (df["expectedp"] / df["gms"]) / 1e6
+      df["compute_throughput_mpps"]  = (df["expectedp"] / df["cms"]) / 1e6
       gms = np.array(df["gms"]).astype(float)
       cms = np.array(df["cms"]).astype(float)
       both = np.add(gms,cms)
-      df["total_throughput_mpps"]  = (df["loadedp"] / both)/ 1e6
+      df["total_throughput_mpps"]  = (df["expectedp"] / both)/ 1e6
 
       # === Plot ===
       ##------------------------------------------
       plt,fig,ax = self.__new_figure__()
       ##-------------------------------------------
       fdct = self.__get_line_format_dict__(1)
-      plt.loglog(df["loadedp"], df["graphics_throughput_mpps"],**fdct)
+      plt.loglog(df["expectedp"], df["graphics_throughput_mpps"],**fdct)
       fdct = self.__get_line_format_dict__(2)
-      plt.loglog(df["loadedp"], df["compute_throughput_mpps"],**fdct)
+      plt.loglog(df["expectedp"], df["compute_throughput_mpps"],**fdct)
       fdct = self.__get_line_format_dict__(3)
-      plt.loglog(df["loadedp"], df["total_throughput_mpps"],**fdct)
+      plt.loglog(df["expectedp"], df["total_throughput_mpps"],**fdct)
       fdct = self.__get_line_format_dict__(4)
       plt.axvline(x=2245632,**fdct)
       fdct = self.__get_line_format_dict__(5)

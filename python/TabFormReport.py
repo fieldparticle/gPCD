@@ -190,8 +190,6 @@ class TabFormReport(QTabWidget):
                 self.report_obj = ReportLatexEquation(self,self.itemcfg)
                 self.report_obj.save_latex()
             case 'table_code':
-                
-                
                 try:
                     module_name = self.itemcfg.name
                     file_path = self.itemcfg.code_dir + '/' + self.itemcfg.name + ".py"
@@ -223,6 +221,7 @@ class TabFormReport(QTabWidget):
                     print(f"Load plot code class failed:{e}")
                     return
                 self.plot_code_class = CLS(self.itemcfg,self.bobj)
+                self.plot_code_class.__init__(self.itemcfg,self.bobj)
                 self.plot_code_class.run() 
                 self.report_obj = ReportLatexPlot(self,self.itemcfg)
                 self.report_obj.save_latex()
@@ -382,6 +381,8 @@ class TabFormReport(QTabWidget):
         self.log = self.bobj.log
         self.log.log(self,"TabFormLatex finished init.")
         self.log.log(self,"TabFormLatex started Create.")
+        update_gpcd_data_pbqrt(self.bobj,self.cfg)
+        update_gpcd_data_pbqt(self.bobj,self.cfg)
         try:
             self.setStyleSheet("background-color:  #eeeeee")
             self.tab_layout = QGridLayout()

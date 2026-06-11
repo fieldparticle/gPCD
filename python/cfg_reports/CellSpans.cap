@@ -1,1 +1,7 @@
-This illustration shows examples of cell and particle locations. These images will be utilized later to describe duplicate handling. In (A) particle 1 spans cell $<1,1>$ and $<2,1>$ while particle 2 is completely contained in cell $<2,2>$. In (B) particle 1 and 2 are in contact in both cells $<1,1>$ and $<2,1>$.
+Two-dimensional illustration of occupancy and collision duplication
+arising from corner-based occupancy construction. (a) Multiple corners
+may map to the same cell, resulting in duplicate occupancy
+contributions. (b) A single collision may be represented within
+multiple neighboring cells when interacting particles span a cell
+boundary. The three-dimensional implementation follows identically
+using the eight corners of the particle AABB.

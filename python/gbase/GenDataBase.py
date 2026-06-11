@@ -222,6 +222,9 @@ class GenDataBase:
         self.bin_file.close()
         if(self.bin_file.closed != True):
             self.bobj.log.log("File:{self.test_bin_name} not closed")
+        
+        file_size = os.path.getsize(self.test_bin_name)
+        print(f"The file size is: {file_size} bytes")
 
    
 

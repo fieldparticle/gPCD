@@ -4,7 +4,7 @@
 void MemStats(VulkanObj* vulkanObj)
 {
 
-	mout << "Total Memory Allocated:" << vulkanObj->m_TotalMemoryBytes << ende;
+	mout << "Total Memory Allocated:" << uint32_t(vulkanObj->m_TotalMemoryBytes) << ende;
 	VmaTotalStatistics memuse;
 	vmaCalculateStatistics(vulkanObj->m_vmaAllocator, &memuse);
 

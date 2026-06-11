@@ -2,9 +2,9 @@ import numpy as np
 import matplotlib.pyplot as mplt
 import csv
 import math
-from ValuesDataBase import *
-from AttrDictFields import *
-
+from gbase.ValuesDataBase import *
+from gbase.AttrDictFields import *
+from gbase.gPCDData import *
 data_list = []
 
 from gbase.PlotterClass import *
@@ -32,7 +32,23 @@ class A_PQBS_V_PQBR(PlotterClass):
     # Allocates prefix_name
     def __init__(self,itemcfg,base):
         super().__init__(itemcfg,base)
-
+        
+    def linearFunc(self,x,intercept,slope):
+        """This function defines the function to be fit. In this case a linear
+        function.
+        
+        Parameters
+        ----------
+        x : independent variable
+        slope : slope
+        intercept : intercept
+        
+        Returns
+        -------
+        y : dependent variable
+        """
+        y = intercept + slope * x
+        return y
 
     def do_linear_fit(self,N,ydata):
         popt,cov=curve_fit(linearFunc,N,ydata)
@@ -56,13 +72,52 @@ class A_PQBS_V_PQBR(PlotterClass):
         return intersect,slope,r_squared,mean,std
 
     def do_plot(self,N,rboth,both):
+        diff = np.subtract(rboth,both)
+        intercept,slope,r_squared,mean,std = self.do_linear_fit(N,rboth)
+        self.vals_list["PPBQRTIntercept"] = f"{intercept}"
+        self.vals_list["PPBQRTSlope"] = f"{slope:.4e}"
+        self.vals_list["PPBQRTRSsquared"] = f"{r_squared:.4f}"
+        self.vals_list["PPBQRTMean"] = f"{mean:.4f}"
+        self.vals_list["PPBQRTSTD"] = f"{std:.4f}"
+        lrboth = self.linearFunc(N,intercept,slope)
+
+        intercept,slope,r_squared,mean,std = self.do_linear_fit(N,both)
+        self.vals_list["PPBQTIntercept"] = f"{intercept}"
+        self.vals_list["PPBQTSlope"] = f"{slope:.4e}"
+        self.vals_list["PPBQTRSsquared"] = f"{r_squared:.4f}"
+        self.vals_list["PPBQTMean"] = f"{mean:.4f}"
+        self.vals_list["PPBQTSTD"] = f"{std:.4f}"
+        lboth = self.linearFunc(N,intercept,slope)
+            
+        intercept,slope,r_squared,mean,std = self.do_linear_fit(N,diff)
+        self.vals_list["PPBQDiffIntercept"] = f"{intercept}"
+        self.vals_list["PPBQDiffSlope"] = f"{slope*1E9:.2f}"
+        self.vals_list["PPBQDiffRSsquared"] = f"{r_squared:.4f}"
+        self.vals_list["PPBQDiffMean"] = f"{mean:.4f}"
+        self.vals_list["PPBQDiffSTD"] = f"{std:.4f}"
+        ldiff = self.linearFunc(N,intercept,slope)
+        
         # === Plot ===
         ##------------------------------------------
         plt,fig,ax = self.__new_figure__()
         fdct = self.__get_line_format_dict__(1)
         plt.plot(N,rboth,**fdct)
+
         fdct = self.__get_line_format_dict__(2)
         plt.plot(N,both,**fdct)
+
+        fdct = self.__get_line_format_dict__(3)
+        plt.plot(N,ldiff,**fdct)
+
+        fdct = self.__get_line_format_dict__(4)
+        plt.plot(N,lrboth,**fdct)
+
+        fdct = self.__get_line_format_dict__(5)
+        plt.plot(N,lboth,**fdct)
+
+        fdct = self.__get_line_format_dict__(6)
+        plt.plot(N,diff,**fdct)
+
         ##-------------------------------------------
         plt.pause(0.01)
         ##-------------------------------------------
@@ -85,27 +140,27 @@ class A_PQBS_V_PQBR(PlotterClass):
         
 
     def run(self):
+        
         try:
-            data_source = self.itemcfg.data_source
-            for ii in data_source:
-                file_name = self.itemcfg.input_data_dir + "/" + f"perfData{ii}/perfdataPerformanceSummary.csv"
-                self.df = pd.read_csv(file_name)
-                if "PQBRT" in ii:
-                    N = self.df['loadedp']
-                    rcms = self.df['cms']
-                    rgms = self.df['gms']            
-                    rboth = np.add(rcms,rgms)
-                if "PQBT" in ii:
-                    cms = self.df['cms']
-                    gms = self.df['gms']            
-                    both = np.add(cms,gms)
+            file_name = self.itemcfg.input_data_file_r
+            self.df = pd.read_csv(file_name)
+            N = self.df['expectedp']
+            rcms = self.df['cms']
+            rgms = self.df['gms']            
+            rboth = np.add(rcms,rgms)
+            
+            file_name = self.itemcfg.input_data_file_s
+            self.df = pd.read_csv(file_name)
+            cms = self.df['cms']
+            gms = self.df['gms']            
+            both = np.add(cms,gms)
         except Exception as e:
             print(f"Error reading data: {e}. Both PBQR and PBQS studies must be included in the data source.")  
             return
         print("-------------------------- TOT ----------------------------")
         self.do_plot(N,rboth,both)
         #self.itemcfg['input_images'] = self.include
-        
+
         self.__write_vals__()
         return
 

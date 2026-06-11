@@ -54,8 +54,6 @@ struct Particle {
 
     lstr CornerList[8];
 
-    ContactState contacts[MAX_CONTACTS];
-
     uint contactCount;         // active entries in contacts
     uint colFlg;               // 1 if in collision, 0 if not
 
@@ -69,6 +67,6 @@ struct boundStruct {
     bool inBZ;
 };
 
-layout(binding = 4) buffer ParticleSSBOOut {
-    Particle P[NUMPARTS];
+layout(std430,binding = 4) buffer ParticleSSBOOut {
+    Particle P[];
 };

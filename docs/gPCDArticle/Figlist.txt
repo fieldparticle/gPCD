@@ -1,0 +1,9 @@
+\input{CellSpans} updated
+\input{ComplexityTable} static
+\input{COMPARITIVE_COMPLEXITY.tex} static
+\input{HISTORICAL_COMPARISION} static
+\input{A_PQBRT_TABLE_ALL} updated
+\input{A_PQBRT_SUMMARY_TABLE} updated
+\input{A_PQBR_THROUGHPUT_AND_TPP} updated
+\input{A_PQBR_LOGLOG_REGRESS} updated
+\input{A_PBQR_CURVATURE} 

@@ -16,7 +16,7 @@ class A_PQBRT_TABLE_ALL():
         self.include = []
         self.vals_list = AttrDictFields()
         self.prefix_name = self.itemcfg.name.replace('_','')
-        update_gpcd_data(base,self.itemcfg)
+        
         
        
     def replace_between_delimiters(self,text, start_delimiter, end_delimiter, replacement_string):
@@ -38,7 +38,7 @@ class A_PQBRT_TABLE_ALL():
         self.df = pd.read_csv(self.itemcfg.input_data_file)
         self.df["loadedp"] = pd.to_numeric(self.df['loadedp'], downcast='integer', errors='coerce')
 
-        N = self.df['loadedp']
+        N = self.df['expectedp']
         M = self.df['expectedc']
         cms = self.df['cms']
         gms = self.df['gms']
@@ -51,7 +51,7 @@ class A_PQBRT_TABLE_ALL():
         self.Table.append(cms*1000)
         self.Table.append(gms*1000)
         self.Table.append(both*1000)
-        self.Table.append((both/mmrr)/1000)
+        #self.Table.append((both/mmrr)/1000)
         self.Table = [list(row) for row in zip(*self.Table)]
         self.save_export_vals(mmrr)
         return self.Table

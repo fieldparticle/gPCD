@@ -31,7 +31,7 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
     def __init__(self,itemcfg,base):
         super().__init__(itemcfg,base)
         self.df = None
-        update_gpcd_data(base,self.itemcfg)
+        
 
     def fit_range(self,mask):
       x, y = self.logN[mask], self.logT[mask]
@@ -60,20 +60,20 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       self.df = pd.read_csv(self.itemcfg.input_data_file)
 
       # Ensure required columns exist
-      required = {"loadedp", "gms", "cms"}
+      required = {"expectedp", "gms", "cms"}
       missing = required - set(self.df.columns)
       if missing:
           raise ValueError(f"CSV is missing required columns: {sorted(missing)}")
 
       
       # === Log–log regression ===
-      self.logN = np.log10(self.df["loadedp"])
+      self.logN = np.log10(self.df["expectedp"])
       self.logT = np.log10(self.df["gms"])
       self.do_plot('gms')  
-      self.logN = np.log10(self.df["loadedp"])
+      self.logN = np.log10(self.df["expectedp"])
       self.logT = np.log10(self.df["cms"])
       self.do_plot('cms')  
-      self.logN = np.log10(self.df["loadedp"])
+      self.logN = np.log10(self.df["expectedp"])
       self.df['tot'] = self.df["cms"]+self.df["gms"]
       self.logT = np.log10(self.df['tot'])
       self.do_plot('tot')  
@@ -89,19 +89,19 @@ class A_PQBR_LOGLOG_REGRESS(PlotterClass):
       # Full fit
       b_all, a_all, r2_all = self.fit_range(np.ones(len(self.df), dtype=bool))
       # Saturated fit
-      mask_sat = self.df["loadedp"] >= N0
+      mask_sat = self.df["expectedp"] >= N0
       b_sat, a_sat, r2_sat = self.fit_range(mask_sat)
 
       # Quadratic fit for curvature (t1 vs k)
-      self.df["t1"] = self.df[name] / self.df["loadedp"]
+      self.df["t1"] = self.df[name] / self.df["expectedp"]
       def quadratic(k, a, b, c):
           return a + b*k + c*(k**2)
-      params_q, _ = curve_fit(quadratic, self.df["loadedp"], self.df["t1"])
+      params_q, _ = curve_fit(quadratic, self.df["expectedp"], self.df["t1"])
       a_q, b_q, c_q = params_q
       curvature_upper = 2*c_q
     
        # (3) Log–log regression
-      ax.loglog(self.df["loadedp"], self.df[name], 'o', label="Measured")
+      ax.loglog(self.df["expectedp"], self.df[name], 'o', label="Measured")
       xx = np.linspace(self.logN.min(), self.logN.max(), 200)
       #axs.loglog(10**xx, 10**(a_all+b_all*xx), '-', label=f"Full fit b={b_all:.2f}")
       ax.loglog(10**xx, 10**(a_sat+b_sat*xx), '--', label=f"Saturated fit b={b_sat:.2f}")

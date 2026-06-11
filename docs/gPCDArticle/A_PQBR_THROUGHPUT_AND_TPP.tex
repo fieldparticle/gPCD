@@ -20,8 +20,32 @@
 		\label{fig:A_PQBR_TIME_PERP_ALL}
 	\end{subfigure}
 \hspace{-.05in}
-\caption[Performance characterization of PQBR]{
-(a) Comparison of randomly ordered particle occupancy (red squares)
+\caption[TITLE:PQBR Performance Plots]{(a) Comparison of randomly ordered particle occupancy (red squares)
+and sequentially ordered particle occupancy (blue circles). Sequential
+ordering consistently produces lower execution times throughout the
+evaluated particle range. The green curve shows the execution-time
+difference between the two configurations. The approximately linear
+increase in this difference indicates that the performance impact of
+random memory access grows proportionally with particle count. A linear
+fit of the difference curve yields a locality penalty rate of
+\PPBQDiffSlope\ ms per million particles.
+
+(b) Log--log throughput as a function of particle count for the total
+application (red), compute stage (blue), and graphics stage (black).
+Dashed vertical lines indicate transitions between utilization,
+saturation, and throughput-limited regimes. Throughput saturates for
+$N>\numprint{\APQBRTIMEPERPALLstartval{}}$.
+
+(c) Time-per-particle for the graphics, compute, and total application
+stages for $N\geq\numprint{\APQBRTIMEPERPALLstartval{}}$, corresponding
+to the saturated throughput regime. The graphics stage stabilizes at
+\APQBRTIMEPERPALLGraphicsstabilzes{}$\pm$\APQBRTIMEPERPALLGraphicsstdval{}
+ns/particle, the compute stage at
+\APQBRTIMEPERPALLComputestabilzes{}$\pm$\APQBRTIMEPERPALLComputestdval{}
+ns/particle, and the total application at
+\APQBRTIMEPERPALLTotalstabilzes{}$\pm$\APQBRTIMEPERPALLTotalstdval{}
+ns/particle.}
+\Description[TITLE:PQBR Performance Plots]{(a) Comparison of randomly ordered particle occupancy (red squares)
 and sequentially ordered particle occupancy (blue circles). Sequential
 ordering consistently produces lower execution times throughout the
 evaluated particle range. At the largest benchmark configuration,
@@ -43,10 +67,7 @@ ns/particle, the compute stage at
 \APQBRTIMEPERPALLComputestabilzes{}$\pm$\APQBRTIMEPERPALLComputestdval{}
 ns/particle, and the total application at
 \APQBRTIMEPERPALLTotalstabilzes{}$\pm$\APQBRTIMEPERPALLTotalstdval{}
-ns/particle.
-}
-
-
+ns/particle.}
 \label{fig:A_PQBR_THROUGHPUT_AND_TPP}
 \end{figure*}
 \endgroup

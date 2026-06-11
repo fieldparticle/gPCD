@@ -4,7 +4,8 @@
 #if defined(DEBUG)
 	#extension GL_EXT_debug_printf : enable
 #endif
-//#extension GL_EXT_scalar_block_layout :enable
+#extension GL_EXT_scalar_block_layout :enable
+
 
 void MaxCellOccupancyError(uint CellOccupancySlot,uint ParticleID);
 void MaxCellLocationsError(uint CellArrayIndex, uint ParticleID);
@@ -89,10 +90,11 @@ void main(){
 	float cz 		= P[index].PosLocA.z;
 	float R			= P[index].Data.x;
 	
+	#if 0
 	if(cx < 0.5 || cy < 0.5 || cz < 0.5)
 		debugPrintfEXT("Invalid Particle slot>F:%u,P:%d,loc:<%0.2f,%0.2f,%0.2f>",
 		uint(ShaderFlags.frameNum),index,P[index].PosLocA.x,P[index].PosLocA.y,P[index].PosLocA.z);
-		
+	#endif	
 	
 	uint duplist[8];
 	uint dupcntr = 0;
@@ -249,7 +251,7 @@ void main(){
 
 	if(uint(P[index].colFlg) == 1)
 		fragColor = vec3(1.0,0.0,0.0);	
-	else if(uint(P[index].colFlg) == 0)
+	else 
 		fragColor = vec3(0.0,1.0,0.0);	
 }
 	

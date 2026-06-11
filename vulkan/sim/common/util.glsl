@@ -108,6 +108,7 @@ uint ArrayToIndex(uvec3 loc)
         return npos;
     }
     return indxLoc;
+	
 
 }
 

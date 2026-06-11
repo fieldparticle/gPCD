@@ -1,0 +1,1 @@
+The standardized testing process. It starts with generating particle data sets for each type of test. Verification tests are run to ensue proper counts. Performance tests shut off reporting counter so that the system can run at maximum speed while measuring performance.

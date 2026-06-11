@@ -48,9 +48,12 @@ void ResourceCollMatrix::Create(uint32_t BindPoint, ResourceVertexParticle* part
                                         * (CfgTst->GetUInt("CellAryH", true)) 
                                         * (CfgTst->GetUInt("CellAryL", true)));
 
-
-    m_BufSize = (m_MaxLoc*sizeof(uint32_t))*8*(CfgTst->GetInt("cell_occupancy_list_size", true));
-    mout << "Collision Matrix Size:" << m_BufSize << ende;    
+    // This is in bytes. sizeof(uint32_t) returns 4
+    uint64_t cell_occ_size = (CfgTst->GetInt("cell_occupancy_list_size", true));
+    m_BufSize = (m_MaxLoc*sizeof(uint32_t)*cell_occ_size);
+    mout << "Total Locations:" << m_MaxLoc 
+        << " Total Memory Size:" << m_BufSize 
+        << " Cell Occupancy Size:" << cell_occ_size << ende;
     
     uint32_t elements = m_BufSize / sizeof(uint32_t);
     uint32_t locations = elements / CfgTst->GetInt("cell_occupancy_list_size", true);
@@ -94,7 +97,7 @@ void ResourceCollMatrix::createBuffers()
 
         m_BufferInfo[i].buffer = m_Buffers[i];
         m_BufferInfo[i].offset = 0;
-        m_BufferInfo[i].range = m_BufSize;
+        m_BufferInfo[i].range = VK_WHOLE_SIZE;
         m_DescriptorWrite[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         m_DescriptorWrite[i].dstBinding = m_BindPoint;
         m_DescriptorWrite[i].dstArrayElement = 0;

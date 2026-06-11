@@ -77,6 +77,7 @@ void VulkanObj::CreateLogicalDevice() {
 		deviceFeatures.geometryShader = VK_TRUE;
         deviceFeatures.shaderClipDistance = VK_TRUE;
         deviceFeatures.fillModeNonSolid = VK_TRUE;
+        deviceFeatures.shaderFloat64 = VK_TRUE;
 
         VkPhysicalDeviceShadingRateImageFeaturesNV fragFeatures{};
         fragFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADING_RATE_IMAGE_FEATURES_NV;

@@ -14,26 +14,518 @@ Why is it important?
 What was achieved?
 
 1. Introduction
-   Why are particle systems important?
-   What are particle systems used for?
-   Why are large particle systems computationally limited?
-   What is the contribution of gPCD?
+	Why are particle systems important?
+		Paragraphs 1–2
 
+	What are particle systems used for?
+		Paragraphs 1–2
+
+	Why are large particle systems computationally limited?
+		Paragraphs 3–5
+
+	What is the contribution of gPCD?
+		Paragraphs 6–7
+
+	Paragraph 1
+
+	   Purpose:
+	   - Define particle methods.
+	   - Explain why particle methods are useful.
+	   - Introduce emergent macroscopic behavior.
+
+	   Contains:
+	   - Particle methods model discrete interacting entities.
+	   - Applicable to solids, fluids, granular materials,
+		 multiphase flows, molecular systems, and other applications.
+	   - Individual entities are represented explicitly.
+	   - Macroscopic behavior emerges from local interactions.
+	   - Particle methods are well suited for studying collective behavior.
+
+	   Presentation Bullets:
+	   - Discrete interacting particles.
+	   - Local interactions create emergent behavior.
+	   - Applicable to many scientific and engineering systems.
+
+	Paragraph 2
+
+	   Purpose:
+	   - Explain why large particle simulations are important.
+	   - Motivate particle simulation as a discovery tool.
+	   - Connect simulation to scientific advancement and AI.
+
+	   Contains:
+	   - Particle simulations support scientific discovery.
+	   - New physical behavior may only emerge in large-scale simulations.
+	   - Machine-learning methods require representative training data.
+	   - Simulations generate training datasets.
+	   - Simulations enable investigation of poorly understood phenomena.
+	   - Simulations complement experiments and analysis.
+
+	   Presentation Bullets:
+	   - Large-scale simulations enable scientific discovery.
+	   - Emergent phenomena may require many interacting particles.
+	   - Simulations generate datasets for machine learning.
+	   - Simulations help investigate previously unobserved behavior.
+
+	Paragraph 3
+
+	   Purpose:
+	   - Explain why large particle counts are desirable.
+	   - Explain why large particle simulations become expensive.
+	   - Introduce the need for efficient particle-processing methods.
+
+	   Contains:
+	   - Simulation fidelity increases with particle count.
+	   - Realistic simulations may require millions or billions of particles.
+	   - Larger particle counts improve spatial resolution.
+	   - Larger particle counts improve geometric representation.
+	   - Larger particle counts enable multiscale investigations.
+	   - Increased particle counts substantially increase computational cost.
+	   - Efficient particle-processing algorithms are required for large-scale simulation.
+
+	   Presentation Bullets:
+	   - High-fidelity simulations require millions to billions of particles.
+	   - Larger particle counts improve resolution and physical realism.
+	   - Computational cost grows rapidly with problem size.
+	   - Efficient particle-processing algorithms are essential.
+   
+	Paragraph 4
+
+		Purpose:
+		- Identify collision detection as a major computational bottleneck.
+		- Explain why naïve collision detection is impractical.
+		- Introduce broad-phase collision detection.
+		- Motivate the need for efficient parallel broad-phase methods.
+
+		Contains:
+		- Collision detection is a primary limitation of large-scale particle simulation.
+		- Naïve collision detection scales as O(N²).
+		- Direct all-to-all evaluation is impractical for large particle counts.
+		- Broad-phase methods reduce collision-detection cost.
+		- Broad-phase methods restrict testing to nearby particles.
+		- Efficient broad-phase construction remains challenging on massively parallel hardware.
+
+		Presentation Bullets:
+		- Collision detection is a major performance bottleneck.
+		- Naïve collision detection scales as O(N²).
+		- Broad-phase methods reduce candidate pairs.
+		- Efficient parallel broad-phase construction remains challenging.
+	   
+ Paragraph 5
+
+	Purpose:
+		- Introduce GPUs as a platform for large-scale particle simulation.
+		- Explain that hardware capability alone does not solve the problem.
+		- Identify occupancy generation as the remaining bottleneck.
+		- Transition toward the architectural motivation for gPCD.
+
+		Contains:
+		- GPUs provide high computational throughput.
+		- GPUs provide high memory bandwidth.
+		- GPUs are well suited for particle simulation.
+		- Spatial occupancy structures remain difficult to construct efficiently.
+		- Occupancy generation remains a bottleneck at large scales.
+
+		Presentation Bullets:
+		- GPUs provide massive parallelism.
+		- GPUs offer high memory bandwidth.
+		- Particle simulation maps naturally to GPU hardware.
+		- Occupancy generation remains a major bottleneck.  
+   
+	Paragraph 6
+
+		Purpose:
+		- Introduce gPCD.
+		- State the primary contribution of the work.
+		- Summarize the key architectural ideas.
+		- Explain the significance of the framework.
+
+		Contains:
+		- gPCD is a GPU-driven particle collision-detection framework.
+		- gPCD uses the graphics pipeline for occupancy generation.
+		- gPCD constructs a uniform cell-array occupancy structure.
+		- Occupancy generation is organized around particle corner locations.
+		- GPU rasterization hardware is used for broad-phase construction.
+		- The framework maintains a simple and scalable data structure.
+		- The framework supports large particle counts on a single CPU–GPU system.
+		- The framework provides a foundation for future large-scale particle simulations.
+
+		Presentation Bullets:
+		- GPU-driven particle collision detection (gPCD).
+		- Graphics-pipeline occupancy generation.
+		- Corner-based occupancy construction.
+		- Uniform cell-array broad phase.
+		- Scalable single CPU–GPU execution.
+	
+	Paragraph 7
+
+		Purpose:
+		- Clearly define the novelty of the work.
+		- Distinguish gPCD from existing occupancy structures.
+		- Explain the architectural contribution.
+		- Explain why the graphics pipeline is used.
+
+		Contains:
+		- The contribution is an execution architecture rather than a new data structure.
+		- gPCD integrates occupancy generation directly into the graphics pipeline.
+		- Rendering and occupancy construction occur concurrently.
+		- Occupancy generation produces the potentially colliding set (PCS).
+		- Graphics-pipeline resources participate in collision detection.
+		- Resources traditionally reserved for rendering are repurposed for occupancy generation.
+
+		Presentation Bullets:
+		- Novelty: execution architecture, not a new data structure.
+		- Graphics-pipeline occupancy generation.
+		- Concurrent rendering and occupancy construction.
+		- PCS generation integrated into rendering workflow.
+		- Repurposes graphics resources for collision detection.
+	
+	
+	
+	
 2. Background and Related Work
    What must the reader know first?
 
-   2.1 Broad-Phase Collision Detection
-   What is occupancy generation and why is it needed?
+   Section Introduction
 
-   2.2 Rendering and Collision Detection
-   How have rendering and collision detection traditionally
-   been organized?
+	   Purpose:
+	   - Introduce the scope of the background section.
+	   - Explain that collision-detection methods differ in both
+		 data structures and execution architectures.
+	   - Establish the relationship between collision detection
+		 and rendering.
+	   - Prepare the reader for the architectural gap discussion.
 
-   2.3 GPU Occupancy Structures
-   Uniform grids, spatial hashing, and related approaches.
+	   Contains:
+	   - Many collision-detection approaches have been proposed.
+	   - Approaches differ in both data structures and execution architectures.
+	   - Collision detection may be organized differently relative to rendering.
+	   - The section reviews methodologies, architectures,
+		 and rendering strategies.
+	   - The section identifies the architectural gap addressed by gPCD.
 
-   2.4 Gap in Existing Methods
-   What architectural capability is missing?
+	   Presentation Bullets:
+	   - Collision-detection methods vary in structure and execution model.
+	   - Rendering and collision detection are often separated.
+	   - Existing architectures leave an unexploited opportunity.
+	   - Background motivates the architectural contribution of gPCD.
+   
+	2.1 Collision-Detection Frameworks
+		What is occupancy generation and why is it needed?
+
+	Paragraph 1
+
+	   Purpose:
+	   - Introduce the broad-phase/narrow-phase organization.
+	   - Define the two major stages of collision detection.
+	   - Establish where gPCD contributes.
+	   - Explain why broad-phase generation is important.
+
+	   Contains:
+	   - Collision detection is commonly divided into broad-phase and narrow-phase stages.
+	   - Broad phase generates collision candidates.
+	   - Narrow phase evaluates candidate collisions.
+	   - This organization is widely used across collision-detection frameworks.
+	   - gPCD's primary contribution occurs in broad-phase occupancy generation.
+	   - Narrow phase completes the overall collision-detection process.
+
+	   Presentation Bullets:
+	   - Collision detection is typically divided into two stages.
+	   - Broad phase generates collision candidates.
+	   - Narrow phase evaluates candidate collisions.
+	   - gPCD focuses on broad-phase occupancy generation.
+	   
+
+	Paragraph 2
+
+		Purpose:
+		- Review common GPU broad-phase methodologies.
+		- Show that many approaches exist for candidate generation.
+		- Explain the common objective of broad-phase methods.
+		- Transition from collision-detection methods to execution architectures.
+
+		Contains:
+		- Numerous GPU broad-phase methods have been proposed.
+		- Common approaches include:
+		  - Uniform grids
+		  - Spatial hashing
+		  - Hierarchical spatial subdivision
+		  - Sweep and prune
+		  - Image-space methods
+		  - Other acceleration techniques
+		- Methods differ in how spatial information is organized and queried.
+		- All broad-phase methods seek to reduce narrow-phase evaluations.
+		- Research has expanded from algorithms to execution architectures.
+		- GPU computing has increased interest in architectural design.
+
+		Presentation Bullets:
+		- Many GPU broad-phase methodologies exist.
+		- Methods differ in spatial organization and query strategy.
+		- All seek to reduce narrow-phase collision tests.
+		- Recent work increasingly focuses on execution architectures.
+
+	2.2 Collision-Detection Architectures
+		How have rendering and collision detection traditionally
+		been organized?
+
+   Paragraph 1
+
+	   Purpose:
+	   - Introduce execution architectures as distinct from collision-detection methods.
+	   - Describe the historical evolution of collision-detection execution.
+	   - Explain the migration from CPU to GPU implementations.
+	   - Establish the architectural spectrum considered in the literature.
+
+	   Contains:
+	   - Collision-detection methodologies can be implemented using different execution architectures.
+	   - Early systems performed broad-phase and narrow-phase operations on the CPU.
+	   - Collision detection and rendering were traditionally separate processes.
+	   - Increasing particle counts motivated GPU acceleration.
+	   - Programmable GPUs enabled portions of the collision-detection pipeline to migrate to the GPU.
+	   - GPU parallelism became a major driver of architectural evolution.
+	   - Existing architectures span:
+		   - CPU-resident implementations
+		   - GPU-assisted implementations
+		   - Fully GPU-resident implementations
+
+	   Presentation Bullets:
+	   - Execution architecture is distinct from collision-detection methodology.
+	   - Early systems were CPU-based.
+	   - Collision detection and rendering were traditionally independent.
+	   - GPU programmability enabled migration of collision detection to the GPU.
+	   - Architectures now range from CPU-resident to fully GPU-resident.
+
+	Paragraph 2
+
+		Purpose:
+		- Define the major architectural categories.
+		- Explain how work is distributed between CPU and GPU.
+		- Describe the progression toward increased GPU utilization.
+		- Introduce data movement as an architectural concern.
+
+		Contains:
+		- CPU-resident architectures perform broad-phase and narrow-phase operations on the CPU.
+		- Simulation state is transferred to the rendering system after collision processing.
+		- GPU-assisted architectures offload selected collision-detection tasks to the GPU.
+		- CPU-managed execution and data structures remain part of the workflow.
+		- GPU-resident architectures perform broad-phase and narrow-phase operations entirely on the GPU.
+		- GPU-resident approaches reduce host-device communication.
+		- GPU-resident approaches improve parallel utilization.
+		- GPU-resident approaches reduce data movement overhead.
+
+		Presentation Bullets:
+		- CPU-resident: collision detection performed entirely on the CPU.
+		- GPU-assisted: selected operations offloaded to the GPU.
+		- GPU-resident: broad phase and narrow phase executed on the GPU.
+		- Increasing GPU utilization reduces data-transfer overhead.
+
+
+	Paragraph 3
+
+		Purpose:
+		- Identify a common limitation across existing architectures.
+		- Explain that rendering and collision detection are usually separate.
+		- Highlight the traditional role of the rendering pipeline.
+		- Motivate examination of rendering-collision integration.
+
+		Contains:
+		- Existing architectures differ in execution location and data movement.
+		- Collision detection and rendering are typically separate processes.
+		- Collision-detection work is performed in dedicated computational stages.
+		- The rendering pipeline primarily consumes simulation state.
+		- Rendering generally does not participate in collision detection.
+		- This separation motivates investigation of rendering-collision interaction.
+
+		Presentation Bullets:
+		- Most architectures separate rendering and collision detection.
+		- Collision detection uses dedicated compute stages.
+		- Rendering typically consumes simulation results.
+		- Rendering rarely contributes to collision detection.
+		- This separation motivates the gPCD architecture.   
+   
+	2.3 Rendering and Collision Detection
+
+	Paragraph 1
+
+		Purpose:
+		- Define the traditional roles of collision detection and rendering.
+		- Explain why the two systems have historically been separated.
+		- Establish the conventional simulation-to-rendering workflow.
+		- Prepare the reader for alternative rendering-based architectures.
+
+		Contains:
+		- Collision detection identifies particle interactions.
+		- Collision detection advances simulation state.
+		- Rendering visualizes simulation results.
+		- Collision detection and rendering perform different functions.
+		- Rendering is typically positioned downstream of simulation.
+		- Rendering primarily consumes simulation state.
+		- Rendering traditionally does not participate in simulation processing.
+
+		Presentation Bullets:
+		- Collision detection computes simulation behavior.
+		- Rendering visualizes simulation results.
+		- Rendering is typically downstream of simulation.
+		- Rendering acts primarily as a consumer of simulation state.
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Explain how GPU adoption affected rendering and collision detection.
+		- Show that GPU execution did not fundamentally change their relationship.
+		- Reinforce the separation between rendering and collision detection.
+		- Identify the underutilization of rendering resources for collision detection.
+
+		Contains:
+		- Rendering and collision detection increasingly leverage GPU parallelism.
+		- GPU-resident implementations became common.
+		- Rendering and collision detection generally remain logically separated.
+		- Collision detection executes in dedicated computational stages.
+		- Rendering continues to generate visual output from simulation data.
+		- Rendering contributes little or no information to collision detection.
+		- GPU adoption alone does not integrate rendering and collision detection.
+
+		Presentation Bullets:
+		- Both rendering and collision detection moved to the GPU.
+		- GPU residency did not eliminate their separation.
+		- Collision detection uses dedicated compute stages.
+		- Rendering remains focused on visualization.
+		- Rendering contributes little to collision detection.
+
+
+
+
+	Paragraph 3
+
+		Purpose:
+		- Review prior attempts to integrate rendering and simulation.
+		- Acknowledge graphics-assisted approaches.
+		- Explain the remaining limitation of existing methods.
+		- Identify the architectural gap that motivates gPCD.
+
+		Contains:
+		- Prior work has explored rendering-simulation integration.
+		- Approaches include:
+			- Image-space techniques
+			- GPU data structures
+			- Graphics-assisted computation
+		- Existing approaches still treat occupancy generation as a dedicated
+		  collision-detection task.
+		- Candidate construction remains independent of rasterization.
+		- Rendering remains primarily downstream of simulation.
+		- Rendering rarely acts as an active participant in collision detection.
+		- An architectural opportunity remains unexploited.
+
+		Presentation Bullets:
+		- Prior work explored graphics-assisted simulation.
+		- Image-space and GPU-assisted approaches exist.
+		- Occupancy generation remains separate from rasterization.
+		- Rendering is still primarily downstream of simulation.
+		- An architectural gap remains.
+
+
+
+	Paragraph 4
+
+		Purpose:
+		- Formulate the central architectural question.
+		- Transition from prior work to the gPCD motivation.
+		- Introduce graphics-pipeline occupancy generation as a possibility.
+		- Establish concurrency between rendering and occupancy generation as a design objective.
+
+		Contains:
+		- Existing architectures separate occupancy generation from rendering.
+		- This separation suggests an unexplored architectural opportunity.
+		- Broad-phase occupancy generation may be integrated into the graphics pipeline.
+		- Occupancy construction and rendering may proceed concurrently.
+		- Graphics-pipeline resources may contribute directly to collision detection.
+
+		Presentation Bullets:
+		- Can occupancy generation be integrated into the graphics pipeline?
+		- Can rendering and occupancy construction execute concurrently?
+		- Can graphics resources participate directly in collision detection?
+		- This question motivates gPCD.
+
+
+	2.4 Gap in Existing Methods
+		What architectural capability is missing?
+
+	   Paragraph 1
+
+		   Purpose:
+		   - Summarize the findings of the previous background sections.
+		   - Restate the traditional relationship between rendering and collision detection.
+		   - Identify occupancy generation as a dedicated operation.
+		   - Prepare the formal statement of the architectural gap.
+
+		   Contains:
+		   - Rendering and collision detection have traditionally remained separate.
+		   - This separation persists in GPU-resident implementations.
+		   - Rendering primarily consumes simulation state.
+		   - Broad-phase occupancy generation is performed separately.
+		   - Occupancy generation is treated as a dedicated collision-detection task.
+		   - Existing architectures do not integrate occupancy generation into rendering.
+
+		   Presentation Bullets:
+		   - Rendering and collision detection remain separate.
+		   - This separation persists on modern GPUs.
+		   - Rendering consumes simulation state.
+		   - Occupancy generation remains a dedicated collision-detection operation.
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- State the architectural gap explicitly.
+		- Define the missing capability in existing methods.
+		- Introduce the gPCD solution.
+		- Connect the Background section to the Methodology section.
+
+		Contains:
+		- Existing methods do not integrate broad-phase occupancy generation directly into the graphics pipeline.
+		- This absence constitutes the architectural gap.
+		- gPCD addresses the gap through graphics-pipeline occupancy generation.
+		- Occupancy construction and rendering proceed concurrently.
+		- Graphics-pipeline execution produces the potentially colliding set (PCS).
+		- The PCS is used during narrow-phase evaluation.
+		- gPCD integrates rendering and occupancy generation into a unified architecture.
+
+		Presentation Bullets:
+		- Missing capability:
+			- Graphics-pipeline occupancy generation.
+		- gPCD integrates occupancy generation directly into the graphics pipeline.
+		- Occupancy construction and rendering execute concurrently.
+		- Graphics-pipeline execution produces the PCS.
+		- gPCD closes the architectural gap.
+
+
+
+	Paragraph 3
+
+		Purpose:
+		- Clarify the nature of the contribution.
+		- Distinguish architectural novelty from algorithmic novelty.
+		- Prevent misinterpretation of the work.
+		- Reinforce the execution-architecture focus of gPCD.
+
+		Contains:
+		- gPCD does not introduce a new occupancy structure.
+		- gPCD does not introduce new asymptotic complexity results.
+		- Existing collision-detection techniques are retained.
+		- The contribution lies in architectural organization.
+		- Existing techniques are integrated into a unified GPU-driven framework.
+		- The novelty is execution architecture rather than methodology.
+
+		Presentation Bullets:
+		- Not a new data structure.
+		- Not a new complexity improvement.
+		- Existing techniques are retained.
+		- Novelty lies in execution architecture.
+		- Unified GPU-driven framework.
+
 
 3. Methodology
    How does gPCD work?
