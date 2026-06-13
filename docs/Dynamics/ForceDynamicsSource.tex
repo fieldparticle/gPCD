@@ -1,0 +1,385 @@
+% !TeX root = main.tex
+\newpage
+\section{ForceDynamics Source Flow}
+
+\newcommand{\ForceFunctionSection}[1]{%
+  \subsection{ForceDynamics:#1}%
+  \label{force:#1}%
+}
+
+\texttt{ForceDynamics} processes one source particle completely before
+advancing to the next source.  It may read target frame-start state, but all
+dynamics writes, contact slots, collision history, and internal-momentum
+ledgers remain owned by the source particle.
+
+\begin{figure}[ht]
+\centering
+\resizebox{\textwidth}{!}{\input{ForceDynamicsFlowTikz}}
+\caption{Current ForceDynamics function flow}
+\end{figure}
+
+\clearpage
+
+\ForceFunctionSection{CollisionRun}
+
+\texttt{CollisionRun} is the permanent generic frame chain:
+
+\begin{verbatim}
+BeginFrame
+ApplyBeforeContactScanHook
+ResetFrameState
+ApplyStartRunHook
+BuildFrameSnapshot
+RecordFrameStartDiagnostics
+DetectContacts
+BuildWallContactLists
+RecordAfterResolveDiagnostics
+MoveParticles
+EndFrame
+\end{verbatim}
+
+Contact response is completed inside \texttt{DetectContacts}: after one source
+has scanned every possible target, it calls \texttt{ContactDynamics} before
+advancing to the next source.
+
+For each source particle \(i\), the implementation reads immutable frame-start
+state, processes every detected contact \(j \in C_i\), calculates each contact
+contribution, sums the contributions locally, and writes only source particle
+\(i\):
+\[
+\Delta\mathbf p_i
+=
+\sum_{j\in C_i}\Delta\mathbf p_{ij}
+\]
+\[
+\mathbf p_i^{new}
+=
+\mathbf p_i^{old}+\Delta\mathbf p_i
+\]
+
+Every source reads the same frame-start snapshot.  A source processes all of its
+contacts before writing its velocity, and no source writes another particle.
+The current implementation calculates source-local contact weights before
+planning and vector-summing the contact impulses.
+
+\ForceFunctionSection{ContactDynamics}
+
+\texttt{ContactDynamics(SourceID)} is the readable top-level dynamics chain for
+one source particle.  The source contact list must already contain the
+current-frame target IDs.
+
+It resets source accumulators, initializes and calculates each contact, then
+performs the source-level stages that require the complete contact set:
+
+\begin{verbatim}
+BeginSourceContactParms
+for each TargetID:
+    InitializeContactState
+    CalculateContactParms
+CalculateContactWeights
+CalculateContactImpulses
+ApplySourceVelocityDelta
+UpdateContactLedgers
+\end{verbatim}
+
+Each stage returns immediately on failure.  The function reads target snapshot
+state but writes only source-owned state.
+
+\ForceFunctionSection{BeginSourceContactParms}
+
+\texttt{BeginSourceContactParms(SourceID)} resets the source-level values that
+will be rebuilt from the current contact list:
+
+\begin{itemize}
+    \item \texttt{total\_overlap\_area}
+    \item \texttt{available\_source\_momentum}
+\end{itemize}
+
+These values must be zero before individual contacts contribute their geometry
+and closing momentum.
+
+\ForceFunctionSection{InitializeContactState}
+
+\texttt{InitializeContactState(SourceID, TargetID)} initializes one current
+source-target contact.  It obtains the source-owned contact slot from
+\texttt{GetContactState}, marks the source as colliding, and updates the
+source's reporting target and contact count.  It returns the initialized slot,
+or \texttt{None} when initialization fails.
+
+\ForceFunctionSection{GetContactState}
+
+\texttt{GetContactState(SourceID, TargetID)} creates and populates one
+current-frame source-owned contact slot.
+
+The function first calls \texttt{AppendContactSlot} to record the target and
+persistent collision state.  It then calls \texttt{GetParticleGeometry} and
+stores the contact normal, overlap area, center distance, overlap depth, and
+stored internal momentum in the slot.
+
+\ForceFunctionSection{AppendContactSlot}
+
+\texttt{AppendContactSlot(SourceID, TargetID)} allocates the next available
+contact slot owned by the source particle.  The slot records:
+
+\begin{itemize}
+    \item target particle ID;
+    \item particle-contact type;
+    \item persistent collision phase;
+    \item active-this-frame state;
+    \item previously stored internal momentum.
+\end{itemize}
+
+The source's \texttt{contactCount} is incremented only after a slot is filled.
+The function returns \texttt{None} when the fixed slot array is full.
+
+\ForceFunctionSection{GetContactSlots}
+
+\texttt{GetContactSlots(SourceID)} returns the fixed contact-slot array owned by
+the source particle.  Newer particle structures use \texttt{contacts}; the
+\texttt{gcs} fallback preserves compatibility with the current particle
+structure.
+
+\ForceFunctionSection{GetCollisionPhase}
+
+\texttt{GetCollisionPhase(SourceID, TargetID)} reads the persistent
+source-owned phase for one contact.  Collision phases are stored by target ID.
+A contact without phase history begins in compression.
+
+\ForceFunctionSection{GetCollisionInternalMomentum}
+
+\texttt{GetCollisionInternalMomentum(SourceID, TargetID)} reads the persistent
+internal momentum owned by one source-target contact ledger.  A missing ledger
+or target entry represents zero stored momentum.
+
+\ForceFunctionSection{GetParticleGeometry}
+
+\texttt{GetParticleGeometry(SourceID, TargetID)} calculates current-frame
+contact geometry from frame-start particle positions.
+
+When the two radii overlap, it returns:
+
+\begin{verbatim}
+(normal_x, normal_y, normal_z, overlap_area, center_distance)
+\end{verbatim}
+
+The normal points from source to target.  The function returns \texttt{None}
+when no overlap exists.  Coincident centers use the positive x direction as a
+deterministic fallback normal.
+
+\ForceFunctionSection{GetParticlePosition}
+
+\texttt{GetParticlePosition(ParticleID)} returns the particle's frame-start
+position.  It prefers the immutable \texttt{PosLocFrame} snapshot so every
+source reads the same frame state.  When no snapshot exists, it reads the
+currently active particle position buffer.
+
+\ForceFunctionSection{CalculateContactParms}
+
+\texttt{CalculateContactParms(SourceID, TargetID, contact\_state)} calculates
+one contact's relative normal motion and contribution to source-level totals.
+
+Using frame-start source and target velocities, it calculates:
+
+\begin{equation}
+v_{\mathrm{rel},n}
+=
+(\mathbf{v}_{t}-\mathbf{v}_{s})\cdot\mathbf{n}
+\end{equation}
+
+\begin{equation}
+p_{\mathrm{closing}}
+=
+\mu\max(0,-v_{\mathrm{rel},n})
+\end{equation}
+
+The relative normal velocity and closing momentum are stored in the contact
+slot.  The contact overlap area and closing momentum are also accumulated into
+the source totals.
+
+\ForceFunctionSection{GetStartFrameVelocity}
+
+\texttt{GetStartFrameVelocity(ParticleID)} returns the immutable frame-start
+velocity.  It prefers \texttt{VelRadFrame}, preventing one source from observing
+another source's velocity write during the same frame.  It falls back to the
+particle's current velocity when no snapshot is available.
+
+\ForceFunctionSection{GetReducedMass}
+
+\texttt{GetReducedMass(SourceID, TargetID)} returns the Newtonian reduced mass:
+
+\begin{equation}
+\mu = \frac{m_s m_t}{m_s + m_t}.
+\end{equation}
+
+Masses come from the GLSL-shaped \texttt{parms.x} particle field.  An epsilon
+floor prevents a zero denominator.
+
+\ForceFunctionSection{CalculateContactWeights}
+
+\texttt{CalculateContactWeights(SourceID)} distributes the source's available
+momentum across its current contacts using source-owned overlap-area weights:
+
+\begin{equation}
+w_i = \frac{A_i}{\sum_j A_j}
+\end{equation}
+
+\begin{equation}
+p_{\mathrm{share},i} = p_{\mathrm{available},s} w_i.
+\end{equation}
+
+The source available share is stored on each contact.  This stage does not
+inspect target-owned contact state and does not apply an impulse.
+
+This source-local allocation is a known conservation failure when it changes
+the physical pair impulse.  Two sources with different surrounding contact
+sets calculate different weights for the same pair contact, so their
+independently evaluated impulse magnitudes are not equal-and-opposite.
+
+\ForceFunctionSection{CalculateContactImpulses}
+
+\texttt{CalculateContactImpulses(SourceID)} plans compression or release for
+each source-owned contact without changing velocity or persistent ledgers.
+
+The current weighted raw impulse is:
+
+\begin{equation}
+J_{\mathrm{raw},i}
+=
+q_{\mathrm{pair}} A_i
+\left(\frac{A_i}{\sum_j A_j}\right)
+\Delta t.
+\end{equation}
+
+This is a description of the implemented rule, not a conservation claim.
+Current \texttt{ThreeParticle} diagnostics show that this source-local weighted
+raw impulse produces whole-system vector momentum and kinetic-energy drift.
+
+For a closing contact, compression is limited by the contact's weighted source
+momentum:
+
+\begin{equation}
+J_{\mathrm{compression}}
+=
+\min(J_{\mathrm{raw}},p_{\mathrm{weighted}}).
+\end{equation}
+
+For a non-closing contact, release is limited by stored contact internal
+momentum:
+
+\begin{equation}
+J_{\mathrm{release}}
+=
+\min(J_{\mathrm{raw}},p_{\mathrm{internal}}).
+\end{equation}
+
+\ForceFunctionSection{GetPairStiffness}
+
+\texttt{GetPairStiffness(SourceID, TargetID)} returns the nonnegative mean of
+the source-owned and target-owned particle stiffness values:
+
+\begin{equation}
+q_{\mathrm{pair}} = \max\left(0,\frac{q_s+q_t}{2}\right).
+\end{equation}
+
+\ForceFunctionSection{ApplySourceVelocityDelta}
+
+\texttt{ApplySourceVelocityDelta(SourceID)} converts each planned scalar
+contact impulse into a vector along the negative source-to-target normal:
+
+\begin{equation}
+\Delta\mathbf{p}_i
+=
+-(J_{\mathrm{compression},i}+J_{\mathrm{release},i})\mathbf{n}_i.
+\end{equation}
+
+All contact momentum deltas are summed before the source velocity is written:
+
+\begin{equation}
+\mathbf{v}'_s
+=
+\mathbf{v}_s+\frac{\sum_i\Delta\mathbf{p}_i}{m_s}.
+\end{equation}
+
+Only the source velocity is changed.  The function also records per-contact
+momentum deltas and source before/after diagnostics.
+
+\ForceFunctionSection{GetParticleMass}
+
+\texttt{GetParticleMass(ParticleID)} reads particle mass from
+\texttt{parms.x}.  The returned value is bounded below by \texttt{EPSILON}.
+
+\ForceFunctionSection{UpdateContactLedgers}
+
+\texttt{UpdateContactLedgers(SourceID)} commits planned compression and release
+to persistent source-owned contact ledgers:
+
+\begin{equation}
+p_{\mathrm{internal},i}'
+=
+\max(0,
+p_{\mathrm{internal},i}
++ J_{\mathrm{compression},i}
+- J_{\mathrm{release},i}).
+\end{equation}
+
+The function updates each contact's phase and current slot diagnostics, then
+rebuilds the source total internal momentum after all contact ledgers are
+committed.
+
+\ForceFunctionSection{SetCollisionInternalMomentum}
+
+\texttt{SetCollisionInternalMomentum(SourceID, TargetID, internal\_momentum)}
+stores one source-owned contact internal-momentum value by target ID.  Values at
+or below \texttt{EPSILON} are removed from the ledger.
+
+\ForceFunctionSection{SetCollisionPhase}
+
+\texttt{SetCollisionPhase(SourceID, TargetID, phase)} stores one persistent
+source-owned collision phase by target ID.  A drained compression contact is
+the default state and therefore requires no stored phase entry.
+
+\ForceFunctionSection{SyncInternalMomentum}
+
+\texttt{SyncInternalMomentum(SourceID)} rebuilds the source's total internal
+momentum from all source-owned contact ledgers and stores the result on the
+particle.
+
+\ForceFunctionSection{GetInternalMomentum}
+
+\texttt{GetInternalMomentum(SourceID)} returns the sum of all stored
+source-owned contact internal momentum.  The particle total is used only as a
+compatibility fallback when no contact-ledger dictionary exists.
+
+\ForceFunctionSection{SetInternalMomentum}
+
+\texttt{SetInternalMomentum(SourceID, internal\_momentum)} stores the source
+total internal momentum in both the runtime \texttt{internal\_momentum} field
+and the GLSL-shaped \texttt{Data.z} field.
+
+\ForceFunctionSection{Move}
+
+\texttt{Move(SourceID)} integrates one source particle into the inactive
+position buffer using its newly updated velocity:
+
+\begin{equation}
+\mathbf{x}' = \mathbf{x}+\mathbf{v}\Delta t.
+\end{equation}
+
+The function validates the particle ID and time step, updates active-buffer
+markers, and reports a lower-bound error when the resulting position leaves the
+allowed domain.  The frame-chain owner performs the final position-buffer swap.
+
+\ForceFunctionSection{isValidParticleID}
+
+\texttt{isValidParticleID(ParticleID)} returns true when the ID is within the
+current particle array:
+
+\begin{verbatim}
+0 <= ParticleID < len(particles)
+\end{verbatim}
+
+\ForceFunctionSection{SetError}
+
+\texttt{SetError(error\_code)} provides the generic linear-dynamics name for
+setting the inherited shared collision error state.  It delegates to the
+existing frame-chain error mechanism and returns failure.

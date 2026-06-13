@@ -25,6 +25,7 @@ from gbase.import_module import load_class_from_file
 from gbase.pdata import *
 from gbase.GenPQBData import *
 from SimulationRunner import run_analysis as simulation_run_analysis
+from base.DiagnosticsPlots import run_diagnostics
 #from GenMotionData import *
 #from subprocess import Popen
 import subprocess
@@ -53,6 +54,7 @@ class TabGenData(QTabWidget):
     #
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs )
+        self.diagnostics_cfg_file = None
         self.threadpool = QThreadPool()
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
         thread_count = self.threadpool.maxThreadCount()
@@ -110,6 +112,8 @@ class TabGenData(QTabWidget):
             self.itemcfgFile = ConfigUtility(self.CfgFile)
             self.itemcfgFile.Create(self.bobj.log,self.CfgFile)
             self.itemcfg = self.itemcfgFile.config
+            if self.itemcfg.get("type") == "batch":
+                self.diagnostics_cfg_file = file
         except BaseException as e:
             self.log.log(self,f"Unable to open item configurations file:{e}")
             self.hasConfig = False
@@ -374,13 +378,20 @@ class TabGenData(QTabWidget):
         control.setMaximumHeight(H)
         control.setMaximumWidth(W)
 
-   
+    def run_diagnostics_plots(self):
+        diagnostics_cfg = self.diagnostics_cfg_file or self.CfgFile
+        self.diagnostics_figure = run_diagnostics([diagnostics_cfg, "--show"])
+
     #******************************************************************
     # Creatwe the tab
     #
     def Create(self,ParticleBase):
         self.bobj = ParticleBase
         self.cfg = self.bobj.cfg.config
+        self.diagnostics_cfg_file = os.path.join(
+            self.cfg.analysis_script_dir,
+            "batch_test_001.cfg",
+        )
         self.log = self.bobj.log
         self.log.log(self,"TabFormGenData finished init.")
         try:
@@ -411,38 +422,45 @@ class TabGenData(QTabWidget):
             dirgrid.addWidget(self.dirButton,0,0)
             dirgrid.addWidget(self.dirEdit,0,1)
 
-            self.AnalyseButton = QPushButton("Analysis")
+            self.AnalyseButton = QPushButton("Simulate")
             self.setSize(self.AnalyseButton,30,100)
             self.AnalyseButton.setStyleSheet("background-color:  #dddddd")
             self.AnalyseButton.clicked.connect(self.run_analysis)
             self.AnalyseButton.setEnabled(True)
             dirgrid.addWidget(self.AnalyseButton,2,0)
 
+            self.DiagnosticsButton = QPushButton("Diagnostics Plots")
+            self.setSize(self.DiagnosticsButton,30,100)
+            self.DiagnosticsButton.setStyleSheet("background-color:  #dddddd")
+            self.DiagnosticsButton.clicked.connect(self.run_diagnostics_plots)
+            self.DiagnosticsButton.setEnabled(True)
+            dirgrid.addWidget(self.DiagnosticsButton,2,1)
+
             self.RefreshButton = QPushButton("Reload")
             self.setSize(self.RefreshButton,30,100)
             self.RefreshButton.setStyleSheet("background-color:  #dddddd")
             self.RefreshButton.clicked.connect(self.update_list_widget)
-            dirgrid.addWidget(self.RefreshButton,2,1)
+            dirgrid.addWidget(self.RefreshButton,2,2)
 
             self.newButton = QPushButton("Plot")
             self.setSize(self.newButton,30,100)
             self.newButton.setStyleSheet("background-color:  #dddddd")
             self.newButton.clicked.connect(self.plot_particles)
-            dirgrid.addWidget(self.newButton,2,2)
+            dirgrid.addWidget(self.newButton,2,3)
 
             self.GenDataButton = QPushButton("GenData")
             self.setSize(self.GenDataButton,30,100)
             self.GenDataButton.setStyleSheet("background-color:  #dddddd")
             self.GenDataButton.clicked.connect(self.gen_data)
             self.GenDataButton.setEnabled(False)
-            dirgrid.addWidget(self.GenDataButton,2,3)
+            dirgrid.addWidget(self.GenDataButton,2,4)
 
             self.StopButton = QPushButton("Stop Gen")
             self.setSize(self.StopButton,30,100)
             self.StopButton.setStyleSheet("background-color:  #dddddd")
             self.StopButton.clicked.connect(self.gen_data)
             self.StopButton.setEnabled(False)
-            dirgrid.addWidget(self.StopButton,2,4)
+            dirgrid.addWidget(self.StopButton,2,5)
 
             self.ToggleCellsBtn = QPushButton("Toggle Cells")
             self.setSize(self.ToggleCellsBtn,30,100)
@@ -541,4 +559,3 @@ class TabGenData(QTabWidget):
         selected_items = dataList.selectedItems()
         self.DataFileText = selected_items[0].text() if selected_items else ""
         print(f"Selected data file:{self.DataFileText}")   
-        

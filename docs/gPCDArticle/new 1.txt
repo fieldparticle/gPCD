@@ -1,0 +1,43 @@
+Outline review process:
+
+1. We go one paragraph at a time.
+2. At the bginiing we overview the flow of the paragraphs in the section.
+3. the for each paragraph we note the putpose, what it contains, how it flows ito the next paragraph (good,fair, bad, not applicable), and presentaion bullets.
+
+format example:
+
+1. Introduction
+	Why are particle systems important?
+		Paragraphs 1–2
+
+	What are particle systems used for?
+		Paragraphs 1–2
+
+	Why are large particle systems computationally limited?
+		Paragraphs 3–5
+
+	What is the contribution of gPCD?
+		Paragraphs 6–7
+
+	Paragraph 1
+
+	   Purpose:
+	   - Define particle methods.
+	   - Explain why particle methods are useful.
+	   - Introduce emergent macroscopic behavior.
+	   
+	   Flow:
+		- Good.
+		
+	   Contains:
+	   - Particle methods model discrete interacting entities.
+	   - Applicable to solids, fluids, granular materials,
+		 multiphase flows, molecular systems, and other applications.
+	   - Individual entities are represented explicitly.
+	   - Macroscopic behavior emerges from local interactions.
+	   - Particle methods are well suited for studying collective behavior.
+
+	   Presentation Bullets:
+	   - Discrete interacting particles.
+	   - Local interactions create emergent behavior.
+	   - Applicable to many scientific and engineering systems.

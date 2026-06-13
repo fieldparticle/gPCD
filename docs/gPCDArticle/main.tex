@@ -44,29 +44,30 @@
 \input{LatexValsDataBase.tex}
 
 \title{A GPU Driven Graphical Particle Collision Detection Method- gPCD}
-\author{}
-\date{}
+\author{Jackie Bell}
+\date{June 13, 2006}
 
 \begin{document}
+\maketitle
 \begin{abstract}
 
 Broad-phase collision detection is a fundamental component of
 particle-based simulation systems and is often a dominant contributor
 to overall computational cost. Existing GPU-resident approaches
-typically perform occupancy generation and candidate construction as
-dedicated collision-detection operations, while rendering remains a
-consumer of simulation state. This separation limits the ability of the
-graphics pipeline to contribute directly to collision detection.
+typically perform occupancy generation as a dedicated
+collision-detection operation, while rendering remains a consumer of
+simulation state. This separation limits the ability of the graphics
+pipeline to contribute directly to collision detection.
 
 This work presents the graphics-based Parallel Collision Detection
 (gPCD) framework, a GPU-resident collision-detection architecture that
 integrates broad-phase occupancy generation directly into the graphics
 pipeline. The proposed framework allows occupancy construction and
-rendering to proceed concurrently while generating the potentially
-colliding set used during narrow-phase evaluation. A detailed
-complexity analysis is presented in which occupancy generation,
-candidate construction, narrow-phase evaluation, and storage
-requirements are examined independently.
+rendering to proceed concurrently while directly generating the
+potentially colliding set used during narrow-phase evaluation. A
+detailed complexity analysis is presented in which occupancy
+generation, narrow-phase evaluation, and storage requirements are
+examined independently.
 
 Experimental evaluation demonstrates high particle throughput and
 near-linear scaling across graphics, compute, and total execution
@@ -78,10 +79,11 @@ efficiency while preserving the underlying asymptotic behavior of the
 framework.
 
 The results demonstrate that graphics-pipeline occupancy generation
-provides a viable execution architecture for large-scale particle
-collision detection and enables particle-system scales approaching those commonly associated
-with high-performance computing environments to be achieved on a single
-CPU--GPU system.
+provides a viable architecture for large-scale particle collision
+detection while maintaining high throughput and near-linear scaling.
+The demonstrated particle counts indicate that particle-system scales
+commonly associated with high-performance computing environments can be
+approached on a single CPU--GPU system.
 
 \end{abstract}
 
@@ -104,5 +106,4 @@ real-time simulation
 \input{Conclusions}
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{ReferencesWithdoi.bib}
-\input{Conventions}
 \end{document}

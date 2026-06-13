@@ -1,0 +1,502 @@
+!TeX root = ManuscriptGuide.tex
+\newpage
+\clearpage
+\section{Manuscript Organization Guide}
+\begin{verbatim}
+=========================================================
+Manuscript Organization Guide
+=========================================================
+
+Purpose of this Guide
+
+This guide provides a structural overview of the manuscript.
+It identifies the purpose of each section, the questions
+addressed, the concepts introduced, the figures and tables
+used to support those concepts, and the relationships among
+sections.
+
+The guide is intended to improve transparency of the paper's
+organizational structure and facilitate navigation by both
+human readers and AI-assisted document-analysis tools.
+
+=========================================================
+Introduction
+=========================================================
+
+Purpose
+
+    Introduce the collision-detection problem,
+    identify the remaining architectural
+    limitation in existing GPU approaches,
+    and present the gPCD framework.
+
+Questions Answered
+
+    What are particle methods?
+
+    Why do particle counts become large?
+
+    Why is collision detection difficult?
+
+    How have GPUs been used to address this
+    challenge?
+
+    What architectural limitation remains?
+
+    What is gPCD?
+
+    What are the contributions of this work?
+
+Key Concepts Introduced
+
+    - Particle methods
+    - Large-scale particle simulation
+    - Broad-phase collision detection
+    - GPU acceleration
+    - Architectural limitation
+    - Graphics-pipeline occupancy generation
+
+Figures/Tables
+
+    None
+
+Inputs
+
+    None
+
+Outputs
+
+    - Architectural limitation
+    - gPCD framework
+    - Contributions of the paper
+
+Key Takeaway
+
+    Existing GPU collision-detection methods
+    accelerate processing, but occupancy
+    generation remains largely independent of
+    rendering. The gPCD framework addresses
+    this limitation by integrating occupancy
+    generation directly into the graphics
+    pipeline.
+
+=========================================================
+Background and Related Work
+=========================================================
+
+Purpose
+
+    Review representative collision-detection
+    methodologies, execution architectures,
+    and rendering relationships that motivate
+    the gPCD framework.
+
+Questions Answered
+
+    What collision-detection methodologies
+    exist?
+
+    How have collision-detection systems been
+    implemented?
+
+    What is the relationship between rendering
+    and collision detection?
+
+    What architectural gap remains?
+
+Key Concepts Introduced
+
+    - Broad-phase methodologies
+    - Uniform grids
+    - Spatial hashing
+    - Hierarchical subdivision
+    - Sweep and prune
+    - Image-space methods
+    - CPU-resident architectures
+    - GPU-assisted architectures
+    - GPU-resident architectures
+    - Rendering as a consumer of simulation
+      state
+    - Architectural gap
+
+Figures/Tables
+
+    None
+
+Inputs
+
+    - Architectural limitation identified in
+      the Introduction
+
+Outputs
+
+    - Architectural gap definition
+    - Motivation for graphics-pipeline
+      occupancy generation
+
+Key Takeaway
+
+    Existing methodologies and architectures
+    accelerate collision detection, but
+    occupancy generation remains largely
+    independent of the rendering pipeline.
+
+=========================================================
+Methodology
+=========================================================
+
+Purpose
+
+    Describe the architecture and operation of
+    the gPCD framework.
+
+Questions Answered
+
+    What is the overall gPCD architecture?
+
+    How is occupancy generated?
+
+    How are cells identified?
+
+    How are occupancy lists constructed?
+
+    What is the potentially colliding set?
+
+    How are collisions evaluated?
+
+    How are duplicate collisions prevented?
+
+Key Concepts Introduced
+
+    - Graphics-pipeline occupancy generation
+    - Broad phase
+    - Narrow phase
+    - AABB corner evaluation
+    - Cell addressing
+    - Flattened cell indices
+    - Particle corner occupancy list
+    - Cell-array particle occupancy list
+    - Duplicate suppression
+    - Potentially colliding set (PCS)
+    - Source-owned collision evaluation
+
+Figures/Tables
+
+    Figure:
+        overview_architecture
+
+    Figure:
+        CellSpans
+
+Inputs
+
+    - Architectural gap from Background
+
+Outputs
+
+    - Occupancy-generation workflow
+    - PCS construction
+    - Source-owned collision evaluation
+    - Data structures used throughout the
+      framework
+
+Key Takeaway
+
+    Broad-phase occupancy generation is
+    integrated directly into the graphics
+    pipeline, producing the PCS used by the
+    narrow phase while rendering and occupancy
+    construction proceed concurrently.
+
+=========================================================
+Complexity Analysis
+=========================================================
+
+Purpose
+
+    Derive the computational and storage
+    complexity of the gPCD framework.
+
+Questions Answered
+
+    What is the complexity of occupancy
+    generation?
+
+    What is the complexity of narrow-phase
+    evaluation?
+
+    What is the worst-case interaction count?
+
+    What are the storage requirements?
+
+Key Concepts Introduced
+
+    - O(N) occupancy generation
+    - O(K) narrow-phase evaluation
+    - O(N+K) total complexity
+    - O(N) particle storage
+    - O(S^3W) cell storage
+
+Figures/Tables
+
+    Table:
+        Complexity Comparison
+
+Inputs
+
+    - Occupancy-generation workflow
+    - PCS construction
+    - Narrow-phase evaluation
+
+Outputs
+
+    - Complexity bounds
+    - Storage bounds
+    - Theoretical expectations for scaling
+
+Key Takeaway
+
+    The framework exhibits O(N) occupancy
+    generation and O(N+K) overall complexity,
+    where K represents candidate interactions
+    contained within the PCS.
+
+=========================================================
+Experimental Setup
+=========================================================
+
+Purpose
+
+    Define the hardware platform, benchmark
+    configurations, verification procedures,
+    and performance metrics used to evaluate
+    the framework.
+
+Questions Answered
+
+    What hardware was used?
+
+    How was the framework implemented?
+
+    What limits the maximum particle count?
+
+    How were occupancy lists sized?
+
+    What benchmark configurations were used?
+
+    How was correctness verified?
+
+    What metrics were measured?
+
+Key Concepts Introduced
+
+    - Hardware platform
+    - Vulkan implementation
+    - Storage-buffer constraints
+    - Occupancy-list sizing
+    - Verification mode
+    - Performance mode
+    - Throughput
+    - Time-per-particle
+
+Figures/Tables
+
+    None
+
+Inputs
+
+    - Complexity expectations
+    - Framework implementation
+
+Outputs
+
+    - Benchmark methodology
+    - Measurement definitions
+    - Verification methodology
+
+Key Takeaway
+
+    Performance measurements are obtained from
+    verified collision-detection results using
+    benchmark configurations that remain within
+    the storage and occupancy constraints of
+    the evaluation platform.
+
+=========================================================
+Experimental Results
+=========================================================
+
+Purpose
+
+    Present measured performance of the gPCD
+    framework.
+
+Questions Answered
+
+    How does memory locality affect
+    performance?
+
+    What throughput is achieved?
+
+    How does time-per-particle behave?
+
+    How does the framework scale?
+
+    How large are deviations from ideal
+    linear behavior?
+
+Key Concepts Introduced
+
+    - Memory-locality benchmark
+    - Throughput
+    - Time-per-particle
+    - Scaling exponents
+    - Curvature bounds
+    - Throughput-transition regime
+    - Stable large-scale regime
+
+Figures/Tables
+
+    Memory Locality Benchmark
+
+    Performance Summary
+
+    Throughput and Time-per-Particle
+
+    Log-Log Regression
+
+    Curvature Analysis
+
+Inputs
+
+    - Experimental setup
+    - Performance metrics
+
+Outputs
+
+    - Throughput measurements
+    - Scaling measurements
+    - Locality measurements
+    - Curvature measurements
+
+Key Takeaway
+
+    The framework demonstrates high throughput
+    and near-linear scaling across the
+    evaluated particle range while supporting
+    multi-million-particle collision detection
+    on a single CPU-GPU system.
+
+=========================================================
+Discussion
+=========================================================
+
+Purpose
+
+    Interpret the architectural significance,
+    performance characteristics, and practical
+    implications of the framework.
+
+Questions Answered
+
+    Why is gPCD architecturally different?
+
+    What synchronization advantages result
+    from the architecture?
+
+    Do the results support the complexity
+    analysis?
+
+    What role does memory locality play?
+
+    What practical particle-system scales are
+    achievable?
+
+    What visualization advantages result from
+    the framework?
+
+Key Concepts Introduced
+
+    - Architectural significance
+    - Source-owned synchronization
+    - Scaling interpretation
+    - Memory locality effects
+    - Practical particle-system scale
+    - GPU-resident visualization
+
+Figures/Tables
+
+    Figure:
+        DensityGraphs
+
+Inputs
+
+    - Experimental results
+
+Outputs
+
+    - Interpretation of results
+    - Practical implications
+    - Visualization implications
+
+Key Takeaway
+
+    The measured performance is consistent with
+    the complexity analysis and demonstrates
+    that graphics-pipeline occupancy generation
+    is a viable architecture for large-scale
+    particle collision detection.
+
+=========================================================
+Conclusion and Future Work
+=========================================================
+
+Purpose
+
+    Summarize the contributions, findings, and
+    future research directions.
+
+Questions Answered
+
+    What was developed?
+
+    What was demonstrated?
+
+    Why is it significant?
+
+    What future work is planned?
+
+Key Concepts Summarized
+
+    - Graphics-pipeline occupancy generation
+    - Near-linear scaling
+    - Multi-million-particle collision
+      detection
+    - GPU-resident architecture
+
+Figures/Tables
+
+    None
+
+Inputs
+
+    - Discussion
+
+Outputs
+
+    - Final conclusions
+    - Future research directions
+
+Key Takeaway
+
+    The gPCD framework demonstrates that
+    graphics-pipeline occupancy generation can
+    support large-scale particle collision
+    detection while maintaining high throughput
+    and near-linear scaling on a single
+    CPU-GPU system.
+
+=========================================================
+End of Manuscript Organization Guide
+=========================================================
+\end{verbatim}

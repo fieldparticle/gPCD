@@ -1,10 +1,11 @@
-class WeightedContactDynamics:
-    """Process particle contacts as a readable source-owned linear chain.
+class MomentumContactDynamics:
+    """Process independent contact momentum through a source-owned chain.
 
     Each source particle completes contact initialization, parameter
-    calculation, weighting, impulse planning, velocity application, and ledger
-    updates before processing moves to the next source particle.  Functions may
-    read target frame-start state, but dynamics writes remain source-owned.
+    calculation, impulse planning, momentum application, and ledger updates
+    before processing moves to the next source particle. Functions read the
+    same frame-start state, vector-sum contact contributions locally, and write
+    only the source particle.
     """
 
     EPSILON = 1.0e-12
@@ -82,25 +83,22 @@ class WeightedContactDynamics:
             contact_state = self.InitializeContactState(SourceID, TargetID)
             if contact_state is None:
                 return False
-            self.CalculateContactParms(SourceID, TargetID, contact_state)
-        if not self.CalculateContactWeights(SourceID):
-            return False
-        if not self.CalculateContactImpulses(SourceID):
-            return False
-        if not self.ApplySourceVelocityDelta(SourceID):
+            if not self.CalculateContactParms(SourceID, TargetID, contact_state):
+                return False
+            if not self.CalculateContactImpulse(SourceID, TargetID, contact_state):
+                return False
+        if not self.ApplySourceMomentumDelta(SourceID):
             return False
         return self.UpdateContactLedgers(SourceID)
 
     def BeginSourceContactParms(self, SourceID):
         """Reset accumulators that will be rebuilt from this source's contacts.
 
-        total_overlap_area and available_source_momentum are source-level frame
-        values.  They must start at zero before individual contacts contribute
-        their geometry and closing momentum.
+        total_overlap_area remains available for diagnostics. Contact momentum
+        is not pooled or redistributed at the source level in this model.
         """
         source = self.particles[SourceID]
         source.total_overlap_area = 0.0
-        source.available_source_momentum = 0.0
         return True
 
     def InitializeContactState(self, SourceID, TargetID):
@@ -263,8 +261,8 @@ class WeightedContactDynamics:
 
         Use frame-start source and target velocities projected onto the stored
         contact normal.  Convert closing speed to closing momentum using
-        reduced mass, store the per-contact results, and add overlap area and
-        closing momentum to the source-level accumulators.
+        reduced mass and store the per-contact result. Each contact retains its
+        own available momentum; it is not weighted against sibling contacts.
         """
         source = self.particles[SourceID]
         overlap_area = max(0.0, float(contact_state.geom.w))
@@ -287,8 +285,9 @@ class WeightedContactDynamics:
 
         contact_state.rel_vn = relative_normal_velocity
         contact_state.source_available_momentum = closing_momentum
+        contact_state.source_available_share = closing_momentum
+        contact_state.weighted_available_momentum = closing_momentum
         source.total_overlap_area += overlap_area
-        source.available_source_momentum += closing_momentum
         return True
 
     def GetStartFrameVelocity(self, ParticleID):
@@ -312,85 +311,40 @@ class WeightedContactDynamics:
         target_mass = max(self.particles[TargetID].parms.x, 1.0e-12)
         return (source_mass * target_mass) / (source_mass + target_mass)
 
-    def CalculateContactWeights(self, SourceID):
-        """Allocate source available momentum across contacts by overlap area.
+    def CalculateContactImpulse(self, SourceID, TargetID, contact_state):
+        """Plan one independent source-owned contact impulse.
 
-        Each contact receives overlap_area / source.total_overlap_area of the
-        source's available momentum.  The calculated share is source-owned;
-        this stage does not inspect target-owned contact state or apply an
-        impulse.
+        Raw impulse is stiffness times this contact's overlap area times dt.
+        Compression is bounded by this contact's reduced-mass closing momentum;
+        rebound is bounded by this contact's stored internal momentum. No
+        source-level overlap weighting or momentum redistribution is applied.
         """
-        source = self.particles[SourceID]
-        contact_slots = self.GetContactSlots(SourceID)
-        total_overlap_area = max(0.0, float(source.total_overlap_area))
-        available_source_momentum = max(
+        dt = max(0.0, float(self.ShaderFlags.dt))
+        overlap_area = max(0.0, float(contact_state.geom.w))
+        raw_impulse = (
+            self.GetPairStiffness(SourceID, TargetID)
+            * overlap_area
+            * dt
+        )
+        available_momentum = max(
             0.0,
-            float(source.available_source_momentum),
+            float(contact_state.source_available_momentum),
+        )
+        stored_internal_momentum = self.GetCollisionInternalMomentum(
+            SourceID,
+            TargetID,
         )
 
-        for slot_index in range(source.contactCount):
-            contact_state = contact_slots[slot_index]
-            overlap_area = max(0.0, float(contact_state.geom.w))
-            if total_overlap_area <= self.EPSILON:
-                contact_weight = 0.0
-            else:
-                contact_weight = overlap_area / total_overlap_area
+        compression_impulse = 0.0
+        release_impulse = 0.0
+        if contact_state.rel_vn < -self.EPSILON:
+            compression_impulse = min(raw_impulse, available_momentum)
+        else:
+            release_impulse = min(raw_impulse, stored_internal_momentum)
 
-            source_available_share = (
-                available_source_momentum
-                * contact_weight
-            )
-            contact_state.source_available_share = source_available_share
-            contact_state.weighted_available_momentum = source_available_share
-        return True
-
-    def CalculateContactImpulses(self, SourceID):
-        """Plan compression or release impulse for each source-owned contact.
-
-        Raw impulse is stiffness times overlap area times dt.  Closing contacts
-        compress up to their weighted available momentum.  Non-closing contacts
-        release up to their stored internal momentum.  This stage records plans
-        only; it does not change velocity or persistent ledgers.
-        """
-        source = self.particles[SourceID]
-        contact_slots = self.GetContactSlots(SourceID)
-        dt = max(0.0, float(self.ShaderFlags.dt))
-
-        for slot_index in range(source.contactCount):
-            contact_state = contact_slots[slot_index]
-            TargetID = int(contact_state.ids.x)
-            overlap_area = max(0.0, float(contact_state.geom.w))
-            raw_impulse = (
-                self.GetPairStiffness(SourceID, TargetID)
-                * overlap_area
-                * dt
-            )
-
-            weighted_available_momentum = max(
-                0.0,
-                float(contact_state.weighted_available_momentum),
-            )
-            stored_internal_momentum = self.GetCollisionInternalMomentum(
-                SourceID,
-                TargetID,
-            )
-
-            compression_impulse = 0.0
-            release_impulse = 0.0
-            if contact_state.rel_vn < -self.EPSILON:
-                compression_impulse = min(
-                    raw_impulse,
-                    weighted_available_momentum,
-                )
-            else:
-                release_impulse = min(
-                    raw_impulse,
-                    stored_internal_momentum,
-                )
-
-            contact_state.raw_impulse = raw_impulse
-            contact_state.compression_impulse = compression_impulse
-            contact_state.release_impulse = release_impulse
+        contact_state.raw_impulse = raw_impulse
+        contact_state.compression_impulse = compression_impulse
+        contact_state.release_impulse = release_impulse
         return True
 
     def GetPairStiffness(self, SourceID, TargetID):
@@ -500,8 +454,8 @@ class WeightedContactDynamics:
         source.Data.z = source.internal_momentum
         return True
 
-    def ApplySourceVelocityDelta(self, SourceID):
-        """Apply the vector sum of planned contact impulses to source velocity.
+    def ApplySourceMomentumDelta(self, SourceID):
+        """Apply the vector sum of planned contact impulses to source momentum.
 
         Each scalar planned impulse is directed opposite the source-to-target
         contact normal.  Per-contact momentum deltas are accumulated before one

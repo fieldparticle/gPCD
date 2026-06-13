@@ -1,0 +1,90 @@
+
+% !TeX root = main.tex
+\section{Dynamics Conventions}
+
+\subsection{Purpose}
+
+\texttt{WeightedDynamics} is the collision dynamics implementation documented
+by this project.  It is a readable Python implementation whose source-complete
+structure is intended to transfer to GLSL with minimal translation.
+
+\subsection{Source-Owned Execution}
+
+Each source particle reads the immutable frame-start position and velocity
+snapshots, processes all of its current contacts, vector-sums the planned
+contact impulses, and writes only its own velocity and contact state.  A source
+must not write a target particle.
+
+The opposing source evaluation reads the same frame-start geometry.  Pair
+compatibility and whole-system conservation must therefore emerge from the
+contact rule used independently by both sources.
+
+\subsection{Overlap Area Convention}
+
+Overlap area is a geometric contact property.  For a particle-particle contact,
+the source-side and target-side overlap areas are the same geometric area, even
+when the two particles have different velocities.  Therefore, once the overlap
+area is computed for a source-target pair, the target particle's overlap area is
+known from the same calculation.
+
+Velocity may affect momentum transfer, phase, or future position, but it does
+not make the instantaneous geometric overlap area different for the two
+particles in the same contact.
+
+\subsection{Frame State}
+
+Current contact geometry and relative motion are calculated from the immutable
+frame-start snapshot:
+
+\begin{itemize}
+    \item current positions;
+    \item current velocities;
+    \item current radii and masses;
+    \item current overlap geometry;
+    \item the current source-owned contact list.
+\end{itemize}
+
+\subsection{Contact Response}
+
+For each source contact, \texttt{WeightedDynamics} calculates relative normal
+velocity, reduced-mass closing momentum, overlap area, and a source-local
+overlap-area weight.  The current raw impulse is:
+
+\begin{equation}
+J_{\mathrm{raw},k}
+=
+q_k A_k
+\left(\frac{A_k}{\sum_j A_j}\right)
+\Delta t.
+\end{equation}
+
+Compression is capped by the contact's weighted share of source available
+closing momentum.  Release is capped by the contact-owned stored internal
+momentum.  All planned contact impulses are vector-summed before the source
+velocity is written.
+
+This equation documents the current implementation.  It does not assert that
+source-local weighting conserves whole-system vector momentum or kinetic
+energy; those properties must be established by diagnostics and test results.
+
+Current \texttt{ThreeParticle} diagnostics show that the weighted rule is not
+conservative.  The weighted capture finishes with approximately
+\(0.04899135\) vector momentum drift and \(+0.00090284\) kinetic-energy drift,
+even though total stored internal momentum returns to zero.  Source-local area
+weighting is therefore a known model failure, not an accepted conservation
+rule.
+
+\subsection{Persistent Contact State}
+
+\texttt{WeightedDynamics} currently stores source-owned internal momentum and
+collision phase by target ID.  Current-frame contact slots are rebuilt each
+frame; the target-keyed dictionaries retain the persistent contact state used
+for compression and release.
+
+\subsection{Diagnostics}
+
+Momentum and kinetic energy are reported diagnostics.  They are used to
+evaluate the contact rule but are not direct dynamics inputs.  Documentation
+must distinguish actual vector momentum drift from scalar internal-momentum
+ledger totals.  A drained internal-momentum ledger does not, by itself, prove
+momentum or kinetic-energy conservation.

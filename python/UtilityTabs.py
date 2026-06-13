@@ -21,8 +21,9 @@ class UtilityTabs(QTabWidget):
         #self.tabFormRun = TabFormRun()        
         self.tabFormReport = TabFormReport()
         
-        self.addTab(self.tabFormReport, 'Reports')
         self.addTab(self.tabFormGenData, 'Generate Data')
+        self.addTab(self.tabFormReport, 'Reports')
+        
         
         #self.addTab(self.tabFormRun, 'Run')
         

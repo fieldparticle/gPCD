@@ -1,76 +1,65 @@
 % !TeX root = main.tex
-
-
-
 \section{Experimental Setup}
-
-This section describes the hardware platform, benchmark
-configurations, and performance metrics used to evaluate the gPCD
-framework.
-
-\subsection{Hardware Platform}
 
 All experiments were conducted on a Lenovo ThinkPad P16 Gen~2 mobile
 workstation equipped with a 13th Generation Intel Core i9-13980HX
-processor and an NVIDIA RTX 3500 Ada Generation professional GPU. The
-GPU contains 5,120 CUDA cores and 12~GB of ECC GDDR6 memory with a
-192-bit memory interface providing approximately 432~GB/s of memory
-bandwidth.This configuration provides a modern mobile GPU baseline for evaluating real-time, 
-large-scale collision detection systems~\cite{hinumNVIDIARTX3500}.
+processor and an NVIDIA RTX 3500 Ada Generation GPU. The GPU contains
+5,120 CUDA cores and 12~GB of ECC GDDR6 memory with approximately
+432~GB/s of memory bandwidth~\cite{hinumNVIDIARTX3500}.
 
-The gPCD framework was implemented using Vulkan, with broad-phase occupancy 
-generation and rendering executed through the graphics pipeline and narrow-phase 
-evaluation executed through compute shaders.
+The gPCD framework was implemented using Vulkan, with broad-phase
+occupancy generation executed within the graphics pipeline and
+narrow-phase evaluation executed through compute shaders. 
 
-\subsection{Maximum Particle Capacity}
+As a GPU-resident framework, the maximum problem size is constrained by the
+available storage-buffer capacity of the target device.
 
-The maximum number of particles that can be represented in a single
-simulation is constrained by the available storage-buffer capacity of
-the graphics device. Let $M_{\max}$ denote the maximum addressable
-storage-buffer range supported by the device and let $S_p$ denote the
-memory footprint of a single particle. The corresponding upper bound on
-the particle count is
+Let \(M_{\max}\) denote the maximum addressable storage-buffer range
+supported by the device and let $S_p$ denote the memory footprint of
+a single particle. The corresponding upper bound on the particle count
+is
+
 
 \begin{equation}
 N_{\max}=\left\lfloor\frac{M_{\max}}{S_p}\right\rfloor.
 \end{equation}
 
 This relationship was used to determine the largest particle counts
-considered during testing. As the particle structure size increases,
-the maximum achievable particle count decreases proportionally.
-Conversely, reducing the memory footprint of the particle structure
-increases the maximum problem size that can be represented within a
-single storage buffer. Consequently, all test cases were selected to
-remain below the storage-buffer capacity limit imposed by the target
-hardware.
+considered during testing, and all benchmark cases remained below the
+storage-buffer capacity limit of the target hardware.
 
-\subsection{Verification and Performance Evaluation}
+Cell-array occupancy lists were sized to accommodate the maximum
+occupancy of a single cell. For heterogeneous particle systems, 
+this maximum occupancy is governed by the smallest
+particle radius present in the simulation. Let
 
-Because gPCD performs exact collision detection, verification and
-performance evaluations were conducted as separate stages. Each test
-case was first executed in a verification mode to validate particle
-counts, cell occupancy generation, and collision counts. Verification
-runs were used to ensure that all particles were processed correctly
-and that all collision events were detected and counted as expected.
+\begin{equation}
+r_{\min}=\min_{1\le i\le N} r_i.
+\end{equation}
 
-Following successful verification, the same configurations were
-executed in performance mode to measure execution time, throughput,
-and time-per-particle scaling. Performance measurements were therefore
-obtained only after the correctness of the collision-detection results
-had been established. This procedure ensured that all reported
-performance metrics correspond to validated collision-detection
-outcomes.
+denote the minimum particle radius and let \(h\) denote the cell side
+length. The maximum cell occupancy is estimated as
 
+\begin{equation}
+N_{\mathrm{cell}}^{3D}=\left(\left\lfloor\frac{h+2r_{\min}}{2r_{\min}}\right\rfloor\right)^3.
+\end{equation}
 
-\subsection{Benchmark Configuration}
+Occupancy-list capacities were determined from this bound during
+initialization.
 
 Benchmark datasets consisted of randomly distributed particle
 configurations with increasing particle count while maintaining an
 approximately constant collision fraction. Particle counts ranged from
-\numprint{32} to
-\numprint{10000000} particles.
+\numprint{16} to \numprint{\APBQRCURVATUREtotMaxParticles{}} particles.
 
-\subsection{Performance Metrics}
+Because gPCD performs exact collision detection, verification and
+performance evaluations were conducted as separate stages. Each test
+case was first executed in verification mode to validate particle
+counts, cell occupancy generation, and collision counts. Following
+successful verification, the same configurations were executed in
+performance mode to measure execution time, throughput, and
+time-per-particle scaling. All reported performance metrics were
+therefore obtained from verified collision-detection results.
 
 Performance evaluation was based on graphics execution time
 ($t_g$), compute execution time ($t_c$), total execution time

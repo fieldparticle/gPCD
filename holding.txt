@@ -1,0 +1,67 @@
+\subsection{Duplicate Handling}
+
+Two forms of duplication can arise within the gPCD framework.
+Corner duplication occurs when multiple AABB corners from the same
+particle map to a common cell location during occupancy generation.
+Collision duplication occurs when the same source--target interaction is
+encountered through multiple occupied cells during PCS traversal.
+Figure~\ref{fig:CellSpans} illustrates both effects.
+
+Corner duplicates are removed during occupancy construction to prevent
+multiple insertions of the same particle identifier into a single cell
+occupancy list. Collision duplicates are removed during narrow-phase
+evaluation using source-owned collision tracking, ensuring that each
+source--target interaction is evaluated at most once.
+
+
+Because occupancy is determined from a fixed set of corner locations,
+each particle performs a bounded number of occupancy evaluations
+independent of the total particle count. Consequently, occupancy
+generation requires constant work per particle.
+
+
+
+For heterogeneous particle systems, the maximum occupancy is governed
+by the smallest particle radius present in the simulation. Let
+
+\begin{equation}
+r_{\min}=\min_i r_i
+\end{equation}
+
+denote the minimum particle radius. Let \(h\) denote the uniform cell side length.
+The maximum cell occupancy is then
+
+\begin{equation}
+N_{\mathrm{cell}}^{3D}=\left(\left\lfloor\frac{h+2r_{\min}}{2r_{\min}}\right\rfloor\right)^3.
+\end{equation}
+
+Consequently, the occupancy-list capacity may be determined during
+initialization directly from the smallest allowable particle diameter.
+Because all larger particles occupy greater volume, they cannot increase
+the maximum number of unique particle identifiers that may be stored
+within a cell.
+
+
+\subsection{Comparative Analysis}
+
+\input{COMPARITIVE_COMPLEXITY.tex}
+
+The primary contribution of gPCD is not the introduction of a new
+asymptotic complexity class. Similar to other direct-insertion spatial
+subdivision approaches, gPCD exhibits linear broad-phase occupancy
+generation complexity. Rather, its contribution lies in the
+architectural organization of graphics-pipeline occupancy generation,
+duplicate-aware cell construction, and source-owned collision
+evaluation within a unified GPU-driven framework.
+
+\input{HISTORICAL_COMPARISION}
+
+Table~\ref{tab:HISTORICAL_COMPARISION} summarizes representative
+particle counts and estimated time-per-particle (TPP) values reported
+in the literature. Because benchmark configurations, hardware
+platforms, and reported operations vary substantially among studies,
+the values should be interpreted as historical context rather than a
+strict performance ranking. Within this context, gPCD supports more than
+11 million particles at approximately 7.62 ns per particle
+on a single CPU-GPU system.
+

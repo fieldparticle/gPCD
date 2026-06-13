@@ -34,7 +34,7 @@ class A_PQBRT_DATA_ALL():
 
 
         self.df = pd.read_csv(self.itemcfg.input_data_file)
-        N = self.df['loadedp']
+        N = self.df['expectedp']
         M = self.df['expectedc']
         cms = self.df['cms']
         gms = self.df['gms']

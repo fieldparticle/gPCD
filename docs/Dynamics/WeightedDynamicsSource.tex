@@ -1,9 +1,9 @@
-% !TeX root = GeoDynamics.tex
+% !TeX root = main.tex
 \newpage
 \section{WeightedDynamics Source Flow}
 
 \newcommand{\WeightedFunctionSection}[1]{%
-  \section{WeightedDynamics:#1}%
+  \subsection{WeightedDynamics:#1}%
   \label{weighted:#1}%
 }
 
@@ -42,48 +42,25 @@ Contact response is completed inside \texttt{DetectContacts}: after one source
 has scanned every possible target, it calls \texttt{ContactDynamics} before
 advancing to the next source.
 
-Correct. This is the source-owned execution model.
-For each source particle \(i\):
-Read immutable frame-start state.
-Process every detected contact \(j \in C_i\).
-Calculate each contact contribution \(\Delta\mathbf p_{ij}\).
-Sum contributions locally.
-Write only source particle \(i\).
+For each source particle \(i\), the implementation reads immutable frame-start
+state, processes every detected contact \(j \in C_i\), calculates each contact
+contribution, sums the contributions locally, and writes only source particle
+\(i\):
 \[
 \Delta\mathbf p_i
 =
 \sum_{j\in C_i}\Delta\mathbf p_{ij}
-\]\[
+\]
+\[
 \mathbf p_i^{new}
 =
 \mathbf p_i^{old}+\Delta\mathbf p_i
-\]For ThreeParticle:
-\[
-\mathbf p_1^{new}
-=
-\mathbf p_1^{old}
-+\Delta\mathbf p_{12}
-+\Delta\mathbf p_{13}
-\]P2 and P3 independently calculate:
-\[
-\mathbf p_2^{new}
-=
-\mathbf p_2^{old}+\Delta\mathbf p_{21}
-\]\[
-\mathbf p_3^{new}
-=
-\mathbf p_3^{old}+\Delta\mathbf p_{31}
-\]The critical requirements are:
-Every source reads the same frame-start snapshot.
-P1 processes both contacts before writing its velocity.
-Contact contributions are vector-summed without source contact-count weighting.
-No source writes another particle.
-The contact rule must naturally produce compatible opposing contributions:
-\[
-\Delta\mathbf p_{ij}
-=
--\Delta\mathbf p_{ji}
-\]Therefore, ApplySourceVelocityDelta has the correct structural shape. The likely mistake is weighting individual contact impulses before their vector sum. P1 should calculate the full source-owned reflection contribution from each contact and let vector addition produce the multi-contact result.
+\]
+
+Every source reads the same frame-start snapshot.  A source processes all of its
+contacts before writing its velocity, and no source writes another particle.
+The current implementation calculates source-local contact weights before
+planning and vector-summing the contact impulses.
 
 \WeightedFunctionSection{ContactDynamics}
 
@@ -253,16 +230,29 @@ p_{\mathrm{share},i} = p_{\mathrm{available},s} w_i.
 The source available share is stored on each contact.  This stage does not
 inspect target-owned contact state and does not apply an impulse.
 
+This source-local allocation is a known conservation failure when it changes
+the physical pair impulse.  Two sources with different surrounding contact
+sets calculate different weights for the same pair contact, so their
+independently evaluated impulse magnitudes are not equal-and-opposite.
+
 \WeightedFunctionSection{CalculateContactImpulses}
 
 \texttt{CalculateContactImpulses(SourceID)} plans compression or release for
 each source-owned contact without changing velocity or persistent ledgers.
 
-The geometric raw impulse is:
+The current weighted raw impulse is:
 
 \begin{equation}
-J_{\mathrm{raw}} = q_{\mathrm{pair}} A \Delta t.
+J_{\mathrm{raw},i}
+=
+q_{\mathrm{pair}} A_i
+\left(\frac{A_i}{\sum_j A_j}\right)
+\Delta t.
 \end{equation}
+
+This is a description of the implemented rule, not a conservation claim.
+Current \texttt{ThreeParticle} diagnostics show that this source-local weighted
+raw impulse produces whole-system vector momentum and kinetic-energy drift.
 
 For a closing contact, compression is limited by the contact's weighted source
 momentum:

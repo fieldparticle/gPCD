@@ -3,12 +3,16 @@ from pathlib import Path
 import math
 
 from base.WeightedDynamicsBase import WeightedDynamics
+from base.MomentumDynamicsBase import MomentumDynamics
+from base.ForceDynamicsBase import ForceDynamics
 from base.Reporting import Reporting
 from base.InLineTest import InLineTest
 from gbase import libconf
 
 
 BASE_CLASS_REGISTRY = {
+    "ForceDynamics": ForceDynamics,
+    "MomentumDynamics": MomentumDynamics,
     "WeightedDynamics": WeightedDynamics,
 }
 
@@ -207,6 +211,8 @@ def _motion_summary(start_diagnostics, particles):
     start_x, start_y = start_total_momentum
     current_x, current_y = _total_momentum(particles)
     current_total_p = math.hypot(current_x, current_y)
+    momentum_drift_x = current_x - start_x
+    momentum_drift_y = current_y - start_y
     total_internal_momentum = _total_internal_momentum(particles)
     curr_plus_internal_mom = current_total_p + total_internal_momentum
     start_ke = start_diagnostics["ke"]
@@ -221,6 +227,9 @@ def _motion_summary(start_diagnostics, particles):
         "current_total_px": current_x,
         "current_total_py": current_y,
         "current_total_p": current_total_p,
+        "momentum_drift_x": momentum_drift_x,
+        "momentum_drift_y": momentum_drift_y,
+        "momentum_drift": math.hypot(momentum_drift_x, momentum_drift_y),
         "total_internal_mom": total_internal_momentum,
         "curr_plus_internal_mom": curr_plus_internal_mom,
         "start_minus_curr_plus_internal_mom": (

@@ -2,169 +2,118 @@
 \section{Experimental Results}
 
 This section presents the measured performance of the gPCD framework
-using randomly distributed particle configurations of increasing size.
+for randomly distributed particle configurations of increasing size.
 Unless otherwise noted, benchmark cases maintain an approximately
 constant collision fraction while varying the total particle count.
-Performance is evaluated using throughput, time-per-particle, and
-scaling analyses to characterize the behavior of the framework across
-the tested particle range.
 
-\subsection{Memory Locality Benchmark}
+To evaluate memory-locality effects, two occupancy configurations were
+considered. In the first configuration, cell occupancy data remained
+sequentially ordered in memory. In the second configuration, occupancy
+data were randomly distributed throughout the cell array.
 
-This benchmark evaluates the sensitivity of the gPCD framework to
-memory locality. Two occupancy configurations were considered. In the
-first configuration, cell occupancy data remained sequentially ordered
-within memory. In the second configuration, occupancy data were
-randomly distributed throughout the cell array.
-
-Figure~\ref{fig:A_PQBS_V_PQBR} compares the resulting execution times as
-a function of particle count. Sequential ordering consistently
-produced lower execution times throughout the evaluated benchmark
-range. The figure also presents the execution-time difference between
-the two configurations, defined as the random-ordering execution time
-minus the sequential-ordering execution time.
-
-Both configurations exhibit approximately linear scaling behavior;
-however, the execution-time difference increases approximately
-linearly with particle count. A linear regression of the difference
-curve produced a slope of \PPBQDiffSlope\ ms per million particles,
-indicating that the performance impact of random memory access grows
-proportionally with problem size. Because both configurations execute
-the same collision-detection algorithm and differ only in the ordering
-of occupancy data, the observed performance gap is attributed
-primarily to memory-locality effects.
-
-These results indicate that memory locality remains an important
-contributor to overall performance despite the GPU-resident nature of
-the framework. While memory locality does not alter the algorithmic
-complexity of the method, it influences the constant factors that
-govern practical execution time.
+\Figo{A_PQBS_V_PQBR} compares execution time as a function of
+particle count for sequential and randomly ordered occupancy data.
+Sequential ordering consistently produced lower execution times
+throughout the evaluated range. The figure also presents the
+execution-time difference, defined as the random-ordering execution
+time minus the sequential-ordering execution time.
 
 \input{A_PQBRT_TABLE_ALL}
 
-\subsection{Performance Overview}
+Both configurations exhibit linear scaling behavior; however, the
+execution-time difference increases with particle count. A linear
+regression of the difference curve produced a slope of
+\PPBQDiffSlope\ ms per million particles, indicating that the cost of
+random memory access grows proportionally with problem size. Since the
+two configurations differ only in the ordering of occupancy data, the
+observed performance gap is attributed primarily to memory-locality
+effects.
 
-\Tigo{performance_summary} summarizes the principal
-performance metrics obtained during evaluation of the gPCD framework.
-The benchmark suite consisted of randomly distributed particle
-configurations of increasing size while maintaining an approximately
-constant collision fraction.
-
-The framework successfully processed benchmark configurations
-containing up to \numprint{\APQBRTTABLEALLbka{}} particles and achieved a
-peak throughput of \SUMMARYTHROUGHPUT{} million particles/s. 
-Representative execution statistics for the largest 
-benchmark case are also reported in Table~\ref{tab:performance_summary}.
+These results indicate that memory locality remains an important
+contributor to overall framework performance despite the GPU-resident
+nature of the implementation. Although memory locality does not alter
+the asymptotic complexity of the method, the increasing performance gap
+observed with particle count demonstrates its influence on practical
+execution time.
 
 \input{A_PQBRT_SUMMARY_TABLE}
 
-Across the evaluated range, performance remained stable and
-exhibited the expected throughput-oriented behavior of a
-GPU-resident collision-detection framework. More detailed
-analysis of throughput trends, time-per-particle behavior,
-and scaling characteristics is presented in the following
-subsections.
+\Tigo{performance_summary} summarizes the principal performance metrics
+obtained during evaluation of the gPCD framework, including the largest
+benchmark configuration and the maximum throughput achieved during
+testing.
 
-The benchmark measurements used throughout the subsequent
-performance analyses are provided in
-Table~\ref{tab:A_PQBRT_TABLE_ALL}.
+The framework successfully processed up to
+\numprint{\APQBRTTABLEALLbka{}} particles and achieved a peak throughput
+of \SUMMARYTHROUGHPUT{} million particles/s. Table~\ref{tab:performance_summary}
+reports representative execution statistics for the largest benchmark
+configuration.
+
+Table~\ref{tab:A_PQBRT_TABLE_ALL} provides the benchmark measurements
+used throughout the subsequent throughput, time-per-particle, and
+scaling analyses.
+
+Figure~\ref{fig:A_PQBR_THROUGHPUT_AND_TPP} presents throughput and
+time-per-particle measurements across the evaluated particle range.
+These metrics are used to examine resource utilization, large-scale
+performance, and scaling behavior.
 
 
 \input{A_PQBR_THROUGHPUT_AND_TPP}
 
-The following subsections examine throughput behavior,
-time-per-particle trends, scaling characteristics, and
-collision-fraction sensitivity in greater detail.
-
-\subsection{Throughput and Time-per-Particle Behavior}
-
-Throughput and time-per-particle provide complementary views of
-framework performance. Throughput measures the aggregate rate at which
-particles are processed, whereas time-per-particle normalizes execution
-cost by particle count and therefore provides a direct measure of
-scaling efficiency.
-
-Figure~\ref{fig:A_PQBR_THROUGHPUT_AND_TPP} presents complementary
-throughput and time-per-particle views of framework performance across
-the evaluated particle range.
-
-\subsubsection{Utilization-Limited Regime}
-
-At low particle counts, throughput increases rapidly with increasing
-particle count as available GPU resources become more fully utilized.
-This regime extends to approximately
-\numprint{100000} particles.
-
-\subsubsection{Throughput-Transition Regime}
-
-Beyond \numprint{100000} particles, throughput enters a transition
-regime in which increasing occupancy and collision workload begin to
-influence performance. This regime spans particle counts between
-approximately \numprint{100000} and \numprint{2000000}.
-
-\subsubsection{Stable Large-Scale Regime}
-
-At approximately \numprint{2000000} particles, the framework reaches a
-stable large-scale operating regime characterized by nearly constant
-time-per-particle behavior. This region is used for the subsequent
-time-per-particle analysis and represents the asymptotic operating
-behavior of the framework.
-
-\subsubsection{Stable Large-Scale Regime}
-
-At approximately \numprint{2000000} particles, the framework reaches a
-stable large-scale operating regime. Although throughput continues to
+At low particle counts, throughput increases rapidly as available GPU
+resources become more fully utilized. This \emph{utilization-limited region}
+extends to approximately \numprint{100000} particles. Between
+approximately \numprint{100000} and \numprint{2000000} particles,
+throughput enters a \emph{throughput-transition regime} in which increasing occupancy and
+collision workload begin to influence performance. Beyond
+approximately \numprint{2000000} particles, the framework reaches a
+\emph{stable large-scale regime}. Although throughput continues to
 decrease gradually with increasing particle count, the corresponding
-time-per-particle curves become nearly constant. This behavior indicates
-that the framework has entered an asymptotic operating region in which
-the average processing cost per particle remains approximately
-constant. Consequently, particle counts exceeding
-\numprint{2000000} are used for the time-per-particle analysis reported
-in Figure~\ref{fig:A_PQBR_THROUGHPUT_AND_TPP}(c).
+time-per-particle curves become nearly constant, indicating an
+approximately constant average processing cost per particle.
+Consequently, particle counts exceeding \numprint{2000000} are used for
+the time-per-particle analysis reported in
+Figure~\ref{fig:A_PQBR_THROUGHPUT_AND_TPP}(c).
 
-\subsection{Scaling Analysis}
 \input{A_PQBR_LOGLOG_REGRESS}
-Log--log regression was performed to quantify the scaling behavior of
+
+Figure~\ref{fig:A_PQBR_LOGLOG_REGRESS} presents log--log regressions of
 graphics, compute, and total execution times. A power-law model of the
 form
+
 \begin{equation}
 t = aN^b
 \end{equation}
-was fitted to the measured data, where $t$ is execution time, $N$ is
-particle count, $a$ is a proportionality constant, and $b$ is the
-scaling exponent.
 
-Figure~\ref{fig:A_PQBR_LOGLOG_REGRESS} presents the resulting log--log
-regressions for graphics, compute, and total execution times. The
-measured scaling exponents were found to be
-$b_g=\APQBRLOGLOGREGRESSgmsasat{}$,
-$b_c=\APQBRLOGLOGREGRESScmsasat{}$, and
-$b_t=\APQBRLOGLOGREGRESStotasat{}$.
+was fitted to the measured data, where (t) is execution time, (N)
+is particle count, (a) is a proportionality constant, and (b) is
+the scaling exponent.
+
+The measured scaling exponents were
+$(b_g=\APQBRLOGLOGREGRESSgmsasat{})$,
+$(b_c=\APQBRLOGLOGREGRESScmsasat{})$, and
+$(b_t=\APQBRLOGLOGREGRESStotasat{})$.
 All three exponents remain close to unity, indicating that execution
 time increases approximately linearly with particle count throughout
-the evaluated benchmark range.
+the evaluated range.
 
-The measured scaling exponents remain close to unity for graphics,
-compute, and total execution times, providing experimental support for
-the near-linear scaling behavior predicted by the complexity analysis.
-
-\subsection{Curvature Analysis}
 \input{A_PBQR_CURVATURE}
-While log-log regression quantifies the overall scaling exponent,
+
+While log--log regression quantifies the overall scaling exponent,
 curvature analysis provides a complementary measure of deviation from
 ideal linear behavior. Quadratic fits were therefore applied to the
-graphics, compute, and total execution-time measurements over the
-evaluated benchmark range.
+graphics, compute, and total execution-time measurements.
 
-Figure~\ref{fig:A_PBQR_CURVATURE} presents the resulting quadratic fits and
-associated curvature bounds. In all cases, the fitted curves remain
+Figure~\ref{fig:A_PBQR_CURVATURE} presents the resulting quadratic fits
+and associated curvature bounds. In all cases, the fitted curves remain
 close to the measured data, indicating only minor departures from
 linear behavior. The graphics and total execution times exhibit
 particularly small curvature, while the compute measurements display
 slightly larger but still bounded deviations.
 
-The measured curvature bounds remain small relative to the overall
-execution-time trends. Combined with the log-log scaling exponents,
-these results provide additional evidence that the gPCD framework
-maintains near-linear scaling throughout the evaluated benchmark range.
+Combined with the log--log scaling exponents, these results provide
+additional evidence that the gPCD framework maintains near-linear
+scaling throughout the evaluated range.
+
 

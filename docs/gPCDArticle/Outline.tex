@@ -1,0 +1,2155 @@
+% !TeX root =ManuscriptGuide.tex
+\newpage
+\clearpage
+\section{Author Review Outline}
+\begin{verbatim}
+
+=========================================================
+Section: Introduction
+=========================================================
+
+Section Flow Overview
+
+    Particle Methods
+        ->
+    Large-Scale Simulation Requirements
+        ->
+    Collision Detection Challenge
+        ->
+    GPU Acceleration
+        ->
+    Remaining Architectural Limitation
+        ->
+    gPCD Framework
+        ->
+    Contributions
+
+Questions Answered
+
+    What are particle methods?
+        Paragraph 1
+
+    Why do particle counts become large?
+        Paragraph 2
+
+    Why is collision detection difficult?
+        Paragraph 3
+
+    How have researchers addressed this
+    challenge?
+        Paragraph 4
+
+    What limitation remains?
+        Paragraph 4
+
+    What is gPCD?
+        Paragraph 5
+
+    What are the contributions of this work?
+        Paragraph 6
+
+Section Connections
+
+    Previous Section:
+        N/A
+
+    Next Section:
+        Background and Related Work
+
+    Connection Quality:
+        Excellent
+
+    Reason:
+        The Introduction establishes the
+        motivation, identifies the remaining
+        architectural limitation, introduces
+        gPCD, and summarizes the contributions.
+        Background then expands upon the
+        literature and further develops the
+        architectural context.
+
+Figures and Tables
+
+    None
+
+Visual Flow Review
+
+    Paragraph 1
+
+    Paragraph 2
+
+    Paragraph 3
+
+    Paragraph 4
+
+    Paragraph 5
+
+    Contributions List
+
+Assessment:
+    Excellent
+
+Reason:
+    No figures or tables interrupt the flow.
+
+Overall Flow Assessment
+
+    Rating:
+        Excellent
+
+Strengths:
+
+        - Clear progression from particle
+          methods to computational challenges.
+
+        - Collision-detection challenge is
+          established before GPU acceleration
+          is introduced.
+
+        - Remaining architectural limitation
+          is explicitly identified.
+
+        - gPCD follows immediately after the
+          limitation it addresses.
+
+        - Contributions are concise and aligned
+          with the remainder of the manuscript.
+
+Weaknesses:
+
+        - None significant.
+
+Reorganization Suggestions:
+
+        - No major restructuring required.
+
+Paragraph Summary
+
+    Paragraph 1
+
+        Purpose:
+            Introduce particle methods and
+            establish their importance.
+
+        Flow to Next:
+            Excellent
+
+    Paragraph 2
+
+        Purpose:
+            Establish the relationship between
+            simulation fidelity and particle
+            count.
+
+        Flow to Next:
+            Excellent
+
+    Paragraph 3
+
+        Purpose:
+            Introduce the collision-detection
+            bottleneck.
+
+        Flow to Next:
+            Excellent
+
+    Paragraph 4
+
+        Purpose:
+            Introduce GPU acceleration and
+            identify the remaining limitation.
+
+        Flow to Next:
+            Excellent
+
+    Paragraph 5
+
+        Purpose:
+            Present the gPCD framework as the
+            proposed solution.
+
+        Flow to Next:
+            Excellent
+
+    Paragraph 6
+
+        Purpose:
+            Summarize contributions.
+
+        Flow to Next:
+            N/A
+
+Overall Introduction Assessment
+
+    Rating:
+        Excellent
+
+    Summary:
+
+        The Introduction now follows a complete
+        and logical argument:
+
+            Particle Methods
+                ->
+            Larger Simulations
+                ->
+            Collision Detection Challenge
+                ->
+            GPU Acceleration
+                ->
+            Remaining Architectural Limitation
+                ->
+            gPCD
+                ->
+            Contributions
+
+        The previously identified repetition
+        between Paragraphs 3 and 4 has been
+        removed, and the architectural gap is
+        now stated explicitly before the
+        framework is introduced.
+
+        No significant restructuring appears
+        necessary.
+
+=========================================================
+Section: Background and Related Work
+=========================================================
+
+Section Flow Overview
+
+    Collision-Detection Frameworks
+        ->
+    Collision-Detection Architectures
+        ->
+    Rendering and Collision Detection
+        ->
+    Architectural Gap
+
+Questions Answered
+
+    What collision-detection methodologies exist?
+        Paragraphs 1--3
+
+    How have collision-detection systems been
+    implemented?
+        Paragraphs 4--6
+
+    What is the relationship between rendering
+    and collision detection?
+        Paragraphs 7--10
+
+    What architectural gap remains?
+        Paragraph 10
+
+    Why is gPCD needed?
+        Paragraph 10
+
+Section Connections
+
+    Previous Section:
+        Introduction
+
+    Connection Quality:
+        Excellent
+
+    Reason:
+        The Introduction establishes the
+        motivation, identifies the remaining
+        architectural limitation, introduces
+        gPCD, and summarizes the contributions.
+        This section expands upon the literature
+        and develops the architectural context.
+
+    Next Section:
+        Methodology
+
+    Connection Quality:
+        Excellent
+
+    Reason:
+        The final paragraph explicitly identifies
+        the architectural gap. Methodology
+        immediately presents the gPCD solution.
+
+Figures and Tables
+
+    None
+
+Visual Flow Review
+
+    Collision-Detection Frameworks
+
+    Collision-Detection Architectures
+
+    Rendering and Collision Detection
+
+Assessment:
+    Excellent
+
+Reason:
+    No figures or tables interrupt the narrative.
+    The discussion progresses continuously from
+    existing methods to the architectural gap.
+
+Overall Flow Assessment
+
+    Rating:
+        Excellent
+
+Strengths:
+
+        - Clear progression from methodologies,
+          to architectures,
+          to rendering relationships,
+          to the architectural gap.
+
+        - Clear distinction between collision-
+          detection methodologies and execution
+          architectures.
+
+        - The methodology discussion naturally
+          motivates the architecture discussion.
+
+        - The section progressively narrows from
+          general collision-detection literature
+          to the specific architectural limitation
+          addressed by gPCD.
+
+        - The final subsection provides a strong
+          transition into Methodology.
+
+        - Novelty is framed as architectural
+          rather than algorithmic.
+
+Weaknesses:
+
+        - None significant.
+
+Reorganization Suggestions:
+
+        - Consider renaming
+
+              Collision-Detection Frameworks
+
+          to
+
+              Collision-Detection Methodologies
+
+          because the subsection primarily
+          discusses broad-phase methods rather
+          than complete frameworks.
+
+        - No major restructuring appears
+          necessary.
+
+Subsection Review
+
+    Collision-Detection Frameworks
+
+        Purpose:
+            Review representative broad-phase
+            methodologies.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Broad phase / narrow phase.
+            - Broad-phase importance.
+            - Uniform grids.
+            - Spatial hashing.
+            - Hierarchical subdivision.
+            - Sweep and prune.
+            - Image-space methods.
+            - GPU acceleration techniques.
+
+        Presentation Bullets:
+            - Broad-phase candidate generation.
+            - Representative methodologies.
+            - Scalability depends heavily on
+              the broad phase.
+
+        Assessment:
+            Excellent
+
+        Notes:
+            Establishes the methodological
+            landscape before discussing execution
+            architectures.
+
+    Collision-Detection Architectures
+
+        Purpose:
+            Review execution architectures used
+            to implement collision detection.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - CPU-resident architectures.
+            - GPU-assisted architectures.
+            - GPU-resident architectures.
+            - Data movement considerations.
+
+        Presentation Bullets:
+            - CPU execution.
+            - GPU-assisted execution.
+            - GPU-resident execution.
+            - Data movement and parallelism.
+
+        Assessment:
+            Excellent
+
+        Notes:
+            Clearly distinguishes where collision
+            detection executes from how collision
+            detection is performed.
+
+    Rendering and Collision Detection
+
+        Purpose:
+            Establish the architectural gap
+            addressed by gPCD.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Rendering as a consumer of
+              simulation state.
+            - Historical separation.
+            - GPU-resident implementations.
+            - Graphics-assisted methods.
+            - Remaining architectural gap.
+
+        Presentation Bullets:
+            - Rendering and collision detection
+              traditionally separated.
+            - Rendering contributes little to
+              collision detection.
+            - Existing integration remains
+              limited.
+            - Occupancy generation remains
+              independent.
+            - Architectural gap identified.
+
+        Assessment:
+            Excellent
+
+        Notes:
+            Serves as the culmination of the
+            literature review and directly
+            motivates the proposed framework.
+
+Overall Section Assessment
+
+    Rating:
+        Excellent
+
+    Summary:
+
+        The section follows a very logical
+        progression:
+
+            Methodologies
+                ->
+            Architectures
+                ->
+            Rendering Relationship
+                ->
+            Architectural Gap
+
+        This progression mirrors the reasoning
+        used to justify gPCD and creates a
+        strong bridge into Methodology.
+
+        The section successfully narrows from
+        the broad collision-detection literature
+        to the specific architectural limitation
+        addressed by the framework.
+
+        No significant restructuring appears
+        necessary.
+
+
+=========================================================
+Section: Methodology
+=========================================================
+
+Section Flow Overview
+
+    Framework Overview
+        ->
+    Broad-Phase Occupancy Generation
+        ->
+    Cell Addressing
+        ->
+    Occupancy Construction
+        ->
+    Duplicate Suppression
+        ->
+    Potentially Colliding Set (PCS)
+        ->
+    Narrow-Phase Evaluation
+        ->
+    Collision-Duplicate Suppression
+
+Questions Answered
+
+    What is the overall gPCD architecture?
+        Paragraphs 1--2
+
+    How is occupancy generated?
+        Paragraphs 3--7
+
+    How are cells identified and stored?
+        Paragraphs 8--13
+
+    How are occupancy lists constructed?
+        Paragraphs 14--18
+
+    What is the output of the broad phase?
+        Paragraph 19
+
+    How are candidate collisions obtained?
+        Paragraphs 20--21
+
+    How are duplicate collisions prevented?
+        Paragraphs 22--24
+
+Section Connections
+
+    Previous Section:
+        Background and Related Work
+
+    Connection Quality:
+        Excellent
+
+    Reason:
+        Background identifies the architectural
+        gap. Methodology immediately presents
+        the gPCD framework that addresses that
+        gap.
+
+    Next Section:
+        Complexity Analysis
+
+    Connection Quality:
+        Excellent
+
+    Reason:
+        Methodology defines the framework
+        organization. Complexity Analysis then
+        evaluates the computational and storage
+        implications of that organization.
+
+Figures and Tables
+
+    Figure: overview_architecture
+
+        Purpose:
+            Compare conventional architecture
+            and gPCD architecture.
+
+        Placement:
+            Excellent
+
+        Reason:
+            Appears immediately after framework
+            overview.
+
+        Discussion Quality:
+            Excellent
+
+    Figure: CellSpans
+
+        Purpose:
+            Illustrate corner duplicates and
+            collision duplicates.
+
+        Placement:
+            Excellent
+
+        Reason:
+            Referenced at both locations where
+            duplicate handling is discussed.
+
+        Discussion Quality:
+            Excellent
+
+Visual Flow Review
+
+    Framework Overview
+
+    Figure: overview_architecture
+
+    Broad-Phase Occupancy Generation
+
+    Figure: CellSpans
+
+    Narrow-Phase Evaluation
+
+Assessment:
+    Excellent
+
+Reason:
+    Figures appear immediately before the
+    concepts they support and are referenced
+    naturally throughout the discussion.
+
+Overall Flow Assessment
+
+    Rating:
+        Excellent
+
+Strengths:
+
+        - Very clear progression from framework
+          overview to implementation details.
+
+        - Broad phase and narrow phase are
+          separated cleanly.
+
+        - Cell addressing and occupancy
+          construction are presented in the
+          same order in which they occur during
+          execution.
+
+        - Each data structure is introduced
+          immediately before it is used.
+
+        - Duplicate handling appears exactly
+          where duplicates arise.
+
+        - The potentially colliding set (PCS)
+          is introduced immediately after
+          occupancy construction and immediately
+          before narrow-phase evaluation.
+
+        - The methodology relies on figures
+          only where visual explanation provides
+          clear benefit.
+
+        - Cell addressing and occupancy
+          construction are described
+          sufficiently through equations and
+          accompanying text, avoiding
+          unnecessary figures that would
+          increase manuscript length without
+          significantly improving comprehension.
+
+Weaknesses:
+
+        - None significant.
+
+Reorganization Suggestions:
+
+        - No major restructuring required.
+
+Subsection Review
+
+    Framework Overview
+
+        Purpose:
+            Introduce the overall architecture.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - gPCD architecture.
+            - Conventional architecture.
+            - Graphics-pipeline occupancy
+              generation.
+            - Broad phase and narrow phase.
+
+        Presentation Bullets:
+            - Conventional architecture.
+            - gPCD architecture.
+            - Concurrent occupancy generation
+              and rendering.
+            - Broad phase followed by
+              narrow phase.
+
+        Assessment:
+            Excellent
+
+        Notes:
+            Strong opening subsection.
+            Figure placement is ideal.
+
+    Broad-Phase Occupancy Generation
+
+        Purpose:
+            Explain occupancy generation.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - AABB representation.
+            - Eight-corner evaluation.
+            - Diameter constraint.
+            - Cell mapping.
+            - Cell flattening.
+            - Occupancy-list construction.
+            - Duplicate suppression.
+            - Atomic insertion.
+            - PCS construction.
+
+        Presentation Bullets:
+            - AABB corners define occupancy.
+            - Corner locations mapped to cells.
+            - Cell indices flattened.
+            - Occupancy lists constructed.
+            - Corner duplicates suppressed.
+            - Atomic insertion.
+            - PCS generated directly.
+
+        Assessment:
+            Excellent
+
+        Notes:
+            The subsection follows the actual
+            occupancy-generation workflow and
+            introduces each concept immediately
+            before it is used.
+
+    Narrow-Phase Evaluation
+
+        Purpose:
+            Explain candidate discovery and
+            collision evaluation.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            N/A
+
+        Contains:
+            - Candidate discovery.
+            - Occupancy-list traversal.
+            - Collision testing.
+            - Collision duplicate suppression.
+            - Source-owned evaluation.
+
+        Presentation Bullets:
+            - Traverse particle corner
+              occupancy lists.
+            - Access cell-array particle
+              occupancy lists.
+            - Evaluate candidates.
+            - Suppress duplicate collisions.
+            - Source-owned collision detection.
+
+        Assessment:
+            Excellent
+
+        Notes:
+            Clean and concise.
+            Naturally follows broad-phase
+            occupancy construction.
+
+Overall Section Assessment
+
+    Rating:
+        Excellent
+
+    Summary:
+
+        This section is one of the strongest
+        sections in the manuscript.
+
+        The discussion follows the actual
+        execution order of the framework:
+
+            Architecture
+                ->
+            Occupancy Generation
+                ->
+            Cell Addressing
+                ->
+            Occupancy Construction
+                ->
+            Duplicate Suppression
+                ->
+            PCS Construction
+                ->
+            Narrow Phase
+                ->
+            Collision-Duplicate Suppression
+
+        Every concept appears immediately
+        before it is needed.
+
+        Figures are integrated naturally and
+        support the discussion without
+        interrupting the narrative.
+
+        No significant restructuring appears
+        necessary.
+
+
+=========================================================
+Section: Complexity Analysis
+=========================================================
+
+Section Flow Overview
+
+    Complexity Comparison Table
+        ->
+    Broad-Phase Complexity
+        ->
+    Narrow-Phase Complexity
+        ->
+    Worst-Case Analysis
+        ->
+    Overall Time Complexity
+        ->
+    Storage Complexity
+
+Questions Answered
+
+    How does gPCD compare with other
+    broad-phase methods?
+        Paragraphs 1--4
+
+    What is the complexity of occupancy
+    generation?
+        Paragraphs 5--7
+
+    What is the complexity of narrow-phase
+    evaluation?
+        Paragraphs 8--11
+
+    What is the worst-case behavior?
+        Paragraphs 12--13
+
+    What is the overall time complexity?
+        Paragraphs 14--15
+
+    What are the storage requirements?
+        Paragraphs 16--20
+
+Section Connections
+
+    Previous Section:
+        Methodology
+
+    Connection Quality:
+        Excellent
+
+    Reason:
+        Methodology defines the framework.
+        Complexity Analysis quantifies the
+        computational implications of that
+        design.
+
+    Next Section:
+        Experimental Setup
+
+    Connection Quality:
+        Good
+
+    Reason:
+        Complexity establishes theoretical
+        expectations which are later evaluated
+        experimentally.
+
+Figures and Tables
+
+    Table: complexity_comparison
+
+        Purpose:
+            Compare theoretical complexity
+            characteristics of representative
+            broad-phase methodologies.
+
+        Placement:
+            Excellent
+
+        Reason:
+            Appears before complexity
+            derivations.
+
+        Discussion Quality:
+            Excellent
+
+        Reason:
+            Table is introduced, then the gPCD
+            complexity entries are derived.
+
+Visual Flow Review
+
+    Introduction
+
+    Complexity Table
+
+    Broad-Phase Analysis
+
+    Narrow-Phase Analysis
+
+    Overall Complexity
+
+    Storage Analysis
+
+Assessment:
+    Excellent
+
+Reason:
+    Table serves as an anchor for the entire
+    section and is referenced naturally by the
+    derivation that follows.
+
+Overall Flow Assessment
+
+    Rating:
+        Excellent
+
+Strengths:
+
+    - Extremely linear progression.
+
+    - Every complexity result follows directly
+      from the Methodology section.
+
+    - Broad phase precedes narrow phase.
+
+    - Worst-case discussion appears exactly
+      where needed.
+
+    - Storage complexity naturally concludes
+      the section.
+
+    - Minimal repetition.
+
+Weaknesses:
+
+    - None significant.
+
+    - The phrase
+          "The complexity entries reported in
+           Table ..."
+      is slightly procedural but does not harm
+      the flow.
+
+    - Storage analysis is shorter than the
+      execution-time analysis, although this is
+      appropriate given its simplicity.
+
+Reorganization Suggestions:
+
+    - None.
+
+    - Section is already highly streamlined.
+
+Subsection Review
+
+    Complexity Comparison Table
+
+        Purpose:
+            Establish comparison context.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Complexity comparison table.
+            - Transition into derivation.
+
+        Presentation Bullets:
+            - Representative methods.
+            - Complexity comparison.
+            - gPCD positioned within literature.
+
+        Assessment:
+            Excellent
+
+    Broad-Phase Complexity
+
+        Purpose:
+            Derive occupancy-generation
+            complexity.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Fixed occupancy evaluations.
+            - Linear scaling.
+            - Constant-time lookup.
+            - Constant-time insertion.
+
+        Presentation Bullets:
+            - Fixed work per particle.
+            - O(N) occupancy generation.
+            - Constant-time addressing.
+
+        Assessment:
+            Excellent
+
+    Narrow-Phase Complexity
+
+        Purpose:
+            Derive candidate-evaluation
+            complexity.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Candidate evaluations.
+            - O(K) narrow phase.
+            - PCS dependence.
+
+        Presentation Bullets:
+            - Candidate evaluations.
+            - O(K) complexity.
+            - Dependent on PCS size.
+
+        Assessment:
+            Excellent
+
+    Worst-Case Analysis
+
+        Purpose:
+            Establish theoretical upper bound.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - All-pairs comparison.
+            - O(N^2) upper bound.
+            - Source-owned evaluation.
+
+        Presentation Bullets:
+            - All-pairs reference.
+            - Worst-case O(N^2).
+            - Reduced synchronization.
+
+        Assessment:
+            Excellent
+
+    Overall Time Complexity
+
+        Purpose:
+            Combine broad-phase and
+            narrow-phase results.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - O(N+K).
+
+        Presentation Bullets:
+            - Overall complexity.
+            - O(N+K).
+
+        Assessment:
+            Excellent
+
+    Storage Complexity
+
+        Purpose:
+            Derive memory requirements.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            N/A
+
+        Contains:
+            - Particle storage.
+            - Cell-array storage.
+            - Total storage.
+
+        Presentation Bullets:
+            - O(N) particle storage.
+            - O(S^3W) cell storage.
+            - O(N+S^3W) total storage.
+
+        Assessment:
+            Excellent
+
+Overall Section Assessment
+
+    Rating:
+        Excellent
+
+    Summary:
+
+        This section is one of the cleanest in
+        the manuscript.
+
+        The structure follows the same order as
+        the framework execution:
+
+            Broad Phase
+                ->
+            Narrow Phase
+                ->
+            Worst Case
+                ->
+            Overall Complexity
+                ->
+            Storage
+
+        The complexity table acts as a strong
+        organizational anchor and the derivation
+        proceeds naturally from it.
+
+        Every result follows directly from the
+        Methodology section and no significant
+        restructuring appears necessary.
+
+        The section is concise, focused, and
+        free from the repetition that existed in
+        earlier manuscript revisions.
+
+=========================================================
+Section: Experimental Setup
+=========================================================
+
+Section Flow Overview
+
+    Hardware Platform
+        ->
+    Implementation Platform
+        ->
+    Capacity Constraints
+        ->
+    Occupancy Configuration
+        ->
+    Benchmark Configuration
+        ->
+    Verification Procedure
+        ->
+    Performance Metrics
+
+Questions Answered
+
+    What hardware was used?
+        Paragraph 1
+
+    How was gPCD implemented?
+        Paragraph 2
+
+    What limits the maximum particle count?
+        Paragraphs 3--6
+
+    How were occupancy-list capacities
+    determined?
+        Paragraphs 7--11
+
+    What benchmark configurations were used?
+        Paragraph 12
+
+    How was correctness verified?
+        Paragraph 13
+
+    What performance metrics were measured?
+        Paragraphs 14--21
+
+Section Connections
+
+    Previous Section:
+        Complexity Analysis
+
+    Connection Quality:
+        Excellent
+
+    Reason:
+        Complexity establishes theoretical
+        expectations. Experimental Setup
+        establishes how those expectations
+        are evaluated.
+
+    Next Section:
+        Experimental Results
+
+    Connection Quality:
+        Excellent
+
+    Reason:
+        Hardware, benchmark configuration,
+        verification procedures, and metrics
+        directly support the subsequent
+        results.
+
+Figures and Tables
+
+    None
+
+Visual Flow Review
+
+    Hardware Platform
+
+    Implementation Platform
+
+    Capacity Constraints
+
+    Occupancy Configuration
+
+    Benchmark Configuration
+
+    Verification Procedure
+
+    Performance Metrics
+
+Assessment:
+    Excellent
+
+Reason:
+    No figures or tables interrupt the flow.
+    The section progresses naturally from
+    hardware and implementation details to
+    benchmark design and measurement.
+
+Overall Flow Assessment
+
+    Rating:
+        Excellent
+
+Strengths:
+
+        - Hardware and implementation platform
+          are established before benchmark
+          design.
+
+        - Maximum particle capacity is derived
+          before benchmark ranges are presented.
+
+        - Occupancy-list capacities are derived
+          and justified before benchmark
+          execution.
+
+        - Capacity constraints are established
+          before benchmark configurations are
+          introduced, allowing the benchmark
+          range to be interpreted in the
+          context of hardware limitations.
+
+        - Verification and performance
+          evaluation are clearly separated.
+
+        - Performance metrics are explicitly
+          defined before presentation of the
+          results.
+
+        - Benchmark configurations are simple
+          and controlled, allowing the effects
+          of particle count to be isolated.
+
+Weaknesses:
+
+        - None significant.
+
+Reorganization Suggestions:
+
+        - No major restructuring required.
+
+Paragraph Review Summary
+
+    Hardware Platform
+
+        Purpose:
+            Define evaluation hardware.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - CPU specifications.
+            - GPU specifications.
+            - Memory capacity.
+            - Memory bandwidth.
+
+        Presentation Bullets:
+            - Lenovo ThinkPad P16 Gen 2.
+            - Intel i9-13980HX.
+            - RTX 3500 Ada.
+            - 12 GB ECC GDDR6.
+
+        Assessment:
+            Excellent
+
+    Implementation Platform
+
+        Purpose:
+            Define software implementation.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Vulkan implementation.
+            - Graphics-pipeline occupancy
+              generation.
+            - Compute-shader narrow phase.
+
+        Presentation Bullets:
+            - Vulkan.
+            - Graphics pipeline.
+            - Compute shaders.
+
+        Assessment:
+            Excellent
+
+    Capacity Constraints
+
+        Purpose:
+            Define maximum particle capacity.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Storage-buffer limitation.
+            - Maximum particle-count equation.
+            - Benchmark constraints.
+
+        Presentation Bullets:
+            - Storage-buffer limit.
+            - Maximum particle count.
+            - Hardware constraints.
+
+        Assessment:
+            Excellent
+
+        Notes:
+            Necessary because maximum particle
+            count is one of the principal
+            experimental outcomes reported in
+            the paper.
+
+    Occupancy Configuration
+
+        Purpose:
+            Define occupancy-list capacity
+            selection.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Minimum particle radius.
+            - Cell occupancy estimate.
+            - Occupancy-list sizing.
+
+        Presentation Bullets:
+            - Minimum radius.
+            - Maximum cell occupancy.
+            - Occupancy-list capacity.
+
+        Assessment:
+            Excellent
+
+        Notes:
+            Establishes that occupancy-list
+            capacities were selected from a
+            geometric bound rather than an
+            arbitrary parameter choice.
+
+    Benchmark Configuration
+
+        Purpose:
+            Define benchmark datasets.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Random particle distributions.
+            - Constant collision fraction.
+            - Particle-count range.
+
+        Presentation Bullets:
+            - Random distributions.
+            - Constant collision fraction.
+            - Increasing particle count.
+
+        Assessment:
+            Excellent
+
+    Verification Procedure
+
+        Purpose:
+            Establish correctness validation.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Verification mode.
+            - Performance mode.
+            - Validated results.
+
+        Presentation Bullets:
+            - Exact collision detection.
+            - Verification first.
+            - Performance second.
+
+        Assessment:
+            Excellent
+
+        Notes:
+            One of the strongest parts of the
+            section because it reinforces the
+            validity of all reported
+            performance results.
+
+    Performance Metrics
+
+        Purpose:
+            Define reported metrics.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            N/A
+
+        Contains:
+            - Graphics execution time.
+            - Compute execution time.
+            - Total execution time.
+            - Throughput.
+            - Time-per-particle.
+            - Additional benchmarks.
+
+        Presentation Bullets:
+            - Graphics execution time.
+            - Compute execution time.
+            - Total execution time.
+            - Throughput.
+            - Time-per-particle.
+
+        Assessment:
+            Excellent
+
+Overall Section Assessment
+
+    Rating:
+        Excellent
+
+    Summary:
+
+        The section follows a clear experimental
+        progression:
+
+            Hardware
+                ->
+            Implementation
+                ->
+            Capacity Constraints
+                ->
+            Occupancy Configuration
+                ->
+            Benchmark Configuration
+                ->
+            Verification
+                ->
+            Performance Metrics
+
+        The benchmark range is presented only
+        after the hardware and storage
+        constraints that define it.
+
+        Verification and performance evaluation
+        are clearly separated, reinforcing the
+        validity of the reported results.
+
+        The section is concise, logically
+        organized, and directly supports the
+        Experimental Results section.
+
+        No significant restructuring appears
+        necessary.
+
+=========================================================
+Section: Discussion
+=========================================================
+
+Section Flow Overview
+
+    Architectural Significance
+        ->
+    Synchronization Advantages
+        ->
+    Scaling Interpretation
+        ->
+    Throughput-Regime Interpretation
+        ->
+    Memory Locality Effects
+        ->
+    Practical Scale Implications
+        ->
+    Visualization Advantages
+
+Questions Answered
+
+    Why is gPCD architecturally different?
+        Paragraph 1
+
+    What synchronization advantages result
+    from the architecture?
+        Paragraph 2
+
+    Do the experimental results support the
+    complexity analysis?
+        Paragraphs 3--5
+
+    What effect does memory locality have on
+    performance?
+        Paragraphs 6--7
+
+    What practical particle-system scales are
+    achievable?
+        Paragraphs 8--9
+
+    What visualization advantages result from
+    the GPU-resident architecture?
+        Paragraph 10
+
+Section Connections
+
+    Previous Section:
+        Experimental Results
+
+    Connection Quality:
+        Excellent
+
+    Reason:
+        Experimental Results present the
+        measurements. Discussion interprets
+        their significance.
+
+    Next Section:
+        Conclusion and Future Work
+
+    Connection Quality:
+        Excellent
+
+    Reason:
+        Discussion interprets the findings,
+        while Conclusion summarizes the overall
+        contributions and future directions.
+
+Figures and Tables
+
+    Figure: DensityGraphs
+
+        Purpose:
+            Illustrate practical particle-system
+            scale and spatial resolution.
+
+        Placement:
+            Excellent
+
+        Reason:
+            Appears within the discussion of
+            practical implications.
+
+        Discussion Quality:
+            Excellent
+
+Visual Flow Review
+
+    Architectural Interpretation
+
+    Scaling Interpretation
+
+    Locality Interpretation
+
+    Figure: DensityGraphs
+
+    Visualization Discussion
+
+Assessment:
+    Excellent
+
+Reason:
+    The figure appears where visual evidence
+    directly supports the discussion and does
+    not interrupt the analytical narrative.
+
+Overall Flow Assessment
+
+    Rating:
+        Excellent
+
+Strengths:
+
+        - Opens by reinforcing the primary
+          architectural contribution of the
+          framework.
+
+        - Distinguishes architectural novelty
+          from algorithmic novelty.
+
+        - Clearly explains the synchronization
+          advantages of source-owned collision
+          evaluation.
+
+        - Scaling conclusions are supported by
+          throughput, time-per-particle,
+          regression, and curvature analyses.
+
+        - Throughput-transition and stable
+          large-scale regimes are interpreted
+          in terms of resource utilization
+          rather than asymptotic complexity.
+
+        - Memory locality is discussed as a
+          performance consideration independent
+          of algorithmic complexity.
+
+        - Concludes with practical implications
+          and visualization capabilities that
+          naturally extend the significance of
+          the framework beyond collision
+          detection.
+
+Weaknesses:
+
+        - Paragraphs 3 and 4 partially overlap.
+
+Reorganization Suggestions:
+
+        - Consider merging Paragraphs 3 and 4
+          into a single scaling-interpretation
+          paragraph.
+
+Subsection Review
+
+    Architectural Significance
+
+        Purpose:
+            Explain the primary contribution of
+            gPCD.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Graphics-pipeline occupancy
+              generation.
+            - Architectural contribution.
+            - Rendering and occupancy
+              construction.
+
+        Presentation Bullets:
+            - Architectural innovation.
+            - Graphics-pipeline occupancy
+              generation.
+            - Rendering contributes directly
+              to collision detection.
+
+        Assessment:
+            Excellent
+
+    Synchronization Advantages
+
+        Purpose:
+            Explain parallel-execution benefits.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Atomic insertion.
+            - Source-owned collision discovery.
+            - Elimination of global collision
+              pair structures.
+
+        Presentation Bullets:
+            - Limited synchronization.
+            - Source-owned evaluation.
+            - Massive parallelism.
+
+        Assessment:
+            Excellent
+
+    Scaling Interpretation
+
+        Purpose:
+            Relate experimental results to the
+            complexity analysis.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Throughput analysis.
+            - Time-per-particle analysis.
+            - Regression analysis.
+            - Curvature analysis.
+            - Scaling exponents.
+            - Curvature bounds.
+
+        Presentation Bullets:
+            - Near-linear scaling.
+            - Exponents near unity.
+            - Small curvature.
+            - No dominant super-linear growth.
+
+        Assessment:
+            Excellent
+
+    Throughput-Regime Interpretation
+
+        Purpose:
+            Explain throughput reductions at
+            large particle counts.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Throughput-transition regime.
+            - Stable large-scale regime.
+            - Resource utilization effects.
+
+        Presentation Bullets:
+            - Throughput reduction.
+            - Resource utilization.
+            - Scaling preserved.
+
+        Assessment:
+            Excellent
+
+    Memory Locality Effects
+
+        Purpose:
+            Interpret locality benchmark
+            results.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Sequential ordering.
+            - Random ordering.
+            - Constant-factor effects.
+            - Asymptotic complexity.
+
+        Presentation Bullets:
+            - Memory locality matters.
+            - Complexity unchanged.
+            - Efficiency improved.
+
+        Assessment:
+            Excellent
+
+    Practical Scale Implications
+
+        Purpose:
+            Discuss achievable particle-system
+            scales.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - DensityGraphs.
+            - Spatial resolution.
+            - Interactive performance.
+            - HPC-scale particle counts.
+
+        Presentation Bullets:
+            - Increasing particle density.
+            - Improved spatial resolution.
+            - Interactive execution.
+            - Large-scale simulations.
+
+        Assessment:
+            Excellent
+
+    Visualization Advantages
+
+        Purpose:
+            Discuss visualization capabilities
+            enabled by the GPU-resident
+            architecture.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            N/A
+
+        Contains:
+            - Temperature colorization.
+            - Velocity magnitude colorization.
+            - Velocity-angle colorization.
+            - HSV visualization.
+
+        Presentation Bullets:
+            - Direct visualization.
+            - Minimal computational overhead.
+            - Flow-pattern identification.
+
+        Assessment:
+            Excellent
+
+Overall Section Assessment
+
+    Rating:
+        Excellent
+
+    Summary:
+
+        The section follows a logical
+        progression from architectural
+        significance to experimental
+        interpretation and finally to practical
+        implications.
+
+            Architecture
+                ->
+            Synchronization
+                ->
+            Scaling Interpretation
+                ->
+            Throughput Interpretation
+                ->
+            Memory Locality
+                ->
+            Practical Scale
+                ->
+            Visualization
+
+        The discussion emphasizes the measured
+        consequences of the architectural
+        design while avoiding unnecessary
+        repetition of methodology details.
+
+        Aside from a minor overlap between the
+        two scaling paragraphs, no significant
+        restructuring appears necessary.
+
+
+=========================================================
+Section: Conclusion and Future Work
+=========================================================
+
+Section Flow Overview
+
+    Framework Contribution
+        ->
+    Experimental Validation
+        ->
+    Significance
+        ->
+    Future Work
+
+Questions Answered
+
+    What was developed?
+        Paragraph 1
+
+    What was demonstrated?
+        Paragraph 2
+
+    Why does it matter?
+        Paragraph 3
+
+    What comes next?
+        Paragraph 4
+
+Section Connections
+
+    Previous Section:
+        Discussion
+
+    Connection Quality:
+        Excellent
+
+    Reason:
+        Discussion interprets the significance
+        of the results. Conclusion summarizes
+        the major findings and future direction.
+
+    Next Section:
+        N/A
+
+    Connection Quality:
+        N/A
+
+Figures and Tables
+
+    None
+
+Visual Flow Review
+
+    Framework Contribution
+
+    Experimental Validation
+
+    Significance
+
+    Future Work
+
+Assessment:
+    Excellent
+
+Reason:
+    The conclusion remains concise and focused.
+    No figures or tables interrupt the summary.
+
+Overall Flow Assessment
+
+    Rating:
+        Excellent
+
+Strengths:
+
+    - Follows the classic conclusion structure:
+          Contribution
+              ->
+          Validation
+              ->
+          Significance
+              ->
+          Future Work
+
+    - Does not repeat methodology details.
+
+    - Does not repeat complexity derivations.
+
+    - Focuses on the most important findings.
+
+    - Future work remains closely connected to
+      the contribution.
+
+Weaknesses:
+
+    - None significant.
+
+    - HPC reference is repeated from the
+      Discussion section, although this is
+      acceptable because it represents one of
+      the primary practical implications.
+
+Reorganization Suggestions:
+
+    - None.
+
+    - Section is already highly streamlined.
+
+Paragraph Review Summary
+
+    Framework Contribution
+
+        Purpose:
+            Restate the principal contribution.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - gPCD framework.
+            - Graphics-pipeline occupancy
+              generation.
+            - New execution architecture.
+            - Broad-phase / narrow-phase
+              organization.
+
+        Presentation Bullets:
+            - gPCD framework.
+            - Graphics-pipeline occupancy
+              generation.
+            - New execution architecture.
+
+        Assessment:
+            Excellent
+
+    Experimental Validation
+
+        Purpose:
+            Summarize major results.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Near-linear scaling.
+            - Complexity validation.
+            - 11+ million particles.
+            - Interactive performance.
+            - Locality study conclusions.
+
+        Presentation Bullets:
+            - Near-linear scaling.
+            - 11+ million particles.
+            - Interactive performance.
+            - Locality effects.
+
+        Assessment:
+            Excellent
+
+    Significance
+
+        Purpose:
+            Explain why the results matter.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            Excellent
+
+        Contains:
+            - Viability of graphics-pipeline
+              occupancy generation.
+            - HPC-scale particle systems on a
+              single CPU-GPU system.
+
+        Presentation Bullets:
+            - Viable architecture.
+            - Large-scale collision detection.
+            - HPC-scale particle counts.
+
+        Assessment:
+            Excellent
+
+    Future Work
+
+        Purpose:
+            Define future research directions.
+
+        Flow from Previous:
+            Excellent
+
+        Flow to Next:
+            N/A
+
+        Contains:
+            - Larger GPU configurations.
+            - Multi-GPU execution.
+            - Distributed execution.
+            - Thermo-fluid simulations.
+            - Multiphysics applications.
+
+        Presentation Bullets:
+            - Multi-GPU.
+            - Distributed computing.
+            - Thermo-fluid simulations.
+            - Multiphysics applications.
+
+        Assessment:
+            Excellent
+
+Overall Section Assessment
+
+    Rating:
+        Excellent
+
+    Summary:
+
+        The conclusion is concise, focused, and
+        appropriately scaled to the manuscript.
+
+        The section follows a very clean
+        progression:
+
+            Contribution
+                ->
+            Validation
+                ->
+            Significance
+                ->
+            Future Work
+
+        Unlike earlier manuscript versions, the
+        conclusion no longer introduces new
+        topics or re-argues results already
+        established elsewhere.
+
+        The future-work discussion remains
+        directly connected to the architectural
+        contribution and naturally extends the
+        scope of the framework.
+
+        No restructuring is recommended.
+
+
+\end{verbatim}

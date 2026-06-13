@@ -1,5 +1,47 @@
-% !TeX root = GeoDynamics.tex
-\section{Programming Styles}
+% !TeX root = main.tex
+\section{Programming Conventions}
+
+\subsection{File Boundaries}
+
+\texttt{<model>Dynamics.py} is the GLSL-portable dynamics layer.  It should contain
+only functions that correspond directly to shader-side dynamics functions.
+
+\texttt{<model>DynamicsBase.py} is the Python harness.  It may load configuration files,
+create Python data structures, build particle arrays, set push constants,
+iterate particles, and call the model dynamics functions.
+
+\texttt{Reporting.py} is reserved for reporting and diagnostic output.  It
+should not own dynamics decisions.
+
+
+\subsection{Creating New Dynamics}
+
+The command for creating a new model is:
+Create <model>
+
+Creating new dynamics classes requires the following definitions.
+\begin{enumerate}
+
+\item Create <new model>DynamicsFlowChart.py, <new model>Dynamics.py, and
+<new model>DynamicsBase.py by copying the corresponding files for the model
+selected by the \texttt{live\_base = <model>} configuration item in
+\texttt{ParticleUtil.cfg}.
+
+\item Copy the live model's <live model>DynamicsSource.tex and
+<live model>DynamicsFlowTikz.tex files and rename them
+<new model>DynamicsSource.tex and <new model>DynamicsFlowTikz.tex.  The initial
+copies document the unchanged starting model before development begins.
+
+\item Add <new model>DynamicsSource.tex to \texttt{main.tex}.
+
+\item Register <new model>Dynamics in \texttt{SimulationRunner.py} so that
+\texttt{live\_base} and \texttt{shadow\_base} can select the new model.
+
+\item Now \texttt{live\_base = <old model>}. Change \texttt{ParticleUtil.cfg} to make \texttt{live\_base = "<new model>Dynamics";} and 
+\texttt{shadow\_base = "<old model>Dynamics";}.
+
+\end{enumerate}
+\subsection{Programming Styles}
 
 When discussing software architecture, two common programming styles frequently emerge. Although there is not a universally accepted pair of names for these approaches, they are often described as \emph{control-oriented} and \emph{data-oriented} designs.
 
@@ -172,44 +214,21 @@ Harder to parallelize & Easier to parallelize \\
 \end{center}
 For large simulation codes, physics engines, and GPU applications, data-oriented pipeline designs are often preferred because they make data dependencies explicit and are generally easier to reason about, profile, parallelize, and maintain.
 
-\subsection{Generated Source Flowcharts}
-
-For weighted dynamics work, the sequential stage chain should be
-documented with a generated flowchart when the source structure becomes hard to
-hold in memory.  The flowchart is not a substitute for narrow functions; it is a
-debugging and navigation aid that makes the stage order visible.
-
-The current weighted source-flow generator is:
-
-\begin{verbatim}
-python/base/WeightedDynamicsFlowChart.py
-\end{verbatim}
-
-It emits DOT, SVG, PDF, and PNG artifacts under
-\texttt{docs/Dynamics/generated}.  The DOT file preserves the graph source, the
-SVG can carry interactive links, and the PDF is used as the stable LaTeX figure.
-The source-flow chart links mostly to code.  The system-flow chart links mostly
-to documentation because it explains loops, decision trees, storage boundaries,
-and GLSL-shaped algorithm stages.  The generators should be updated when
-function names, stage order, decision points, or major source handoffs change.
-
-This preserves the same programming rule used by the code: the primary flow is
-explicit, generated documentation follows that flow, and helpers are shown as
-supporting calls rather than hidden control-flow owners.
 
 \subsection{Source-Complete Linear Dynamics}
 
-The permanent weighted implementation demonstrates the preferred shape for dynamics
+The dynamics implementation demonstrates the preferred shape for dynamics
 that will eventually execute once per source particle in GLSL.  The top-level
 function must read like the algorithm:
 
 \begin{verbatim}
 initialize source totals
 for each source-owned contact:
-    initialize one contact
-    calculate one contact
-calculate source contact weights
-calculate planned contact impulses
+    process contact1
+	process contact2
+apply totals1
+apply totals2
+...
 apply one source velocity write
 update source-owned ledgers
 \end{verbatim}
@@ -228,8 +247,67 @@ read the same frame-start positions and velocities during contact response.
 
 When the generated flow is included in the project PDF, native TikZ is preferred
 for interactive navigation.  Each function node links to a stable labeled
-function section in \texttt{SourceDocumentation.tex}.  Graphviz remains useful
+function section in \texttt{<model>DynamicsSource.tex}.  Graphviz remains useful
 for standalone DOT, SVG, PDF, and PNG artifacts, but links embedded in a
 Graphviz PDF are not expected to survive inclusion through
 \texttt{\textbackslash includegraphics}.
 
+\subsection{Naming Convention}
+
+Functions intended to map to GLSL should use GLSL-like names and signatures
+where practical.  Current examples are:
+
+\begin{verbatim}
+InitializeContactState(SourceID, TargetID)
+ContactDynamics(SourceID)
+Move(SourceID)
+isParticleContact(Frame, SourceID, TargetID, positionBuffer)
+\end{verbatim}
+
+\texttt{WeightedDynamics.py} should avoid Python-only helper names unless the helper
+is also expected to exist in GLSL.
+
+Before adding or renaming any dynamics field, buffer, function, or constant, check
+the GLSL source files first.  The GLSL names are the naming authority for the
+weighted path:
+
+\begin{verbatim}
+C:\_DJ\gPCD\vulkan\sim\common\*.glsl
+C:\_DJ\gPCD\vulkan\sim\BoundarySpheresMotion\BoundarySpheresMotionP.comp
+\end{verbatim}
+
+Python names should stay coordinated with those files whenever possible.  If a
+Python-only harness name is needed, it belongs in \texttt{WeightedDynamicsBase.py},
+\texttt{SimulationRunner.py}, or \texttt{Reporting.py}, not in
+\texttt{WeightedDynamics.py}.
+
+\subsection{Data Convention}
+
+Particle records use field access:
+
+\begin{verbatim}
+Particle.vx
+Particle.radius
+\end{verbatim}
+
+rather than dictionary access:
+
+\begin{verbatim}
+Particle["vx"]
+\end{verbatim}
+
+The Python structures should be shaped to resemble GLSL buffers and push
+constants.  Python-only configuration parsing must not leak into
+\texttt{WeightedDynamics.py}.
+
+\subsection{Runtime Names}
+
+Runtime functions use generic descriptive names, and runtime error constants
+use the \texttt{ERROR\_*} family.
+
+When adding particle position, velocity, radius, collision-list, push-constant,
+or error fields, first look for the corresponding GLSL structure or function
+name in the common shader files.  For example, position double buffering should
+prefer names coordinated with the GLSL particle buffers and
+\texttt{ShaderFlags.positionBuffer}, rather than inventing unrelated Python-only
+names.

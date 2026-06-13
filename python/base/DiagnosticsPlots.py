@@ -21,6 +21,24 @@ REPORT_MODES = {
 }
 
 
+def _report_model_names():
+    cfg_path = Path(__file__).resolve().parents[1] / "ParticleUtil.cfg"
+    names = {
+        "live": "live",
+        "shadow": "shadow",
+    }
+    if not cfg_path.exists():
+        return names
+    with cfg_path.open("r", encoding="utf-8") as cfg_file:
+        cfg = libconf.load(cfg_file)
+    for mode in REPORT_MODES:
+        names[mode] = str(cfg.get(f"{mode}_base", mode))
+    if names["live"] == names["shadow"]:
+        names["live"] = f"{names['live']} (live)"
+        names["shadow"] = f"{names['shadow']} (shadow)"
+    return names
+
+
 def _float(row, key, default=0.0):
     value = row.get(key, default)
     if value in ("", None):
@@ -179,6 +197,9 @@ def _momentum_series(momentum_csv):
         "current_total": [_float(row, "curr_total_p") for row in rows],
         "current_px": [_float(row, "curr_px") for row in rows],
         "current_py": [_float(row, "curr_py") for row in rows],
+        "momentum_drift_x": [_float(row, "momentum_drift_x") for row in rows],
+        "momentum_drift_y": [_float(row, "momentum_drift_y") for row in rows],
+        "momentum_drift": [_float(row, "momentum_drift") for row in rows],
         "internal_total": internal_total,
         "current_plus_internal": [
             _float(row, "curr_plus_internal_mom")
@@ -220,6 +241,28 @@ def _batch_momentum_items(batch_cfg, report_mode="live"):
     batch_cfg = Path(batch_cfg)
     with batch_cfg.open("r", encoding="utf-8") as cfg_file:
         batch = libconf.load(cfg_file)
+
+    if "batch_items" not in batch:
+        run_configuration = batch.get("RUN_CONFIGURATION", {})
+        report_dir = run_configuration.get("run_debug_dir")
+        if not report_dir:
+            raise ValueError(
+                f"{batch_cfg} does not define RUN_CONFIGURATION.run_debug_dir"
+            )
+        momentum_csv = _report_path(report_dir, "momentum", report_mode)
+        if not momentum_csv.exists():
+            return []
+        return [
+            {
+                "name": batch.get("STUDY_NAME", batch_cfg.stem),
+                "cfg_path": batch_cfg,
+                "momentum_csv": momentum_csv,
+                "frame_window": _frame_window_from_config(
+                    batch.get("frames", run_configuration.get("rpt_frames"))
+                ),
+            }
+        ]
+
     base_dir = Path(batch["data_dir"])
     frame_window = _frame_window_from_config(batch.get("frames"))
     items = []
@@ -487,7 +530,7 @@ def _csv_number(value):
 
 
 def _write_panel_data(output_dir, panel_name, frames, series):
-    csv_path = Path(output_dir) / f"MomentumDiagnostics_{panel_name}.csv"
+    csv_path = Path(output_dir) / f"DiagnosticsPlots_{panel_name}.csv"
     with csv_path.open("w", newline="", encoding="utf-8") as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow(["frame", *[_plot_column_name(item[0]) for item in series]])
@@ -560,7 +603,7 @@ def _draw_totals_panel(axis, item, series):
             _latest(series, "current_total"),
             _latest(series, "current_px"),
             _latest(series, "current_py"),
-            drift=_latest(series, "start_total") - _latest(series, "current_total"),
+            drift=_latest(series, "momentum_drift"),
         ),
         table_row(
             "internal_p",
@@ -1110,11 +1153,19 @@ def show_batch_menu(batch_cfg, report_mode="live"):
     radio = RadioButtons(menu_axis, labels, active=0)
     menu_axis.set_title("Test")
     mode_axis = fig.add_axes([0.03, 0.24, 0.24, 0.08])
-    mode_labels = list(REPORT_MODES.keys())
+    report_model_names = _report_model_names()
+    mode_labels = [
+        report_model_names[mode]
+        for mode in REPORT_MODES
+    ]
+    mode_by_label = {
+        report_model_names[mode]: mode
+        for mode in REPORT_MODES
+    }
     mode_radio = RadioButtons(
         mode_axis,
         mode_labels,
-        active=mode_labels.index(current_report_mode["mode"]),
+        active=list(REPORT_MODES).index(current_report_mode["mode"]),
     )
     mode_axis.set_title("Report")
     particle_visible = {"p1": True, "p2": True, "p3": True}
@@ -1136,10 +1187,11 @@ def show_batch_menu(batch_cfg, report_mode="live"):
                 return
 
     def select_mode(label):
-        current_report_mode["mode"] = label
-        new_items = _batch_momentum_items(batch_cfg, label)
+        report_mode = mode_by_label[label]
+        current_report_mode["mode"] = report_mode
+        new_items = _batch_momentum_items(batch_cfg, report_mode)
         for item in new_items:
-            item["report_mode"] = label
+            item["report_mode"] = report_mode
         if not new_items:
             return
         items[:] = new_items
@@ -1155,14 +1207,36 @@ def show_batch_menu(batch_cfg, report_mode="live"):
         particle_visible[label] = not particle_visible[label]
         _draw_matplotlib_axes(fig, axes, selected_item["item"], particle_visible)
 
-    radio.on_clicked(select)
-    mode_radio.on_clicked(select_mode)
-    particle_checks.on_clicked(toggle_particle)
+    radio_connection = radio.on_clicked(select)
+    mode_connection = mode_radio.on_clicked(select_mode)
+    particle_connection = particle_checks.on_clicked(toggle_particle)
+
+    # Matplotlib show() is non-blocking when launched from the existing Qt
+    # event loop. Keep widgets, callbacks, and mutable menu state alive for as
+    # long as the figure exists so the controls remain interactive.
+    fig._diagnostics_controls = {
+        "radio": radio,
+        "mode_radio": mode_radio,
+        "particle_checks": particle_checks,
+        "callbacks": (select, select_mode, toggle_particle),
+        "connections": (radio_connection, mode_connection, particle_connection),
+        "items": items,
+        "selected_item": selected_item,
+        "particle_visible": particle_visible,
+        "current_report_mode": current_report_mode,
+    }
     _draw_matplotlib_axes(fig, axes, selected_item["item"], particle_visible)
     plt.show()
+    return fig
 
 
-def main():
+def run_diagnostics(argv=None):
+    """Run diagnostics using command-line-style arguments.
+
+    Pass a list such as ``[batch_cfg, "--show", "--report-mode", "shadow"]``
+    when calling from Python. When argv is None, argparse reads sys.argv so
+    direct command-line execution continues to work normally.
+    """
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -1188,18 +1262,18 @@ def main():
         default="live",
         help="Choose live CSV files or shadow *_s.csv files.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     path = Path(args.path)
     if args.show or (path.suffix.lower() == ".cfg" and not args.svg):
-        show_batch_menu(path, args.report_mode)
-        return
+        return show_batch_menu(path, args.report_mode)
     if path.suffix.lower() == ".cfg":
         outputs = plot_batch(path, args.report_mode)
     else:
         outputs = [plot_momentum_diagnostics(path)]
     for output in outputs:
         print(output)
+    return outputs
 
 
 if __name__ == "__main__":
-    main()
+    run_diagnostics()

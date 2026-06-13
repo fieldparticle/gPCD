@@ -8,30 +8,24 @@
 \usepackage{enumitem}
 \usepackage{listings}
 \usepackage[T1]{fontenc}
-\usepackage{listings}
-\usepackage{geometry}
 \usepackage{fancyvrb}
 \usepackage{graphicx}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning}
 \geometry{margin=1in}
 
-\title{gPCD Geometry Dynamics}
+\title{gPCD Dynamics}
 \author{}
 \date{\today}
 
 \begin{document}
 \maketitle
-\input{SourceDocumentation}
 
-\include{ParticleGeometry.tex}
+\input{DocumentConventions.tex}
+\input{DynamicsConventions}
+\input{WeightedDynamicsSource}
+\input{ForceDynamicsSource}
 \input{ProblemEvolution.tex}
-\input{GeoConventions.tex}
-\input{GeoExportProcess.tex}
-%\input{OldParticleGeometry.tex}
-%\input{porting.tex}
 \input{ProgrammingStyle.tex}
-\input{AIlimitations.tex}
-
 
 \end{document}

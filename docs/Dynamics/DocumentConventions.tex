@@ -1,0 +1,106 @@
+% !TeX root = main.tex
+\section{Document Conventions}
+
+\subsection{Update Project}
+
+The phrase \emph{update project} means:
+\begin{enumerate}
+\item Read \texttt{main.tex} and every active file that it includes.
+\item Compare the document against the current live \texttt{<model>Dynamics}
+implementation.
+\item Analyze which document sections are out of date.
+\item Present the proposed document changes for review before modifying any
+document file.
+\item After approval, update the affected document sections.
+\item Add a new entry to \texttt{ProblemEvolution.tex} when the approved work
+changes the dynamics model or records a completed investigation.
+\item Do not modify \texttt{<model>DynamicsFlowTikz.tex} unless that specific
+change is separately reviewed and approved.
+\item Present a proposed git commit message.
+\end{enumerate}
+
+\subsection{Problem Evolution}
+\label{sec:problem-evolution}
+
+The intent of this section is to follow the path of dynamics evolution.
+Understanding that path makes the design issues and nomenclature visible.  It
+also helps future development because the current model contains assumptions
+about rules such as equal-radius particles, wall particles, and source-owned
+contact state.  When those rules change, it should be clear where they came
+from and why they existed.
+
+It shall take the form:
+\begin{verbatim}
+
+\subsection{<Problem Statement>}
+
+\subsubsection{<previous form>}
+\subsubsection{<current form>}
+
+\subsubsection{difference outcome}
+	one of :full solution, particle solution, no solution
+
+\subsubsection{<Analysis>}
+
+\end{verbatim}
+
+\subsection{git message}
+
+\begin{verbatim}
+The git message will be of the format :
+Current status:
+	- <what we changed since last commit>
+	- <etc>
+Code Changes:
+	- <short description of code changes this session>
+	- <etc>
+Next: <What we will do next>
+\end{verbatim}
+
+\subsection{Document Authority}
+
+The compiled document rooted at \texttt{main.tex} is the single dynamics
+document.  Its included files divide the document into maintainable sections;
+they are not separate competing dynamics specifications.
+
+The dynamics implementations are <model>Dynamics.  Documentation
+must describe that implementation and its current architecture.  Historical
+architecture names and retired implementations do not belong in the active
+document.
+
+\subsection{Model Documents}
+
+Each maintained dynamics model has a corresponding
+\texttt{<model>DynamicsSource.tex} file that documents that model's source
+flow, equations, model-specific state, and implementation architecture.  Every
+maintained model source document must be included by \texttt{main.tex}.
+
+Shared document conventions, dynamics conventions, programming conventions,
+and problem evolution remain in their corresponding shared document files.
+Retired model source documents must be removed from \texttt{main.tex} or moved
+under the old-document directory.
+
+\subsection{Generated Source Flowcharts}
+
+For dynamics work, the sequential stage chain should be
+documented with a generated flowchart when the source structure becomes hard to
+hold in memory.  The flowchart is not a substitute for narrow functions; it is a
+debugging and navigation aid that makes the stage order visible.
+
+The current source-flow generator is:
+
+\begin{verbatim}
+python/base/<model>DynamicsFlowChart.py
+\end{verbatim}
+
+It emits DOT, SVG, PDF, and PNG artifacts under
+\texttt{docs/Dynamics/generated}.  The DOT file preserves the graph source, the
+SVG can carry interactive links, and the PDF is used as the stable LaTeX figure.
+The source-flow chart links mostly to code.  The system-flow chart links mostly
+to documentation because it explains loops, decision trees, storage boundaries,
+and GLSL-shaped algorithm stages.  The generators should be updated when
+function names, stage order, decision points, or major source handoffs change.
+
+This preserves the same programming rule used by the code: the primary flow is
+explicit, generated documentation follows that flow, and helpers are shown as
+supporting calls rather than hidden control-flow owners.

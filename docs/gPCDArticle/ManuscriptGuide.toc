@@ -1,0 +1,77 @@
+\contentsline {section}{\numberline {1}Author Review Outline}{4}{section.1}%
+\contentsline {section}{\numberline {2}Manuscript Organization Guide}{49}{section.2}%
+\contentsline {section}{\numberline {3}Author Outline}{60}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Purpose}{60}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Primary Contribution}{60}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Abstract Requirements}{60}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Paper Scope}{61}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}Section Responsibilities}{61}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}Revision Procedure}{62}{subsection.3.6}%
+\contentsline {section}{\numberline {4}Figures}{64}{section.4}%
+\contentsline {section}{\numberline {5}Performance Regions}{64}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Sequential vs Random Percent increase}{65}{subsection.5.1}%
+\contentsline {section}{\numberline {6}Comparative Analysis}{66}{section.6}%
+\contentsline {section}{\numberline {7}Comparative Analysis}{66}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Latta (2004)}{66}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Kipfer (2004)}{66}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}Zhang (2008)}{67}{subsection.7.3}%
+\contentsline {subsection}{\numberline {7.4}Anderson (2008)}{67}{subsection.7.4}%
+\contentsline {subsection}{\numberline {7.5}Liu (2010)}{67}{subsection.7.5}%
+\contentsline {subsection}{\numberline {7.6}Govender (2015)}{68}{subsection.7.6}%
+\contentsline {subsection}{\numberline {7.7}Joselli (2015)}{68}{subsection.7.7}%
+\contentsline {subsection}{\numberline {7.8}Franklin (2017)}{68}{subsection.7.8}%
+\contentsline {subsection}{\numberline {7.9}Mittal (2020)}{69}{subsection.7.9}%
+\contentsline {subsection}{\numberline {7.10}Bell (2025)}{69}{subsection.7.10}%
+\contentsline {subsection}{\numberline {7.11}Uniform Grids}{69}{subsection.7.11}%
+\contentsline {section}{\numberline {8}Audience and Explanation Level}{70}{section.8}%
+\contentsline {section}{\numberline {9}Drafting Note}{70}{section.9}%
+\contentsline {section}{\numberline {10}Document Conventions and Research Governance}{71}{section.10}%
+\contentsline {section}{\numberline {11}Approved Terminology}{71}{section.11}%
+\contentsline {subsection}{\numberline {11.1}Terminology Convention: Potentially Colliding Set (PCS)}{71}{subsection.11.1}%
+\contentsline {subsection}{\numberline {11.2}Symbols}{71}{subsection.11.2}%
+\contentsline {subsection}{\numberline {11.3}Symbol Conventions}{72}{subsection.11.3}%
+\contentsline {subsubsection}{\numberline {11.3.1}Physical Particle Coordinates}{72}{subsubsection.11.3.1}%
+\contentsline {subsubsection}{\numberline {11.3.2}Cell Coordinates}{72}{subsubsection.11.3.2}%
+\contentsline {subsubsection}{\numberline {11.3.3}Flattened Cell Index}{72}{subsubsection.11.3.3}%
+\contentsline {subsection}{\numberline {11.4}Cell Coordinate Convention}{72}{subsection.11.4}%
+\contentsline {subsubsection}{\numberline {11.4.1}Cell Array Dimensions}{73}{subsubsection.11.4.1}%
+\contentsline {subsubsection}{\numberline {11.4.2}Storage Conventions}{73}{subsubsection.11.4.2}%
+\contentsline {subsubsection}{\numberline {11.4.3}Coordinate Transformation Pipeline}{73}{subsubsection.11.4.3}%
+\contentsline {subsection}{\numberline {11.5}Bounding Volume Terminology}{73}{subsection.11.5}%
+\contentsline {section}{\numberline {12}Document Structure}{74}{section.12}%
+\contentsline {subsection}{\numberline {12.1}Architecture Hierarchy}{74}{subsection.12.1}%
+\contentsline {subsection}{\numberline {12.2}Numerical Placeholders}{74}{subsection.12.2}%
+\contentsline {section}{\numberline {13}Collision-Detection Architecture}{74}{section.13}%
+\contentsline {subsection}{\numberline {13.1}Traditional Architectures}{75}{subsection.13.1}%
+\contentsline {subsection}{\numberline {13.2}GPU-Resident Architectures}{75}{subsection.13.2}%
+\contentsline {subsection}{\numberline {13.3}gPCD Architecture}{75}{subsection.13.3}%
+\contentsline {subsection}{\numberline {13.4}Architectural Classification}{77}{subsection.13.4}%
+\contentsline {subsection}{\numberline {13.5}Graphics Pipeline Execution}{77}{subsection.13.5}%
+\contentsline {subsection}{\numberline {13.6}Broad Phase}{78}{subsection.13.6}%
+\contentsline {subsection}{\numberline {13.7}Narrow Phase}{78}{subsection.13.7}%
+\contentsline {subsection}{\numberline {13.8}Cell Array}{78}{subsection.13.8}%
+\contentsline {section}{\numberline {14}Related Work Objectives}{78}{section.14}%
+\contentsline {section}{\numberline {15}Experimental Claims}{79}{section.15}%
+\contentsline {section}{\numberline {16}Complexity Claims}{79}{section.16}%
+\contentsline {subsection}{\numberline {16.1}Access Complexity}{79}{subsection.16.1}%
+\contentsline {subsection}{\numberline {16.2}Computational Complexity}{79}{subsection.16.2}%
+\contentsline {subsection}{\numberline {16.3}Storage Complexity}{80}{subsection.16.3}%
+\contentsline {subsection}{\numberline {16.4}Complexity Convention}{80}{subsection.16.4}%
+\contentsline {section}{\numberline {17}Novelty Statement}{81}{section.17}%
+\contentsline {subsection}{\numberline {17.1}Novelty Classification}{81}{subsection.17.1}%
+\contentsline {subsection}{\numberline {17.2}Primary Organizational Contribution}{81}{subsection.17.2}%
+\contentsline {subsection}{\numberline {17.3}Candidate Supporting Contributions}{82}{subsection.17.3}%
+\contentsline {subsubsection}{\numberline {17.3.1}Supporting Contributions}{83}{subsubsection.17.3.1}%
+\contentsline {subsection}{\numberline {17.4}Contribution Hierarchy}{83}{subsection.17.4}%
+\contentsline {section}{\numberline {18}Methodological Requirements}{83}{section.18}%
+\contentsline {subsection}{\numberline {18.1}Correctness Mechanisms}{83}{subsection.18.1}%
+\contentsline {subsection}{\numberline {18.2}Memory}{83}{subsection.18.2}%
+\contentsline {section}{\numberline {19}Approved Technical Claims}{83}{section.19}%
+\contentsline {section}{\numberline {20}Retired Concepts}{84}{section.20}%
+\contentsline {section}{\numberline {21}Writing Standards}{84}{section.21}%
+\contentsline {section}{\numberline {22}Research Separation}{84}{section.22}%
+\contentsline {subsection}{\numberline {22.1}gPCD Paper}{84}{subsection.22.1}%
+\contentsline {subsection}{\numberline {22.2}Field Particle Method Paper}{85}{subsection.22.2}%
+\contentsline {subsection}{\numberline {22.3}Active Manuscript Rule}{85}{subsection.22.3}%
+\contentsline {subsection}{\numberline {22.4}Item 1 Status}{85}{subsection.22.4}%
+\contentsline {section}{\numberline {23}Manuscript Review Status}{85}{section.23}%

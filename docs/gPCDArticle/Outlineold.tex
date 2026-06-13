@@ -1,0 +1,2989 @@
+
+% !TeX root = main.tex
+\newpage
+\clearpage
+\begin{center}
+\Large\textbf{Conventions Section\\ (included only in rough draft. For documenting standards, outline, and rules)}
+\end{center}
+
+\section*{Document Review Approach}
+
+The objective of the review process is to improve clarity, strengthen
+the narrative structure, and reduce unnecessary complexity while
+preserving all information required to support the paper's central
+argument.
+
+Each paragraph is evaluated against the current manuscript outline to
+ensure that it contributes directly to the progression
+
+[
+\text{Problem}
+$\rightarrow$
+\text{Limitation}
+$\rightarrow$
+\text{Architectural Contribution}
+$\rightarrow$
+\text{Validation}
+$\rightarrow$
+\text{Capability Enabled}.
+]
+
+For every paragraph, the following questions are applied:
+
+\begin{enumerate}
+
+\item Does the paragraph belong in the section defined by the outline?
+
+\item What information does the paragraph contribute to the narrative?
+
+\item Can the paragraph be shortened without removing information?
+
+\item Can the language be made more objective?
+
+\item Can statements describing quality or significance be replaced by
+descriptions of what was done?
+
+\item Does the final sentence naturally motivate the first sentence of
+the following paragraph?
+
+\item Does the paragraph introduce new information, or does it repeat
+information already presented elsewhere?
+
+\end{enumerate}
+
+Paragraphs are then classified as:
+
+\begin{itemize}
+
+\item \textbf{KEEP} -- The paragraph supports the outline and requires
+only minor editing.
+
+\item \textbf{REWRITE} -- The paragraph contains useful information but
+requires restructuring, shortening, or improved transitions.
+
+\item \textbf{MERGE} -- The paragraph overlaps substantially with
+adjacent material and should be combined with another paragraph.
+
+\item \textbf{MOVE} -- The paragraph belongs in a different section of
+the manuscript.
+
+\item \textbf{DELETE} -- The paragraph does not contribute information
+required by the outline or repeats information already presented.
+
+\end{itemize}
+
+Particular attention is given to the following editorial principles:
+
+\begin{itemize}
+
+\item Can this sentence be shorter?
+
+\item Can it be more objective?
+
+\item Can it state what was done rather than how good it is?
+
+\end{itemize}
+
+The goal is to produce concise, technically precise prose that allows
+the experimental results and analysis to establish significance rather
+than relying on subjective claims.
+
+
+\section{Manuscript Outline}
+
+\begin{verbatim}
+Abstract
+What was done?
+Why is it important?
+What was achieved?
+
+1. Introduction
+	Why are particle systems important?
+		Paragraphs 1–2
+
+	What are particle systems used for?
+		Paragraphs 1–2
+
+	Why are large particle systems computationally limited?
+		Paragraphs 3–5
+
+	What is the contribution of gPCD?
+		Paragraphs 6–7
+
+	Paragraph 1
+
+	   Purpose:
+	   - Define particle methods.
+	   - Explain why particle methods are useful.
+	   - Introduce emergent macroscopic behavior.
+
+	   Contains:
+	   - Particle methods model discrete interacting entities.
+	   - Applicable to solids, fluids, granular materials,
+		 multiphase flows, molecular systems, and other applications.
+	   - Individual entities are represented explicitly.
+	   - Macroscopic behavior emerges from local interactions.
+	   - Particle methods are well suited for studying collective behavior.
+
+	   Presentation Bullets:
+	   - Discrete interacting particles.
+	   - Local interactions create emergent behavior.
+	   - Applicable to many scientific and engineering systems.
+
+	Paragraph 2
+
+	   Purpose:
+	   - Explain why large particle simulations are important.
+	   - Motivate particle simulation as a discovery tool.
+	   - Connect simulation to scientific advancement and AI.
+
+	   Contains:
+	   - Particle simulations support scientific discovery.
+	   - New physical behavior may only emerge in large-scale simulations.
+	   - Machine-learning methods require representative training data.
+	   - Simulations generate training datasets.
+	   - Simulations enable investigation of poorly understood phenomena.
+	   - Simulations complement experiments and analysis.
+
+	   Presentation Bullets:
+	   - Large-scale simulations enable scientific discovery.
+	   - Emergent phenomena may require many interacting particles.
+	   - Simulations generate datasets for machine learning.
+	   - Simulations help investigate previously unobserved behavior.
+
+	Paragraph 3
+
+	   Purpose:
+	   - Explain why large particle counts are desirable.
+	   - Explain why large particle simulations become expensive.
+	   - Introduce the need for efficient particle-processing methods.
+
+	   Contains:
+	   - Simulation fidelity increases with particle count.
+	   - Realistic simulations may require millions or billions of particles.
+	   - Larger particle counts improve spatial resolution.
+	   - Larger particle counts improve geometric representation.
+	   - Larger particle counts enable multiscale investigations.
+	   - Increased particle counts substantially increase computational cost.
+	   - Efficient particle-processing algorithms are required for large-scale simulation.
+
+	   Presentation Bullets:
+	   - High-fidelity simulations require millions to billions of particles.
+	   - Larger particle counts improve resolution and physical realism.
+	   - Computational cost grows rapidly with problem size.
+	   - Efficient particle-processing algorithms are essential.
+   
+	Paragraph 4
+
+		Purpose:
+		- Identify collision detection as a major computational bottleneck.
+		- Explain why naïve collision detection is impractical.
+		- Introduce broad-phase collision detection.
+		- Motivate the need for efficient parallel broad-phase methods.
+
+		Contains:
+		- Collision detection is a primary limitation of large-scale particle simulation.
+		- Naïve collision detection scales as O(N²).
+		- Direct all-to-all evaluation is impractical for large particle counts.
+		- Broad-phase methods reduce collision-detection cost.
+		- Broad-phase methods restrict testing to nearby particles.
+		- Efficient broad-phase construction remains challenging on massively parallel hardware.
+
+		Presentation Bullets:
+		- Collision detection is a major performance bottleneck.
+		- Naïve collision detection scales as O(N²).
+		- Broad-phase methods reduce candidate pairs.
+		- Efficient parallel broad-phase construction remains challenging.
+	   
+	Paragraph 5
+
+		Purpose:
+		- Introduce GPUs as a platform for large-scale particle simulation.
+		- Explain that hardware capability alone does not solve the problem.
+		- Identify occupancy generation as the remaining bottleneck.
+		- Transition toward the architectural motivation for gPCD.
+
+		Contains:
+		- GPUs provide high computational throughput.
+		- GPUs provide high memory bandwidth.
+		- GPUs are well suited for particle simulation.
+		- Spatial occupancy structures remain difficult to construct efficiently.
+		- Occupancy generation remains a bottleneck at large scales.
+
+		Presentation Bullets:
+		- GPUs provide massive parallelism.
+		- GPUs offer high memory bandwidth.
+		- Particle simulation maps naturally to GPU hardware.
+		- Occupancy generation remains a major bottleneck.  
+   
+	Paragraph 6
+
+		Purpose:
+		- Introduce gPCD.
+		- State the primary contribution of the work.
+		- Summarize the key architectural ideas.
+		- Explain the significance of the framework.
+
+		Contains:
+		- gPCD is a GPU-driven particle collision-detection framework.
+		- gPCD uses the graphics pipeline for occupancy generation.
+		- gPCD constructs a uniform cell-array occupancy structure.
+		- Occupancy generation is organized around particle corner locations.
+		- GPU rasterization hardware is used for broad-phase construction.
+		- The framework maintains a simple and scalable data structure.
+		- The framework supports large particle counts on a single CPU–GPU system.
+		- The framework provides a foundation for future large-scale particle simulations.
+
+		Presentation Bullets:
+		- GPU-driven particle collision detection (gPCD).
+		- Graphics-pipeline occupancy generation.
+		- Corner-based occupancy construction.
+		- Uniform cell-array broad phase.
+		- Scalable single CPU–GPU execution.
+	
+	Paragraph 7
+
+		Purpose:
+		- Clearly define the novelty of the work.
+		- Distinguish gPCD from existing occupancy structures.
+		- Explain the architectural contribution.
+		- Explain why the graphics pipeline is used.
+
+		Contains:
+		- The contribution is an execution architecture rather than a new data structure.
+		- gPCD integrates occupancy generation directly into the graphics pipeline.
+		- Rendering and occupancy construction occur concurrently.
+		- Occupancy generation produces the potentially colliding set (PCS).
+		- Graphics-pipeline resources participate in collision detection.
+		- Resources traditionally reserved for rendering are repurposed for occupancy generation.
+
+		Presentation Bullets:
+		- Novelty: execution architecture, not a new data structure.
+		- Graphics-pipeline occupancy generation.
+		- Concurrent rendering and occupancy construction.
+		- PCS generation integrated into rendering workflow.
+		- Repurposes graphics resources for collision detection.
+	
+	
+	
+	
+2. Background and Related Work
+   What must the reader know first?
+
+   Section Introduction
+
+	   Purpose:
+	   - Introduce the scope of the background section.
+	   - Explain that collision-detection methods differ in both
+		 data structures and execution architectures.
+	   - Establish the relationship between collision detection
+		 and rendering.
+	   - Prepare the reader for the architectural gap discussion.
+
+	   Contains:
+	   - Many collision-detection approaches have been proposed.
+	   - Approaches differ in both data structures and execution architectures.
+	   - Collision detection may be organized differently relative to rendering.
+	   - The section reviews methodologies, architectures,
+		 and rendering strategies.
+	   - The section identifies the architectural gap addressed by gPCD.
+
+	   Presentation Bullets:
+	   - Collision-detection methods vary in structure and execution model.
+	   - Rendering and collision detection are often separated.
+	   - Existing architectures leave an unexploited opportunity.
+	   - Background motivates the architectural contribution of gPCD.
+   
+2.1 Collision-Detection Frameworks
+		What is occupancy generation and why is it needed?
+
+	Paragraph 1
+
+	   Purpose:
+	   - Introduce the broad-phase/narrow-phase organization.
+	   - Define the two major stages of collision detection.
+	   - Establish where gPCD contributes.
+	   - Explain why broad-phase generation is important.
+
+	   Contains:
+	   - Collision detection is commonly divided into broad-phase and narrow-phase stages.
+	   - Broad phase generates collision candidates.
+	   - Narrow phase evaluates candidate collisions.
+	   - This organization is widely used across collision-detection frameworks.
+	   - gPCD's primary contribution occurs in broad-phase occupancy generation.
+	   - Narrow phase completes the overall collision-detection process.
+
+	   Presentation Bullets:
+	   - Collision detection is typically divided into two stages.
+	   - Broad phase generates collision candidates.
+	   - Narrow phase evaluates candidate collisions.
+	   - gPCD focuses on broad-phase occupancy generation.
+	   
+
+	Paragraph 2
+
+		Purpose:
+		- Review common GPU broad-phase methodologies.
+		- Show that many approaches exist for candidate generation.
+		- Explain the common objective of broad-phase methods.
+		- Transition from collision-detection methods to execution architectures.
+
+		Contains:
+		- Numerous GPU broad-phase methods have been proposed.
+		- Common approaches include:
+		  - Uniform grids
+		  - Spatial hashing
+		  - Hierarchical spatial subdivision
+		  - Sweep and prune
+		  - Image-space methods
+		  - Other acceleration techniques
+		- Methods differ in how spatial information is organized and queried.
+		- All broad-phase methods seek to reduce narrow-phase evaluations.
+		- Research has expanded from algorithms to execution architectures.
+		- GPU computing has increased interest in architectural design.
+
+		Presentation Bullets:
+		- Many GPU broad-phase methodologies exist.
+		- Methods differ in spatial organization and query strategy.
+		- All seek to reduce narrow-phase collision tests.
+		- Recent work increasingly focuses on execution architectures.
+
+2.2 Collision-Detection Architectures
+		How have rendering and collision detection traditionally
+		been organized?
+
+   Paragraph 1
+
+	   Purpose:
+	   - Introduce execution architectures as distinct from collision-detection methods.
+	   - Describe the historical evolution of collision-detection execution.
+	   - Explain the migration from CPU to GPU implementations.
+	   - Establish the architectural spectrum considered in the literature.
+
+	   Contains:
+	   - Collision-detection methodologies can be implemented using different execution architectures.
+	   - Early systems performed broad-phase and narrow-phase operations on the CPU.
+	   - Collision detection and rendering were traditionally separate processes.
+	   - Increasing particle counts motivated GPU acceleration.
+	   - Programmable GPUs enabled portions of the collision-detection pipeline to migrate to the GPU.
+	   - GPU parallelism became a major driver of architectural evolution.
+	   - Existing architectures span:
+		   - CPU-resident implementations
+		   - GPU-assisted implementations
+		   - Fully GPU-resident implementations
+
+	   Presentation Bullets:
+	   - Execution architecture is distinct from collision-detection methodology.
+	   - Early systems were CPU-based.
+	   - Collision detection and rendering were traditionally independent.
+	   - GPU programmability enabled migration of collision detection to the GPU.
+	   - Architectures now range from CPU-resident to fully GPU-resident.
+
+	Paragraph 2
+
+		Purpose:
+		- Define the major architectural categories.
+		- Explain how work is distributed between CPU and GPU.
+		- Describe the progression toward increased GPU utilization.
+		- Introduce data movement as an architectural concern.
+
+		Contains:
+		- CPU-resident architectures perform broad-phase and narrow-phase operations on the CPU.
+		- Simulation state is transferred to the rendering system after collision processing.
+		- GPU-assisted architectures offload selected collision-detection tasks to the GPU.
+		- CPU-managed execution and data structures remain part of the workflow.
+		- GPU-resident architectures perform broad-phase and narrow-phase operations entirely on the GPU.
+		- GPU-resident approaches reduce host-device communication.
+		- GPU-resident approaches improve parallel utilization.
+		- GPU-resident approaches reduce data movement overhead.
+
+		Presentation Bullets:
+		- CPU-resident: collision detection performed entirely on the CPU.
+		- GPU-assisted: selected operations offloaded to the GPU.
+		- GPU-resident: broad phase and narrow phase executed on the GPU.
+		- Increasing GPU utilization reduces data-transfer overhead.
+
+
+	Paragraph 3
+
+		Purpose:
+		- Identify a common limitation across existing architectures.
+		- Explain that rendering and collision detection are usually separate.
+		- Highlight the traditional role of the rendering pipeline.
+		- Motivate examination of rendering-collision integration.
+
+		Contains:
+		- Existing architectures differ in execution location and data movement.
+		- Collision detection and rendering are typically separate processes.
+		- Collision-detection work is performed in dedicated computational stages.
+		- The rendering pipeline primarily consumes simulation state.
+		- Rendering generally does not participate in collision detection.
+		- This separation motivates investigation of rendering-collision interaction.
+
+		Presentation Bullets:
+		- Most architectures separate rendering and collision detection.
+		- Collision detection uses dedicated compute stages.
+		- Rendering typically consumes simulation results.
+		- Rendering rarely contributes to collision detection.
+		- This separation motivates the gPCD architecture.   
+   
+2.3 Rendering and Collision Detection
+
+	Paragraph 1
+
+		Purpose:
+		- Define the traditional roles of collision detection and rendering.
+		- Explain why the two systems have historically been separated.
+		- Establish the conventional simulation-to-rendering workflow.
+		- Prepare the reader for alternative rendering-based architectures.
+
+		Contains:
+		- Collision detection identifies particle interactions.
+		- Collision detection advances simulation state.
+		- Rendering visualizes simulation results.
+		- Collision detection and rendering perform different functions.
+		- Rendering is typically positioned downstream of simulation.
+		- Rendering primarily consumes simulation state.
+		- Rendering traditionally does not participate in simulation processing.
+
+		Presentation Bullets:
+		- Collision detection computes simulation behavior.
+		- Rendering visualizes simulation results.
+		- Rendering is typically downstream of simulation.
+		- Rendering acts primarily as a consumer of simulation state.
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Explain how GPU adoption affected rendering and collision detection.
+		- Show that GPU execution did not fundamentally change their relationship.
+		- Reinforce the separation between rendering and collision detection.
+		- Identify the underutilization of rendering resources for collision detection.
+
+		Contains:
+		- Rendering and collision detection increasingly leverage GPU parallelism.
+		- GPU-resident implementations became common.
+		- Rendering and collision detection generally remain logically separated.
+		- Collision detection executes in dedicated computational stages.
+		- Rendering continues to generate visual output from simulation data.
+		- Rendering contributes little or no information to collision detection.
+		- GPU adoption alone does not integrate rendering and collision detection.
+
+		Presentation Bullets:
+		- Both rendering and collision detection moved to the GPU.
+		- GPU residency did not eliminate their separation.
+		- Collision detection uses dedicated compute stages.
+		- Rendering remains focused on visualization.
+		- Rendering contributes little to collision detection.
+
+
+
+
+	Paragraph 3
+
+		Purpose:
+		- Review prior attempts to integrate rendering and simulation.
+		- Acknowledge graphics-assisted approaches.
+		- Explain the remaining limitation of existing methods.
+		- Identify the architectural gap that motivates gPCD.
+
+		Contains:
+		- Prior work has explored rendering-simulation integration.
+		- Approaches include:
+			- Image-space techniques
+			- GPU data structures
+			- Graphics-assisted computation
+		- Existing approaches still treat occupancy generation as a dedicated
+		  collision-detection task.
+		- Candidate construction remains independent of rasterization.
+		- Rendering remains primarily downstream of simulation.
+		- Rendering rarely acts as an active participant in collision detection.
+		- An architectural opportunity remains unexploited.
+
+		Presentation Bullets:
+		- Prior work explored graphics-assisted simulation.
+		- Image-space and GPU-assisted approaches exist.
+		- Occupancy generation remains separate from rasterization.
+		- Rendering is still primarily downstream of simulation.
+		- An architectural gap remains.
+
+
+
+	Paragraph 4
+
+		Purpose:
+		- Formulate the central architectural question.
+		- Transition from prior work to the gPCD motivation.
+		- Introduce graphics-pipeline occupancy generation as a possibility.
+		- Establish concurrency between rendering and occupancy generation as a design objective.
+
+		Contains:
+		- Existing architectures separate occupancy generation from rendering.
+		- This separation suggests an unexplored architectural opportunity.
+		- Broad-phase occupancy generation may be integrated into the graphics pipeline.
+		- Occupancy construction and rendering may proceed concurrently.
+		- Graphics-pipeline resources may contribute directly to collision detection.
+
+		Presentation Bullets:
+		- Can occupancy generation be integrated into the graphics pipeline?
+		- Can rendering and occupancy construction execute concurrently?
+		- Can graphics resources participate directly in collision detection?
+		- This question motivates gPCD.
+
+
+2.4 Gap in Existing Methods
+		What architectural capability is missing?
+
+	   Paragraph 1
+
+		   Purpose:
+		   - Summarize the findings of the previous background sections.
+		   - Restate the traditional relationship between rendering and collision detection.
+		   - Identify occupancy generation as a dedicated operation.
+		   - Prepare the formal statement of the architectural gap.
+
+		   Contains:
+		   - Rendering and collision detection have traditionally remained separate.
+		   - This separation persists in GPU-resident implementations.
+		   - Rendering primarily consumes simulation state.
+		   - Broad-phase occupancy generation is performed separately.
+		   - Occupancy generation is treated as a dedicated collision-detection task.
+		   - Existing architectures do not integrate occupancy generation into rendering.
+
+		   Presentation Bullets:
+		   - Rendering and collision detection remain separate.
+		   - This separation persists on modern GPUs.
+		   - Rendering consumes simulation state.
+		   - Occupancy generation remains a dedicated collision-detection operation.
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- State the architectural gap explicitly.
+		- Define the missing capability in existing methods.
+		- Introduce the gPCD solution.
+		- Connect the Background section to the Methodology section.
+
+		Contains:
+		- Existing methods do not integrate broad-phase occupancy generation directly into the graphics pipeline.
+		- This absence constitutes the architectural gap.
+		- gPCD addresses the gap through graphics-pipeline occupancy generation.
+		- Occupancy construction and rendering proceed concurrently.
+		- Graphics-pipeline execution produces the potentially colliding set (PCS).
+		- The PCS is used during narrow-phase evaluation.
+		- gPCD integrates rendering and occupancy generation into a unified architecture.
+
+		Presentation Bullets:
+		- Missing capability:
+			- Graphics-pipeline occupancy generation.
+		- gPCD integrates occupancy generation directly into the graphics pipeline.
+		- Occupancy construction and rendering execute concurrently.
+		- Graphics-pipeline execution produces the PCS.
+		- gPCD closes the architectural gap.
+
+
+
+	Paragraph 3
+
+		Purpose:
+		- Clarify the nature of the contribution.
+		- Distinguish architectural novelty from algorithmic novelty.
+		- Prevent misinterpretation of the work.
+		- Reinforce the execution-architecture focus of gPCD.
+
+		Contains:
+		- gPCD does not introduce a new occupancy structure.
+		- gPCD does not introduce new asymptotic complexity results.
+		- Existing collision-detection techniques are retained.
+		- The contribution lies in architectural organization.
+		- Existing techniques are integrated into a unified GPU-driven framework.
+		- The novelty is execution architecture rather than methodology.
+
+		Presentation Bullets:
+		- Not a new data structure.
+		- Not a new complexity improvement.
+		- Existing techniques are retained.
+		- Novelty lies in execution architecture.
+		- Unified GPU-driven framework.
+
+
+
+   
+3. Methodology
+
+
+	Figure: Overall Framework Architecture
+
+		Purpose:
+		- Provide a high-level view of gPCD.
+		- Show the relationship between graphics and compute pipelines.
+		- Orient the reader before implementation details.
+
+		Supports:
+		- gPCD is an execution architecture.
+		- Occupancy generation occurs in the graphics pipeline.
+		- Narrow-phase evaluation occurs in the compute pipeline.
+		- Rendering and occupancy construction proceed concurrently.
+
+		Presentation Bullets:
+		- Graphics-pipeline occupancy generation.
+		- PCS generation.
+		- Compute-based narrow phase.
+		- Concurrent rendering and collision detection.
+   
+ 
+
+	Figure: Cell Spans
+
+		Purpose:
+		- Illustrate how particle geometry spans cells.
+		- Show the relationship between particle size and cell occupancy.
+		- Motivate occupancy-list sizing and bounded occupancy generation.
+		- Provide geometric justification for the broad-phase design.
+
+		Supports:
+		- Particles are represented by bounding volumes.
+		- Particle corners determine occupied cells.
+		- A particle may intersect multiple neighboring cells.
+		- Cell occupancy can be determined geometrically.
+		- Occupancy generation is suitable for parallel execution.
+		- Occupancy-list capacity can be bounded from particle geometry.
+
+		Presentation Bullets:
+		- Particle-to-cell relationships.
+		- Corner-based cell assignment.
+		- Multi-cell occupancy.
+		- Geometric basis for occupancy generation.  
+   
+
+	Paragraph 1
+
+		Purpose:
+		- Introduce the gPCD framework.
+		- Connect the Methodology section to the architectural gap identified in the Background section.
+		- State the central architectural idea.
+		- Provide a high-level description of the framework before implementation details.
+
+		Contains:
+		- gPCD addresses the architectural gap identified in the Background section.
+		- Broad-phase occupancy generation is integrated directly into the graphics pipeline.
+		- Occupancy construction and rendering proceed concurrently.
+		- The framework produces the potentially colliding set (PCS).
+		- The PCS is used during narrow-phase evaluation.
+		- The framework unifies rendering and collision-detection activities within a GPU-driven architecture.
+
+		Presentation Bullets:
+		- gPCD addresses the architectural gap.
+		- Graphics-pipeline occupancy generation.
+		- Concurrent occupancy construction and rendering.
+		- PCS generation for narrow-phase evaluation.
+   
+3.1 Framework Overview
+
+	Paragraph 1
+
+		Purpose:
+		- Explain the architecture figure.
+		- Contrast conventional and gPCD organizations.
+		- Highlight the architectural difference between existing methods and gPCD.
+		- Introduce concurrent occupancy construction and rendering.
+
+		Contains:
+		- Figure (a) shows conventional GPU-based collision-detection frameworks.
+		- Conventional frameworks separate rendering and collision detection.
+		- Figure (b) shows the gPCD architecture.
+		- gPCD integrates occupancy generation into the graphics pipeline.
+		- Occupancy construction and rendering proceed concurrently.
+		- The framework generates the PCS for narrow-phase evaluation.
+
+		Presentation Bullets:
+		- Conventional: separate rendering and collision detection.
+		- gPCD: graphics-pipeline occupancy generation.
+		- Concurrent rendering and occupancy construction.
+		- PCS generation integrated into the architecture.  
+   
+   
+3.2 Duplicate Handling
+
+	Paragraph 1
+
+		Purpose:
+		- Define the two forms of duplication present in gPCD.
+		- Distinguish occupancy duplication from collision duplication.
+		- Introduce the duplicate-handling problem.
+		- Connect the discussion to the Cell Spans figure.
+
+		Contains:
+		- Two forms of duplication can occur in gPCD.
+		- Corner duplication occurs during occupancy generation.
+		- Multiple AABB corners from the same particle may map to the same cell.
+		- Collision duplication occurs during PCS traversal.
+		- The same source-target interaction may be encountered through multiple cells.
+		- Figure~\ref{fig:CellSpans} illustrates both duplication mechanisms.
+
+		Presentation Bullets:
+		- Two duplication mechanisms exist.
+		- Corner duplication:
+			- Multiple corners → same cell.
+		- Collision duplication:
+			- Same pair encountered multiple times.
+		- Duplicate handling is required.  
+
+
+	Paragraph 2
+
+		Purpose:
+		- Explain how duplicate occupancy entries are prevented.
+		- Explain how duplicate collision evaluations are prevented.
+		- Associate each duplication type with its corresponding solution.
+		- Establish correctness of PCS generation and collision evaluation.
+
+		Contains:
+		- Corner duplicates are removed during occupancy construction.
+		- Duplicate particle insertions into a cell occupancy list are prevented.
+		- Collision duplicates are removed during narrow-phase evaluation.
+		- Source-owned collision tracking is used.
+		- Each source-target interaction is evaluated at most once.
+		- Duplicate suppression preserves correctness and efficiency.
+
+		Presentation Bullets:
+		- Corner duplicates removed during occupancy construction.
+		- Prevents duplicate cell occupancy entries.
+		- Collision duplicates removed during narrow phase.
+		- Source-owned collision tracking.
+		- Each collision pair evaluated once.
+
+
+3.3 Graphics-Pipeline Occupancy Generation
+
+	Paragraph 1
+
+		Purpose:
+		- Introduce graphics-pipeline occupancy generation.
+		- Explain where broad-phase construction occurs.
+		- Describe the role of individual particles during occupancy generation.
+		- Connect occupancy generation to PCS construction.
+
+		Contains:
+		- Broad-phase occupancy generation is performed in the graphics pipeline.
+		- Occupancy generation occurs in the vertex stage.
+		- Each particle independently determines its occupancy contribution.
+		- Each particle determines the cell locations required for broad-phase construction.
+		- Occupancy information is stored in the cell-array structure.
+		- Cell occupancy information is later used to construct candidate collision pairs.
+		- Candidate pairs are passed to the narrow phase.
+
+		Presentation Bullets:
+		- Occupancy generation occurs in the graphics pipeline.
+		- Implemented in the vertex stage.
+		- Particles independently determine occupied cells.
+		- Occupancy stored in cell array.
+		- Cell array used to construct PCS candidates.
+
+3.4 Corner-Based Occupancy Construction
+
+	Paragraph 1
+
+		Purpose:
+		- Introduce the geometric representation used for occupancy generation.
+		- Explain how occupied cells are identified.
+		- Establish the role of AABB corners in broad-phase construction.
+		- Connect particle geometry to cell-array occupancy.
+
+		Contains:
+		- Particles are represented by axis-aligned bounding boxes (AABBs).
+		- Occupancy generation evaluates the eight AABB corners.
+		- Corner locations are mapped to cell locations.
+		- Occupied cells are determined from corner-cell intersections.
+		- Corner locations define the occupancy contribution of a particle.
+		- Cell occupancy is derived directly from particle geometry.
+
+		Presentation Bullets:
+		- Particles represented by AABBs.
+		- Eight corners evaluated per particle.
+		- Corners mapped to cell locations.
+		- Corner locations define cell occupancy.
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Define the corner-generation procedure mathematically.
+		- Show how AABB corners are constructed from particle position and radius.
+		- Connect particle geometry to cell occupancy generation.
+		- Establish the inputs required for cell-coordinate determination.
+
+		Contains:
+		- Particle position is represented by (x,y,z).
+		- Particle radius is represented by r.
+		- Eight AABB corners are generated using -+r offsets.
+		- Each corner corresponds to one of eight corner identifiers.
+		- Corner positions are computed directly from particle geometry.
+		- Corner locations are converted into cell coordinates.
+		- Cell coordinates determine occupancy contributions.
+
+		Presentation Bullets:
+		- Corner location:
+			x_c = x + (+-r, +-r, +-r)
+		- Eight corners per particle.
+		- Corner identifiers c in {0,...,7}.
+		- Corners converted to cell coordinates.
+		- Cell coordinates define occupancy.
+
+
+	Paragraph 3
+
+		Purpose:
+		- Explain the computational consequence of corner-based occupancy generation.
+		- Establish bounded work per particle.
+		- Connect particle geometry to computational cost.
+		- Motivate the scalability of occupancy generation.
+
+		Contains:
+		- Occupancy generation uses a fixed set of eight corners.
+		- Each particle performs a bounded number of occupancy evaluations.
+		- Occupancy work does not depend on total particle count.
+		- Per-particle occupancy generation cost is constant.
+		- Occupancy generation requires O(1) work per particle.
+		- The total occupancy-generation workload scales linearly with particle count.
+
+		Presentation Bullets:
+		- Fixed number of corner evaluations.
+		- Bounded work per particle.
+		- O(1) occupancy generation per particle.
+		- Linear scaling with particle count.
+
+
+
+	Paragraph 4
+
+		Purpose:
+		- State the particle-size constraint used by the framework.
+		- Justify why eight-corner occupancy determination is sufficient.
+		- Establish the maximum number of cells a particle may occupy.
+		- Show that occupancy-generation cost is independent of particle size within the admissible range.
+
+		Contains:
+		- Particle diameter must not exceed cell width.
+		- Under this constraint, a particle intersects at most eight neighboring cells.
+		- Occupancy can be determined entirely from the eight AABB corners.
+		- No additional occupancy evaluations are required for admissible particle sizes.
+		- Particle size may vary within the admissible range.
+		- The occupancy-generation procedure remains unchanged.
+		- Per-particle occupancy cost remains bounded.
+
+		Presentation Bullets:
+		- Constraint: particle diameter <= cell width.
+		- Maximum occupancy span: 8 cells.
+		- Eight corners fully determine occupancy.
+		- Particle size variation does not increase occupancy work.
+		- Constant-cost occupancy generation preserved.
+
+
+3.5 Cell Addressing and Flattening
+
+	Paragraph 1
+
+		Purpose:
+		- Define the mapping from corner positions to cell coordinates.
+		- Establish the coordinate system used by the cell array.
+		- Explain how floating-point geometry is converted into discrete cell locations.
+		- Provide the first step of the cell-addressing process.
+
+		Contains:
+		- Each corner location is mapped to a cell coordinate.
+		- Corner locations are represented in floating-point coordinates.
+		- Cell locations are represented by unsigned integer coordinates.
+		- Cell coordinates are obtained by rounding corner positions.
+		- Rounding maps each corner to the nearest cell center.
+		- Cell coordinates provide the basis for occupancy insertion.
+
+		Presentation Bullets:
+		- Corner locations use floating-point coordinates.
+		- Cell locations use integer coordinates.
+		- Cell coordinates obtained by rounding.
+		- Corner-to-cell mapping enables occupancy construction.
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Define the valid occupancy region of the cell array.
+		- Establish the indexing convention used by the framework.
+		- Explain the reservation of zero-valued coordinate locations.
+		- Define the admissible cell-coordinate domain.
+
+		Contains:
+		- Cell coordinates use zero-based indexing.
+		- Cells containing zero-valued coordinate components are reserved.
+		- Reserved cells are excluded from occupancy generation.
+		- Valid occupancy cells satisfy:
+			X > 0
+			Y > 0
+			Z > 0
+		- Occupancy generation operates only within the admissible cell region.
+		- Cell-coordinate validity is enforced before occupancy insertion.
+
+		Presentation Bullets:
+		- Zero-based indexing.
+		- Zero-coordinate cells are reserved.
+		- Reserved cells are excluded from occupancy generation.
+		- Valid cells satisfy:
+			X > 0, Y > 0, Z > 0.
+
+
+
+	Paragraph 3
+
+		Purpose:
+		- Justify the reserved-cell convention.
+		- Explain how boundary conditions are handled during occupancy generation.
+		- Prevent invalid cell addressing.
+		- Improve robustness of corner-based occupancy construction.
+
+		Contains:
+		- Reserved cells create a guard layer around the active domain.
+		- The guard layer surrounds valid occupancy cells.
+		- Particles near domain boundaries may generate corner locations outside the active region.
+		- The guard layer prevents negative cell coordinates.
+		- Boundary particles can be processed without special-case logic.
+		- Occupancy generation remains robust near domain boundaries.
+
+		Presentation Bullets:
+		- Reserved cells form a guard layer.
+		- Protects occupancy generation near boundaries.
+		- Prevents negative cell coordinates.
+		- Eliminates boundary-addressing issues.
+
+
+
+	Paragraph 4
+
+		Purpose:
+		- Define the mapping from cell coordinates to storage locations.
+		- Convert three-dimensional cell coordinates into a one-dimensional index.
+		- Enable efficient occupancy-list storage and retrieval.
+		- Establish the addressing mechanism used by the cell array.
+
+		Contains:
+		- Cell coordinates are converted into a flattened index.
+		- The cell array is stored as a one-dimensional structure.
+		- W, H, and D represent cell-array dimensions.
+		- The flattening operation maps (X,Y,Z) to a unique index I.
+		- The flattened index identifies the occupancy-list location.
+		- Occupancy insertion and retrieval use the flattened index.
+
+		Presentation Bullets:
+		- Convert (X,Y,Z) to a unique index.
+		- Flattening enables 1D storage.
+		- Cell-array dimensions:
+			W, H, D.
+		- Flattened index:
+			I = X + W(Y + HZ).
+		- Supports efficient occupancy access.
+
+
+	Paragraph 5
+
+		Purpose:
+		- Explain the role of the flattened index within the framework.
+		- Justify the use of a flattened representation.
+		- Describe how the index is used throughout the collision-detection pipeline.
+		- Highlight storage and addressing benefits.
+
+		Contains:
+		- The flattened index is the primary cell identifier.
+		- The index directly addresses occupancy lists.
+		- Flattening reduces storage requirements.
+		- A three-component coordinate tuple is replaced by a single integer.
+		- The same identifier is reused throughout the pipeline.
+		- Occupancy construction uses the flattened index.
+		- Candidate generation uses the flattened index.
+		- Narrow-phase evaluation uses the flattened index.
+		- Cell coordinates do not need to be reconstructed.
+
+		Presentation Bullets:
+		- Flattened index is the primary cell identifier.
+		- Direct occupancy-list addressing.
+		- Reduced storage requirements.
+		- Single identifier reused throughout the pipeline.
+		- No coordinate reconstruction required.
+
+	Paragraph 6
+
+		Purpose:
+		- Explain how concurrent occupancy insertion is performed.
+		- Introduce thread-safe occupancy-list updates.
+		- Describe the role of atomic operations.
+		- Ensure correctness during massively parallel occupancy generation.
+
+		Contains:
+		- Multiple particles may target the same occupancy list concurrently.
+		- Shared occupancy lists require coordinated insertion.
+		- Atomic reservation operations are used.
+		- Atomic operations allocate unique occupancy-list slots.
+		- Each insertion receives a distinct storage location.
+		- Thread-safe occupancy generation is maintained.
+		- Concurrent occupancy construction is supported.
+
+		Presentation Bullets:
+		- Occupancy lists are shared resources.
+		- Multiple particles may insert concurrently.
+		- Atomic reservation obtains a unique slot.
+		- Thread-safe occupancy construction.
+		- Supports massively parallel execution.
+
+
+3.6 Cell Array Construction
+
+	Paragraph 1
+
+		Purpose:
+		- Explain how duplicate corner references affect occupancy storage.
+		- Describe duplicate suppression during cell-array construction.
+		- Establish how occupancy-list capacity is determined.
+		- Connect duplicate handling to memory requirements.
+
+		Contains:
+		- Multiple AABB corners from the same particle may map to a common cell.
+		- Duplicate corner references are suppressed during occupancy generation.
+		- Only one particle identifier is stored per particle-cell pair.
+		- Occupancy lists store unique particle references.
+		- Occupancy-list capacity depends on unique particle contributors.
+		- Capacity is not determined by the total number of corner insertions.
+		- Duplicate suppression reduces storage requirements.
+
+		Presentation Bullets:
+		- Multiple corners may target the same cell.
+		- Duplicate corner references are removed.
+		- One particle identifier per cell.
+		- Occupancy capacity based on unique particles.
+		- Capacity independent of duplicate corner insertions.
+
+	Paragraph 2
+
+		Purpose:
+		- Derive the maximum occupancy-list capacity.
+		- Establish a sizing rule for heterogeneous particle systems.
+		- Identify the governing particle size.
+		- Provide a memory-allocation model for the cell array.
+
+		Contains:
+		- Occupancy capacity depends on particle size.
+		- The smallest particle radius governs maximum occupancy.
+		- r_min is defined as the minimum particle radius in the simulation.
+		- Smaller particles permit higher local packing densities.
+		- The uniform cell side length is represented by h.
+		- A closed-form expression is provided for maximum cell occupancy.
+		- The expression defines the required occupancy-list capacity.
+		- Occupancy-list sizing supports heterogeneous particle systems.
+
+		Presentation Bullets:
+		- Maximum occupancy determined by smallest particle.
+		- Define:
+			r_min = min(r_i).
+		- Smaller particles create worst-case occupancy.
+		- Maximum occupancy:
+			N_cell^3D.
+		- Provides occupancy-list sizing rule.
+
+
+
+	Paragraph 3
+
+		Purpose:
+		- Explain how the occupancy-capacity expression is used in practice.
+		- Connect the occupancy model to memory allocation.
+		- Justify sizing occupancy lists using the smallest particle size.
+		- Explain why larger particles cannot increase maximum occupancy.
+
+		Contains:
+		- Occupancy-list capacity can be determined during initialization.
+		- Capacity is based on the smallest allowable particle diameter.
+		- Memory allocation can be performed before simulation begins.
+		- Larger particles occupy more volume.
+		- Larger particles reduce local packing density.
+		- Larger particles cannot increase the maximum number of unique particle identifiers within a cell.
+		- The smallest particle defines the worst-case occupancy condition.
+
+		Presentation Bullets:
+		- Occupancy capacity determined during initialization.
+		- Smallest particle diameter defines worst-case occupancy.
+		- Memory allocation performed a priori.
+		- Larger particles cannot increase occupancy capacity.
+		- Single sizing rule for heterogeneous systems.
+
+
+3.7 Potentially Colliding Set Construction
+
+	Paragraph 1
+
+		Purpose:
+		- Define the potentially colliding set (PCS).
+		- Explain the relationship between the cell array and the PCS.
+		- Show how occupancy generation produces collision candidates.
+		- Eliminate the need for a separate candidate-construction stage.
+
+		Contains:
+		- The populated cell array forms the PCS.
+		- Occupied cells contain particle identifiers.
+		- Particle identifiers are associated with mapped corner locations.
+		- Particles sharing occupancy cells become collision candidates.
+		- Occupancy generation directly constructs the PCS.
+		- No separate candidate-construction stage is required.
+		- Broad-phase construction and PCS construction occur simultaneously.
+
+		Presentation Bullets:
+		- Populated cell array = PCS.
+		- Occupied cells contain particle identifiers.
+		- Shared occupancy implies candidate interaction.
+		- PCS generated directly during occupancy construction.
+		- No separate candidate-generation stage required.
+
+
+3.8 Narrow-Phase Evaluation
+
+	Paragraph 1
+
+		Purpose:
+		- Introduce the data structure used during narrow-phase evaluation.
+		- Explain how occupancy information is carried forward from the broad phase.
+		- Connect occupancy construction to collision evaluation.
+		- Establish the per-particle information required for PCS traversal.
+
+		Contains:
+		- Each particle stores an array of eight corner-cell identifiers.
+		- Each entry corresponds to one AABB corner.
+		- Entries contain flattened cell indices.
+		- Cell identifiers are generated during occupancy construction.
+		- Occupancy information is retained after broad-phase generation.
+		- Narrow-phase evaluation uses the stored corner-cell identifiers.
+		- Broad-phase and narrow-phase stages are linked through the cornerCell array.
+
+		Presentation Bullets:
+		- Each particle stores cornerCell[8].
+		- One entry per AABB corner.
+		- Entries contain flattened cell indices.
+		- Generated during occupancy construction.
+		- Reused during narrow-phase evaluation.
+
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Explain how collision candidates are retrieved.
+		- Describe source-owned PCS traversal.
+		- Eliminate the need for centralized collision-pair construction.
+		- Connect occupancy lists to contact evaluation.
+
+		Contains:
+		- Each source particle independently performs candidate retrieval.
+		- The source particle traverses its cornerCell array.
+		- Each corner-cell identifier references an occupancy list.
+		- Candidate neighbors are obtained directly from occupancy lists.
+		- No centralized collision-pair list is constructed.
+		- Collision candidates are generated on demand.
+		- The source particle evaluates contact against referenced particles.
+		- Candidate retrieval and collision evaluation are source owned.
+
+		Presentation Bullets:
+		- Source particle traverses cornerCell[8].
+		- Occupancy lists provide candidate neighbors.
+		- No centralized collision-pair list.
+		- Candidates generated on demand.
+		- Source-owned collision evaluation.
+
+
+
+	Paragraph 3
+
+		Purpose:
+		- Explain duplicate-collision suppression during narrow-phase evaluation.
+		- Describe the source-owned collision-tracking mechanism.
+		- Ensure each source-target interaction is evaluated at most once.
+		- Preserve correctness during PCS traversal.
+
+		Contains:
+		- Each particle maintains a collision list.
+		- The collision list stores previously evaluated target identifiers.
+		- Collision tracking is source owned.
+		- When a collision is detected, the target identifier is recorded.
+		- Future evaluations consult the collision list.
+		- Previously evaluated source-target pairs are discarded.
+		- Duplicate collision evaluations are prevented.
+		- Each collision pair is evaluated at most once per evaluation step.
+
+		Presentation Bullets:
+		- Source-owned collision list.
+		- Stores previously evaluated targets.
+		- Collision registration updates the list.
+		- Duplicate source-target evaluations discarded.
+		- One evaluation per collision pair.
+
+
+
+	Paragraph 4
+
+		Purpose:
+		- Explain the benefits of source-owned candidate evaluation.
+		- Justify the narrow-phase execution architecture.
+		- Reduce synchronization requirements.
+		- Demonstrate suitability for massively parallel execution.
+
+		Contains:
+		- Candidate discovery is performed independently by each source particle.
+		- Candidate ownership remains local to the source particle.
+		- Collision evaluation is source owned.
+		- No globally shared collision-pair list is required.
+		- Synchronization requirements are reduced.
+		- Parallel execution is simplified.
+		- The organization is well suited to massively parallel hardware.
+		- Collision management remains decentralized.
+
+		Presentation Bullets:
+		- Source-owned candidate discovery.
+		- Local candidate ownership.
+		- No global collision-pair structure.
+		- Reduced synchronization.
+		- Massively parallel execution.
+
+4. Complexity Analysis
+
+		Table: Complexity Comparison
+
+		Purpose:
+		- Compare the theoretical complexity of gPCD with representative
+		  broad-phase collision-detection methodologies.
+		- Position gPCD within the existing collision-detection literature.
+		- Provide context for the theoretical scaling analysis.
+		- Highlight differences between methodologies and execution architectures.
+
+		Supports:
+		- gPCD achieves competitive theoretical complexity.
+		- Architectural innovation does not require asymptotic-complexity improvements.
+		- Broad-phase methodologies exhibit differing computational characteristics.
+		- The contribution of gPCD is architectural rather than asymptotic.
+
+		Presentation Bullets:
+		- Complexity comparison with representative methods.
+		- Broad-phase computational complexity.
+		- Relative scalability.
+		- Architectural innovation without asymptotic penalty.
+
+	Paragraph 1
+
+		Purpose:
+		- Introduce the complexity-analysis section.
+		- Identify the dominant computational components of the framework.
+		- Focus the analysis on occupancy generation and collision evaluation.
+		- Establish the scope of the theoretical analysis.
+
+		Contains:
+		- The computational complexity of gPCD is analyzed.
+		- Broad-phase occupancy generation is a primary contributor to cost.
+		- Narrow-phase collision evaluation is a primary contributor to cost.
+		- These stages determine overall framework complexity.
+		- Complexity analysis focuses on the dominant computational operations.
+
+		Presentation Bullets:
+		- Complexity driven by:
+			* Broad-phase occupancy generation
+			* Narrow-phase collision evaluation
+		- Dominant framework costs analyzed.
+
+4.1 Occupancy Generation
+
+	Paragraph 1
+
+		Purpose:
+		- Derive the computational complexity of occupancy generation.
+		- Formalize the bounded-work argument from the methodology.
+		- Establish the broad-phase scaling behavior.
+		- Provide the first theoretical complexity result for gPCD.
+
+		Contains:
+		- Each particle performs a fixed number of occupancy evaluations.
+		- Occupancy work is independent of total particle count.
+		- c_occ represents the bounded occupancy cost per particle.
+		- Occupancy-generation cost grows linearly with particle count.
+		- Broad-phase occupancy generation has O(N) complexity.
+		- The broad phase exhibits constant work per particle.
+
+		Presentation Bullets:
+		- Fixed occupancy evaluations per particle.
+		- Bounded occupancy cost c_occ.
+		- Linear growth with particle count.
+		- Broad-phase occupancy generation:O(N).
+
+	Paragraph 2
+
+		Purpose:
+		- Establish the cost of cell-array access operations.
+		- Show that addressing does not increase occupancy-generation complexity.
+		- Connect flattened indexing to computational efficiency.
+		- Reinforce the bounded-work assumption.
+
+		Contains:
+		- Occupancy lists are accessed through flattened indices.
+		- Cell addressing is performed in constant time.
+		- Direct indexing eliminates search overhead.
+		- Occupancy insertion requires bounded work.
+		- Occupancy retrieval requires bounded work.
+		- Fixed occupancy-width assumptions are maintained.
+		- Addressing and storage operations preserve O(1) per-particle behavior.
+		- Occupancy-generation complexity remains O(N).
+
+		Presentation Bullets:
+		- Direct access via flattened indices.
+		- Constant-time cell lookup.
+		- Bounded insertion cost.
+		- Bounded retrieval cost.
+		- Addressing preserves O(N) occupancy generation.
+
+4.2 Narrow-Phase Evaluation
+
+	Paragraph 1
+
+	Purpose:
+	- Derive the computational complexity of narrow-phase evaluation.
+	- Define the quantity governing narrow-phase cost.
+	- Establish the scaling behavior of collision evaluation.
+	- Separate occupancy-generation complexity from interaction-evaluation complexity.
+
+	Contains:
+	- Source particles traverse occupancy lists associated with corner cells.
+	- Narrow-phase cost depends on the number of interaction evaluations.
+	- K represents the total number of candidate interactions evaluated.
+	- Each interaction requires bounded work.
+	- Narrow-phase cost grows linearly with K.
+	- Narrow-phase evaluation has O(K) complexity.
+	- Collision-processing cost is proportional to the number of evaluated interactions.
+
+	Presentation Bullets:
+	- Source particles traverse occupancy lists.
+	- K = total interaction evaluations.
+	- Constant work per interaction.
+	- Narrow-phase complexity:O(K).
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Interpret the narrow-phase complexity result.
+		- Identify the quantity that governs collision-evaluation cost.
+		- Distinguish interaction count from particle count.
+		- Connect PCS construction to narrow-phase workload.
+
+		Contains:
+		- Narrow-phase complexity depends on candidate interactions.
+		- Candidate interactions are represented by the PCS.
+		- Interaction count is the primary driver of narrow-phase cost.
+		- Particle count alone does not determine narrow-phase workload.
+		- Different particle distributions may produce different values of K.
+		- PCS density influences collision-processing cost.
+		- Narrow-phase scaling is governed by interaction density rather than particle count alone.
+
+		Presentation Bullets:
+		- Narrow-phase cost depends on PCS interactions.
+		- K is more important than N.
+		- Particle count alone does not determine workload.
+		- Interaction density drives collision-evaluation cost.
+
+
+4.3 Storage Requirements
+
+	Paragraph 1
+
+		Purpose:
+		- Derive the storage requirements of the framework.
+		- Separate particle-storage costs from cell-array storage costs.
+		- Establish the memory-scaling behavior of gPCD.
+		- Provide the storage-complexity result.
+
+		Contains:
+		- Particle storage scales linearly with particle count.
+		- M_particle = O(N).
+		- Cell-array storage depends on array dimensions and occupancy width.
+		- M_cell = O(S^3 W).
+		- Occupancy width W is fixed.
+		- Cell-array storage reduces to O(S^3).
+		- Total storage is the sum of particle and cell-array storage.
+		- M_gPCD = O(N + S^3 W).
+		- For fixed occupancy width:
+			M_gPCD = O(N + S^3).
+
+		Presentation Bullets:
+		- Particle storage:
+			O(N).
+		- Cell-array storage:
+			O(S^3 W).
+		- Fixed occupancy width:
+			O(S^3).
+		- Total storage:
+			O(N + S^3).
+
+5. Comparative Analysis
+
+	Table: Comparative Complexity
+
+		Purpose:
+		- Compare gPCD with representative collision-detection methodologies.
+		- Position the framework relative to existing approaches.
+		- Contrast methodological and architectural contributions.
+		- Provide context for interpreting the complexity results.
+
+		Supports:
+		- gPCD exhibits competitive theoretical complexity.
+		- gPCD does not require a new asymptotic-complexity class.
+		- Direct-insertion spatial subdivision approaches share similar broad-phase scaling.
+		- The primary distinction of gPCD is architectural.
+		- Architectural innovation can occur without asymptotic-complexity improvement.
+
+		Presentation Bullets:
+		- Complexity comparison with representative methods.
+		- Comparable broad-phase scaling.
+		- No new asymptotic complexity class.
+		- Architectural differentiation.
+
+	Table: Historical Comparison
+
+		Purpose:
+		- Place gPCD within the historical development of particle simulation.
+		- Compare representative particle counts and TPP values.
+		- Provide context for interpreting reported performance.
+		- Illustrate how simulation scale has evolved across studies.
+
+		Supports:
+		- Published studies span a wide range of particle counts.
+		- Published studies span a wide range of TPP values.
+		- Direct performance comparisons are difficult due to differing
+		  hardware, algorithms, and benchmark conditions.
+		- gPCD supports large particle counts on a single CPU-GPU system.
+		- gPCD exhibits competitive time-per-particle performance.
+
+		Presentation Bullets:
+		- Historical particle-count comparison.
+		- Historical TPP comparison.
+		- Literature context.
+		- gPCD positioning.
+
+	
+
+	Paragraph 1
+
+		Purpose:
+		- Clarify the nature of the gPCD contribution.
+		- Distinguish architectural innovation from asymptotic-complexity improvements.
+		- Position gPCD among direct-insertion spatial subdivision methods.
+		- Summarize the outcome of the comparative analysis.
+
+		Contains:
+		- gPCD does not introduce a new asymptotic complexity class.
+		- Broad-phase occupancy generation remains linear.
+		- Similar broad-phase complexity exists in other direct-insertion methods.
+		- The contribution is architectural rather than asymptotic.
+		- Graphics-pipeline occupancy generation is a distinguishing feature.
+		- Duplicate-aware cell construction is a distinguishing feature.
+		- Source-owned collision evaluation is a distinguishing feature.
+		- These elements are unified within a GPU-driven framework.
+
+		Presentation Bullets:
+		- No new asymptotic complexity class.
+		- Broad phase remains O(N).
+		- Contribution is architectural.
+		- Graphics-pipeline occupancy generation.
+		- Duplicate-aware cell construction.
+		- Source-owned collision evaluation.
+		- Unified GPU-driven framework.
+
+
+	Paragraph 2
+
+		Purpose:
+		- Interpret the historical-comparison table.
+		- Caution against direct performance ranking.
+		- Position gPCD relative to prior work.
+		- Highlight achieved particle count and TPP.
+
+		Contains:
+		- Representative particle counts are summarized.
+		- Representative TPP values are summarized.
+		- Benchmark conditions differ substantially across studies.
+		- Hardware platforms differ across studies.
+		- Reported operations differ across studies.
+		- Results should be interpreted as historical context.
+		- The comparison is not a strict performance ranking.
+		- gPCD supports more than 11 million particles.
+		- gPCD achieves approximately 7.62 ns per particle.
+		- Results are obtained on a single CPU-GPU system.
+
+		Presentation Bullets:
+		- Literature comparisons require caution.
+		- Different hardware and benchmarks.
+		- Historical context rather than ranking.
+		- gPCD:
+			• >11 million particles
+			• 7.62 ns/particle
+			• Single CPU-GPU system
+
+
+6. Experimental Setup
+
+	Paragraph 1
+
+		Purpose:
+		- Introduce the experimental-evaluation section.
+		- Define the scope of the benchmark methodology.
+		- Identify the elements required to reproduce the evaluation.
+		- Prepare the reader for the performance results.
+
+		Contains:
+		- The evaluation methodology is described.
+		- Hardware platform is specified.
+		- Benchmark configurations are specified.
+		- Performance metrics are specified.
+		- These components are used to evaluate gPCD.
+		- The section establishes the experimental basis for the Results section.
+
+		Presentation Bullets:
+		- Experimental methodology.
+		- Hardware platform.
+		- Benchmark configurations.
+		- Performance metrics.
+		- Evaluation framework.
+
+
+6.1 Hardware Platform
+
+	Paragraph 1
+
+		Purpose:
+		- Define the hardware platform used for evaluation.
+		- Establish the computational resources available to gPCD.
+		- Provide context for interpreting performance results.
+		- Position the benchmark system relative to practical deployment environments.
+
+		Contains:
+		- Evaluation performed on a Lenovo ThinkPad P16 Gen 2.
+		- CPU:
+			Intel Core i9-13980HX.
+		- GPU:
+			NVIDIA RTX 3500 Ada Generation.
+		- GPU contains 5,120 CUDA cores.
+		- GPU provides 12 GB ECC GDDR6 memory.
+		- GPU uses a 192-bit memory interface.
+		- GPU bandwidth is approximately 432 GB/s.
+		- System represents a modern mobile workstation.
+		- Hardware serves as the evaluation baseline.
+
+		Presentation Bullets:
+		- Lenovo ThinkPad P16 Gen 2.
+		- Intel Core i9-13980HX.
+		- NVIDIA RTX 3500 Ada.
+		- 5,120 CUDA cores.
+		- 12 GB ECC GDDR6.
+		- 432 GB/s memory bandwidth.
+		- Mobile workstation platform.
+
+	Paragraph 2
+
+		Purpose:
+		- Describe the software implementation of gPCD.
+		- Explain how framework operations are mapped onto GPU execution resources.
+		- Connect the experimental implementation to the methodology.
+		- Establish the execution environment used during benchmarking.
+
+		Contains:
+		- gPCD is implemented using Vulkan.
+		- Broad-phase occupancy generation executes in the graphics pipeline.
+		- Rendering executes in the graphics pipeline.
+		- Narrow-phase evaluation executes in compute shaders.
+		- Graphics and compute pipelines are both utilized.
+		- The implementation follows the proposed GPU-driven architecture.
+
+		Presentation Bullets:
+		- Vulkan implementation.
+		- Graphics-pipeline occupancy generation.
+		- Graphics-pipeline rendering.
+		- Compute-shader narrow phase.
+		- GPU-driven execution architecture.
+	
+6.2 Maximum Particle Capacity
+
+	Paragraph 1
+
+		Purpose:
+		- Define the theoretical upper bound on particle count.
+		- Relate simulation capacity to graphics-device memory limits.
+		- Establish a hardware-dependent particle-count constraint.
+		- Provide a sizing model for maximum simulation scale.
+
+		Contains:
+		- Particle count is limited by storage-buffer capacity.
+		- M_max represents the maximum addressable storage-buffer range.
+		- S_p represents the memory footprint of a particle.
+		- Maximum particle count depends on available buffer storage.
+		- N_max is computed from the ratio M_max / S_p.
+		- Larger particle structures reduce maximum capacity.
+		- Smaller particle structures increase maximum capacity.
+		- The capacity limit is hardware dependent.
+
+		Presentation Bullets:
+		- Maximum capacity constrained by storage-buffer limits.
+		- Define:
+			• M_max = maximum storage-buffer range
+			• S_p = particle size
+		- Maximum particle count:
+			N_max = floor(M_max / S_p)
+		- Capacity depends on particle footprint.
+		- Capacity depends on hardware.
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Explain how the capacity model was applied during testing.
+		- Connect theoretical capacity limits to benchmark selection.
+		- Describe the effect of particle-structure size on simulation scale.
+		- Demonstrate that all experiments respected hardware constraints.
+
+		Contains:
+		- The capacity equation was used to select benchmark sizes.
+		- Tested particle counts were constrained by storage-buffer limits.
+		- Increasing particle size reduces maximum achievable particle count.
+		- Particle capacity scales inversely with particle memory footprint.
+		- Reducing particle size increases achievable simulation scale.
+		- Maximum problem size depends on storage efficiency.
+		- All benchmark cases remained below the device storage-buffer limit.
+		- Experimental configurations were selected to ensure valid execution.
+
+		Presentation Bullets:
+		- Capacity equation used to select benchmarks.
+		- Larger particle structures reduce maximum capacity.
+		- Smaller particle structures increase maximum capacity.
+		- Maximum problem size depends on particle memory footprint.
+		- All tests remained within hardware limits.
+
+
+
+6.3 Verification and Performance Evaluation
+
+	Paragraph 1
+
+		Purpose:
+		- Explain the evaluation methodology used for gPCD.
+		- Separate correctness validation from performance measurement.
+		- Establish confidence in reported benchmark results.
+		- Justify the use of verification mode.
+
+		Contains:
+		- gPCD performs exact collision detection.
+		- Verification and performance evaluations are separate stages.
+		- Each test case is first executed in verification mode.
+		- Verification validates particle counts.
+		- Verification validates occupancy generation.
+		- Verification validates collision counts.
+		- Verification ensures all particles are processed correctly.
+		- Verification ensures collision events are detected and counted correctly.
+		- Correctness is established before performance evaluation.
+
+		Presentation Bullets:
+		- Exact collision detection framework.
+		- Verification and performance measured separately.
+		- Verification validates:
+			* Particle counts
+			* Occupancy generation
+			* Collision counts
+		- Correctness established before benchmarking.
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Describe the performance-evaluation stage.
+		- Explain when performance measurements were collected.
+		- Ensure that reported metrics are based on validated results.
+		- Establish the credibility of the reported benchmarks.
+
+		Contains:
+		- Performance evaluation follows successful verification.
+		- The same benchmark configurations are reused.
+		- Performance mode measures execution time.
+		- Performance mode measures throughput.
+		- Performance mode measures time-per-particle scaling.
+		- Correctness is established before performance measurement.
+		- Reported performance metrics correspond to validated collision-detection results.
+		- Benchmark results are based on verified executions.
+
+		Presentation Bullets:
+		- Performance mode executed after verification.
+		- Same benchmark configurations used.
+		- Measured:
+			• Execution time
+			• Throughput
+			• Time per particle
+		- Performance results based on validated collision detection.
+
+
+6.3 Benchmark Configuration
+
+	Paragraph 1
+
+		Purpose:
+		- Define the benchmark configurations used for evaluation.
+		- Describe how test cases were generated.
+		- Establish the particle-count range used in scaling studies.
+		- Control collision density while varying problem size.
+
+		Contains:
+		- Benchmark configurations use randomly distributed particles.
+		- Particle count is systematically increased across test cases.
+		- Collision fraction is maintained approximately constant.
+		- Scaling behavior is evaluated independently of large density variations.
+		- Particle counts range from 32 to 11,000,000 particles.
+		- Benchmark configurations span multiple orders of magnitude.
+
+		Presentation Bullets:
+		- Random particle configurations.
+		- Approximately constant collision fraction.
+		- Systematic increase in particle count.
+		- Range:
+			32 to 11,000,000 particles.
+		- Multi-order-of-magnitude scaling study.
+
+6.5 Performance Metrics
+
+	Paragraph 1
+
+		Purpose:
+		- Define the performance metrics used to evaluate gPCD.
+		- Establish the quantities reported in the Results section.
+		- Separate graphics, compute, and total execution costs.
+		- Introduce throughput as a primary performance metric.
+
+		Contains:
+		- Graphics execution time is measured.
+		- Compute execution time is measured.
+		- Total execution time is measured.
+		- Throughput is measured.
+		- Time-per-particle is measured.
+		- Metrics capture both execution cost and processing efficiency.
+
+		Presentation Bullets:
+		- Metrics:
+			• Graphics time (t_g)
+			• Compute time (t_c)
+			• Total time (t_t)
+			• Throughput
+			• Time per particle
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Define throughput mathematically.
+		- Relate particle count to execution time.
+		- Establish the primary measure of processing rate.
+		- Provide a basis for throughput comparisons.
+
+		Contains:
+		- Throughput is particles processed per second.
+		- Throughput depends on particle count.
+		- Throughput depends on total execution time.
+		- Throughput is defined as:
+			T = N / t_t.
+		- Higher throughput indicates greater processing capacity.
+		- Throughput is used to evaluate scalability and efficiency.
+
+		Presentation Bullets:
+		- Throughput = particles per second.
+		- T = N / t_t.
+		- Combines particle count and execution time.
+		- Measures processing capacity.
+
+
+
+
+	Paragraph 3
+
+		Purpose:
+		- Define time-per-particle (TPP).
+		- Introduce a normalized performance metric.
+		- Enable comparisons across different particle counts.
+		- Provide a measure of computational efficiency.
+
+		Contains:
+		- Time-per-particle is computed from total execution time.
+		- TPP is defined as:
+			t_pp = t_t / N.
+		- TPP normalizes execution cost by particle count.
+		- TPP allows comparison across benchmark sizes.
+		- TPP is independent of absolute particle count.
+		- TPP is used to evaluate scaling efficiency.
+
+		Presentation Bullets:
+		- Time per particle:
+			t_pp = t_t / N.
+		- Normalized execution cost.
+		- Independent of particle count.
+		- Measures scaling efficiency.
+
+
+7. Experimental Results
+
+	Paragraph 1
+
+		Purpose:
+		- Introduce the results section.
+		- Define the benchmark conditions used for the reported results.
+		- Identify the primary performance measures.
+		- Establish the scope of the experimental analysis.
+
+		Contains:
+		- Measured gPCD performance is presented.
+		- Results use randomly distributed particle configurations.
+		- Particle count increases across benchmark cases.
+		- Collision fraction remains approximately constant unless noted otherwise.
+		- Performance is evaluated using throughput.
+		- Performance is evaluated using time-per-particle.
+		- Performance is evaluated using scaling analyses.
+		- Results characterize framework behavior across the tested particle range.
+
+		Presentation Bullets:
+		- Experimental performance results.
+		- Random particle configurations.
+		- Increasing particle count.
+		- Approximately constant collision fraction.
+		- Throughput analysis.
+		- Time-per-particle analysis.
+		- Scaling analysis.
+
+7.1 Memory Locality Benchmark
+	Figure: Memory Locality Benchmark
+
+		Purpose:
+		- Compare execution times for sequential and random occupancy ordering.
+		- Quantify locality-induced performance differences.
+		- Measure how the locality effect changes with particle count.
+
+		Supports:
+		- Both configurations exhibit approximately linear scaling.
+		- Sequential ordering consistently outperforms random ordering.
+		- The execution-time difference grows approximately linearly.
+		- Difference growth is characterized by slope \PPBQDiffSlope.
+		- The observed performance gap arises from memory-locality effects.
+		- Algorithmic complexity remains unchanged.
+
+	Paragraph 1
+
+		Purpose:
+		- Introduce the memory-locality study.
+		- Define the benchmark variable being investigated.
+		- Describe the two occupancy-ordering configurations.
+		- Establish the basis for the locality comparison.
+
+		Contains:
+		- The benchmark evaluates memory-locality effects.
+		- Memory locality is treated as an independent variable.
+		- Two occupancy configurations are compared.
+		- Sequential ordering preserves locality within memory.
+		- Random ordering disrupts locality within memory.
+		- Both configurations use the same occupancy-generation framework.
+		- The benchmark isolates the impact of occupancy ordering.
+
+		Presentation Bullets:
+		- Memory-locality sensitivity study.
+		- Two occupancy configurations:
+			* Sequential ordering
+			* Random ordering
+		- Locality treated as an independent variable.
+		- Isolates memory-ordering effects.
+
+	Paragraph 2
+
+		Purpose:
+		- Present the locality-benchmark results.
+		- Compare sequential and random occupancy ordering.
+		- Introduce the execution-time difference metric.
+		- Establish the observed performance trend.
+
+		Contains:
+		- Execution time is plotted versus particle count.
+		- Sequential ordering produces lower execution times.
+		- The performance advantage exists throughout the tested range.
+		- Random ordering produces higher execution times.
+		- A difference curve is included in the figure.
+		- The difference is defined as:
+			Random Time - Sequential Time.
+		- The figure enables direct visualization of locality effects.
+		- Performance differences are quantified across the particle range.
+
+		Presentation Bullets:
+		- Execution time versus particle count.
+		- Sequential ordering consistently faster.
+		- Random ordering consistently slower.
+		- Difference curve included.
+		- Difference:
+			Random - Sequential.
+
+
+
+	Paragraph 3
+
+		Purpose:
+		- Interpret the locality-benchmark results.
+		- Characterize the scaling behavior of both configurations.
+		- Quantify the growth of the execution-time difference.
+		- Attribute the observed performance gap.
+
+		Contains:
+		- Sequential and random configurations exhibit approximately linear scaling.
+		- Neither configuration exhibits dominant super-linear behavior.
+		- The execution-time difference increases approximately linearly with particle count.
+		- A linear regression was performed on the difference curve.
+		- The regression slope quantifies the rate at which the performance gap grows.
+		- The slope equals \PPBQDiffSlope ms per million particles.
+		- The locality penalty grows proportionally with problem size.
+		- Both configurations execute the same collision-detection algorithm.
+		- Occupancy ordering is the only significant difference.
+		- The performance gap is attributed to memory-locality effects.
+
+		Presentation Bullets:
+		- Both configurations scale approximately linearly.
+		- Difference grows approximately linearly.
+		- Difference slope:
+			\PPBQDiffSlope ms per million particles.
+		- Locality effect increases with scale.
+		- Performance gap attributed to memory locality.
+
+
+
+	Paragraph 4
+
+		Purpose:
+		- Summarize the implications of the locality benchmark.
+		- Distinguish algorithmic complexity from practical performance.
+		- Explain the role of memory locality in observed execution times.
+		- Connect the benchmark results to real-world performance.
+
+		Contains:
+		- Memory locality remains an important performance factor.
+		- The effect persists despite GPU-resident execution.
+		- Memory locality influences execution efficiency.
+		- Memory locality does not alter algorithmic complexity.
+		- The asymptotic scaling behavior remains unchanged.
+		- Memory locality affects implementation-dependent constants.
+		- Practical execution time depends on these constant factors.
+		- Observed performance differences arise from memory-access behavior rather than computational complexity.
+
+		Presentation Bullets:
+		- Memory locality matters.
+		- GPU execution does not eliminate locality effects.
+		- Complexity unchanged.
+		- Constant factors change.
+		- Practical performance depends on memory access patterns.
+
+7.2 Performance Overview
+
+	Table: Benchmark Measurements
+
+		Purpose:
+		- Present the benchmark data used throughout the Results section.
+		- Provide the measured execution statistics for each benchmark case.
+		- Serve as the source dataset for all subsequent analyses.
+		- Support reproducibility and independent interpretation.
+
+		Supports:
+		- Throughput calculations.
+		- Time-per-particle calculations.
+		- Scaling analyses.
+		- Regression analyses.
+		- Curvature analyses.
+		- Performance-overview conclusions.
+
+		Presentation Bullets:
+		- Particle count.
+		- Graphics execution time.
+		- Compute execution time.
+		- Total execution time.
+		- Throughput.
+		- Time per particle.
+
+	Paragraph 1
+
+		Purpose:
+		- Introduce the overall performance results.
+		- Reference the summary figure/table containing the principal metrics.
+		- Define the benchmark conditions associated with the reported results.
+		- Provide context for the detailed analyses that follow.
+
+		Contains:
+		- Principal gPCD performance metrics are summarized.
+		- Performance results are aggregated into a summary presentation.
+		- Benchmark cases use randomly distributed particles.
+		- Particle count increases across benchmark configurations.
+		- Collision fraction remains approximately constant.
+		- Results characterize performance across the tested particle range.
+		- The summary provides a high-level view of framework behavior.
+
+		Presentation Bullets:
+		- Performance summary.
+		- Random particle configurations.
+		- Increasing particle count.
+		- Approximately constant collision fraction.
+		- High-level performance overview.
+
+
+	Paragraph 2
+
+		Purpose:
+		- Present the principal performance achievements of gPCD.
+		- Report the largest benchmark successfully processed.
+		- Report peak throughput performance.
+		- Reference representative execution statistics.
+
+		Contains:
+		- gPCD successfully processed the largest benchmark configuration.
+		- Maximum tested particle count:
+			\APQBRTTABLEALLbka{} particles.
+		- Peak throughput:
+			\SUMMARYTHROUGHPUT{} million particles/s.
+		- Large-scale particle processing was demonstrated.
+		- Representative execution statistics are reported.
+		- The largest benchmark configuration is summarized in the performance table.
+		- The table provides detailed execution metrics for the largest case.
+
+		Presentation Bullets:
+		- Largest benchmark:
+			\APQBRTTABLEALLbka{} particles.
+		- Peak throughput:
+			\SUMMARYTHROUGHPUT{} million particles/s.
+		- Large-scale processing demonstrated.
+		- Largest-case execution statistics reported.	
+		
+
+
+	Paragraph 3
+
+		Purpose:
+		- Summarize the overall performance behavior of gPCD.
+		- Relate observed behavior to expectations for GPU-resident execution.
+		- Establish that performance remained stable across the tested range.
+		- Transition to the detailed performance analyses.
+
+		Contains:
+		- Performance remained stable across benchmark sizes.
+		- Framework behavior was consistent throughout the evaluated range.
+		- Throughput-oriented GPU scaling behavior was observed.
+		- Results are consistent with expectations for a GPU-resident framework.
+		- No unexpected performance degradation was observed.
+		- Detailed throughput analysis follows.
+		- Detailed time-per-particle analysis follows.
+		- Detailed scaling analysis follows.
+
+		Presentation Bullets:
+		- Stable performance across benchmark range.
+		- Expected GPU-resident behavior.
+		- Throughput-oriented scaling.
+		- Detailed analysis follows:
+			* Throughput
+			* Time per particle
+			* Scaling behavior		
+
+	Paragraph 4
+
+		Purpose:
+		- Identify the benchmark dataset used in the Results section.
+		- Reference the source of the reported performance measurements.
+		- Establish traceability between analyses and measured data.
+		- Provide a common data source for subsequent performance discussions.
+
+		Contains:
+		- Benchmark measurements are tabulated.
+		- The table contains the data used throughout subsequent analyses.
+		- Throughput analysis uses the table data.
+		- Time-per-particle analysis uses the table data.
+		- Scaling analysis uses the table data.
+		- The table serves as the primary benchmark reference.
+
+		Presentation Bullets:
+		- Benchmark measurement table.
+		- Source data for all performance analyses.
+		- Throughput results.
+		- Time-per-particle results.
+		- Scaling analyses.		
+		
+
+
+	Paragraph 5
+
+		Purpose:
+		- Provide a roadmap for the remaining Results section.
+		- Identify the detailed analyses that follow.
+		- Transition from summary results to supporting evidence.
+		- Establish the structure of the subsequent subsections.
+
+		Contains:
+		- Throughput behavior will be analyzed.
+		- Time-per-particle trends will be analyzed.
+		- Scaling characteristics will be analyzed.
+		- Collision-fraction sensitivity will be analyzed.
+		- Detailed examination follows the performance overview.
+		- Subsequent analyses provide supporting evidence for the summary results.
+
+		Presentation Bullets:
+		- Detailed throughput analysis.
+		- Detailed time-per-particle analysis.
+		- Detailed scaling analysis.
+		- Detailed collision-fraction study.		
+		
+		
+	7.3 Throughput and Time-per-Particle Behavior
+
+	Paragraph 1
+
+		Purpose:
+		- Introduce the primary performance metrics.
+		- Explain the relationship between throughput and time-per-particle.
+		- Justify the use of both metrics.
+		- Establish the interpretation framework for the results.
+
+		Contains:
+		- Throughput and time-per-particle are complementary metrics.
+		- Throughput measures aggregate processing rate.
+		- Throughput characterizes total framework productivity.
+		- Time-per-particle normalizes execution cost.
+		- Time-per-particle removes the direct influence of particle count.
+		- Time-per-particle measures scaling efficiency.
+		- Both metrics are required for a complete performance assessment.
+
+		Presentation Bullets:
+		- Two complementary metrics:
+			• Throughput
+			• Time per particle
+		- Throughput = processing rate.
+		- TPP = scaling efficiency.
+		- Both required to characterize performance.		
+		
+		
+7.3.1 Utilization-Limited Regime
+
+	Paragraph 1
+
+		Purpose:
+		- Define the low-particle-count operating regime.
+		- Explain the initial throughput growth behavior.
+		- Relate throughput improvement to GPU utilization.
+		- Identify the approximate extent of the utilization-limited region.
+
+		Contains:
+		- Low particle counts underutilize available GPU resources.
+		- Throughput increases rapidly as particle count increases.
+		- Additional particles improve hardware utilization.
+		- GPU resources become progressively more occupied.
+		- Throughput growth is driven primarily by increasing utilization.
+		- The utilization-limited regime extends to approximately 100,000 particles.
+		- This regime precedes throughput saturation behavior.
+
+		Presentation Bullets:
+		- Low particle-count regime.
+		- GPU initially underutilized.
+		- Throughput increases rapidly.
+		- Increasing utilization drives performance gains.
+		- Extends to ~100,000 particles.		
+		
+7.3.2 Throughput-Transition Regime
+
+	Paragraph 1
+
+		Purpose:
+		- Define the intermediate operating regime.
+		- Identify the onset of workload-dependent behavior.
+		- Explain why throughput growth begins to slow.
+		- Establish the particle-count range of the transition region.
+
+		Contains:
+		- Throughput behavior changes beyond approximately 100,000 particles.
+		- GPU utilization is no longer the sole performance driver.
+		- Occupancy-generation workload becomes increasingly significant.
+		- Collision-processing workload becomes increasingly significant.
+		- Throughput continues to increase.
+		- Throughput growth occurs at a reduced rate.
+		- The framework transitions from utilization-limited to workload-influenced behavior.
+		- The transition regime spans approximately 100,000 to 2,000,000 particles.
+
+		Presentation Bullets:
+		- Intermediate performance regime.
+		- Begins near 100,000 particles.
+		- Occupancy workload increases.
+		- Collision workload increases.
+		- Throughput growth slows.
+		- Extends to ~2,000,000 particles.
+		
+	7.3.3 Stable Large-Scale Regime
+
+	Paragraph 1
+
+		Purpose:
+		- Define the large-scale operating regime.
+		- Identify the onset of asymptotic framework behavior.
+		- Explain why this region is used for detailed scaling analysis.
+		- Establish the particle-count threshold for stable operation.
+
+		Contains:
+		- The framework enters a stable operating regime near 2,000,000 particles.
+		- Time-per-particle becomes nearly constant.
+		- GPU utilization has effectively stabilized.
+		- Performance behavior becomes predictable.
+		- The regime represents mature large-scale execution.
+		- This region is used for subsequent TPP analysis.
+		- This region is used for subsequent scaling analysis.
+		- The regime approximates the asymptotic behavior of the framework.
+
+		Presentation Bullets:
+		- Begins near 2,000,000 particles.
+		- Stable large-scale operation.
+		- Nearly constant time per particle.
+		- Performance behavior stabilizes.
+		- Represents asymptotic framework behavior.
+		- Used for subsequent scaling analysis.	
+				
+				
+7.3.3 Stable Large-Scale Regime
+
+	Paragraph 1
+
+		Purpose:
+		- Define the large-scale operating regime.
+		- Explain the relationship between decreasing throughput and stable TPP.
+		- Identify the asymptotic operating region.
+		- Justify using particle counts above 2,000,000 for TPP analysis.
+
+		Contains:
+		- Stable large-scale regime begins near 2,000,000 particles.
+		- Throughput continues to decrease gradually as particle count increases.
+		- Time-per-particle curves become nearly constant.
+		- Nearly constant TPP indicates stable average processing cost per particle.
+		- The framework has entered an asymptotic operating region.
+		- Particle counts above 2,000,000 are used for the TPP analysis in Figure~\ref{fig:A_PQBR_THROUGHPUT_AND_TPP}(c).
+
+		Presentation Bullets:
+		- Stable regime begins near 2 million particles.
+		- Throughput gradually decreases with increasing particle count.
+		- Time per particle becomes nearly constant.
+		- Constant TPP indicates stable average cost.
+		- Counts above 2 million used for TPP analysis.		
+		
+7.4 Scaling Analysis
+
+	Paragraph 1
+
+		Purpose:
+		- Introduce the scaling-analysis methodology.
+		- Quantify measured framework scaling behavior.
+		- Define the regression model used for evaluation.
+		- Establish the meaning of the scaling exponent.
+
+		Contains:
+		- Scaling behavior is evaluated using log-log regression.
+		- Graphics execution times are analyzed.
+		- Compute execution times are analyzed.
+		- Total execution times are analyzed.
+		- A power-law model is fitted to the measured data.
+		- The model has the form:
+			t = aN^b.
+		- t represents execution time.
+		- N represents particle count.
+		- a is a proportionality constant.
+		- b is the scaling exponent.
+		- The scaling exponent is the primary quantity used to characterize scaling behavior.
+
+		Presentation Bullets:
+		- Log-log regression analysis.
+		- Graphics, compute, and total times analyzed.
+		- Power-law model:
+			t = aN^b
+		- a = proportionality constant.
+		- b = scaling exponent.
+		- Scaling quantified through exponent b.		
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Present the measured scaling exponents.
+		- Report regression results for graphics, compute, and total execution times.
+		- Interpret the meaning of the measured exponents.
+		- Quantify observed scaling behavior.
+
+		Contains:
+		- Log-log regression results are presented.
+		- Graphics execution time exponent is reported.
+		- Compute execution time exponent is reported.
+		- Total execution time exponent is reported.
+		- All exponents remain close to unity.
+		- Execution time increases approximately linearly with particle count.
+		- Similar scaling behavior is observed across graphics and compute stages.
+		- Measured behavior is consistent with near-linear scaling.
+
+		Presentation Bullets:
+		- Graphics exponent:
+			b_g = \APQBRLOGLOGREGRESSgmsasat{}
+		- Compute exponent:
+			b_c = \APQBRLOGLOGREGRESScmsasat{}
+		- Total exponent:
+			b_t = \APQBRLOGLOGREGRESStotasat{}
+		- All exponents near 1.
+		- Approximately linear scaling observed.		
+		
+		
+
+
+	Paragraph 3
+
+		Purpose:
+		- Summarize the scaling-analysis results.
+		- Relate measured scaling behavior to theoretical predictions.
+		- Connect experimental observations to the complexity analysis.
+		- Reinforce the near-linear scaling conclusion.
+
+		Contains:
+		- Graphics scaling exponent remains close to unity.
+		- Compute scaling exponent remains close to unity.
+		- Total execution-time exponent remains close to unity.
+		- Measured behavior is consistent across framework components.
+		- Experimental results support near-linear scaling.
+		- Measured behavior agrees with complexity-analysis predictions.
+		- Theory and experiment are in agreement.
+		- Near-linear scaling is validated empirically.
+
+		Presentation Bullets:
+		- Graphics exponent = 1.
+		- Compute exponent = 1.
+		- Total exponent = 1.
+		- Experimental support for near-linear scaling.
+		- Results agree with complexity analysis.		
+		
+		
+	7.5 Curvature Analysis
+	
+	Figure: Curvature Analysis
+
+		Purpose:
+		- Quantify departures from linear scaling.
+		- Compare curvature among graphics, compute, and total execution times.
+		- Assess scaling stability across the benchmark range.
+		- Complement the log-log regression results.
+
+		Supports:
+		- Measured data closely follows quadratic fits.
+		- Deviations from linear behavior are small.
+		- Graphics execution exhibits minimal curvature.
+		- Total execution exhibits minimal curvature.
+		- Compute execution exhibits slightly larger curvature.
+		- Curvature remains bounded in all cases.
+		- Near-linear behavior is maintained throughout the benchmark range.
+
+		Presentation Bullets:
+		- Quadratic fits.
+		- Curvature bounds.
+		- Graphics curvature.
+		- Compute curvature.
+		- Total curvature.
+		- Small deviations from linearity.
+			Paragraph 1
+
+		Purpose:
+		- Introduce curvature analysis as a secondary scaling metric.
+		- Explain why scaling exponents alone are insufficient.
+		- Quantify deviations from ideal linear behavior.
+		- Establish the methodology used for curvature evaluation.
+
+		Contains:
+		- Log-log regression measures overall scaling behavior.
+		- Scaling exponents provide a global characterization of growth.
+		- Curvature analysis provides complementary information.
+		- Curvature measures deviation from ideal linear behavior.
+		- Graphics execution times are analyzed.
+		- Compute execution times are analyzed.
+		- Total execution times are analyzed.
+		- Quadratic fits are applied to the benchmark data.
+		- Curvature is used to assess departures from linear scaling.
+
+		Presentation Bullets:
+		- Complement to log-log regression.
+		- Measures deviation from linear behavior.
+		- Graphics, compute, and total times analyzed.
+		- Quadratic fitting methodology.
+		- Quantifies scaling curvature.		
+		
+
+
+	Paragraph 2
+
+		Purpose:
+		- Present the curvature-analysis results.
+		- Evaluate the magnitude of deviations from linear behavior.
+		- Compare graphics, compute, and total execution-time curvature.
+		- Assess the practical significance of observed curvature.
+
+		Contains:
+		- Quadratic fits and curvature bounds are presented.
+		- Fitted curves closely follow the measured data.
+		- Deviations from linear behavior are small.
+		- Graphics execution times exhibit very small curvature.
+		- Total execution times exhibit very small curvature.
+		- Compute execution times exhibit somewhat larger curvature.
+		- Compute curvature remains bounded.
+		- No component exhibits substantial departure from linear behavior.
+		- Measured behavior remains consistent with near-linear scaling.
+
+		Presentation Bullets:
+		- Quadratic fits match measured data.
+		- Minor departures from linear behavior.
+		- Graphics curvature is small.
+		- Total curvature is small.
+		- Compute curvature is slightly larger.
+		- All curvature remains bounded.		
+		
+
+
+	Paragraph 3
+
+		Purpose:
+		- Summarize the curvature-analysis findings.
+		- Relate curvature measurements to overall scaling behavior.
+		- Combine curvature and regression results into a unified interpretation.
+		- Reinforce the near-linear scaling conclusion.
+
+		Contains:
+		- Curvature bounds remain small.
+		- Curvature is small relative to overall execution-time trends.
+		- No substantial departure from linear behavior is observed.
+		- Curvature results support the regression analysis.
+		- Curvature and scaling exponents provide complementary evidence.
+		- Both analyses indicate near-linear scaling.
+		- Near-linear behavior is maintained throughout the benchmark range.
+		- Experimental evidence consistently supports theoretical expectations.
+
+		Presentation Bullets:
+		- Curvature bounds are small.
+		- Deviations from linearity remain minor.
+		- Curvature supports regression results.
+		- Multiple analyses indicate near-linear scaling.
+		- Near-linear behavior maintained across the benchmark range.		
+
+8. Discussion
+
+8.1 Graphics-Pipeline Occupancy Generation
+
+	Paragraph 1
+
+		Purpose:
+		- Revisit the central architectural contribution of gPCD.
+		- Contrast gPCD with conventional collision-detection frameworks.
+		- Explain how rendering and occupancy generation are organized differently.
+		- Establish the foundation for the discussion that follows.
+
+		Contains:
+		- Traditional frameworks separate collision detection and rendering.
+		- Rendering typically consumes simulation state.
+		- Simulation data is passed to the graphics pipeline for visualization.
+		- Occupancy generation is traditionally a separate operation.
+		- gPCD integrates occupancy generation into the graphics pipeline.
+		- Occupancy generation and rendering occur concurrently.
+		- The graphics pipeline participates directly in collision detection.
+		- The framework adopts a different architectural organization than conventional approaches.
+
+		Presentation Bullets:
+		- Traditional approach:
+			• Simulation
+			• Collision detection
+			• Rendering
+
+		- gPCD approach:
+			• Occupancy generation in graphics pipeline
+			• Rendering and occupancy construction proceed concurrently
+
+		- Architectural integration of rendering and collision detection.
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Clarify the nature of the gPCD contribution.
+		- Distinguish architectural novelty from algorithmic novelty.
+		- Explain how graphics hardware is repurposed within the framework.
+		- Reinforce the execution-model contribution of the work.
+
+		Contains:
+		- The primary contribution is architectural.
+		- The contribution is not a new collision-detection algorithm.
+		- The contribution is not a new spatial data structure.
+		- gPCD introduces a new execution model.
+		- Graphics-pipeline operations participate directly in broad-phase collision detection.
+		- Occupancy generation is integrated into graphics execution.
+		- Graphics hardware performs work beyond visualization.
+		- Rendering resources contribute directly to collision detection.
+		- The framework repurposes resources traditionally reserved for rendering.
+
+		Presentation Bullets:
+		- Architectural contribution.
+		- Not a new data structure.
+		- Not a new broad-phase methodology.
+		- New execution model.
+		- Graphics pipeline contributes to collision detection.
+		- Rendering resources perform occupancy generation.
+
+
+
+
+	Paragraph 3
+
+		Purpose:
+		- Discuss the synchronization characteristics of gPCD.
+		- Explain how the framework reduces coordination requirements.
+		- Relate the architecture to massively parallel execution.
+		- Highlight an implementation advantage of the particle-centric design.
+
+		Contains:
+		- Synchronization requirements are limited.
+		- Most synchronization occurs during occupancy generation.
+		- Atomic operations are used only for occupancy-list insertion.
+		- Shared-cell slot reservation requires thread-safe insertion.
+		- Collision discovery is particle-centric.
+		- No global collision-pair structure is constructed.
+		- Candidate ownership remains local to the source particle.
+		- Narrow-phase evaluation maps naturally onto GPU parallelism.
+		- The architecture minimizes global coordination requirements.
+		- The framework is well suited to massively parallel execution.
+
+		Presentation Bullets:
+		- Synchronization localized to occupancy generation.
+		- Atomics only for cell-list insertion.
+		- No global collision-pair structure.
+		- Particle-centric collision discovery.
+		- Natural GPU parallelism.
+		- Reduced synchronization overhead.
+
+
+
+	Paragraph 4
+
+		Purpose:
+		- Relate experimental performance results to theoretical complexity.
+		- Synthesize evidence from multiple performance analyses.
+		- Evaluate whether measured behavior matches theoretical expectations.
+		- Discuss the practical implications of the scaling results.
+
+		Contains:
+		- Throughput results are consistent with theoretical expectations.
+		- Time-per-particle results are consistent with theoretical expectations.
+		- Log-log regression results are consistent with theoretical expectations.
+		- Curvature results are consistent with theoretical expectations.
+		- Measured behavior agrees with O(N) occupancy-generation complexity.
+		- Implementation-specific effects influence absolute execution times.
+		- Hardware and implementation details affect constant factors.
+		- No dominant super-linear behavior was observed.
+		- Measured scaling remained stable across the benchmark range.
+		- Experimental results support the complexity analysis.
+
+		Presentation Bullets:
+		- Throughput supports theory.
+		- Time-per-particle supports theory.
+		- Regression supports theory.
+		- Curvature supports theory.
+		- Consistent with O(N) occupancy generation.
+		- No dominant super-linear behavior observed.
+		- Constant factors affect absolute performance.
+
+	8.2 Scalability of the gPCD Framework
+
+	Paragraph 1
+
+		Purpose:
+		- Summarize the scalability evidence presented in the Results section.
+		- Synthesize multiple performance analyses into a unified conclusion.
+		- Relate measured behavior to the theoretical complexity analysis.
+		- Establish the basis for the scalability discussion that follows.
+
+		Contains:
+		- The framework exhibits near-linear scaling.
+		- Scaling behavior is maintained throughout the evaluated benchmark range.
+		- Throughput results support the scalability conclusion.
+		- Time-per-particle results support the scalability conclusion.
+		- Log-log regression results support the scalability conclusion.
+		- Curvature results support the scalability conclusion.
+		- Multiple independent analyses are consistent.
+		- Measured behavior agrees with the complexity analysis.
+		- Experimental evidence supports the scalability claims.
+
+		Presentation Bullets:
+		- Near-linear scaling observed.
+		- Throughput supports scalability.
+		- Time-per-particle supports scalability.
+		- Regression supports scalability.
+		- Curvature supports scalability.
+		- Results agree with complexity analysis.
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Interpret the measured scaling and curvature results.
+		- Examine scalability at the level of individual execution stages.
+		- Identify potential sources of nonlinear growth.
+		- Explain why near-linear behavior is maintained.
+
+		Contains:
+		- Graphics scaling exponent remains near unity.
+		- Compute scaling exponent remains near unity.
+		- Total execution-time exponent remains near unity.
+		- Curvature bounds remain small.
+		- Graphics execution exhibits stable scaling behavior.
+		- Compute execution exhibits stable scaling behavior.
+		- No stage exhibits strong nonlinear growth.
+		- No single stage dominates overall scaling behavior.
+		- Performance growth remains balanced across framework components.
+		- Near-linear overall scaling emerges from near-linear behavior within individual stages.
+
+		Presentation Bullets:
+		- Graphics exponent = 1.
+		- Compute exponent = 1.
+		- Total exponent = 1.
+		- Small curvature bounds.
+		- No dominant nonlinear stage.
+		- Balanced scaling across framework components.
+
+	Paragraph 3
+
+		Purpose:
+		- Distinguish throughput saturation from scaling degradation.
+		- Explain the behavior observed at large particle counts.
+		- Address a potential misinterpretation of the throughput results.
+		- Clarify the relationship between utilization limits and scalability.
+
+		Contains:
+		- Throughput eventually enters a throughput-limited regime.
+		- Throughput behavior changes at large particle counts.
+		- The throughput limitation is associated with resource utilization.
+		- GPU resources approach sustained operating capacity.
+		- Throughput saturation does not imply a loss of scalability.
+		- Underlying scaling behavior remains stable.
+		- The framework continues to exhibit near-linear characteristics.
+		- The observed behavior reflects hardware utilization limits rather than algorithmic degradation.
+		- Large-scale performance remains consistent with the complexity analysis.
+
+		Presentation Bullets:
+		- Throughput-limited regime observed.
+		- High resource utilization.
+		- Throughput saturation is expected.
+		- Not evidence of scaling breakdown.
+		- Underlying scaling behavior remains stable.
+		- Consistent with complexity analysis.
+
+	8.3 Memory Locality Considerations
+
+	Paragraph 1
+
+		Purpose:
+		- Interpret the memory-locality benchmark results.
+		- Distinguish complexity from practical performance.
+		- Explain why memory organization influences execution time.
+		- Relate locality effects to framework performance.
+
+		Contains:
+		- Memory locality influences measured performance.
+		- Memory organization affects execution time.
+		- Locality effects occur independently of asymptotic complexity.
+		- Sequential and random layouts have the same theoretical complexity.
+		- Sequential ordering improves memory locality.
+		- Improved locality reduces execution time.
+		- The locality benchmark isolates memory-access effects.
+		- Performance differences arise from implementation characteristics rather than algorithmic complexity.
+
+		Presentation Bullets:
+		- Memory locality matters.
+		- Same asymptotic complexity.
+		- Different execution times.
+		- Sequential ordering improves locality.
+		- Improved locality reduces runtime.
+		- Complexity and performance are distinct considerations.
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Interpret the locality benchmark trends.
+		- Relate observed behavior to scaling characteristics.
+		- Distinguish locality effects from asymptotic behavior.
+		- Identify the primary impact of memory locality.
+
+		Contains:
+		- Sequential and random configurations exhibit similar trends.
+		- The execution-time difference remains approximately proportional across the benchmark range.
+		- The observed behavior suggests locality affects constant factors.
+		- Memory-access efficiency is the primary source of the performance difference.
+		- Locality does not substantially alter scaling behavior.
+		- The underlying growth characteristics remain unchanged.
+		- Locality influences implementation efficiency.
+		- Asymptotic framework behavior remains unaffected.
+		- Performance differences arise from practical execution effects rather than complexity differences.
+
+		Presentation Bullets:
+		- Approximately parallel trends observed.
+		- Locality affects memory-access cost.
+		- Constant factors are influenced.
+		- Scaling behavior remains unchanged.
+		- Implementation efficiency is affected.
+		- Asymptotic behavior is preserved.
+
+
+	8.4 Implications for Large-Scale Particle Simulation
+	
+	Figure: Particle Density Comparison
+
+		Purpose:
+		- Visualize the effect of increasing particle count.
+		- Demonstrate increasing spatial resolution.
+		- Compare sparse and dense particle representations.
+		- Illustrate the practical value of scalability.
+
+		Supports:
+		- Low particle counts exhibit visible discreteness.
+		- High particle counts approach continuum-like appearance.
+		- Particle density increases spatial fidelity.
+		- Large particle counts enable more detailed physical representations.
+		- Scalability directly translates into simulation capability.
+
+		Presentation Bullets:
+		- 5,832 particles.
+		- 2,985,984 particles.
+		- Resolution increase.
+		- Continuum-like appearance.
+		- Retained discrete formulation.
+
+	Paragraph 1
+
+		Purpose:
+		- Relate scalability to physical modeling capability.
+		- Explain the practical significance of increasing particle count.
+		- Connect framework performance to simulation fidelity.
+		- Motivate the broader applicability of gPCD.
+
+		Contains:
+		- Increasing particle count increases spatial resolution.
+		- Low particle counts reveal the discrete nature of the representation.
+		- High particle counts approach visually continuous behavior.
+		- The formulation remains fundamentally discrete.
+		- Increased particle density improves physical representation.
+		- Higher particle counts enable investigation of more complex phenomena.
+		- Large-scale particle systems can model a broad range of physical processes.
+		- Macroscopic behavior emerges from interacting discrete particles.
+		- The demonstrated scalability expands the range of feasible particle-based simulations.
+
+		Presentation Bullets:
+		- Higher particle counts increase spatial resolution.
+		- Discrete systems approach continuum-like behavior.
+		- Representation remains particle based.
+		- Increased simulation fidelity.
+		- Broader physical applicability.
+
+
+
+	Paragraph 2
+
+		Purpose:
+		- Discuss the practical usability of high-density particle configurations.
+		- Relate particle density to interactive simulation performance.
+		- Explain the significance of maintaining real-time execution.
+		- Connect collision-detection performance to broader simulation capability.
+
+		Contains:
+		- High-density particle configurations remain interactive.
+		- Approximately three million particles sustain about 50 FPS.
+		- Large particle counts do not preclude interactive visualization.
+		- Computational resources remain available beyond collision detection.
+		- Particle dynamics can be evaluated concurrently.
+		- Force calculations remain feasible.
+		- Additional simulation operations remain feasible.
+		- High particle density and practical simulation performance can coexist.
+		- The framework supports both large-scale representation and interactive execution.
+
+		Presentation Bullets:
+		- ~3 million particles.
+		- ~50 FPS.
+		- Interactive performance maintained.
+		- Resources remain available for simulation.
+		- Dynamics and force evaluation remain feasible.
+		- Large-scale simulations remain practical.
+
+	Paragraph 3
+
+		Purpose:
+		- Interpret the demonstrated particle counts in practical terms.
+		- Relate benchmark results to simulation scale.
+		- Position the framework relative to traditional HPC workloads.
+		- Highlight the significance of achieving large-scale simulation on a single CPU-GPU system.
+
+		Contains:
+		- The visualizations provide scale intuition.
+		- Demonstrated particle counts represent practically significant system sizes.
+		- Large particle counts can be achieved on a single CPU-GPU platform.
+		- The framework supports simulation scales traditionally associated with HPC resources.
+		- High particle counts are no longer restricted to large computing clusters.
+		- Large-scale particle simulation becomes accessible on workstation-class hardware.
+		- The demonstrated scalability extends the practical applicability of particle-based methods.
+		- The framework lowers the hardware requirements associated with large particle systems.
+
+		Presentation Bullets:
+		- Visual scale comparison.
+		- Demonstrated multi-million-particle systems.
+		- Single CPU-GPU execution.
+		- HPC-scale particle counts.
+		- Workstation-class accessibility.
+		- Expanded simulation capability.
+
+9. Conclusion and Future Work
+
+	Paragraph 1
+
+		Purpose:
+		- Summarize the primary contribution of the work.
+		- Restate the architectural innovation introduced by gPCD.
+		- Contrast gPCD with conventional collision-detection frameworks.
+		- Reiterate the role of graphics-pipeline occupancy generation.
+
+		Contains:
+		- gPCD is presented as a graphics-based parallel collision-detection framework.
+		- Broad-phase occupancy generation is integrated into the graphics pipeline.
+		- Traditional frameworks treat rendering as a consumer of simulation state.
+		- gPCD assigns an active collision-detection role to the graphics pipeline.
+		- Occupancy construction and rendering proceed concurrently.
+		- The framework generates the potentially colliding set during graphics execution.
+		- Candidate generation supports subsequent narrow-phase evaluation.
+		- The primary contribution is architectural organization rather than a new data structure.
+
+		Presentation Bullets:
+		- Graphics-based Parallel Collision Detection (gPCD).
+		- Graphics-pipeline occupancy generation.
+		- Concurrent rendering and occupancy construction.
+		- PCS generation during graphics execution.
+		- Architectural contribution.
+
+
+	Paragraph 2
+
+		Purpose:
+		- Summarize the analytical and experimental findings.
+		- Connect theoretical predictions to measured behavior.
+		- Reinforce the scalability conclusions.
+		- Consolidate the major results of the study.
+
+		Contains:
+		- Complexity analysis was developed for all major framework components.
+		- Occupancy generation complexity was analyzed.
+		- Candidate construction complexity was analyzed.
+		- Narrow-phase complexity was analyzed.
+		- Storage requirements were analyzed.
+		- Experimental evaluation demonstrated high throughput.
+		- Experimental evaluation demonstrated near-linear scaling.
+		- Graphics execution exhibited near-linear behavior.
+		- Compute execution exhibited near-linear behavior.
+		- Total execution exhibited near-linear behavior.
+		- Log-log regression supported the scaling conclusions.
+		- Curvature analysis supported the scaling conclusions.
+		- Measured behavior was consistent with theoretical expectations.
+		- Locality studies identified memory-access effects.
+		- Memory locality influenced implementation efficiency.
+		- Memory locality did not alter asymptotic behavior.
+
+		Presentation Bullets:
+		- Complexity analysis completed.
+		- High throughput demonstrated.
+		- Near-linear scaling demonstrated.
+		- Regression supports theory.
+		- Curvature supports theory.
+		- Locality affects efficiency.
+		- Asymptotic behavior preserved.
+
+	Paragraph 3
+
+		Purpose:
+		- State the broader implications of the results.
+		- Evaluate the viability of the proposed architecture.
+		- Connect measured performance to practical capability.
+		- Position the framework relative to traditional HPC expectations.
+
+		Contains:
+		- Graphics-pipeline occupancy generation is a viable execution architecture.
+		- The proposed organization successfully supports large-scale collision detection.
+		- Experimental results demonstrate practical scalability.
+		- Large particle counts can be achieved on a single CPU-GPU system.
+		- Multi-million-particle simulations are feasible on workstation-class hardware.
+		- The demonstrated scales have traditionally been associated with HPC environments.
+		- The framework expands the accessibility of large-scale particle simulation.
+		- The architectural approach provides a practical alternative to conventional execution models.
+
+		Presentation Bullets:
+		- Graphics-pipeline occupancy generation is viable.
+		- Large-scale collision detection demonstrated.
+		- Single CPU-GPU execution.
+		- Multi-million-particle capability.
+		- Traditionally HPC-associated scales.
+		- Increased accessibility of large-scale simulation.
+
+	Paragraph 4
+
+		Purpose:
+		- Identify future research directions.
+		- Discuss planned extensions of the framework.
+		- Connect collision detection to broader simulation applications.
+		- Position the framework within future thermo-fluid and multiphysics research.
+
+		Contains:
+		- Future work includes larger GPU configurations.
+		- Future work includes multi-GPU execution.
+		- Future work includes distributed computing environments.
+		- Current work focuses primarily on collision detection.
+		- The framework has already been applied to particle-based thermo-fluid simulations.
+		- Preliminary thermo-fluid studies have produced promising results.
+		- Novel physical observations have emerged from preliminary investigations.
+		- Direct simulation remains important for scientific discovery.
+		- Machine-learning methods depend on representative training data.
+		- Simulation-generated data can support data-driven models.
+		- Future work will investigate thermo-fluid applications in greater depth.
+		- Future work will investigate multiphysics applications.
+		- Future work will evaluate graphics-pipeline occupancy generation in broader simulation domains.
+
+		Presentation Bullets:
+		- Larger GPU configurations.
+		- Multi-GPU execution.
+		- Distributed computing.
+		- Thermo-fluid simulation.
+		- Multiphysics simulation.
+		- Novel physical observations.
+		- Simulation-generated training data.
+		- AI-assisted predictive modeling.
+
+
+
+
+   \end{verbatim}
+

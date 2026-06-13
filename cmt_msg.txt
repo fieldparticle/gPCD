@@ -1,10 +1,11 @@
-Serious Memory problems in graphics
+Current status:
+	- ForceDynamics is the live model and WeightedDynamics is the shadow model
+	- Physical pair impulse no longer uses source-local area weighting
+	- ThreeParticle vector momentum is conserved; KE drift remains
 
-- Fixed graphics
-- Compute not getting collisons
-- fixed ssbo limits
-- reran tests
-- Fixed plots and tables
-- Updated article 
-	fix sequential vs random
-	start detailed outline with paragraghs, bullets, and puropse
+Code Changes:
+	- Added independent ForceDynamics model and documentation
+	- Registered ForceDynamics and added model names to diagnostics plots
+	- Removed source-local weighting from the physical pair impulse
+
+Next: Implement and evaluate overlap area as a conservative central force field

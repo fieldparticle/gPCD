@@ -4,31 +4,26 @@
 \section{Complexity Analysis}
 
 The computational complexity of gPCD is determined primarily by
-broad-phase occupancy generation and narrow-phase collision evaluation.
+broad-phase occupancy generation and narrow-phase collision
+evaluation. The complexity results summarized in
+Table~\ref{tab:ComplexityTable} are derived below.
 
-The theoretical complexity of gPCD is compared with representative
-broad-phase collision-detection methodologies in
-Table~\ref{tab:complexity_comparison}.
 
 \input{ComplexityTable}
 
-\subsection{Occupancy Generation}
 
 Each particle performs a fixed number of occupancy evaluations
-independent of the total particle count. Let
-$c_{\mathrm{occ}}$ denote the bounded occupancy-generation cost per
-particle. The resulting broad-phase cost is
+independent of the total particle count. Consequently, broad-phase
+occupancy generation scales linearly with the number of particles,
 
 \begin{equation}
-T_{\mathrm{occ}}(N)=c_{\mathrm{occ}}N=O(N).
+T_{\mathrm{occ}}(N)=O(N).
 \end{equation}
 
 Because occupancy lists are accessed directly through flattened cell
 indices, cell lookup requires constant-time addressing. Under the fixed
 occupancy-width assumptions used by the framework, insertion and
 retrieval therefore require bounded work per operation.
-
-\subsection{Narrow-Phase Evaluation}
 
 Each source particle traverses the occupancy lists associated with its
 corner cells. Let $K$ denote the total number of interaction
@@ -39,11 +34,36 @@ interaction requires bounded work,
 T_{\mathrm{np}}(K)=O(K).
 \end{equation}
 
-Consequently, narrow-phase complexity depends on the number of
-candidate interactions represented within the potentially colliding
-set rather than the total particle count alone.
+Consequently, narrow-phase complexity is governed by the number of
+candidate interactions (K) represented within the potentially
+colliding set.
 
-\subsection{Storage Requirements}
+For comparison, a naive all-pairs collision search that evaluates each
+unordered particle pair once requires
+
+\begin{equation}
+K_{\mathrm{all}} =\frac{N(N-1)}{2}=O(N^2)
+\end{equation}
+
+pair evaluations.
+
+The source-owned narrow phase used by gPCD does not eliminate the
+theoretical worst-case quadratic bound associated with pairwise
+collision testing. If every particle is a candidate for every other
+particle, then \(K=O(N^2)\). However, candidate evaluation remains
+source-owned throughout the narrow phase, avoiding construction of a
+globally shared collision-pair structure and reducing synchronization
+requirements during massively parallel execution.
+
+Combining broad-phase occupancy generation and narrow-phase evaluation
+gives
+
+\begin{equation}
+T_{\mathrm{gPCD}} = O(N+K),
+\end{equation}
+
+where \(K\) is the number of candidate interactions represented within
+the potentially colliding set.
 
 Particle storage scales linearly with particle count,
 
@@ -58,59 +78,13 @@ For a cubic cell array of side length (S) and occupancy-list width
 M_{\mathrm{cell}}=O(S^3W).
 \end{equation}
 
-Since (W) is fixed,
-
-\begin{equation}
-M_{\mathrm{cell}}=O(S^3).
-\end{equation}
-
 The total storage requirement is therefore
 
 \begin{equation}
 M_{\mathrm{gPCD}}=O(N+S^3W),
 \end{equation}
 
-or $(O(N+S^3))$ for fixed occupancy width.
+which reduces to $(O(N+S^3))$ for fixed occupancy width.
 
-\subsection{Overall Complexity}
 
-Combining broad-phase occupancy generation and narrow-phase evaluation
-gives
-
-\begin{equation}
-T_{\mathrm{gPCD}}=O(N+K),
-\end{equation}
-
-where \(N\) is the number of particles and \(K\) is the number of
-candidate interactions evaluated during narrow-phase execution.
-
-The corresponding storage requirement is
-
-\begin{equation}
-M_{\mathrm{gPCD}}=O(N+S^3W),
-\end{equation}
-
-which reduces to \(O(N+S^3)\) for fixed occupancy width.
-\section{Comparative Analysis}
-
-\input{COMPARITIVE_COMPLEXITY.tex}
-
-The primary contribution of gPCD is not the introduction of a new
-asymptotic complexity class. Similar to other direct-insertion spatial
-subdivision approaches, gPCD exhibits linear broad-phase occupancy
-generation complexity. Rather, its contribution lies in the
-architectural organization of graphics-pipeline occupancy generation,
-duplicate-aware cell construction, and source-owned collision
-evaluation within a unified GPU-driven framework.
-
-\input{HISTORICAL_COMPARISION}
-
-Table~\ref{tab:HISTORICAL_COMPARISION} summarizes representative
-particle counts and estimated time-per-particle (TPP) values reported
-in the literature. Because benchmark configurations, hardware
-platforms, and reported operations vary substantially among studies,
-the values should be interpreted as historical context rather than a
-strict performance ranking. Within this context, gPCD supports more than
-11 million particles at approximately 7.62 ns per particle
-on a single CPU-GPU system.
 

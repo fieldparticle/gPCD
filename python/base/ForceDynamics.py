@@ -1,4 +1,4 @@
-class WeightedContactDynamics:
+class ForceContactDynamics:
     """Process particle contacts as a readable source-owned linear chain.
 
     Each source particle completes contact initialization, parameter

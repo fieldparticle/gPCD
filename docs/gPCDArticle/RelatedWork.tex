@@ -3,98 +3,94 @@
 
 Numerous methodologies and execution architectures have been proposed
 to improve collision-detection performance, particularly for large-scale
-particle simulations. These approaches differ not only in the data
-structures used to generate collision candidates, but also in where
-collision detection is performed and how it interacts with the rendering
-pipeline. This section reviews common collision-detection
-methodologies, execution architectures, and rendering strategies, and
-identifies the architectural gap addressed by the gPCD framework.
+particle simulations. These approaches differ in the data structures
+used to generate collision candidates, the execution architectures used
+to process them, and their interaction with the rendering pipeline.
+This section reviews representative collision-detection methodologies,
+execution architectures, and rendering strategies, and identifies the
+architectural gap addressed by the gPCD framework.
 
 \subsection{Collision-Detection Frameworks}
 
 Most collision-detection frameworks separate candidate generation from
-collision evaluation through broad-phase and narrow-phase stages.
-Although numerous collision-detection methodologies have been proposed,
-this organizational structure remains common across a wide range of
-implementations. This distinction is important because the primary
-contribution of gPCD occurs within broad-phase occupancy generation,
-while narrow-phase evaluation completes the collision-detection
-framework.
+collision evaluation through broad-phase and narrow-phase stages. The
+primary contribution of gPCD occurs during broad-phase occupancy
+generation, while narrow-phase evaluation completes the collision-
+detection framework. Consequently, broad-phase methodologies play a
+central role in determining the scalability of large-scale collision-
+detection systems.
 
-Numerous GPU-based broad-phase collision detection approaches have been proposed, 
-including uniform grids \cite{barbieri2013}, spatial hashing \cite{hastings}, 
-hierarchical spatial subdivision structures \cite{Evangelou2023}, 
-sweep and prune \cite{capannini2016}, image space \cite{Faure2008,Jang2008a}
-and other acceleration techniques \cite{benitez2005,jansen2018}.
-These techniques differ in how spatial information is
-organized and queried, but they share the common objective of reducing
-the number of pairwise evaluations passed to the narrow phase. As
-particle counts have increased and GPU computing has become more
-prevalent, research has expanded beyond broad-phase methodologies to
-consider the execution architectures used to implement them.
+Numerous GPU-based broad-phase collision-detection approaches have been
+proposed, including uniform grids \cite{barbieri2013}, spatial hashing
+\cite{hastings}, hierarchical spatial subdivision structures
+\cite{Evangelou2023}, sweep and prune \cite{capannini2016}, image-space
+methods \cite{Faure2008,Jang2008a}, and other acceleration techniques
+\cite{benitez2005,jansen2018}. These techniques differ in how spatial
+information is organized and queried, but all seek to reduce the number
+of pairwise evaluations passed to the narrow phase. As particle counts
+and GPU capabilities have increased, research has expanded beyond
+broad-phase methodologies to consider the execution architectures used
+to implement them.
 
 \subsection{Collision-Detection Architectures}
 
-Collision-detection methodologies are commonly implemented using a variety of execution architectures.
-Early systems performed both broad-phase and narrow-phase operations on the CPU, where collision detection 
-and rendering existed as largely independent processes. As particle counts increased and graphics hardware became 
-increasingly programmable, portions of the collision-detection pipeline were migrated to the GPU to exploit massive 
-parallelism \cite{brodtkorb2013}. These developments produced a spectrum of architectures 
-ranging from CPU-resident implementations to GPU-assisted and fully GPU-resident approaches.
+Collision-detection methodologies have been implemented using a wide
+range of execution architectures. Early systems performed both
+broad-phase and narrow-phase operations on the CPU. As particle counts
+increased and graphics hardware became increasingly programmable,
+portions of the collision-detection pipeline were migrated to the GPU
+to exploit massive parallelism \cite{brodtkorb2013}. These developments
+produced a spectrum of architectures ranging from CPU-resident
+implementations to GPU-assisted and fully GPU-resident approaches.
 
-In CPU-resident architectures, collision candidates are generated and evaluated entirely on the 
-CPU before simulation state is transferred to the rendering system for visualization. GPU-assisted architectures 
-offload selected collision-detection operations to the GPU while maintaining coordination with CPU-managed data 
-structures and execution flow. GPU-resident architectures further reduce data movement by performing broad-phase 
-and narrow-phase operations directly on the GPU, thereby improving parallel utilization and minimizing host-device communication.
+In CPU-resident architectures, both broad-phase and narrow-phase
+operations are performed on the CPU. GPU-assisted architectures offload
+selected collision-detection operations to the GPU while maintaining
+CPU-managed coordination and data structures. GPU-resident
+architectures further reduce data movement by performing both
+broad-phase and narrow-phase operations on the GPU, improving parallel
+utilization and minimizing host-device communication.
 
-Although these architectures differ in execution location and data movement, collision detection and rendering 
-generally remain distinct processes. Collision-detection operations are typically performed using dedicated 
-computational stages, while the rendering pipeline functions primarily as a consumer of simulation state. 
-This distinction motivates a closer examination of the relationship between rendering and collision detection.
+Although these architectures differ in execution location and data
+movement, they do not fundamentally alter the relationship between
+collision detection and rendering.
 
 
 \subsection{Rendering and Collision Detection}
 
-Collision detection and rendering have historically served distinct roles within simulation systems. 
-Collision detection is responsible for identifying particle interactions and advancing simulation state, 
-whereas rendering is responsible for visualizing the resulting geometry. Consequently, rendering pipelines 
-are commonly positioned downstream of simulation and collision-detection processes, operating primarily as consumers of simulation state.
+Collision detection and rendering have historically served distinct
+roles within simulation systems. Collision detection identifies particle
+interactions and advances simulation state, whereas rendering
+visualizes the resulting geometry and therefore acts primarily as a
+consumer of simulation state.
 
-As graphics hardware evolved, both rendering and collision detection increasingly leveraged GPU parallelism. 
-However, even within GPU-resident implementations \cite{he2018,Harada2007}, rendering and collision detection typically remained logically 
-separated. Collision-detection operations were executed using dedicated computational stages, while rendering 
-continued to transform simulation data into visual output. In this organization, rendering contributes little 
-or no information to the collision-detection process itself.
+This separation has persisted as simulation systems have evolved.
+Although both rendering and collision detection increasingly leverage
+GPU parallelism, even GPU-resident implementations
+\cite{he2018,Harada2007} typically maintain a logical separation between
+the two. Collision-detection operations are performed using dedicated
+computational stages, while rendering serves primarily as a
+visualization process. Consequently, rendering contributes little or no
+information to collision detection.
 
-Several approaches have explored tighter integration between rendering and simulation through image-space techniques,
-GPU data structures, and graphics-assisted computation \cite{Faure2008}. Nevertheless, occupancy generation and candidate construction 
-generally remain dedicated collision-detection operations performed independently of rasterization. As a result, 
-rendering remains largely downstream of simulation and collision-detection processes rather than serving as an active
-participant in broad-phase collision detection.
+To reduce this separation, several approaches have explored tighter
+integration between rendering and simulation through image-space
+techniques, GPU data structures, and graphics-assisted computation
+\cite{Faure2008}. Nevertheless, occupancy generation and candidate
+construction generally remain dedicated collision-detection operations
+performed independently of rasterization. As a result, rendering
+remains largely downstream of simulation and collision-detection
+processes rather than serving as an active participant in broad-phase
+collision detection.
 
-This separation raises an architectural question: can broad-phase occupancy generation be integrated directly into the graphics
-pipeline, allowing occupancy construction and rendering to proceed concurrently?
-
-\subsection{Gap in Existing Methods}
-
-Previous sections established that rendering and collision detection
-have traditionally remained separate operations, even within
-GPU-resident implementations. Rendering typically consumes simulation
-state, while broad-phase occupancy generation is performed through
-dedicated collision-detection operations.
-
-The remaining architectural gap is therefore the absence of a
+Despite advances in GPU-resident collision detection, broad-phase
+occupancy generation remains largely independent of the rendering
+pipeline. The remaining architectural gap is therefore the absence of a
 collision-detection framework in which broad-phase occupancy generation
-is integrated directly into the graphics pipeline. This work addresses
-that gap through graphics-pipeline occupancy generation, allowing
-occupancy construction and rendering to proceed concurrently while
-producing the potentially colliding set (PCS) used during narrow-phase
-evaluation.
+is integrated directly into the graphics pipeline.
 
-The contribution of gPCD lies not in the introduction of new data
-structures or asymptotic complexity improvements, but in the
-architectural organization of existing techniques within a unified
-GPU-driven framework. 
+
+
+
 
 \input{OverviewArchitecture}
