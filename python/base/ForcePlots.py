@@ -57,6 +57,8 @@ def _pair_contact_series(item, frames):
 
     pairs = {}
     for row in _read_rows(contacts_csv):
+        if row.get("contact_type", "1") not in ("", "1"):
+            continue
         if row.get("source_index", "") == "" or row.get("target_index", "") == "":
             continue
         source_index = int(_float(row, "source_index"))

@@ -5,8 +5,8 @@ from base.InLineTest import InLineTest
 import math
 import re
 from pathlib import Path
-
-
+from gbase import BinaryFileUtilities
+from gbase.libconf import AttrDict
 class ParticleFields(AttrDictFields):
     def __setattr__(self, attr, value):
         if attr.startswith("_"):
@@ -68,7 +68,11 @@ class WeightedDynamics(WeightedContactDynamics):
 
         self.config_error_return = None
         self.run_configuration = self.config.get("RUN_CONFIGURATION", {})
-        self.particle_data = self.config.get("PARTICLE_DATA", {})
+        if self.config.pdata_from_file == True:
+            self.particle_data = self.getParticleData(self.config)
+        else:
+            self.particle_data = self.config.get("PARTICLE_DATA", {})
+        
         self.particles = self.create_particle_array_from_cfg(self.particle_data)
         self.ShaderFlags = self.create_shader_flags_from_cfg(self.run_configuration)
         if "in_line_obj" in self.config.RUN_CONFIGURATION or self.study == True:
@@ -117,6 +121,47 @@ class WeightedDynamics(WeightedContactDynamics):
     def VelocityAngle(vx, vy):
         """Return the GLSL VelRad.w velocity angle for an xy velocity."""
         return math.atan2(vy, vx) if vx != 0.0 or vy != 0.0 else 0.0
+
+    def getParticleData(self,config):
+        file_name = f"{config.data_dir}/{config.STUDY_NAME}.bin" 
+        results = BinaryFileUtilities.read_all_particle_data(file_name)
+        particle_data = AttrDict()
+        particles = AttrDict()
+        for pp in results:
+            if pp.pnum == 0:
+                continue  # Skip null particle
+            
+            dict_location = {
+                "use": 0,
+                "x1": pp.rx,
+                "y1": pp.ry,
+                "z1": pp.rz,
+                "x2": pp.rx,
+                "y2": pp.ry,
+                "z2": pp.rz,
+                "vx": pp.vx,
+                "vy": pp.vy,
+                "vz": pp.vz
+            }
+            particle = AttrDict()
+            particle["location"] = AttrDict(dict_location)
+            particle["vx"] = pp.vx
+            particle["vy"] = pp.vy
+            particle["vz"] = pp.vz
+            particle["mass"] = pp.molar_mass
+            particle["radius"] = pp.radius
+            particle["ptype"] = pp.ptype
+            particle["state_flg"] = int(pp.state_flg)
+            particle["edge"] = (100, 170, 255)
+            particle["fill"] = (160, 210, 255)
+            particle_data[pp.pnum] = particle
+            pnumtxt = f"p{int(pp.pnum)}"
+            particles[pnumtxt] =  particle
+
+            print(f"Read particle: {pp.pnum} at ({pp.rx}, {pp.ry}, {pp.rz}) with velocity ({pp.vx}, {pp.vy}, {pp.vz})")
+
+        return particles
+
 
     def create_particle(self, **fields):
         particle = ParticleFields()
@@ -198,9 +243,9 @@ class WeightedDynamics(WeightedContactDynamics):
         particle_number = int(str(particle_name).lstrip("p") or 0)
         location = particle_cfg.get("location", {})
         if "collision_stiffness_q" not in particle_cfg:
-            self.config_error_return = self.constants.ERROR_MISSING_COLLISION_STIFFNESS_Q
-            self.collIn.ErrorReturn = self.config_error_return
-        collision_stiffness_q = particle_cfg.get("collision_stiffness_q", 0.0)
+            collision_stiffness_q = 4.0
+        else:
+            collision_stiffness_q = particle_cfg.get("collision_stiffness_q", 0.0)
         return self.create_particle(
             pnum=particle_number,
             rx=location.get("x1", 0.0),
@@ -214,9 +259,62 @@ class WeightedDynamics(WeightedContactDynamics):
             collision_stiffness_q=collision_stiffness_q,
             state_flg=particle_cfg.get("state_flg", 1.0),
         )
+    
+    
+    def create_particle(self, **fields):
+        particle = ParticleFields()
+        particle.pnum = fields.get("pnum", 0)
+        rx = fields.get("rx", 0.0)
+        ry = fields.get("ry", 0.0)
+        rz = fields.get("rz", 0.0)
+        vx = fields.get("vx", 0.0)
+        vy = fields.get("vy", 0.0)
+        vz = fields.get("vz", 0.0)
+        mass = fields.get("mass", fields.get("molar_mass", 1.0))
+        radius = fields.get("radius", 0.0)
+        velocity_angle = self.VelocityAngle(vx, vy)
+        particle.PosLocA = self.create_vec4(rx, ry, rz, 0.0)
+        particle.PosLocB = self.create_vec4(rx, ry, rz, 1.0)
+        particle.VelRad = self.create_vec4(vx, vy, vz, velocity_angle)
+        particle.Data = self.create_vec4(radius, fields.get("collision_stiffness_q", 0.0), 0.0, fields.get("state_flg", 1.0))
+        particle.parms = self.create_vec4(mass, 0.0, 0.0, 0.0)
+        particle.force_acceleration_current = self.create_vec4()
+        particle.force_acceleration_next = self.create_vec4()
+        particle.internal_momentum = particle.Data.z
+        particle.contacts = [self.create_geo_contact_state() for _ in range(16)]
+        particle.gcs = particle.contacts
+        particle.contactCount = 0
+        particle.colFlg = 0
+        particle.rx = rx
+        particle.ry = ry
+        particle.rz = rz
+        particle.vx = vx
+        particle.vy = vy
+        particle.vz = vz
+        particle.mass = mass
+        particle.radius = radius
+        particle.state_flg = fields.get("state_flg", 1.0)
+        particle.collision_list = fields.get("collision_list", [])
+        particle.oa = fields.get("oa", 0.0)
+        particle.max_penetration_depth = fields.get("max_penetration_depth", 0.0)
+        particle.report_contacts = 0
+        particle.report_phase = 0
+        particle.report_target = 0
+        particle.report_center_distance = 0.0
+        particle.report_normal_x = 0.0
+        particle.report_normal_y = 0.0
+        particle.report_stored_mom = 0.0
+        particle.report_alpha_zero = 0.0
+        particle.report_zero_area = 0.0
+        particle.report_compression_fraction = 0.0
+        particle.report_rel_vn = 0.0
+        particle.report_closing_mom = 0.0
+        particle.report_collision_stiffness_q = 0.0
+        return particle
 
     def create_particle_array_from_cfg(self, particle_data):
         particles = []
+        
         for particle_name in sorted(
             particle_data.keys(),
             key=lambda name: int(str(name).lstrip("p") or 0),

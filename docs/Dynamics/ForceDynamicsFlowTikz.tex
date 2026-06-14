@@ -1,71 +1,137 @@
 \begin{tikzpicture}[
-    node distance=0.34in and 0.62in,
+    node distance=0.27in and 0.44in,
     function/.style={
         draw=black!60,
         fill=black!3,
         rounded corners=2pt,
-        minimum width=2.25in,
+        minimum width=2.18in,
         minimum height=0.28in,
         align=center,
         font=\ttfamily\small
     },
-    diagnostic/.style={
+    entry/.style={
         function,
-        fill=blue!5
+        fill=green!8,
+        draw=green!40!black,
+        line width=0.65pt
     },
-    owner/.style={
+    wall/.style={
         function,
-        fill=green!6
+        fill=blue!7,
+        draw=blue!45!black
+    },
+    reused/.style={
+        draw=orange!55!black,
+        fill=orange!10,
+        rounded corners=2pt,
+        minimum width=1.26in,
+        minimum height=0.22in,
+        inner xsep=2pt,
+        align=center,
+        font=\ttfamily\scriptsize
     },
     flow/.style={-{Stealth[length=5pt]}, draw=black!65, line width=0.45pt},
-    support/.style={flow, dashed},
+    reusecall/.style={-{Stealth[length=4pt]}, draw=orange!60!black, dashed, line width=0.4pt},
     loop/.style={flow, rounded corners=0pt}
 ]
 
 \newcommand{\ForceFlowNode}[2]{\hyperref[force:#1]{\strut #2}}
 
-\node[owner] (collisionrun) {\ForceFlowNode{CollisionRun}{CollisionRun}};
-\node[function, below=of collisionrun] (contact) {\ForceFlowNode{ContactDynamics}{ContactDynamics}};
-\node[function, below=of contact] (begin) {\ForceFlowNode{BeginSourceContactParms}{BeginSourceContactParms}};
-\node[function, below=of begin] (init) {\ForceFlowNode{InitializeContactState}{InitializeContactState}};
-\node[function, below=of init] (state) {\ForceFlowNode{GetContactState}{GetContactState}};
-\node[function, below=of state] (append) {\ForceFlowNode{AppendContactSlot}{AppendContactSlot}};
-\node[function, below=of append] (slots) {\ForceFlowNode{GetContactSlots}{GetContactSlots}};
-\node[function, below=of slots] (geometry) {\ForceFlowNode{GetParticleGeometry}{GetParticleGeometry}};
-\node[function, below=of geometry] (position) {\ForceFlowNode{GetParticlePosition}{GetParticlePosition}};
-\node[function, below=of position] (parms) {\ForceFlowNode{CalculateContactParms}{CalculateContactParms}};
-\node[function, below=of parms] (startvelocity) {\ForceFlowNode{GetStartFrameVelocity}{GetStartFrameVelocity}};
+\node[entry] (main) {main(SourceID)};
 
-\node[function, right=of collisionrun] (forces) {\ForceFlowNode{CalculateContactForces}{CalculateContactForces}};
-\node[function, below=of forces] (stiffness) {\ForceFlowNode{GetPairStiffness}{GetPairStiffness}};
-\node[diagnostic, below=of stiffness] (contactpotential) {\ForceFlowNode{GetContactPotentialEnergy}{GetContactPotentialEnergy}};
-\node[function, below=of contactpotential] (acceleration) {\ForceFlowNode{CalculateSourceAcceleration}{CalculateSourceAcceleration}};
-\node[function, below=of acceleration] (mass) {\ForceFlowNode{GetParticleMass}{GetParticleMass}};
-\node[function, below=of mass] (move) {\ForceFlowNode{Move}{Move}};
-\node[function, below=of move] (finish) {\ForceFlowNode{FinishSourceVelocity}{FinishSourceVelocity}};
-\node[diagnostic, right=of move] (totalpotential) {\ForceFlowNode{TotalPotentialEnergy}{TotalPotentialEnergy}};
+% Particle contacts are processed immediately when detected.
+\node[function, below left=0.46in and 0.72in of main] (particle-scan)
+    {particle cell scan};
+\node[function, below=of particle-scan] (particle-process)
+    {ProcessParticleCollision};
+\node[function, below=of particle-process] (init)
+    {\ForceFlowNode{InitializeContactState}{InitializeContactState}};
+\node[function, below=of init] (state)
+    {\ForceFlowNode{GetContactState}{GetContactState}};
+\node[function, below=of state] (append)
+    {\ForceFlowNode{AppendContactSlot}{AppendContactSlot}};
+\node[function, below=of append] (geometry)
+    {\ForceFlowNode{GetParticleGeometry}{GetParticleGeometry}};
+\node[function, below=of geometry] (particle-force)
+    {AccumulateContactForce};
 
-\draw[flow] (collisionrun) -- (contact);
-\draw[flow] (contact) -- (begin);
-\draw[flow] (begin) -- (init);
+% Each configured wall is processed exactly once.
+\node[wall, below right=0.46in and 0.72in of main] (wall-scan)
+    {four-wall scan};
+\node[wall, below=of wall-scan] (wall-process)
+    {ProcessWallCollision};
+\node[wall, below=of wall-process] (wall-init)
+    {InitializeWallContactState};
+\node[wall, below=of wall-init] (wall-geometry)
+    {GetWallGhostGeometry};
+\node[wall, below=of wall-geometry] (wall-append)
+    {AppendWallContactSlot};
+\node[wall, below=of wall-append] (wall-force)
+    {AccumulateContactForce};
+
+% Source-local totalForce is complete before integration.
+\node[entry, below=0.58in of main |- particle-force.south] (velocity)
+    {CalcVelocity(SourceID, totalForce)};
+\node[entry, below=of velocity] (position)
+    {CalcPosition(SourceID)};
+
+% Reused helpers are repeated beside their callers.
+\node[reused, right=0.18in of append] (append-slots)
+    {\ForceFlowNode{GetContactSlots}{GetContactSlots}};
+\node[reused, right=0.18in of geometry] (geometry-position)
+    {\ForceFlowNode{GetParticlePosition}{GetParticlePosition}};
+\node[reused, right=0.18in of particle-force] (particle-stiffness)
+    {GetContactStiffness};
+\node[reused, left=0.18in of wall-geometry] (wall-position)
+    {\ForceFlowNode{GetParticlePosition}{GetParticlePosition}};
+\node[reused, left=0.18in of wall-append] (wall-slots)
+    {\ForceFlowNode{GetContactSlots}{GetContactSlots}};
+\node[reused, left=0.18in of wall-force] (wall-stiffness)
+    {GetContactStiffness};
+\node[reused, left=of velocity] (velocity-mass)
+    {\ForceFlowNode{GetParticleMass}{GetParticleMass}};
+\node[reused, left=of velocity-mass] (velocity-start)
+    {\ForceFlowNode{GetStartFrameVelocity}{GetStartFrameVelocity}};
+\node[reused, left=of position] (position-current)
+    {\ForceFlowNode{GetParticlePosition}{GetParticlePosition}};
+
+\draw[flow] (main) -- (particle-scan);
+\draw[flow] (main) -- (wall-scan);
+
+\draw[flow] (particle-scan) -- node[right,font=\scriptsize]{contact found} (particle-process);
+\draw[flow] (particle-process) -- (init);
 \draw[flow] (init) -- (state);
 \draw[flow] (state) -- (append);
-\draw[flow] (append) -- (slots);
-\draw[flow] (slots) -- (geometry);
-\draw[flow] (geometry) -- (position);
-\draw[flow] (position) -- (parms);
-\draw[support] (parms) -- (startvelocity);
+\draw[flow] (append) -- (geometry);
+\draw[flow] (geometry) -- (particle-force);
+\draw[loop] (particle-force.west) -- ++(-0.20in,0)
+    |- node[pos=0.12,left,font=\scriptsize]{next detected contact} (particle-scan.west);
 
-\draw[loop] (parms.west) -- ++(-0.25in,0) |- node[pos=0.16,left,font=\scriptsize]{next contact} (init.west);
-\draw[flow] (parms.east) -- ++(0.28in,0) |- node[pos=0.15,right,font=\scriptsize]{all contacts} (forces.south);
+\draw[flow] (wall-scan) -- node[right,font=\scriptsize]{wall 1--4} (wall-process);
+\draw[flow] (wall-process) -- (wall-init);
+\draw[flow] (wall-init) -- (wall-geometry);
+\draw[flow] (wall-geometry) -- (wall-append);
+\draw[flow] (wall-append) -- (wall-force);
+\draw[loop] (wall-force.east) -- ++(0.20in,0)
+    |- node[pos=0.12,right,font=\scriptsize]{next wall} (wall-scan.east);
 
-\draw[support] (forces) -- (stiffness);
-\draw[support] (forces.east) -- ++(0.22in,0) |- (contactpotential.east);
-\draw[flow] (forces.west) -- ++(-0.22in,0) |- (acceleration.west);
-\draw[support] (acceleration) -- (mass);
-\draw[flow] (collisionrun.east) -- ++(0.28in,0) |- node[pos=0.82,right,font=\scriptsize]{predict position} (move.east);
-\draw[flow] (move) -- node[right,font=\scriptsize]{second force scan} (finish);
-\draw[support] (collisionrun.east) -- ++(0.48in,0) |- node[pos=0.82,right,font=\scriptsize]{reporting diagnostic} (totalpotential.east);
-\draw[support] (totalpotential) -- (contactpotential);
+\draw[flow] (particle-force.south) -- ++(0,-0.18in) -| (velocity.north);
+\draw[flow] (wall-force.south) -- ++(0,-0.18in) -| (velocity.north);
+\draw[flow] (velocity) -- (position);
+
+\draw[reusecall] (append) -- (append-slots);
+\draw[reusecall] (geometry) -- (geometry-position);
+\draw[reusecall] (particle-force) -- (particle-stiffness);
+\draw[reusecall] (wall-geometry) -- (wall-position);
+\draw[reusecall] (wall-append) -- (wall-slots);
+\draw[reusecall] (wall-force) -- (wall-stiffness);
+\draw[reusecall] (velocity) -- (velocity-mass);
+\draw[reusecall] (velocity-mass) -- (velocity-start);
+\draw[reusecall] (position) -- (position-current);
+
+\node[font=\sffamily\scriptsize, text=black!65, above=0.08in of particle-scan]
+    {particle contacts};
+\node[font=\sffamily\scriptsize, text=blue!55!black, above=0.08in of wall-scan]
+    {wall contacts};
 
 \end{tikzpicture}

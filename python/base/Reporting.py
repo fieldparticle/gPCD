@@ -88,7 +88,7 @@ class Reporting:
 
         csv_path = self.momentum_report_path()
         write_header = csv_path not in self.written_headers
-        integer_columns = {
+        self.integer_columns = {
             "frame",
             "source_index",
             "target_index",
@@ -255,7 +255,7 @@ class Reporting:
                         row[column]
                         if column == "phase"
                         else int(row[column])
-                        if column in integer_columns
+                        if column in self.integer_columns
                         else self.csv_number(row[column])
                         for column in columns
                     ]
@@ -318,6 +318,7 @@ class Reporting:
                         "target_index",
                         "target",
                         "slot",
+                        "contact_type",
                         "source_contact_count",
                         "source_targets",
                         "source_total_overlap_area",
@@ -347,7 +348,7 @@ class Reporting:
             for source_index, particle in enumerate(particles):
                 contacts = active_by_source.get(source_index, [])
                 source_targets = "|".join(
-                    str(self.particle_number_for_index(particles, contact.ids.x))
+                    self.contact_target_label(particles, contact)
                     for _slot, contact in contacts
                 )
                 if not contacts:
@@ -356,6 +357,7 @@ class Reporting:
                             frame_number,
                             source_index,
                             particle.pnum,
+                            "",
                             "",
                             "",
                             "",
@@ -382,7 +384,13 @@ class Reporting:
                 source_total_overlap_area = total_overlap_by_source.get(source_index, 0.0)
                 for slot, contact in contacts:
                     target_index = int(contact.ids.x)
-                    target_total_overlap_area = total_overlap_by_source.get(target_index, 0.0)
+                    contact_type = int(contact.ids.y)
+                    is_particle_contact = contact_type == 1
+                    target_total_overlap_area = (
+                        total_overlap_by_source.get(target_index, 0.0)
+                        if is_particle_contact
+                        else 0.0
+                    )
                     overlap_area = max(0.0, contact.geom.w)
                     source_area_weight = (
                         overlap_area / source_total_overlap_area
@@ -408,8 +416,9 @@ class Reporting:
                             source_index,
                             particle.pnum,
                             target_index,
-                            self.particle_number_for_index(particles, target_index),
+                            self.contact_target_label(particles, contact),
                             slot,
+                            contact_type,
                             len(contacts),
                             source_targets,
                             self.csv_number(source_total_overlap_area),
@@ -472,7 +481,10 @@ class Reporting:
             contacts = getattr(particle, "contacts", getattr(particle, "gcs", []))
             active_contacts = []
             for slot, contact in enumerate(contacts):
-                if getattr(contact.ids, "w", 0) == 1 and getattr(contact.ids, "y", 0) == 1:
+                if (
+                    getattr(contact.ids, "w", 0) == 1
+                    and getattr(contact.ids, "y", 0) in (1, 2)
+                ):
                     active_contacts.append((slot, contact))
             active_by_source[source_index] = active_contacts
         return active_by_source
@@ -482,6 +494,17 @@ class Reporting:
         if 0 <= int(particle_index) < len(particles):
             return particles[int(particle_index)].pnum
         return ""
+
+    @staticmethod
+    def contact_target_label(particles, contact):
+        if int(contact.ids.y) == 2:
+            return {
+                1: "wall_left",
+                2: "wall_right",
+                3: "wall_bottom",
+                4: "wall_top",
+            }.get(int(contact.ids.x), f"wall_{int(contact.ids.x)}")
+        return str(Reporting.particle_number_for_index(particles, contact.ids.x))
 
     def close(self):
         pass

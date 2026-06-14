@@ -1,0 +1,357 @@
+% !TeX root = main_aip.tex
+\newpage
+\section{Manuscript Outline}
+
+
+\begin{verbatim}
+
+=========================================================
+Section: Introduction
+=========================================================
+
+    Subject:
+        Motivation for the development of the Field
+        Particle System (FPS) and overview of its
+        principal contributions.
+
+    Purpose:
+        Introduce the need for efficient and scalable
+        particle dynamics frameworks, motivate the
+        development of FPS, and summarize the primary
+        contributions and organization of the paper.
+
+    Paragraph Subjects:
+
+        - Introduce particle systems as a computational
+          approach for representing physical systems
+          through collections of interacting particles.
+
+        - Discuss the importance of particle interaction
+          models and dynamics formulations in determining
+          the behavior, accuracy, and computational
+          characteristics of particle systems.
+
+        - Identify the need for particle dynamics
+          formulations that support efficient large-scale
+          and massively parallel computation.
+
+        - Introduce the Field Particle System (FPS) as a
+          particle dynamics framework developed to address
+          these requirements.
+
+        - Provide a high-level overview of the FPS
+          philosophy without discussing implementation
+          details.
+
+        - Summarize the principal characteristics of FPS,
+          including geometric interactions,
+          interpenetrating contacts, instantaneous state
+          updates, energyless representation, and
+          source-owned data ownership.
+
+        - Summarize the primary contributions of the
+          present work.
+
+        - Provide an overview of the organization of the
+          remainder of the manuscript.
+
+=========================================================
+Section: Background and Related Work
+=========================================================
+
+    Subject:
+        Review of particle dynamics formulations and the
+        interaction models used by existing particle
+        methods.
+
+    Purpose:
+        Establish the theoretical context for FPS by
+        reviewing how particle interactions, momentum
+        transfer, and state evolution are traditionally
+        represented within particle-based systems.
+
+    Paragraph Subjects:
+
+        - Define the fundamental components of a particle
+          dynamics system including particle state,
+          interactions, and state evolution.
+
+        - Review force-based particle dynamics and the use
+          of interaction forces to govern particle motion.
+
+        - Review energy-based and potential-based
+          formulations used to determine particle
+          interactions.
+
+        - Review contact-based methods that employ overlap
+          measurements and constitutive response models.
+
+        - Review pair-owned interaction formulations and
+          the update mechanisms commonly used to transfer
+          momentum between particles.
+
+        - Discuss the computational implications of pair-
+          wise updates, synchronization requirements, and
+          data dependencies.
+
+        - Review particle methods developed for parallel
+          computing architectures and the approaches used
+          to manage interaction ownership.
+
+        - Identify the assumptions common to existing
+          particle dynamics formulations.
+
+        - Position FPS relative to existing approaches and
+          motivate investigation of an alternative
+          geometric, source-owned dynamics framework.
+
+
+=========================================================
+Section: Methodology
+=========================================================
+
+    Subject:
+        Definition of the Field Particle System (FPS)
+        methodology including particle representation,
+        force generation, state evolution, and source-
+        owned execution.
+
+    Purpose:
+        Present the complete FPS methodology and describe
+        how particle geometry, contact interactions,
+        force evaluation, and numerical integration are
+        combined to evolve the system through time.
+
+    Paragraph Subjects:
+
+        - Provide a high-level overview of the FPS
+          methodology and its principal computational
+          stages.
+
+        - Define the particle representation and the
+          quantities stored by each particle.
+
+        - Define the source-owned interaction model and
+          the ownership rules governing particle updates.
+
+        - Define the geometric quantities used to
+          characterize particle contacts.
+
+        - Define particle overlap and overlap area.
+
+        - Describe construction of the contact state for
+          an interacting particle pair.
+
+        - Define the overlap-area force model.
+
+        - Define pair stiffness and force generation.
+
+        - Define potential-energy evaluation and its role
+          within the framework.
+
+        - Define source acceleration accumulation from
+          contact contributions.
+
+        - Describe the velocity-Verlet integration
+          procedure.
+
+        - Describe the frame-start and predicted-position
+          snapshots used during force evaluation.
+
+        - Describe position prediction and velocity
+          update procedures.
+
+        - Describe boundary interactions and boundary
+          force generation.
+
+        - Summarize the complete timestep execution
+          sequence.
+
+        - Discuss computational properties of the
+          methodology including symmetry, conservation,
+          and parallel execution characteristics.
+
+=========================================================
+Section: Implementation and Performance Characteristics
+=========================================================
+
+    Subject:
+        Computational implementation of FPS and its
+        performance characteristics.
+
+    Purpose:
+        Describe the execution environment used for the
+        demonstrations and quantify the computational
+        overhead associated with the FPS dynamics model.
+
+    Paragraph Subjects:
+
+        - Describe the hardware and software
+          configuration used for all simulations.
+
+        - Summarize the implementation relationship
+          between FPS and the underlying gPCD framework.
+
+        - Present representative particle counts and
+          simulation sizes.
+
+        - Quantify the computational cost of FPS.
+
+        - Compare FPS performance against the gPCD
+          baseline.
+
+        - Discuss the scalability implications of the
+          observed performance characteristics.
+
+
+=========================================================
+Section: Simulation Demonstrations
+=========================================================
+
+    Subject:
+        Representative simulations demonstrating the
+        capabilities of the Field Particle System (FPS)
+        across multiple physical domains.
+
+    Purpose:
+        Illustrate the range of phenomena that can be
+        represented by FPS and demonstrate the emergence
+        of complex behavior from the proposed dynamics
+        formulation.
+
+    Paragraph Subjects:
+
+        - Introduce the purpose of the demonstration
+          simulations and describe the visualization
+          techniques used throughout this section.
+
+        - Introduce the Cathedral simulation and its
+          objectives.
+
+        - Describe the Cathedral environment including
+          the particle species used to represent air,
+          dust, light, and solid boundaries.
+
+        - Present the resulting particle behavior and
+          illustrate light transport through the dust-
+          filled environment.
+
+        - Discuss the interaction of light particles
+          with dust particles and reflective walls.
+
+        - Summarize the phenomena demonstrated by the
+          Cathedral simulation.
+
+        - Introduce the Incense simulation and its
+          objectives.
+
+        - Describe the simulation configuration,
+          particle species, and boundary conditions used
+          to generate the rising smoke plume.
+
+        - Present the initial laminar flow behavior
+          observed near the source.
+
+        - Present the development of periodic flow
+          structures within the plume.
+
+        - Present the transition from periodic motion
+          to turbulent flow behavior.
+
+        - Discuss the flow structures and emergent
+          behavior observed throughout the transition
+          process.
+
+        - Summarize the phenomena demonstrated by the
+          Incense simulation.
+
+        - Introduce the converging-diverging nozzle
+          simulation and its objectives.
+
+        - Describe the nozzle geometry, particle
+          initialization procedure, boundary conditions,
+          and visualization methodology.
+
+        - Present HSV velocity-direction visualizations
+          of the resulting flow field.
+
+        - Present acceleration of the flow through the
+          converging section and throat region.
+
+        - Present kinematic signatures consistent with
+          choking behavior.
+
+        - Present shock-like structures observed within
+          the diverging section.
+
+        - Discuss the observed flow behavior and the
+          information revealed through HSV velocity-
+          direction visualization.
+
+        - Summarize the phenomena demonstrated by the
+          converging-diverging nozzle simulation.
+
+        - Summarize the collective observations from all
+          demonstration cases and discuss the breadth of
+          phenomena represented by FPS.
+
+=========================================================
+Section: Conclusions
+=========================================================
+
+    Subject:
+        Summary of the Field Particle System (FPS)
+        methodology, its computational characteristics,
+        and the phenomena demonstrated through simulation.
+
+    Purpose:
+        Summarize the principal contributions of the
+        work, review the demonstrated capabilities of
+        FPS, and identify directions for future
+        investigation.
+
+    Paragraph Subjects:
+
+        - Summarize the motivation for developing FPS
+          and the objectives addressed by the proposed
+          methodology.
+
+        - Summarize the principal characteristics of FPS
+          including geometric interactions,
+          interpenetrating contacts, source-owned
+          updates, and the numerical integration
+          framework.
+
+        - Summarize the computational characteristics of
+          the methodology and its suitability for
+          large-scale parallel execution.
+
+        - Summarize the Cathedral simulation and its
+          demonstration of multi-species particle
+          interactions including air, dust, light, and
+          boundary interactions.
+
+        - Summarize the Incense simulation and its
+          demonstration of laminar, periodic, and
+          turbulent flow behavior emerging from the FPS
+          dynamics.
+
+        - Summarize the converging-diverging nozzle
+          simulation and the observed kinematic
+          signatures consistent with choking together
+          with shock-like structures.
+
+        - Summarize the collective significance of the
+          simulation demonstrations and the range of
+          phenomena represented by FPS.
+
+        - Discuss future work including expanded
+          thermo-fluid modeling, additional particle
+          species, larger-scale simulations, and further
+          investigation of the physical phenomena
+          observed in the demonstration cases.
+
+
+
+\end{verbatim}
+

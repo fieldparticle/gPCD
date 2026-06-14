@@ -174,7 +174,7 @@ class GenParticlesInBox():
                     particle_struct.molar_mass = 1.0
                     particle_struct.radius = 0.25
                     particle_struct.state_flg = 1.0
-                    particle_struct.collision_stiffness_q = run_cfg.collision_stiffness_q
+                    particle_struct.collision_stiffness_q = 10
                     self.p_list.append(particle_struct)
                     
         except BaseException as e:

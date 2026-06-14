@@ -7,144 +7,128 @@
   \label{force:#1}%
 }
 
-\texttt{ForceDynamics} treats particle overlap area as a central repulsive
-force field.  Velocity Verlet evaluates the source-owned force once at the
-frame-start positions and once at predicted end positions.  Each source
-vector-sums its force contributions and writes only its own acceleration,
-position, and velocity.
+\texttt{ForceDynamics} treats overlap area as an instantaneous central
+repulsive force field.  One source-particle invocation detects all current
+particle and wall contacts, immediately vector-sums their forces into a
+source-local \texttt{totalForce}, and writes only the source velocity and
+position.  The implementation is shaped to transfer directly to one GLSL
+compute invocation per source particle.
 
 \begin{figure}[ht]
 \centering
 \resizebox{\textwidth}{!}{\input{ForceDynamicsFlowTikz}}
-\caption{Current ForceDynamics central-force flow}
+\caption{Current ForceDynamics source-owned force flow}
 \end{figure}
 
 \clearpage
 
 \ForceFunctionSection{CollisionRun}
 
-\texttt{CollisionRun} performs a velocity-Verlet frame:
+\texttt{CollisionRun} is the Python harness for the shader-shaped execution
+schedule:
 
 \begin{verbatim}
-snapshot x_n and v_n
-calculate source accelerations a_n
-predict x_(n+1)
-snapshot predicted positions
-calculate source accelerations a_(n+1)
-finish v_(n+1) from the average acceleration
+snapshot frame-start positions and velocities
+initialize totalForce for every source
+for each SourceID:
+    detect particle contacts
+        ProcessParticleCollision(TargetID, SourceID, totalForce)
+for each SourceID:
+    for each configured wall:
+        ProcessWallCollision(SourceID, wall, totalForce)
+capture frame-start pair diagnostics
+for each SourceID:
+    CalcVelocity(SourceID, totalForce)
+for each SourceID:
+    CalcPosition(SourceID)
+snapshot end positions for diagnostics
 \end{verbatim}
 
-Both force scans read immutable position snapshots.  The integration stores
-accelerations only within the current timestep; the force law retains no
-information from a previous timestep.
+The Python harness uses a direct particle scan where GLSL uses cell occupancy
+lists.  Both schedules complete one source-local force sum before integration.
+The end-position snapshot is diagnostic only and is not a second force scan.
 
-\subsection{Current Wall Status}
+\ForceFunctionSection{ProcessParticleCollision}
 
-\texttt{BuildWallContactLists} is currently a no-op, so
-\texttt{ForceDynamics} does not yet apply wall forces.  Restoring walls is the
-next implementation step.  Wall response must participate in both
-velocity-Verlet force evaluations and remain source-owned: a particle may read
-fixed wall geometry and write only its own acceleration, position, velocity,
-and wall-contact diagnostics.
+\texttt{ProcessParticleCollision(TargetID, SourceID, totalForce)} initializes
+the current contact geometry, records a diagnostic contact slot, and
+immediately adds the contact force to the source-local \texttt{totalForce}.
+It does not write the target particle.
 
-The wall force should be conservative and derived from overlap geometry so
-that wall interactions can be included in kinetic, potential, total-energy,
-and work-residual diagnostics.  Until wall behavior is restored and verified,
-long-running particles-in-a-box energy statistics cannot distinguish
-particle-contact integration error from boundary error.
+\ForceFunctionSection{ProcessWallCollision}
 
-\ForceFunctionSection{ContactDynamics}
+\texttt{ProcessWallCollision(SourceID, wall, totalForce)} creates the
+configured wall ghost geometry and immediately adds its force to
+\texttt{totalForce}.  Each of the four configured walls is scanned exactly
+once for each source particle.
 
-\texttt{ContactDynamics(SourceID)} is the complete source-level force chain:
+\ForceFunctionSection{InitializeWallContactState}
 
-\begin{verbatim}
-BeginSourceContactParms
-for each TargetID:
-    InitializeContactState
-CalculateContactParms
-CalculateContactForces
-CalculateSourceAcceleration
-\end{verbatim}
-
-There is no contact weighting, compression/release decision, available
-momentum cap, collision phase, or internal-momentum ledger.
-
-\subsection{No Contact History}
-
-Force response is instantaneous and memoryless.  It reads only current
-frame-start geometry and fixed particle properties.  Previous overlap area,
-contact normal, relative velocity, force, and potential energy are not retained
-as dynamics inputs.
-
-\ForceFunctionSection{BeginSourceContactParms}
-
-\texttt{BeginSourceContactParms(SourceID)} resets the source overlap-area total
-used for geometry diagnostics.
+\texttt{InitializeWallContactState(SourceID, wall)} represents a wall contact
+with a stationary ghost having the same radius and mass as the source
+particle.  The contact normal is perpendicular to the wall.  The configurable
+\texttt{wall\_contact\_offset} controls how far the ghost center lies beyond
+the wall boundary.
 
 \ForceFunctionSection{InitializeContactState}
 
-\texttt{InitializeContactState(SourceID, TargetID)} allocates one current-frame
-contact slot and populates its source-to-target normal, overlap area, center
-distance, and penetration depth.
+\texttt{InitializeContactState(SourceID, TargetID)} obtains the current
+particle-particle geometry and records one source-owned diagnostic contact
+slot.
 
 \ForceFunctionSection{GetContactState}
 
-\texttt{GetContactState(SourceID, TargetID)} obtains a reusable source-owned
-contact slot and fills it with current frame-start geometry.  The slot contains
-no persistent collision phase or stored momentum.
+\texttt{GetContactState(SourceID, TargetID)} obtains a reusable current-frame
+contact slot.  The slot contains geometry and diagnostic values only; it is
+not used later to calculate force.
 
 \ForceFunctionSection{AppendContactSlot}
 
-\texttt{AppendContactSlot(SourceID, TargetID)} records the target ID, particle
-contact type, and active-this-frame flag in the next available source-owned
-slot.
+\texttt{AppendContactSlot(SourceID, TargetID)} records an active
+particle-contact slot owned by the source.
 
 \ForceFunctionSection{GetContactSlots}
 
-\texttt{GetContactSlots(SourceID)} returns the fixed contact-slot array owned
-by the source particle.
+\texttt{GetContactSlots(SourceID)} returns the fixed diagnostic contact-slot
+array owned by the source particle.
 
 \ForceFunctionSection{GetParticleGeometry}
 
-\texttt{GetParticleGeometry(SourceID, TargetID)} calculates geometry from the
-immutable frame-start position snapshot.  The returned normal points from
-source to target.
+\texttt{GetParticleGeometry(SourceID, TargetID)} calculates overlap area,
+center distance, penetration depth, and the source-to-target normal from the
+immutable frame-start position snapshot.
 
 \ForceFunctionSection{GetParticlePosition}
 
-\texttt{GetParticlePosition(ParticleID)} returns the immutable frame-start
-position when available, ensuring both sides of a pair calculate from the same
-geometry.
-
-\ForceFunctionSection{CalculateContactParms}
-
-\texttt{CalculateContactParms} records relative normal velocity for
-diagnostics and accumulates overlap area.  Relative velocity does not gate or
-cap the force.
+\texttt{GetParticlePosition(ParticleID)} returns a particle position from the
+selected immutable position snapshot.
 
 \ForceFunctionSection{GetStartFrameVelocity}
 
 \texttt{GetStartFrameVelocity(ParticleID)} returns the immutable frame-start
-velocity used only for relative-normal-velocity diagnostics.
+velocity used by integration and relative-normal-velocity diagnostics.
 
-\ForceFunctionSection{CalculateContactForces}
+\ForceFunctionSection{AccumulateContactForce}
 
-For each overlapping pair:
+For every current particle or wall contact,
+\texttt{AccumulateContactForce(SourceID, contact\_state, totalForce)} applies:
 
 \begin{equation}
-F_{ij}=q_{ij}A_{ij}
+F_{ij}=q_{ij}A_{ij},
 \end{equation}
 
 \begin{equation}
-J_{ij}=F_{ij}\Delta t.
+\mathbf F_i \mathrel{+}= -F_{ij}\mathbf n_{ij}.
 \end{equation}
 
-The force is applied during both approach and separation.  The function also
-records pair potential energy:
+The force is applied during both compression and rebound.  There is no
+contact weighting, available-momentum cap, collision phase, or stored
+internal momentum.
 
-\begin{equation}
-U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}A_{ij}(s)\,ds.
-\end{equation}
+\ForceFunctionSection{GetContactStiffness}
+
+\texttt{GetContactStiffness(SourceID, TargetID, contact\_type)} selects
+particle-pair or wall stiffness for the current contact.
 
 \ForceFunctionSection{GetPairStiffness}
 
@@ -155,78 +139,16 @@ the two particle-owned stiffness values:
 q_{ij}=\max\left(0,\frac{q_i+q_j}{2}\right).
 \end{equation}
 
-\ForceFunctionSection{GetContactPotentialEnergy}
+\ForceFunctionSection{CalcVelocity}
 
-\texttt{GetContactPotentialEnergy} evaluates the overlap-area integral using
-Simpson integration.  This value is diagnostic; force application depends
-directly on the instantaneous overlap area.  Removing this diagnostic function
-would not change particle motion.
-
-\ForceFunctionSection{TotalPotentialEnergy}
-
-\texttt{TotalPotentialEnergy} is called by reporting outside the source-owned
-contact-response pass.  It sums each unordered particle pair once to avoid
-diagnostic double counting.  System energy diagnostics report:
-
-\begin{equation}
-E_{\mathrm{total}}=KE+\sum_{i<j}U_{ij}.
-\end{equation}
-
-\subsection{Pair-Phase Symmetry Diagnostics}
-
-After both force evaluations, diagnostics classify each unordered pair's
-actual geometric step from the change in center distance.  Decreasing distance
-is compression; increasing distance is rebound.  The diagnostics accumulate
-compression and rebound step counts, trapezoidal overlap area-time, central
-force work, and phase energy-error extrema.  They also report:
-
-\begin{equation}
-\Delta N=N_{\mathrm{compression}}-N_{\mathrm{rebound}},
-\end{equation}
-
-\begin{equation}
-\Delta(A t)=
-\sum_{\mathrm{compression}}A\Delta t
--
-\sum_{\mathrm{rebound}}A\Delta t,
-\end{equation}
-
-\begin{equation}
-W_{\mathrm{residual}}=
-W_{\mathrm{compression}}+W_{\mathrm{rebound}}.
-\end{equation}
-
-These values are written to \texttt{pair\_phases.csv}.  They are diagnostics
-only and do not affect force, acceleration, position, or velocity.
-
-The completed-contact work residual matches the completed-collision total
-energy residual in the current two- and three-particle tests.  Compression and
-rebound step-count or area-time differences reveal sampling asymmetry, but
-neither alone predicts the sign or magnitude of the remaining energy error.
-
-\ForceFunctionSection{CalculateSourceAcceleration}
-
-Each source contact contributes a central impulse diagnostic:
-
-\begin{equation}
-\Delta\mathbf p_{ij}=-J_{ij}\mathbf n_{ij}.
-\end{equation}
-
-All source contact contributions are vector-summed and divided by source mass
-to store either \(\mathbf a_n\) or \(\mathbf a_{n+1}\).  Independent
-opposing-source evaluation produces equal-and-opposite pair forces because
-pair stiffness, overlap area, and snapshot geometry are symmetric.
-
-\ForceFunctionSection{FinishSourceVelocity}
-
-\texttt{FinishSourceVelocity(SourceID)} performs the only velocity write in
-the frame:
+\texttt{CalcVelocity(SourceID, totalForce)} performs the source velocity
+write.  It converts the completed source-local force sum to acceleration
+inside the function:
 
 \begin{equation}
 \mathbf v_{n+1}
 =
-\mathbf v_n+\frac{1}{2}
-\left(\mathbf a_n+\mathbf a_{n+1}\right)\Delta t.
+\mathbf v_n+\frac{\mathbf F_n}{m}\Delta t.
 \end{equation}
 
 \ForceFunctionSection{GetParticleMass}
@@ -234,26 +156,48 @@ the frame:
 \texttt{GetParticleMass(ParticleID)} returns particle mass from
 \texttt{parms.x} with an epsilon lower bound.
 
-\ForceFunctionSection{Move}
+\ForceFunctionSection{CalcPosition}
 
-\texttt{Move(SourceID)} predicts the end position:
+\texttt{CalcPosition(SourceID)} performs the semi-implicit Euler position
+write using the newly calculated velocity:
 
 \begin{equation}
 \mathbf x_{n+1}
 =
-\mathbf x_n+\mathbf v_n\Delta t
-+\frac{1}{2}\mathbf a_n\Delta t^2.
+\mathbf x_n+\mathbf v_{n+1}\Delta t.
 \end{equation}
 
-Completed-collision energy error converges toward zero under timestep
-refinement.  Potential energy may exchange with kinetic energy while overlap
-is active.  At \(\Delta t=0.05\), the current \texttt{ThreeParticle} result is:
+\subsection{Potential Energy and Diagnostics}
+
+The force is conservative with pair potential:
+
+\begin{equation}
+U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}A_{ij}(s)\,ds.
+\end{equation}
+
+Potential energy, relative normal velocity, contact slots, end-position
+snapshots, and pair-phase measurements are diagnostic only.  They do not
+affect the source-local force sum or particle integration.  System energy is:
+
+\begin{equation}
+E_{\mathrm{total}}=KE+\sum_{i<j}U_{ij}+\sum_{i,w}U_{iw}.
+\end{equation}
+
+\subsection{Current Numerical Results}
+
+The central pair rule independently produces equal-and-opposite particle-pair
+forces and preserves vector momentum.  Semi-implicit Euler introduces a small
+bounded numerical energy excursion.  Current captures include:
 
 \begin{verbatim}
-vector momentum drift = 0
-final energy difference = approximately -0.00000017
+ThreeParticle, 500 steps:
+energy range = approximately [-9.18e-5, +9.98e-5]
+final energy difference = approximately -1.69e-7
+
+ParticlesInBox, 10000 steps:
+energy range = approximately [-1.85e-5, +1.90e-5]
+final energy difference = approximately -7.34e-7
 \end{verbatim}
 
-The remaining difference is a small numerical energy leak from the current
-integration step.  With velocity Verlet, the maximum absolute energy excursion
-during the same run is approximately \(0.00000227\).
+The long-running box result currently rises and falls within a bounded band
+rather than showing monotonic energy drift.

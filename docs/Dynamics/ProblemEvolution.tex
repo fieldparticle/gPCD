@@ -109,13 +109,11 @@ potential energy      = 0
 \end{verbatim}
 
 Equal-time timestep refinement drives the completed-collision energy error
-toward zero.  \texttt{ForceDynamics} now uses velocity Verlet: it evaluates
-force at frame-start and predicted end positions, predicts position with
-\(\frac{1}{2}\mathbf a_n\Delta t^2\), and finishes velocity with the average
-of the two accelerations.  At \(\Delta t=0.05\), the maximum absolute
-\texttt{ThreeParticle} energy excursion fell from approximately
-\(0.0000998\) to \(0.00000227\), while vector momentum remains conserved.
-Wall-force behavior has not yet been established.
+toward zero.  The current \texttt{ForceDynamics} implementation immediately
+accumulates contact forces into a source-local \texttt{totalForce}, updates
+velocity once, and then updates position with semi-implicit Euler.  Vector
+momentum remains conserved, while integration produces a small bounded energy
+excursion.
 
 \subsection{Statistical Energy Validation Requires Walls}
 
@@ -129,36 +127,56 @@ collisions.
 
 \subsubsection{<current form>}
 
-The next validation target is a long-running particles-in-a-box test with many
-elastic particle collisions.  It will measure whether completed-contact energy
-residuals are unbiased and statistically cancel, behave as a random walk, or
-produce systematic energy drift.
+A long-running particles-in-a-box test now exercises many elastic particle and
+wall collisions.  It measures whether the numerical energy excursion remains
+bounded or accumulates into systematic drift.
 
 \subsubsection{difference outcome}
 
-Next investigation.
+Particle solution.
 
 \subsubsection{<Analysis>}
 
-The box test is blocked by the current \texttt{ForceDynamics} wall path:
-\texttt{BuildWallContactLists} is a no-op.  Walls must be restored before the
-statistical test because nonconservative or unreported wall work would
-contaminate the particle-collision result.
+Walls are now stationary equal-particle ghosts processed by a direct
+four-wall scan.  Their conservative overlap-derived force and potential
+participate in the same source-local dynamics and energy diagnostics as
+particle contacts.
 
-The wall implementation must:
+In the current 10,000-step \texttt{ParticlesInBox} capture, total-energy error
+rises and falls between approximately \(-1.85\times10^{-5}\) and
+\(+1.90\times10^{-5}\), with a final error of approximately
+\(-7.34\times10^{-7}\).  The result is bounded over this run rather than
+monotonic, enabling continued statistical validation over longer runs and
+multiple random seeds.
 
-\begin{itemize}
-    \item remain source-owned and treat walls as fixed geometry;
-    \item evaluate wall forces during both velocity-Verlet force scans;
-    \item use a conservative overlap-derived wall potential;
-    \item report wall work and potential energy separately;
-    \item preserve tangential velocity for a frictionless wall;
-    \item prevent tunneling without an after-the-fact energy-changing clip.
-\end{itemize}
+\subsection{Return ForceDynamics to One Source Invocation}
 
-After wall validation, repeated random-seed box runs will report total-energy
-error versus time, completed-contact work-residual distributions, mean
-residual per collision, and cumulative residual versus collision count.
+\subsubsection{<previous form>}
+
+\texttt{ForceDynamics} used velocity Verlet, requiring a frame-start force
+scan, predicted positions, a second force scan, and stored current and
+predicted accelerations.
+
+\subsubsection{<current form>}
+
+Each source invocation now detects particle and wall contacts once,
+immediately accumulates their forces into source-local \texttt{totalForce},
+calls \texttt{CalcVelocity}, and then calls \texttt{CalcPosition}.  Contact
+slots remain available for diagnostics but are not force inputs.
+
+\subsubsection{difference outcome}
+
+Full solution.
+
+\subsubsection{<Analysis>}
+
+The current structure maps directly to a GLSL compute invocation without a
+global synchronization point or second force scan.  It preserves the central
+overlap-area force law, source ownership, and equal-and-opposite independent
+particle-pair evaluation.  Semi-implicit Euler has a larger instantaneous
+excursion than velocity Verlet in small collision tests, but the current
+\texttt{ParticlesInBox} result is bounded and performs better than the Verlet
+implementation in that long-running test.
 
 \subsection{Retire MomentumDynamics}
 

@@ -1,13 +1,5 @@
-Current status:
-	- ForceDynamics uses source-owned velocity Verlet integration.
-	- Pair-phase diagnostics show completed-contact work residual equals final energy residual.
-	- ForcePlots provides three model-owned time-series panels.
-	- Missing ForceDynamics wall behavior blocks many-particle statistical validation.
+Update ForceDynamics documentation for source-owned force integration
 
-Code Changes:
-	- Replaced ForceDynamics semi-implicit integration with two-scan velocity Verlet.
-	- Added compression/rebound work and symmetry diagnostics.
-	- Added pair-phase CSV reporting.
-	- Added model-owned ForcePlots.py without live/shadow selection.
-
-Next: Implement conservative ForceDynamics wall forces in both Verlet force scans, then validate long-running particles-in-a-box energy statistics.
+Replace obsolete velocity Verlet documentation with the current
+single-scan semi-implicit ForceDynamics architecture, document wall
+processing, and record the bounded ParticlesInBox energy results.

@@ -225,25 +225,25 @@ function must read like the algorithm:
 
 \begin{verbatim}
 initialize source totals
-for each source-owned contact:
-    process contact1
-	process contact2
-apply totals1
-apply totals2
-...
+detect or visit each source-owned contact
+process each contact into source totals
 apply one source velocity write
-update source-owned ledgers
+apply one source position write when required by the model
 \end{verbatim}
 
 Loops belong in the narrowest function that owns the sequence.  Per-contact
 functions process exactly one contact and do not hide a second contact-list
-loop.  Source-level functions may iterate the completed source contact slots
-when their result depends on the whole source contact set.
+loop.  \texttt{WeightedDynamics} completes source contact slots before
+applying contact dynamics.  \texttt{ForceDynamics} immediately accumulates
+each detected particle or wall force into \texttt{totalForce}; its contact
+slots are diagnostic only.
 
 This shape keeps the main decision order visible, makes stepper debugging
 practical, and exposes which functions must eventually map into a per-source
-shader invocation.  Movement remains a separate pass because every source must
-read the same frame-start positions and velocities during contact response.
+shader invocation.  All contact response must read the same immutable
+frame-start positions and velocities.  The Python harness may express velocity
+and position writes as separate source loops while preserving the same
+per-source GLSL schedule.
 
 \subsection{Interactive Source Documentation}
 
@@ -261,17 +261,19 @@ where practical.  Current examples are:
 
 \begin{verbatim}
 InitializeContactState(SourceID, TargetID)
-ContactDynamics(SourceID)
-Move(SourceID)
+ProcessParticleCollision(TargetID, SourceID, totalForce)
+ProcessWallCollision(SourceID, wall, totalForce)
+AccumulateContactForce(SourceID, contactState, totalForce)
+CalcVelocity(SourceID, totalForce)
+CalcPosition(SourceID)
 isParticleContact(Frame, SourceID, TargetID, positionBuffer)
 \end{verbatim}
 
-\texttt{WeightedDynamics.py} should avoid Python-only helper names unless the helper
-is also expected to exist in GLSL.
+\texttt{<model>Dynamics.py} should avoid Python-only helper names unless the
+helper is also expected to exist in GLSL.
 
 Before adding or renaming any dynamics field, buffer, function, or constant, check
-the GLSL source files first.  The GLSL names are the naming authority for the
-weighted path:
+the GLSL source files first.  The GLSL names are the naming authority:
 
 \begin{verbatim}
 C:\_DJ\gPCD\vulkan\sim\common\*.glsl
@@ -279,9 +281,9 @@ C:\_DJ\gPCD\vulkan\sim\BoundarySpheresMotion\BoundarySpheresMotionP.comp
 \end{verbatim}
 
 Python names should stay coordinated with those files whenever possible.  If a
-Python-only harness name is needed, it belongs in \texttt{WeightedDynamicsBase.py},
-\texttt{SimulationRunner.py}, or \texttt{Reporting.py}, not in
-\texttt{WeightedDynamics.py}.
+Python-only harness name is needed, it belongs in
+\texttt{<model>DynamicsBase.py}, \texttt{SimulationRunner.py}, or
+\texttt{Reporting.py}, not in \texttt{<model>Dynamics.py}.
 
 \subsection{Data Convention}
 
@@ -300,7 +302,7 @@ Particle["vx"]
 
 The Python structures should be shaped to resemble GLSL buffers and push
 constants.  Python-only configuration parsing must not leak into
-\texttt{WeightedDynamics.py}.
+\texttt{<model>Dynamics.py}.
 
 \subsection{Runtime Names}
 

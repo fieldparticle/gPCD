@@ -1,0 +1,33 @@
+% !TeX root = main_aip.tex
+\newpage
+\section{Dynamics}
+
+\subsection{Description of Dynamics}
+
+The dynamics of FPS:
+
+\begin{enumerate}
+\item It is purely geometric 
+	\begin{itemize}
+	\item that all calculations are founded on the area of overlap of particles.
+	\end{itemize}
+\item Particle collisions are interpenetrating
+	\begin{itemize}
+	\item Particles stay in contact during compression and rebound.
+	\item Allows for time to perform in contact operations
+	\item Creates the need for storing momentum as a replacement for internal energy.
+	\end{itemize}
+\item It is instantaneous
+	\begin{itemize}
+	\item  meaning that all force and momentum calculations occur at a single time step. 
+	\item without regards to previous values except prior position and velocity.
+	\end{itemize}
+\item It is energyless
+	\begin{itemize}
+	\item energy is a diagnostic value only
+	\end{itemize}
+\item All particle data is source owned.
+	\begin{itemize}
+	\item creates a source owned system that is parallel friendly and fits with gPCD.
+	\end{itemize}
+\end{enumerate} 

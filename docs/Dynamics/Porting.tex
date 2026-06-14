@@ -1,40 +1,64 @@
-% !TeX root = GeoDynamics.tex
-\section{Porting Python to glsl}
+% !TeX root = main.tex
+\section{Porting Python to GLSL}
 
+Python is the readable canonical source for GLSL dynamics.  Naming,
+structures, and the dynamics schedule should match as closely as practical.
+The Python harness may replace GPU cell traversal with a direct scan, but it
+must preserve the same source-owned processing order.
 
+The current ForceDynamics compute flow is:
+\begin{verbatim}
+main()
+{
+    vec3 totalForce = vec3(0.0);
+    uint SourceID = gl_GlobalInvocationID.x;
 
-Python needs to be a canonical source for the glsl. 
-This means that naming conventions, structures and dynamical processes should match as closely as possible.
-Where they cannot match is as follows
+    for (uint ii = 0; ii < 8; ii++)
+    {
+        uint loc = P[SourceID].CornerList[ii].ploc;
 
-The Python side should be organized schedule-wise in the same order as GLSL:
-\begin{enumerate}
-\item begin contact frame
-\item detect/add wall contacts
-\item detect/add particle contacts
-\item update phase
-\item predict pair velocity
-\item apply wall scheduler
-\item apply pair escape scheduler
-\item  write final velocity
-\end{enumerate}
+        for (uint jj = 0; jj < MAX_CELL_OCCUPANCY; jj++)
+        {
+            uint TargetID = clink[loc].idx[jj];
+            if (TargetID == 0)
+                break;
 
-The main mismatch is that Python has extra analysis machinery:
+            if (isParticleContact(
+                    ii, SourceID, TargetID,
+                    uint(ShaderFlags.positionBuffer)) > 0
+                && isDuplicate(SourceID) == False)
+            {
+                ProcessParticleCollision(
+                    TargetID, SourceID, totalForce);
+            }
+        }
+    }
 
+    for (uint wall = 1; wall <= 4; wall++)
+    {
+        if (isWallContact(
+                SourceID, wall,
+                uint(ShaderFlags.positionBuffer)) > 0)
+        {
+            ProcessWallCollision(SourceID, wall, totalForce);
+        }
+    }
 
-A mix. They are not all the same kind of mismatch.
+    CalcVelocity(
+        SourceID, totalForce,
+        uint(ShaderFlags.positionBuffer));
+    CalcPosition(SourceID, uint(ShaderFlags.positionBuffer));
+}
+\end{verbatim}
 
-cluster solving: real GPU parallelism conflict.
-The current Python cluster solver solves coupled contacts together, which means one particle’s update depends on multiple other particles’ updates in the same solve. That is hard to port directly because GLSL is source-particle scheduled and avoids pairwise mutual writes. This would need a deliberately GPU-shaped approximation or a separate multi-pass solver.
+\texttt{totalForce} is a source-local variable passed as an \texttt{inout}
+parameter to particle and wall collision processors.  Each processor adds its
+force contribution immediately.  Contact slots may be recorded for
+diagnostics, but ForceDynamics does not loop over them later to calculate
+force.
 
-wall ghost diagnostics: mostly not in GLSL by choice.
-The wall ghost geometry is in GLSL conceptually, but the diagnostic visualization/accounting objects are Python-side. No hard conflict if we only need reporting, but GLSL would need extra buffers/fields to expose it.
-
-momentum reservoir reporting: not a dynamics conflict, but needs storage.
-The reservoir is an accounting term. GLSL can compute something equivalent, but it needs somewhere to store/report accumulated wall momentum. If multiple shader invocations update a shared global reservoir, that becomes an atomic/reduction issue. If stored per-particle, it is GPU-friendly.
-
-capture/UI diagnostics: not a conflict, just Python-only tooling.
-GLSL should not own this. The GPU can emit fields; Python or host-side tooling should capture/display them.
-
-Python dictionaries/contact reports: implementation mismatch, not conceptual conflict.
-Python uses dictionaries because they are convenient. GLSL needs fixed structs/slots like $P[source_id].ncs[slot]$. The conflict is not physics; it is representation. This is exactly the kind of thing the transfer document/generator should map.
+The GPU launches one invocation for each valid source particle, so the
+dynamics invocation does not need a source-ID validity check.  The current
+wall implementation directly scans four configured walls.  A later boundary
+representation may place uniquely identified boundary segments in cells
+without changing the source-owned force and integration schedule.

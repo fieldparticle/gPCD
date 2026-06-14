@@ -41,8 +41,12 @@ frame-start snapshot:
     \item current velocities;
     \item current radii and masses;
     \item current overlap geometry;
-    \item the current source-owned contact list.
+    \item the current source-owned contact representation.
 \end{itemize}
+
+\texttt{WeightedDynamics} completes source-owned contact lists before applying
+its dynamics.  \texttt{ForceDynamics} immediately accumulates each detected
+contact into a source-local force sum; its contact slots are diagnostic only.
 
 \subsection{Momentum-Field Contact Response}
 
@@ -89,11 +93,14 @@ U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}A_{ij}(s)\,ds.
 \end{equation}
 
 The Force contact law is memoryless, instantaneous, and purely geometric.
-Each velocity-Verlet timestep evaluates it at frame-start positions and
-predicted end positions.  Force depends on the selected position snapshot,
-radii, pair stiffness, overlap area, and contact normal.  Relative velocity is
-diagnostic only and does not affect force magnitude.  Only particle physical
-state, including position and velocity, persists into the next frame.
+Each timestep scans current particle and wall contacts once and immediately
+vector-sums their contributions into the source-local \texttt{totalForce}.
+After the source force sum is complete, semi-implicit Euler first updates
+velocity and then updates position using the new velocity.  An end-position
+snapshot is created only for diagnostics; it is not a second force evaluation.
+Relative velocity is diagnostic only and does not affect force magnitude.
+Only particle physical state, including position and velocity, persists into
+the next frame.
 
 \subsection{Persistent Contact State}
 
@@ -117,8 +124,11 @@ conservation.
 Force-model walls must use a conservative geometric response compatible with
 the model's integration method.  A fixed wall may contribute force and
 potential energy to a source particle, but it is not integrated and must not
-receive a particle-state write.  Wall forces must be evaluated at every
-position snapshot used by the model integrator.
+receive a particle-state write.  Current \texttt{ForceDynamics} scans each of
+the four configured walls exactly once for each source and accumulates wall
+force into the same source-local \texttt{totalForce} used for particle
+contacts.  A wall contact uses stationary equal-particle ghost geometry and
+the configured \texttt{wall\_contact\_offset}.
 
 Long-running closed-box energy statistics are meaningful only after wall work
 and wall potential energy are included in the same diagnostics as
