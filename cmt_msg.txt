@@ -1,11 +1,11 @@
 Current status:
-	- ForceDynamics is the live model and WeightedDynamics is the shadow model
-	- Physical pair impulse no longer uses source-local area weighting
-	- ThreeParticle vector momentum is conserved; KE drift remains
+	- ForceDynamics uses an instantaneous geometric central-force model
+	- Vector momentum is exact and completed-collision energy has a small numerical leak
+	- Force energy calculations are diagnostic only
 
 Code Changes:
-	- Added independent ForceDynamics model and documentation
-	- Registered ForceDynamics and added model names to diagnostics plots
-	- Removed source-local weighting from the physical pair impulse
+	- Replaced ForceDynamics momentum ledgers with overlap-area central forces
+	- Added potential-energy and total-energy diagnostics
+	- Updated Force source documentation and flowchart
 
-Next: Implement and evaluate overlap area as a conservative central force field
+Next: Reduce the remaining numerical energy leak through integration refinement

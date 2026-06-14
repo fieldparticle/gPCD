@@ -136,9 +136,6 @@ class ForceDynamics(ForceContactDynamics):
         particle.Data = self.create_vec4(radius, fields.get("collision_stiffness_q", 0.0), 0.0, fields.get("state_flg", 1.0))
         particle.parms = self.create_vec4(mass, 0.0, 0.0, 0.0)
         particle.internal_momentum = particle.Data.z
-        particle.internal_momentum_phase = self.PHASE_COMPRESSION
-        particle.contact_internal_momentum = {}
-        particle.contact_internal_phase = {}
         particle.contacts = [self.create_geo_contact_state() for _ in range(16)]
         particle.gcs = particle.contacts
         particle.contactCount = 0
@@ -540,7 +537,7 @@ class ForceDynamics(ForceContactDynamics):
         return source_area + target_area - triangle_area
 
     def DetectContacts(self):
-        """Run naive contact detection and weighted dynamics for every source."""
+        """Run naive contact detection and overlap-area forces for every source."""
         return self.NaiveContactDetermination()
 
     def NaiveContactDetermination(self):
@@ -572,7 +569,7 @@ class ForceDynamics(ForceContactDynamics):
         return True
 
     def MoveParticles(self):
-        """Move every particle using the weighted per-particle move function."""
+        """Move every particle using the force-model per-particle move function."""
         for SourceID in range(len(self.particles)):
             if not self.Move(SourceID):
                 return False

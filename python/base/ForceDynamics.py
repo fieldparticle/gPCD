@@ -1,29 +1,21 @@
 class ForceContactDynamics:
-    """Process particle contacts as a readable source-owned linear chain.
-
-    Each source particle completes contact initialization, parameter
-    calculation, weighting, impulse planning, velocity application, and ledger
-    updates before processing moves to the next source particle.  Functions may
-    read target frame-start state, but dynamics writes remain source-owned.
-    """
+    """Apply overlap-area central forces through a source-owned linear chain."""
 
     EPSILON = 1.0e-12
     CONTACT_PARTICLE = 1
     CONTACT_ACTIVE_THIS_FRAME = 1
-    PHASE_COMPRESSION = 1
-    PHASE_RETURNING = 2
-
     def ClearContactDiagnostics(self, contact_state):
         """Reset reporting-only diagnostics on one reusable contact slot."""
         for field_name in (
             "raw_impulse",
+            "force_magnitude",
+            "contact_potential_energy",
             "compression_impulse",
             "release_impulse",
             "source_available_momentum",
             "source_available_share",
             "target_available_momentum",
             "target_available_share",
-            "weighted_available_momentum",
             "source_vn",
             "target_vn",
             "rel_vn",
@@ -58,23 +50,18 @@ class ForceContactDynamics:
         self.ClearContactDiagnostics(contact_state)
 
     def BeginContactFrame(self, SourceID):
-        """Reset current-frame source contact state while preserving ledgers."""
+        """Reset current-frame source contact state."""
         source = self.particles[SourceID]
         source.collision_list = []
         source.contactCount = 0
         source.colFlg = 0
+        source.internal_momentum = 0.0
+        source.Data.z = 0.0
         for contact_state in self.GetContactSlots(SourceID):
             self.ClearContactSlot(contact_state)
 
     def ContactDynamics(self, SourceID):
-        """Run the complete contact-response chain for one source particle.
-
-        The source contact list must already contain the current-frame target
-        IDs.  This function initializes each source-owned contact slot,
-        accumulates contact parameters, then performs the source-level stages
-        that require the complete contact set.  Return False immediately when
-        a required stage fails.
-        """
+        """Calculate and apply every current overlap-area force for one source."""
         if not self.BeginSourceContactParms(SourceID):
             return False
         source = self.particles[SourceID]
@@ -83,24 +70,14 @@ class ForceContactDynamics:
             if contact_state is None:
                 return False
             self.CalculateContactParms(SourceID, TargetID, contact_state)
-        if not self.CalculateContactWeights(SourceID):
+        if not self.CalculateContactForces(SourceID):
             return False
-        if not self.CalculateContactImpulses(SourceID):
-            return False
-        if not self.ApplySourceVelocityDelta(SourceID):
-            return False
-        return self.UpdateContactLedgers(SourceID)
+        return self.ApplySourceVelocityDelta(SourceID)
 
     def BeginSourceContactParms(self, SourceID):
-        """Reset accumulators that will be rebuilt from this source's contacts.
-
-        total_overlap_area and available_source_momentum are source-level frame
-        values.  They must start at zero before individual contacts contribute
-        their geometry and closing momentum.
-        """
+        """Reset source-level geometry totals rebuilt from current contacts."""
         source = self.particles[SourceID]
         source.total_overlap_area = 0.0
-        source.available_source_momentum = 0.0
         return True
 
     def InitializeContactState(self, SourceID, TargetID):
@@ -146,7 +123,7 @@ class ForceContactDynamics:
         )
         contact_state.aux.x = center_distance
         contact_state.aux.y = source.Data.x + target.Data.x - center_distance
-        contact_state.aux.z = self.GetCollisionInternalMomentum(SourceID, TargetID)
+        contact_state.aux.z = 0.0
         return contact_state
 
     def GetParticleGeometry(self, SourceID, TargetID):
@@ -202,8 +179,7 @@ class ForceContactDynamics:
     def AppendContactSlot(self, SourceID, TargetID):
         """Allocate and initialize the next source-owned contact slot.
 
-        The slot records the target ID, contact type, persistent collision
-        phase, active-this-frame flag, and previously stored internal momentum.
+        The slot records the target ID, contact type, and active-this-frame flag.
         Increment source.contactCount only after a slot is successfully filled.
         Return None when the source has no remaining slot capacity.
         """
@@ -215,9 +191,9 @@ class ForceContactDynamics:
         contact_state = contact_slots[source.contactCount]
         contact_state.ids.x = TargetID
         contact_state.ids.y = self.CONTACT_PARTICLE
-        contact_state.ids.z = self.GetCollisionPhase(SourceID, TargetID)
+        contact_state.ids.z = 0
         contact_state.ids.w = self.CONTACT_ACTIVE_THIS_FRAME
-        contact_state.aux.z = self.GetCollisionInternalMomentum(SourceID, TargetID)
+        contact_state.aux.z = 0.0
         source.contactCount += 1
         return contact_state
 
@@ -232,40 +208,8 @@ class ForceContactDynamics:
             return particle.contacts
         return particle.gcs
 
-    def GetCollisionInternalMomentum(self, SourceID, TargetID):
-        """Return stored internal momentum for one source-owned contact ledger.
-
-        Create the source ledger dictionary when it does not yet exist.  A
-        missing target entry represents zero stored momentum.
-        """
-        source = self.particles[SourceID]
-        ledgers = getattr(source, "contact_internal_momentum", None)
-        if ledgers is None:
-            source.contact_internal_momentum = {}
-            ledgers = source.contact_internal_momentum
-        return max(0.0, ledgers.get(TargetID, 0.0))
-
-    def GetCollisionPhase(self, SourceID, TargetID):
-        """Return the persistent source-owned phase for one contact.
-
-        Create the phase dictionary when needed.  Contacts without history
-        begin in the compression phase.
-        """
-        source = self.particles[SourceID]
-        phases = getattr(source, "contact_internal_phase", None)
-        if phases is None:
-            source.contact_internal_phase = {}
-            phases = source.contact_internal_phase
-        return phases.get(TargetID, self.PHASE_COMPRESSION)
-
     def CalculateContactParms(self, SourceID, TargetID, contact_state):
-        """Calculate one contact's relative motion and source contribution.
-
-        Use frame-start source and target velocities projected onto the stored
-        contact normal.  Convert closing speed to closing momentum using
-        reduced mass, store the per-contact results, and add overlap area and
-        closing momentum to the source-level accumulators.
-        """
+        """Record relative normal motion and overlap geometry for diagnostics."""
         source = self.particles[SourceID]
         overlap_area = max(0.0, float(contact_state.geom.w))
         normal_x = float(contact_state.geom.x)
@@ -279,16 +223,8 @@ class ForceContactDynamics:
             + (target_velocity.y - source_velocity.y) * normal_y
             + (target_velocity.z - source_velocity.z) * normal_z
         )
-        closing_speed = max(0.0, -relative_normal_velocity)
-        closing_momentum = (
-            self.GetReducedMass(SourceID, TargetID)
-            * closing_speed
-        )
-
         contact_state.rel_vn = relative_normal_velocity
-        contact_state.source_available_momentum = closing_momentum
         source.total_overlap_area += overlap_area
-        source.available_source_momentum += closing_momentum
         return True
 
     def GetStartFrameVelocity(self, ParticleID):
@@ -302,56 +238,8 @@ class ForceContactDynamics:
             return self.VelRadFrame[ParticleID]
         return self.particles[ParticleID].VelRad
 
-    def GetReducedMass(self, SourceID, TargetID):
-        """Return the Newtonian reduced mass for one source-target contact.
-
-        Particle masses come from parms.x.  The epsilon floor prevents a zero
-        denominator and keeps this calculation compatible with shader logic.
-        """
-        source_mass = max(self.particles[SourceID].parms.x, 1.0e-12)
-        target_mass = max(self.particles[TargetID].parms.x, 1.0e-12)
-        return (source_mass * target_mass) / (source_mass + target_mass)
-
-    def CalculateContactWeights(self, SourceID):
-        """Allocate source available momentum across contacts by overlap area.
-
-        Each contact receives overlap_area / source.total_overlap_area of the
-        source's available momentum.  The calculated share is source-owned;
-        this stage does not inspect target-owned contact state or apply an
-        impulse.
-        """
-        source = self.particles[SourceID]
-        contact_slots = self.GetContactSlots(SourceID)
-        total_overlap_area = max(0.0, float(source.total_overlap_area))
-        available_source_momentum = max(
-            0.0,
-            float(source.available_source_momentum),
-        )
-
-        for slot_index in range(source.contactCount):
-            contact_state = contact_slots[slot_index]
-            overlap_area = max(0.0, float(contact_state.geom.w))
-            if total_overlap_area <= self.EPSILON:
-                contact_weight = 0.0
-            else:
-                contact_weight = overlap_area / total_overlap_area
-
-            source_available_share = (
-                available_source_momentum
-                * contact_weight
-            )
-            contact_state.source_available_share = source_available_share
-            contact_state.weighted_available_momentum = source_available_share
-        return True
-
-    def CalculateContactImpulses(self, SourceID):
-        """Plan compression or release impulse for each source-owned contact.
-
-        Raw impulse is stiffness times overlap area times dt.  Closing contacts
-        compress up to their weighted available momentum.  Non-closing contacts
-        release up to their stored internal momentum.  This stage records plans
-        only; it does not change velocity or persistent ledgers.
-        """
+    def CalculateContactForces(self, SourceID):
+        """Calculate central force and timestep impulse for every overlap."""
         source = self.particles[SourceID]
         contact_slots = self.GetContactSlots(SourceID)
         dt = max(0.0, float(self.ShaderFlags.dt))
@@ -360,37 +248,16 @@ class ForceContactDynamics:
             contact_state = contact_slots[slot_index]
             TargetID = int(contact_state.ids.x)
             overlap_area = max(0.0, float(contact_state.geom.w))
-            raw_impulse = (
-                self.GetPairStiffness(SourceID, TargetID)
-                * overlap_area
-                * dt
-            )
-
-            weighted_available_momentum = max(
-                0.0,
-                float(contact_state.weighted_available_momentum),
-            )
-            stored_internal_momentum = self.GetCollisionInternalMomentum(
+            force_magnitude = self.GetPairStiffness(SourceID, TargetID) * overlap_area
+            contact_state.force_magnitude = force_magnitude
+            contact_state.raw_impulse = force_magnitude * dt
+            contact_state.contact_potential_energy = self.GetContactPotentialEnergy(
                 SourceID,
                 TargetID,
+                float(contact_state.aux.x),
             )
-
-            compression_impulse = 0.0
-            release_impulse = 0.0
-            if contact_state.rel_vn < -self.EPSILON:
-                compression_impulse = min(
-                    raw_impulse,
-                    weighted_available_momentum,
-                )
-            else:
-                release_impulse = min(
-                    raw_impulse,
-                    stored_internal_momentum,
-                )
-
-            contact_state.raw_impulse = raw_impulse
-            contact_state.compression_impulse = compression_impulse
-            contact_state.release_impulse = release_impulse
+            contact_state.compression_impulse = 0.0
+            contact_state.release_impulse = 0.0
         return True
 
     def GetPairStiffness(self, SourceID, TargetID):
@@ -399,115 +266,57 @@ class ForceContactDynamics:
         target_q = self.particles[TargetID].Data.y or 0.0
         return max(0.0, 0.5 * (source_q + target_q))
 
-    def UpdateContactLedgers(self, SourceID):
-        """Commit planned impulses to persistent source-owned contact ledgers.
+    def GetContactPotentialEnergy(self, SourceID, TargetID, center_distance):
+        """Return q times the overlap-area integral over center separation."""
+        source_radius = float(self.particles[SourceID].Data.x)
+        target_radius = float(self.particles[TargetID].Data.x)
+        separation_limit = source_radius + target_radius
+        center_distance = max(0.0, float(center_distance))
+        if center_distance >= separation_limit:
+            return 0.0
 
-        Compression adds internal momentum and release removes it.  The contact
-        phase is updated from the resulting stored momentum and release state,
-        current slot diagnostics are synchronized, and the source total
-        internal momentum is rebuilt after all contact ledgers are committed.
-        """
-        source = self.particles[SourceID]
-        contact_slots = self.GetContactSlots(SourceID)
-
-        for slot_index in range(source.contactCount):
-            contact_state = contact_slots[slot_index]
-            TargetID = int(contact_state.ids.x)
-            stored_internal_momentum = max(
-                0.0,
-                self.GetCollisionInternalMomentum(SourceID, TargetID)
-                + max(0.0, float(contact_state.compression_impulse))
-                - max(0.0, float(contact_state.release_impulse)),
+        interval_count = 32
+        step = (separation_limit - center_distance) / interval_count
+        area_sum = self.particle_overlap_area(
+            source_radius,
+            target_radius,
+            center_distance,
+        )
+        for interval in range(1, interval_count):
+            distance = center_distance + interval * step
+            coefficient = 4.0 if interval % 2 else 2.0
+            area_sum += coefficient * self.particle_overlap_area(
+                source_radius,
+                target_radius,
+                distance,
             )
+        area_sum += self.particle_overlap_area(
+            source_radius,
+            target_radius,
+            separation_limit,
+        )
+        return self.GetPairStiffness(SourceID, TargetID) * step * area_sum / 3.0
 
-            if stored_internal_momentum <= self.EPSILON:
-                stored_internal_momentum = 0.0
-                collision_phase = self.PHASE_COMPRESSION
-            elif contact_state.release_impulse > self.EPSILON:
-                collision_phase = self.PHASE_RETURNING
-            else:
-                collision_phase = self.PHASE_COMPRESSION
-
-            self.SetCollisionInternalMomentum(
-                SourceID,
-                TargetID,
-                stored_internal_momentum,
-            )
-            self.SetCollisionPhase(SourceID, TargetID, collision_phase)
-            contact_state.ids.z = collision_phase
-            contact_state.aux.z = stored_internal_momentum
-
-        self.SyncInternalMomentum(SourceID)
-        return True
-
-    def SetCollisionInternalMomentum(self, SourceID, TargetID, internal_momentum):
-        """Store or remove one source-owned contact internal-momentum entry.
-
-        Values at or below EPSILON are removed so an empty contact ledger does
-        not retain meaningless zero entries.
-        """
-        source = self.particles[SourceID]
-        if not hasattr(source, "contact_internal_momentum"):
-            source.contact_internal_momentum = {}
-
-        internal_momentum = max(0.0, float(internal_momentum))
-        if internal_momentum <= self.EPSILON:
-            source.contact_internal_momentum.pop(TargetID, None)
-        else:
-            source.contact_internal_momentum[TargetID] = internal_momentum
-        return True
-
-    def SetCollisionPhase(self, SourceID, TargetID, phase):
-        """Store or remove one source-owned persistent collision phase.
-
-        A drained compression contact is the default state and therefore needs
-        no dictionary entry.  Other phases remain stored by target ID.
-        """
-        source = self.particles[SourceID]
-        if not hasattr(source, "contact_internal_phase"):
-            source.contact_internal_phase = {}
-
-        if (
-            phase == self.PHASE_COMPRESSION
-            and self.GetCollisionInternalMomentum(SourceID, TargetID) <= self.EPSILON
-        ):
-            source.contact_internal_phase.pop(TargetID, None)
-        else:
-            source.contact_internal_phase[TargetID] = phase
-        return True
-
-    def SyncInternalMomentum(self, SourceID):
-        """Rebuild and store the source total from its contact ledgers."""
-        self.SetInternalMomentum(SourceID, self.GetInternalMomentum(SourceID))
-        return True
-
-    def GetInternalMomentum(self, SourceID):
-        """Return the sum of all source-owned contact internal momentum.
-
-        Use the particle total only as a compatibility fallback when no contact
-        ledger dictionary exists.
-        """
-        source = self.particles[SourceID]
-        ledgers = getattr(source, "contact_internal_momentum", None)
-        if ledgers is not None:
-            return sum(max(0.0, momentum) for momentum in ledgers.values())
-        return max(0.0, getattr(source, "internal_momentum", source.Data.z))
-
-    def SetInternalMomentum(self, SourceID, internal_momentum):
-        """Store the source total internal momentum in runtime and data fields."""
-        source = self.particles[SourceID]
-        source.internal_momentum = max(0.0, float(internal_momentum))
-        source.Data.z = source.internal_momentum
-        return True
+    def TotalPotentialEnergy(self):
+        """Return current whole-system pair potential energy."""
+        total_potential_energy = 0.0
+        for SourceID in range(len(self.particles)):
+            source_position = self.GetParticlePosition(SourceID)
+            for TargetID in range(SourceID + 1, len(self.particles)):
+                target_position = self.GetParticlePosition(TargetID)
+                dx = target_position.x - source_position.x
+                dy = target_position.y - source_position.y
+                dz = target_position.z - source_position.z
+                center_distance = (dx * dx + dy * dy + dz * dz) ** 0.5
+                total_potential_energy += self.GetContactPotentialEnergy(
+                    SourceID,
+                    TargetID,
+                    center_distance,
+                )
+        return total_potential_energy
 
     def ApplySourceVelocityDelta(self, SourceID):
-        """Apply the vector sum of planned contact impulses to source velocity.
-
-        Each scalar planned impulse is directed opposite the source-to-target
-        contact normal.  Per-contact momentum deltas are accumulated before one
-        source velocity write is made.  The function also records before/after
-        velocity and source-net momentum diagnostics in each active slot.
-        """
+        """Apply the vector sum of central-force impulses to source velocity."""
         source = self.particles[SourceID]
         contact_slots = self.GetContactSlots(SourceID)
         source_mass = self.GetParticleMass(SourceID)
@@ -524,10 +333,7 @@ class ForceContactDynamics:
             normal_x = float(contact_state.geom.x)
             normal_y = float(contact_state.geom.y)
             normal_z = float(contact_state.geom.z)
-            applied_impulse = (
-                max(0.0, float(contact_state.compression_impulse))
-                + max(0.0, float(contact_state.release_impulse))
-            )
+            applied_impulse = max(0.0, float(contact_state.raw_impulse))
 
             contact_delta_px = -applied_impulse * normal_x
             contact_delta_py = -applied_impulse * normal_y

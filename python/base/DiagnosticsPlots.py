@@ -217,6 +217,9 @@ def _momentum_series(momentum_csv):
             internal_total,
         ),
         "ke_drift": [_float(row, "ke_drift") for row in rows],
+        "potential_energy": [_float(row, "potential_energy") for row in rows],
+        "total_energy": [_float(row, "total_energy", _float(row, "curr_ke")) for row in rows],
+        "energy_drift": [_float(row, "energy_drift") for row in rows],
         "v_rel": [_float(row, "v_rel") for row in rows],
         "raw_impulse": [_float(row, "raw_impulse") for row in rows],
     }
@@ -617,6 +620,15 @@ def _draw_totals_panel(axis, item, series):
             combined=_latest(series, "current_ke"),
             drift=_latest(series, "ke_drift"),
         ),
+        table_row(
+            "potential",
+            combined=_latest(series, "potential_energy"),
+        ),
+        table_row(
+            "total_E",
+            combined=_latest(series, "total_energy"),
+            drift=_latest(series, "energy_drift"),
+        ),
         "",
         table_row(
             "contact",
@@ -908,6 +920,20 @@ def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
         frames,
         "planned_impulse_to_target",
     )
+    p1_to_p2_force = _contact_series(
+        item["momentum_csv"],
+        1,
+        2,
+        frames,
+        "force_magnitude",
+    )
+    p1_to_p3_force = _contact_series(
+        item["momentum_csv"],
+        1,
+        3,
+        frames,
+        "force_magnitude",
+    )
     p1_net_dx = _source_contact_series(
         item["momentum_csv"],
         1,
@@ -960,6 +986,22 @@ def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     )
     p1_contact_axis.plot(
         frames,
+        p1_to_p2_force,
+        label="p1->p2 force",
+        linewidth=1.5,
+        color="#fb8072",
+        linestyle="-.",
+    )
+    p1_contact_axis.plot(
+        frames,
+        p1_to_p3_force,
+        label="p1->p3 force",
+        linewidth=1.5,
+        color="#80b1d3",
+        linestyle="-.",
+    )
+    p1_contact_axis.plot(
+        frames,
         p1_net_dx,
         label="p1 source_net_delta_px",
         linewidth=2,
@@ -976,7 +1018,7 @@ def _draw_matplotlib_axes(fig, axes, item, particle_visible=None):
     )
     p1_contact_axis.axhline(0.0, color="black", linewidth=1, alpha=0.5)
     p1_contact_axis.set_ylabel("momentum")
-    p1_contact_axis.set_title("p1 Ledger -> Applied Impulse -> Net Delta")
+    p1_contact_axis.set_title("p1 Contact State -> Force/Impulse -> Net Delta")
     p1_contact_axis.grid(True, alpha=0.3)
     p1_contact_axis.legend(loc="upper right")
     _apply_frame_window(p1_contact_axis, item, frames)

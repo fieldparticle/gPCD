@@ -4,9 +4,9 @@
 
 \subsection{Purpose}
 
-\texttt{WeightedDynamics} is the collision dynamics implementation documented
-by this project.  It is a readable Python implementation whose source-complete
-structure is intended to transfer to GLSL with minimal translation.
+The project maintains independently selectable dynamics models.  Each model is
+a readable Python implementation whose source-complete structure is intended
+to transfer to GLSL with minimal translation.
 
 \subsection{Source-Owned Execution}
 
@@ -44,7 +44,7 @@ frame-start snapshot:
     \item the current source-owned contact list.
 \end{itemize}
 
-\subsection{Contact Response}
+\subsection{Momentum-Field Contact Response}
 
 For each source contact, \texttt{WeightedDynamics} calculates relative normal
 velocity, reduced-mass closing momentum, overlap area, and a source-local
@@ -54,7 +54,6 @@ overlap-area weight.  The current raw impulse is:
 J_{\mathrm{raw},k}
 =
 q_k A_k
-\left(\frac{A_k}{\sum_j A_j}\right)
 \Delta t.
 \end{equation}
 
@@ -63,16 +62,37 @@ closing momentum.  Release is capped by the contact-owned stored internal
 momentum.  All planned contact impulses are vector-summed before the source
 velocity is written.
 
-This equation documents the current implementation.  It does not assert that
-source-local weighting conserves whole-system vector momentum or kinetic
-energy; those properties must be established by diagnostics and test results.
+Source-local overlap-area weighting remains only in the compression
+available-momentum cap.  It does not multiply the physical pair impulse.
+Current \texttt{ThreeParticle} diagnostics show exact vector-momentum return
+but approximately \(-0.00020547\) kinetic-energy drift.
 
-Current \texttt{ThreeParticle} diagnostics show that the weighted rule is not
-conservative.  The weighted capture finishes with approximately
-\(0.04899135\) vector momentum drift and \(+0.00090284\) kinetic-energy drift,
-even though total stored internal momentum returns to zero.  Source-local area
-weighting is therefore a known model failure, not an accepted conservation
-rule.
+\subsection{Force-Field Contact Response}
+
+\texttt{ForceDynamics} treats overlap area as a central repulsive pair force:
+
+\begin{equation}
+F_{ij}=q_{ij}A_{ij}.
+\end{equation}
+
+Every overlapping frame applies:
+
+\begin{equation}
+\Delta\mathbf p_i=-F_{ij}\mathbf n_{ij}\Delta t.
+\end{equation}
+
+There are no compression/release phases, available-momentum caps, or
+internal-momentum ledgers.  The corresponding pair potential is:
+
+\begin{equation}
+U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}A_{ij}(s)\,ds.
+\end{equation}
+
+The Force contact law is memoryless, instantaneous, and purely geometric.
+Current force depends on current frame-start positions, radii, pair stiffness,
+overlap area, and contact normal.  Relative velocity is diagnostic only and
+does not affect force magnitude.  Only particle physical state, including
+position and velocity, persists into the next frame.
 
 \subsection{Persistent Contact State}
 
@@ -83,8 +103,10 @@ for compression and release.
 
 \subsection{Diagnostics}
 
-Momentum and kinetic energy are reported diagnostics.  They are used to
-evaluate the contact rule but are not direct dynamics inputs.  Documentation
-must distinguish actual vector momentum drift from scalar internal-momentum
-ledger totals.  A drained internal-momentum ledger does not, by itself, prove
-momentum or kinetic-energy conservation.
+Momentum, kinetic energy, potential energy, and total energy are reported
+diagnostics.  Diagnostic calculations evaluate the contact rule but do not
+affect particle motion.  Force potential energy is calculated from current
+geometry only.  Documentation must distinguish actual vector momentum drift
+from scalar internal-momentum ledger totals.  A drained WeightedDynamics
+internal-momentum ledger does not, by itself, prove momentum or kinetic-energy
+conservation.

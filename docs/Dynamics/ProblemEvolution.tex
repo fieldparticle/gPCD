@@ -17,7 +17,7 @@ target impulses have equal scalar magnitude.
 
 \subsubsection{<current form>}
 
-\texttt{WeightedDynamics} applies a source-local overlap-area weight to the raw
+The failed weighted form applied a source-local overlap-area weight to the raw
 impulse:
 
 \begin{equation}
@@ -70,7 +70,70 @@ energy do not return to their starting values.  Complete scalar ledger return
 therefore does not establish conservation.
 
 Source-local area weights may describe a source allocation, but multiplying
-them into the physical pair impulse breaks pair compatibility.  The next
-dynamics investigation should remove source-local weighting from the physical
-pair impulse and evaluate whether an unweighted pair contribution restores
-equal-and-opposite source evaluations.
+them into the physical pair impulse breaks pair compatibility.  Removing that
+factor restored equal-and-opposite pair evaluation and exact vector momentum
+in the \texttt{ThreeParticle} test.  Kinetic-energy drift remained, motivating
+the separate central-force model.
+
+\subsection{Overlap Area as a Central Force Field}
+
+\subsubsection{<previous form>}
+
+\texttt{WeightedDynamics} stores compression impulse in source-owned contact
+ledgers and returns that scalar impulse during separation.
+
+\subsubsection{<current form>}
+
+\texttt{ForceDynamics} applies the central pair force
+\(F_{ij}=q_{ij}A_{ij}\) during every overlapping timestep.  It stores no
+contact momentum and uses
+\(U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}A_{ij}(s)\,ds\) for energy diagnostics.
+
+\subsubsection{difference outcome}
+
+Particle solution.
+
+\subsubsection{<Analysis>}
+
+The force is symmetric for both independently evaluated sources, so pair
+impulses are equal-and-opposite.  The changing contact-normal direction is
+handled directly by the central force rather than by returning a stored scalar
+impulse along a later normal.
+
+At \(\Delta t=0.05\), the current \texttt{ThreeParticle} capture ends with:
+
+\begin{verbatim}
+vector momentum drift = 0
+total-energy drift    = approximately -0.00000017
+potential energy      = 0
+\end{verbatim}
+
+Equal-time timestep refinement drives the completed-collision energy error
+toward zero.  The remaining error is numerical integration error from the
+current semi-implicit movement step rather than a missing physical energy
+store.  Improving the integration step is the next investigation.  Wall-force
+behavior has not yet been established.
+
+\subsection{Retire MomentumDynamics}
+
+\subsubsection{<previous form>}
+
+\texttt{MomentumDynamics} remained registered as a selectable runtime model
+without an active model source document.
+
+\subsubsection{<current form>}
+
+\texttt{MomentumDynamics} is removed from the active runtime registry.  Its
+model-specific Python files are retained under
+\texttt{python/base/old/MomentumDynamics}.
+
+\subsubsection{difference outcome}
+
+Full solution.
+
+\subsubsection{<Analysis>}
+
+The active selectable models are now \texttt{ForceDynamics} and
+\texttt{WeightedDynamics}, and both have corresponding source documents
+included by \texttt{main.tex}.  Retiring rather than deleting the old model
+preserves its implementation history without presenting it as maintained.

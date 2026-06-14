@@ -11,43 +11,32 @@ considered. In the first configuration, cell occupancy data remained
 sequentially ordered in memory. In the second configuration, occupancy
 data were randomly distributed throughout the cell array.
 
-\Figo{A_PQBS_V_PQBR} compares execution time as a function of
-particle count for sequential and randomly ordered occupancy data.
-Sequential ordering consistently produced lower execution times
-throughout the evaluated range. The figure also presents the
-execution-time difference, defined as the random-ordering execution
-time minus the sequential-ordering execution time.
+\Figo{A_PQBS_V_PQBR} compares execution time for sequentially and
+randomly ordered occupancy data. Randomized occupancy ordering was
+included because many particle systems naturally evolve toward
+irregular spatial and memory-access patterns as particles mix and
+interact. Sequential ordering consistently produced lower execution
+times, and the difference increased with particle count. A linear
+regression of the difference curve produced a slope of
+\PPBQDiffSlope\ ms per million particles.
 
 \input{A_PQBRT_TABLE_ALL}
 
-Both configurations exhibit linear scaling behavior; however, the
-execution-time difference increases with particle count. A linear
-regression of the difference curve produced a slope of
-\PPBQDiffSlope\ ms per million particles, indicating that the cost of
-random memory access grows proportionally with problem size. Since the
-two configurations differ only in the ordering of occupancy data, the
-observed performance gap is attributed primarily to memory-locality
-effects.
-
-These results indicate that memory locality remains an important
-contributor to overall framework performance despite the GPU-resident
-nature of the implementation. Although memory locality does not alter
-the asymptotic complexity of the method, the increasing performance gap
-observed with particle count demonstrates its influence on practical
-execution time.
+Because the two configurations differ only in occupancy-data ordering,
+the results indicate that memory locality has a measurable effect on
+execution time while preserving the underlying scaling behavior of the
+framework.
 
 \input{A_PQBRT_SUMMARY_TABLE}
 
 \Tigo{performance_summary} summarizes the principal performance metrics
-obtained during evaluation of the gPCD framework, including the largest
-benchmark configuration and the maximum throughput achieved during
-testing.
+obtained during evaluation of the gPCD framework. The framework
+successfully processed up to \SUMMARYPARTICLECOUNT{} particles and
+achieved a peak throughput of \SUMMARYTHROUGHPUT{} million
+particles/s. Using the naive all-pairs formulation of
+Eq.~(\ref{niaeve}), this throughput on the order of
+$1.0\times10^{16}$ pairwise collision queries per second.
 
-The framework successfully processed up to
-\numprint{\APQBRTTABLEALLbka{}} particles and achieved a peak throughput
-of \SUMMARYTHROUGHPUT{} million particles/s. Table~\ref{tab:performance_summary}
-reports representative execution statistics for the largest benchmark
-configuration.
 
 Table~\ref{tab:A_PQBRT_TABLE_ALL} provides the benchmark measurements
 used throughout the subsequent throughput, time-per-particle, and

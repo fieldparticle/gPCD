@@ -40,15 +40,10 @@ of the underlying scaling characteristics of the framework.
 The locality benchmark demonstrates that memory organization affects
 performance independently of algorithmic complexity. Although
 sequential and random occupancy layouts retain the same asymptotic
-complexity, the increasing execution-time difference observed between
-the two configurations indicates a measurable performance benefit from
-improved memory locality.
-
-The approximately parallel trends observed in
-Figure~\ref{fig:A_PQBS_V_PQBR} suggest that memory locality primarily
-affects implementation efficiency through memory-access costs rather
-than the asymptotic scaling characteristics of the framework.
-
+complexity, the increasing performance gap observed in
+Figure~\ref{fig:A_PQBS_V_PQBR} indicates that improved memory locality
+reduces execution time while preserving the underlying scaling
+characteristics of the framework.
 
 \input{DensityStudies}
 
@@ -57,19 +52,20 @@ resolution achievable through increasing particle count. At 5,832
 particles, the discrete nature of the particle representation remains
 visually apparent. In contrast, the 2,985,984-particle configuration
 approaches a visually continuous representation while retaining an
-explicitly discrete particle formulation.
+explicitly discrete particle formulation. Increased particle density
+expands the practical utility of particle methods by enabling higher
+fidelity investigations of thermo-fluid systems, particulate transport,
+granular mechanics, fracture processes, photonic ray tracing, and other
+applications in which macroscopic behavior emerges from large numbers
+of interacting discrete entities.
 
 Despite this increase in particle density, the largest configuration
 remains interactive, sustaining approximately 50 frames per second on
-the evaluation platform. These results suggest that a single CPU-GPU
-system can support particle-system scales traditionally associated with
-high-performance computing resources.
+the evaluation platform. This level of performance suggests that
+substantial computational resources remain available for particle
+dynamics, while still supporting particle-system scales traditionally
+associated with high-performance computing resources.
 
-The GPU-resident organization of the framework also facilitates
-particle visualization and analysis. Because particle state remains
-available within the graphics pipeline, quantities such as temperature,
-velocity magnitude, and velocity direction can be mapped directly to
-color during rendering with minimal additional computational cost. In
-particular, HSV-based velocity-angle colorization provides an efficient
-means of visualizing directional flow structures and other emergent
-patterns in large-scale particle systems.
+
+
+

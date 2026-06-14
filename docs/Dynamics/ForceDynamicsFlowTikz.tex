@@ -9,65 +9,61 @@
         align=center,
         font=\ttfamily\small
     },
+    diagnostic/.style={
+        function,
+        fill=blue!5
+    },
+    owner/.style={
+        function,
+        fill=green!6
+    },
     flow/.style={-{Stealth[length=5pt]}, draw=black!65, line width=0.45pt},
+    support/.style={flow, dashed},
     loop/.style={flow, rounded corners=0pt}
 ]
 
 \newcommand{\ForceFlowNode}[2]{\hyperref[force:#1]{\strut #2}}
 
-\node[function] (contact) {\ForceFlowNode{ContactDynamics}{ContactDynamics}};
+\node[owner] (collisionrun) {\ForceFlowNode{CollisionRun}{CollisionRun}};
+\node[function, below=of collisionrun] (contact) {\ForceFlowNode{ContactDynamics}{ContactDynamics}};
 \node[function, below=of contact] (begin) {\ForceFlowNode{BeginSourceContactParms}{BeginSourceContactParms}};
 \node[function, below=of begin] (init) {\ForceFlowNode{InitializeContactState}{InitializeContactState}};
 \node[function, below=of init] (state) {\ForceFlowNode{GetContactState}{GetContactState}};
 \node[function, below=of state] (append) {\ForceFlowNode{AppendContactSlot}{AppendContactSlot}};
 \node[function, below=of append] (slots) {\ForceFlowNode{GetContactSlots}{GetContactSlots}};
-\node[function, below=of slots] (phase) {\ForceFlowNode{GetCollisionPhase}{GetCollisionPhase}};
-\node[function, below=of phase] (collisionmom) {\ForceFlowNode{GetCollisionInternalMomentum}{GetCollisionInternalMomentum}};
-\node[function, below=of collisionmom] (geometry) {\ForceFlowNode{GetParticleGeometry}{GetParticleGeometry}};
+\node[function, below=of slots] (geometry) {\ForceFlowNode{GetParticleGeometry}{GetParticleGeometry}};
 \node[function, below=of geometry] (position) {\ForceFlowNode{GetParticlePosition}{GetParticlePosition}};
-\node[function, below=of position] (startvelocity) {\ForceFlowNode{GetStartFrameVelocity}{GetStartFrameVelocity}};
-\node[function, below=of startvelocity] (reducedmass) {\ForceFlowNode{GetReducedMass}{GetReducedMass}};
-\node[function, below=of reducedmass] (parms) {\ForceFlowNode{CalculateContactParms}{CalculateContactParms}};
+\node[function, below=of position] (parms) {\ForceFlowNode{CalculateContactParms}{CalculateContactParms}};
+\node[function, below=of parms] (startvelocity) {\ForceFlowNode{GetStartFrameVelocity}{GetStartFrameVelocity}};
 
-\node[function, right=of contact] (weights) {\ForceFlowNode{CalculateContactWeights}{CalculateContactWeights}};
-\node[function, below=of weights] (impulses) {\ForceFlowNode{CalculateContactImpulses}{CalculateContactImpulses}};
-\node[function, below=of impulses] (stiffness) {\ForceFlowNode{GetPairStiffness}{GetPairStiffness}};
-\node[function, below=of stiffness] (velocitydelta) {\ForceFlowNode{ApplySourceVelocityDelta}{ApplySourceVelocityDelta}};
+\node[function, right=of collisionrun] (forces) {\ForceFlowNode{CalculateContactForces}{CalculateContactForces}};
+\node[function, below=of forces] (stiffness) {\ForceFlowNode{GetPairStiffness}{GetPairStiffness}};
+\node[diagnostic, below=of stiffness] (contactpotential) {\ForceFlowNode{GetContactPotentialEnergy}{GetContactPotentialEnergy}};
+\node[function, below=of contactpotential] (velocitydelta) {\ForceFlowNode{ApplySourceVelocityDelta}{ApplySourceVelocityDelta}};
 \node[function, below=of velocitydelta] (mass) {\ForceFlowNode{GetParticleMass}{GetParticleMass}};
-\node[function, below=of mass] (ledgers) {\ForceFlowNode{UpdateContactLedgers}{UpdateContactLedgers}};
-\node[function, below=of ledgers] (setcollisionmom) {\ForceFlowNode{SetCollisionInternalMomentum}{SetCollisionInternalMomentum}};
-\node[function, below=of setcollisionmom] (setphase) {\ForceFlowNode{SetCollisionPhase}{SetCollisionPhase}};
-\node[function, below=of setphase] (syncmom) {\ForceFlowNode{SyncInternalMomentum}{SyncInternalMomentum}};
-\node[function, below=of syncmom] (getmom) {\ForceFlowNode{GetInternalMomentum}{GetInternalMomentum}};
-\node[function, below=of getmom] (setmom) {\ForceFlowNode{SetInternalMomentum}{SetInternalMomentum}};
+\node[function, below=of mass] (move) {\ForceFlowNode{Move}{Move}};
+\node[diagnostic, right=of move] (totalpotential) {\ForceFlowNode{TotalPotentialEnergy}{TotalPotentialEnergy}};
 
+\draw[flow] (collisionrun) -- (contact);
 \draw[flow] (contact) -- (begin);
 \draw[flow] (begin) -- (init);
 \draw[flow] (init) -- (state);
 \draw[flow] (state) -- (append);
 \draw[flow] (append) -- (slots);
-\draw[flow] (slots) -- (phase);
-\draw[flow] (phase) -- (collisionmom);
-\draw[flow] (collisionmom) -- (geometry);
+\draw[flow] (slots) -- (geometry);
 \draw[flow] (geometry) -- (position);
-\draw[flow] (position) -- (startvelocity);
-\draw[flow] (startvelocity) -- (reducedmass);
-\draw[flow] (reducedmass) -- (parms);
+\draw[flow] (position) -- (parms);
+\draw[support] (parms) -- (startvelocity);
 
 \draw[loop] (parms.west) -- ++(-0.25in,0) |- node[pos=0.16,left,font=\scriptsize]{next contact} (init.west);
-\draw[flow] (parms.east) -- ++(0.28in,0) |- node[pos=0.15,right,font=\scriptsize]{all contacts} (weights.south);
+\draw[flow] (parms.east) -- ++(0.28in,0) |- node[pos=0.15,right,font=\scriptsize]{all contacts} (forces.south);
 
-\draw[flow] (weights) -- (impulses);
-\draw[flow] (impulses) -- (stiffness);
-\draw[loop] (stiffness.east) -- ++(0.22in,0) |- (impulses.east);
-\draw[flow] (impulses.west) -- ++(-0.22in,0) |- (velocitydelta.west);
-\draw[flow] (velocitydelta) -- (mass);
-\draw[loop] (mass.east) -- ++(0.22in,0) |- (velocitydelta.east);
-\draw[flow] (velocitydelta.west) -- ++(-0.22in,0) |- (ledgers.west);
-\draw[flow] (ledgers) -- (setcollisionmom);
-\draw[flow] (setcollisionmom) -- (setphase);
-\draw[flow] (setphase) -- (syncmom);
-\draw[flow] (syncmom) -- (getmom);
-\draw[flow] (getmom) -- (setmom);
+\draw[support] (forces) -- (stiffness);
+\draw[support] (forces.east) -- ++(0.22in,0) |- (contactpotential.east);
+\draw[flow] (forces.west) -- ++(-0.22in,0) |- (velocitydelta.west);
+\draw[support] (velocitydelta) -- (mass);
+\draw[flow] (collisionrun.east) -- ++(0.28in,0) |- node[pos=0.82,right,font=\scriptsize]{movement pass} (move.east);
+\draw[support] (collisionrun.east) -- ++(0.48in,0) |- node[pos=0.82,right,font=\scriptsize]{reporting diagnostic} (totalpotential.east);
+\draw[support] (totalpotential) -- (contactpotential);
 
 \end{tikzpicture}

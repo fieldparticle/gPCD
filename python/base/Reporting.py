@@ -107,6 +107,9 @@ class Reporting:
                         "frame_start_ke",
                         "after_resolve_ke",
                         "ke_drift",
+                        "potential_energy",
+                        "total_energy",
+                        "energy_drift",
                         "v_rel",
                         "raw_impulse",
                     ]
@@ -132,6 +135,9 @@ class Reporting:
                     self.csv_number(momentum_summary["frame_start_ke"]),
                     self.csv_number(momentum_summary["after_resolve_ke"]),
                     self.csv_number(momentum_summary["ke_drift"]),
+                    self.csv_number(momentum_summary["potential_energy"]),
+                    self.csv_number(momentum_summary["total_energy"]),
+                    self.csv_number(momentum_summary["energy_drift"]),
                     self.csv_number(momentum_summary["v_rel"]),
                     self.csv_number(momentum_summary["raw_impulse"]),
                 ]
@@ -196,6 +202,8 @@ class Reporting:
         write_header = csv_path not in self.written_headers
         contact_diagnostic_columns = [
             "raw_impulse",
+            "force_magnitude",
+            "contact_potential_energy",
             "compression_impulse",
             "release_impulse",
             "planned_impulse_to_target",
@@ -343,6 +351,8 @@ class Reporting:
                             self.csv_number(contact.aux.z),
                             self.csv_number(contact.aux.w),
                             self.csv_number(getattr(contact, "raw_impulse", 0.0)),
+                            self.csv_number(getattr(contact, "force_magnitude", 0.0)),
+                            self.csv_number(getattr(contact, "contact_potential_energy", 0.0)),
                             self.csv_number(getattr(contact, "compression_impulse", 0.0)),
                             self.csv_number(getattr(contact, "release_impulse", 0.0)),
                             self.csv_number(contact.aux.w),

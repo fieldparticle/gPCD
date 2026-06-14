@@ -230,29 +230,26 @@ p_{\mathrm{share},i} = p_{\mathrm{available},s} w_i.
 The source available share is stored on each contact.  This stage does not
 inspect target-owned contact state and does not apply an impulse.
 
-This source-local allocation is a known conservation failure when it changes
-the physical pair impulse.  Two sources with different surrounding contact
-sets calculate different weights for the same pair contact, so their
-independently evaluated impulse magnitudes are not equal-and-opposite.
+This source-local allocation limits compression only.  It does not multiply
+the physical pair impulse.
 
 \WeightedFunctionSection{CalculateContactImpulses}
 
 \texttt{CalculateContactImpulses(SourceID)} plans compression or release for
 each source-owned contact without changing velocity or persistent ledgers.
 
-The current weighted raw impulse is:
+The current raw pair impulse is:
 
 \begin{equation}
 J_{\mathrm{raw},i}
 =
 q_{\mathrm{pair}} A_i
-\left(\frac{A_i}{\sum_j A_j}\right)
 \Delta t.
 \end{equation}
 
-This is a description of the implemented rule, not a conservation claim.
-Current \texttt{ThreeParticle} diagnostics show that this source-local weighted
-raw impulse produces whole-system vector momentum and kinetic-energy drift.
+Current \texttt{ThreeParticle} diagnostics show exact vector momentum but
+approximately \(-0.00020547\) kinetic-energy drift after the contact ledgers
+drain.
 
 For a closing contact, compression is limited by the contact's weighted source
 momentum:

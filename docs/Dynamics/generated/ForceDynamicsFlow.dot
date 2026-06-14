@@ -22,35 +22,27 @@ digraph ForceDynamicsFlow {
     arrowsize=0.7
   ];
 
-    ContactDynamics [label="ContactDynamics", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:65:1", tooltip="Open the ContactDynamics section in SourceDocumentation.tex", target="_blank"];
-    BeginSourceContactParms [label="BeginSourceContactParms", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:88:1", tooltip="Open the BeginSourceContactParms section in SourceDocumentation.tex", target="_blank"];
-    InitializeContactState [label="InitializeContactState", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:101:1", tooltip="Open the InitializeContactState section in SourceDocumentation.tex", target="_blank"];
-    GetContactState [label="GetContactState", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:109:1", tooltip="Open the GetContactState section in SourceDocumentation.tex", target="_blank"];
-    GetParticleGeometry [label="GetParticleGeometry", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:154:1", tooltip="Open the GetParticleGeometry section in SourceDocumentation.tex", target="_blank"];
-    GetParticlePosition [label="GetParticlePosition", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:169:1", tooltip="Open the GetParticlePosition section in SourceDocumentation.tex", target="_blank"];
-    AppendContactSlot [label="AppendContactSlot", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:119:1", tooltip="Open the AppendContactSlot section in SourceDocumentation.tex", target="_blank"];
-    GetContactSlots [label="GetContactSlots", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:135:1", tooltip="Open the GetContactSlots section in SourceDocumentation.tex", target="_blank"];
-    GetCollisionPhase [label="GetCollisionPhase", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:142:1", tooltip="Open the GetCollisionPhase section in SourceDocumentation.tex", target="_blank"];
-    GetCollisionInternalMomentum [label="GetCollisionInternalMomentum", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:148:1", tooltip="Open the GetCollisionInternalMomentum section in SourceDocumentation.tex", target="_blank"];
-    CalculateContactParms [label="CalculateContactParms", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:176:1", tooltip="Open the CalculateContactParms section in SourceDocumentation.tex", target="_blank"];
-    GetStartFrameVelocity [label="GetStartFrameVelocity", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:199:1", tooltip="Open the GetStartFrameVelocity section in SourceDocumentation.tex", target="_blank"];
-    GetReducedMass [label="GetReducedMass", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:206:1", tooltip="Open the GetReducedMass section in SourceDocumentation.tex", target="_blank"];
-    CalculateContactWeights [label="CalculateContactWeights", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:217:1", tooltip="Open the CalculateContactWeights section in SourceDocumentation.tex", target="_blank"];
-    CalculateContactImpulses [label="CalculateContactImpulses", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:238:1", tooltip="Open the CalculateContactImpulses section in SourceDocumentation.tex", target="_blank"];
-    GetPairStiffness [label="GetPairStiffness", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:275:1", tooltip="Open the GetPairStiffness section in SourceDocumentation.tex", target="_blank"];
-    ApplySourceVelocityDelta [label="ApplySourceVelocityDelta", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:284:1", tooltip="Open the ApplySourceVelocityDelta section in SourceDocumentation.tex", target="_blank"];
-    GetParticleMass [label="GetParticleMass", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:306:1", tooltip="Open the GetParticleMass section in SourceDocumentation.tex", target="_blank"];
-    UpdateContactLedgers [label="UpdateContactLedgers", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:311:1", tooltip="Open the UpdateContactLedgers section in SourceDocumentation.tex", target="_blank"];
-    SetCollisionInternalMomentum [label="SetCollisionInternalMomentum", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:329:1", tooltip="Open the SetCollisionInternalMomentum section in SourceDocumentation.tex", target="_blank"];
-    SetCollisionPhase [label="SetCollisionPhase", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:335:1", tooltip="Open the SetCollisionPhase section in SourceDocumentation.tex", target="_blank"];
-    SyncInternalMomentum [label="SyncInternalMomentum", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:341:1", tooltip="Open the SyncInternalMomentum section in SourceDocumentation.tex", target="_blank"];
-    GetInternalMomentum [label="GetInternalMomentum", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:347:1", tooltip="Open the GetInternalMomentum section in SourceDocumentation.tex", target="_blank"];
-    SetInternalMomentum [label="SetInternalMomentum", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:353:1", tooltip="Open the SetInternalMomentum section in SourceDocumentation.tex", target="_blank"];
+    ContactDynamics [label="ContactDynamics", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:25:1", tooltip="Open the ContactDynamics section in ForceDynamicsSource.tex", target="_blank"];
+    BeginSourceContactParms [label="BeginSourceContactParms", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:41:1", tooltip="Open the BeginSourceContactParms section in ForceDynamicsSource.tex", target="_blank"];
+    InitializeContactState [label="InitializeContactState", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:46:1", tooltip="Open the InitializeContactState section in ForceDynamicsSource.tex", target="_blank"];
+    GetContactState [label="GetContactState", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:1:1", tooltip="Open the GetContactState section in ForceDynamicsSource.tex", target="_blank"];
+    GetParticleGeometry [label="GetParticleGeometry", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:52:1", tooltip="Open the GetParticleGeometry section in ForceDynamicsSource.tex", target="_blank"];
+    GetParticlePosition [label="GetParticlePosition", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:1:1", tooltip="Open the GetParticlePosition section in ForceDynamicsSource.tex", target="_blank"];
+    AppendContactSlot [label="AppendContactSlot", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:1:1", tooltip="Open the AppendContactSlot section in ForceDynamicsSource.tex", target="_blank"];
+    GetContactSlots [label="GetContactSlots", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:1:1", tooltip="Open the GetContactSlots section in ForceDynamicsSource.tex", target="_blank"];
+    CalculateContactParms [label="CalculateContactParms", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:58:1", tooltip="Open the CalculateContactParms section in ForceDynamicsSource.tex", target="_blank"];
+    GetStartFrameVelocity [label="GetStartFrameVelocity", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:1:1", tooltip="Open the GetStartFrameVelocity section in ForceDynamicsSource.tex", target="_blank"];
+    CalculateContactForces [label="CalculateContactForces", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:64:1", tooltip="Open the CalculateContactForces section in ForceDynamicsSource.tex", target="_blank"];
+    GetPairStiffness [label="GetPairStiffness", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:83:1", tooltip="Open the GetPairStiffness section in ForceDynamicsSource.tex", target="_blank"];
+    GetContactPotentialEnergy [label="GetContactPotentialEnergy", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:92:1", tooltip="Open the GetContactPotentialEnergy section in ForceDynamicsSource.tex", target="_blank"];
+    TotalPotentialEnergy [label="TotalPotentialEnergy", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:98:1", tooltip="Open the TotalPotentialEnergy section in ForceDynamicsSource.tex", target="_blank"];
+    ApplySourceVelocityDelta [label="ApplySourceVelocityDelta", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:107:1", tooltip="Open the ApplySourceVelocityDelta section in ForceDynamicsSource.tex", target="_blank"];
+    GetParticleMass [label="GetParticleMass", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/ForceDynamicsSource.tex:1:1", tooltip="Open the GetParticleMass section in ForceDynamicsSource.tex", target="_blank"];
 
   {
     rank=same;
     ContactDynamics;
-    CalculateContactWeights;
+    CalculateContactForces;
   }
 
     ContactDynamics -> BeginSourceContactParms;
@@ -58,25 +50,17 @@ digraph ForceDynamicsFlow {
     InitializeContactState -> GetContactState;
     GetContactState -> AppendContactSlot;
     AppendContactSlot -> GetContactSlots;
-    GetContactSlots -> GetCollisionPhase;
-    GetCollisionPhase -> GetCollisionInternalMomentum;
-    GetCollisionInternalMomentum -> GetParticleGeometry;
+    GetContactSlots -> GetParticleGeometry;
     GetParticleGeometry -> GetParticlePosition;
     GetParticlePosition -> GetStartFrameVelocity;
-    GetStartFrameVelocity -> GetReducedMass;
-    GetReducedMass -> CalculateContactParms;
+    GetStartFrameVelocity -> CalculateContactParms;
     CalculateContactParms -> InitializeContactState [label="next contact"];
-    CalculateContactParms -> CalculateContactWeights [label="all contacts done"];
-    CalculateContactWeights -> CalculateContactImpulses;
-    CalculateContactImpulses -> GetPairStiffness;
-    GetPairStiffness -> CalculateContactImpulses;
-    CalculateContactImpulses -> ApplySourceVelocityDelta;
+    CalculateContactParms -> CalculateContactForces [label="all contacts done"];
+    CalculateContactForces -> GetPairStiffness;
+    GetPairStiffness -> CalculateContactForces;
+    CalculateContactForces -> GetContactPotentialEnergy;
+    GetContactPotentialEnergy -> CalculateContactForces;
+    CalculateContactForces -> ApplySourceVelocityDelta;
     ApplySourceVelocityDelta -> GetParticleMass;
     GetParticleMass -> ApplySourceVelocityDelta;
-    ApplySourceVelocityDelta -> UpdateContactLedgers;
-    UpdateContactLedgers -> SetCollisionInternalMomentum;
-    SetCollisionInternalMomentum -> SetCollisionPhase;
-    SetCollisionPhase -> SyncInternalMomentum;
-    SyncInternalMomentum -> GetInternalMomentum;
-    GetInternalMomentum -> SetInternalMomentum;
 }

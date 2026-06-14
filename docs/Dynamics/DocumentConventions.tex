@@ -6,8 +6,8 @@
 The phrase \emph{update project} means:
 \begin{enumerate}
 \item Read \texttt{main.tex} and every active file that it includes.
-\item Compare the document against the current live \texttt{<model>Dynamics}
-implementation.
+\item Compare every model document included by \texttt{main.tex} against its
+current \texttt{<model>Dynamics} implementation.
 \item Analyze which document sections are out of date.
 \item Present the proposed document changes for review before modifying any
 document file.
@@ -79,6 +79,19 @@ Shared document conventions, dynamics conventions, programming conventions,
 and problem evolution remain in their corresponding shared document files.
 Retired model source documents must be removed from \texttt{main.tex} or moved
 under the old-document directory.
+
+\subsection{Retiring Dynamics}
+
+Retiring \texttt{<model>Dynamics} means:
+\begin{enumerate}
+\item Remove the model import and registry entry from
+\texttt{SimulationRunner.py}.
+\item Move its model-specific Python files under
+\texttt{python/base/old/<model>Dynamics}.
+\item Remove its source document from \texttt{main.tex} and move any retained
+model-specific documents under \texttt{docs/Dynamics/old}.
+\item Ensure \texttt{ParticleUtil.cfg} does not select the retired model.
+\end{enumerate}
 
 \subsection{Generated Source Flowcharts}
 

@@ -3,7 +3,6 @@ from pathlib import Path
 import math
 
 from base.WeightedDynamicsBase import WeightedDynamics
-from base.MomentumDynamicsBase import MomentumDynamics
 from base.ForceDynamicsBase import ForceDynamics
 from base.Reporting import Reporting
 from base.InLineTest import InLineTest
@@ -12,7 +11,6 @@ from gbase import libconf
 
 BASE_CLASS_REGISTRY = {
     "ForceDynamics": ForceDynamics,
-    "MomentumDynamics": MomentumDynamics,
     "WeightedDynamics": WeightedDynamics,
 }
 
@@ -163,6 +161,13 @@ def _total_kinetic_energy(particles):
     return sum(_particle_kinetic_energy(particle) for particle in particles)
 
 
+def _total_potential_energy(dynamics):
+    total_potential_energy = getattr(dynamics, "TotalPotentialEnergy", None)
+    if total_potential_energy is None:
+        return 0.0
+    return float(total_potential_energy())
+
+
 def _total_report_kinetic_energy(particles, field_name):
     return sum(float(getattr(particle, field_name, 0.0)) for particle in particles)
 
@@ -199,14 +204,19 @@ def _sequential_contact_diagnostics(particles):
     return 0.0, 0.0
 
 
-def _run_start_diagnostics(particles):
+def _run_start_diagnostics(dynamics):
+    particles = dynamics.particles
+    ke = _total_kinetic_energy(particles)
+    potential_energy = _total_potential_energy(dynamics)
     return {
         "total_momentum": _total_momentum(particles),
-        "ke": _total_kinetic_energy(particles),
+        "ke": ke,
+        "potential_energy": potential_energy,
+        "total_energy": ke + potential_energy,
     }
 
 
-def _motion_summary(start_diagnostics, particles):
+def _motion_summary(start_diagnostics, particles, dynamics=None):
     start_total_momentum = start_diagnostics["total_momentum"]
     start_x, start_y = start_total_momentum
     current_x, current_y = _total_momentum(particles)
@@ -217,6 +227,8 @@ def _motion_summary(start_diagnostics, particles):
     curr_plus_internal_mom = current_total_p + total_internal_momentum
     start_ke = start_diagnostics["ke"]
     current_ke = _total_kinetic_energy(particles)
+    potential_energy = _total_potential_energy(dynamics) if dynamics is not None else 0.0
+    total_energy = current_ke + potential_energy
     frame_start_ke = _total_report_kinetic_energy(particles, "report_frame_start_ke")
     after_resolve_ke = _total_report_kinetic_energy(particles, "report_after_resolve_ke")
     v_rel, raw_impulse = _sequential_contact_diagnostics(particles)
@@ -240,6 +252,9 @@ def _motion_summary(start_diagnostics, particles):
         "frame_start_ke": frame_start_ke,
         "after_resolve_ke": after_resolve_ke,
         "ke_drift": current_ke - start_ke,
+        "potential_energy": potential_energy,
+        "total_energy": total_energy,
+        "energy_drift": total_energy - start_diagnostics["total_energy"],
         "v_rel": v_rel,
         "raw_impulse": raw_impulse,
     }
@@ -444,8 +459,8 @@ def _draw_particles(
     pygame.display.flip()
 
 
-def _report_particles(reporting, frame_number, particles, start_diagnostics):
-    motion_summary = _motion_summary(start_diagnostics, particles)
+def _report_particles(reporting, frame_number, particles, start_diagnostics, dynamics):
+    motion_summary = _motion_summary(start_diagnostics, particles, dynamics)
     reporting.report_frame_momentum(frame_number, motion_summary)
     reporting.report_contacts(frame_number, particles)
     for particle in particles:
@@ -490,8 +505,8 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
         f"SimulationRunner cleared {live_reporting.cleared_report_count} "
         f"capture file(s): {report_dir}"
     )
-    live_start_diagnostics = _run_start_diagnostics(live.particles)
-    shadow_start_diagnostics = _run_start_diagnostics(shadow.particles)
+    live_start_diagnostics = _run_start_diagnostics(live)
+    shadow_start_diagnostics = _run_start_diagnostics(shadow)
 
     pygame.init()
     screen = pygame.display.set_mode(_window_size(run_configuration))
@@ -530,6 +545,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                     frame_number,
                     live_particles,
                     live_start_diagnostics,
+                    live,
                 )
                 shadow_particles = shadow.CollisionRun()
                 _report_particles(
@@ -537,6 +553,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                     frame_number,
                     shadow_particles,
                     shadow_start_diagnostics,
+                    shadow,
                 )
             else:
                 live_particles = live.particles
