@@ -40,6 +40,8 @@ copies document the unchanged starting model before development begins.
 \item Now \texttt{live\_base = <old model>}. Change \texttt{ParticleUtil.cfg} to make \texttt{live\_base = "<new model>Dynamics";} and 
 \texttt{shadow\_base = "<old model>Dynamics";}.
 
+\item Determine the data required for the diagnostics plots.
+\item Create a new diagnostics plotting script named <new model>Plots.py
 \end{enumerate}
 \subsection{Programming Styles}
 
@@ -230,7 +232,7 @@ apply totals1
 apply totals2
 ...
 apply one source velocity write
-update model-owned state when required
+update source-owned ledgers
 \end{verbatim}
 
 Loops belong in the narrowest function that owns the sequence.  Per-contact
@@ -264,12 +266,12 @@ Move(SourceID)
 isParticleContact(Frame, SourceID, TargetID, positionBuffer)
 \end{verbatim}
 
-\texttt{<model>Dynamics.py} should avoid Python-only helper names unless the helper
+\texttt{WeightedDynamics.py} should avoid Python-only helper names unless the helper
 is also expected to exist in GLSL.
 
 Before adding or renaming any dynamics field, buffer, function, or constant, check
-the GLSL source files first.  The GLSL names are the naming authority for each
-portable dynamics path:
+the GLSL source files first.  The GLSL names are the naming authority for the
+weighted path:
 
 \begin{verbatim}
 C:\_DJ\gPCD\vulkan\sim\common\*.glsl
@@ -277,9 +279,9 @@ C:\_DJ\gPCD\vulkan\sim\BoundarySpheresMotion\BoundarySpheresMotionP.comp
 \end{verbatim}
 
 Python names should stay coordinated with those files whenever possible.  If a
-Python-only harness name is needed, it belongs in
-\texttt{<model>DynamicsBase.py}, \texttt{SimulationRunner.py}, or
-\texttt{Reporting.py}, not in \texttt{<model>Dynamics.py}.
+Python-only harness name is needed, it belongs in \texttt{WeightedDynamicsBase.py},
+\texttt{SimulationRunner.py}, or \texttt{Reporting.py}, not in
+\texttt{WeightedDynamics.py}.
 
 \subsection{Data Convention}
 
@@ -298,7 +300,7 @@ Particle["vx"]
 
 The Python structures should be shaped to resemble GLSL buffers and push
 constants.  Python-only configuration parsing must not leak into
-\texttt{<model>Dynamics.py}.
+\texttt{WeightedDynamics.py}.
 
 \subsection{Runtime Names}
 

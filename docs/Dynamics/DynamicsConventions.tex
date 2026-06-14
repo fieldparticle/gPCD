@@ -10,10 +10,10 @@ to transfer to GLSL with minimal translation.
 
 \subsection{Source-Owned Execution}
 
-Each source particle reads the immutable frame-start position and velocity
-snapshots, processes all of its current contacts, vector-sums the planned
-contact impulses, and writes only its own velocity and contact state.  A source
-must not write a target particle.
+Each source particle reads immutable position and velocity snapshots,
+processes all of its current contacts, vector-sums the planned contact
+response, and writes only its own state.  A source must not write a target
+particle.
 
 The opposing source evaluation reads the same frame-start geometry.  Pair
 compatibility and whole-system conservation must therefore emerge from the
@@ -89,10 +89,11 @@ U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}A_{ij}(s)\,ds.
 \end{equation}
 
 The Force contact law is memoryless, instantaneous, and purely geometric.
-Current force depends on current frame-start positions, radii, pair stiffness,
-overlap area, and contact normal.  Relative velocity is diagnostic only and
-does not affect force magnitude.  Only particle physical state, including
-position and velocity, persists into the next frame.
+Each velocity-Verlet timestep evaluates it at frame-start positions and
+predicted end positions.  Force depends on the selected position snapshot,
+radii, pair stiffness, overlap area, and contact normal.  Relative velocity is
+diagnostic only and does not affect force magnitude.  Only particle physical
+state, including position and velocity, persists into the next frame.
 
 \subsection{Persistent Contact State}
 
@@ -110,3 +111,15 @@ geometry only.  Documentation must distinguish actual vector momentum drift
 from scalar internal-momentum ledger totals.  A drained WeightedDynamics
 internal-momentum ledger does not, by itself, prove momentum or kinetic-energy
 conservation.
+
+\subsection{Boundary Convention}
+
+Force-model walls must use a conservative geometric response compatible with
+the model's integration method.  A fixed wall may contribute force and
+potential energy to a source particle, but it is not integrated and must not
+receive a particle-state write.  Wall forces must be evaluated at every
+position snapshot used by the model integrator.
+
+Long-running closed-box energy statistics are meaningful only after wall work
+and wall potential energy are included in the same diagnostics as
+particle-particle contacts.

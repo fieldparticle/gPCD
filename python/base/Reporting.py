@@ -18,6 +18,7 @@ class Reporting:
         self.written_momentum_frames = set()
         self.written_particle_frames = set()
         self.written_contact_frames = set()
+        self.written_pair_phase_frames = set()
 
     def clear_existing_reports(self):
         deleted_count = 0
@@ -70,6 +71,9 @@ class Reporting:
     def contacts_report_path(self):
         return self.output_dir / f"contacts{self.file_suffix}.csv"
 
+    def pair_phases_report_path(self):
+        return self.output_dir / f"pair_phases{self.file_suffix}.csv"
+
     @staticmethod
     def csv_number(value):
         if value == "":
@@ -84,6 +88,15 @@ class Reporting:
 
         csv_path = self.momentum_report_path()
         write_header = csv_path not in self.written_headers
+        integer_columns = {
+            "frame",
+            "source_index",
+            "target_index",
+            "compression_steps",
+            "rebound_steps",
+            "stationary_steps",
+            "step_count_difference",
+        }
         with csv_path.open("a", newline="", encoding="utf-8") as csv_file:
             writer = csv.writer(csv_file)
             if write_header:
@@ -191,6 +204,63 @@ class Reporting:
                 ]
             )
         self.written_particle_frames.add(particle_frame_key)
+
+    def report_pair_phases(self, frame_number, dynamics):
+        """Write diagnostics-only ForceDynamics pair-phase symmetry measures."""
+        if not self.should_report_frame(frame_number):
+            return
+        if frame_number in self.written_pair_phase_frames:
+            return
+        rows = getattr(dynamics, "pair_phase_frame_diagnostics", [])
+        if not rows:
+            return
+
+        csv_path = self.pair_phases_report_path()
+        columns = [
+            "frame",
+            "source_index",
+            "target_index",
+            "phase",
+            "start_overlap_area",
+            "end_overlap_area",
+            "area_time",
+            "force_work",
+            "energy_drift",
+            "compression_steps",
+            "rebound_steps",
+            "stationary_steps",
+            "compression_area_time",
+            "rebound_area_time",
+            "stationary_area_time",
+            "compression_work",
+            "rebound_work",
+            "stationary_work",
+            "compression_min_energy_drift",
+            "compression_max_energy_drift",
+            "rebound_min_energy_drift",
+            "rebound_max_energy_drift",
+            "step_count_difference",
+            "area_time_difference",
+            "work_residual",
+        ]
+        write_header = csv_path not in self.written_headers
+        with csv_path.open("a", newline="", encoding="utf-8") as csv_file:
+            writer = csv.writer(csv_file)
+            if write_header:
+                writer.writerow(columns)
+                self.written_headers.add(csv_path)
+            for row in rows:
+                writer.writerow(
+                    [
+                        row[column]
+                        if column == "phase"
+                        else int(row[column])
+                        if column in integer_columns
+                        else self.csv_number(row[column])
+                        for column in columns
+                    ]
+                )
+        self.written_pair_phase_frames.add(frame_number)
 
     def report_contacts(self, frame_number, particles):
         if not self.should_report_frame(frame_number):

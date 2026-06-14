@@ -8,9 +8,10 @@
 }
 
 \texttt{ForceDynamics} treats particle overlap area as a central repulsive
-force field.  Each source reads immutable frame-start geometry, calculates the
-force contribution from every overlapping target, vector-sums those
-contributions, and writes only its own velocity.
+force field.  Velocity Verlet evaluates the source-owned force once at the
+frame-start positions and once at predicted end positions.  Each source
+vector-sums its force contributions and writes only its own acceleration,
+position, and velocity.
 
 \begin{figure}[ht]
 \centering
@@ -22,10 +23,35 @@ contributions, and writes only its own velocity.
 
 \ForceFunctionSection{CollisionRun}
 
-\texttt{CollisionRun} retains the shared frame chain.  Contact forces are
-calculated from one immutable frame-start snapshot, velocities are updated,
-and movement then uses the updated velocities.  This is a semi-implicit Euler
-step.
+\texttt{CollisionRun} performs a velocity-Verlet frame:
+
+\begin{verbatim}
+snapshot x_n and v_n
+calculate source accelerations a_n
+predict x_(n+1)
+snapshot predicted positions
+calculate source accelerations a_(n+1)
+finish v_(n+1) from the average acceleration
+\end{verbatim}
+
+Both force scans read immutable position snapshots.  The integration stores
+accelerations only within the current timestep; the force law retains no
+information from a previous timestep.
+
+\subsection{Current Wall Status}
+
+\texttt{BuildWallContactLists} is currently a no-op, so
+\texttt{ForceDynamics} does not yet apply wall forces.  Restoring walls is the
+next implementation step.  Wall response must participate in both
+velocity-Verlet force evaluations and remain source-owned: a particle may read
+fixed wall geometry and write only its own acceleration, position, velocity,
+and wall-contact diagnostics.
+
+The wall force should be conservative and derived from overlap geometry so
+that wall interactions can be included in kinetic, potential, total-energy,
+and work-residual diagnostics.  Until wall behavior is restored and verified,
+long-running particles-in-a-box energy statistics cannot distinguish
+particle-contact integration error from boundary error.
 
 \ForceFunctionSection{ContactDynamics}
 
@@ -35,9 +61,9 @@ step.
 BeginSourceContactParms
 for each TargetID:
     InitializeContactState
-    CalculateContactParms
+CalculateContactParms
 CalculateContactForces
-ApplySourceVelocityDelta
+CalculateSourceAcceleration
 \end{verbatim}
 
 There is no contact weighting, compression/release decision, available
@@ -146,18 +172,62 @@ diagnostic double counting.  System energy diagnostics report:
 E_{\mathrm{total}}=KE+\sum_{i<j}U_{ij}.
 \end{equation}
 
-\ForceFunctionSection{ApplySourceVelocityDelta}
+\subsection{Pair-Phase Symmetry Diagnostics}
 
-Each source contact contributes:
+After both force evaluations, diagnostics classify each unordered pair's
+actual geometric step from the change in center distance.  Decreasing distance
+is compression; increasing distance is rebound.  The diagnostics accumulate
+compression and rebound step counts, trapezoidal overlap area-time, central
+force work, and phase energy-error extrema.  They also report:
+
+\begin{equation}
+\Delta N=N_{\mathrm{compression}}-N_{\mathrm{rebound}},
+\end{equation}
+
+\begin{equation}
+\Delta(A t)=
+\sum_{\mathrm{compression}}A\Delta t
+-
+\sum_{\mathrm{rebound}}A\Delta t,
+\end{equation}
+
+\begin{equation}
+W_{\mathrm{residual}}=
+W_{\mathrm{compression}}+W_{\mathrm{rebound}}.
+\end{equation}
+
+These values are written to \texttt{pair\_phases.csv}.  They are diagnostics
+only and do not affect force, acceleration, position, or velocity.
+
+The completed-contact work residual matches the completed-collision total
+energy residual in the current two- and three-particle tests.  Compression and
+rebound step-count or area-time differences reveal sampling asymmetry, but
+neither alone predicts the sign or magnitude of the remaining energy error.
+
+\ForceFunctionSection{CalculateSourceAcceleration}
+
+Each source contact contributes a central impulse diagnostic:
 
 \begin{equation}
 \Delta\mathbf p_{ij}=-J_{ij}\mathbf n_{ij}.
 \end{equation}
 
-All source contact contributions are vector-summed before one source velocity
-write.  Independent opposing-source evaluation produces the equal-and-opposite
-target contribution because pair stiffness, overlap area, and frame-start
-geometry are symmetric.
+All source contact contributions are vector-summed and divided by source mass
+to store either \(\mathbf a_n\) or \(\mathbf a_{n+1}\).  Independent
+opposing-source evaluation produces equal-and-opposite pair forces because
+pair stiffness, overlap area, and snapshot geometry are symmetric.
+
+\ForceFunctionSection{FinishSourceVelocity}
+
+\texttt{FinishSourceVelocity(SourceID)} performs the only velocity write in
+the frame:
+
+\begin{equation}
+\mathbf v_{n+1}
+=
+\mathbf v_n+\frac{1}{2}
+\left(\mathbf a_n+\mathbf a_{n+1}\right)\Delta t.
+\end{equation}
 
 \ForceFunctionSection{GetParticleMass}
 
@@ -166,10 +236,13 @@ geometry are symmetric.
 
 \ForceFunctionSection{Move}
 
-\texttt{Move(SourceID)} advances position using the newly updated velocity:
+\texttt{Move(SourceID)} predicts the end position:
 
 \begin{equation}
-\mathbf x_{n+1}=\mathbf x_n+\mathbf v_{n+1}\Delta t.
+\mathbf x_{n+1}
+=
+\mathbf x_n+\mathbf v_n\Delta t
++\frac{1}{2}\mathbf a_n\Delta t^2.
 \end{equation}
 
 Completed-collision energy error converges toward zero under timestep
@@ -182,4 +255,5 @@ final energy difference = approximately -0.00000017
 \end{verbatim}
 
 The remaining difference is a small numerical energy leak from the current
-integration step.
+integration step.  With velocity Verlet, the maximum absolute energy excursion
+during the same run is approximately \(0.00000227\).

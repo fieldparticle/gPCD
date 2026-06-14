@@ -39,9 +39,10 @@
 \node[function, right=of collisionrun] (forces) {\ForceFlowNode{CalculateContactForces}{CalculateContactForces}};
 \node[function, below=of forces] (stiffness) {\ForceFlowNode{GetPairStiffness}{GetPairStiffness}};
 \node[diagnostic, below=of stiffness] (contactpotential) {\ForceFlowNode{GetContactPotentialEnergy}{GetContactPotentialEnergy}};
-\node[function, below=of contactpotential] (velocitydelta) {\ForceFlowNode{ApplySourceVelocityDelta}{ApplySourceVelocityDelta}};
-\node[function, below=of velocitydelta] (mass) {\ForceFlowNode{GetParticleMass}{GetParticleMass}};
+\node[function, below=of contactpotential] (acceleration) {\ForceFlowNode{CalculateSourceAcceleration}{CalculateSourceAcceleration}};
+\node[function, below=of acceleration] (mass) {\ForceFlowNode{GetParticleMass}{GetParticleMass}};
 \node[function, below=of mass] (move) {\ForceFlowNode{Move}{Move}};
+\node[function, below=of move] (finish) {\ForceFlowNode{FinishSourceVelocity}{FinishSourceVelocity}};
 \node[diagnostic, right=of move] (totalpotential) {\ForceFlowNode{TotalPotentialEnergy}{TotalPotentialEnergy}};
 
 \draw[flow] (collisionrun) -- (contact);
@@ -60,9 +61,10 @@
 
 \draw[support] (forces) -- (stiffness);
 \draw[support] (forces.east) -- ++(0.22in,0) |- (contactpotential.east);
-\draw[flow] (forces.west) -- ++(-0.22in,0) |- (velocitydelta.west);
-\draw[support] (velocitydelta) -- (mass);
-\draw[flow] (collisionrun.east) -- ++(0.28in,0) |- node[pos=0.82,right,font=\scriptsize]{movement pass} (move.east);
+\draw[flow] (forces.west) -- ++(-0.22in,0) |- (acceleration.west);
+\draw[support] (acceleration) -- (mass);
+\draw[flow] (collisionrun.east) -- ++(0.28in,0) |- node[pos=0.82,right,font=\scriptsize]{predict position} (move.east);
+\draw[flow] (move) -- node[right,font=\scriptsize]{second force scan} (finish);
 \draw[support] (collisionrun.east) -- ++(0.48in,0) |- node[pos=0.82,right,font=\scriptsize]{reporting diagnostic} (totalpotential.east);
 \draw[support] (totalpotential) -- (contactpotential);
 

@@ -25,7 +25,7 @@ from gbase.import_module import load_class_from_file
 from gbase.pdata import *
 from gbase.GenPQBData import *
 from SimulationRunner import run_analysis as simulation_run_analysis
-from base.DiagnosticsPlots import run_diagnostics
+from base.ForcePlots import run_force_plots
 #from GenMotionData import *
 #from subprocess import Popen
 import subprocess
@@ -380,7 +380,7 @@ class TabGenData(QTabWidget):
 
     def run_diagnostics_plots(self):
         diagnostics_cfg = self.diagnostics_cfg_file or self.CfgFile
-        self.diagnostics_figure = run_diagnostics([diagnostics_cfg, "--show"])
+        self.diagnostics_figure = run_force_plots([diagnostics_cfg])
 
     #******************************************************************
     # Creatwe the tab
@@ -429,7 +429,7 @@ class TabGenData(QTabWidget):
             self.AnalyseButton.setEnabled(True)
             dirgrid.addWidget(self.AnalyseButton,2,0)
 
-            self.DiagnosticsButton = QPushButton("Diagnostics Plots")
+            self.DiagnosticsButton = QPushButton("Force Plots")
             self.setSize(self.DiagnosticsButton,30,100)
             self.DiagnosticsButton.setStyleSheet("background-color:  #dddddd")
             self.DiagnosticsButton.clicked.connect(self.run_diagnostics_plots)

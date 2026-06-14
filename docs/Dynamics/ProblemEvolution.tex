@@ -109,10 +109,56 @@ potential energy      = 0
 \end{verbatim}
 
 Equal-time timestep refinement drives the completed-collision energy error
-toward zero.  The remaining error is numerical integration error from the
-current semi-implicit movement step rather than a missing physical energy
-store.  Improving the integration step is the next investigation.  Wall-force
-behavior has not yet been established.
+toward zero.  \texttt{ForceDynamics} now uses velocity Verlet: it evaluates
+force at frame-start and predicted end positions, predicts position with
+\(\frac{1}{2}\mathbf a_n\Delta t^2\), and finishes velocity with the average
+of the two accelerations.  At \(\Delta t=0.05\), the maximum absolute
+\texttt{ThreeParticle} energy excursion fell from approximately
+\(0.0000998\) to \(0.00000227\), while vector momentum remains conserved.
+Wall-force behavior has not yet been established.
+
+\subsection{Statistical Energy Validation Requires Walls}
+
+\subsubsection{<previous form>}
+
+Two- and three-particle tests measured bounded energy excursions and small
+completed-collision residuals.  They established timestep convergence and
+showed that completed-contact force-work residual equals final total-energy
+residual, but they do not establish the long-term statistical behavior of many
+collisions.
+
+\subsubsection{<current form>}
+
+The next validation target is a long-running particles-in-a-box test with many
+elastic particle collisions.  It will measure whether completed-contact energy
+residuals are unbiased and statistically cancel, behave as a random walk, or
+produce systematic energy drift.
+
+\subsubsection{difference outcome}
+
+Next investigation.
+
+\subsubsection{<Analysis>}
+
+The box test is blocked by the current \texttt{ForceDynamics} wall path:
+\texttt{BuildWallContactLists} is a no-op.  Walls must be restored before the
+statistical test because nonconservative or unreported wall work would
+contaminate the particle-collision result.
+
+The wall implementation must:
+
+\begin{itemize}
+    \item remain source-owned and treat walls as fixed geometry;
+    \item evaluate wall forces during both velocity-Verlet force scans;
+    \item use a conservative overlap-derived wall potential;
+    \item report wall work and potential energy separately;
+    \item preserve tangential velocity for a frictionless wall;
+    \item prevent tunneling without an after-the-fact energy-changing clip.
+\end{itemize}
+
+After wall validation, repeated random-seed box runs will report total-energy
+error versus time, completed-contact work-residual distributions, mean
+residual per collision, and cumulative residual versus collision count.
 
 \subsection{Retire MomentumDynamics}
 

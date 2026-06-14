@@ -463,6 +463,7 @@ def _report_particles(reporting, frame_number, particles, start_diagnostics, dyn
     motion_summary = _motion_summary(start_diagnostics, particles, dynamics)
     reporting.report_frame_momentum(frame_number, motion_summary)
     reporting.report_contacts(frame_number, particles)
+    reporting.report_pair_phases(frame_number, dynamics)
     for particle in particles:
         reporting.report_particle(frame_number, particle, motion_summary)
 

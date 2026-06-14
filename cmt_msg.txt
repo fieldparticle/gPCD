@@ -1,11 +1,13 @@
 Current status:
-	- ForceDynamics uses an instantaneous geometric central-force model
-	- Vector momentum is exact and completed-collision energy has a small numerical leak
-	- Force energy calculations are diagnostic only
+	- ForceDynamics uses source-owned velocity Verlet integration.
+	- Pair-phase diagnostics show completed-contact work residual equals final energy residual.
+	- ForcePlots provides three model-owned time-series panels.
+	- Missing ForceDynamics wall behavior blocks many-particle statistical validation.
 
 Code Changes:
-	- Replaced ForceDynamics momentum ledgers with overlap-area central forces
-	- Added potential-energy and total-energy diagnostics
-	- Updated Force source documentation and flowchart
+	- Replaced ForceDynamics semi-implicit integration with two-scan velocity Verlet.
+	- Added compression/rebound work and symmetry diagnostics.
+	- Added pair-phase CSV reporting.
+	- Added model-owned ForcePlots.py without live/shadow selection.
 
-Next: Reduce the remaining numerical energy leak through integration refinement
+Next: Implement conservative ForceDynamics wall forces in both Verlet force scans, then validate long-running particles-in-a-box energy statistics.

@@ -35,7 +35,8 @@ NODE_SOURCES = {
     "GetPairStiffness": FORCE_DYNAMICS,
     "GetContactPotentialEnergy": FORCE_DYNAMICS,
     "TotalPotentialEnergy": FORCE_DYNAMICS,
-    "ApplySourceVelocityDelta": FORCE_DYNAMICS,
+    "CalculateSourceAcceleration": FORCE_DYNAMICS,
+    "FinishSourceVelocity": FORCE_DYNAMICS,
     "GetParticleMass": FORCE_DYNAMICS,
 }
 
@@ -101,9 +102,10 @@ def build_dot() -> str:
         dot_edge("GetPairStiffness", "CalculateContactForces"),
         dot_edge("CalculateContactForces", "GetContactPotentialEnergy"),
         dot_edge("GetContactPotentialEnergy", "CalculateContactForces"),
-        dot_edge("CalculateContactForces", "ApplySourceVelocityDelta"),
-        dot_edge("ApplySourceVelocityDelta", "GetParticleMass"),
-        dot_edge("GetParticleMass", "ApplySourceVelocityDelta"),
+        dot_edge("CalculateContactForces", "CalculateSourceAcceleration"),
+        dot_edge("CalculateSourceAcceleration", "GetParticleMass"),
+        dot_edge("GetParticleMass", "CalculateSourceAcceleration"),
+        dot_edge("CalculateSourceAcceleration", "FinishSourceVelocity"),
     ]
 
     lines = [
@@ -148,7 +150,8 @@ def build_dot() -> str:
             dot_node("GetPairStiffness", "GetPairStiffness", "box", action),
             dot_node("GetContactPotentialEnergy", "GetContactPotentialEnergy", "box", action),
             dot_node("TotalPotentialEnergy", "TotalPotentialEnergy", "box", action),
-            dot_node("ApplySourceVelocityDelta", "ApplySourceVelocityDelta", "box", action),
+            dot_node("CalculateSourceAcceleration", "CalculateSourceAcceleration", "box", action),
+            dot_node("FinishSourceVelocity", "FinishSourceVelocity", "box", action),
             dot_node("GetParticleMass", "GetParticleMass", "box", action),
         ]
     )

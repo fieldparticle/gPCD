@@ -61,7 +61,7 @@ class ForceContactDynamics:
             self.ClearContactSlot(contact_state)
 
     def ContactDynamics(self, SourceID):
-        """Calculate and apply every current overlap-area force for one source."""
+        """Calculate every current overlap-area force for one source."""
         if not self.BeginSourceContactParms(SourceID):
             return False
         source = self.particles[SourceID]
@@ -72,7 +72,7 @@ class ForceContactDynamics:
             self.CalculateContactParms(SourceID, TargetID, contact_state)
         if not self.CalculateContactForces(SourceID):
             return False
-        return self.ApplySourceVelocityDelta(SourceID)
+        return self.CalculateSourceAcceleration(SourceID)
 
     def BeginSourceContactParms(self, SourceID):
         """Reset source-level geometry totals rebuilt from current contacts."""
@@ -315,51 +315,75 @@ class ForceContactDynamics:
                 )
         return total_potential_energy
 
-    def ApplySourceVelocityDelta(self, SourceID):
-        """Apply the vector sum of central-force impulses to source velocity."""
+    def CalculateSourceAcceleration(self, SourceID):
+        """Store the source acceleration from the current geometry snapshot."""
         source = self.particles[SourceID]
         contact_slots = self.GetContactSlots(SourceID)
         source_mass = self.GetParticleMass(SourceID)
-        source_vx_before = source.VelRad.x
-        source_vy_before = source.VelRad.y
-        source_vz_before = source.VelRad.z
 
-        delta_momentum_x = 0.0
-        delta_momentum_y = 0.0
-        delta_momentum_z = 0.0
+        source_force_x = 0.0
+        source_force_y = 0.0
+        source_force_z = 0.0
 
         for slot_index in range(source.contactCount):
             contact_state = contact_slots[slot_index]
             normal_x = float(contact_state.geom.x)
             normal_y = float(contact_state.geom.y)
             normal_z = float(contact_state.geom.z)
+            force_magnitude = max(0.0, float(contact_state.force_magnitude))
             applied_impulse = max(0.0, float(contact_state.raw_impulse))
 
+            source_force_x -= force_magnitude * normal_x
+            source_force_y -= force_magnitude * normal_y
+            source_force_z -= force_magnitude * normal_z
             contact_delta_px = -applied_impulse * normal_x
             contact_delta_py = -applied_impulse * normal_y
             contact_delta_pz = -applied_impulse * normal_z
-            delta_momentum_x += contact_delta_px
-            delta_momentum_y += contact_delta_py
-            delta_momentum_z += contact_delta_pz
 
             contact_state.aux.w = applied_impulse
             contact_state.delta_px = contact_delta_px
             contact_state.delta_py = contact_delta_py
             contact_state.delta_pz = contact_delta_pz
-            contact_state.source_vx_before = source_vx_before
-            contact_state.source_vy_before = source_vy_before
-            contact_state.source_vz_before = source_vz_before
 
-        source.VelRad.x += delta_momentum_x / source_mass
-        source.VelRad.y += delta_momentum_y / source_mass
-        source.VelRad.z += delta_momentum_z / source_mass
+        acceleration = (
+            source.force_acceleration_current
+            if getattr(self, "force_acceleration_pass", "current") == "current"
+            else source.force_acceleration_next
+        )
+        acceleration.x = source_force_x / source_mass
+        acceleration.y = source_force_y / source_mass
+        acceleration.z = source_force_z / source_mass
+        acceleration.w = 0.0
+        return True
+
+    def FinishSourceVelocity(self, SourceID):
+        """Apply the velocity-Verlet average acceleration to one source."""
+        if not self.isValidParticleID(SourceID):
+            return self.SetError(self.constants.ERROR_INVALID_SOURCE_ID)
+        dt = float(self.ShaderFlags.dt)
+        if dt <= 0.0:
+            return self.SetError(self.constants.ERROR_INVALID_DT)
+
+        source = self.particles[SourceID]
+        start_velocity = self.GetStartFrameVelocity(SourceID)
+        current = source.force_acceleration_current
+        next_acceleration = source.force_acceleration_next
+        source.VelRad.x = start_velocity.x + 0.5 * (current.x + next_acceleration.x) * dt
+        source.VelRad.y = start_velocity.y + 0.5 * (current.y + next_acceleration.y) * dt
+        source.VelRad.z = start_velocity.z + 0.5 * (current.z + next_acceleration.z) * dt
         source.VelRad.w = self.VelocityAngle(source.VelRad.x, source.VelRad.y)
         source.vx = source.VelRad.x
         source.vy = source.VelRad.y
         source.vz = source.VelRad.z
 
+        delta_momentum_x = self.GetParticleMass(SourceID) * (source.VelRad.x - start_velocity.x)
+        delta_momentum_y = self.GetParticleMass(SourceID) * (source.VelRad.y - start_velocity.y)
+        delta_momentum_z = self.GetParticleMass(SourceID) * (source.VelRad.z - start_velocity.z)
         for slot_index in range(source.contactCount):
-            contact_state = contact_slots[slot_index]
+            contact_state = self.GetContactSlots(SourceID)[slot_index]
+            contact_state.source_vx_before = start_velocity.x
+            contact_state.source_vy_before = start_velocity.y
+            contact_state.source_vz_before = start_velocity.z
             contact_state.source_vx_after = source.VelRad.x
             contact_state.source_vy_after = source.VelRad.y
             contact_state.source_vz_after = source.VelRad.z
@@ -373,13 +397,7 @@ class ForceContactDynamics:
         return max(self.particles[ParticleID].parms.x, self.EPSILON)
 
     def Move(self, SourceID):
-        """Move one source particle into the inactive position buffer.
-
-        Validate the source ID and frame dt, integrate position using the
-        source's newly updated velocity, mark which position buffer is active,
-        and report an error if the output position crosses the lower bounds.
-        The frame-chain owner performs the final buffer swap.
-        """
+        """Predict one source position into the inactive position buffer."""
         position_buffer = int(self.ShaderFlags.positionBuffer)
         dt = self.ShaderFlags.dt
         if not self.isValidParticleID(SourceID):
@@ -388,18 +406,21 @@ class ForceContactDynamics:
             return self.SetError(self.constants.ERROR_INVALID_DT)
 
         particle = self.particles[SourceID]
-        velocity = particle.VelRad
+        position = self.GetParticlePosition(SourceID)
+        velocity = self.GetStartFrameVelocity(SourceID)
+        acceleration = particle.force_acceleration_current
+        half_dt_squared = 0.5 * dt * dt
         if position_buffer == 0:
-            particle.PosLocB.x = particle.PosLocA.x + velocity.x * dt
-            particle.PosLocB.y = particle.PosLocA.y + velocity.y * dt
-            particle.PosLocB.z = particle.PosLocA.z + velocity.z * dt
+            particle.PosLocB.x = position.x + velocity.x * dt + acceleration.x * half_dt_squared
+            particle.PosLocB.y = position.y + velocity.y * dt + acceleration.y * half_dt_squared
+            particle.PosLocB.z = position.z + velocity.z * dt + acceleration.z * half_dt_squared
             particle.PosLocA.w = 1.0
             particle.PosLocB.w = 0.0
             output_position = particle.PosLocB
         else:
-            particle.PosLocA.x = particle.PosLocB.x + velocity.x * dt
-            particle.PosLocA.y = particle.PosLocB.y + velocity.y * dt
-            particle.PosLocA.z = particle.PosLocB.z + velocity.z * dt
+            particle.PosLocA.x = position.x + velocity.x * dt + acceleration.x * half_dt_squared
+            particle.PosLocA.y = position.y + velocity.y * dt + acceleration.y * half_dt_squared
+            particle.PosLocA.z = position.z + velocity.z * dt + acceleration.z * half_dt_squared
             particle.PosLocA.w = 0.0
             particle.PosLocB.w = 1.0
             output_position = particle.PosLocA

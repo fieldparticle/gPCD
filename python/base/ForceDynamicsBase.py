@@ -59,6 +59,9 @@ class ForceDynamics(ForceContactDynamics):
         self.ShaderFlags = self.create_shader_flags()
         self.inline_test_flag = False
         self.config_error_return = None
+        self.pair_phase_totals = {}
+        self.pair_phase_frame_diagnostics = []
+        self.pair_phase_energy_reference = None
 
     def load_cfg_file(self, cfg_file_name):
         self.load_constants()
@@ -71,6 +74,9 @@ class ForceDynamics(ForceContactDynamics):
         self.particle_data = self.config.get("PARTICLE_DATA", {})
         self.particles = self.create_particle_array_from_cfg(self.particle_data)
         self.ShaderFlags = self.create_shader_flags_from_cfg(self.run_configuration)
+        self.pair_phase_totals = {}
+        self.pair_phase_frame_diagnostics = []
+        self.pair_phase_energy_reference = None
         if "in_line_obj" in self.config.RUN_CONFIGURATION or self.study == True:
             self.inline_test_flag = True
         else:
@@ -135,6 +141,8 @@ class ForceDynamics(ForceContactDynamics):
         particle.VelRad = self.create_vec4(vx, vy, vz, velocity_angle)
         particle.Data = self.create_vec4(radius, fields.get("collision_stiffness_q", 0.0), 0.0, fields.get("state_flg", 1.0))
         particle.parms = self.create_vec4(mass, 0.0, 0.0, 0.0)
+        particle.force_acceleration_current = self.create_vec4()
+        particle.force_acceleration_next = self.create_vec4()
         particle.internal_momentum = particle.Data.z
         particle.contacts = [self.create_geo_contact_state() for _ in range(16)]
         particle.gcs = particle.contacts
@@ -260,7 +268,7 @@ class ForceDynamics(ForceContactDynamics):
         )
 
     def CollisionRun(self):
-        """Run one complete weighted-dynamics frame."""
+        """Run one complete force-dynamics frame with velocity Verlet."""
         if not self.BeginFrame():
             return self.particles
         self.ApplyBeforeContactScanHook()
@@ -268,15 +276,28 @@ class ForceDynamics(ForceContactDynamics):
         self.ApplyStartRunHook()
         self.BuildFrameSnapshot()
         self.RecordFrameStartDiagnostics()
+        self.InitializePairPhaseEnergyReference()
 
+        self.force_acceleration_pass = "current"
         if not self.DetectContacts():
             return self.particles
+        frame_start_pairs = self.CapturePairGeometryDiagnostics()
+        if not self.MoveParticles():
+            return self.particles
+
+        self.BuildPredictedPositionSnapshot()
+        self.ResetContactStateForSecondForceEvaluation()
+        self.force_acceleration_pass = "next"
+        if not self.DetectContacts():
+            return self.particles
+        frame_end_pairs = self.CapturePairGeometryDiagnostics()
         if not self.BuildWallContactLists():
             return self.particles
 
-        self.RecordAfterResolveDiagnostics()
-        if not self.MoveParticles():
+        if not self.FinishVelocities():
             return self.particles
+        self.RecordAfterResolveDiagnostics()
+        self.RecordPairPhaseDiagnostics(frame_start_pairs, frame_end_pairs)
         self.EndFrame()
         return self.particles
 
@@ -396,6 +417,29 @@ class ForceDynamics(ForceContactDynamics):
             for particle in self.particles
         ]
 
+    def BuildPredictedPositionSnapshot(self):
+        """Expose the predicted inactive-buffer positions to the second scan."""
+        predicted_buffer = 1 - int(self.ShaderFlags.positionBuffer)
+        self.PosLocFrame = [
+            self.create_vec4(position.x, position.y, position.z, position.w)
+            for position in (
+                self.particle_position(particle, predicted_buffer)
+                for particle in self.particles
+            )
+        ]
+
+    def ResetContactStateForSecondForceEvaluation(self):
+        """Clear first-scan contacts while retaining the stored acceleration."""
+        for particle_index, particle in enumerate(self.particles):
+            self.BeginContactFrame(particle_index)
+            particle.oa = 0.0
+            particle.max_penetration_depth = 0.0
+            particle.report_contacts = 0
+            particle.report_target = 0
+            particle.report_center_distance = 0.0
+            particle.report_normal_x = 0.0
+            particle.report_normal_y = 0.0
+
     def ParticleKineticEnergy(self, particle_index, velocity=None):
         if velocity is None:
             velocity = self.particles[particle_index].VelRad
@@ -425,6 +469,145 @@ class ForceDynamics(ForceContactDynamics):
         for particle_index, particle in enumerate(self.particles):
             particle.report_after_resolve_ke = self.ParticleKineticEnergy(
                 particle_index,
+            )
+
+    def CapturePairGeometryDiagnostics(self):
+        """Capture unordered-pair geometry from the current position snapshot."""
+        pairs = {}
+        for source_id in range(len(self.particles)):
+            source_position = self.GetParticlePosition(source_id)
+            for target_id in range(source_id + 1, len(self.particles)):
+                target_position = self.GetParticlePosition(target_id)
+                dx = target_position.x - source_position.x
+                dy = target_position.y - source_position.y
+                dz = target_position.z - source_position.z
+                center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+                if center_distance > 1.0e-12:
+                    normal = (dx / center_distance, dy / center_distance, dz / center_distance)
+                else:
+                    normal = (1.0, 0.0, 0.0)
+                source_radius = float(self.particles[source_id].Data.x)
+                target_radius = float(self.particles[target_id].Data.x)
+                overlap_area = self.particle_overlap_area(
+                    source_radius,
+                    target_radius,
+                    center_distance,
+                )
+                pairs[(source_id, target_id)] = {
+                    "center_distance": center_distance,
+                    "normal": normal,
+                    "overlap_area": overlap_area,
+                    "potential_energy": self.GetContactPotentialEnergy(
+                        source_id,
+                        target_id,
+                        center_distance,
+                    ),
+                }
+        return pairs
+
+    def CurrentDiagnosticTotalEnergy(self):
+        kinetic_energy = sum(
+            self.ParticleKineticEnergy(particle_index)
+            for particle_index in range(len(self.particles))
+        )
+        return kinetic_energy + self.TotalPotentialEnergy()
+
+    def InitializePairPhaseEnergyReference(self):
+        if self.pair_phase_energy_reference is None:
+            self.pair_phase_energy_reference = self.CurrentDiagnosticTotalEnergy()
+
+    def RecordPairPhaseDiagnostics(self, frame_start_pairs, frame_end_pairs):
+        """Accumulate diagnostics-only compression/rebound symmetry measures."""
+        dt = float(self.ShaderFlags.dt)
+        energy_drift = self.CurrentDiagnosticTotalEnergy() - self.pair_phase_energy_reference
+        self.pair_phase_frame_diagnostics = []
+        for pair, start in frame_start_pairs.items():
+            end = frame_end_pairs[pair]
+            if start["overlap_area"] <= 0.0 and end["overlap_area"] <= 0.0:
+                continue
+
+            distance_change = end["center_distance"] - start["center_distance"]
+            if distance_change < -self.EPSILON:
+                phase = "compression"
+            elif distance_change > self.EPSILON:
+                phase = "rebound"
+            else:
+                phase = "stationary"
+
+            area_time = 0.5 * (start["overlap_area"] + end["overlap_area"]) * dt
+            pair_stiffness = self.GetPairStiffness(*pair)
+            start_force = tuple(
+                pair_stiffness * start["overlap_area"] * component
+                for component in start["normal"]
+            )
+            end_force = tuple(
+                pair_stiffness * end["overlap_area"] * component
+                for component in end["normal"]
+            )
+            relative_displacement = tuple(
+                end["normal"][axis] * end["center_distance"]
+                - start["normal"][axis] * start["center_distance"]
+                for axis in range(3)
+            )
+            force_work = sum(
+                0.5 * (start_force[axis] + end_force[axis])
+                * relative_displacement[axis]
+                for axis in range(3)
+            )
+
+            totals = self.pair_phase_totals.setdefault(
+                pair,
+                {
+                    "compression_steps": 0,
+                    "rebound_steps": 0,
+                    "stationary_steps": 0,
+                    "compression_area_time": 0.0,
+                    "rebound_area_time": 0.0,
+                    "stationary_area_time": 0.0,
+                    "compression_work": 0.0,
+                    "rebound_work": 0.0,
+                    "stationary_work": 0.0,
+                    "compression_min_energy_drift": 0.0,
+                    "compression_max_energy_drift": 0.0,
+                    "rebound_min_energy_drift": 0.0,
+                    "rebound_max_energy_drift": 0.0,
+                },
+            )
+            totals[f"{phase}_steps"] += 1
+            totals[f"{phase}_area_time"] += area_time
+            totals[f"{phase}_work"] += force_work
+            if phase != "stationary":
+                totals[f"{phase}_min_energy_drift"] = min(
+                    totals[f"{phase}_min_energy_drift"],
+                    energy_drift,
+                )
+                totals[f"{phase}_max_energy_drift"] = max(
+                    totals[f"{phase}_max_energy_drift"],
+                    energy_drift,
+                )
+
+            self.pair_phase_frame_diagnostics.append(
+                {
+                    "frame": int(self.ShaderFlags.frameNum),
+                    "source_index": pair[0],
+                    "target_index": pair[1],
+                    "phase": phase,
+                    "start_overlap_area": start["overlap_area"],
+                    "end_overlap_area": end["overlap_area"],
+                    "area_time": area_time,
+                    "force_work": force_work,
+                    "energy_drift": energy_drift,
+                    **totals,
+                    "step_count_difference": (
+                        totals["compression_steps"] - totals["rebound_steps"]
+                    ),
+                    "area_time_difference": (
+                        totals["compression_area_time"] - totals["rebound_area_time"]
+                    ),
+                    "work_residual": (
+                        totals["compression_work"] + totals["rebound_work"]
+                    ),
+                }
             )
 
     def BuildWallContactLists(self):
@@ -569,8 +752,15 @@ class ForceDynamics(ForceContactDynamics):
         return True
 
     def MoveParticles(self):
-        """Move every particle using the force-model per-particle move function."""
+        """Predict every particle position using frame-start acceleration."""
         for SourceID in range(len(self.particles)):
             if not self.Move(SourceID):
+                return False
+        return True
+
+    def FinishVelocities(self):
+        """Finish every source velocity using both force evaluations."""
+        for SourceID in range(len(self.particles)):
+            if not self.FinishSourceVelocity(SourceID):
                 return False
         return True
