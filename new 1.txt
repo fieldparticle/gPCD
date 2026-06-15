@@ -1,42 +1,10 @@
-Correct. This is the source-owned execution model.
-For each source particle \(i\):
-Read immutable frame-start state.
-Process every detected contact \(j \in C_i\).
-Calculate each contact contribution \(\Delta\mathbf p_{ij}\).
-Sum contributions locally.
-Write only source particle \(i\).
-\[
-\Delta\mathbf p_i
-=
-\sum_{j\in C_i}\Delta\mathbf p_{ij}
-\]\[
-\mathbf p_i^{new}
-=
-\mathbf p_i^{old}+\Delta\mathbf p_i
-\]For ThreeParticle:
-\[
-\mathbf p_1^{new}
-=
-\mathbf p_1^{old}
-+\Delta\mathbf p_{12}
-+\Delta\mathbf p_{13}
-\]P2 and P3 independently calculate:
-\[
-\mathbf p_2^{new}
-=
-\mathbf p_2^{old}+\Delta\mathbf p_{21}
-\]\[
-\mathbf p_3^{new}
-=
-\mathbf p_3^{old}+\Delta\mathbf p_{31}
-\]The critical requirements are:
-Every source reads the same frame-start snapshot.
-P1 processes both contacts before writing its velocity.
-Contact contributions are vector-summed without source contact-count weighting.
-No source writes another particle.
-The contact rule must naturally produce compatible opposing contributions:
-\[
-\Delta\mathbf p_{ij}
-=
--\Delta\mathbf p_{ji}
-\]Therefore, ApplySourceVelocityDelta has the correct structural shape. The likely mistake is weighting individual contact impulses before their vector sum. P1 should calculate the full source-owned reflection contribution from each contact and let vector addition produce the multi-contact result.
+Decide whether Base.py, gPCD.py, and runner.py remain active. Restore their dependencies or retire the entire path consistently.
+Restore DiagnosticsPlots.py as shared active infrastructure.
+Remove WeightedDynamics imports and registry entries.
+Rename the VerA files to valid importable names.
+Rename VerA classes and internal imports to fully isolate them.
+Register VerAForceDynamics in SimulationRunner.
+Refactor VerAForcePlots.
+Replace the Weighted document input with VerA in main.tex.
+Rename and update VerA documentation and flowchart references.
+Verify live/shadow runs produce identical results before changing live ForceDynamics.

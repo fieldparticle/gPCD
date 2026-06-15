@@ -20,6 +20,10 @@ occupancy generation scales linearly with the number of particles,
 T_{\mathrm{occ}}(N)=O(N).
 \end{equation}
 
+This cost is independent of the total number of allocated cells because
+occupancy generation is particle-driven: empty cells are not traversed
+during broad-phase construction.
+
 Because occupancy lists are accessed directly through flattened cell
 indices, cell lookup requires constant-time addressing. Under the fixed
 occupancy-width assumptions used by the framework, insertion and

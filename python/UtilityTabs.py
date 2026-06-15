@@ -4,7 +4,6 @@ from PyQt6.QtCore import Qt
 from TabFormReport import *
 from TabFormGenData import *
 from TabFormRun import *
-from TabFormAnalysis import *
 
 ## Add all tabs
 class UtilityTabs(QTabWidget):

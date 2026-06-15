@@ -1,5 +1,9 @@
-Update ForceDynamics documentation for source-owned force integration
-
-Replace obsolete velocity Verlet documentation with the current
-single-scan semi-implicit ForceDynamics architecture, document wall
-processing, and record the bounded ParticlesInBox energy results.
+Current status:
+	- Added VerAForceDynamics as an independent shadow baseline.
+	- Verified live and shadow results are identical across 2,878 frames.
+	- Retired obsolete dynamics paths and restored shared diagnostics.
+Code Changes:
+	- Registered VerAForceDynamics and added optional shadow execution.
+	- Isolated VerAForceDynamics from live ForceDynamics imports.
+	- Added VerA documentation, plots, and flowchart support.
+Next: Implement starting-collision handling in live ForceDynamics.

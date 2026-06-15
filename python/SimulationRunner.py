@@ -2,8 +2,8 @@ import pygame
 from pathlib import Path
 import math
 
-from base.WeightedDynamicsBase import WeightedDynamics
 from base.ForceDynamicsBase import ForceDynamics
+from base.VerAForceDynamicsBase import ForceDynamics as VerAForceDynamics
 from base.Reporting import Reporting
 from base.InLineTest import InLineTest
 from gbase import libconf
@@ -11,7 +11,7 @@ from gbase import libconf
 
 BASE_CLASS_REGISTRY = {
     "ForceDynamics": ForceDynamics,
-    "WeightedDynamics": WeightedDynamics,
+    "VerAForceDynamics": VerAForceDynamics,
 }
 
 
@@ -23,13 +23,22 @@ def _particle_util_cfg():
         return libconf.load(handle)
 
 
-def _base_class_from_config(particle_util_cfg, field_name, default_name):
-    base_name = particle_util_cfg.get(field_name, default_name)
+def _base_class_from_config(
+    particle_util_cfg,
+    field_name,
+    default_name,
+    allow_none=False,
+):
+    base_name = str(particle_util_cfg.get(field_name, default_name))
+    if allow_none and base_name.lower() == "none":
+        return None
     if base_name not in BASE_CLASS_REGISTRY:
-        allowed_names = ", ".join(sorted(BASE_CLASS_REGISTRY))
+        allowed_names = sorted(BASE_CLASS_REGISTRY)
+        if allow_none:
+            allowed_names.append("none")
         raise ValueError(
             f"ParticleUtil.cfg {field_name}={base_name!r} is not registered. "
-            f"Allowed base classes: {allowed_names}"
+            f"Allowed base classes: {', '.join(allowed_names)}"
         )
     return BASE_CLASS_REGISTRY[base_name]
 
@@ -39,23 +48,30 @@ def _create_configured_bases():
     live_base_class = _base_class_from_config(
         particle_util_cfg,
         "live_base",
-        "WeightedDynamics",
+        "ForceDynamics",
     )
     shadow_base_class = _base_class_from_config(
         particle_util_cfg,
         "shadow_base",
-        "WeightedDynamics",
+        "none",
+        allow_none=True,
     )
-    return live_base_class(), shadow_base_class()
+    shadow = shadow_base_class() if shadow_base_class is not None else None
+    return live_base_class(), shadow
 
 
-def _display_base_from_config():
+def _display_base_from_config(shadow):
     particle_util_cfg = _particle_util_cfg()
     display_base = str(particle_util_cfg.get("display_base", "live")).lower()
     if display_base not in ("live", "shadow"):
         raise ValueError(
             "ParticleUtil.cfg display_base must be 'live' or 'shadow'. "
             f"Got {display_base!r}."
+        )
+    if display_base == "shadow" and shadow is None:
+        raise ValueError(
+            "ParticleUtil.cfg display_base cannot be 'shadow' when "
+            "shadow_base is 'none'."
         )
     return display_base
 
@@ -470,9 +486,10 @@ def _report_particles(reporting, frame_number, particles, start_diagnostics, dyn
 
 def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_number=None):
     live, shadow = _create_configured_bases()
-    display_base = _display_base_from_config()
+    display_base = _display_base_from_config(shadow)
     live.load_cfg_file(cfg_file)
-    shadow.load_cfg_file(cfg_file)
+    if shadow is not None:
+        shadow.load_cfg_file(cfg_file)
     test_file_name = Path(cfg_file).name
     run_configuration = live.run_configuration
     senario = None
@@ -482,11 +499,12 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
         live.study = study
         live.inline_test_flag = True
         senario.Create(live.config, study_number)
-        shadow_senario = InLineTest()
-        shadow.senario = shadow_senario
-        shadow.study = study
-        shadow.inline_test_flag = True
-        shadow_senario.Create(shadow.config, study_number)
+        if shadow is not None:
+            shadow_senario = InLineTest()
+            shadow.senario = shadow_senario
+            shadow.study = study
+            shadow.inline_test_flag = True
+            shadow_senario.Create(shadow.config, study_number)
     if batch_mode:
         run_configuration["end_frame"] = end_frame
     if "run_debug_dir" not in run_configuration:
@@ -496,18 +514,24 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
         )
     report_dir = Path(run_configuration["run_debug_dir"])
     live_reporting = Reporting(report_dir, run_configuration.get("rpt_frames"))
-    reporting_s = Reporting(
-        report_dir,
-        run_configuration.get("rpt_frames"),
-        clear_existing=False,
-        file_suffix="_s",
-    )
+    reporting_s = None
+    if shadow is not None:
+        reporting_s = Reporting(
+            report_dir,
+            run_configuration.get("rpt_frames"),
+            clear_existing=False,
+            file_suffix="_s",
+        )
     print(
         f"SimulationRunner cleared {live_reporting.cleared_report_count} "
         f"capture file(s): {report_dir}"
     )
     live_start_diagnostics = _run_start_diagnostics(live)
-    shadow_start_diagnostics = _run_start_diagnostics(shadow)
+    shadow_start_diagnostics = (
+        _run_start_diagnostics(shadow)
+        if shadow is not None
+        else None
+    )
 
     pygame.init()
     screen = pygame.display.set_mode(_window_size(run_configuration))
@@ -538,7 +562,6 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
 
             if not paused:
                 live.ShaderFlags.frameNum = frame_number
-                shadow.ShaderFlags.frameNum = frame_number
                 ##JMB Main Call to live.CollisionRun()
                 live_particles = live.CollisionRun()
                 _report_particles(
@@ -548,17 +571,20 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                     live_start_diagnostics,
                     live,
                 )
-                shadow_particles = shadow.CollisionRun()
-                _report_particles(
-                    reporting_s,
-                    frame_number,
-                    shadow_particles,
-                    shadow_start_diagnostics,
-                    shadow,
-                )
+                if shadow is not None:
+                    shadow.ShaderFlags.frameNum = frame_number
+                    shadow_particles = shadow.CollisionRun()
+                    _report_particles(
+                        reporting_s,
+                        frame_number,
+                        shadow_particles,
+                        shadow_start_diagnostics,
+                        shadow,
+                    )
             else:
                 live_particles = live.particles
-                shadow_particles = shadow.particles
+                if shadow is not None:
+                    shadow_particles = shadow.particles
             display_runner = shadow if display_base == "shadow" else live
             display_particles = (
                 shadow_particles if display_base == "shadow" else live_particles

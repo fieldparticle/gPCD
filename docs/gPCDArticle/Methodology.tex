@@ -75,12 +75,19 @@ flattened cell identifiers associated with its eight AABB corners.
 These cell identifiers are generated during occupancy construction and
 retained for subsequent narrow-phase evaluation.
 
-Each cell maintains a \emph{cell-array particle occupancy} list containing the
-identifiers of particles occupying that cell. During occupancy
-generation, the cell identifiers stored in the particle corner
-occupancy list are used to locate the corresponding cell-array particle
-occupancy lists and insert the particle identifier into each occupied
-cell.
+Each cell maintains a \emph{cell-array particle occupancy list}
+containing the identifiers of particles occupying that cell. During
+occupancy generation, the cell identifiers stored in the particle
+corner occupancy list are used to locate the corresponding cell-array
+particle occupancy lists and insert the particle identifier into each
+occupied cell.
+
+Because occupancy generation is particle-driven, only cells referenced
+by particle AABB corners are accessed during broad-phase construction.
+Empty cells are never traversed during occupancy generation. Therefore,
+for sparse particle configurations, broad-phase work depends on the
+number of particles and their occupied cells rather than the total
+number of cells in the cell array.
 
 As illustrated in \Figo{CellSpansA}, multiple AABB corners from
 the same particle may map to a common cell. These duplicate corner

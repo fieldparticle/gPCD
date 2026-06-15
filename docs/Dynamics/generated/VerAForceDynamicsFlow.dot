@@ -1,0 +1,68 @@
+digraph VerAForceDynamicsFlow {
+  graph [
+    rankdir=TB,
+    compound=true,
+    bgcolor="white",
+    fontname="Consolas",
+    fontsize=11,
+    splines=ortho,
+    nodesep=0.75,
+    ranksep=0.65
+  ];
+  node [
+    fontname="Consolas",
+    fontsize=10,
+    style="rounded,filled",
+    color="#606060"
+  ];
+  edge [
+    fontname="Consolas",
+    fontsize=9,
+    color="#505050",
+    arrowsize=0.7
+  ];
+
+    ContactDynamics [label="ContactDynamics", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:1:1", tooltip="Open the ContactDynamics section in VerAForceDynamicsSource.tex", target="_blank"];
+    BeginSourceContactParms [label="BeginSourceContactParms", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:1:1", tooltip="Open the BeginSourceContactParms section in VerAForceDynamicsSource.tex", target="_blank"];
+    InitializeContactState [label="InitializeContactState", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:73:1", tooltip="Open the InitializeContactState section in VerAForceDynamicsSource.tex", target="_blank"];
+    GetContactState [label="GetContactState", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:79:1", tooltip="Open the GetContactState section in VerAForceDynamicsSource.tex", target="_blank"];
+    GetParticleGeometry [label="GetParticleGeometry", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:95:1", tooltip="Open the GetParticleGeometry section in VerAForceDynamicsSource.tex", target="_blank"];
+    GetParticlePosition [label="GetParticlePosition", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:101:1", tooltip="Open the GetParticlePosition section in VerAForceDynamicsSource.tex", target="_blank"];
+    AppendContactSlot [label="AppendContactSlot", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:85:1", tooltip="Open the AppendContactSlot section in VerAForceDynamicsSource.tex", target="_blank"];
+    GetContactSlots [label="GetContactSlots", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:90:1", tooltip="Open the GetContactSlots section in VerAForceDynamicsSource.tex", target="_blank"];
+    CalculateContactParms [label="CalculateContactParms", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:1:1", tooltip="Open the CalculateContactParms section in VerAForceDynamicsSource.tex", target="_blank"];
+    GetStartFrameVelocity [label="GetStartFrameVelocity", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:106:1", tooltip="Open the GetStartFrameVelocity section in VerAForceDynamicsSource.tex", target="_blank"];
+    CalculateContactForces [label="CalculateContactForces", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:1:1", tooltip="Open the CalculateContactForces section in VerAForceDynamicsSource.tex", target="_blank"];
+    GetPairStiffness [label="GetPairStiffness", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:133:1", tooltip="Open the GetPairStiffness section in VerAForceDynamicsSource.tex", target="_blank"];
+    GetContactPotentialEnergy [label="GetContactPotentialEnergy", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:1:1", tooltip="Open the GetContactPotentialEnergy section in VerAForceDynamicsSource.tex", target="_blank"];
+    TotalPotentialEnergy [label="TotalPotentialEnergy", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:1:1", tooltip="Open the TotalPotentialEnergy section in VerAForceDynamicsSource.tex", target="_blank"];
+    CalculateSourceAcceleration [label="CalculateSourceAcceleration", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:1:1", tooltip="Open the CalculateSourceAcceleration section in VerAForceDynamicsSource.tex", target="_blank"];
+    FinishSourceVelocity [label="FinishSourceVelocity", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:1:1", tooltip="Open the FinishSourceVelocity section in VerAForceDynamicsSource.tex", target="_blank"];
+    GetParticleMass [label="GetParticleMass", shape=box, fillcolor="#f8f8f8", URL="vscode://file/C:/_DJ/gPCD/docs/Dynamics/VerAForceDynamicsSource.tex:154:1", tooltip="Open the GetParticleMass section in VerAForceDynamicsSource.tex", target="_blank"];
+
+  {
+    rank=same;
+    ContactDynamics;
+    CalculateContactForces;
+  }
+
+    ContactDynamics -> BeginSourceContactParms;
+    BeginSourceContactParms -> InitializeContactState [label="first contact"];
+    InitializeContactState -> GetContactState;
+    GetContactState -> AppendContactSlot;
+    AppendContactSlot -> GetContactSlots;
+    GetContactSlots -> GetParticleGeometry;
+    GetParticleGeometry -> GetParticlePosition;
+    GetParticlePosition -> GetStartFrameVelocity;
+    GetStartFrameVelocity -> CalculateContactParms;
+    CalculateContactParms -> InitializeContactState [label="next contact"];
+    CalculateContactParms -> CalculateContactForces [label="all contacts done"];
+    CalculateContactForces -> GetPairStiffness;
+    GetPairStiffness -> CalculateContactForces;
+    CalculateContactForces -> GetContactPotentialEnergy;
+    GetContactPotentialEnergy -> CalculateContactForces;
+    CalculateContactForces -> CalculateSourceAcceleration;
+    CalculateSourceAcceleration -> GetParticleMass;
+    GetParticleMass -> CalculateSourceAcceleration;
+    CalculateSourceAcceleration -> FinishSourceVelocity;
+}

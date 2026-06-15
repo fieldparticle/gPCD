@@ -44,32 +44,8 @@ frame-start snapshot:
     \item the current source-owned contact representation.
 \end{itemize}
 
-\texttt{WeightedDynamics} completes source-owned contact lists before applying
-its dynamics.  \texttt{ForceDynamics} immediately accumulates each detected
-contact into a source-local force sum; its contact slots are diagnostic only.
-
-\subsection{Momentum-Field Contact Response}
-
-For each source contact, \texttt{WeightedDynamics} calculates relative normal
-velocity, reduced-mass closing momentum, overlap area, and a source-local
-overlap-area weight.  The current raw impulse is:
-
-\begin{equation}
-J_{\mathrm{raw},k}
-=
-q_k A_k
-\Delta t.
-\end{equation}
-
-Compression is capped by the contact's weighted share of source available
-closing momentum.  Release is capped by the contact-owned stored internal
-momentum.  All planned contact impulses are vector-summed before the source
-velocity is written.
-
-Source-local overlap-area weighting remains only in the compression
-available-momentum cap.  It does not multiply the physical pair impulse.
-Current \texttt{ThreeParticle} diagnostics show exact vector-momentum return
-but approximately \(-0.00020547\) kinetic-energy drift.
+\texttt{ForceDynamics} immediately accumulates each detected contact into a
+source-local force sum; its contact slots are diagnostic only.
 
 \subsection{Force-Field Contact Response}
 
@@ -102,22 +78,14 @@ Relative velocity is diagnostic only and does not affect force magnitude.
 Only particle physical state, including position and velocity, persists into
 the next frame.
 
-\subsection{Persistent Contact State}
-
-\texttt{WeightedDynamics} currently stores source-owned internal momentum and
-collision phase by target ID.  Current-frame contact slots are rebuilt each
-frame; the target-keyed dictionaries retain the persistent contact state used
-for compression and release.
-
 \subsection{Diagnostics}
 
 Momentum, kinetic energy, potential energy, and total energy are reported
 diagnostics.  Diagnostic calculations evaluate the contact rule but do not
 affect particle motion.  Force potential energy is calculated from current
 geometry only.  Documentation must distinguish actual vector momentum drift
-from scalar internal-momentum ledger totals.  A drained WeightedDynamics
-internal-momentum ledger does not, by itself, prove momentum or kinetic-energy
-conservation.
+from any scalar diagnostic totals.  Diagnostic return to zero does not, by
+itself, prove momentum or kinetic-energy conservation.
 
 \subsection{Boundary Convention}
 

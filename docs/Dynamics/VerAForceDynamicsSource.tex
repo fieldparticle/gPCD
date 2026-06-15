@@ -1,13 +1,13 @@
-% !TeX root = main.tex
+﻿% !TeX root = main.tex
 \newpage
-\section{ForceDynamics Source Flow}
+\section{VerAForceDynamics Source Flow}
 
-\newcommand{\ForceFunctionSection}[1]{%
-  \subsection{ForceDynamics:#1}%
-  \label{force:#1}%
+\newcommand{\VerAForceFunctionSection}[1]{%
+  \subsection{VerAForceDynamics:#1}%
+  \label{vera-force:#1}%
 }
 
-\texttt{ForceDynamics} treats overlap area as an instantaneous central
+\texttt{VerAForceDynamics} treats overlap area as an instantaneous central
 repulsive force field.  One source-particle invocation detects all current
 particle and wall contacts, immediately vector-sums their forces into a
 source-local \texttt{totalForce}, and writes only the source velocity and
@@ -16,13 +16,13 @@ compute invocation per source particle.
 
 \begin{figure}[ht]
 \centering
-\resizebox{\textwidth}{!}{\input{ForceDynamicsFlowTikz}}
-\caption{Current ForceDynamics source-owned force flow}
+\resizebox{\textwidth}{!}{\input{VerAForceDynamicsFlowTikz}}
+\caption{Current VerAForceDynamics source-owned force flow}
 \end{figure}
 
 \clearpage
 
-\ForceFunctionSection{CollisionRun}
+\VerAForceFunctionSection{CollisionRun}
 
 \texttt{CollisionRun} is the Python harness for the shader-shaped execution
 schedule:
@@ -48,21 +48,21 @@ The Python harness uses a direct particle scan where GLSL uses cell occupancy
 lists.  Both schedules complete one source-local force sum before integration.
 The end-position snapshot is diagnostic only and is not a second force scan.
 
-\ForceFunctionSection{ProcessParticleCollision}
+\VerAForceFunctionSection{ProcessParticleCollision}
 
 \texttt{ProcessParticleCollision(TargetID, SourceID, totalForce)} initializes
 the current contact geometry, records a diagnostic contact slot, and
 immediately adds the contact force to the source-local \texttt{totalForce}.
 It does not write the target particle.
 
-\ForceFunctionSection{ProcessWallCollision}
+\VerAForceFunctionSection{ProcessWallCollision}
 
 \texttt{ProcessWallCollision(SourceID, wall, totalForce)} creates the
 configured wall ghost geometry and immediately adds its force to
 \texttt{totalForce}.  Each of the four configured walls is scanned exactly
 once for each source particle.
 
-\ForceFunctionSection{InitializeWallContactState}
+\VerAForceFunctionSection{InitializeWallContactState}
 
 \texttt{InitializeWallContactState(SourceID, wall)} represents a wall contact
 with a stationary ghost having the same radius and mass as the source
@@ -70,45 +70,45 @@ particle.  The contact normal is perpendicular to the wall.  The configurable
 \texttt{wall\_contact\_offset} controls how far the ghost center lies beyond
 the wall boundary.
 
-\ForceFunctionSection{InitializeContactState}
+\VerAForceFunctionSection{InitializeContactState}
 
 \texttt{InitializeContactState(SourceID, TargetID)} obtains the current
 particle-particle geometry and records one source-owned diagnostic contact
 slot.
 
-\ForceFunctionSection{GetContactState}
+\VerAForceFunctionSection{GetContactState}
 
 \texttt{GetContactState(SourceID, TargetID)} obtains a reusable current-frame
 contact slot.  The slot contains geometry and diagnostic values only; it is
 not used later to calculate force.
 
-\ForceFunctionSection{AppendContactSlot}
+\VerAForceFunctionSection{AppendContactSlot}
 
 \texttt{AppendContactSlot(SourceID, TargetID)} records an active
 particle-contact slot owned by the source.
 
-\ForceFunctionSection{GetContactSlots}
+\VerAForceFunctionSection{GetContactSlots}
 
 \texttt{GetContactSlots(SourceID)} returns the fixed diagnostic contact-slot
 array owned by the source particle.
 
-\ForceFunctionSection{GetParticleGeometry}
+\VerAForceFunctionSection{GetParticleGeometry}
 
 \texttt{GetParticleGeometry(SourceID, TargetID)} calculates overlap area,
 center distance, penetration depth, and the source-to-target normal from the
 immutable frame-start position snapshot.
 
-\ForceFunctionSection{GetParticlePosition}
+\VerAForceFunctionSection{GetParticlePosition}
 
 \texttt{GetParticlePosition(ParticleID)} returns a particle position from the
 selected immutable position snapshot.
 
-\ForceFunctionSection{GetStartFrameVelocity}
+\VerAForceFunctionSection{GetStartFrameVelocity}
 
 \texttt{GetStartFrameVelocity(ParticleID)} returns the immutable frame-start
 velocity used by integration and relative-normal-velocity diagnostics.
 
-\ForceFunctionSection{AccumulateContactForce}
+\VerAForceFunctionSection{AccumulateContactForce}
 
 For every current particle or wall contact,
 \texttt{AccumulateContactForce(SourceID, contact\_state, totalForce)} applies:
@@ -125,12 +125,12 @@ The force is applied during both compression and rebound.  There is no
 contact weighting, available-momentum cap, collision phase, or stored
 internal momentum.
 
-\ForceFunctionSection{GetContactStiffness}
+\VerAForceFunctionSection{GetContactStiffness}
 
 \texttt{GetContactStiffness(SourceID, TargetID, contact\_type)} selects
 particle-pair or wall stiffness for the current contact.
 
-\ForceFunctionSection{GetPairStiffness}
+\VerAForceFunctionSection{GetPairStiffness}
 
 \texttt{GetPairStiffness(SourceID, TargetID)} returns the nonnegative mean of
 the two particle-owned stiffness values:
@@ -139,7 +139,7 @@ the two particle-owned stiffness values:
 q_{ij}=\max\left(0,\frac{q_i+q_j}{2}\right).
 \end{equation}
 
-\ForceFunctionSection{CalcVelocity}
+\VerAForceFunctionSection{CalcVelocity}
 
 \texttt{CalcVelocity(SourceID, totalForce)} performs the source velocity
 write.  It converts the completed source-local force sum to acceleration
@@ -151,12 +151,12 @@ inside the function:
 \mathbf v_n+\frac{\mathbf F_n}{m}\Delta t.
 \end{equation}
 
-\ForceFunctionSection{GetParticleMass}
+\VerAForceFunctionSection{GetParticleMass}
 
 \texttt{GetParticleMass(ParticleID)} returns particle mass from
 \texttt{parms.x} with an epsilon lower bound.
 
-\ForceFunctionSection{CalcPosition}
+\VerAForceFunctionSection{CalcPosition}
 
 \texttt{CalcPosition(SourceID)} performs the semi-implicit Euler position
 write using the newly calculated velocity:
@@ -210,3 +210,4 @@ final energy difference = approximately -7.34e-7
 
 The long-running box result currently rises and falls within a bounded band
 rather than showing monotonic energy drift.
+

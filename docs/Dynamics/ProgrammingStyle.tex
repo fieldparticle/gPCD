@@ -233,10 +233,8 @@ apply one source position write when required by the model
 
 Loops belong in the narrowest function that owns the sequence.  Per-contact
 functions process exactly one contact and do not hide a second contact-list
-loop.  \texttt{WeightedDynamics} completes source contact slots before
-applying contact dynamics.  \texttt{ForceDynamics} immediately accumulates
-each detected particle or wall force into \texttt{totalForce}; its contact
-slots are diagnostic only.
+loop.  \texttt{ForceDynamics} immediately accumulates each detected particle
+or wall force into \texttt{totalForce}; its contact slots are diagnostic only.
 
 This shape keeps the main decision order visible, makes stepper debugging
 practical, and exposes which functions must eventually map into a per-source
