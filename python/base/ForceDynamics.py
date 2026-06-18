@@ -52,7 +52,18 @@ class ForceContactDynamics:
         if contact is None:
             return contact_state
 
-        normal_x, normal_y, normal_z, overlap_area, center_distance = contact
+        (
+            normal_x,
+            normal_y,
+            normal_z,
+            overlap_area,
+            center_distance,
+            effective_source_radius,
+            effective_target_radius,
+            physical_separation_limit,
+            starting_contact,
+            starting_resolved,
+        ) = contact
         source = self.particles[SourceID]
         target = self.particles[TargetID]
         contact_state.geom = self.create_vec4(
@@ -62,8 +73,18 @@ class ForceContactDynamics:
             overlap_area,
         )
         contact_state.aux.x = center_distance
-        contact_state.aux.y = source.Data.x + target.Data.x - center_distance
+        contact_state.aux.y = (
+            effective_source_radius + effective_target_radius - center_distance
+        )
         contact_state.aux.z = 0.0
+        contact_state.effective_source_radius = effective_source_radius
+        contact_state.effective_target_radius = effective_target_radius
+        contact_state.effective_separation_limit = (
+            effective_source_radius + effective_target_radius
+        )
+        contact_state.physical_separation_limit = physical_separation_limit
+        contact_state.starting_contact = starting_contact
+        contact_state.starting_resolved = starting_resolved
         return contact_state
 
     def GetParticleGeometry(self, SourceID, TargetID):
@@ -81,8 +102,20 @@ class ForceContactDynamics:
         dz = target_position.z - source_position.z
         center_distance = (dx * dx + dy * dy + dz * dz) ** 0.5
 
-        source_radius = self.particles[SourceID].Data.x
-        target_radius = self.particles[TargetID].Data.x
+        (
+            source_radius,
+            target_radius,
+            physical_separation_limit,
+            starting_contact,
+            starting_resolved,
+            suppress_contact,
+        ) = self.GetParticleEffectiveContactGeometry(
+            SourceID,
+            TargetID,
+            center_distance,
+        )
+        if suppress_contact:
+            return None
         if center_distance >= source_radius + target_radius:
             return None
 
@@ -100,7 +133,18 @@ class ForceContactDynamics:
             target_radius,
             center_distance,
         )
-        return normal_x, normal_y, normal_z, overlap_area, center_distance
+        return (
+            normal_x,
+            normal_y,
+            normal_z,
+            overlap_area,
+            center_distance,
+            source_radius,
+            target_radius,
+            physical_separation_limit,
+            starting_contact,
+            starting_resolved,
+        )
 
     def GetParticlePosition(self, ParticleID):
         """Return a particle's frame-start position.

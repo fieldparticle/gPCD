@@ -12,7 +12,9 @@ repulsive force field.  One source-particle invocation detects all current
 particle and wall contacts, immediately vector-sums their forces into a
 source-local \texttt{totalForce}, and writes only the source velocity and
 position.  The implementation is shaped to transfer directly to one GLSL
-compute invocation per source particle.
+compute invocation per source particle.  This model is the preserved
+baseline: it uses physical particle radii and physical wall-ghost geometry for
+starting overlaps, with no effective starting-contact state.
 
 \begin{figure}[ht]
 \centering
@@ -123,7 +125,8 @@ F_{ij}=q_{ij}A_{ij},
 
 The force is applied during both compression and rebound.  There is no
 contact weighting, available-momentum cap, collision phase, or stored
-internal momentum.
+internal momentum.  Starting overlaps are treated as ordinary physical
+overlaps in this baseline model.
 
 \VerAForceFunctionSection{GetContactStiffness}
 

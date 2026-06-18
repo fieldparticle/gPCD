@@ -38,6 +38,8 @@
 \newcommand{\ForceFlowNode}[2]{\hyperref[force:#1]{\strut #2}}
 
 \node[entry] (main) {main(SourceID)};
+\node[function, below=0.20in of main] (start-state)
+    {\ForceFlowNode{InitializeStartingContactState}{InitializeStartingContactState}};
 
 % Particle contacts are processed immediately when detected.
 \node[function, below left=0.46in and 0.72in of main] (particle-scan)
@@ -80,6 +82,8 @@
     {\ForceFlowNode{GetContactSlots}{GetContactSlots}};
 \node[reused, right=0.18in of geometry] (geometry-position)
     {\ForceFlowNode{GetParticlePosition}{GetParticlePosition}};
+\node[reused, right=0.18in of geometry-position] (geometry-effective)
+    {\ForceFlowNode{GetParticleEffectiveContactGeometry}{GetParticleEffectiveContactGeometry}};
 \node[reused, right=0.18in of particle-force] (particle-stiffness)
     {GetContactStiffness};
 \node[reused, left=0.18in of wall-geometry] (wall-position)
@@ -95,8 +99,9 @@
 \node[reused, left=of position] (position-current)
     {\ForceFlowNode{GetParticlePosition}{GetParticlePosition}};
 
-\draw[flow] (main) -- (particle-scan);
-\draw[flow] (main) -- (wall-scan);
+\draw[flow] (main) -- (start-state);
+\draw[flow] (start-state) -- (particle-scan);
+\draw[flow] (start-state) -- (wall-scan);
 
 \draw[flow] (particle-scan) -- node[right,font=\scriptsize]{contact found} (particle-process);
 \draw[flow] (particle-process) -- (init);
@@ -121,6 +126,7 @@
 
 \draw[reusecall] (append) -- (append-slots);
 \draw[reusecall] (geometry) -- (geometry-position);
+\draw[reusecall] (geometry-position) -- (geometry-effective);
 \draw[reusecall] (particle-force) -- (particle-stiffness);
 \draw[reusecall] (wall-geometry) -- (wall-position);
 \draw[reusecall] (wall-append) -- (wall-slots);

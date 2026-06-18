@@ -68,24 +68,31 @@ internal-momentum ledgers.  The corresponding pair potential is:
 U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}A_{ij}(s)\,ds.
 \end{equation}
 
-The Force contact law is memoryless, instantaneous, and purely geometric.
-Each timestep scans current particle and wall contacts once and immediately
+The ordinary Force contact law is instantaneous and purely geometric.  Each
+timestep scans current particle and wall contacts once and immediately
 vector-sums their contributions into the source-local \texttt{totalForce}.
 After the source force sum is complete, semi-implicit Euler first updates
 velocity and then updates position using the new velocity.  An end-position
 snapshot is created only for diagnostics; it is not a second force evaluation.
 Relative velocity is diagnostic only and does not affect force magnitude.
-Only particle physical state, including position and velocity, persists into
-the next frame.
+
+Starting contacts are the exception to memoryless operation.  When particles
+or wall contacts are already overlapping at initialization, the starting
+separation is recorded as an effective zero-force contact limit.  The model
+applies force only if the contact compresses deeper than that starting
+separation.  After rebound to the starting separation, the physical overlap is
+suppressed until the actual radii separate, preventing a second rebound from
+the configured initial overlap.
 
 \subsection{Diagnostics}
 
 Momentum, kinetic energy, potential energy, and total energy are reported
 diagnostics.  Diagnostic calculations evaluate the contact rule but do not
-affect particle motion.  Force potential energy is calculated from current
-geometry only.  Documentation must distinguish actual vector momentum drift
-from any scalar diagnostic totals.  Diagnostic return to zero does not, by
-itself, prove momentum or kinetic-energy conservation.
+affect particle motion.  Force potential energy is calculated from the same
+physical or effective geometry used by the force calculation.  Documentation
+must distinguish actual vector momentum drift from any scalar diagnostic
+totals.  Diagnostic return to zero does not, by itself, prove momentum or
+kinetic-energy conservation.
 
 \subsection{Boundary Convention}
 
@@ -96,7 +103,9 @@ receive a particle-state write.  Current \texttt{ForceDynamics} scans each of
 the four configured walls exactly once for each source and accumulates wall
 force into the same source-local \texttt{totalForce} used for particle
 contacts.  A wall contact uses stationary equal-particle ghost geometry and
-the configured \texttt{wall\_contact\_offset}.
+the configured \texttt{wall\_contact\_offset}.  Starting wall contacts retain
+the physical wall ghost for clearance but use an effective ghost radius while
+the starting overlap is active.
 
 Long-running closed-box energy statistics are meaningful only after wall work
 and wall potential energy are included in the same diagnostics as

@@ -29,6 +29,7 @@ schedule:
 
 \begin{verbatim}
 snapshot frame-start positions and velocities
+initialize starting-contact effective geometry
 initialize totalForce for every source
 for each SourceID:
     detect particle contacts
@@ -46,7 +47,19 @@ snapshot end positions for diagnostics
 
 The Python harness uses a direct particle scan where GLSL uses cell occupancy
 lists.  Both schedules complete one source-local force sum before integration.
-The end-position snapshot is diagnostic only and is not a second force scan.
+Starting-contact state is initialized after the frame-start snapshot so
+particle-particle and particle-wall overlaps present in the initial
+configuration can be treated as zero-force contact limits.  The end-position
+snapshot is diagnostic only and is not a second force scan.
+
+\ForceFunctionSection{InitializeStartingContactState}
+
+\texttt{InitializeStartingContactState()} records particle and wall contacts
+that already overlap when the model starts.  For each starting contact, the
+current center distance becomes the effective separation limit.  The physical
+radii are still retained, but force and potential energy use the effective
+geometry until the contact rebounds to its starting separation and then clears
+the physical overlap.
 
 \ForceFunctionSection{ProcessParticleCollision}
 
@@ -65,10 +78,12 @@ once for each source particle.
 \ForceFunctionSection{InitializeWallContactState}
 
 \texttt{InitializeWallContactState(SourceID, wall)} represents a wall contact
-with a stationary ghost having the same radius and mass as the source
-particle.  The contact normal is perpendicular to the wall.  The configurable
-\texttt{wall\_contact\_offset} controls how far the ghost center lies beyond
-the wall boundary.
+with a stationary ghost.  Ordinary wall contacts use a ghost having the same
+radius and mass as the source particle.  Starting wall contacts use an
+effective ghost radius whose diameter equals the starting wall-ghost center
+distance.  The contact normal is perpendicular to the wall.  The configurable
+\texttt{wall\_contact\_offset} controls how far the physical ghost center lies
+beyond the wall boundary.
 
 \ForceFunctionSection{InitializeContactState}
 
@@ -96,7 +111,22 @@ array owned by the source particle.
 
 \texttt{GetParticleGeometry(SourceID, TargetID)} calculates overlap area,
 center distance, penetration depth, and the source-to-target normal from the
-immutable frame-start position snapshot.
+immutable frame-start position snapshot.  Ordinary contacts use the physical
+particle radii.  If the pair belongs to a starting contact,
+\texttt{GetParticleGeometry} obtains effective radii from
+\texttt{GetParticleEffectiveContactGeometry}.  The effective radii make the
+starting separation a zero-force limit.  If a resolved starting contact is
+still physically overlapping, physical force is suppressed until the actual
+radii separate.
+
+\ForceFunctionSection{GetParticleEffectiveContactGeometry}
+
+\texttt{GetParticleEffectiveContactGeometry(SourceID, TargetID,
+center\_distance)} selects the radii used by both force and diagnostic
+potential energy for one particle contact.  It returns physical radii for
+ordinary contacts, effective radii for active starting contacts, and a
+suppression flag for resolved starting contacts that have not yet cleared the
+physical-radius overlap.
 
 \ForceFunctionSection{GetParticlePosition}
 
@@ -121,9 +151,10 @@ F_{ij}=q_{ij}A_{ij},
 \mathbf F_i \mathrel{+}= -F_{ij}\mathbf n_{ij}.
 \end{equation}
 
-The force is applied during both compression and rebound.  There is no
-contact weighting, available-momentum cap, collision phase, or stored
-internal momentum.
+The force is applied during both compression and rebound.  Ordinary contacts
+use physical overlap area.  Starting contacts use effective overlap area
+measured from their starting separation.  There is no contact weighting,
+available-momentum cap, collision phase, or stored internal momentum.
 
 \ForceFunctionSection{GetContactStiffness}
 
@@ -183,6 +214,12 @@ The force is conservative with pair potential:
 \begin{equation}
 U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}A_{ij}(s)\,ds.
 \end{equation}
+
+For a starting contact, \(r_i+r_j\) is replaced by the effective starting
+separation limit while the contact is active.  After the contact rebounds to
+that limit, force and potential energy remain suppressed until the actual
+physical radii separate.  This avoids a second rebound caused only by the
+initial configured overlap.
 
 Potential energy, relative normal velocity, contact slots, end-position
 snapshots, and pair-phase measurements are diagnostic only.  They do not

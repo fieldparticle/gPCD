@@ -1,9 +1,9 @@
 Current status:
-	- Added VerAForceDynamics as an independent shadow baseline.
-	- Verified live and shadow results are identical across 2,878 frames.
-	- Retired obsolete dynamics paths and restored shared diagnostics.
+	- Implemented live ForceDynamics starting-collision handling.
+	- VerAForceDynamics remains the unchanged shadow baseline.
+	- Starting particle and wall overlaps now use effective zero-force geometry until physical overlap clears.
 Code Changes:
-	- Registered VerAForceDynamics and added optional shadow execution.
-	- Isolated VerAForceDynamics from live ForceDynamics imports.
-	- Added VerA documentation, plots, and flowchart support.
-Next: Implement starting-collision handling in live ForceDynamics.
+	- Added persistent starting-contact state to live ForceDynamics.
+	- Routed particle, wall, and potential-energy calculations through effective starting-contact geometry.
+	- Added starting-contact diagnostics to contact reports.
+Next: Update Dynamics documentation to describe live starting-collision handling.

@@ -203,3 +203,50 @@ included by \texttt{main.tex}.  \texttt{VerAForceDynamics} is an independently
 wired baseline copy used as the shadow model before changes are made to the
 live implementation.  Retiring rather than deleting old models preserves
 their implementation history without presenting them as maintained.
+
+\subsection{Resolve Starting Overlap Without Extra Rebound}
+
+\subsubsection{<previous form>}
+
+\texttt{ForceDynamics} treated a starting overlap exactly like any later
+physical overlap.  The physical radii defined both the force magnitude and the
+diagnostic potential energy from the first frame.  In
+\texttt{ResolveStartingCollisions}, this meant the initial configuration
+stored a large physical-overlap potential and produced a stronger rebound than
+the same collision would have produced if it had evolved into that overlap
+from first contact.
+
+\subsubsection{<current form>}
+
+Live \texttt{ForceDynamics} records contacts that are already overlapping at
+initialization.  For each starting particle or wall contact, the starting
+center distance becomes an effective separation limit.  The force and
+potential-energy diagnostics use the effective geometry while the starting
+contact is active, so the initial configured overlap contributes no force
+until the contact compresses deeper than the starting separation.
+
+When the contact rebounds back to its starting separation, the starting contact
+is marked resolved.  Physical-radius force is then suppressed until the actual
+physical overlap clears, preventing a second rebound from the configured
+overlap.  \texttt{VerAForceDynamics} remains the shadow baseline that uses the
+previous physical-radius behavior.
+
+\subsubsection{difference outcome}
+
+Particle solution.
+
+\subsubsection{<Analysis>}
+
+The fix keeps normal contacts unchanged: non-starting particle and wall
+scenarios remain physically identical to the VerA baseline.  Starting-overlap
+scenarios intentionally diverge from VerA because live ForceDynamics removes
+the initial artificial stored potential.  Current targeted runs show
+\texttt{ResolveStartingCollisions}, \texttt{ResolveStartingWallCollision}, and
+\texttt{ResolveStartingWPCollision} completing without runtime errors and
+draining their starting-contact state.
+
+The result is local to starting contacts and avoids an external evaluator.  It
+does introduce persistent contact state, so future GLSL work must carry that
+state outside the transient per-frame contact slots.  The result is still
+marked a particle solution because broader multi-contact starting-overlap
+validation remains future work.

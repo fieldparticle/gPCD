@@ -13,6 +13,8 @@ main()
     vec3 totalForce = vec3(0.0);
     uint SourceID = gl_GlobalInvocationID.x;
 
+    InitializeStartingContactState();
+
     for (uint ii = 0; ii < 8; ii++)
     {
         uint loc = P[SourceID].CornerList[ii].ploc;
@@ -56,6 +58,11 @@ parameter to particle and wall collision processors.  Each processor adds its
 force contribution immediately.  Contact slots may be recorded for
 diagnostics, but ForceDynamics does not loop over them later to calculate
 force.
+
+Live ForceDynamics also carries starting-contact state.  A GLSL port must
+preserve that state outside the per-frame contact slots so an initial
+overlap can use effective contact geometry until it rebounds to the starting
+separation and then clears the physical overlap.
 
 The GPU launches one invocation for each valid source particle, so the
 dynamics invocation does not need a source-ID validity check.  The current
