@@ -36,14 +36,6 @@ struct lstr {
     uint fill;
 };
 
-struct ContactState {
-    uvec4 ids;   // x=target particle index, yzw=reserved/contact metadata
-    vec4 geom;   // xyz=current contact normal, w=current overlap area
-    vec4 aux;    // x=center distance, y=penetration depth, z=stored internal normal momentum, w=last impulse
-};
-
-const uint MAX_CONTACTS = 16u;
-
 struct Particle {
     vec4 PosLocA;              // xyz=position, w=active flag: 0 active, 1 inactive
     vec4 PosLocB;              // xyz=alternate position buffer, w=active flag

@@ -1,5 +1,15 @@
 \contentsline {section}{\numberline {1}Manuscript Outline}{2}{section.1}%
 \contentsline {section}{\numberline {2}Dynamics}{10}{section.2}%
 \contentsline {subsection}{\numberline {2.1}Description of Dynamics}{10}{subsection.2.1}%
-\contentsline {section}{\numberline {3}Document Guide}{11}{section.3}%
-\contentsline {section}{\numberline {4}Novelty Statements}{13}{section.4}%
+\contentsline {subsection}{\numberline {2.2}Geometry-to-Motion Causality}{10}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.1}Geometry-to-Motion Causality PLot}{11}{subsubsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.3}Purely Geometric Interactions}{11}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Instantaneous Dynamics}{12}{subsection.2.4}%
+\contentsline {subsection}{\numberline {2.5}Energyless Dynamics}{12}{subsection.2.5}%
+\contentsline {subsection}{\numberline {2.6}Force Generation}{13}{subsection.2.6}%
+\contentsline {subsection}{\numberline {2.7}Numerical Integration}{13}{subsection.2.7}%
+\contentsline {subsubsection}{\numberline {2.7.1}Drift and Excursion}{14}{subsubsection.2.7.1}%
+\contentsline {subsection}{\numberline {2.8}Interpenetrating Contacts}{14}{subsection.2.8}%
+\contentsline {subsection}{\numberline {2.9}Source-Owned Dynamics}{15}{subsection.2.9}%
+\contentsline {section}{\numberline {3}Document Guide}{16}{section.3}%
+\contentsline {section}{\numberline {4}Novelty Statements}{18}{section.4}%

@@ -1,3 +1,6 @@
+import math
+
+
 class ForceContactDynamics:
     """Apply overlap-area central forces through a source-owned linear chain."""
 
@@ -5,6 +8,53 @@ class ForceContactDynamics:
     CONTACT_PARTICLE = 1
     CONTACT_WALL = 2
     CONTACT_ACTIVE_THIS_FRAME = 1
+
+    @staticmethod
+    def VelocityAngle(vx, vy):
+        """Return the GLSL VelRad.w velocity angle for an xy velocity."""
+        return math.atan2(vy, vx) if vx != 0.0 or vy != 0.0 else 0.0
+
+    @staticmethod
+    def particle_position(particle, positionBuffer):
+        """Return the currently selected position buffer for one particle."""
+        if int(positionBuffer) == 0:
+            return particle.PosLocA
+        return particle.PosLocB
+
+    @staticmethod
+    def particle_overlap_area(source_radius, target_radius, center_distance):
+        """Return the circular overlap area of two particles."""
+        if center_distance <= 0.0:
+            return math.pi * min(source_radius, target_radius) ** 2
+        if center_distance >= source_radius + target_radius:
+            return 0.0
+        if center_distance <= abs(source_radius - target_radius):
+            return math.pi * min(source_radius, target_radius) ** 2
+
+        source_term = (
+            center_distance * center_distance
+            + source_radius * source_radius
+            - target_radius * target_radius
+        ) / (2.0 * center_distance * source_radius)
+        target_term = (
+            center_distance * center_distance
+            + target_radius * target_radius
+            - source_radius * source_radius
+        ) / (2.0 * center_distance * target_radius)
+        source_term = max(-1.0, min(1.0, source_term))
+        target_term = max(-1.0, min(1.0, target_term))
+        source_area = source_radius * source_radius * math.acos(source_term)
+        target_area = target_radius * target_radius * math.acos(target_term)
+        triangle_area = 0.5 * math.sqrt(
+            max(
+                0.0,
+                (-center_distance + source_radius + target_radius)
+                * (center_distance + source_radius - target_radius)
+                * (center_distance - source_radius + target_radius)
+                * (center_distance + source_radius + target_radius),
+            )
+        )
+        return source_area + target_area - triangle_area
 
     def ProcessParticleCollision(self, TargetID, SourceID, totalForce):
         """Calculate and accumulate one particle-contact force."""
@@ -160,6 +210,140 @@ class ForceContactDynamics:
             int(self.ShaderFlags.positionBuffer),
         )
 
+    def StartingParticleKey(self, SourceID, TargetID):
+        """Return the unordered key for a particle starting contact."""
+        low_id = min(int(SourceID), int(TargetID))
+        high_id = max(int(SourceID), int(TargetID))
+        return ("particle", low_id, high_id)
+
+    def StartingWallKey(self, SourceID, wall_flag):
+        """Return the key for a source-owned wall starting contact."""
+        return ("wall", int(SourceID), int(wall_flag))
+
+    def InitializeStartingContactState(self):
+        """Record contacts that already overlap at the initial configuration."""
+        if self.starting_contacts_initialized:
+            return
+
+        self.starting_contacts_initialized = True
+        self.starting_contact_states = {}
+
+        for source_id in range(len(self.particles)):
+            source_radius = float(self.particles[source_id].Data.x)
+            for target_id in range(source_id + 1, len(self.particles)):
+                target_radius = float(self.particles[target_id].Data.x)
+                center_distance = self.ParticleCenterDistance(source_id, target_id)
+                physical_limit = source_radius + target_radius
+                if center_distance >= physical_limit - self.EPSILON:
+                    continue
+                if center_distance <= self.EPSILON or physical_limit <= self.EPSILON:
+                    continue
+
+                radius_scale = center_distance / physical_limit
+                self.starting_contact_states[
+                    self.StartingParticleKey(source_id, target_id)
+                ] = {
+                    "kind": "particle",
+                    "status": "active",
+                    "start_center_distance": center_distance,
+                    "physical_separation_limit": physical_limit,
+                    "effective_source_radius": source_radius * radius_scale,
+                    "effective_target_radius": target_radius * radius_scale,
+                    "compressed": False,
+                }
+
+        if bool(self.ShaderFlags.Boundary):
+            for source_id, source in enumerate(self.particles):
+                radius = float(source.Data.x)
+                physical_limit = 2.0 * radius
+                for wall_flag in (1, 2, 3, 4):
+                    geometry = self.GetPhysicalWallGhostGeometry(source_id, wall_flag)
+                    if geometry is None:
+                        continue
+                    center_distance = geometry[4]
+                    if center_distance >= physical_limit - self.EPSILON:
+                        continue
+                    if center_distance <= self.EPSILON or physical_limit <= self.EPSILON:
+                        continue
+
+                    self.starting_contact_states[
+                        self.StartingWallKey(source_id, wall_flag)
+                    ] = {
+                        "kind": "wall",
+                        "status": "active",
+                        "start_center_distance": center_distance,
+                        "physical_separation_limit": physical_limit,
+                        "effective_radius": 0.5 * center_distance,
+                        "compressed": False,
+                    }
+
+    def ParticleCenterDistance(self, SourceID, TargetID):
+        """Return frame-snapshot center distance for one particle pair."""
+        source_position = self.GetParticlePosition(SourceID)
+        target_position = self.GetParticlePosition(TargetID)
+        dx = target_position.x - source_position.x
+        dy = target_position.y - source_position.y
+        dz = target_position.z - source_position.z
+        return math.sqrt(dx * dx + dy * dy + dz * dz)
+
+    def GetParticleEffectiveContactGeometry(self, SourceID, TargetID, center_distance):
+        """Return radii and suppression state for a particle contact."""
+        source_radius = float(self.particles[SourceID].Data.x)
+        target_radius = float(self.particles[TargetID].Data.x)
+        physical_limit = source_radius + target_radius
+        key = self.StartingParticleKey(SourceID, TargetID)
+        state = self.starting_contact_states.get(key)
+        if state is None:
+            return source_radius, target_radius, physical_limit, 0.0, 0.0, False
+
+        start_distance = float(state["start_center_distance"])
+        if state["status"] == "active":
+            if center_distance < start_distance - self.EPSILON:
+                state["compressed"] = True
+            elif (
+                center_distance > start_distance + self.EPSILON
+                or (
+                    bool(state.get("compressed", False))
+                    and center_distance >= start_distance - self.EPSILON
+                )
+            ):
+                state["status"] = "resolved"
+
+        if state["status"] == "resolved":
+            if center_distance >= physical_limit - self.EPSILON:
+                self.starting_contact_states.pop(key, None)
+                return source_radius, target_radius, physical_limit, 0.0, 1.0, False
+            return source_radius, target_radius, physical_limit, 1.0, 1.0, True
+
+        return (
+            float(state["effective_source_radius"]),
+            float(state["effective_target_radius"]),
+            physical_limit,
+            1.0,
+            0.0,
+            False,
+        )
+
+    def GetParticlePotentialGeometry(self, SourceID, TargetID, center_distance):
+        """Return geometry used by force and potential diagnostics."""
+        (
+            source_radius,
+            target_radius,
+            _physical_limit,
+            _starting_contact,
+            _starting_resolved,
+            suppress_contact,
+        ) = self.GetParticleEffectiveContactGeometry(
+            SourceID,
+            TargetID,
+            center_distance,
+        )
+        if suppress_contact:
+            return None
+        if center_distance >= source_radius + target_radius:
+            return None
+        return source_radius, target_radius
+
     def AppendContactSlot(self, SourceID, TargetID):
         """Allocate and initialize the next source-owned contact slot.
 
@@ -224,6 +408,167 @@ class ForceContactDynamics:
             return max(0.0, float(self.particles[SourceID].Data.y or 0.0))
         return self.GetPairStiffness(SourceID, TargetID)
 
+    def WallContactOffsetDistance(self, radius):
+        """Return configured wall offset as a bounded fraction of radius."""
+        return min(float(radius), float(radius) * self.wall_contact_offset)
+
+    def GetPhysicalWallGhostGeometry(self, SourceID, wall_flag):
+        """Return physical fixed-wall ghost geometry for the current snapshot."""
+        source = self.particles[SourceID]
+        position = self.GetParticlePosition(SourceID)
+        radius = float(source.Data.x)
+        offset = self.WallContactOffsetDistance(radius)
+        cfg = self.run_configuration
+
+        if wall_flag == 1:
+            ghost = (
+                float(cfg.get("WallXMIN", 0.0)) - radius + offset,
+                position.y,
+                position.z,
+            )
+            normal = (-1.0, 0.0, 0.0)
+        elif wall_flag == 2:
+            ghost = (
+                float(cfg.get("WallXMAX", self.ShaderFlags.SideLength))
+                + radius
+                - offset,
+                position.y,
+                position.z,
+            )
+            normal = (1.0, 0.0, 0.0)
+        elif wall_flag == 3:
+            ghost = (
+                position.x,
+                float(cfg.get("WallYMIN", 0.0)) - radius + offset,
+                position.z,
+            )
+            normal = (0.0, -1.0, 0.0)
+        elif wall_flag == 4:
+            ghost = (
+                position.x,
+                float(cfg.get("WallYMAX", self.ShaderFlags.SideLength))
+                + radius
+                - offset,
+                position.z,
+            )
+            normal = (0.0, 1.0, 0.0)
+        else:
+            return None
+
+        dx = ghost[0] - position.x
+        dy = ghost[1] - position.y
+        dz = ghost[2] - position.z
+        center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if center_distance >= 2.0 * radius:
+            return None
+        overlap_area = self.particle_overlap_area(radius, radius, center_distance)
+        return (*normal, overlap_area, center_distance)
+
+    def GetWallGhostGeometry(self, SourceID, wall_flag):
+        """Return fixed-wall ghost geometry for the current position snapshot."""
+        physical_geometry = self.GetPhysicalWallGhostGeometry(SourceID, wall_flag)
+        if physical_geometry is None:
+            self.starting_contact_states.pop(
+                self.StartingWallKey(SourceID, wall_flag),
+                None,
+            )
+            return None
+
+        normal_x, normal_y, normal_z, _overlap_area, center_distance = physical_geometry
+        radius = float(self.particles[SourceID].Data.x)
+        physical_limit = 2.0 * radius
+        key = self.StartingWallKey(SourceID, wall_flag)
+        state = self.starting_contact_states.get(key)
+
+        effective_radius = radius
+        starting_contact = 0.0
+        starting_resolved = 0.0
+        if state is not None:
+            start_distance = float(state["start_center_distance"])
+            if state["status"] == "active":
+                if center_distance < start_distance - self.EPSILON:
+                    state["compressed"] = True
+                elif (
+                    center_distance > start_distance + self.EPSILON
+                    or (
+                        bool(state.get("compressed", False))
+                        and center_distance >= start_distance - self.EPSILON
+                    )
+                ):
+                    state["status"] = "resolved"
+
+            if state["status"] == "resolved":
+                starting_contact = 1.0
+                starting_resolved = 1.0
+                if center_distance >= physical_limit - self.EPSILON:
+                    self.starting_contact_states.pop(key, None)
+                return None
+
+            effective_radius = float(state["effective_radius"])
+            starting_contact = 1.0
+
+        if center_distance >= 2.0 * effective_radius:
+            return None
+        overlap_area = self.particle_overlap_area(
+            effective_radius,
+            effective_radius,
+            center_distance,
+        )
+        return (
+            normal_x,
+            normal_y,
+            normal_z,
+            overlap_area,
+            center_distance,
+            effective_radius,
+            physical_limit,
+            starting_contact,
+            starting_resolved,
+        )
+
+    def AppendWallContactSlot(self, SourceID, wall_flag, geometry):
+        """Append one source-owned stationary wall-ghost contact slot."""
+        source = self.particles[SourceID]
+        slots = self.GetContactSlots(SourceID)
+        if source.contactCount >= len(slots):
+            return None
+        contact_state = slots[source.contactCount]
+        (
+            normal_x,
+            normal_y,
+            normal_z,
+            overlap_area,
+            center_distance,
+            effective_radius,
+            physical_limit,
+            starting_contact,
+            starting_resolved,
+        ) = geometry
+        contact_state.ids.x = int(wall_flag)
+        contact_state.ids.y = self.CONTACT_WALL
+        contact_state.ids.z = int(wall_flag)
+        contact_state.ids.w = self.CONTACT_ACTIVE_THIS_FRAME
+        contact_state.geom = self.create_vec4(
+            normal_x,
+            normal_y,
+            normal_z,
+            overlap_area,
+        )
+        contact_state.aux.x = center_distance
+        contact_state.aux.y = 2.0 * effective_radius - center_distance
+        contact_state.aux.z = 0.0
+        contact_state.effective_source_radius = effective_radius
+        contact_state.effective_target_radius = effective_radius
+        contact_state.effective_separation_limit = 2.0 * effective_radius
+        contact_state.physical_separation_limit = physical_limit
+        contact_state.starting_contact = starting_contact
+        contact_state.starting_resolved = starting_resolved
+        contact_state.wall_ghost_mass = self.GetParticleMass(SourceID)
+        source.contactCount += 1
+        source.colFlg = 1
+        source.report_contacts = source.contactCount
+        return contact_state
+
     def CalcVelocity(self, SourceID, totalForce):
         """Apply source-local total force directly to the source velocity."""
         dt = float(self.ShaderFlags.dt)
@@ -274,6 +619,117 @@ class ForceContactDynamics:
             and (output_position.x < 1.0 or output_position.y < 1.0)
         ):
             return self.SetError(self.constants.ERROR_PARTICLE_OUT_OF_BOUNDS)
+        return True
+
+    def isParticleContact(self, Frame, SourceID, TargetID, positionBuffer):
+        source = self.particles[SourceID]
+        target = self.particles[TargetID]
+        if hasattr(self, "PosLocFrame") and self.PosLocFrame:
+            source_position = self.PosLocFrame[SourceID]
+            target_position = self.PosLocFrame[TargetID]
+        else:
+            source_position = self.particle_position(source, positionBuffer)
+            target_position = self.particle_position(target, positionBuffer)
+        dx = target_position.x - source_position.x
+        dy = target_position.y - source_position.y
+        dz = target_position.z - source_position.z
+        center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+        source_radius = source.Data.x
+        target_radius = target.Data.x
+        contact = center_distance <= source_radius + target_radius
+        if not contact:
+            return False
+        (
+            effective_source_radius,
+            _effective_target_radius,
+            _physical_limit,
+            _starting_contact,
+            _starting_resolved,
+            suppress_contact,
+        ) = self.GetParticleEffectiveContactGeometry(
+            SourceID,
+            TargetID,
+            center_distance,
+        )
+
+        overlap_area = self.particle_overlap_area(
+            effective_source_radius,
+            _effective_target_radius,
+            center_distance,
+        )
+        source.oa = max(source.oa, overlap_area)
+        penetration_depth = (
+            effective_source_radius + _effective_target_radius - center_distance
+        )
+        source.max_penetration_depth = max(
+            source.max_penetration_depth,
+            penetration_depth,
+        )
+        if not suppress_contact and center_distance <= effective_source_radius:
+            self.collIn.ErrorReturn = self.constants.ERROR_TUNNELING
+        return True
+
+    def DetectContacts(self, total_forces):
+        """Run naive contact detection and overlap-area forces for every source."""
+        return self.NaiveContactDetermination(total_forces)
+
+    def NaiveContactDetermination(self, total_forces):
+        """Fully process each source after scanning its possible targets."""
+        position_buffer = int(self.ShaderFlags.positionBuffer)
+        for source_id in range(len(self.particles)):
+            for target_id in range(len(self.particles)):
+                if source_id == target_id:
+                    continue
+                if self.isParticleContact(
+                    self.ShaderFlags.frameNum,
+                    source_id,
+                    target_id,
+                    position_buffer,
+                ):
+                    if not self.AddContactTargetID(source_id, target_id):
+                        return False
+                    if not self.ProcessParticleCollision(
+                        target_id,
+                        source_id,
+                        total_forces[source_id],
+                    ):
+                        return False
+                if self.collIn.ErrorReturn != self.constants.ERROR_NONE:
+                    return False
+        return True
+
+    def AddContactTargetID(self, SourceID, TargetID):
+        """Add only the target id to the source contact list."""
+        source = self.particles[SourceID]
+        if TargetID not in source.collision_list:
+            source.collision_list.append(TargetID)
+        return True
+
+    def BuildWallContactLists(self, total_forces):
+        """Process each active stationary wall ghost exactly once."""
+        for source_id in range(len(self.particles)):
+            if bool(self.ShaderFlags.Boundary):
+                for wall_flag in (1, 2, 3, 4):
+                    if not self.ProcessWallCollision(
+                        source_id,
+                        wall_flag,
+                        total_forces[source_id],
+                    ):
+                        return False
+        return True
+
+    def CalculateVelocities(self, total_forces):
+        """Calculate each source velocity after all source contacts are known."""
+        for SourceID in range(len(self.particles)):
+            if not self.CalcVelocity(SourceID, total_forces[SourceID]):
+                return False
+        return True
+
+    def CalculatePositions(self):
+        """Move every source using its newly calculated velocity."""
+        for SourceID in range(len(self.particles)):
+            if not self.CalcPosition(SourceID):
+                return False
         return True
 
     def SetError(self, error_code):

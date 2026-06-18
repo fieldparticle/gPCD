@@ -1,10 +1,68 @@
 % !TeX root = main.tex
-\section{Porting Python to GLSL}
+\section{Python-glsl Export Rules }
 
 Python is the readable canonical source for GLSL dynamics.  Naming,
 structures, and the dynamics schedule should match as closely as practical.
 The Python harness may replace GPU cell traversal with a direct scan, but it
 must preserve the same source-owned processing order.
+
+\subsection{Source Of Truth}
+
+Python \texttt{base/ForceDynamics.py} is the export source for dynamics.
+\texttt{ForceDynamicsBase.py} is Python infrastructure and diagnostics.
+
+\subsection{Stable Shader Wrapper}
+
+The compute shader stays hand-maintained.  Generated GLSL is included by it
+and may be regenerated.  Existing contact-query helpers such as
+\texttt{isParticleContact.glsl} remain hand-maintained shader infrastructure
+and are not rewritten by the ForceDynamics export.
+
+\subsection{Generated Files}
+
+\texttt{ForceDynamics.glsl} is generated dynamics logic.
+\texttt{StartingContactState.glsl} is shared ABI/state layout and should be
+edited carefully because C++ must match it.
+
+\subsection{Particle ABI}
+
+Only fields actually present in \texttt{particle.glsl} are legal shader
+particle fields: \texttt{PosLocA}, \texttt{PosLocB}, \texttt{VelRad},
+\texttt{Data}, \texttt{parms}, \texttt{CornerList}, \texttt{contactCount},
+\texttt{colFlg}, etc.  Python aliases like \texttt{rx}, \texttt{vx},
+\texttt{mass}, \texttt{radius}, and reporting fields are not portable.
+
+\subsection{Compute Atomics}
+
+Compute-shader atomic counters are defined by the shared
+\texttt{atomic.glsl} include.  Generated ForceDynamics GLSL must not redefine
+the compute atomic buffer or create a competing counter layout.  Error/status
+state such as \texttt{collIn.ErrorReturn} is defined separately by
+\texttt{atomicg.glsl}.
+
+\subsection{Generated Boundary File}
+
+Boundary parameters are generated from the scenario cfg into
+\texttt{boundary.glsl}.  Wall geometry reads symbols such as
+\texttt{BOUNDARY\_XMIN}, \texttt{BOUNDARY\_XMAX},
+\texttt{BOUNDARY\_YMIN}, and \texttt{BOUNDARY\_YMAX} from that include.
+Generated ForceDynamics code assumes those symbols exist and must not hardcode
+the cfg values.
+
+\subsection{Python-Only Infrastructure}
+
+Config loading, reports, inline tests, scenario hooks, CSV diagnostics, and UI
+plotting stay in Python.
+
+\subsection{Known Translation Rules}
+
+\texttt{create\_vec4(...)} maps to \texttt{vec4(...)}; Python dict
+starting-contact state maps to the \texttt{StartingContactState} SSBO; Python
+\texttt{None} return maps to GLSL boolean/result structs.
+
+\subsection{Porting Issues Found}
+
+\subsection{permanent host form}
 
 The current ForceDynamics compute flow is:
 \begin{verbatim}
@@ -12,8 +70,6 @@ main()
 {
     vec3 totalForce = vec3(0.0);
     uint SourceID = gl_GlobalInvocationID.x;
-
-    InitializeStartingContactState();
 
     for (uint ii = 0; ii < 8; ii++)
     {
@@ -53,19 +109,256 @@ main()
 }
 \end{verbatim}
 
+\subsection{Required Force Variable}
+
 \texttt{totalForce} is a source-local variable passed as an \texttt{inout}
 parameter to particle and wall collision processors.  Each processor adds its
 force contribution immediately.  Contact slots may be recorded for
 diagnostics, but ForceDynamics does not loop over them later to calculate
 force.
 
-Live ForceDynamics also carries starting-contact state.  A GLSL port must
-preserve that state outside the per-frame contact slots so an initial
-overlap can use effective contact geometry until it rebounds to the starting
-separation and then clears the physical overlap.
+\subsection{no source-ID validity check}
 
 The GPU launches one invocation for each valid source particle, so the
 dynamics invocation does not need a source-ID validity check.  The current
 wall implementation directly scans four configured walls.  A later boundary
 representation may place uniquely identified boundary segments in cells
 without changing the source-owned force and integration schedule.
+
+\section{Python-glsl Export Process}
+
+\subsection{Step 1: Report The Export Surface}
+
+Before generating GLSL, run the report-only exporter gate:
+\begin{verbatim}
+& "c:\_DJ\gPCD\python\.venv\Scripts\python.exe" tools\ExportForceDynamicsGLSL.py
+\end{verbatim}
+
+This tool parses \texttt{base/ForceDynamics.py}, lists the methods intended
+for generated GLSL, lists Python wrapper/harness methods separately, and
+reports \texttt{self.} method calls that are not defined in the generated
+surface.  The expected known translation primitive is
+\texttt{create\_vec4(...)}, which maps to \texttt{vec4(...)} in GLSL.
+
+This step must pass before any GLSL file is generated.  Any unexpected
+dependency means the Python dynamics source still depends on infrastructure
+that either needs to move into \texttt{ForceDynamics.py} or needs an explicit
+translation rule.  Python direct-scan helpers such as
+\texttt{isParticleContact(...)}, \texttt{DetectContacts(...)}, and
+\texttt{NaiveContactDetermination(...)} are wrapper/harness parity methods and
+are not part of generated ForceDynamics GLSL.
+
+\subsection{Step 2: Generate The Stub Artifact}
+
+After the export surface report passes, generate the stub artifact:
+\begin{verbatim}
+& "c:\_DJ\gPCD\python\.venv\Scripts\python.exe" tools\ExportForceDynamicsGLSL.py --write-stubs
+\end{verbatim}
+
+This writes \texttt{C:/\_DJ/gPCD/vulkan/sim/common/ForceDynamics.glsl}.  The
+file contains the generated-file header, include guard, and one stub function
+for each approved generated GLSL method.  It must not contain hand-maintained
+wrapper helpers such as \texttt{isParticleContact(...)},
+\texttt{DetectContacts(...)}, or \texttt{NaiveContactDetermination(...)}.
+
+At this stage the generated functions are intentionally non-functional stubs.
+The purpose of this gate is only to prove that the exporter can create the
+right artifact in the right location without modifying the permanent compute
+shader or stable common shader helpers.
+
+\subsection{Step 3: Classify Translation Status}
+
+Before translating function bodies, classify every generated method by
+translation status.  The exporter report groups methods as:
+\begin{itemize}
+    \item \texttt{direct}: can be translated nearly 1:1 now;
+    \item \texttt{needs\_struct}: needs a GLSL result struct or temporary state
+    object;
+    \item \texttt{needs\_buffer}: depends on
+    \texttt{StartingContactState.glsl} or particle/storage layout;
+    \item \texttt{defer}: depends on later interface decisions.
+\end{itemize}
+
+Every method in the generated GLSL list must appear in exactly one
+translation-status group.  This gate prevents body generation from starting
+with unresolved interface questions hidden inside the method list.  Direct
+methods may be translated first.  Methods in the other groups require their
+GLSL structs, buffers, or call contracts to be designed before code generation
+is enabled for them.
+
+\subsection{Step 4: Define Geometry Result Structs}
+
+Python geometry helpers often return either a tuple of values or
+\texttt{None}.  GLSL does not use that convention.  These returns are
+translated into explicit result structs with a \texttt{valid} flag, or a
+named suppression flag where that is the actual Python meaning.
+
+The generated \texttt{ForceDynamics.glsl} stub declares:
+\begin{itemize}
+    \item \texttt{ParticleEffectiveContactGeometry};
+    \item \texttt{ParticleGeometry};
+    \item \texttt{ParticlePotentialGeometry};
+    \item \texttt{WallPhysicalGhostGeometry};
+    \item \texttt{WallGhostGeometry}.
+\end{itemize}
+
+The corresponding method signatures return those structs instead of generic
+\texttt{bool} values.  This keeps the Python tuple layout visible while giving
+GLSL a single value to return from each geometry helper.
+
+\subsection{Step 5A: Generate Direct Read-Only And Math Bodies}
+
+The first real body-generation pass is limited to direct methods that only do
+math, read particle data, or write the shared error code.  These bodies are
+generated from explicit templates rather than inferred from the Python AST.
+This keeps the first generated code small and reviewable.
+
+The Step 5A template set includes:
+\begin{itemize}
+    \item \texttt{VelocityAngle(...)};
+    \item \texttt{particle\_position(...)};
+    \item \texttt{particle\_overlap\_area(...)};
+    \item \texttt{GetParticlePosition(...)};
+    \item \texttt{ParticleCenterDistance(...)};
+    \item \texttt{GetStartFrameVelocity(...)};
+    \item \texttt{GetPairStiffness(...)};
+    \item \texttt{GetContactStiffness(...)};
+    \item \texttt{WallContactOffsetDistance(...)};
+    \item \texttt{GetParticleMass(...)};
+    \item \texttt{SetError(...)}.
+\end{itemize}
+
+State-writing integration methods such as \texttt{CalcVelocity(...)} and
+\texttt{CalcPosition(...)} remain stubbed until the shader buffer-write
+contract is verified.  Geometry and starting-contact methods remain governed
+by their struct and buffer design steps.
+
+\subsection{Step 5B: Generate Integration Write Bodies}
+
+After the read-only templates are generated, the exporter may generate the
+state-writing integration methods:
+\begin{itemize}
+    \item \texttt{CalcVelocity(...)};
+    \item \texttt{CalcPosition(...)}.
+\end{itemize}
+
+\texttt{CalcVelocity(...)} writes only \texttt{P[SourceID].VelRad}.  It reads
+\texttt{ShaderFlags.dt}, checks for invalid time step, reads the source
+particle mass, applies the source-local \texttt{totalForce}, and updates
+\texttt{VelRad.w} with the velocity angle.
+
+\texttt{CalcPosition(...)} implements the position double buffer.  When
+\texttt{ShaderFlags.positionBuffer == 0}, the method reads \texttt{PosLocA}
+and writes the next position into \texttt{PosLocB}.  Otherwise it reads
+\texttt{PosLocB} and writes into \texttt{PosLocA}.  It then flips the
+\texttt{.w} active flags using the same convention as Python.  The generated
+method must never update the same position buffer that contact detection is
+reading during that frame.
+
+The lower-bound out-of-bounds check remains matched to Python:
+\texttt{ERROR\_PARTICLE\_OUT\_OF\_BOUNDS} is set when boundary mode is off and
+the output x or y coordinate is below 1.0.
+
+\subsection{Step 6: Generate Ordinary Particle Geometry}
+
+After the direct math and integration methods are generated, the exporter may
+generate the ordinary particle geometry path:
+\begin{itemize}
+    \item \texttt{GetParticleEffectiveContactGeometry(...)};
+    \item \texttt{GetParticlePotentialGeometry(...)};
+    \item \texttt{GetParticleGeometry(...)}.
+\end{itemize}
+
+At this stage \texttt{GetParticleEffectiveContactGeometry(...)} uses the
+physical particle radii from \texttt{P[SourceID].Data.x} and
+\texttt{P[TargetID].Data.x}.  It returns \texttt{startingContact = 0.0},
+\texttt{startingResolved = 0.0}, and \texttt{suppressContact = false}.  This
+creates a valid ordinary-contact geometry path while keeping starting-contact
+effective-radius behavior disabled until the
+\texttt{StartingContactState.glsl} buffer logic is implemented.
+
+\texttt{GetParticleGeometry(...)} returns a \texttt{ParticleGeometry} struct
+with \texttt{valid = false} when there is no active overlap.  Coincident
+centers use \texttt{vec3(1.0, 0.0, 0.0)} as the deterministic fallback normal,
+matching the Python implementation.
+
+\subsection{Step 7: Generate Ordinary 2D Wall Geometry}
+
+The exporter may generate the ordinary wall geometry path after particle
+geometry is available:
+\begin{itemize}
+    \item \texttt{GetPhysicalWallGhostGeometry(...)};
+    \item \texttt{GetWallGhostGeometry(...)}.
+\end{itemize}
+
+For now ForceDynamics uses the 2D wall flags from the Python model:
+\texttt{1} for \texttt{BOUNDARY\_XMIN}, \texttt{2} for
+\texttt{BOUNDARY\_XMAX}, \texttt{3} for \texttt{BOUNDARY\_YMIN}, and
+\texttt{4} for \texttt{BOUNDARY\_YMAX}.  The wall bounds are read from
+\texttt{boundary.glsl}; they are not derived from
+\texttt{ShaderFlags.SideLength} and are not hardcoded in generated dynamics.
+
+\texttt{GetPhysicalWallGhostGeometry(...)} returns a
+\texttt{WallPhysicalGhostGeometry} struct with \texttt{valid = false} when the
+wall flag is invalid or the source particle does not overlap the wall ghost.
+\texttt{GetWallGhostGeometry(...)} wraps that physical geometry with ordinary
+physical radius behavior.  Starting-wall effective-radius behavior remains
+disabled until the \texttt{StartingContactState.glsl} buffer logic is
+implemented.
+
+The cfg may later provide z-wall constants, but Step 7 does not enable z-wall
+processing.  The current generated wall path remains 2D to match the live
+Python wall loop.
+
+\subsection{Step 8: Use Transient Contact Force Input}
+
+Generated ForceDynamics GLSL does not store contacts in particle-owned contact
+slots.  The active \texttt{particle.glsl} ABI does not contain
+\texttt{P[SourceID].contacts[...]}, and generated dynamics must not
+reintroduce that old layout.
+
+Instead, generated GLSL uses a transient \texttt{ContactForceInput} struct:
+\begin{verbatim}
+struct ContactForceInput {
+    uint targetID;
+    uint contactType;
+    vec3 normal;
+    float overlapArea;
+    bool valid;
+};
+\end{verbatim}
+
+The shader computes current contact geometry, builds a local
+\texttt{ContactForceInput}, immediately accumulates that contact into the
+source-local \texttt{totalForce}, and then discards the temporary contact data.
+This keeps the generated force path independent of Python diagnostic contact
+slots.
+
+\texttt{AccumulateContactForce(...)} is therefore generated against
+\texttt{ContactForceInput}.  Python methods that allocate or populate
+diagnostic contact slots, such as \texttt{AppendContactSlot(...)},
+\texttt{GetContactSlots(...)}, and \texttt{GetContactState(...)}, remain
+deferred for Python parity and are not part of the generated force-storage
+model.
+
+\subsection{Step 9: Generate Collision Processors}
+
+Once transient force input exists, generated GLSL may implement the collision
+processor methods:
+\begin{itemize}
+    \item \texttt{ProcessParticleCollision(...)};
+    \item \texttt{ProcessWallCollision(...)}.
+\end{itemize}
+
+These generated processors do not initialize, append, or store contact slots.
+\texttt{ProcessParticleCollision(...)} computes a \texttt{ParticleGeometry},
+builds a local \texttt{ContactForceInput} with
+\texttt{CONTACT\_PARTICLE}, and calls \texttt{AccumulateContactForce(...)}.
+\texttt{ProcessWallCollision(...)} does the same with
+\texttt{WallGhostGeometry} and \texttt{CONTACT\_WALL}.
+
+The Python diagnostic setup methods \texttt{InitializeContactState(...)},
+\texttt{InitializeWallContactState(...)}, \texttt{GetContactState(...)},
+\texttt{AppendContactSlot(...)}, \texttt{GetContactSlots(...)}, and
+\texttt{AppendWallContactSlot(...)} remain deferred.  They describe Python
+reporting/contact-slot behavior, not the generated GLSL force path.

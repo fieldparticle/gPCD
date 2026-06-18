@@ -38,6 +38,7 @@ layout (binding = 5) coherent buffer CollisionOut
 	uint CollisionCount; 	// Number of colisions.
 	uint numParticles;		// number of particle into compute.
 	uint vnumParticles; 	// Number of particles emitted from compute to verterx.
+	uint ErrorNumber;
 	uint holdPidx;			// Reserved
 	
 } collOut;

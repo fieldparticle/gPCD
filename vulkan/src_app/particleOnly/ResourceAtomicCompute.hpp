@@ -36,6 +36,7 @@ struct Collision
 	uint32_t CollisionCount;
 	uint32_t numParticles;
 	uint32_t vnumParticles;
+	uint32_t ErrorNumber;
 	uint32_t holdPidx;
 };
 class ResourceAtomicCompute : public Resource

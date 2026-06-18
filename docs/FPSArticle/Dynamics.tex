@@ -31,3 +31,454 @@ The dynamics of FPS:
 	\item creates a source owned system that is parallel friendly and fits with gPCD.
 	\end{itemize}
 \end{enumerate} 
+
+\subsection{Geometry-to-Motion Causality}
+
+The Field Particle System (FPS) may be viewed as a
+geometry-to-motion system. The purpose of the methodology
+is not to solve governing equations directly, but rather
+to transform geometric relationships into particle motion
+through a sequence of local interactions. At every
+timestep, the current geometric configuration of the
+system determines the interaction state of each particle.
+The resulting interactions generate forces, forces produce
+accelerations, accelerations modify motion, and the
+resulting motion creates a new geometric configuration.
+The process then repeats.
+
+The causal chain begins with particle geometry. Particle
+position, size, shape, orientation, and boundary
+relationships collectively define the geometric state of
+the system. This state determines whether particles are
+separated, approaching contact, overlapping, bonded, or
+interacting with boundaries.
+
+When particles enter an overlapping configuration, an
+interaction state is established. The overlap region is a
+purely geometric quantity that measures the extent of
+particle interpenetration and defines a temporary domain
+within which particle interactions may occur. Depending
+upon the simulation model, this interaction state may
+support force generation, momentum transfer, bonding,
+species exchange, thermal exchange, or other particle-
+level processes.
+
+The overlap geometry is subsequently converted into a
+contact area. The contact area serves as a geometric
+measure of interaction strength and provides the basis for
+force generation. Larger overlap regions generally produce
+larger contact areas and therefore stronger interactions.
+
+The force-generation model converts contact area into
+force magnitude through the particle-pair stiffness
+relationship. The resulting force acts upon the source
+particle and produces an acceleration according to the
+particle mass.
+
+Acceleration modifies particle velocity through numerical
+integration. The updated velocity then modifies particle
+position, producing a new geometric configuration for the
+next timestep.
+
+The complete causal chain may therefore be summarized as
+
+\begin{verbatim}
+Geometry
+    ↓
+Interaction State
+    ↓
+Overlap
+    ↓
+Contact Area
+    ↓
+Force
+    ↓
+Acceleration
+    ↓
+Velocity
+    ↓
+Position
+    ↓
+New Geometry
+\end{verbatim}
+
+An important consequence of this formulation is that
+geometry acts as the fundamental source of causality
+within FPS. Motion changes geometry, geometry creates
+interactions, and interactions generate new motion.
+Consequently, the methodology forms a closed causal loop
+in which the evolution of the system is governed by the
+continuous conversion of geometry into motion and motion
+into geometry.
+
+This viewpoint distinguishes FPS from methodologies in
+which energy, pressure, constitutive laws, or other
+macroscopic quantities serve as the primary drivers of
+system evolution. Within FPS, such quantities may be
+observed, measured, or derived; however, the underlying
+causal mechanism remains geometric interaction.
+
+\subsubsection{Geometry-to-Motion Causality Plot}
+\begin{verbatim}
+
+
+\end{verbatim}
+
+\subsection{Purely Geometric Interactions}
+
+The Field Particle System (FPS) employs a purely geometric
+interaction formulation in which particle behavior is
+determined exclusively from geometric relationships between
+particles and boundaries. Interaction quantities are derived
+from geometric measures such as overlap, contact orientation,
+separation distance, particle size, and boundary geometry.
+
+The term \emph{purely geometric} does not imply the absence of
+forces. Rather, it indicates that all forces within the
+framework originate from geometric relationships. Force
+generation is therefore a consequence of particle geometry and
+spatial configuration rather than the direct application of
+phenomenon-specific governing models.
+
+Unlike many traditional simulation methodologies, FPS does not
+require equations of state, constitutive relationships,
+turbulence models, shock-capturing algorithms, transition
+criteria, or other phenomenon-specific formulations to govern
+particle interactions. Instead, a common set of geometric
+interaction rules is applied throughout the simulation domain
+regardless of the macroscopic behavior that may emerge.
+
+As a consequence, the same interaction methodology governs all
+particle species and simulation scenarios. Complex system-level
+behavior arises from the collective evolution of local
+geometric interactions rather than from specialized models
+introduced to reproduce particular physical phenomena.
+
+The purely geometric formulation is a fundamental characteristic
+of FPS and forms the basis for the framework's ability to apply
+a single interaction methodology across a diverse range of
+simulation environments.
+```
+
+
+\subsection{Instantaneous Dynamics}
+
+The Field Particle System (FPS) employs an instantaneous
+dynamics formulation in which particle response is determined
+from the present geometric state of the system. Interactions do
+not require a stored history of previous contacts, accumulated
+collision states, or persistent memory of prior particle
+interactions.
+
+At each simulation step, forces and accelerations are evaluated
+from the current geometric configuration of the particles. The
+resulting dynamic response is applied during the same timestep,
+so the particle motion is governed by the geometry that exists
+at the moment of evaluation.
+
+The only exception occurs when a particle is initialized in an
+overlapping or colliding state. In that case, the initial contact
+condition may require stored information to identify the particle
+as already participating in a collision at the start of the
+simulation. Apart from this initialization condition, the FPS
+dynamics do not require memory of previous contacts in order to
+compute the current response.
+
+The term \emph{instantaneous} does not imply infinite propagation
+speed or instantaneous communication across the simulation
+domain. Rather, it indicates that the local response of each
+particle is computed directly from the current particle geometry
+and applied immediately within the timestep.
+
+\subsection{Energyless Dynamics}
+
+The Field Particle System (FPS) employs an energyless
+dynamics formulation in which energy is not treated as a
+governing quantity of the simulation. Particle motion is
+determined directly from geometric interactions and the
+resulting forces without requiring the storage, transport,
+exchange, minimization, or conservation of energy.
+
+Within FPS, energy is used only as a diagnostic quantity
+during analysis. It may be computed from the evolving
+particle configuration to evaluate or interpret system
+behavior, but it does not participate in the determination
+of particle motion.
+
+This distinction is also reflected in the executable
+implementation. When the method is exported to GLSL for
+GPU execution, diagnostic quantities are removed from the
+runtime code. The exported shader implementation therefore
+evolves particle states without computing or storing
+energy-related diagnostic terms.
+
+The framework does not impose energy conservation as a
+governing constraint. Momentum may exhibit conservation
+properties arising from the symmetry of the interaction
+rules, whereas energy is not required to remain constant.
+As a result, energy may be created or destroyed during
+system evolution while still remaining useful as an
+offline diagnostic measure.
+
+Accordingly, FPS treats energy as an analytical observable
+rather than a governing variable. The simulation is driven
+by geometric interactions and their associated forces,
+while energy diagnostics exist only outside the core
+runtime dynamics.
+
+```latex
+\subsection{Force Generation}
+
+Within FPS, forces arise directly from the geometric
+relationship between interacting particles. When two
+particles overlap, the intersection region defines a
+contact area that characterizes the strength of the
+interaction. Larger overlaps produce larger contact
+areas and therefore stronger interactions, while
+particles that are not in contact generate no force.
+
+For a particle pair $(i,j)$, the overlap geometry is
+used to compute the contact area $A_{ij}$. The force
+magnitude is then obtained from
+
+\begin{equation}
+F_{ij}=q_{ij}A_{ij},
+\end{equation}
+
+where $q_{ij}$ is the pair stiffness coefficient and
+$A_{ij}$ is the overlap area. The pair stiffness
+controls the interaction strength while the overlap
+area determines how strongly the particles interact
+within the current geometric configuration.
+
+The resulting force acts along the line connecting the
+particle centers. Let
+
+\begin{equation}
+\mathbf{n}_{ij}
+=
+\frac{\mathbf{x}_{j}-\mathbf{x}_{i}}
+{\left\|\mathbf{x}_{j}-\mathbf{x}_{i}\right\|}
+\end{equation}
+
+denote the unit vector directed from particle $i$ to
+particle $j$. The force applied to particle $i$ is
+
+\begin{equation}
+\mathbf{F}_{ij}
+=
+F_{ij}\mathbf{n}_{ij}.
+\end{equation}
+
+Because the force is derived entirely from overlap
+geometry and particle configuration, no equations of
+state, constitutive relationships, turbulence models,
+shock-capturing algorithms, or other phenomenon-
+specific governing equations are required to generate
+particle interactions.
+
+The total force acting on a particle is obtained by
+summing the contributions from all interacting
+neighbors. These forces are subsequently converted to
+accelerations and used by the integration procedure to
+advance the system through time.
+
+```latex id="2xv7fr"
+\subsection{Numerical Integration}
+
+The FPS interaction model is independent of the numerical
+integration procedure used to advance particle states.
+Once forces have been computed from the geometric
+configuration of the system, any suitable integration
+scheme may be employed to update particle positions and
+velocities.
+
+The current implementation utilizes semi-implicit Euler
+integration because of its simplicity, computational
+efficiency, and suitability for massively parallel GPU
+execution. For each particle, acceleration is first
+computed from the total applied force
+
+\begin{equation}
+\mathbf{a}_i=\frac{\mathbf{F}_i}{m_i}.
+\end{equation}
+
+Velocity is then updated according to
+
+\begin{equation}
+\mathbf{v}_i^{\,n+1}
+=
+\mathbf{v}_i^{\,n}
++
+\mathbf{a}_i^{\,n}\Delta t,
+\end{equation}
+
+followed by the position update
+
+\begin{equation}
+\mathbf{x}_i^{\,n+1}
+=
+\mathbf{x}_i^{\,n}
++
+\mathbf{v}_i^{\,n+1}\Delta t.
+\end{equation}
+
+Because the updated velocity is used during the position
+update, the method provides improved stability compared
+to explicit Euler integration while retaining a simple
+computational structure.
+
+It should be noted that the FPS methodology does not
+require semi-implicit Euler integration specifically.
+Alternative integration procedures may be employed
+without modifying the underlying interaction model,
+provided that particle positions and velocities are
+advanced consistently with the computed forces.
+
+\subsubsection{Drift and Excursion}
+
+When evaluating the long-term behavior of a numerical
+integration scheme, it is useful to distinguish between
+drift and excursion.
+
+Drift refers to the systematic accumulation of numerical
+error that produces a persistent trend in a measured
+quantity. Excursion refers to a temporary deviation from
+an expected value that remains bounded and subsequently
+reverses direction.
+
+Evaluation of the FPS implementation indicated that
+measured deviations were dominated by bounded excursions
+rather than persistent drift. Quantities exhibiting
+temporary departures from their expected values were
+observed to oscillate about a mean state without
+demonstrating continuous growth over time.
+
+This behavior is consistent with the use of a symplectic
+integration scheme. Symplectic methods do not generally
+eliminate numerical error; however, they tend to prevent
+the systematic accumulation of error associated with
+long-term drift. As a consequence, errors often manifest
+as bounded excursions rather than continuously growing
+deviations.
+
+For the simulations examined in this work, the observed
+behavior suggests that numerical error remains bounded
+over extended simulation periods, thereby reducing the
+likelihood of unphysical long-term drift.
+
+
+```latex
+\subsection{Interpenetrating Contacts}
+
+The Field Particle System (FPS) employs an interpenetrating
+contact model in which particles are permitted to occupy a
+common geometric region during interaction. Unlike rigid-body
+collision formulations that attempt to prevent overlap through
+instantaneous collision resolution, FPS allows overlap to
+develop naturally and uses the resulting overlap geometry as
+the basis for force generation.
+
+Within the framework, overlap is not interpreted as a
+simulation error requiring immediate correction. Instead,
+overlap is regarded as a physically meaningful geometric
+state that quantifies the strength of interaction between
+particles. As particles move into one another, the overlap
+region grows, increasing the geometric contact area and
+therefore increasing the force generated by the interaction.
+As particles separate, the overlap region decreases and the
+resulting force diminishes.
+
+Interpenetration is not merely a mechanism for force generation. 
+It establishes a finite-duration interaction state during which particles 
+may exchange information, transfer momentum, form bonds, or participate in 
+other interaction processes. The overlap region therefore serves as both a 
+geometric measure of contact and a temporary domain in which 
+particle-level interactions may occur.
+
+This interpretation differs fundamentally from many
+traditional collision models. In rigid collision systems,
+the primary objective is often to eliminate penetration and
+restore a non-overlapping configuration. FPS adopts the
+opposite viewpoint. Penetration is not removed directly.
+Rather, penetration generates forces that influence future
+particle motion. The reduction of overlap therefore occurs
+through dynamic evolution of the system rather than through
+explicit geometric correction.
+
+Interpenetration also provides a continuous description of
+contact. Traditional collision systems frequently treat
+contact as a discrete event occurring at a particular
+instant in time. FPS instead treats contact as a finite
+process extending over multiple timesteps. A particle pair
+may enter contact, increase overlap, reach a maximum
+interaction state, and subsequently separate, all while
+remaining governed by the same interaction rules.
+
+The overlap region therefore serves as an intermediate
+quantity connecting geometry and dynamics. Particle
+configuration determines overlap. Overlap determines
+contact area. Contact area determines force magnitude.
+Force determines acceleration and motion. Through this
+sequence, geometric interpenetration becomes the mechanism
+by which particles influence one another.
+
+An important consequence of this formulation is that the
+same interaction mechanism applies throughout the simulation
+domain. No distinction is required between collision,
+contact, compression, rebound, or separation phases.
+Particles interact through a common geometric process, and
+the resulting behavior emerges from the evolution of the
+overlap geometry.
+
+Within FPS, interpenetration is therefore not a numerical
+artifact but a fundamental component of the dynamics. The
+ability of particles to occupy a shared geometric region
+provides the foundation for force generation and enables
+the methodology to convert geometry directly into motion.
+```
+\subsection{Source-Owned Dynamics}
+
+The Field Particle System (FPS) employs a source-owned
+dynamics formulation in which each particle is solely
+responsible for the computation and modification of its
+own state. Although a particle may observe neighboring
+particles and use their properties during force
+evaluation, it never directly modifies the state of
+another particle.
+
+Within the methodology, the particle being updated is
+referred to as the source particle. Neighboring particles
+participating in the interaction are referred to as
+target particles. During force evaluation, a source
+particle may read information from any number of target
+particles; however, all resulting state changes remain
+local to the source particle.
+
+Consequently, interactions are not treated as pair-owned
+operations. The interaction between two particles is
+evaluated independently from the perspective of each
+participant. Particle \(i\) computes its response to
+particle \(j\), and particle \(j\) computes its response
+to particle \(i\) during its own update procedure.
+Neither particle writes to the state of the other.
+
+This ownership model eliminates the need for pairwise
+state updates, shared modification of particle data, and
+many forms of synchronization commonly encountered in
+parallel particle systems. Each particle remains the sole
+owner of its position, velocity, momentum, bonding state,
+and other dynamic quantities throughout the simulation.
+
+Source ownership also provides a natural framework for
+future interaction processes. Momentum transfer, bonding,
+species exchange, thermal exchange, and other particle
+interactions may be evaluated from the perspective of the
+source particle while preserving exclusive ownership of
+particle state.
+
+Within FPS, source ownership is therefore not merely a
+parallel implementation strategy. It is a fundamental
+property of the dynamics that defines how information
+flows through the system and how particles interact with
+one another.

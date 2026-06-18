@@ -20,84 +20,105 @@
 \contentsline {subsection}{\numberline {1.19}ForceDynamics:CalcPosition}{7}{subsection.1.19}%
 \contentsline {subsection}{\numberline {1.20}Potential Energy and Diagnostics}{8}{subsection.1.20}%
 \contentsline {subsection}{\numberline {1.21}Current Numerical Results}{8}{subsection.1.21}%
-\contentsline {section}{\numberline {2}Document Conventions}{8}{section.2}%
-\contentsline {subsection}{\numberline {2.1}Update Project}{8}{subsection.2.1}%
-\contentsline {subsection}{\numberline {2.2}Problem Evolution}{9}{subsection.2.2}%
-\contentsline {subsection}{\numberline {2.3}git message}{9}{subsection.2.3}%
-\contentsline {subsection}{\numberline {2.4}Document Authority}{9}{subsection.2.4}%
-\contentsline {subsection}{\numberline {2.5}Model Documents}{10}{subsection.2.5}%
-\contentsline {subsection}{\numberline {2.6}Retiring Dynamics}{10}{subsection.2.6}%
-\contentsline {subsection}{\numberline {2.7}Generated Source Flowcharts}{10}{subsection.2.7}%
-\contentsline {section}{\numberline {3}Dynamics Conventions}{10}{section.3}%
-\contentsline {subsection}{\numberline {3.1}Purpose}{10}{subsection.3.1}%
-\contentsline {subsection}{\numberline {3.2}Source-Owned Execution}{11}{subsection.3.2}%
-\contentsline {subsection}{\numberline {3.3}Overlap Area Convention}{11}{subsection.3.3}%
-\contentsline {subsection}{\numberline {3.4}Frame State}{11}{subsection.3.4}%
-\contentsline {subsection}{\numberline {3.5}Force-Field Contact Response}{11}{subsection.3.5}%
-\contentsline {subsection}{\numberline {3.6}Diagnostics}{12}{subsection.3.6}%
-\contentsline {subsection}{\numberline {3.7}Boundary Convention}{12}{subsection.3.7}%
-\contentsline {section}{\numberline {4}VerAForceDynamics Source Flow}{13}{section.4}%
-\contentsline {subsection}{\numberline {4.1}VerAForceDynamics:CollisionRun}{14}{subsection.4.1}%
-\contentsline {subsection}{\numberline {4.2}VerAForceDynamics:ProcessParticleCollision}{14}{subsection.4.2}%
-\contentsline {subsection}{\numberline {4.3}VerAForceDynamics:ProcessWallCollision}{14}{subsection.4.3}%
-\contentsline {subsection}{\numberline {4.4}VerAForceDynamics:InitializeWallContactState}{14}{subsection.4.4}%
-\contentsline {subsection}{\numberline {4.5}VerAForceDynamics:InitializeContactState}{14}{subsection.4.5}%
-\contentsline {subsection}{\numberline {4.6}VerAForceDynamics:GetContactState}{14}{subsection.4.6}%
-\contentsline {subsection}{\numberline {4.7}VerAForceDynamics:AppendContactSlot}{15}{subsection.4.7}%
-\contentsline {subsection}{\numberline {4.8}VerAForceDynamics:GetContactSlots}{15}{subsection.4.8}%
-\contentsline {subsection}{\numberline {4.9}VerAForceDynamics:GetParticleGeometry}{15}{subsection.4.9}%
-\contentsline {subsection}{\numberline {4.10}VerAForceDynamics:GetParticlePosition}{15}{subsection.4.10}%
-\contentsline {subsection}{\numberline {4.11}VerAForceDynamics:GetStartFrameVelocity}{15}{subsection.4.11}%
-\contentsline {subsection}{\numberline {4.12}VerAForceDynamics:AccumulateContactForce}{15}{subsection.4.12}%
-\contentsline {subsection}{\numberline {4.13}VerAForceDynamics:GetContactStiffness}{15}{subsection.4.13}%
-\contentsline {subsection}{\numberline {4.14}VerAForceDynamics:GetPairStiffness}{15}{subsection.4.14}%
-\contentsline {subsection}{\numberline {4.15}VerAForceDynamics:CalcVelocity}{16}{subsection.4.15}%
-\contentsline {subsection}{\numberline {4.16}VerAForceDynamics:GetParticleMass}{16}{subsection.4.16}%
-\contentsline {subsection}{\numberline {4.17}VerAForceDynamics:CalcPosition}{16}{subsection.4.17}%
-\contentsline {subsection}{\numberline {4.18}Potential Energy and Diagnostics}{16}{subsection.4.18}%
-\contentsline {subsection}{\numberline {4.19}Current Numerical Results}{16}{subsection.4.19}%
-\contentsline {section}{\numberline {5}Porting Python to GLSL}{17}{section.5}%
-\contentsline {section}{\numberline {6}Problem Evolution}{18}{section.6}%
-\contentsline {subsection}{\numberline {6.1}Source-Local Area Weighting Breaks Conservation}{18}{subsection.6.1}%
-\contentsline {subsubsection}{\numberline {6.1.1}<previous form>}{18}{subsubsection.6.1.1}%
-\contentsline {subsubsection}{\numberline {6.1.2}<current form>}{18}{subsubsection.6.1.2}%
-\contentsline {subsubsection}{\numberline {6.1.3}difference outcome}{18}{subsubsection.6.1.3}%
-\contentsline {subsubsection}{\numberline {6.1.4}<Analysis>}{19}{subsubsection.6.1.4}%
-\contentsline {subsection}{\numberline {6.2}Overlap Area as a Central Force Field}{19}{subsection.6.2}%
-\contentsline {subsubsection}{\numberline {6.2.1}<previous form>}{19}{subsubsection.6.2.1}%
-\contentsline {subsubsection}{\numberline {6.2.2}<current form>}{19}{subsubsection.6.2.2}%
-\contentsline {subsubsection}{\numberline {6.2.3}difference outcome}{19}{subsubsection.6.2.3}%
-\contentsline {subsubsection}{\numberline {6.2.4}<Analysis>}{19}{subsubsection.6.2.4}%
-\contentsline {subsection}{\numberline {6.3}Statistical Energy Validation Requires Walls}{20}{subsection.6.3}%
-\contentsline {subsubsection}{\numberline {6.3.1}<previous form>}{20}{subsubsection.6.3.1}%
-\contentsline {subsubsection}{\numberline {6.3.2}<current form>}{20}{subsubsection.6.3.2}%
-\contentsline {subsubsection}{\numberline {6.3.3}difference outcome}{20}{subsubsection.6.3.3}%
-\contentsline {subsubsection}{\numberline {6.3.4}<Analysis>}{20}{subsubsection.6.3.4}%
-\contentsline {subsection}{\numberline {6.4}Return ForceDynamics to One Source Invocation}{20}{subsection.6.4}%
-\contentsline {subsubsection}{\numberline {6.4.1}<previous form>}{20}{subsubsection.6.4.1}%
-\contentsline {subsubsection}{\numberline {6.4.2}<current form>}{20}{subsubsection.6.4.2}%
-\contentsline {subsubsection}{\numberline {6.4.3}difference outcome}{20}{subsubsection.6.4.3}%
-\contentsline {subsubsection}{\numberline {6.4.4}<Analysis>}{20}{subsubsection.6.4.4}%
-\contentsline {subsection}{\numberline {6.5}Retire MomentumDynamics}{21}{subsection.6.5}%
-\contentsline {subsubsection}{\numberline {6.5.1}<previous form>}{21}{subsubsection.6.5.1}%
-\contentsline {subsubsection}{\numberline {6.5.2}<current form>}{21}{subsubsection.6.5.2}%
-\contentsline {subsubsection}{\numberline {6.5.3}difference outcome}{21}{subsubsection.6.5.3}%
-\contentsline {subsubsection}{\numberline {6.5.4}<Analysis>}{21}{subsubsection.6.5.4}%
-\contentsline {subsection}{\numberline {6.6}Resolve Starting Overlap Without Extra Rebound}{21}{subsection.6.6}%
-\contentsline {subsubsection}{\numberline {6.6.1}<previous form>}{21}{subsubsection.6.6.1}%
-\contentsline {subsubsection}{\numberline {6.6.2}<current form>}{21}{subsubsection.6.6.2}%
-\contentsline {subsubsection}{\numberline {6.6.3}difference outcome}{22}{subsubsection.6.6.3}%
-\contentsline {subsubsection}{\numberline {6.6.4}<Analysis>}{22}{subsubsection.6.6.4}%
-\contentsline {section}{\numberline {7}Programming Conventions}{22}{section.7}%
-\contentsline {subsection}{\numberline {7.1}File Boundaries}{22}{subsection.7.1}%
-\contentsline {subsection}{\numberline {7.2}Creating New Dynamics}{22}{subsection.7.2}%
-\contentsline {subsection}{\numberline {7.3}Programming Styles}{23}{subsection.7.3}%
-\contentsline {subsection}{\numberline {7.4}Control-Oriented (Hierarchical) Design}{23}{subsection.7.4}%
-\contentsline {subsection}{\numberline {7.5}Data-Oriented (Pipeline) Design}{24}{subsection.7.5}%
-\contentsline {subsection}{\numberline {7.6}Application to GPU and HPC Systems}{25}{subsection.7.6}%
-\contentsline {subsection}{\numberline {7.7}Summary}{26}{subsection.7.7}%
-\contentsline {subsection}{\numberline {7.8}Source-Complete Linear Dynamics}{26}{subsection.7.8}%
-\contentsline {subsection}{\numberline {7.9}Interactive Source Documentation}{26}{subsection.7.9}%
-\contentsline {subsection}{\numberline {7.10}Naming Convention}{26}{subsection.7.10}%
-\contentsline {subsection}{\numberline {7.11}Data Convention}{27}{subsection.7.11}%
-\contentsline {subsection}{\numberline {7.12}Runtime Names}{27}{subsection.7.12}%
+\contentsline {section}{\numberline {2}Programming Conventions}{9}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Current .venv environment}{9}{subsection.2.1}%
+\contentsline {section}{\numberline {3}Document Conventions}{9}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Update Project}{9}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Problem Evolution}{9}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}git message}{10}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Document Authority}{10}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}Model Documents}{10}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}Retiring Dynamics}{10}{subsection.3.6}%
+\contentsline {subsection}{\numberline {3.7}Generated Source Flowcharts}{10}{subsection.3.7}%
+\contentsline {section}{\numberline {4}Dynamics Conventions}{11}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Purpose}{11}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Source-Owned Execution}{11}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Overlap Area Convention}{11}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}Frame State}{11}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}Force-Field Contact Response}{12}{subsection.4.5}%
+\contentsline {subsection}{\numberline {4.6}Diagnostics}{12}{subsection.4.6}%
+\contentsline {subsection}{\numberline {4.7}Boundary Convention}{12}{subsection.4.7}%
+\contentsline {section}{\numberline {5}VerAForceDynamics Source Flow}{13}{section.5}%
+\contentsline {subsection}{\numberline {5.1}VerAForceDynamics:CollisionRun}{14}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}VerAForceDynamics:ProcessParticleCollision}{14}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}VerAForceDynamics:ProcessWallCollision}{14}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}VerAForceDynamics:InitializeWallContactState}{14}{subsection.5.4}%
+\contentsline {subsection}{\numberline {5.5}VerAForceDynamics:InitializeContactState}{14}{subsection.5.5}%
+\contentsline {subsection}{\numberline {5.6}VerAForceDynamics:GetContactState}{14}{subsection.5.6}%
+\contentsline {subsection}{\numberline {5.7}VerAForceDynamics:AppendContactSlot}{15}{subsection.5.7}%
+\contentsline {subsection}{\numberline {5.8}VerAForceDynamics:GetContactSlots}{15}{subsection.5.8}%
+\contentsline {subsection}{\numberline {5.9}VerAForceDynamics:GetParticleGeometry}{15}{subsection.5.9}%
+\contentsline {subsection}{\numberline {5.10}VerAForceDynamics:GetParticlePosition}{15}{subsection.5.10}%
+\contentsline {subsection}{\numberline {5.11}VerAForceDynamics:GetStartFrameVelocity}{15}{subsection.5.11}%
+\contentsline {subsection}{\numberline {5.12}VerAForceDynamics:AccumulateContactForce}{15}{subsection.5.12}%
+\contentsline {subsection}{\numberline {5.13}VerAForceDynamics:GetContactStiffness}{15}{subsection.5.13}%
+\contentsline {subsection}{\numberline {5.14}VerAForceDynamics:GetPairStiffness}{15}{subsection.5.14}%
+\contentsline {subsection}{\numberline {5.15}VerAForceDynamics:CalcVelocity}{16}{subsection.5.15}%
+\contentsline {subsection}{\numberline {5.16}VerAForceDynamics:GetParticleMass}{16}{subsection.5.16}%
+\contentsline {subsection}{\numberline {5.17}VerAForceDynamics:CalcPosition}{16}{subsection.5.17}%
+\contentsline {subsection}{\numberline {5.18}Potential Energy and Diagnostics}{16}{subsection.5.18}%
+\contentsline {subsection}{\numberline {5.19}Current Numerical Results}{16}{subsection.5.19}%
+\contentsline {section}{\numberline {6}Python-glsl Export Rules }{17}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Source Of Truth}{17}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Stable Shader Wrapper}{17}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Generated Files}{17}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}Particle ABI}{17}{subsection.6.4}%
+\contentsline {subsection}{\numberline {6.5}Compute Atomics}{17}{subsection.6.5}%
+\contentsline {subsection}{\numberline {6.6}Python-Only Infrastructure}{17}{subsection.6.6}%
+\contentsline {subsection}{\numberline {6.7}Known Translation Rules}{17}{subsection.6.7}%
+\contentsline {subsection}{\numberline {6.8}Porting Issues Found}{18}{subsection.6.8}%
+\contentsline {subsection}{\numberline {6.9}permanent host form}{18}{subsection.6.9}%
+\contentsline {subsection}{\numberline {6.10}Required Force Variable}{19}{subsection.6.10}%
+\contentsline {subsection}{\numberline {6.11}no source-ID validity check}{19}{subsection.6.11}%
+\contentsline {section}{\numberline {7}Python-glsl Export Process}{19}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Step 1: Report The Export Surface}{19}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Step 2: Generate The Stub Artifact}{19}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}Step 3: Classify Translation Status}{19}{subsection.7.3}%
+\contentsline {subsection}{\numberline {7.4}Step 4: Define Geometry Result Structs}{20}{subsection.7.4}%
+\contentsline {subsection}{\numberline {7.5}Step 5A: Generate Direct Read-Only And Math Bodies}{20}{subsection.7.5}%
+\contentsline {subsection}{\numberline {7.6}Step 5B: Generate Integration Write Bodies}{21}{subsection.7.6}%
+\contentsline {subsection}{\numberline {7.7}Step 6: Generate Ordinary Particle Geometry}{21}{subsection.7.7}%
+\contentsline {section}{\numberline {8}Problem Evolution}{22}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Source-Local Area Weighting Breaks Conservation}{22}{subsection.8.1}%
+\contentsline {subsubsection}{\numberline {8.1.1}<previous form>}{22}{subsubsection.8.1.1}%
+\contentsline {subsubsection}{\numberline {8.1.2}<current form>}{22}{subsubsection.8.1.2}%
+\contentsline {subsubsection}{\numberline {8.1.3}difference outcome}{22}{subsubsection.8.1.3}%
+\contentsline {subsubsection}{\numberline {8.1.4}<Analysis>}{22}{subsubsection.8.1.4}%
+\contentsline {subsection}{\numberline {8.2}Overlap Area as a Central Force Field}{23}{subsection.8.2}%
+\contentsline {subsubsection}{\numberline {8.2.1}<previous form>}{23}{subsubsection.8.2.1}%
+\contentsline {subsubsection}{\numberline {8.2.2}<current form>}{23}{subsubsection.8.2.2}%
+\contentsline {subsubsection}{\numberline {8.2.3}difference outcome}{23}{subsubsection.8.2.3}%
+\contentsline {subsubsection}{\numberline {8.2.4}<Analysis>}{23}{subsubsection.8.2.4}%
+\contentsline {subsection}{\numberline {8.3}Statistical Energy Validation Requires Walls}{23}{subsection.8.3}%
+\contentsline {subsubsection}{\numberline {8.3.1}<previous form>}{23}{subsubsection.8.3.1}%
+\contentsline {subsubsection}{\numberline {8.3.2}<current form>}{23}{subsubsection.8.3.2}%
+\contentsline {subsubsection}{\numberline {8.3.3}difference outcome}{23}{subsubsection.8.3.3}%
+\contentsline {subsubsection}{\numberline {8.3.4}<Analysis>}{24}{subsubsection.8.3.4}%
+\contentsline {subsection}{\numberline {8.4}Return ForceDynamics to One Source Invocation}{24}{subsection.8.4}%
+\contentsline {subsubsection}{\numberline {8.4.1}<previous form>}{24}{subsubsection.8.4.1}%
+\contentsline {subsubsection}{\numberline {8.4.2}<current form>}{24}{subsubsection.8.4.2}%
+\contentsline {subsubsection}{\numberline {8.4.3}difference outcome}{24}{subsubsection.8.4.3}%
+\contentsline {subsubsection}{\numberline {8.4.4}<Analysis>}{24}{subsubsection.8.4.4}%
+\contentsline {subsection}{\numberline {8.5}Retire MomentumDynamics}{24}{subsection.8.5}%
+\contentsline {subsubsection}{\numberline {8.5.1}<previous form>}{24}{subsubsection.8.5.1}%
+\contentsline {subsubsection}{\numberline {8.5.2}<current form>}{24}{subsubsection.8.5.2}%
+\contentsline {subsubsection}{\numberline {8.5.3}difference outcome}{24}{subsubsection.8.5.3}%
+\contentsline {subsubsection}{\numberline {8.5.4}<Analysis>}{25}{subsubsection.8.5.4}%
+\contentsline {subsection}{\numberline {8.6}Resolve Starting Overlap Without Extra Rebound}{25}{subsection.8.6}%
+\contentsline {subsubsection}{\numberline {8.6.1}<previous form>}{25}{subsubsection.8.6.1}%
+\contentsline {subsubsection}{\numberline {8.6.2}<current form>}{25}{subsubsection.8.6.2}%
+\contentsline {subsubsection}{\numberline {8.6.3}difference outcome}{25}{subsubsection.8.6.3}%
+\contentsline {subsubsection}{\numberline {8.6.4}<Analysis>}{25}{subsubsection.8.6.4}%
+\contentsline {section}{\numberline {9}Programming Conventions}{26}{section.9}%
+\contentsline {subsection}{\numberline {9.1}File Boundaries}{26}{subsection.9.1}%
+\contentsline {subsection}{\numberline {9.2}Creating New Dynamics}{26}{subsection.9.2}%
+\contentsline {subsection}{\numberline {9.3}Programming Styles}{26}{subsection.9.3}%
+\contentsline {subsection}{\numberline {9.4}Control-Oriented (Hierarchical) Design}{26}{subsection.9.4}%
+\contentsline {subsection}{\numberline {9.5}Data-Oriented (Pipeline) Design}{28}{subsection.9.5}%
+\contentsline {subsection}{\numberline {9.6}Application to GPU and HPC Systems}{29}{subsection.9.6}%
+\contentsline {subsection}{\numberline {9.7}Summary}{29}{subsection.9.7}%
+\contentsline {subsection}{\numberline {9.8}Source-Complete Linear Dynamics}{30}{subsection.9.8}%
+\contentsline {subsection}{\numberline {9.9}Interactive Source Documentation}{30}{subsection.9.9}%
+\contentsline {subsection}{\numberline {9.10}Naming Convention}{30}{subsection.9.10}%
+\contentsline {subsection}{\numberline {9.11}Data Convention}{31}{subsection.9.11}%
+\contentsline {subsection}{\numberline {9.12}Runtime Names}{31}{subsection.9.12}%
