@@ -1,0 +1,20 @@
+| Slide | Title                              | Purpose                                                      |
+| ----- | ---------------------------------- | ------------------------------------------------------------ |
+| 1     | Intro                              | Title Slide													|
+| 2		| Applications						 | Give a visual understanding of applications
+| 3     | The Challenge                      | Why the problem matters                                      |
+| 4     | Market Opportunity                 | Why the opportunity is large                                 |
+| 5     | The Bottleneck                     | Why existing approaches struggle                             |
+| 6     | The Solution                       | How gPCD is different                                        |
+| 7     | Validation                         | Proof that it works                                          |
+| 8     | Commercial Opportunity             | Where it can be used                                         |
+| 9     | Competition / Competitive Position | Why it occupies a unique position                            |
+| 10     | Defensibility                      | Why it is difficult to replicate                             |
+| 11    | Business Model                     | How money is made                                            |
+| 12    | Roadmap                            | How adoption grows                                           |
+| 13    | Revenue Opportunity                | How large the revenue opportunity could become               |
+| 14    | Growth Opportunity                 | Why support today accelerates adoption and commercialization |
+| 15    | Vision                             | Why AI will increase demand for simulation                   |
+| 16    | Thank You                          | Contact information                                          |
+
+

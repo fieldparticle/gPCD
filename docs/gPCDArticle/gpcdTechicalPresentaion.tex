@@ -1,0 +1,133 @@
+
+!TeX root = ManuscriptGuide.tex
+\newpage
+\clearpage
+\section{Technical Presentation}
+
+\begin{verbatim}
+
+1. Title
+    1.1 gPCD: A GPU-Driven Parallel Collision Detection Framework
+    1.2 Author
+    1.3 University of Florida
+    1.4 Conference / Venue
+
+2. Motivation
+    2.1 Particle-based simulation applications
+    2.2 Importance of collision detection
+    2.3 Computational challenges at large particle counts
+    2.4 Need for scalable GPU solutions
+
+3. Problem Statement
+    3.1 Collision detection as a performance bottleneck
+    3.2 Memory-access challenges
+    3.3 Synchronization challenges
+    3.4 Scalability requirements
+    3.5 Objectives of gPCD
+
+4. Background
+    4.1 Particle collision detection workflow
+    4.2 Broad-phase collision detection
+    4.3 Narrow-phase collision detection
+    4.4 Uniform-grid approaches
+    4.5 GPU-based collision detection approaches
+
+5. gPCD Framework Overview
+    5.1 Design objectives
+    5.2 Fully GPU-resident execution
+    5.3 Graphics-pipeline occupancy generation
+    5.4 Compute-shader collision detection
+    5.5 Overall processing pipeline
+
+6. Cell Array Organization
+    6.1 Uniform-grid spatial decomposition
+    6.2 Cell indexing
+    6.3 Occupancy storage
+    6.4 Sparse occupancy handling
+    6.5 O(1) cell access
+    6.6 No empty-cell processing
+
+7. Graphics-Pipeline Broad Phase
+    7.1 Particle representation
+    7.2 AABB construction
+    7.3 Eight-corner generation
+    7.4 Vertex-shader processing
+    7.5 Fragment-shader occupancy generation
+    7.6 Occupancy-list creation
+
+8. Compute-Based Narrow Phase
+    8.1 Candidate-pair generation
+    8.2 Exact collision testing
+    8.3 Parallel execution model
+    8.4 Source-owned updates
+    8.5 Collision determination
+
+9. Experimental Setup
+    9.1 Hardware platform
+    9.2 GPU specifications
+    9.3 Test configurations
+    9.4 Random particle distributions
+    9.5 Verification mode
+    9.6 Performance mode
+    9.7 Measurement methodology
+
+10. Scaling Results
+    10.1 Execution time versus particle count
+    10.2 Linear scaling behavior
+    10.3 Regression analysis
+    10.4 Discussion of scaling characteristics
+
+11. Throughput Results
+    11.1 Throughput definition
+    11.2 Throughput versus particle count
+    11.3 Peak throughput
+    11.4 Largest benchmark configuration
+    11.5 Performance observations
+
+12. Time-per-Particle Analysis
+    12.1 Time-per-particle definition
+    12.2 Scaling efficiency
+    12.3 Constant-cost behavior
+    12.4 Interpretation of results
+
+13. Memory Locality Study
+    13.1 Motivation
+    13.2 Sequential occupancy layout
+    13.3 Random occupancy layout
+    13.4 Performance comparison
+    13.5 Locality effects
+    13.6 Implications for GPU execution
+
+14. Discussion
+    14.1 Exact collision detection
+    14.2 GPU-driven occupancy generation
+    14.3 Sparse-domain advantages
+    14.4 Memory-access behavior
+    14.5 Practical scalability considerations
+
+15. Contributions
+    15.1 Graphics-pipeline occupancy generation
+    15.2 Fully GPU-resident collision detection
+    15.3 Exact collision detection
+    15.4 O(1) cell access
+    15.5 Near-linear scaling
+    15.6 Multi-million-particle capability
+
+16. Future Work
+    16.1 Larger GPU configurations
+    16.2 Multi-GPU execution
+    16.3 Distributed computing
+    16.4 Thermo-fluid simulation integration
+    16.5 Additional large-scale studies
+
+17. Conclusions
+    17.1 Summary of gPCD
+    17.2 Major findings
+    17.3 Performance achievements
+    17.4 Scalability observations
+    17.5 Closing remarks
+
+18. Questions
+    18.1 Discussion
+
+\end{verbatim}
