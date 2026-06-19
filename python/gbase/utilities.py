@@ -3,6 +3,38 @@ import os
 import csv
 import math
 import sys
+
+
+def hsv_angle(angle, value=1.0, sat=0.707):
+    hue = (angle / (2.0 * math.pi)) % 1.0
+    sat = max(0.0, min(1.0, sat))
+    value = max(0.0, min(1.0, value))
+
+    sector = hue * 6.0
+    chroma = value * sat
+    x = chroma * (1.0 - abs((sector % 2.0) - 1.0))
+    match = value - chroma
+
+    if sector < 1.0:
+        red, green, blue = chroma, x, 0.0
+    elif sector < 2.0:
+        red, green, blue = x, chroma, 0.0
+    elif sector < 3.0:
+        red, green, blue = 0.0, chroma, x
+    elif sector < 4.0:
+        red, green, blue = 0.0, x, chroma
+    elif sector < 5.0:
+        red, green, blue = x, 0.0, chroma
+    else:
+        red, green, blue = chroma, 0.0, x
+
+    return (
+        int(round((red + match) * 255.0)),
+        int(round((green + match) * 255.0)),
+        int(round((blue + match) * 255.0)),
+    )
+
+
 class ParticleUtilities():
 
     col_count = 0

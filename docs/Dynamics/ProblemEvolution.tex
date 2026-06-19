@@ -348,3 +348,37 @@ The current result is a particle solution because the reservoir lifecycle is
 working in the active Python and Vulkan reservoir paths.  Broader throughput,
 long-run statistical energy, and inlet packing studies remain future
 validation work.
+
+\subsection{Velocity-Angle HSV Python Visualization}
+
+\subsubsection{<previous form>}
+
+The Python viewer used fixed particle colors with a collision-color override.
+This made collision state easy to see, but it did not expose flow direction or
+changes in particle velocity angle during reservoir and box tests.
+
+\subsubsection{<current form>}
+
+The Python viewer now supports \texttt{RUN\_CONFIGURATION.hsv\_color}.  When
+enabled, \texttt{SimulationRunner.py} colors each active particle from
+\texttt{VelRad.w} using \texttt{gbase/utilities.py:hsv\_angle}.  The helper
+maps a radians angle to hue using \(1/(2\pi)\), clamps
+\texttt{hsv\_sat} and \texttt{hsv\_val} to \([0,1]\), and returns a Python RGB
+tuple.
+
+\subsubsection{difference outcome}
+
+Full solution.
+
+\subsubsection{<Analysis>}
+
+The color change is diagnostic only.  It reads the velocity angle already
+maintained by the dynamics model, but it does not feed color back into contact
+detection, force accumulation, integration, reservoir lifecycle, or energy and
+momentum reports.
+
+Keeping the HSV helper in \texttt{gbase/utilities.py} and applying it in
+\texttt{SimulationRunner.py} preserves the boundary between portable dynamics
+logic and Python display logic.  A later GLSL utility can mirror the same
+\texttt{hsv\_angle(angle, value, sat)} interface for Vulkan rendering without
+changing the ForceDynamics collision model.

@@ -27,7 +27,8 @@
 \contentsline {subsection}{\numberline {2.4}Frame State}{10}{subsection.2.4}%
 \contentsline {subsection}{\numberline {2.5}Force-Field Contact Response}{10}{subsection.2.5}%
 \contentsline {subsection}{\numberline {2.6}Diagnostics}{11}{subsection.2.6}%
-\contentsline {subsection}{\numberline {2.7}Boundary Convention}{11}{subsection.2.7}%
+\contentsline {subsection}{\numberline {2.7}Visual Diagnostics}{11}{subsection.2.7}%
+\contentsline {subsection}{\numberline {2.8}Boundary Convention}{11}{subsection.2.8}%
 \contentsline {section}{\numberline {3}Simple Reservoir Flow}{12}{section.3}%
 \contentsline {subsection}{\numberline {3.1}Purpose}{12}{subsection.3.1}%
 \contentsline {subsection}{\numberline {3.2}State Field}{12}{subsection.3.2}%
@@ -42,14 +43,15 @@
 \contentsline {subsection}{\numberline {3.11}Death Rule}{15}{subsection.3.11}%
 \contentsline {section}{\numberline {4}Programming Conventions}{16}{section.4}%
 \contentsline {subsection}{\numberline {4.1}Current .venv environment}{16}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Python Viewer Color Utilities}{16}{subsection.4.2}%
 \contentsline {section}{\numberline {5}Document Conventions}{16}{section.5}%
 \contentsline {subsection}{\numberline {5.1}Update Project}{16}{subsection.5.1}%
-\contentsline {subsection}{\numberline {5.2}Problem Evolution}{16}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.2}Problem Evolution}{17}{subsection.5.2}%
 \contentsline {subsection}{\numberline {5.3}git message}{17}{subsection.5.3}%
 \contentsline {subsection}{\numberline {5.4}Document Authority}{17}{subsection.5.4}%
 \contentsline {subsection}{\numberline {5.5}Model Documents}{17}{subsection.5.5}%
-\contentsline {subsection}{\numberline {5.6}Retiring Dynamics}{17}{subsection.5.6}%
-\contentsline {subsection}{\numberline {5.7}Generated Source Flowcharts}{17}{subsection.5.7}%
+\contentsline {subsection}{\numberline {5.6}Retiring Dynamics}{18}{subsection.5.6}%
+\contentsline {subsection}{\numberline {5.7}Generated Source Flowcharts}{18}{subsection.5.7}%
 \contentsline {section}{\numberline {6}VerAForceDynamics Source Flow}{19}{section.6}%
 \contentsline {subsection}{\numberline {6.1}VerAForceDynamics:CollisionRun}{20}{subsection.6.1}%
 \contentsline {subsection}{\numberline {6.2}VerAForceDynamics:ProcessParticleCollision}{20}{subsection.6.2}%
@@ -142,16 +144,21 @@
 \contentsline {subsubsection}{\numberline {9.8.2}<current form>}{36}{subsubsection.9.8.2}%
 \contentsline {subsubsection}{\numberline {9.8.3}difference outcome}{36}{subsubsection.9.8.3}%
 \contentsline {subsubsection}{\numberline {9.8.4}<Analysis>}{36}{subsubsection.9.8.4}%
+\contentsline {subsection}{\numberline {9.9}Velocity-Angle HSV Python Visualization}{37}{subsection.9.9}%
+\contentsline {subsubsection}{\numberline {9.9.1}<previous form>}{37}{subsubsection.9.9.1}%
+\contentsline {subsubsection}{\numberline {9.9.2}<current form>}{37}{subsubsection.9.9.2}%
+\contentsline {subsubsection}{\numberline {9.9.3}difference outcome}{37}{subsubsection.9.9.3}%
+\contentsline {subsubsection}{\numberline {9.9.4}<Analysis>}{37}{subsubsection.9.9.4}%
 \contentsline {section}{\numberline {10}Programming Conventions}{37}{section.10}%
 \contentsline {subsection}{\numberline {10.1}File Boundaries}{37}{subsection.10.1}%
-\contentsline {subsection}{\numberline {10.2}Creating New Dynamics}{37}{subsection.10.2}%
+\contentsline {subsection}{\numberline {10.2}Creating New Dynamics}{38}{subsection.10.2}%
 \contentsline {subsection}{\numberline {10.3}Programming Styles}{38}{subsection.10.3}%
 \contentsline {subsection}{\numberline {10.4}Control-Oriented (Hierarchical) Design}{38}{subsection.10.4}%
 \contentsline {subsection}{\numberline {10.5}Data-Oriented (Pipeline) Design}{39}{subsection.10.5}%
 \contentsline {subsection}{\numberline {10.6}Application to GPU and HPC Systems}{40}{subsection.10.6}%
 \contentsline {subsection}{\numberline {10.7}Summary}{41}{subsection.10.7}%
 \contentsline {subsection}{\numberline {10.8}Source-Complete Linear Dynamics}{41}{subsection.10.8}%
-\contentsline {subsection}{\numberline {10.9}Interactive Source Documentation}{41}{subsection.10.9}%
-\contentsline {subsection}{\numberline {10.10}Naming Convention}{41}{subsection.10.10}%
+\contentsline {subsection}{\numberline {10.9}Interactive Source Documentation}{42}{subsection.10.9}%
+\contentsline {subsection}{\numberline {10.10}Naming Convention}{42}{subsection.10.10}%
 \contentsline {subsection}{\numberline {10.11}Data Convention}{42}{subsection.10.11}%
-\contentsline {subsection}{\numberline {10.12}Runtime Names}{42}{subsection.10.12}%
+\contentsline {subsection}{\numberline {10.12}Runtime Names}{43}{subsection.10.12}%

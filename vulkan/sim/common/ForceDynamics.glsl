@@ -566,7 +566,26 @@ bool RetireParticlePastXMax(uint SourceID)
 {
     uint next_position_buffer = 1u - uint(ShaderFlags.positionBuffer);
     vec4 next_position = particle_position(SourceID, next_position_buffer);
-    if (next_position.x > BOUNDARY_XMAX) {
+    float outlet_x = BOUNDARY_XMAX;
+#ifdef OUTLET_X
+    outlet_x = OUTLET_X;
+#endif
+    if (next_position.x > outlet_x) {
+        float inlet_x = BOUNDARY_XMIN;
+#ifdef INLET_X
+        inlet_x = INLET_X;
+#endif
+        vec3 reservoir_position = vec3(
+            inlet_x,
+            next_position.y,
+            next_position.z
+        );
+        P[SourceID].PosLocA.xyz = reservoir_position;
+        P[SourceID].PosLocB.xyz = reservoir_position;
+        P[SourceID].PosLocA.w = next_position_buffer == 0u ? 0.0 : 1.0;
+        P[SourceID].PosLocB.w = next_position_buffer == 0u ? 1.0 : 0.0;
+        P[SourceID].VelRad.xyz = vec3(0.0);
+        P[SourceID].VelRad.w = 0.0;
         P[SourceID].Data.w = -1.0;
         return false;
     }

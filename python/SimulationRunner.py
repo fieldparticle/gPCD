@@ -7,6 +7,7 @@ from base.VerAForceDynamicsBase import ForceDynamics as VerAForceDynamics
 from base.Reporting import Reporting
 from base.InLineTest import InLineTest
 from gbase import libconf
+from gbase.utilities import hsv_angle
 
 
 BASE_CLASS_REGISTRY = {
@@ -406,6 +407,9 @@ def _draw_particles(
         pygame.draw.rect(screen, (70, 85, 105), side_rect, 1)
 
     font = pygame.font.Font(None, 24)
+    hsv_color = bool(run_configuration.get("hsv_color", False))
+    hsv_sat = float(run_configuration.get("hsv_sat", 0.707))
+    hsv_val = float(run_configuration.get("hsv_val", 1.0))
     wall_xmax = float(run_configuration.get("WallXMAX", view_box[1]))
     wall_ymax = float(run_configuration.get("WallYMAX", view_box[3]))
     xmax_label = font.render(f"x={wall_xmax:g}", True, (190, 205, 225))
@@ -433,7 +437,10 @@ def _draw_particles(
         radius = _radius_to_pixels(particle.radius, view_box, screen_width, screen_height)
         fill = (100, 170, 255)
         edge = (210, 230, 255)
-        if particle.collision_list:
+        if hsv_color:
+            fill = hsv_angle(particle.VelRad.w, hsv_val, hsv_sat)
+            edge = fill
+        elif particle.collision_list:
             fill = (255, 140, 110)
             edge = (255, 220, 200)
         particle_screen_data.append((index, particle, center, radius, edge))

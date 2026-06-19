@@ -9,3 +9,24 @@ Use this .venv to coordinate programming tasks:
 \begin{verbatim}
 c:\_DJ\gPCD\python\.venv\Scripts\python.exe
 \end{verbatim}
+
+\subsection{Python Viewer Color Utilities}
+
+Python viewer colorization belongs in viewer or utility code, not in
+\texttt{<model>Dynamics.py}.  The dynamics model may calculate and store the
+velocity angle in \texttt{VelRad.w}, but conversion from angle to RGB is a
+display operation.
+
+The Python HSV velocity-angle helper is:
+\begin{verbatim}
+gbase/utilities.py:hsv_angle(angle, value, sat)
+\end{verbatim}
+
+\texttt{SimulationRunner.py} applies this helper when
+\texttt{RUN\_CONFIGURATION.hsv\_color} is true.  The helper reads the angle in
+radians, maps it to hue with \(1/(2\pi)\), clamps saturation and value to
+\([0,1]\), and returns an RGB tuple for the Python renderer.
+
+Future GLSL color utilities should mirror this interface but remain separate
+from generated ForceDynamics collision code.  Color is diagnostic display
+state and must not become a dynamics input.
