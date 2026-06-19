@@ -163,18 +163,37 @@ def _particle_kinetic_energy(particle):
     return 0.5 * mass * (vx * vx + vy * vy + vz * vz)
 
 
-def _total_momentum(particles):
+def _active_particles(particles, dynamics=None):
+    if dynamics is None or not hasattr(dynamics, "IsParticleActiveForDynamics"):
+        return particles
+    return [
+        particle
+        for particle_index, particle in enumerate(particles)
+        if dynamics.IsParticleActiveForDynamics(particle_index)
+    ]
+
+
+def _is_active_particle(particle_index, dynamics=None):
+    if dynamics is None or not hasattr(dynamics, "IsParticleActiveForDynamics"):
+        return True
+    return dynamics.IsParticleActiveForDynamics(particle_index)
+
+
+def _total_momentum(particles, dynamics=None):
     total_x = 0.0
     total_y = 0.0
-    for particle in particles:
+    for particle in _active_particles(particles, dynamics):
         momentum_x, momentum_y = _particle_momentum(particle)
         total_x += momentum_x
         total_y += momentum_y
     return total_x, total_y
 
 
-def _total_kinetic_energy(particles):
-    return sum(_particle_kinetic_energy(particle) for particle in particles)
+def _total_kinetic_energy(particles, dynamics=None):
+    return sum(
+        _particle_kinetic_energy(particle)
+        for particle in _active_particles(particles, dynamics)
+    )
 
 
 def _total_potential_energy(dynamics):
@@ -184,13 +203,16 @@ def _total_potential_energy(dynamics):
     return float(total_potential_energy())
 
 
-def _total_report_kinetic_energy(particles, field_name):
-    return sum(float(getattr(particle, field_name, 0.0)) for particle in particles)
+def _total_report_kinetic_energy(particles, field_name, dynamics=None):
+    return sum(
+        float(getattr(particle, field_name, 0.0))
+        for particle in _active_particles(particles, dynamics)
+    )
 
 
-def _total_internal_momentum(particles):
+def _total_internal_momentum(particles, dynamics=None):
     total_internal_momentum = 0.0
-    for particle in particles:
+    for particle in _active_particles(particles, dynamics):
         total_internal_momentum += float(
             getattr(
                 particle,
@@ -222,10 +244,10 @@ def _sequential_contact_diagnostics(particles):
 
 def _run_start_diagnostics(dynamics):
     particles = dynamics.particles
-    ke = _total_kinetic_energy(particles)
+    ke = _total_kinetic_energy(particles, dynamics)
     potential_energy = _total_potential_energy(dynamics)
     return {
-        "total_momentum": _total_momentum(particles),
+        "total_momentum": _total_momentum(particles, dynamics),
         "ke": ke,
         "potential_energy": potential_energy,
         "total_energy": ke + potential_energy,
@@ -235,18 +257,26 @@ def _run_start_diagnostics(dynamics):
 def _motion_summary(start_diagnostics, particles, dynamics=None):
     start_total_momentum = start_diagnostics["total_momentum"]
     start_x, start_y = start_total_momentum
-    current_x, current_y = _total_momentum(particles)
+    current_x, current_y = _total_momentum(particles, dynamics)
     current_total_p = math.hypot(current_x, current_y)
     momentum_drift_x = current_x - start_x
     momentum_drift_y = current_y - start_y
-    total_internal_momentum = _total_internal_momentum(particles)
+    total_internal_momentum = _total_internal_momentum(particles, dynamics)
     curr_plus_internal_mom = current_total_p + total_internal_momentum
     start_ke = start_diagnostics["ke"]
-    current_ke = _total_kinetic_energy(particles)
+    current_ke = _total_kinetic_energy(particles, dynamics)
     potential_energy = _total_potential_energy(dynamics) if dynamics is not None else 0.0
     total_energy = current_ke + potential_energy
-    frame_start_ke = _total_report_kinetic_energy(particles, "report_frame_start_ke")
-    after_resolve_ke = _total_report_kinetic_energy(particles, "report_after_resolve_ke")
+    frame_start_ke = _total_report_kinetic_energy(
+        particles,
+        "report_frame_start_ke",
+        dynamics,
+    )
+    after_resolve_ke = _total_report_kinetic_energy(
+        particles,
+        "report_after_resolve_ke",
+        dynamics,
+    )
     v_rel, raw_impulse = _sequential_contact_diagnostics(particles)
     return {
         "start_total_px": start_x,
@@ -326,6 +356,7 @@ def _draw_particles(
     screen,
     particles,
     run_configuration,
+    dynamics,
     frame_number,
     test_file_name,
     start_diagnostics,
@@ -338,6 +369,7 @@ def _draw_particles(
     motion_summary = _motion_summary(
         start_diagnostics,
         particles,
+        dynamics,
     )
 
     wall_left, wall_top = _to_screen(
@@ -395,6 +427,8 @@ def _draw_particles(
 
     particle_screen_data = []
     for index, particle in enumerate(particles):
+        if not _is_active_particle(index, dynamics):
+            continue
         center = _to_screen(particle.rx, particle.ry, view_box, screen_width, screen_height)
         radius = _radius_to_pixels(particle.radius, view_box, screen_width, screen_height)
         fill = (100, 170, 255)
@@ -407,9 +441,19 @@ def _draw_particles(
 
     for index, particle, center, radius, _edge in particle_screen_data:
         for target_id in particle.collision_list:
-            if target_id <= index or target_id >= len(particle_screen_data):
+            if target_id <= index:
                 continue
-            _target_index, _target_particle, target_center, target_radius, _target_edge = particle_screen_data[target_id]
+            target_screen_data = next(
+                (
+                    screen_data
+                    for screen_data in particle_screen_data
+                    if screen_data[0] == target_id
+                ),
+                None,
+            )
+            if target_screen_data is None:
+                continue
+            _target_index, _target_particle, target_center, target_radius, _target_edge = target_screen_data
             _draw_overlap_lens(screen, center, radius, target_center, target_radius)
 
     particle_label_font = pygame.font.Font(None, 22)
@@ -458,11 +502,18 @@ def _draw_particles(
         screen.blit(row, (10, row_y))
         row_y += 20
     row_y += 6
-    for particle in particles:
+    displayed_particle_rows = 0
+    active_particle_count = len(_active_particles(particles, dynamics))
+    for index, particle in enumerate(particles):
+        if not _is_active_particle(index, dynamics):
+            continue
+        if active_particle_count > 4 and displayed_particle_rows >= 4:
+            break
         row_text = _particle_report_row(particle)
         row = row_font.render(row_text, True, (220, 230, 240))
         screen.blit(row, (10, row_y))
         row_y += 20
+        displayed_particle_rows += 1
 
     if error_return != 0:
         error_text = row_font.render(
@@ -480,7 +531,9 @@ def _report_particles(reporting, frame_number, particles, start_diagnostics, dyn
     reporting.report_frame_momentum(frame_number, motion_summary)
     reporting.report_contacts(frame_number, particles)
     reporting.report_pair_phases(frame_number, dynamics)
-    for particle in particles:
+    for particle_index, particle in enumerate(particles):
+        if not _is_active_particle(particle_index, dynamics):
+            continue
         reporting.report_particle(frame_number, particle, motion_summary)
 
 
@@ -598,6 +651,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                 screen,
                 display_particles,
                 run_configuration,
+                display_runner,
                 frame_number,
                 test_file_name,
                 display_start_diagnostics,

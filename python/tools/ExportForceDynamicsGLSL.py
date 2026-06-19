@@ -297,14 +297,14 @@ GLSL_BODY_TEMPLATES = {
     "particle_overlap_area": [
         "if (center_distance <= 0.0) {",
         "    float min_radius = min(source_radius, target_radius);",
-        "    return PI * min_radius * min_radius;",
+        "    return FORCE_DYNAMICS_PI * min_radius * min_radius;",
         "}",
         "if (center_distance >= source_radius + target_radius) {",
         "    return 0.0;",
         "}",
         "if (center_distance <= abs(source_radius - target_radius)) {",
         "    float min_radius = min(source_radius, target_radius);",
-        "    return PI * min_radius * min_radius;",
+        "    return FORCE_DYNAMICS_PI * min_radius * min_radius;",
         "}",
         "",
         "float source_term = (",
@@ -586,7 +586,7 @@ GLSL_BODY_TEMPLATES = {
         ");",
     ],
     "SetError": [
-        "collIn.ErrorReturn = error_code;",
+        "collOut.ErrorNumber = error_code;",
         "return false;",
     ],
 }
@@ -722,7 +722,18 @@ def render_stub_file(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
         "// Do not hand edit generated dynamics content.",
         "",
         "const float EPSILON = 1.0e-12;",
-        "const float PI = 3.1415926535897932384626433832795;",
+        "const float FORCE_DYNAMICS_PI = 3.1415926535897932384626433832795;",
+        "const uint ERROR_NONE = 0u;",
+        "const uint ERROR_INVALID_SOURCE_ID = 1u;",
+        "const uint ERROR_INVALID_TARGET_ID = 2u;",
+        "const uint ERROR_INVALID_DT = 3u;",
+        "const uint ERROR_CONTACT_LIST_MISSING = 4u;",
+        "const uint ERROR_PARTICLE_OUT_OF_BOUNDS = 5u;",
+        "const uint ERROR_TUNNELING = 6u;",
+        "const uint ERROR_MISSING_COLLISION_STIFFNESS_Q = 7u;",
+        "const uint CONTACT_INACTIVE = 0u;",
+        "const uint CONTACT_PARTICLE = 1u;",
+        "const uint CONTACT_WALL = 2u;",
         "",
     ]
 
@@ -732,6 +743,11 @@ def render_stub_file(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
             lines.append(f"    {field}")
         lines.append("};")
         lines.append("")
+
+    lines.append("// Forward declarations for generated methods.")
+    for method_name in GENERATED_GLSL_METHODS:
+        lines.append(f"{GLSL_SIGNATURES[method_name]};")
+    lines.append("")
 
     for method_name in GENERATED_GLSL_METHODS:
         method = visitor.methods[method_name]

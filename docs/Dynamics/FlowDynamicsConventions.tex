@@ -1,0 +1,259 @@
+% !TeX root = main.tex
+\newpage
+\section{Simple Reservoir Flow}
+
+\subsection{Purpose}
+
+\texttt{SimpleReservoir} is a particle birth/life/death process used with
+\texttt{ForceDynamics}.  It does not change the ForceDynamics overlap-area
+force law.  It decides when particles become active, which particles are
+eligible for dynamics, and when particles leave the active simulation.
+
+\subsection{State Field}
+
+For \texttt{SimpleReservoir}, the model-owned particle state is stored in
+\texttt{Particle.Data.w}.  When particles are loaded from a binary
+\texttt{pdata} file, the input field \texttt{state\_flg} is copied into
+\texttt{Particle.Data.w}.
+
+The meaning of \texttt{Data.w} is:
+
+\begin{itemize}
+    \item \(\texttt{Data.w} > 0\): unborn particle.  The value is the frame on
+    which the particle becomes active.
+    \item \(\texttt{Data.w} = 0\): live particle.  The particle participates in
+    ForceDynamics.
+    \item \(\texttt{Data.w} < 0\): dead particle.  The particle is removed from
+    ForceDynamics.
+\end{itemize}
+
+These meanings apply only when the active configuration selects
+\texttt{SimpleReservoir}.  Other models may assign different meanings to
+\texttt{Data.w}.
+
+\subsection{Birth Rule}
+
+At the beginning of each frame, before contact detection, every unborn
+particle is tested against the current frame number:
+
+\[
+\texttt{if Data.w > 0 and frameNum >= Data.w}
+\]
+
+then the particle is born.  Birth performs:
+
+\begin{itemize}
+    \item set \(\texttt{Data.w}=0\);
+    \item place the particle at the inlet birth position;
+    \item assign the inlet velocity;
+    \item make both position buffers agree on the birth position.
+\end{itemize}
+
+A particle is born before the frame-start snapshot is built, so the newly born
+particle participates in the current frame using ordinary ForceDynamics rules.
+
+In the GLSL compute path this rule is owned by:
+
+\begin{verbatim}
+StartReservoir(SourceID)
+\end{verbatim}
+
+The compute shader calls this function before particle contact scans, wall
+contact scans, velocity update, or position update.  If the function returns
+\texttt{false}, the source invocation returns immediately.  This means unborn
+and dead particles do not participate in the current frame.  If the source
+particle reaches its stored birth frame, \texttt{StartReservoir} resets the
+active position to the inlet birth location, updates both position buffers,
+sets \texttt{Data.w=0}, and returns \texttt{true}.
+
+\subsection{Live Rule}
+
+A particle is live when:
+
+\[
+\texttt{Data.w = 0}.
+\]
+
+Only live particles are eligible for:
+
+\begin{itemize}
+    \item particle-particle contact detection;
+    \item wall contact detection;
+    \item force accumulation;
+    \item velocity update;
+    \item position update;
+    \item energy and momentum diagnostics.
+\end{itemize}
+
+Unborn and dead particles are skipped by the dynamics pass.
+
+\subsection{Death Rule}
+
+After position update, each live particle is tested against the outlet
+boundary.  If the particle has crossed the outlet boundary, then:
+
+\[
+\texttt{Data.w = -1}.
+\]
+
+A dead particle no longer participates in ForceDynamics and is not reused by
+\texttt{SimpleReservoir}.
+
+In the GLSL compute path this rule is owned by:
+
+\begin{verbatim}
+RetireParticlePastXMax(SourceID)
+\end{verbatim}
+
+The compute shader calls this function after \texttt{CalcPosition(SourceID)}.
+It reads the next position buffer, the buffer just written by
+\texttt{CalcPosition}, and sets \texttt{Data.w=-1} when the particle has
+passed the outlet x boundary.
+
+\subsection{Boundary Rule}
+
+For \texttt{SimpleReservoir}, the inlet and outlet are not solid walls.  They
+are lifecycle planes.  Only the pipe walls are solid ForceDynamics walls.
+
+For the current two-dimensional pipe convention:
+
+\begin{itemize}
+    \item \(x_{\min}\): inlet birth plane, not a wall;
+    \item \(x_{\max}\): outlet death plane, not a wall;
+    \item \(y_{\min}\): solid lower wall;
+    \item \(y_{\max}\): solid upper wall.
+\end{itemize}
+
+Therefore the wall scan for \texttt{SimpleReservoir} includes only wall flags
+3 and 4.
+
+\subsection{ForceDynamics Invariance}
+
+\texttt{SimpleReservoir} does not modify the ForceDynamics equations:
+
+\[
+F_{ij}=q_{ij}A_{ij}
+\]
+
+and
+
+\[
+\mathbf v_{n+1}
+=
+\mathbf v_n+\frac{\mathbf F_n}{m}\Delta t.
+\]
+
+It only controls particle eligibility and boundary interpretation.
+
+
+\subsection{Unborn Particle Rule}
+
+Reservoir particles may be stored in repeated columns of length
+\texttt{col\_length}.  Many unborn particles may therefore share the same
+stored position.  These stored positions are not physical particle positions
+until the particle is born.
+
+For \texttt{SimpleReservoir}, if:
+
+\[
+\texttt{Data.w > frameNum}
+\]
+
+then the particle is unborn.  An unborn particle is ignored by all
+ForceDynamics operations:
+
+\begin{itemize}
+    \item no particle-particle contact check;
+    \item no wall contact check;
+    \item no tunneling check;
+    \item no starting-contact check;
+    \item no force accumulation;
+    \item no velocity update;
+    \item no position update;
+    \item no energy or momentum diagnostics.
+\end{itemize}
+
+This prevents staged reservoir particles that share the same stored location
+from producing artificial overlap, tunneling, or starting-collision errors.
+
+\subsection{Birth Frame Rule}
+
+When:
+
+\[
+\texttt{Data.w <= frameNum}
+\]
+
+and \(\texttt{Data.w > 0}\), the particle becomes live.  The birth process
+sets:
+
+\[
+\texttt{Data.w = 0}
+\]
+
+and assigns the particle's active inlet position and velocity before the
+ForceDynamics frame snapshot is built.
+
+The corresponding GLSL source invocation order is:
+
+\begin{verbatim}
+if (!StartReservoir(SourceID))
+    return;
+
+// particle contact scan
+// wall contact scan
+CalcVelocity(SourceID, totalForce);
+CalcPosition(SourceID);
+RetireParticlePastXMax(SourceID);
+\end{verbatim}
+
+This preserves source ownership.  The reservoir state gates only the current
+source invocation; it does not write target particles and does not introduce a
+separate global reservoir pass.
+
+
+\subsection{Birth Placement Rule}
+
+When an unborn particle becomes live, its stored reservoir position is not used
+as its active physical position.  The particle is moved to the inlet birth
+position before ForceDynamics contact detection.
+
+The birth position is offset from the reservoir/staging column by at least
+
+\[
+1.1(2r)
+\]
+
+where \(r\) is the particle radius.  Equivalently, the minimum birth offset is
+
+\[
+2.2r.
+\]
+
+This places the newly live particle slightly more than one particle diameter
+away from particles that remain in the reservoir column.  The factor \(1.1\)
+adds a small clearance margin so the particle is not born in contact due to
+rounding or exact-diameter placement.
+
+After birth:
+
+\[
+\texttt{Data.w}=0
+\]
+
+and both position buffers are set to the active birth position.
+
+\subsection{Death Rule}
+
+After position update, every live particle is tested against the outlet
+boundary using its center position.  If the particle center has passed the
+outlet boundary, then:
+
+\[
+\texttt{Data.w}=-1.
+\]
+
+A particle with \(\texttt{Data.w}<0\) is dead.  Dead particles are no longer
+processed by ForceDynamics and are not checked for collision, wall contact,
+tunneling, starting overlap, force, motion, or ordinary energy/momentum
+diagnostics.

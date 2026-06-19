@@ -1,2 +1,31 @@
 % !TeX root = main_fps.tex
-\section{Related Work}
+\section{Background and Related Work}
+Particle-based simulation encompasses a broad family of methodologies including molecular dynamics (MD), 
+discrete element methods (DEM), smoothed particle hydrodynamics (SPH), material point methods (MPM), 
+dissipative particle dynamics (DPD), and numerous other specialized formulations. Although these approaches 
+differ substantially in their mathematical formulation and intended applications, they generally share a 
+common objective: the determination of forces that govern particle motion. Consequently, the primary 
+distinction between particle methodologies often lies not in their particle representation, but in the 
+assumptions and interaction models used to generate particle behavior.
+
+Molecular dynamics (MD) derives particle interactions from interatomic potential functions that describe attraction, repulsion, 
+and bonding behavior. Forces are obtained from the gradient of the potential-energy function and subsequently integrated to 
+determine particle motion. The resulting dynamics are therefore closely coupled to the chosen potential model and have been 
+widely used to study molecular systems, phase transitions, and atomistic phenomena.
+
+Discrete Element Methods (DEM) model particle interactions through prescribed contact laws that relate particle overlap, 
+relative motion, and material properties to interaction forces. Normal and tangential contact forces are commonly augmented 
+with damping, friction, cohesion, or rolling-resistance models to reproduce desired material behavior. Consequently, particle 
+dynamics emerge from the assumptions embedded within the selected contact formulation. DEM has been widely applied to granular 
+materials, powders, and particulate systems where contact interactions play a dominant role.
+
+Smoothed Particle Hydrodynamics (SPH) represents fluids through particles that carry continuum properties such as density, 
+pressure, and velocity. Particle interactions are evaluated through kernel interpolation schemes that approximate continuum 
+fields and their derivatives. Consequently, particle motion is governed by continuum relationships expressed through the SPH 
+formulation rather than direct particle-contact interactions.
+
+Despite their differences, existing particle methodologies commonly derive particle interactions from potential functions, 
+contact laws, continuum approximations, or specialized response models. The present work investigates an alternative 
+formulation in which particle interactions arise directly from geometric relationships between particles. Rather than 
+beginning from a prescribed physical model associated with a particular phenomenon, the Field Particle System derives 
+particle behavior from geometric interaction states and their evolution through time.

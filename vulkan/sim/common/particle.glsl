@@ -49,7 +49,9 @@ struct Particle {
     uint contactCount;         // active entries in contacts
     uint colFlg;               // 1 if in collision, 0 if not
 
-    float MolarMatter;         // reserved
+    float MolarMatter;         	// liveframe the frame the particle comes alive.
+								// Once the particle is born this is set to 0.0 - zero is always a live Particle.
+								// when it dies this is set to -1.0
     float temp_vel;            // reserved
 };
 

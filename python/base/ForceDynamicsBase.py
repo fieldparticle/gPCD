@@ -484,11 +484,61 @@ class ForceDynamics(ForceContactDynamics):
             positionBuffer=run_configuration.get("positionBuffer", 0.0),
         )
 
+    def ReservoirBirthSpacingFactor(self):
+        return float(self.run_configuration.get("reservoir_birth_spacing_factor", 1.1))
+
+    def ReservoirBirthOffset(self, particle):
+        return self.ReservoirBirthSpacingFactor() * 2.0 * float(particle.Data.x)
+
+    def SetParticlePosition(self, particle, x, y, z):
+        position_buffer = int(self.ShaderFlags.positionBuffer)
+        particle.PosLocA.x = x
+        particle.PosLocA.y = y
+        particle.PosLocA.z = z
+        particle.PosLocB.x = x
+        particle.PosLocB.y = y
+        particle.PosLocB.z = z
+        particle.PosLocA.w = 0.0 if position_buffer == 0 else 1.0
+        particle.PosLocB.w = 1.0 if position_buffer == 0 else 0.0
+        particle.rx = x
+        particle.ry = y
+        particle.rz = z
+
+    def ApplyReservoirBirths(self):
+        """Activate particles whose Data.w birth frame has arrived."""
+        if not self.ReservoirLifecycleEnabled():
+            return
+        current_frame = float(self.ShaderFlags.frameNum)
+        inlet_x = float(self.run_configuration.get("inlet_x", self.run_configuration.get("WallXMIN", 0.0)))
+        for particle in self.particles:
+            birth_frame = float(particle.Data.w)
+            if birth_frame <= 0.0 or current_frame < birth_frame:
+                continue
+            x = inlet_x + self.ReservoirBirthOffset(particle)
+            self.SetParticlePosition(particle, x, particle.ry, particle.rz)
+            particle.Data.w = 0.0
+            particle.state_flg = 0.0
+
+    def RetireReservoirEscapes(self):
+        """Mark live reservoir particles dead after their center crosses outlet."""
+        if not self.ReservoirLifecycleEnabled():
+            return
+        outlet_x = float(self.run_configuration.get("outlet_x", self.run_configuration.get("WallXMAX", self.ShaderFlags.SideLength)))
+        output_buffer = 1 - int(self.ShaderFlags.positionBuffer)
+        for particle_index, particle in enumerate(self.particles):
+            if not self.IsParticleActiveForDynamics(particle_index):
+                continue
+            position = self.particle_position(particle, output_buffer)
+            if position.x >= outlet_x:
+                particle.Data.w = -1.0
+                particle.state_flg = -1.0
+
     def CollisionRun(self):
         """Run one source-owned semi-implicit ForceDynamics frame."""
         if not self.BeginFrame():
             return self.particles
         self.ApplyBeforeContactScanHook()
+        self.ApplyReservoirBirths()
         self.ResetFrameState()
         self.ApplyStartRunHook()
         self.BuildFrameSnapshot()
@@ -506,6 +556,7 @@ class ForceDynamics(ForceContactDynamics):
             return self.particles
         if not self.CalculatePositions():
             return self.particles
+        self.RetireReservoirEscapes()
         self.BuildEndPositionSnapshot()
         frame_end_pairs = self.CapturePairGeometryDiagnostics()
         self.RecordAfterResolveDiagnostics()
@@ -659,6 +710,9 @@ class ForceDynamics(ForceContactDynamics):
         later written to the particle capture files.
         """
         for particle_index, particle in enumerate(self.particles):
+            if not self.IsParticleActiveForDynamics(particle_index):
+                particle.report_frame_start_ke = 0.0
+                continue
             velocity = self.VelRadFrame[particle_index]
             particle.report_frame_start_ke = self.ParticleKineticEnergy(
                 particle_index,
@@ -667,6 +721,9 @@ class ForceDynamics(ForceContactDynamics):
 
     def RecordAfterResolveDiagnostics(self):
         for particle_index, particle in enumerate(self.particles):
+            if not self.IsParticleActiveForDynamics(particle_index):
+                particle.report_after_resolve_ke = 0.0
+                continue
             particle.report_after_resolve_ke = self.ParticleKineticEnergy(
                 particle_index,
             )
@@ -729,8 +786,12 @@ class ForceDynamics(ForceContactDynamics):
         self.InitializeStartingContactState()
         total_potential_energy = 0.0
         for source_id in range(len(self.particles)):
+            if not self.IsParticleActiveForDynamics(source_id):
+                continue
             source_position = self.GetParticlePosition(source_id)
             for target_id in range(source_id + 1, len(self.particles)):
+                if not self.IsParticleActiveForDynamics(target_id):
+                    continue
                 target_position = self.GetParticlePosition(target_id)
                 dx = target_position.x - source_position.x
                 dy = target_position.y - source_position.y
@@ -747,8 +808,12 @@ class ForceDynamics(ForceContactDynamics):
         """Capture unordered-pair geometry from the current position snapshot."""
         pairs = {}
         for source_id in range(len(self.particles)):
+            if not self.IsParticleActiveForDynamics(source_id):
+                continue
             source_position = self.GetParticlePosition(source_id)
             for target_id in range(source_id + 1, len(self.particles)):
+                if not self.IsParticleActiveForDynamics(target_id):
+                    continue
                 target_position = self.GetParticlePosition(target_id)
                 dx = target_position.x - source_position.x
                 dy = target_position.y - source_position.y
@@ -788,6 +853,7 @@ class ForceDynamics(ForceContactDynamics):
         kinetic_energy = sum(
             self.ParticleKineticEnergy(particle_index)
             for particle_index in range(len(self.particles))
+            if self.IsParticleActiveForDynamics(particle_index)
         )
         return kinetic_energy + self.TotalPotentialEnergy()
 
@@ -896,8 +962,10 @@ class ForceDynamics(ForceContactDynamics):
         self.InitializeStartingContactState()
         total = 0.0
         for source_id, source in enumerate(self.particles):
+            if not self.IsParticleActiveForDynamics(source_id):
+                continue
             stiffness = max(0.0, float(source.Data.y or 0.0))
-            for wall_flag in (1, 2, 3, 4):
+            for wall_flag in self.WallFlagsForDynamics():
                 geometry = self.GetWallGhostGeometry(source_id, wall_flag)
                 if geometry is None:
                     continue

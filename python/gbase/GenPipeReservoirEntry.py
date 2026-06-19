@@ -81,6 +81,35 @@ class GenPipeReservoirEntry():
             return cfg[key]
         return default
 
+    def frames_between_waves(
+        self,
+        particle_radius,
+        inlet_velocity,
+        dt,
+        spacing_factor=1.1,
+    ):
+        """Return minimum whole-frame wait between release waves.
+
+        The previous wave must move at least spacing_factor diameters before
+        the next wave is born at the inlet.
+        """
+        radius = float(particle_radius)
+        velocity = float(inlet_velocity)
+        timestep = float(dt)
+        spacing = float(spacing_factor)
+        if radius <= 0.0:
+            raise ValueError("particle_radius must be positive")
+        if velocity <= 0.0:
+            raise ValueError("inlet_velocity must be positive")
+        if timestep <= 0.0:
+            raise ValueError("dt must be positive")
+        if spacing <= 0.0:
+            raise ValueError("spacing_factor must be positive")
+
+        clearance_distance = spacing * (2.0 * radius)
+        distance_per_frame = velocity * timestep
+        return int(math.ceil(clearance_distance / distance_per_frame))
+
         #******************************************************************
     # Write the tst files taht are read by particle.exe for tests
     # 
@@ -181,24 +210,32 @@ class GenPipeReservoirEntry():
         reservoir_count = int(self.cfg_value(RUN_CONFIGURATION, "reservoir_particle_count", 32))
         radius = float(self.cfg_value(RUN_CONFIGURATION, "radius", 0.25))
         mass = float(self.cfg_value(RUN_CONFIGURATION, "particle_mass", 1.0))
+        dt = float(self.cfg_value(RUN_CONFIGURATION, "dt", 1.0))
         collision_stiffness_q = float(self.cfg_value(RUN_CONFIGURATION, "collision_stiffness_q", 0.0))
         local_particles_in_row = self.itemcfg.num_particles_y
         local_particles_in_col = self.itemcfg.num_particles_x
+        starting_vx = 0.02
+        starting_vy = 0.0
+        start_birth = 10.0
         try:
-           for row in range(1,local_particles_in_row+1):
-                for col in range(1,local_particles_in_col+1):
+            for col in range(1,local_particles_in_col+1):    
+                k = self.frames_between_waves(radius,starting_vx,dt,spacing_factor=1.1)
+                birth_frame =  start_birth + k * (col-1.0)
+
+                
+                for row in range(1,local_particles_in_row+1):     
                     particle_struct = pdata()
                     self.number_particles += 1
                     particle_struct.pnum = self.number_particles
-                    particle_struct.rx = 1.5
+                    particle_struct.rx = 1.0
                     particle_struct.ry = row+0.5
                     particle_struct.rz = 2.0
-                    particle_struct.vx = random.uniform(0.01, 0.02)
-                    particle_struct.vy = random.uniform(0.01, 0.02)
+                    particle_struct.vx = 0.02
+                    particle_struct.vy = 0.0
                     particle_struct.vz = 0.0
                     particle_struct.molar_mass = 1.0
-                    particle_struct.radius = 0.25
-                    particle_struct.state_flg = 1.0
+                    particle_struct.radius = radius
+                    particle_struct.state_flg = birth_frame
                     particle_struct.collision_stiffness_q = collision_stiffness_q
                     self.p_list.append(particle_struct)
                     

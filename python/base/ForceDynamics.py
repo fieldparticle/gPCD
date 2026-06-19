@@ -145,6 +145,10 @@ class ForceContactDynamics:
         and center distance.  Return None when no overlap exists.  Coincident
         centers use +x as a deterministic fallback normal.
         """
+        if not self.IsParticleActiveForDynamics(SourceID):
+            return None
+        if not self.IsParticleActiveForDynamics(TargetID):
+            return None
         source_position = self.GetParticlePosition(SourceID)
         target_position = self.GetParticlePosition(TargetID)
         dx = target_position.x - source_position.x
@@ -210,6 +214,25 @@ class ForceContactDynamics:
             int(self.ShaderFlags.positionBuffer),
         )
 
+    def ReservoirLifecycleEnabled(self):
+        """Return True when Data.w is used as birth/live/dead state."""
+        flow_type = str(
+            getattr(self, "run_configuration", {}).get("flow_type", "")
+        ).lower()
+        return flow_type in ("pipe_reservoir_entry", "simple_reservoir")
+
+    def IsParticleActiveForDynamics(self, ParticleID):
+        """Return whether a particle participates in contacts and motion."""
+        if not self.ReservoirLifecycleEnabled():
+            return True
+        return abs(float(self.particles[ParticleID].Data.w)) <= self.EPSILON
+
+    def WallFlagsForDynamics(self):
+        """Return wall flags that are solid for the current flow model."""
+        if self.ReservoirLifecycleEnabled():
+            return (3, 4)
+        return (1, 2, 3, 4)
+
     def StartingParticleKey(self, SourceID, TargetID):
         """Return the unordered key for a particle starting contact."""
         low_id = min(int(SourceID), int(TargetID))
@@ -229,8 +252,12 @@ class ForceContactDynamics:
         self.starting_contact_states = {}
 
         for source_id in range(len(self.particles)):
+            if not self.IsParticleActiveForDynamics(source_id):
+                continue
             source_radius = float(self.particles[source_id].Data.x)
             for target_id in range(source_id + 1, len(self.particles)):
+                if not self.IsParticleActiveForDynamics(target_id):
+                    continue
                 target_radius = float(self.particles[target_id].Data.x)
                 center_distance = self.ParticleCenterDistance(source_id, target_id)
                 physical_limit = source_radius + target_radius
@@ -254,9 +281,11 @@ class ForceContactDynamics:
 
         if bool(self.ShaderFlags.Boundary):
             for source_id, source in enumerate(self.particles):
+                if not self.IsParticleActiveForDynamics(source_id):
+                    continue
                 radius = float(source.Data.x)
                 physical_limit = 2.0 * radius
-                for wall_flag in (1, 2, 3, 4):
+                for wall_flag in self.WallFlagsForDynamics():
                     geometry = self.GetPhysicalWallGhostGeometry(source_id, wall_flag)
                     if geometry is None:
                         continue
@@ -622,6 +651,10 @@ class ForceContactDynamics:
         return True
 
     def isParticleContact(self, Frame, SourceID, TargetID, positionBuffer):
+        if not self.IsParticleActiveForDynamics(SourceID):
+            return False
+        if not self.IsParticleActiveForDynamics(TargetID):
+            return False
         source = self.particles[SourceID]
         target = self.particles[TargetID]
         if hasattr(self, "PosLocFrame") and self.PosLocFrame:
@@ -677,8 +710,12 @@ class ForceContactDynamics:
         """Fully process each source after scanning its possible targets."""
         position_buffer = int(self.ShaderFlags.positionBuffer)
         for source_id in range(len(self.particles)):
+            if not self.IsParticleActiveForDynamics(source_id):
+                continue
             for target_id in range(len(self.particles)):
                 if source_id == target_id:
+                    continue
+                if not self.IsParticleActiveForDynamics(target_id):
                     continue
                 if self.isParticleContact(
                     self.ShaderFlags.frameNum,
@@ -708,8 +745,10 @@ class ForceContactDynamics:
     def BuildWallContactLists(self, total_forces):
         """Process each active stationary wall ghost exactly once."""
         for source_id in range(len(self.particles)):
+            if not self.IsParticleActiveForDynamics(source_id):
+                continue
             if bool(self.ShaderFlags.Boundary):
-                for wall_flag in (1, 2, 3, 4):
+                for wall_flag in self.WallFlagsForDynamics():
                     if not self.ProcessWallCollision(
                         source_id,
                         wall_flag,
@@ -721,6 +760,8 @@ class ForceContactDynamics:
     def CalculateVelocities(self, total_forces):
         """Calculate each source velocity after all source contacts are known."""
         for SourceID in range(len(self.particles)):
+            if not self.IsParticleActiveForDynamics(SourceID):
+                continue
             if not self.CalcVelocity(SourceID, total_forces[SourceID]):
                 return False
         return True
@@ -728,6 +769,8 @@ class ForceContactDynamics:
     def CalculatePositions(self):
         """Move every source using its newly calculated velocity."""
         for SourceID in range(len(self.particles)):
+            if not self.IsParticleActiveForDynamics(SourceID):
+                continue
             if not self.CalcPosition(SourceID):
                 return False
         return True

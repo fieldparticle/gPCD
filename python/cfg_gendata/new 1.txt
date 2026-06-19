@@ -1,45 +1,7 @@
-=========================================================
-Section: Introduction
-=====================
-
-```
-Subject:
-    Introduction to the Field Particle System (FPS)
-    and the motivation for its development.
-
-Purpose:
-    Introduce the problem domain, motivate the need
-    for the proposed framework, identify limitations
-    of existing approaches, and summarize the primary
-    contributions of the work.
-
-Paragraph Subjects:
-
-    - Introduce particle-based simulation methods and
-      their role in modeling physical systems.
-
-    - Discuss common characteristics of existing
-      particle methods and the challenges associated
-      with force-based, energy-based, and pair-update
-      formulations.
-
-    - Introduce the motivation for a framework based
-      on geometric interactions and source-owned
-      particle updates.
-
-    - Introduce the Field Particle System (FPS) and
-      provide a high-level overview of its governing
-      concepts.
-
-    - Summarize the fundamental characteristics of
-      the framework, including geometric interactions,
-      interpenetrating contacts, instantaneous state
-      updates, energyless representation, and
-      source-owned data ownership.
-
-    - Summarize the primary contributions of the
-      paper.
-
-    - Provide an overview of the organization of the
-      remainder of the manuscript.
-```
+def frames_between_waves(
+        self,
+        particle_radius,
+        inlet_velocity,
+        dt,
+        spacing_factor=1.1,
+    ):

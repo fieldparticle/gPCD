@@ -1,0 +1,54 @@
+% !TeX root = main_fps.tex
+\section{Competing Models}
+
+
+\subsection{Discrete Element Methods}
+
+Discrete Element Methods (DEM) represent particles as
+individual interacting entities whose motion is governed
+by contact interactions with neighboring particles and
+boundaries. Unlike molecular dynamics methodologies,
+which commonly derive forces from potential-energy
+functions, DEM formulations typically generate forces
+through prescribed contact laws that relate particle
+deformation, overlap, relative motion, and material
+properties to interaction forces.
+
+A defining characteristic of DEM is the use of contact
+models to represent particle interactions. Normal and
+tangential forces are frequently computed using
+relationships that incorporate stiffness, damping,
+friction, cohesion, rolling resistance, or other
+material-dependent parameters. These models allow DEM
+frameworks to reproduce a wide range of particle
+behaviors and have contributed to their widespread use
+in the study of granular materials, powders, bulk solids,
+and particulate processes.
+
+Although numerous DEM formulations have been proposed,
+they generally share a common interaction philosophy.
+Particle contacts are identified, a prescribed contact
+law is evaluated, forces are generated from the contact
+model, and the resulting forces are integrated to produce
+particle motion. The resulting causal chain may be
+summarized as:
+
+\begin{verbatim}
+Contact Law
+↓
+Force
+↓
+Acceleration
+↓
+Motion
+\end{verbatim}
+
+Consequently, the behavior of a DEM simulation is closely
+linked to the assumptions embedded within the selected
+contact model. The choice of stiffness relationships,
+friction laws, damping models, and other constitutive
+parameters plays a central role in determining the
+resulting particle dynamics.
+
+```
+```

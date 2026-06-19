@@ -241,6 +241,7 @@ class TabGenData(QTabWidget):
         if self.selected_item:
            #print(selected_item[0].text())
            count_all_particle_data(selected_item[0].text())
+           
 
         else:
             self.no_selection()
@@ -544,7 +545,8 @@ class TabGenData(QTabWidget):
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenDUP.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
+        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/PipeReservoirEntry.cfg")
         self.update_list_widget()
         self.update_data_list_widget()
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontalStiffness.cfg")

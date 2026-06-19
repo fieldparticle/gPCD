@@ -7,7 +7,18 @@
 // Do not hand edit generated dynamics content.
 
 const float EPSILON = 1.0e-12;
-const float PI = 3.1415926535897932384626433832795;
+const float FORCE_DYNAMICS_PI = 3.1415926535897932384626433832795;
+const uint ERROR_NONE = 0u;
+const uint ERROR_INVALID_SOURCE_ID = 1u;
+const uint ERROR_INVALID_TARGET_ID = 2u;
+const uint ERROR_INVALID_DT = 3u;
+const uint ERROR_CONTACT_LIST_MISSING = 4u;
+const uint ERROR_PARTICLE_OUT_OF_BOUNDS = 5u;
+const uint ERROR_TUNNELING = 6u;
+const uint ERROR_MISSING_COLLISION_STIFFNESS_Q = 7u;
+const uint CONTACT_INACTIVE = 0u;
+const uint CONTACT_PARTICLE = 1u;
+const uint CONTACT_WALL = 2u;
 
 struct ParticleEffectiveContactGeometry {
     float sourceRadius;
@@ -62,6 +73,40 @@ struct ContactForceInput {
     bool valid;
 };
 
+// Forward declarations for generated methods.
+float VelocityAngle(float vx, float vy);
+vec4 particle_position(uint ParticleID, uint positionBuffer);
+float particle_overlap_area(float source_radius, float target_radius, float center_distance);
+bool ProcessParticleCollision(uint TargetID, uint SourceID, inout vec3 totalForce);
+bool ProcessWallCollision(uint SourceID, uint wall, inout vec3 totalForce);
+bool InitializeWallContactState(uint SourceID, uint wall);
+bool InitializeContactState(uint SourceID, uint TargetID);
+bool GetContactState(uint SourceID, uint TargetID);
+ParticleGeometry GetParticleGeometry(uint SourceID, uint TargetID);
+vec4 GetParticlePosition(uint ParticleID);
+uint StartingParticleKey(uint SourceID, uint TargetID);
+uint StartingWallKey(uint SourceID, uint wall_flag);
+void InitializeStartingContactState();
+float ParticleCenterDistance(uint SourceID, uint TargetID);
+ParticleEffectiveContactGeometry GetParticleEffectiveContactGeometry(uint SourceID, uint TargetID, float center_distance);
+ParticlePotentialGeometry GetParticlePotentialGeometry(uint SourceID, uint TargetID, float center_distance);
+bool AppendContactSlot(uint SourceID, uint TargetID);
+uint GetContactSlots(uint SourceID);
+vec4 GetStartFrameVelocity(uint ParticleID);
+bool AccumulateContactForce(uint SourceID, ContactForceInput contact, inout vec3 totalForce);
+float GetPairStiffness(uint SourceID, uint TargetID);
+float GetContactStiffness(uint SourceID, uint TargetID, uint contact_type);
+float WallContactOffsetDistance(float radius);
+WallPhysicalGhostGeometry GetPhysicalWallGhostGeometry(uint SourceID, uint wall_flag);
+WallGhostGeometry GetWallGhostGeometry(uint SourceID, uint wall_flag);
+bool AppendWallContactSlot(uint SourceID, uint wall_flag);
+bool CalcVelocity(uint SourceID, vec3 totalForce);
+float GetParticleMass(uint ParticleID);
+bool CalcPosition(uint SourceID);
+bool StartReservoir(uint SourceID);
+bool RetireParticlePastXMax(uint SourceID);
+bool SetError(uint error_code);
+
 // Python source: ForceDynamics.py:13
 float VelocityAngle(float vx, float vy)
 {
@@ -81,14 +126,14 @@ float particle_overlap_area(float source_radius, float target_radius, float cent
 {
     if (center_distance <= 0.0) {
         float min_radius = min(source_radius, target_radius);
-        return PI * min_radius * min_radius;
+        return FORCE_DYNAMICS_PI * min_radius * min_radius;
     }
     if (center_distance >= source_radius + target_radius) {
         return 0.0;
     }
     if (center_distance <= abs(source_radius - target_radius)) {
         float min_radius = min(source_radius, target_radius);
-        return PI * min_radius * min_radius;
+        return FORCE_DYNAMICS_PI * min_radius * min_radius;
     }
 
     float source_term = (
@@ -483,10 +528,55 @@ bool CalcPosition(uint SourceID)
     return true;
 }
 
+bool StartReservoir(uint SourceID)
+{
+    float state_flag = P[SourceID].Data.w;
+    if (state_flag < 0.0) {
+        return false;
+    }
+    if (state_flag == 0.0) {
+        return true;
+    }
+    if (ShaderFlags.frameNum < state_flag) {
+        return false;
+    }
+
+    uint position_buffer = uint(ShaderFlags.positionBuffer);
+    vec4 current_position = particle_position(SourceID, position_buffer);
+    float radius = P[SourceID].Data.x;
+    float inlet_x = BOUNDARY_XMIN;
+#ifdef INLET_X
+    inlet_x = INLET_X;
+#endif
+
+    vec3 start_position = vec3(
+        inlet_x + 2.2 * radius,
+        current_position.y,
+        current_position.z
+    );
+    P[SourceID].PosLocA.xyz = start_position;
+    P[SourceID].PosLocB.xyz = start_position;
+    P[SourceID].PosLocA.w = position_buffer == 0u ? 0.0 : 1.0;
+    P[SourceID].PosLocB.w = position_buffer == 0u ? 1.0 : 0.0;
+    P[SourceID].Data.w = 0.0;
+    return true;
+}
+
+bool RetireParticlePastXMax(uint SourceID)
+{
+    uint next_position_buffer = 1u - uint(ShaderFlags.positionBuffer);
+    vec4 next_position = particle_position(SourceID, next_position_buffer);
+    if (next_position.x > BOUNDARY_XMAX) {
+        P[SourceID].Data.w = -1.0;
+        return false;
+    }
+    return true;
+}
+
 // Python source: ForceDynamics.py:735
 bool SetError(uint error_code)
 {
-    collIn.ErrorReturn = error_code;
+    collOut.ErrorNumber = error_code;
     return false;
 }
 

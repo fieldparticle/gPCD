@@ -6,7 +6,7 @@ echo %cd%
 del %~dp0\*.spv
 cd %~dp0\
 
-set src=C:\_DJ\gPCD\vulkan\sim\BoundarySpheres\BoundarySpheres.vert
+set src=C:\_DJ\gPCD\vulkan\sim\BoundarySpheresAndCube\BoundarySpheresAndCube.vert
 set dst=vertb.spv
 echo Compiling vert shader %src% to %dst%
 	C:\_DJ\gPCD\vulkan\shaders\glslc.exe --target-env=vulkan1.3 -g %src% -o %dst% >> vert.log
@@ -16,7 +16,7 @@ echo Compiling vert shader %src% to %dst%
 	)
 	
 	
-set src=C:\_DJ\gPCD\vulkan\sim\BoundarySpheres\BoundarySpheres.frag
+set src=C:\_DJ\gPCD\vulkan\sim\BoundarySpheresAndCube\BoundarySpheresAndCube.frag
 set dst=fragb.spv
 echo Compiling frag shader %src% to %dst%
 	C:\_DJ\gPCD\vulkan\shaders\glslc.exe --target-env=vulkan1.3 -g %src% -o  %dst% >> frg.log
@@ -25,7 +25,7 @@ echo Compiling frag shader %src% to %dst%
 	  goto errexit
 	)
 	
-set src=C:\_DJ\gPCD\vulkan\sim\BoundarySpheres\BoundarySpheresP.frag
+set src=C:\_DJ\gPCD\vulkan\sim\BoundarySpheresAndCube\BoundarySpheresAndCubeP.frag
 set dst=frag.spv
 echo Compiling frag shader %src% to %dst%
 	C:\_DJ\gPCD\vulkan\shaders\glslc.exe --target-env=vulkan1.3 -g %src% -o  %dst% >> frg.log
@@ -34,7 +34,7 @@ echo Compiling frag shader %src% to %dst%
 	  goto errexit
 	)
 
-set src=C:\_DJ\gPCD\vulkan\sim\BoundarySpheres\BoundarySpheresP.vert
+set src=C:\_DJ\gPCD\vulkan\sim\BoundarySpheresAndCube\BoundarySpheresAndCubeP.vert
 set dst=vert.spv
 echo Compiling frag shader %src% to %dst%
 	C:\_DJ\gPCD\vulkan\shaders\glslc.exe --target-env=vulkan1.3 -g %src% -o  %dst% >> frg.log
@@ -44,7 +44,7 @@ echo Compiling frag shader %src% to %dst%
 	)
 
 
-set src=C:\_DJ\gPCD\vulkan\sim\BoundarySpheres\BoundarySpheresP.comp
+set src=C:\_DJ\gPCD\vulkan\sim\BoundarySpheresAndCube\BoundarySpheresAndCubeP.comp
 set dst=comp.spv
 echo Compiling frag shader %src% to %dst%
 	C:\_DJ\gPCD\vulkan\shaders\glslc.exe --target-env=vulkan1.3 -g %src% -o  %dst% >> frg.log

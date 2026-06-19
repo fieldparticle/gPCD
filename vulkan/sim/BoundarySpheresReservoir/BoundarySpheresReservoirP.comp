@@ -99,6 +99,15 @@ void main()
 	vec3 totalForce = vec3(0.0);
 	bool dupflg = false;
 
+	if (!StartReservoir(SourceID))
+		return;
+	
+
+	#if 1 && defined(DEBUG)
+		if(uint(ShaderFlags.frameNum) == 8 && SourceID == 4)
+		debugPrintfEXT("Reservoir Particle:%d, start frame:%0.2f, curr frame:%d",SourceID,P[SourceID].Data.w,uint(ShaderFlags.frameNum));
+	#endif
+	
 	// Clear the duparray
 	for(uint kk =0; kk < DUP_LIST_SIZE; kk++)
 		duplst[kk] = 0;
@@ -169,31 +178,27 @@ void main()
 	}
 	for (uint wall = 1; wall <= 4; wall++)
 	{
-		if (isWallContact(
-				SourceID, wall,
-				uint(ShaderFlags.positionBuffer)) > 0)
-		{
-			ProcessWallCollision(SourceID, wall, totalForce);
-		}
+		ProcessWallCollision(SourceID, wall, totalForce);
 	}
 	#if 0 && defined(DEBUG)
 		if(uint(ShaderFlags.frameNum) > 3 && SourceID == 1)
 			debugPrintfEXT("positionBuffer:%f",ShaderFlags.positionBuffer);
 	#endif
-	 
+
 	if(CalcVelocity(SourceID, totalForce) == false)
-	{	
-		#if 0 && defined(DEBUG)
-			collOut.ErrorNumber = 2;
-		#endif
+	{
 		return;
 	}
 	if(CalcPosition(SourceID) == false)
 	{
-		#if 0 && defined(DEBUG)
-			collOut.ErrorNumber = 2;
-		#endif
 		return;
 	}
+	RetireParticlePastXMax(SourceID);
+	
+	#if 1 && defined(DEBUG)
+		if(uint(ShaderFlags.frameNum) == 10 && SourceID == 4)
+		debugPrintfEXT("After Reservoir Particle:%d, start frame:%0.2f, curr frame:%d",SourceID,P[SourceID].Data.w,uint(ShaderFlags.frameNum));
+	#endif
+	
 }
 

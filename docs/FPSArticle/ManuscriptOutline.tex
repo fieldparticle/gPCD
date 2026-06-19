@@ -55,6 +55,31 @@ Section: Introduction
         - Provide an overview of the organization of the
           remainder of the manuscript.
 
+
+	Paragrph 1
+		Purpose: What particle dynamics methods are.
+			- Defines a particle system.
+			- Explains that particle motion comes from interaction rules.
+			- Introduces the dominant approaches:
+				* constitutive laws,
+				* equations of state,
+				* potential functions,
+				* collision models.
+			- Stops before discussing applications.
+		Flow to Next:
+
+	Paragraph 2: Why do interaction models matter
+
+
+	Paragraph 3:Why look for something different?
+			-  Existing methods are often phenomenon-specific.
+    
+
+	Paragraph 4:Motivation for exploring an alternative framework.
+
+	Paragraph 5:Introduction of FPS.
+
+	Paragraph 6:Contributions.
 =========================================================
 Section: Background and Related Work
 =========================================================
@@ -104,7 +129,9 @@ Section: Background and Related Work
         - Position FPS relative to existing approaches and
           motivate investigation of an alternative
           geometric, source-owned dynamics framework.
-
+		  
+		- Review geometric interaction formulations and
+		  overlap-based contact representations.
 
 =========================================================
 Section: Methodology
@@ -112,15 +139,16 @@ Section: Methodology
 
     Subject:
         Definition of the Field Particle System (FPS)
-        methodology including particle representation,
-        force generation, state evolution, and source-
-        owned execution.
+        methodology including its governing principles,
+        particle representation, force generation,
+        numerical integration, and source-owned
+        execution model.
 
     Purpose:
         Present the complete FPS methodology and describe
-        how particle geometry, contact interactions,
-        force evaluation, and numerical integration are
-        combined to evolve the system through time.
+        how geometric relationships are transformed into
+        particle motion through local interactions,
+        force evaluation, and numerical integration.
 
     Paragraph Subjects:
 
@@ -128,11 +156,33 @@ Section: Methodology
           methodology and its principal computational
           stages.
 
-        - Define the particle representation and the
-          quantities stored by each particle.
+        - Introduce the fundamental principles that
+          govern the FPS framework.
+
+        - Define purely geometric interactions and their
+          role in determining particle behavior.
+
+        - Define interpenetrating contacts and the
+          overlap state as a finite-duration interaction
+          domain.
+
+        - Define instantaneous dynamics and the role of
+          the current geometric configuration in
+          determining particle response.
+
+        - Define energyless dynamics and discuss energy
+          as a diagnostic rather than a governing
+          quantity.
 
         - Define the source-owned interaction model and
           the ownership rules governing particle updates.
+
+        - Define geometry-to-motion causality and
+          describe the conversion of geometry into
+          motion through repeated local interactions.
+
+        - Define the particle representation and the
+          quantities stored by each particle.
 
         - Define the geometric quantities used to
           characterize particle contacts.
@@ -146,20 +196,14 @@ Section: Methodology
 
         - Define pair stiffness and force generation.
 
-        - Define potential-energy evaluation and its role
-          within the framework.
-
         - Define source acceleration accumulation from
           contact contributions.
 
-        - Describe the velocity-Verlet integration
+        - Describe the semi-implicit Euler integration
           procedure.
 
-        - Describe the frame-start and predicted-position
-          snapshots used during force evaluation.
-
-        - Describe position prediction and velocity
-          update procedures.
+        - Define drift and excursion and discuss their
+          significance in long-term system evolution.
 
         - Describe boundary interactions and boundary
           force generation.
@@ -168,8 +212,9 @@ Section: Methodology
           sequence.
 
         - Discuss computational properties of the
-          methodology including symmetry, conservation,
-          and parallel execution characteristics.
+          methodology including source ownership,
+          symmetry, conservation characteristics, and
+          parallel execution.
 
 =========================================================
 Section: Implementation and Performance Characteristics
@@ -294,6 +339,9 @@ Section: Simulation Demonstrations
         - Summarize the collective observations from all
           demonstration cases and discuss the breadth of
           phenomena represented by FPS.
+		  
+		- Discuss the emergence of complex behavior from
+		  a common dynamics framework.
 
 =========================================================
 Section: Conclusions

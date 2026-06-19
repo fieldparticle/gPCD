@@ -1,6 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
+#include "debug.glsl"
 #if defined(DEBUG)
 	#extension GL_EXT_debug_printf : enable
 #endif

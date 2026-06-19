@@ -178,6 +178,44 @@ excursion than velocity Verlet in small collision tests, but the current
 \texttt{ParticlesInBox} result is bounded and performs better than the Verlet
 implementation in that long-running test.
 
+\subsection{ForceDynamics GLSL Export Reaches Vulkan Runtime}
+
+\subsubsection{<previous form>}
+
+Python \texttt{ForceDynamics} was shaped for GLSL, but the generated
+\texttt{ForceDynamics.glsl} path was still a compile and integration
+experiment.  The export path had to settle forward declarations, compute
+atomic error reporting, ForceDynamics-owned constants, the wall-contact
+wrapper contract, and application-generated boundary configuration.
+
+\subsubsection{<current form>}
+
+Generated \texttt{ForceDynamics.glsl} now runs through the Vulkan compute path
+for the ordinary scenarios tested so far.  The permanent compute shader owns
+the particle cell scan and directly scans the four configured walls.  The
+generated dynamics include owns ForceDynamics constants, source-local force
+accumulation, ordinary particle and wall geometry, velocity update, and
+position update.  Wall dimensions and \texttt{wall\_contact\_offset} remain
+application-generated in \texttt{boundary.glsl}.
+
+\subsubsection{difference outcome}
+
+Particle solution.
+
+\subsubsection{<Analysis>}
+
+The ordinary ForceDynamics path has crossed from Python-only validation into
+Vulkan runtime validation.  The working path includes ordinary particle
+contacts, ordinary wall contacts, direct four-wall processing, source-local
+\texttt{totalForce}, \texttt{CalcVelocity}, and \texttt{CalcPosition}.
+
+\texttt{ResolveStartingCollision} is intentionally not part of this completed
+validation.  Starting collisions require persistent starting-contact state,
+and that state still needs a GLSL buffer/export implementation through
+\texttt{StartingContactState.glsl}.  Until that path is implemented, the
+export result is a particle solution for ordinary particle and wall dynamics,
+with starting-overlap resolution deferred.
+
 \subsection{Retire MomentumDynamics}
 
 \subsubsection{<previous form>}
@@ -250,3 +288,63 @@ does introduce persistent contact state, so future GLSL work must carry that
 state outside the transient per-frame contact slots.  The result is still
 marked a particle solution because broader multi-contact starting-overlap
 validation remains future work.
+
+\subsection{Reservoir Flow Uses Data.w Lifecycle}
+
+\subsubsection{<previous form>}
+
+Reservoir flow used older ad hoc state names and shader-side release logic.
+The Python analysis path and Vulkan path did not share the same simple
+birth/live/death rule, and repeated reservoir columns could create artificial
+starting collisions if unborn particles were included in contact processing.
+
+\subsubsection{<current form>}
+
+\texttt{SimpleReservoir} now uses \texttt{Particle.Data.w} as the lifecycle
+field:
+\begin{itemize}
+    \item \(\texttt{Data.w} > 0\): unborn particle; value is the birth frame;
+    \item \(\texttt{Data.w} = 0\): live particle;
+    \item \(\texttt{Data.w} < 0\): dead particle.
+\end{itemize}
+
+Python \texttt{ForceDynamics} gates contact scans, wall scans, velocity
+updates, position updates, and diagnostics by this live-state rule.  When a
+particle reaches its birth frame, it is moved to the inlet birth position with
+a \(1.1\) diameter offset and both position buffers are synchronized.  After
+position update, a particle that crosses the outlet is marked dead.
+
+The Vulkan reservoir compute path now calls
+\texttt{StartReservoir(SourceID)} at the beginning of the source invocation and
+\texttt{RetireParticlePastXMax(SourceID)} after \texttt{CalcPosition}.  This
+matches the Python lifecycle rule while leaving \texttt{CalcPosition}
+unchanged.
+
+\subsubsection{difference outcome}
+
+Particle solution.
+
+\subsubsection{<Analysis>}
+
+The reservoir state is a source-local lifecycle gate, not a change to the
+ForceDynamics force law.  Unborn and dead particles return before collision
+processing, so repeated stored columns can exist in the input data without
+generating artificial overlap, tunneling, wall contact, or diagnostic energy.
+Live particles continue to use the ordinary source-owned overlap-area force
+model.
+
+The GLSL call order remains compatible with one source invocation:
+\begin{verbatim}
+if (!StartReservoir(SourceID))
+    return;
+
+// source-owned contact scans and force accumulation
+CalcVelocity(SourceID, totalForce);
+CalcPosition(SourceID);
+RetireParticlePastXMax(SourceID);
+\end{verbatim}
+
+The current result is a particle solution because the reservoir lifecycle is
+working in the active Python and Vulkan reservoir paths.  Broader throughput,
+long-run statistical energy, and inlet packing studies remain future
+validation work.

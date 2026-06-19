@@ -1,2 +1,51 @@
 % !TeX root = main_fps.tex
 \section{Introduction}
+
+Particle-based simulation methodologies represent physical systems as collections of discrete interacting particles. 
+The evolution of these systems is governed by interaction rules that determine how particles influence one another through
+ time. In existing particle methods, these interactions are commonly derived from constitutive relationships, equations of 
+state, potential-energy functions, collision-response models, or other phenomenon-specific formulations. Although the 
+mathematical forms of these models differ substantially, they generally share a common objective: the generation of 
+forces that are subsequently integrated to produce particle motion and the evolving state of the system.
+
+
+The assumptions used to define particle interactions play a central role in determining the behavior of a particle methodology.
+Interaction models influence not only the forces generated within the system, but also the physical phenomena that may emerge, 
+the numerical properties of the simulation, and the computational cost required to evaluate particle interactions. 
+Consequently, the choice of interaction model often reflects a balance between physical representation, numerical stability, 
+computational efficiency, and the specific phenomena the methodology is intended to reproduce.
+
+Existing particle methodologies frequently employ interaction models that are tailored to particular classes of physical phenomena. 
+Constitutive relationships are commonly introduced to represent material response, equations of state are used to model compressibility 
+and pressure effects, and specialized formulations are often developed to reproduce specific behaviors such as turbulence, fracture,
+ phase change, or collision response. While these approaches have demonstrated success across many application domains, they typically 
+rely upon assumptions that are specific to the phenomena being modeled. Consequently, the development of a particle methodology often
+ becomes closely coupled to the physical behaviors it is intended to reproduce.
+
+The present work explores an alternative approach to particle dynamics through the Field Particle System (FPS). 
+Rather than beginning with interaction models tailored to specific physical phenomena, FPS investigates a framework 
+in which particle behavior emerges from geometric relationships between interacting particles. Within the methodology, 
+geometry serves as the primary source of interaction, providing the information required to generate forces, evolve particle motion, 
+and determine the future state of the system. The objective is not to reproduce a particular phenomenon through specialized 
+governing models, but to establish a common interaction framework from which complex system behavior may emerge through repeated 
+local particle interactions.
+
+FPS is founded upon a set of principles that collectively define how particle interactions are represented and evaluated. 
+Interactions are derived from geometric relationships between particles, contact is represented through interpenetrating overlap 
+states, and particle response is determined from the current geometric configuration of the system. The methodology employs a 
+source-owned execution model in which particles update only their own state, while energy is treated as a diagnostic quantity 
+rather than a governing variable.Together, these principles establish an instantaneous, geometry-driven framework in which 
+particle response is determined from the current geometric configuration of the system and state evolution is governed through 
+source-owned interactions. The combination of instantaneous response and source-owned state ownership naturally supports parallel 
+execution while allowing particle motion to emerge through local interactions and the continuous evolution of system geometry.
+
+This work presents the Field Particle System (FPS), a particle-based simulation methodology founded upon geometric interactions, 
+interpenetrating contacts, instantaneous dynamics, energyless state evolution, and source-owned execution. The paper defines the 
+governing principles of the framework, describes the conversion of geometry into motion through local particle interactions, and 
+details the numerical procedures used to evolve the system through time. The methodology is demonstrated through a series of 
+simulation examples, including a three-dimensional cathedral environment containing interacting air, dust, and light particles, 
+a three-dimensional incense simulation exhibiting the development of complex flow structures, and a two-dimensional converging-diverging 
+nozzle simulation. Together, these demonstrations illustrate the ability of a common geometric interaction framework to produce a
+ diverse range of particle behaviors and flow phenomena.
+
+

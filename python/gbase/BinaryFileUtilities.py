@@ -58,6 +58,7 @@ def count_all_particle_data(file_name):
         while True:
             record = pdata()
             ret = f.readinto(record)
+            print(f"pnum: {record.pnum}, live frame:{record.state_flg}, x: {record.rx}, y: {record.ry}, z: {record.rz}")
             count += 1
             if ret == 0:
                 break

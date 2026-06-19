@@ -1,5 +1,11 @@
-Update ForceDynamics documentation for source-owned force integration
+Current status:
+- Reservoir flow uses Data.w as birth/live/dead lifecycle state.
+- Vulkan reservoir compute path calls StartReservoir before dynamics work and RetireParticlePastXMax after CalcPosition.
 
-Replace obsolete velocity Verlet documentation with the current
-single-scan semi-implicit ForceDynamics architecture, document wall
-processing, and record the bounded ParticlesInBox energy results.
+Code Changes:
+- Document SimpleReservoir lifecycle helpers and compute call order.
+- Update porting notes for BoundarySpheresReservoirP.comp.
+- Add ProblemEvolution entry for reservoir lifecycle.
+- Update GLSL naming authority path.
+
+Next: Validate longer reservoir-flow runs and inlet packing statistics.

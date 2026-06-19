@@ -79,6 +79,7 @@ void ShaderObj::Reservoir()
 
 void ShaderObj::WriteWalls()
 {
+#if 0 //walls are frm test file only
 	std::vector<double> walls = { 0.0, 0.0, 0.0, 0.0 };
 	bool walls_on = CfgApp->GetBool("application.walls_on", true);
 	config_setting_t* setting;
@@ -95,14 +96,10 @@ void ShaderObj::WriteWalls()
 		}
 	}
 	
-	
+#endif
 	std::string wlflg = "0u";
-
-	if (walls_on == true)
-		wlflg = "1u;";
-	else
-		wlflg = "0u;";
-
+	wlflg = "1u;";
+	
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
 	std::string filename = fildir + "/boundary.glsl";
 	{
@@ -115,10 +112,11 @@ void ShaderObj::WriteWalls()
 		ostrm << "#ifndef BOUNDARY_GLSL\n#define BOUNDARY_GLSL\n" <<
 			
 			"const uint BOUNDARY_ENABLED = " << wlflg << "\n" << 
-			"const float BOUNDARY_XMIN = " << std::fixed << std::setprecision(2) << walls[0] << ";\n"
-			"const float BOUNDARY_XMAX  = " << std::fixed << std::setprecision(2) << walls[1] << ";\n"
-			"const float BOUNDARY_YMIN  = " << std::fixed << std::setprecision(2) << walls[2] << ";\n"
-			"const float BOUNDARY_YMAX  = " << std::fixed << std::setprecision(2) << walls[3] << ";\n"
+			"const float BOUNDARY_XMIN = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallXMIN",true) << ";\n"
+			"const float BOUNDARY_XMAX  = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallXMAX", true) << ";\n"
+			"const float BOUNDARY_YMIN  = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallYMIN", true) << ";\n"
+			"const float BOUNDARY_YMAX  = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallYMAX", true) << ";\n"
+			"const float wall_contact_offset = " << std::fixed << std::setprecision(2) << 0.20 << ";\n"
 			"#endif\n";
 	}
 }
@@ -172,7 +170,7 @@ void  ShaderObj::WriteShaderHeader()
 	float dt = 0.0;
 	if (CfgApp->GetBool("application.doMotion", true) == true)
 	{
-		dt = CfgApp->GetBool("application.dt", true);
+		dt = CfgApp->GetFloat("application.dt", true);
 		motion_str = 1;
 	}
 

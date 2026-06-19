@@ -1,5 +1,5 @@
 /*******************************************************************
-%***      C PROPRIETARY SOURCE FILE IDENTIFICATION               ***
+%***      C PROPRIETARY SourceID FILE IDENTIFICATION               ***
 %*******************************************************************
 % $Author: jb $
 %
@@ -14,7 +14,7 @@
 			@author: Jackie Michael Bell<nl>
 			COPYRIGHT <cp> Jackie Michael Bell<nl>
 			Property of Jackie Michael Bell<rtm>. All Rights Reserved.<nl>
-			This source code file contains proprietary<nl>
+			This SourceID code file contains proprietary<nl>
 			and confidential information.<nl>
 
 
@@ -31,27 +31,33 @@
 %******************************************************************/
 
 #version 460
+#extension GL_GOOGLE_include_directive : enable
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
+#include "debug.glsl"
 #if defined(DEBUG)
 	#extension GL_EXT_debug_printf : enable
 #endif
 //#extension GL_EXT_scalar_block_layout :enable
 #extension GL_KHR_memory_scope_semantics:enable
 #extension GL_EXT_shader_atomic_float:enable
-#extension GL_KHR_shader_subgroup_basic:enable
 
 
-#include "../VerfPerf/params.glsl"
+
+#include "params.glsl"
 #include "../common/constants.glsl"
+#include "boundary.glsl"
 #include "../common/util.glsl"
 #include "../common/push.glsl"
 #include "../common/atomic.glsl"
 #include "../common/CollimageIndex.glsl"
 #include "../common/Lockimage.glsl"
 #include "../common/particle.glsl"
-#include "../VerfPerf/workgroups.glsl"
-#include "../common/isParticleContact.glsl"
+#include "workgroups.glsl"
+#include "../common/isParticleContactMotion.glsl"
+#include "../common/ForceDynamics.glsl"
+ 
+
 ///
 // Use this one with 000_ParticleVerfPerfCountOnly.vert to
 // see if you are getting the right number of threads and particles in 
@@ -85,15 +91,17 @@ void main()
 #endif
 	
 	
-	uint Findex = index;
-	uint Tindex = 0;
+	uint SourceID = index;
+	uint TargetID = 0;
 	const uint DUP_LIST_SIZE = 32;
 	uint duplst[DUP_LIST_SIZE];
 	uint dupcnt = 0;
+	vec3 totalForce = vec3(0.0);
 	bool dupflg = false;
-	P[Findex].colFlg = 0;
+
+	
 	// Clear the duparray
-	for(uint kk =0; kk < 8; kk++)
+	for(uint kk =0; kk < DUP_LIST_SIZE; kk++)
 		duplst[kk] = 0;
 	
 	// For all of the corner locations in the particle corner array
@@ -101,10 +109,10 @@ void main()
 	{
 		
 		// Set location of this corner to local variable.
-		uint loc = P[Findex].CornerList[ii].ploc;
+		uint loc = P[SourceID].CornerList[ii].ploc;
 		
-		// If the lcation is not zero...
-		if (loc != 0)
+		// If the location is valid...
+		if (loc != npos)
 		{
 			// Use the linked particle location to index into the particle-cell hash table 
 			// And compare this particle with all of the paricles at this location.
@@ -115,47 +123,70 @@ void main()
 			{
 				
 				// Get the particle number at the jj slot
-				Tindex = clink[loc].idx[jj];
+				TargetID = clink[loc].idx[jj];
 				// If the particle number is 0, then end of list
-				if(Tindex == 0)
+				if(TargetID == 0)
+				{
+					
 					break;
+				}
 				
-				if(isParticleContact(ii,Findex, Tindex) > 0)
+				#if 0 && defined(DEBUG)
+						debugPrintfEXT("SourceID:%d TargetID %d", SourceID,TargetID);
+				#endif
+				if(isParticleContact(ii,SourceID, TargetID, uint(ShaderFlags.positionBuffer)) > 0)
 				{
 					// Run thru the duplicates list to the current count
 					for(uint dd = 0; dd < DUP_LIST_SIZE;dd++)
 					{
-						if (duplst[dd] == Tindex)
+						if (duplst[dd] == TargetID)
 							break;
 							
 						// If the end of the duplist no duplicate found so count the collison
 						if (duplst[dd] == 0)
 						{
 							// Set the collison flag
-							P[Findex].colFlg = 1;
+							ProcessParticleCollision(TargetID, SourceID, totalForce);
 							// Add the TO particle number ot the dups list.
-							duplst[dd] = Tindex;
+							duplst[dd] = TargetID;
 							// Report is verification
 							#ifdef DEBUG
 								atomicAdd(collOut.CollisionCount,1);
 							#endif
 							
 							#if 0 && defined(DEBUG)
-								if(uint(ShaderFlags.frameNum) == 3 && Findex == 3)
-									debugPrintfEXT("%d,%d",Tindex,Findex);
+								///if(uint(ShaderFlags.frameNum) == 29962)
+									debugPrintfEXT("Contact Src:%d,Tgt:%d, frame:%d",TargetID,SourceID,uint(ShaderFlags.frameNum));
 							#endif
 							
 							break;
 						}
 						
-					}
+    				}
 				}
 				dupflg = true;
 			}
 		}
 	}
-	
-	
-	
+	for (uint wall = 1; wall <= 4; wall++)
+	{
+		ProcessWallCollision(SourceID, wall, totalForce);
+	}
+	#if 0 && defined(DEBUG)
+		if(uint(ShaderFlags.frameNum) > 3 && SourceID == 1)
+			debugPrintfEXT("positionBuffer:%f",ShaderFlags.positionBuffer);
+	#endif
+
+	if(CalcVelocity(SourceID, totalForce) == false)
+	{
+
+		return;
+	}
+	if(CalcPosition(SourceID) == false)
+	{
+
+		return;
+	}
+	RetireParticlePastXMax(SourceID);
 }
 

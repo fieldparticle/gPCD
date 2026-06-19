@@ -14,6 +14,12 @@ source-local \texttt{totalForce}, and writes only the source velocity and
 position.  The implementation is shaped to transfer directly to one GLSL
 compute invocation per source particle.
 
+The current generated GLSL path validates the ordinary particle and wall force
+model in Vulkan.  Starting-contact effective geometry remains Python-side
+model behavior until the \texttt{StartingContactState.glsl} buffer/export path
+is implemented, so \texttt{ResolveStartingCollision} is intentionally excluded
+from the current Vulkan export validation.
+
 \begin{figure}[ht]
 \centering
 \resizebox{\textwidth}{!}{\input{ForceDynamicsFlowTikz}}
