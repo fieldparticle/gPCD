@@ -432,7 +432,7 @@ class ForceDynamics(ForceContactDynamics):
             pnumtxt = f"p{int(pp.pnum)}"
             particles[pnumtxt] =  particle
 
-            print(f"Read particle: {pp.pnum} at ({pp.rx}, {pp.ry}, {pp.rz}) with velocity ({pp.vx}, {pp.vy}, {pp.vz})")
+            #print(f"Read particle: {pp.pnum} at ({pp.rx}, {pp.ry}, {pp.rz}) with velocity ({pp.vx}, {pp.vy}, {pp.vz})")
 
         return particles
 

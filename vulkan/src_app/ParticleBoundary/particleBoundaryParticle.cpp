@@ -33,7 +33,7 @@
 
 
 
-int ParticleBoundaryParticle(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
+int ParticleBoundaryandSphere(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 {
 
 	VulkanObj* vulkanObj 

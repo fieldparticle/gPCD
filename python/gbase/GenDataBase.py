@@ -312,6 +312,15 @@ class GenDataBase:
         f.write(fstr)
         fstr = f"cell_occupancy_list_size = {self.cell_occupancy_list_size};\n"
         f.write(fstr)
+        if run_cfg.hsv_color == true:
+            fstr = f"hsv_color = 1;\n"
+        else:
+            fstr = f"hsv_color = 0;\n"
+        f.write(fstr)
+        fstr = f"hsv_sat = {run_cfg.hsv_sat:0.4f};\n"
+        f.write(fstr)
+        fstr = f"hsv_val = {run_cfg.hsv_val:0.4f};\n"
+        f.write(fstr)
         f.flush()
         f.close()
 

@@ -71,6 +71,30 @@ the cfg values.
 Config loading, reports, inline tests, scenario hooks, CSV diagnostics, and UI
 plotting stay in Python.
 
+\subsection{Rendering Diagnostics}
+
+Rendering diagnostics are not part of the force law.  Scenario vertex shaders
+may color particles from \texttt{colFlg} or from velocity angle, but those
+colors must not affect generated dynamics.
+
+When GLSL uses \texttt{colFlg} as a collision-color diagnostic, the active
+compute shader must clear \texttt{P[SourceID].colFlg} once per source
+invocation before contact processing.  The generated force path may set
+\texttt{P[SourceID].colFlg=1u} when \texttt{AccumulateContactForce(...)}
+receives a valid particle or wall contact.  This mirrors the Python diagnostic
+flag without reintroducing contact-slot storage as a force input.
+
+For sphere rendering, the mesh resource should provide a unit-radius sphere
+and the vertex shader should scale each instance by \texttt{P[index].Data.x}.
+This keeps the rendered radius tied to the particle ABI rather than to a
+separate scenario configuration radius or OBJ-file diameter.
+
+Velocity-angle HSV rendering uses scenario-generated constants such as
+\texttt{HSV\_ON}, \texttt{HSV\_SAT}, and \texttt{HSV\_VAL} from
+\texttt{params.glsl}.  The shared utility
+\texttt{colorizeVelocity(angle, sat, val)} expects \texttt{angle} in radians
+from \texttt{VelRad.w}.
+
 \subsection{Known Translation Rules}
 
 \texttt{create\_vec4(...)} maps to \texttt{vec4(...)}; Python dict

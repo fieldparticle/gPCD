@@ -30,3 +30,26 @@ radians, maps it to hue with \(1/(2\pi)\), clamps saturation and value to
 Future GLSL color utilities should mirror this interface but remain separate
 from generated ForceDynamics collision code.  Color is diagnostic display
 state and must not become a dynamics input.
+
+\subsection{GLSL Viewer Color Utilities}
+
+GLSL velocity-angle colorization belongs in rendering utilities and scenario
+vertex shaders, not in the ForceDynamics force law.  The current shared GLSL
+helper is:
+\begin{verbatim}
+vulkan/sim/common/util.glsl:colorizeVelocity(angle, sat, val)
+\end{verbatim}
+
+The helper reads \texttt{angle} in radians, maps it to hue with
+\(1/(2\pi)\), clamps saturation and value to \([0,1]\), and returns a
+\texttt{vec3} RGB color.  Scenario-generated \texttt{params.glsl} files may
+provide:
+\begin{verbatim}
+const uint HSV_ON;
+const float HSV_SAT;
+const float HSV_VAL;
+\end{verbatim}
+
+Vertex shaders that output \texttt{vec4} colors must wrap the returned
+\texttt{vec3} with an alpha channel.  Vertex shaders that output
+\texttt{vec3} colors may assign the return value directly.

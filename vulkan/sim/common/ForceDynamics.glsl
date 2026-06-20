@@ -342,6 +342,7 @@ bool AccumulateContactForce(uint SourceID, ContactForceInput contact, inout vec3
         return true;
     }
 
+    P[SourceID].colFlg = 1u;
     float stiffness = GetContactStiffness(
         SourceID,
         contact.targetID,

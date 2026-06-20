@@ -78,7 +78,7 @@ int Loop(PerfObj* pf, TCPObj* tcp, TCPObj* tcpapp,DrawObj* DrawInstance, VulkanO
 int NoPerfLoop(PerfObj* perfObj, TCPObj* tcp, TCPObj* tcpsapp,DrawObj* DrawInstance, VulkanObj* VulkanWin, ResourceGraphicsContainer* rgc, ResourceComputeContainer* rcc);
 int ParticleOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp,bool rmtFlag);
 int ParticleBoundaryOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag);
-int ParticleBoundaryParticle(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag);
+int ParticleBoundaryandSphere(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag);
 int glsl(std::vector<std::string>& InputArgs, std::vector<char>& OutPutSPV);
 void GLFWError(int err, const char* err_str);
 void LaunchExecutable(std::string path, std::string cmd) ;

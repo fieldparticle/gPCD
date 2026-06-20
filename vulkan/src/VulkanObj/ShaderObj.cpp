@@ -39,9 +39,7 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 
 		WriteShaderHeader();
 		WriteShaderDbgHeader();
-		bool walls_on = CfgApp->GetBool("application.walls_on", true);
-		if (walls_on == true)
-			WriteWalls();
+		WriteWalls();
 		Reservoir();
 		GenWorkGroups();
 }
@@ -76,30 +74,18 @@ void ShaderObj::Reservoir()
 }
 
 
-
+// This function is only for walls that are passed to glsl.
+// It is up to the glsl version to use it or not. It has nothing to
+// do with drawing the boundaries. That is in ResourceVertexCube.cpp
 void ShaderObj::WriteWalls()
 {
-#if 0 //walls are frm test file only
-	std::vector<double> walls = { 0.0, 0.0, 0.0, 0.0 };
-	bool walls_on = CfgApp->GetBool("application.walls_on", true);
-	config_setting_t* setting;
-	setting = config_lookup(&CfgApp->m_cfg, "application.walls");
-
-	if (setting != NULL && config_setting_is_array(setting))
-	{
-		int count = config_setting_length(setting);
-
-		for (int i = 0; i < count && i < static_cast<int>(walls.size()); i++)
-		{
-			walls[i] =
-				config_setting_get_float_elem(setting, i);
-		}
-	}
-	
-#endif
 	std::string wlflg = "0u";
 	wlflg = "1u;";
-	
+	bool show_wall_as_boundary_cube = CfgApp->GetBool("application.show_wall_as_boundary_cube", true);
+	bool show_cell_boundary_cube = CfgApp->GetBool("application.show_cell_boundary_cube", true);
+	float wallXMIN = 0.0;
+	float wallXMAX = 0.0;
+	float wallYMIN = 0.0;
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
 	std::string filename = fildir + "/boundary.glsl";
 	{
@@ -110,15 +96,16 @@ void ShaderObj::WriteWalls()
 			throw std::runtime_error(rpt.c_str());
 		}
 		ostrm << "#ifndef BOUNDARY_GLSL\n#define BOUNDARY_GLSL\n" <<
-			
-			"const uint BOUNDARY_ENABLED = " << wlflg << "\n" << 
-			"const float BOUNDARY_XMIN = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallXMIN",true) << ";\n"
+
+			"const uint BOUNDARY_ENABLED = " << wlflg << "\n" <<
+			"const float BOUNDARY_XMIN = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallXMIN", true) << ";\n"
 			"const float BOUNDARY_XMAX  = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallXMAX", true) << ";\n"
 			"const float BOUNDARY_YMIN  = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallYMIN", true) << ";\n"
 			"const float BOUNDARY_YMAX  = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallYMAX", true) << ";\n"
 			"const float wall_contact_offset = " << std::fixed << std::setprecision(2) << 0.20 << ";\n"
 			"#endif\n";
 	}
+	
 }
 void ShaderObj::GenWorkGroups()
 {
@@ -165,14 +152,9 @@ void  ShaderObj::WriteShaderHeader()
 	// Dont compile shaders if using nsight.
 //if(CfgApp->GetBool("application.nsight", true) == true)
 //		return;
-	uint32_t compflag=0;
-	uint32_t motion_str = 0;
+	
 	float dt = 0.0;
-	if (CfgApp->GetBool("application.doMotion", true) == true)
-	{
-		dt = CfgApp->GetFloat("application.dt", true);
-		motion_str = 1;
-	}
+	
 
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
     std::string filename = fildir + "/params.glsl";
@@ -195,6 +177,28 @@ void  ShaderObj::WriteShaderHeader()
 		float ncol_green = CfgApp->GetFloat("application.ncol_color.green", true);
 		float ncol_blue = CfgApp->GetFloat("application.ncol_color.blue", true);
 		float ncol_alpha = CfgApp->GetFloat("application.ncol_color.alpha", true);
+
+		std::ostringstream hsv_color_on;
+		std::ostringstream hsv_sat;
+		std::ostringstream hsv_val;
+		bool has_hsv = false;
+		if (CfgTst->CheckKey("hsv_color"))
+		{
+			if (CfgTst->GetInt("hsv_color", true) == 1)
+			{
+				has_hsv = true;
+				hsv_color_on << "const uint HSV_ON = 1u;\n";
+				hsv_sat << "const float HSV_SAT = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("hsv_sat", true) << ";\n";
+				hsv_val << "const float HSV_VAL = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("hsv_val", true) << ";\n";
+			}
+			else
+			{
+				hsv_color_on << "const uint HSV_ON = 0u;\n";
+				hsv_sat << "const float HSV_SAT = 0.000f" << ";\n";
+				hsv_val << "const float HSV_VAL = 0.000f" << ";\n";
+			}
+			
+		}
 
 		std::ostringstream col_color;
 		col_color << "vec3("
@@ -233,15 +237,15 @@ void  ShaderObj::WriteShaderHeader()
 			<< "const uint LockArySize=" << m_LMO->m_BufSize << ";\n"
 			<< "const uint ColAryLen=" << m_CMO->m_MaxLoc << ";\n"
 			<< "const uint LockAryLen=" << m_LMO->m_MaxLoc << ";\n"
-			<< "const uint doMotion = " << motion_str << ";\n"
 			<< "const uint MAX_CELL_ARRAY_LOCATIONS =" << m_CMO->m_MaxLoc << ";\n"
-				//##JMBDont know what this is
-			<< "const uint compflag =" << compflag << ";\n"
 			<< "const uint bbound =" << m_VPO->BoundaryParticleLimit << ";\n"
 			<< "const float point_size = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.gl_point_size", true) << ";\n"
 			<< "vec3 ncolcolor = " << ncol_color.str() << ";\n"
 			<< "vec3 colcolor = " << col_color.str() << ";\n";
-			
+		if (has_hsv == true)
+		{
+			ostrm << hsv_color_on.str() << hsv_sat.str() << hsv_val.str();
+		}
 			
 		ostrm.flush();
 		ostrm.close();

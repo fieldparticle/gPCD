@@ -279,11 +279,14 @@ void main(){
 	#endif
 		
 	}
-	
+	if(HSV_ON == 1)
+		fragColor = colorizeVelocity(P[index].VelRad.w,HSV_SAT,HSV_VAL);
+	else
+	{
 	if(uint(P[index].colFlg) == 1)
 		fragColor = vec3(1.0,0.0,0.0);	
 	else if(uint(P[index].colFlg) == 0)
 		fragColor = vec3(0.0,1.0,0.0);	
-	
+	}
 	
 }

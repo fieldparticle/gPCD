@@ -101,15 +101,25 @@ detection, force accumulation, integration, lifecycle state, or energy and
 momentum reports.
 
 When \texttt{RUN\_CONFIGURATION.hsv\_color} is enabled in the Python viewer,
-particle color is derived from the velocity angle stored in
-\texttt{VelRad.w}.  The hue maps angle to the unit interval with
+or when \texttt{HSV\_ON} is enabled in a Vulkan scenario
+\texttt{params.glsl}, particle color is derived from the velocity angle stored
+in \texttt{VelRad.w}.  The hue maps angle to the unit interval with
 \(h=\theta/(2\pi)\), wrapped modulo one.  The configuration values
-\texttt{hsv\_sat} and \texttt{hsv\_val} control saturation and value and must
-remain in the interval \([0,1]\).
+\texttt{hsv\_sat}/\texttt{HSV\_SAT} and \texttt{hsv\_val}/\texttt{HSV\_VAL}
+control saturation and value and must remain in the interval \([0,1]\).
 
 This colorization is a visualization aid for flow direction and particle
 motion.  The dynamics model owns the velocity angle; the renderer owns the
 conversion from angle to RGB.
+
+The collision-color flag \texttt{colFlg} is also diagnostic display state.
+Shader paths that use it must clear it once per source invocation and set it
+only when a valid particle or wall contact is accumulated for the current
+frame.  It is not a force input.
+
+Rendered sphere radius must be derived from the particle radius stored in
+\texttt{Data.x}.  Mesh files may provide a convenient unit sphere, but they
+must not bake a separate configuration radius into the rendered particle size.
 
 \subsection{Boundary Convention}
 

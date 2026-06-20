@@ -382,3 +382,46 @@ Keeping the HSV helper in \texttt{gbase/utilities.py} and applying it in
 logic and Python display logic.  A later GLSL utility can mirror the same
 \texttt{hsv\_angle(angle, value, sat)} interface for Vulkan rendering without
 changing the ForceDynamics collision model.
+
+\subsection{BoundarySpheresAndCube Vulkan Visualization Parity}
+
+\subsubsection{<previous form>}
+
+\texttt{BoundarySpheresAndCube} rendered particles with fixed collision
+colors and a sphere mesh whose size was baked from the scenario radius during
+vertex-buffer creation.  The generated ForceDynamics GLSL force path applied
+contacts, but it bypassed the Python diagnostic contact-slot code that set
+\texttt{colFlg}, so shader collision colors could fail to reflect current
+contacts.
+
+\subsubsection{<current form>}
+
+The rendered sphere resource now stores a unit-radius mesh, and the
+\texttt{BoundarySpheresAndCube} sphere vertex shader scales each instance by
+the particle radius in \texttt{P[index].Data.x}.  The compute shader clears
+\texttt{P[SourceID].colFlg} once per source invocation, and
+\texttt{AccumulateContactForce(...)} sets it when a valid particle or wall
+contact is accumulated.
+
+\texttt{BoundarySpheresAndCube} also supports scenario-controlled HSV
+velocity-angle rendering through \texttt{HSV\_ON}, \texttt{HSV\_SAT}, and
+\texttt{HSV\_VAL} in \texttt{params.glsl}.  The shared GLSL utility
+\texttt{colorizeVelocity(angle, sat, val)} reads \texttt{VelRad.w} in radians
+and maps it to hue with \(1/(2\pi)\).
+
+\subsubsection{difference outcome}
+
+Full solution.
+
+\subsubsection{<Analysis>}
+
+The result separates display diagnostics from dynamics.  Particle radius,
+velocity angle, and collision state are read from the particle ABI, while the
+renderer owns mesh scaling and color conversion.  Collision coloring and HSV
+coloring are now selectable visual interpretations of the same dynamics state.
+Neither feeds back into contact detection, force accumulation, integration, or
+energy and momentum diagnostics.
+
+Because \texttt{ForceDynamics.glsl} is generated content, the
+\texttt{colFlg} assignment in \texttt{AccumulateContactForce(...)} should be
+moved into the exporter template when the generated file is regenerated.

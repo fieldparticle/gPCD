@@ -1,0 +1,23 @@
+#define VERPONLY 
+const uint WIDTH=5;
+const uint HEIGHT=5;
+const uint DEPTH=5;
+const uint CENTER=0;
+const float RADIUS=0;
+const uint MAX_CELL_OCCUPANY=64;
+const uint SCR_W =1000;
+const uint SCR_H =1000;
+const uint SCR_X =0;
+const uint SCR_Y =0;
+const uint NUMPARTS =101;
+const uint NUM_PARICLES_COLLIDING =0;
+const uint MAXSPCOLLS =8;
+const uint ColArySize=32000;
+const uint LockArySize=500;
+const uint ColAryLen=125;
+const uint LockAryLen=125;
+const uint MAX_CELL_ARRAY_LOCATIONS =125;
+const uint bbound =0;
+const float point_size = 1.50;
+vec3 ncolcolor = vec3(0.0f,1.0f,0.0f);
+vec3 colcolor = vec3(1.0f,0.0f,0.0f);

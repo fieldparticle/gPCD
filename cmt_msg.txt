@@ -1,10 +1,7 @@
 Current status:
-- Python viewer supports HSV velocity-angle particle coloring.
-- Dynamics docs now classify color as diagnostic display state.
+- BoundarySpheresAndCube renders particle radius from Data.x.
+- Vulkan visualization supports HSV velocity-angle coloring and current-frame collision colors.
+- Dynamics docs updated for rendering diagnostics and Vulkan visualization parity.
 
-Code Changes:
-- Added hsv_angle helper in gbase/utilities.py.
-- Applied hsv_angle in SimulationRunner.py when hsv_color is enabled.
-- Updated Dynamics docs for HSV viewer diagnostics.
-
-Next: Mirror hsv_angle in GLSL rendering utilities when Vulkan colorization is ready.
+Next:
+- Move the ForceDynamics.glsl colFlg assignment into the exporter template so it survives regeneration.

@@ -40,9 +40,11 @@ void ResourceVertexSphere::Create(ResourceVertexParticle* PartVert)
 	for (size_t ii = 0; ii < m_vtemp.size(); ii++)
 	{
 		CartVert tmp = {};
-		tmp.pos.x = m_vtemp[ii].x * 2.0f * PartVert->m_Radius;
-		tmp.pos.y = m_vtemp[ii].y * 2.0f * PartVert->m_Radius; //*m_ParticleVert->m_SideLength;
-		tmp.pos.z = m_vtemp[ii].z * 2.0f * PartVert->m_Radius; //*m_ParticleVert->m_SideLength;
+		// The OBJ sphere has radius 0.5.  Store a unit-radius mesh here;
+		// the vertex shader scales each instance by P[instance].Data.x.
+		tmp.pos.x = m_vtemp[ii].x * 2.0f;
+		tmp.pos.y = m_vtemp[ii].y * 2.0f;
+		tmp.pos.z = m_vtemp[ii].z * 2.0f;
 		tmp.pos.w = 0.2f;
 		tmp.color = glm::vec4(1.0, 0.0, 0.0, 1.0);
 		m_Verts.push_back(tmp);

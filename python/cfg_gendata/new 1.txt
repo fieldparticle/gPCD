@@ -1,7 +1,0 @@
-def frames_between_waves(
-        self,
-        particle_radius,
-        inlet_velocity,
-        dt,
-        spacing_factor=1.1,
-    ):

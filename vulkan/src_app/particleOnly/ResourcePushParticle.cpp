@@ -65,6 +65,14 @@ void ResourceParticlePush::PushMem(uint32_t currentBuffer)
 	m_ShaderFlags.SideLength = static_cast<float>(m_VertP->m_SideLength);
 	m_ShaderFlags.Ptot = static_cast<float>(m_App->m_Numparticles);
 	m_ShaderFlags.dt = m_App->m_dt;
+	
+	
+	if (CfgTst->CheckKey("DT"))
+	{
+		float tst_dt = CfgTst->GetFloat("DT", false);
+		if (tst_dt != m_App->m_dt)
+			mout << "Delta Time Mismatch->ConfigFile Val:" << m_App->m_dt << " *.tst file Val:" << tst_dt << ende;
+	}
 	m_ShaderFlags.systemp = 250.0;
 	m_ShaderFlags.ColorMap = ColorMap;
 	

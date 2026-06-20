@@ -46,18 +46,28 @@ int ParseCommandLine(int argc, const char* argv[], ConfigObj* cfg_file);
 void LaunchExecutable(std::string path, std::string cmd) ;
 int main(int argc, const char* argv[]) try
 {
+
+	// Get current path 
 	std::filesystem::path cwd = std::filesystem::current_path();
+	// Initialize mout
 	mout.Init("particle.log", "Particle");
-	mout << "Starting gPCD\r\n" << ende;
-	MpsApp = new ConfigObj;
-	MpsApp->Create("mps.cfg");
+
+	mout << "Starting...\r\n" << ende;
+		
 	mout << "Working Directory :" << cwd.string().c_str() << ende;
 	for (unsigned int ii = 0; ii++; argc)
 		mout << "MPS Command Line:" << ii << " is :" << argv[ii] << ende;
 
 	// If the are command line options replace items ithe config file
 	bool test = true;
-	// Run the mps.cfg file to get the test filw and other global parameters
+
+	// allocate and create the main config file
+	MpsApp = new ConfigObj;
+	MpsApp->Create("mps.cfg");
+
+	// Parse command line.
+	// The config items in command line are modified or added to MpsApp
+	// so to open the run code confgiuration file CfgApp
 	if (argc > 1)
 	{
 		if (ParseCommandLine(argc, argv, MpsApp) > 0)
@@ -66,23 +76,16 @@ int main(int argc, const char* argv[]) try
 
 		}
 	}
-	// Run the cfgapp.cfg file to get the test filw and other global parameters
-	CfgApp = new ConfigObj;
 	mout << "Opening study file:" << MpsApp->GetString("studyFile", true) << ende;
+
+	// Create CfgApp based on the studyfile 
+	CfgApp = new ConfigObj;
 	CfgApp->Create(MpsApp->GetString("studyFile", true));
-	if (argc > 1)
-	{
-		if (ParseCommandLine(argc, argv, CfgApp) > 0)
-		{
-			mout << "No Command Line for CfgApp." << ende;
 
-		}
-
-	}
-
-	//std::string app = CfgApp->GetString("application.app",true);
+	//Create the config that will hold the data from *.tst files
 	CfgTst = new ConfigObj;
 		
+	// Create a new performance object
 	PerfObj* pf = new PerfObj();
 	pf->Create();
 	
@@ -93,6 +96,8 @@ int main(int argc, const char* argv[]) try
 	// Need to go to settings->System->Display->Graphics
 	// Down to GPU Prefernce Set to High performance
 	SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
+
+	// If the auto flag is set this will be a verf-perf run
 	if (CfgApp->GetBool("application.doAuto", true) == true)
 	{
 		mout << "Do study :" << ende;
@@ -105,22 +110,29 @@ int main(int argc, const char* argv[]) try
 			return ret;
 
 	}
+	// This is a single simulation file
 	else
 	{
+		// Get the name of the simulation file *.tst that was created by the generation software
 		std::string testfile = "application.testfile";
 		CfgTst->Create(CfgApp->GetString(testfile, true));
-		bool has_boundary = CfgApp->GetBool("application.has_boundary", true);
-		bool has_spheres = CfgApp->GetBool("application.particle_as_spheres", true);
 
-		if (has_boundary == true && has_spheres == true)
+		bool show_cell_boundary_cube = CfgApp->GetBool("application.show_cell_boundary_cube", true);
+		bool show_wall_as_boundary_cube = CfgApp->GetBool("application.show_wall_as_boundary_cube", true);
+		bool particle_as_spheres = CfgApp->GetBool("application.particle_as_spheres", true);
+
+
+		// If this has both a boundary and spheres.
+		if (particle_as_spheres == true && (show_cell_boundary_cube == true || show_wall_as_boundary_cube ==true))
 		{
 			
-			if (ParticleBoundaryParticle(pf, nullptr, nullptr, false))
+			if (ParticleBoundaryandSphere(pf, nullptr, nullptr, false))
 			{
 				return 1;
 			}
 		}
-		else if (has_boundary == true && has_spheres == false)
+		// If this has a boundary and no spheres.
+		else if ((show_cell_boundary_cube == true || show_wall_as_boundary_cube == true) && particle_as_spheres == false)
 		{
 			if (ParticleBoundaryOnly(pf, nullptr, nullptr, false))
 			{
@@ -128,16 +140,8 @@ int main(int argc, const char* argv[]) try
 			}
 
 		}
-		else if (has_boundary == true)
-		{
-
-			if (ParticleBoundaryOnly(pf, nullptr, nullptr, false))
-			{
-				return 1;
-			}
-		}
-
-		else if (has_boundary == false)
+		// No boudary and no spheres
+		else
 		{
 			if (ParticleOnly(pf, nullptr, nullptr, false))
 			{
@@ -149,7 +153,7 @@ int main(int argc, const char* argv[]) try
 }
 	
 
-#if 1
+// Gloabl catch
 catch (const std::exception& e)
 {
 
@@ -157,7 +161,10 @@ catch (const std::exception& e)
 	
 	exit(1);
 }
-#endif
+
+
+// Parse the command line and add or modify the configuration items on the 
+// passed configuration file.
 int ParseCommandLine(int argc, const char* argv[], ConfigObj* cfg_file)
 {
 	config_setting_t* setting;

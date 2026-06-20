@@ -114,20 +114,13 @@ void ResourceVertexCube::MakeAxes(uint32_t sidelen)
 	m_Axes.clear();
 	m_CubeIndices.clear();
 
-	bool basw = CfgApp->GetBool("application.boundary_as_walls", true);
+	bool show_wall_as_boundary_cube = CfgApp->GetBool("application.show_wall_as_boundary_cube", true);
+	bool show_cell_boundary_cube = CfgApp->GetBool("application.show_cell_boundary_cube", true);
 
 	glm::vec3 minCorner;
 	glm::vec3 maxCorner;
 
-	if (basw == false)
-	{
-		minCorner = glm::vec3(0.5f, 0.5f, 0.5f);
-
-		float side = static_cast<float>(sidelen);
-
-		maxCorner = glm::vec3(side-0.5, side-0.5, side-0.5);
-	}
-	else
+	if (show_wall_as_boundary_cube ==true)
 	{
 		minCorner = glm::vec3(
 			CfgTst->GetFloat("wallXMIN", true),
@@ -141,62 +134,58 @@ void ResourceVertexCube::MakeAxes(uint32_t sidelen)
 			CfgTst->GetFloat("wallZMAX", true)
 		);
 	}
-
-	float xmin = minCorner.x;
-	float ymin = minCorner.y;
-	float zmin = minCorner.z;
-
-	float xmax = maxCorner.x;
-	float ymax = maxCorner.y;
-	float zmax = maxCorner.z;
-	m_CubeIndices =
+	
+	if (show_cell_boundary_cube == true)
 	{
-		// back face zmin
-		0, 1,
-		1, 2,
-		2, 3,
-		3, 0,
+		minCorner = glm::vec3(0.5f, 0.5f, 0.5f);
 
-		// front face zmax
-		4, 5,
-		5, 6,
-		6, 7,
-		7, 4,
+		float side = static_cast<float>(sidelen);
 
-		// connecting edges
-		0, 4,
-		1, 5,
-		2, 6,
-		3, 7
-	};
-#if 0
-	m_CubeIndices =
+		maxCorner = glm::vec3(side - 0.5, side - 0.5, side - 0.5);
+	}
+
+	if (show_cell_boundary_cube == true || show_wall_as_boundary_cube == true)
 	{
-		0, 2, 1,  2, 0, 3,   // back
-		4, 5, 6,  6, 7, 4,   // front
+		float xmin = minCorner.x;
+		float ymin = minCorner.y;
+		float zmin = minCorner.z;
 
-		0, 4, 7,  7, 3, 0,   // left
-		1, 2, 6,  6, 5, 1,   // right
+		float xmax = maxCorner.x;
+		float ymax = maxCorner.y;
+		float zmax = maxCorner.z;
+		m_CubeIndices =
+		{
+			// back face zmin
+			0, 1,
+			1, 2,
+			2, 3,
+			3, 0,
 
-		0, 1, 5,  5, 4, 0,   // bottom
-		3, 7, 6,  6, 2, 3    // top
-	};
-#endif
-	glm::vec4 color(1.0f, 1.0f, 1.0f, 1.0f);
+			// front face zmax
+			4, 5,
+			5, 6,
+			6, 7,
+			7, 4,
 
-	m_Axes.push_back({ { xmin, ymin, zmin, 1.0f }, color });
-	m_Axes.push_back({ { xmax, ymin, zmin, 1.0f }, color });
-	m_Axes.push_back({ { xmax, ymax, zmin, 1.0f }, color });
-	m_Axes.push_back({ { xmin, ymax, zmin, 1.0f }, color });
+			// connecting edges
+			0, 4,
+			1, 5,
+			2, 6,
+			3, 7
+		};
 
-	m_Axes.push_back({ { xmin, ymin, zmax, 1.0f }, color });
-	m_Axes.push_back({ { xmax, ymin, zmax, 1.0f }, color });
-	m_Axes.push_back({ { xmax, ymax, zmax, 1.0f }, color });
-	m_Axes.push_back({ { xmin, ymax, zmax, 1.0f }, color });
+		glm::vec4 color(1.0f, 1.0f, 1.0f, 1.0f);
 
-	m_Verts = m_Axes;
+		m_Axes.push_back({ { xmin, ymin, zmin, 1.0f }, color });
+		m_Axes.push_back({ { xmax, ymin, zmin, 1.0f }, color });
+		m_Axes.push_back({ { xmax, ymax, zmin, 1.0f }, color });
+		m_Axes.push_back({ { xmin, ymax, zmin, 1.0f }, color });
 
-	// Optional: save these for PushMem/view-centering
-	//m_MinCorner = minCorner;
-	//m_MaxCorner = maxCorner;
+		m_Axes.push_back({ { xmin, ymin, zmax, 1.0f }, color });
+		m_Axes.push_back({ { xmax, ymin, zmax, 1.0f }, color });
+		m_Axes.push_back({ { xmax, ymax, zmax, 1.0f }, color });
+		m_Axes.push_back({ { xmin, ymax, zmax, 1.0f }, color });
+
+		m_Verts = m_Axes;
+	}
 }

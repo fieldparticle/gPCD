@@ -128,7 +128,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL ReportCallback(VkDebugReportFlagsEXT flags
 		std::string pch = msg.substr(last+1, endof);
 		if (pch.compare("vkQueueSubmit"))
 			pch.erase(0, 42);
-		mout << pch.c_str() << ende;
+		mout << msg.c_str() << ende;
 	}
 
 	return false;

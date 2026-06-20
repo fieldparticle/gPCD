@@ -124,11 +124,11 @@ class GenPipeReservoirEntry():
         f.write(fstr)
         # size lengths must be plus 1 since the cell locations start as <0,0,0>
         # THIS is the only place you so this - The vulkan code nees to check this
-        fstr = f"CellAryW = {run_cfg.side_len};\n"     
+        fstr = f"CellAryW = {int(self.side_len)};\n"     
         f.write(fstr)
-        fstr = f"CellAryH = {run_cfg.side_len};\n"     
+        fstr = f"CellAryH = {int(self.side_len)};\n"     
         f.write(fstr)
-        fstr = f"CellAryL = {run_cfg.side_len};\n"     
+        fstr = f"CellAryL = {int(self.side_len)};\n"     
         f.write(fstr)
         fstr = f"radius = {run_cfg.radius};\n"
         f.write(fstr)
@@ -178,21 +178,18 @@ class GenPipeReservoirEntry():
         f.write(fstr)
         fstr = f"wallZMAX = {run_cfg.WallZMAX};\n"
         f.write(fstr)
-        fstr = f"flow_type = \"{self.cfg_value(run_cfg, 'flow_type', 'pipe_reservoir_entry')}\";\n"
+        fstr = f"DT = {run_cfg.dt};\n"
         f.write(fstr)
-        fstr = f"particle_rate = {self.cfg_value(run_cfg, 'particle_rate', 0.0)};\n"
+        if run_cfg.hsv_color == True:
+            fstr = f"hsv_color = 1;\n"
+        else:
+            fstr = f"hsv_color = 0;\n"
         f.write(fstr)
-        fstr = f"inlet_velocity = {self.cfg_value(run_cfg, 'inlet_velocity', 0.0)};\n"
+        fstr = f"hsv_sat = {run_cfg.hsv_sat:0.4f};\n"
         f.write(fstr)
-        fstr = f"inlet_x = {self.cfg_value(run_cfg, 'inlet_x', run_cfg.WallXMIN)};\n"
+        fstr = f"hsv_val = {run_cfg.hsv_val:0.4f};\n"
         f.write(fstr)
-        fstr = f"outlet_x = {self.cfg_value(run_cfg, 'outlet_x', run_cfg.WallXMAX)};\n"
-        f.write(fstr)
-        fstr = f"pipe_y_min = {self.cfg_value(run_cfg, 'pipe_y_min', run_cfg.WallYMIN)};\n"
-        f.write(fstr)
-        fstr = f"pipe_y_max = {self.cfg_value(run_cfg, 'pipe_y_max', run_cfg.WallYMAX)};\n"
-        f.write(fstr)
-        fstr = f"escape_mode = {int(self.cfg_value(run_cfg, 'escape_mode', 1))};\n"
+        fstr = f"DT = {run_cfg.dt};\n"
         f.write(fstr)
         f.flush()
         f.close()
@@ -207,30 +204,69 @@ class GenPipeReservoirEntry():
         
         
         RUN_CONFIGURATION = self.itemcfg["RUN_CONFIGURATION"]
-        reservoir_count = int(self.cfg_value(RUN_CONFIGURATION, "reservoir_particle_count", 32))
+        
         radius = float(self.cfg_value(RUN_CONFIGURATION, "radius", 0.25))
-        mass = float(self.cfg_value(RUN_CONFIGURATION, "particle_mass", 1.0))
         dt = float(self.cfg_value(RUN_CONFIGURATION, "dt", 1.0))
         collision_stiffness_q = float(self.cfg_value(RUN_CONFIGURATION, "collision_stiffness_q", 0.0))
-        local_particles_in_row = self.itemcfg.num_particles_y
-        local_particles_in_col = self.itemcfg.num_particles_x
+        WallYMAX = float(self.cfg_value(RUN_CONFIGURATION, "WallYMAX", 10.0))
+        WallYMIN = float(self.cfg_value(RUN_CONFIGURATION, "WallYMIN", 10.0))
+        # Paticle length is twice the radius times the fraction of diameter separation.
+        particle_length =2.0*radius+2.0*radius*self.itemcfg.fraction_of_diameter_separation
+        # The particle row length is the number of particles per cell row times the particle length. 
+        particle_cell_row_length = self.itemcfg.particles_per_cell_row*particle_length
+        # if the length of the particles in a cell row is larger than one then there is overlap.
+        if particle_cell_row_length > 1.0:
+            print(f"Error: Particles per cell row is {particle_cell_row_length:.2f} which is greater than 1.0. ")
+            return
+        print(f"Paricle row length is {particle_cell_row_length:.2f} with separation distance of {self.itemcfg.fraction_of_diameter_separation} and radius of {radius}")
+        # Take the difference between the particle row length and 1.0 to see how much space is 
+        # left in a cell row. Then divide by the particle length to see how 
+        # many more particles could fit in the row if we wanted to add more.
+        particle_row_length_difference = 1.0 - particle_cell_row_length
+        # See how many particles can fit in the cell row.
+        can_fit = particle_row_length_difference/particle_length
+        print(f"Particle row length difference is {particle_row_length_difference:.2f} can fit {can_fit:.2f} particles")
+
+        particles_per_row = self.itemcfg.particles_per_row
+        required_width = particles_per_row/self.itemcfg.particles_per_cell_row
+        width = RUN_CONFIGURATION.WallYMAX - RUN_CONFIGURATION.WallYMIN
+        if required_width > width:
+            print(f"Error: Particles per row is {particles_per_row} which requires a width of {required_width:.2f} but the width is only {width:.2f}. ")
+            return
+        self.side_len = math.ceil(self.itemcfg.particles_per_row/self.itemcfg.particles_per_cell_row)+2.0
+        print(f"Side length is {self.side_len} for particles per row of {particles_per_row} and particles per cell row of {self.itemcfg.particles_per_cell_row}")
+        wall_cell_diff = self.side_len-WallYMAX
+        if wall_cell_diff < 1.0:
+            print(f"Error: Side length is {self.side_len} but WallYMAX is {WallYMAX}")
+            print(f"Maximum WallYMAX is {self.side_len-1.0}")
+            return
+        
+        total_cell_row_length = self.itemcfg.particles_per_cell_row*particle_length
+        empty_space = 1.0 - total_cell_row_length 
+        empty_particle_count = math.floor(empty_space/particle_length)
+        print(f"total_cell_row_length is {total_cell_row_length:.2f} empty space is {empty_space:.2f} which can fit {empty_particle_count:.2f} more particles in the row if we wanted to add more.")        
+
+
+        tot_particles = self.itemcfg.particle_columns*self.itemcfg.particles_per_row
+        total_colums = self.itemcfg.particle_columns
+        particles_per_row = self.itemcfg.particles_per_row
+        
         starting_vx = 0.02
         starting_vy = 0.0
         start_birth = 10.0
         try:
-            for col in range(1,local_particles_in_col+1):    
-                k = self.frames_between_waves(radius,starting_vx,dt,spacing_factor=1.1)
+            for col in range(1,total_colums+1):    
+                k = self.frames_between_waves(radius,starting_vx,dt,spacing_factor=1.05)
                 birth_frame =  start_birth + k * (col-1.0)
-
                 
-                for row in range(1,local_particles_in_row+1):     
+                for row in range(1,particles_per_row+1):     
                     particle_struct = pdata()
                     self.number_particles += 1
                     particle_struct.pnum = self.number_particles
-                    particle_struct.rx = 1.0
-                    particle_struct.ry = row+0.5
+                    particle_struct.rx = 0.5
+                    particle_struct.ry = 0.5+row*particle_length
                     particle_struct.rz = 2.0
-                    particle_struct.vx = 0.02
+                    particle_struct.vx = starting_vx
                     particle_struct.vy = 0.0
                     particle_struct.vz = 0.0
                     particle_struct.molar_mass = 1.0

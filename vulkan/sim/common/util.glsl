@@ -251,12 +251,9 @@ vec3 hsv2rgb(in vec3 hsv)
 	return ret_clr;
 }
 
-vec3 colorizeVelocity(float v_ang, float v_mag)
+vec3 colorizeVelocity(float v_ang, float sat, float val)
 {
-	// v_mag is reserved for future value/intensity scaling.
-	float hue = mod(v_ang, 360.0) / 360.0;
-	if (hue < 0.0)
-		hue += 1.0;
-	return hsv2rgb(vec3(hue, 1.0, 1.0));
+	float hue = fract(v_ang / 6.28318530718);
+	return hsv2rgb(vec3(hue, clamp(sat, 0.0, 1.0), clamp(val, 0.0, 1.0)));
 }
 	

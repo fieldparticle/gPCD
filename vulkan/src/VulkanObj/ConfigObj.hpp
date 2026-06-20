@@ -87,7 +87,10 @@ public:
 	bool GetNextSubStruct(config_setting_t* setting, std::vector<pair> &pairs, int index);
 	const char* GetArrayElementString(config_setting_t* setting, int index);
 	void GetArrayElementFloats(config_setting_t* setting, std::string Name, float *Ary, uint32_t Max,int index);
-
+	config_setting_t* CheckKey(std::string key)
+	{
+		return config_lookup(&m_cfg, key.c_str());
+	}
 	VulkanObj* m_App;
 	ConfigObj() {};
 	virtual void Create(std::string cfg_file);
