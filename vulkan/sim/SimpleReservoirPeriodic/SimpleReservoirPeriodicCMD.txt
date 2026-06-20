@@ -1,2 +1,1 @@
-studyFile C:\_DJ\gPCD\vulkan\sim\BoundarySpheresReservoir\BoundarySpheresReservoir.cfg
-
+studyFile "C:\_DJ\gPCD\vulkan\sim\SimpleReservoirPeriodic\SimpleReservoirPeriodic.cfg"  

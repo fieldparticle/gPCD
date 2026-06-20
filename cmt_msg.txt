@@ -1,7 +1,2 @@
 Current status:
-- BoundarySpheresAndCube renders particle radius from Data.x.
-- Vulkan visualization supports HSV velocity-angle coloring and current-frame collision colors.
-- Dynamics docs updated for rendering diagnostics and Vulkan visualization parity.
-
-Next:
-- Move the ForceDynamics.glsl colFlg assignment into the exporter template so it survives regeneration.
+	- made a rename project batch file
