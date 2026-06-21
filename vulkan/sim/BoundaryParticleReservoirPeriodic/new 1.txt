@@ -1,0 +1,7 @@
+Questions I’d answer before changing code:
+Which existing ABI field marks particle type?
+Are boundary particles stored in the same pdata binary?
+Should boundary particles have radius equal to mobile particles?
+Should a boundary target behave as a fixed ghost wall or as a real equal-mass particle whose velocity is always zero?
+Should boundary particles be rendered?
+Should they contribute to energy/momentum diagnostics?

@@ -1,7 +1,7 @@
 @echo off
 
-set newPrefix=SimpleReservoirPeriodic
-set oldPrefix=BoundarySpheresReservoir
+set newPrefix=BoundaryParticleReservoirPeriodic
+set oldPrefix=SimpleReservoirPeriodic
 
 set old_dir=%~dp0%oldPrefix%
 set new_dir=%~dp0%newPrefix%
@@ -96,6 +96,16 @@ IF EXIST "%new_dir%\%newPrefix%.bat" (
     )
 )
 
+IF EXIST "%new_dir%\%newPrefix%.cfg" (
+    ECHO [ERROR] "%new_dir%\%newPrefix%.cfg" already exists.
+) ELSE (
+    IF EXIST "%new_dir%\%oldPrefix%.cfg" (
+        REN "%new_dir%\%oldPrefix%.cfg" "%newPrefix%.cfg"
+        ECHO [SUCCESS] Renamed "%oldPrefix%.cfg" to "%newPrefix%.cfg"
+    ) ELSE (
+        ECHO [ERROR] "%new_dir%\%oldPrefix%.cfg" does not exist.
+    )
+)
 
 echo studyFile "%new_dir%\%newPrefix%.cfg" > "%new_dir%\%newPrefix%CMD.txt" 
 

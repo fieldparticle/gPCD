@@ -127,6 +127,44 @@ For the current two-dimensional pipe convention:
 Therefore the wall scan for \texttt{SimpleReservoir} includes only wall flags
 3 and 4.
 
+\subsection{Boundary Particle Wall Rule}
+
+Reservoir configurations may select the wall representation with:
+
+\begin{verbatim}
+wall_type = 0;  // manual configured wall planes
+wall_type = 1;  // particle boundary markers
+\end{verbatim}
+
+When \texttt{wall\_type=0}, the configured wall fields retain their legacy
+meaning as physical wall planes.  When \texttt{wall\_type=1}, boundary
+particles define the solid wall broad phase.  The configured manual wall
+planes must not be used as the physical wall-collision geometry for those
+pipe walls.
+
+A boundary particle is an occupancy marker, not a moving dynamics particle.
+It is stored in the same particle buffer with \texttt{ptype=1.0} and
+\texttt{Data.w=0.0} so the vertex/cell placement pass includes it.  The
+compute/source dynamics dispatch still processes only mobile particles as
+sources.  When a mobile source encounters a boundary marker as a target, it
+must evaluate the wall segment represented by that marker rather than process
+the marker as an ordinary particle-particle collision.
+
+The current straight-wall implementation is:
+
+\begin{verbatim}
+EvaluateWallSegment(SourceID, BoundaryID)
+\end{verbatim}
+
+For now, each boundary marker represents a straight horizontal wall segment
+through the center of the marker's cell.  The evaluator determines whether
+the marker belongs to the lower or upper wall from the boundary-marker
+geometry, calculates the current source-to-segment wall ghost geometry, and
+returns the normal, overlap area, center distance, and wall flag needed by the
+ordinary wall contact slot.  Later sloped or curved boundaries should extend
+\texttt{EvaluateWallSegment} without changing the source-owned force
+accumulation rule.
+
 \subsection{ForceDynamics Invariance}
 
 \texttt{SimpleReservoir} does not modify the ForceDynamics equations:

@@ -32,7 +32,7 @@ struct Particle {
 	uint32_t contactCount; // active entries in contacts
 	uint32_t colFlg;       // 1 if in collision, 0 if not
 
-	float MolarMatter;     // reserved
+	float ptype;           // runtime particle type copied from binary pdata.ptype
 	float temp_vel;        // reserved
 };
 

@@ -70,6 +70,113 @@ class ForceContactDynamics:
             return True
         return self.AccumulateContactForce(SourceID, contact_state, totalForce)
 
+    def BoundaryParticleWallFlag(self, SourceID, BoundaryID):
+        """Infer the configured wall represented by a boundary marker."""
+        boundary_position = self.GetParticlePosition(BoundaryID)
+        boundary_particles = [
+            particle_id
+            for particle_id in range(len(self.particles))
+            if self.IsBoundaryParticle(particle_id)
+        ]
+        if boundary_particles:
+            boundary_y_values = [
+                float(self.GetParticlePosition(particle_id).y)
+                for particle_id in boundary_particles
+            ]
+            min_y = min(boundary_y_values)
+            max_y = max(boundary_y_values)
+        else:
+            cfg = self.run_configuration
+            min_y = float(cfg.get("WallYMIN", 0.0))
+            max_y = float(cfg.get("WallYMAX", self.ShaderFlags.SideLength))
+        mid_y = 0.5 * (min_y + max_y)
+        if boundary_position.y < mid_y:
+            return 3
+        return 4
+
+    def EvaluateWallSegment(self, SourceID, BoundaryID):
+        """Evaluate the straight wall segment represented by a boundary marker.
+
+        Boundary particles are occupancy markers.  For this first reservoir
+        model, each marker represents a horizontal wall segment through the
+        marker's cell center.  The returned tuple contains normal x/y/z,
+        overlap area, ghost-center distance, and wall flag.
+        """
+        wall_flag = self.BoundaryParticleWallFlag(SourceID, BoundaryID)
+        if wall_flag == 0:
+            return None
+
+        source = self.particles[SourceID]
+        source_position = self.GetParticlePosition(SourceID)
+        boundary_position = self.GetParticlePosition(BoundaryID)
+        radius = float(source.Data.x)
+        offset = self.WallContactOffsetDistance(radius)
+
+        if wall_flag == 3:
+            ghost = (
+                source_position.x,
+                boundary_position.y - radius + offset,
+                source_position.z,
+            )
+            normal = (0.0, -1.0, 0.0)
+        elif wall_flag == 4:
+            ghost = (
+                source_position.x,
+                boundary_position.y + radius - offset,
+                source_position.z,
+            )
+            normal = (0.0, 1.0, 0.0)
+        else:
+            return None
+
+        dx = ghost[0] - source_position.x
+        dy = ghost[1] - source_position.y
+        dz = ghost[2] - source_position.z
+        center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if center_distance >= 2.0 * radius:
+            return None
+        overlap_area = self.particle_overlap_area(radius, radius, center_distance)
+        return (*normal, overlap_area, center_distance, wall_flag)
+
+    def ProcessBoundaryParticleWallCollision(self, SourceID, BoundaryID, totalForce):
+        """Treat a boundary marker target as a source-owned wall collision."""
+        contact_state = self.InitializeBoundaryParticleWallContactState(
+            SourceID,
+            BoundaryID,
+        )
+        if contact_state is None:
+            return True
+        return self.AccumulateContactForce(SourceID, contact_state, totalForce)
+
+    def InitializeBoundaryParticleWallContactState(self, SourceID, BoundaryID):
+        """Initialize one source-boundary-marker wall-segment contact."""
+        segment = self.EvaluateWallSegment(SourceID, BoundaryID)
+        if segment is None:
+            return None
+        normal_x, normal_y, normal_z, overlap_area, center_distance, wall_flag = segment
+        radius = float(self.particles[SourceID].Data.x)
+        geometry = (
+            normal_x,
+            normal_y,
+            normal_z,
+            overlap_area,
+            center_distance,
+            radius,
+            2.0 * radius,
+            0.0,
+            0.0,
+        )
+        return self.AppendWallContactSlot(SourceID, wall_flag, geometry)
+
+    def BoundaryParticleAppliesToSource(self, SourceID, BoundaryID):
+        """Return True when a boundary marker is local to the source."""
+        source_position = self.GetParticlePosition(SourceID)
+        boundary_position = self.GetParticlePosition(BoundaryID)
+        return (
+            abs(source_position.x - boundary_position.x) <= 1.0
+            and abs(source_position.z - boundary_position.z) <= 1.0
+        )
+
     def InitializeWallContactState(self, SourceID, wall):
         """Initialize one current-frame source-wall contact."""
         geometry = self.GetWallGhostGeometry(SourceID, wall)
@@ -227,6 +334,23 @@ class ForceContactDynamics:
             return True
         return abs(float(self.particles[ParticleID].Data.w)) <= self.EPSILON
 
+    def IsBoundaryParticle(self, ParticleID):
+        """Return True when a particle is an occupancy-only boundary marker."""
+        return float(getattr(self.particles[ParticleID], "ptype", 0.0)) > 0.5
+
+    def IsMobileParticleActiveForDynamics(self, ParticleID):
+        """Return True when a particle is a live mobile dynamics source."""
+        if self.IsBoundaryParticle(ParticleID):
+            return False
+        return self.IsParticleActiveForDynamics(ParticleID)
+
+    def BoundaryParticleWallsEnabled(self):
+        """Return True when boundary markers provide wall broad phase."""
+        return any(
+            self.IsBoundaryParticle(particle_id)
+            for particle_id in range(len(self.particles))
+        )
+
     def WallFlagsForDynamics(self):
         """Return wall flags that are solid for the current flow model."""
         if self.ReservoirLifecycleEnabled():
@@ -252,11 +376,11 @@ class ForceContactDynamics:
         self.starting_contact_states = {}
 
         for source_id in range(len(self.particles)):
-            if not self.IsParticleActiveForDynamics(source_id):
+            if not self.IsMobileParticleActiveForDynamics(source_id):
                 continue
             source_radius = float(self.particles[source_id].Data.x)
             for target_id in range(source_id + 1, len(self.particles)):
-                if not self.IsParticleActiveForDynamics(target_id):
+                if not self.IsMobileParticleActiveForDynamics(target_id):
                     continue
                 target_radius = float(self.particles[target_id].Data.x)
                 center_distance = self.ParticleCenterDistance(source_id, target_id)
@@ -281,7 +405,7 @@ class ForceContactDynamics:
 
         if bool(self.ShaderFlags.Boundary):
             for source_id, source in enumerate(self.particles):
-                if not self.IsParticleActiveForDynamics(source_id):
+                if not self.IsMobileParticleActiveForDynamics(source_id):
                     continue
                 radius = float(source.Data.x)
                 physical_limit = 2.0 * radius
@@ -710,12 +834,27 @@ class ForceContactDynamics:
         """Fully process each source after scanning its possible targets."""
         position_buffer = int(self.ShaderFlags.positionBuffer)
         for source_id in range(len(self.particles)):
-            if not self.IsParticleActiveForDynamics(source_id):
+            if not self.IsMobileParticleActiveForDynamics(source_id):
                 continue
+            processed_boundary_walls = set()
             for target_id in range(len(self.particles)):
                 if source_id == target_id:
                     continue
-                if not self.IsParticleActiveForDynamics(target_id):
+                if self.IsBoundaryParticle(target_id):
+                    if not self.BoundaryParticleAppliesToSource(source_id, target_id):
+                        continue
+                    wall_flag = self.BoundaryParticleWallFlag(source_id, target_id)
+                    if wall_flag in processed_boundary_walls:
+                        continue
+                    if not self.ProcessBoundaryParticleWallCollision(
+                        source_id,
+                        target_id,
+                        total_forces[source_id],
+                    ):
+                        return False
+                    processed_boundary_walls.add(wall_flag)
+                    continue
+                if not self.IsMobileParticleActiveForDynamics(target_id):
                     continue
                 if self.isParticleContact(
                     self.ShaderFlags.frameNum,
@@ -744,8 +883,10 @@ class ForceContactDynamics:
 
     def BuildWallContactLists(self, total_forces):
         """Process each active stationary wall ghost exactly once."""
+        if self.BoundaryParticleWallsEnabled():
+            return True
         for source_id in range(len(self.particles)):
-            if not self.IsParticleActiveForDynamics(source_id):
+            if not self.IsMobileParticleActiveForDynamics(source_id):
                 continue
             if bool(self.ShaderFlags.Boundary):
                 for wall_flag in self.WallFlagsForDynamics():

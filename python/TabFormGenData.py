@@ -546,10 +546,10 @@ class TabGenData(QTabWidget):
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/PipeReservoirEntry.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/BoundaryParticleReservoirPeriodic.cfg")
         self.update_list_widget()
         self.update_data_list_widget()
-        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontalStiffness.cfg")
+        
     def valueChange(self,listObj):  
         selected_items = listObj.selectedItems()
         Text = selected_items[0].text() if selected_items else ""   

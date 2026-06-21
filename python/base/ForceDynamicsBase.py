@@ -331,6 +331,7 @@ class ForceDynamics(ForceContactDynamics):
         particle.vz = vz
         particle.mass = mass
         particle.radius = radius
+        particle.ptype = fields.get("ptype", 0.0)
         particle.state_flg = fields.get("state_flg", 1.0)
         particle.collision_list = fields.get("collision_list", [])
         particle.oa = fields.get("oa", 0.0)
@@ -392,12 +393,13 @@ class ForceDynamics(ForceContactDynamics):
             vz=particle_cfg.get("vz", 0.0),
             mass=particle_cfg.get("mass", 1.0),
             radius=particle_cfg.get("radius", 0.0),
+            ptype=particle_cfg.get("ptype", 0.0),
             collision_stiffness_q=collision_stiffness_q,
             state_flg=particle_cfg.get("state_flg", 1.0),
         )
 
     def getParticleData(self,config):
-        file_name = f"{config.data_dir}/{config.STUDY_NAME}.bin"
+        file_name = config.bin_file
         results = BinaryFileUtilities.read_all_particle_data(file_name)
         particle_data = AttrDict()
         particles = AttrDict()
@@ -710,7 +712,7 @@ class ForceDynamics(ForceContactDynamics):
         later written to the particle capture files.
         """
         for particle_index, particle in enumerate(self.particles):
-            if not self.IsParticleActiveForDynamics(particle_index):
+            if not self.IsMobileParticleActiveForDynamics(particle_index):
                 particle.report_frame_start_ke = 0.0
                 continue
             velocity = self.VelRadFrame[particle_index]
@@ -721,7 +723,7 @@ class ForceDynamics(ForceContactDynamics):
 
     def RecordAfterResolveDiagnostics(self):
         for particle_index, particle in enumerate(self.particles):
-            if not self.IsParticleActiveForDynamics(particle_index):
+            if not self.IsMobileParticleActiveForDynamics(particle_index):
                 particle.report_after_resolve_ke = 0.0
                 continue
             particle.report_after_resolve_ke = self.ParticleKineticEnergy(
@@ -786,11 +788,11 @@ class ForceDynamics(ForceContactDynamics):
         self.InitializeStartingContactState()
         total_potential_energy = 0.0
         for source_id in range(len(self.particles)):
-            if not self.IsParticleActiveForDynamics(source_id):
+            if not self.IsMobileParticleActiveForDynamics(source_id):
                 continue
             source_position = self.GetParticlePosition(source_id)
             for target_id in range(source_id + 1, len(self.particles)):
-                if not self.IsParticleActiveForDynamics(target_id):
+                if not self.IsMobileParticleActiveForDynamics(target_id):
                     continue
                 target_position = self.GetParticlePosition(target_id)
                 dx = target_position.x - source_position.x
@@ -808,11 +810,11 @@ class ForceDynamics(ForceContactDynamics):
         """Capture unordered-pair geometry from the current position snapshot."""
         pairs = {}
         for source_id in range(len(self.particles)):
-            if not self.IsParticleActiveForDynamics(source_id):
+            if not self.IsMobileParticleActiveForDynamics(source_id):
                 continue
             source_position = self.GetParticlePosition(source_id)
             for target_id in range(source_id + 1, len(self.particles)):
-                if not self.IsParticleActiveForDynamics(target_id):
+                if not self.IsMobileParticleActiveForDynamics(target_id):
                     continue
                 target_position = self.GetParticlePosition(target_id)
                 dx = target_position.x - source_position.x
@@ -853,7 +855,7 @@ class ForceDynamics(ForceContactDynamics):
         kinetic_energy = sum(
             self.ParticleKineticEnergy(particle_index)
             for particle_index in range(len(self.particles))
-            if self.IsParticleActiveForDynamics(particle_index)
+            if self.IsMobileParticleActiveForDynamics(particle_index)
         )
         return kinetic_energy + self.TotalPotentialEnergy()
 
@@ -867,7 +869,9 @@ class ForceDynamics(ForceContactDynamics):
         energy_drift = self.CurrentDiagnosticTotalEnergy() - self.pair_phase_energy_reference
         self.pair_phase_frame_diagnostics = []
         for pair, start in frame_start_pairs.items():
-            end = frame_end_pairs[pair]
+            end = frame_end_pairs.get(pair)
+            if end is None:
+                continue
             if start["overlap_area"] <= 0.0 and end["overlap_area"] <= 0.0:
                 continue
 
@@ -962,7 +966,7 @@ class ForceDynamics(ForceContactDynamics):
         self.InitializeStartingContactState()
         total = 0.0
         for source_id, source in enumerate(self.particles):
-            if not self.IsParticleActiveForDynamics(source_id):
+            if not self.IsMobileParticleActiveForDynamics(source_id):
                 continue
             stiffness = max(0.0, float(source.Data.y or 0.0))
             for wall_flag in self.WallFlagsForDynamics():

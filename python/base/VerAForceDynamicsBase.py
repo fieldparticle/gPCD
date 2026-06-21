@@ -322,6 +322,7 @@ class ForceDynamics(ForceContactDynamics):
         particle.vz = vz
         particle.mass = mass
         particle.radius = radius
+        particle.ptype = fields.get("ptype", 0.0)
         particle.state_flg = fields.get("state_flg", 1.0)
         particle.collision_list = fields.get("collision_list", [])
         particle.oa = fields.get("oa", 0.0)
@@ -383,12 +384,13 @@ class ForceDynamics(ForceContactDynamics):
             vz=particle_cfg.get("vz", 0.0),
             mass=particle_cfg.get("mass", 1.0),
             radius=particle_cfg.get("radius", 0.0),
+            ptype=particle_cfg.get("ptype", 0.0),
             collision_stiffness_q=collision_stiffness_q,
             state_flg=particle_cfg.get("state_flg", 1.0),
         )
 
     def getParticleData(self,config):
-        file_name = f"{config.data_dir}/{config.STUDY_NAME}.bin"
+        file_name = config.bin_file
         results = BinaryFileUtilities.read_all_particle_data(file_name)
         particle_data = AttrDict()
         particles = AttrDict()

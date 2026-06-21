@@ -1,0 +1,3 @@
+2. Add boundary-particle helpers in ForceDynamics.py
+3.Add boundary-marker wall processing
+4.Change the contact loop behavior

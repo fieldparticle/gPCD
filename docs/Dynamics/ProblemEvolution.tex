@@ -481,3 +481,54 @@ energy and momentum diagnostics.
 Because \texttt{ForceDynamics.glsl} is generated content, the
 \texttt{colFlg} assignment in \texttt{AccumulateContactForce(...)} should be
 moved into the exporter template when the generated file is regenerated.
+
+\subsection{Crowding Requires Internal Momentum, Not Energy Repair}
+
+\subsubsection{<previous form>}
+
+The reservoir boundary-particle wall test converted solid pipe walls from
+manual configured planes into cell-occupancy boundary markers.  A mobile
+particle that encounters a \texttt{ptype=1.0} boundary marker evaluates a wall
+segment and applies the ordinary source-owned wall force.
+
+Under crowding, particles near the wall can compress into the particles behind
+them.  The observed failure mode is tunneling in the crowded particle column,
+not a failure of the boundary marker itself.
+
+\subsubsection{<current form>}
+
+The project rule is now momentum-first: energy is diagnostic bookkeeping, not
+a governing correction.  No global step should reach backward to force a
+kinetic-energy or total-energy value.  A particle responds only to the current
+geometry, current force, current momentum, and stored local contact state.
+
+When overlap compression cannot be resolved as translational motion during the
+current frame, the unresolved part should be treated as internal normal
+momentum or contact stress.  The stored quantity is local and causal.  It must
+later release only through current contact geometry and current contact
+normals.  This is the pressure channel required for crowded contacts.
+
+\subsubsection{difference outcome}
+
+Analysis direction.
+
+\subsubsection{<Analysis>}
+
+The crowding case exposes a missing physical channel.  In a real material,
+pressure information propagates through contacts at a finite wave speed,
+related to the material speed of sound.  The entire particle column does not
+know the future rebound path; pressure builds and propagates contact by
+contact.
+
+Therefore the next model step should not be a maximum-penetration clamp or an
+energy correction.  A clamp can be retained as a diagnostic failure threshold,
+but it does not explain where the impulse went.  The correct bookkeeping
+question is whether the current impulse became translational particle
+momentum, wall/constraint momentum, or stored internal contact momentum.
+
+For a particle-particle crowding contact, the internal state should be scalar
+normal momentum owned by the contact or contact pair.  Direction must come
+from the current contact normal at release time, not from a stored arbitrary
+vector.  For a wall contact, the same idea represents local pressure against
+the wall segment or constraint.  Energy diagnostics may later report the
+consequence of this bookkeeping, but they must not govern the update.

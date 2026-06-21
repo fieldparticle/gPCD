@@ -7,7 +7,7 @@ import math
 from gbase.pdata import *
 from gbase.libconf import AttrDict
 import io
-class GenPipeReservoirEntry():
+class SimpleReservoirPeriodic():
 
     local_particles_in_row = 0
     local_particles_in_col = 0
@@ -278,13 +278,12 @@ class GenPipeReservoirEntry():
                     particle_struct.state_flg = birth_frame
                     particle_struct.collision_stiffness_q = collision_stiffness_q
                     self.p_list.append(particle_struct)
-                    
-                
-                
-                    
         except BaseException as e:
             print(f"Failed adding Particle:{e} ")   
             return
+        self.writeCFGData(RUN_CONFIGURATION)
+
+    def writeCFGData(self,RUN_CONFIGURATION):
         cfg_data_name = self.itemcfg["STUDY_NAME"]
         suffix = f"{self.itemcfg.particle_columns}x{self.itemcfg.particles_per_row}x{self.itemcfg.particles_per_cell_row}"
         self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.tst"

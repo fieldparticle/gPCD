@@ -94,6 +94,24 @@ must distinguish actual vector momentum drift from any scalar diagnostic
 totals.  Diagnostic return to zero does not, by itself, prove momentum or
 kinetic-energy conservation.
 
+\subsection{Momentum-First Causality}
+
+The dynamics model is force and momentum governed.  Energy is diagnostic
+bookkeeping, not an input correction.  No particle is assumed to know the
+future collision arc, the final rebound state, or a global energy target.  A
+model update must be expressible from current geometry, current force, current
+momentum, and stored local contact state.
+
+Therefore global or after-the-fact energy repair must not be used to drive
+motion.  If a crowded contact cannot resolve all compression as translational
+motion during the current timestep, the unresolved part belongs in a local
+internal momentum or stress ledger, not in an energy correction.  Later release
+must occur only through current contact geometry and current contact normals.
+
+Energy diagnostics may expose whether the bookkeeping is consistent, but the
+governing question is where the impulse went: translational particle momentum,
+stored contact/internal momentum, or wall/constraint momentum.
+
 \subsection{Visual Diagnostics}
 
 Particle color is diagnostic display state.  It must not affect collision

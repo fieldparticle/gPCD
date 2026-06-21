@@ -1,8 +1,12 @@
 Current status:
-- SimpleReservoirPeriodic inactive particles no longer leave undefined vertex output.
-- Reservoir lifecycle documentation now covers compute and vertex-stage gating.
+    - Documented the momentum-first dynamics rule: force and momentum govern the model, while energy remains diagnostic bookkeeping.
+    - Documented boundary-particle walls for reservoir flow using wall_type=1 and EvaluateWallSegment(SourceID, BoundaryID).
+    - Recorded the crowding/tunneling interpretation: the missing physical channel is internal normal momentum/contact stress, not energy repair.
 
 Code Changes:
-- Document vertex lifecycle rule for ParticleLifeActive and offscreen suppression.
+    - Updated DynamicsConventions.tex with Momentum-First Causality.
+    - Updated FlowDynamicsConventions.tex with Boundary Particle Wall Rule, including ptype=1.0 markers and straight segment evaluation.
+    - Updated ProblemEvolution.tex with Crowding Requires Internal Momentum, Not Energy Repair.
+    - Rebuilt docs/Dynamics/main.pdf successfully.
 
-Next: Continue reservoir flow validation with side-length/wall guard-band behavior.
+Next: Implement the internal normal momentum/contact stress ledger for crowded particle and wall contacts.
