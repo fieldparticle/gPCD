@@ -1,2 +1,8 @@
 Current status:
-	- made a rename project batch file
+- SimpleReservoirPeriodic inactive particles no longer leave undefined vertex output.
+- Reservoir lifecycle documentation now covers compute and vertex-stage gating.
+
+Code Changes:
+- Document vertex lifecycle rule for ParticleLifeActive and offscreen suppression.
+
+Next: Continue reservoir flow validation with side-length/wall guard-band behavior.

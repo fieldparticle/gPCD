@@ -349,6 +349,62 @@ working in the active Python and Vulkan reservoir paths.  Broader throughput,
 long-run statistical energy, and inlet packing studies remain future
 validation work.
 
+\subsection{SimpleReservoirPeriodic Vertex Lifecycle Output}
+
+\subsubsection{<previous form>}
+
+\texttt{SimpleReservoirPeriodicP.vert} used the reservoir lifecycle gate to
+return early for unborn and dead particles:
+
+\begin{verbatim}
+if (!ParticleLifeActive(index, uint(ShaderFlags.frameNum)))
+    return;
+\end{verbatim}
+
+This prevented inactive particles from reaching the cell-occupancy insertion
+code, but it also returned from the vertex shader before writing a defined
+\texttt{gl\_Position}, point size, or output color.  In practice, inactive or
+retired particles could still appear as stale visual artifacts, including a
+red particle drawn near the center of the screen.  Increasing the cell-array
+side length could hide other pressure symptoms, but it did not address the
+undefined vertex output.
+
+\subsubsection{<current form>}
+
+Inactive reservoir particles now write a defined offscreen vertex before the
+early return:
+
+\begin{verbatim}
+if (!ParticleLifeActive(index, uint(ShaderFlags.frameNum))) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    gl_PointSize = 0.0;
+    fragColor = vec3(0.0);
+    return;
+}
+\end{verbatim}
+
+The offscreen clip-space position keeps the vertex outside the visible region,
+while the zero point size and neutral color remove stale display state.
+
+\subsubsection{difference outcome}
+
+Full solution.
+
+\subsubsection{<Analysis>}
+
+The fix does not change reservoir birth, death, collision detection, or
+ForceDynamics.  It only makes the vertex-stage lifecycle gate produce defined
+graphics output when a particle is not renderable or processable.  Because
+\texttt{discard} is not available in vertex shaders, explicitly moving the
+vertex outside clip space is the appropriate stage-local way to suppress
+inactive particles.
+
+This also clarifies the debugging interpretation: a red particle drawn near
+the center was a vertex-output artifact, not proof that a dead particle was
+being included in contact processing.  Compute-side lifecycle filtering still
+uses \texttt{StartReservoir(SourceID)} for sources and skips targets whose
+\texttt{Data.w} is not live.
+
 \subsection{Velocity-Angle HSV Python Visualization}
 
 \subsubsection{<previous form>}

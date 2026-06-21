@@ -257,3 +257,33 @@ A particle with \(\texttt{Data.w}<0\) is dead.  Dead particles are no longer
 processed by ForceDynamics and are not checked for collision, wall contact,
 tunneling, starting overlap, force, motion, or ordinary energy/momentum
 diagnostics.
+
+\subsection{Vertex Lifecycle Rule}
+
+The graphics vertex stage must apply the same lifecycle rule before building
+particle cell occupancy or drawing particle markers.  A vertex invocation for
+an unborn or dead reservoir particle must not write cell-array occupancy and
+must not leave vertex outputs undefined.
+
+The shared GLSL vertex helper is:
+
+\begin{verbatim}
+ParticleLifeActive(SourceID, frameNum)
+\end{verbatim}
+
+For inactive particles, the vertex shader must write a defined offscreen
+position before returning:
+
+\begin{verbatim}
+if (!ParticleLifeActive(index, uint(ShaderFlags.frameNum))) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    gl_PointSize = 0.0;
+    fragColor = vec3(0.0);
+    return;
+}
+\end{verbatim}
+
+A bare vertex-stage \texttt{return} is not sufficient because it prevents
+occupancy processing but can leave \texttt{gl\_Position} and color outputs
+undefined.  \texttt{discard} is not available in vertex shaders, so moving the
+vertex outside clip space is the required suppression method.

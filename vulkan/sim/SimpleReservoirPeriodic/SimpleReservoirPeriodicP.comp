@@ -101,6 +101,7 @@ void main()
 
 	if (!StartReservoir(SourceID))
 		return;
+		
 	P[SourceID].colFlg = 0u;
 	
 

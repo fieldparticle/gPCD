@@ -16,7 +16,7 @@
 #include "../common/CollimageIndex.glsl"
 #include "../common/Lockimage.glsl"
 #include "../common/particle.glsl"
-
+#include "../common/VertexLifeTest.glsl"
 
 
 out gl_PerVertex {
@@ -43,20 +43,33 @@ layout(location = 3) in vec2 inParms;
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 outParms;
 layout(location = 2) out vec3 matpos;
-uint addUniqueCell(uint index, uint CornerLocation, uint Count)
+
+void ReportVertexOccupancyError(uint error_code, uint index, uint detail)
+{
+	collIn.ExcessSlots = detail;
+	collIn.particleNumber = index;
+	collIn.ErrorReturn = error_code;
+	collIn.maxCells = MAX_CELL_ARRAY_LOCATIONS;
+	P[index].parms.w = float(error_code);
+	P[0].colFlg = 1;
+}
+
+bool addUniqueCell(uint index, uint CornerLocation, inout uint Count)
 {
     if (CornerLocation == npos) {
-        return 0;
+        ReportVertexOccupancyError(3, index, npos);
+        return false;
     }
 
     for(uint i = 0; i < Count; i++)
     {
         if(P[index].CornerList[i].ploc == CornerLocation)
-            return 0;
+            return true;
     }
 
     P[index].CornerList[Count].ploc = CornerLocation;
-    return 1;
+	Count += 1;
+    return true;
 }
 
 ///
@@ -84,6 +97,14 @@ void main(){
 			debugPrintfEXT("Indexing passed H:%d,W:%d at #:%d",HEIGHT,WIDTH,ret);
 	}
 #endif
+
+	if(!ParticleLifeActive(index,uint(ShaderFlags.frameNum)))
+	{
+		gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+		gl_PointSize = 0.0;
+		fragColor = vec3(0.0);
+		return;
+	}
 
 	if(index == 0)
 	{
@@ -126,8 +147,8 @@ void main(){
 	// Render the particle from the same selected position buffer used to build
 	// the corner list and drive compute collision detection.
 	vec3 particleCenter = vec3(cx, cy, cz);
-	//gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz + particleCenter, 1.0);
-	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
+	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz + particleCenter, 1.0);
+	//gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
 
 	uint duplist[8];
 	uint dupcntr = 0;
@@ -156,29 +177,26 @@ void main(){
 			debugPrintfEXT("F:%d,Boundary->P:=%d,min:<%0.3f,%0.3f,%0.3f> max:<%0.3f,%0.3f,%0.3f>",
 				uint(ShaderFlags.frameNum),index,min_x,min_y,min_z,max_x,max_y,max_z);
 		#endif
-		collIn.ExcessSlots = 0;
-		collIn.particleNumber = index;
-		collIn.ErrorReturn = 4;
-		collIn.maxCells = MAX_CELL_ARRAY_LOCATIONS;
+		ReportVertexOccupancyError(4, uint(index), 0);
 		return;
 	}
 
 	CornerLocation = ArrayToIndex(uvec3(uint(max_x), uint(max_y), uint(min_z)));
-	count += addUniqueCell(index, CornerLocation, count);
+	if(!addUniqueCell(index, CornerLocation, count)) return;
 	CornerLocation = ArrayToIndex(uvec3(uint(max_x), uint(max_y), uint(max_z)));
-	count += addUniqueCell(index, CornerLocation, count);
+	if(!addUniqueCell(index, CornerLocation, count)) return;
 	CornerLocation = ArrayToIndex(uvec3(uint(min_x), uint(max_y), uint(max_z)));
-	count += addUniqueCell(index, CornerLocation, count);
+	if(!addUniqueCell(index, CornerLocation, count)) return;
 	CornerLocation = ArrayToIndex(uvec3(uint(min_x), uint(max_y), uint(min_z)));
-	count += addUniqueCell(index, CornerLocation, count);
+	if(!addUniqueCell(index, CornerLocation, count)) return;
 	CornerLocation = ArrayToIndex(uvec3(uint(max_x), uint(min_y), uint(max_z)));
-	count += addUniqueCell(index, CornerLocation, count);
+	if(!addUniqueCell(index, CornerLocation, count)) return;
 	CornerLocation = ArrayToIndex(uvec3(uint(max_x), uint(min_y), uint(min_z)));
-	count += addUniqueCell(index, CornerLocation, count);
+	if(!addUniqueCell(index, CornerLocation, count)) return;
 	CornerLocation = ArrayToIndex(uvec3(uint(min_x), uint(min_y), uint(max_z)));
-	count += addUniqueCell(index, CornerLocation, count);
+	if(!addUniqueCell(index, CornerLocation, count)) return;
 	CornerLocation = ArrayToIndex(uvec3(uint(min_x), uint(min_y), uint(min_z)));
-	count += addUniqueCell(index, CornerLocation, count);
+	if(!addUniqueCell(index, CornerLocation, count)) return;
 	
 	
 //#################################################################
@@ -212,13 +230,8 @@ void main(){
 			#if 0 && defined(DEBUG)
 				debugPrintfEXT("ParticleVerfPerf sltidx > MaxLocation:P=%d,sltidx=%d,MaxLocation=%d",index,sltidx,MAX_CELL_ARRAY_LOCATIONS);
 			#endif	
-			collIn.ExcessSlots = sltidx;
-			collIn.particleNumber = index;
-			collIn.ErrorReturn = 3;
-			collIn.maxCells = MAX_CELL_ARRAY_LOCATIONS;
-			P[index].parms.w = 1.0;
-			P[0].colFlg = 1;
-			break;
+			ReportVertexOccupancyError(3, uint(index), sltidx);
+			return;
 		}
 		
 		// Reserve a slot for this location in the cell array occupancy list
@@ -240,11 +253,8 @@ void main(){
 				debugPrintfEXT("ParticleVerfPerf slot>F:%u,P:%d,MAX_CELL_OCCUPANY:%d,at loc: %d",
 				uint(ShaderFlags.frameNum),index,MAX_CELL_OCCUPANY,slot);
 			#endif
-			collIn.ExcessSlots = slot;
-			collIn.ErrorReturn = 2;
-			P[0].colFlg = 1;
-			P[index].parms.w = 2.0;
-			break;
+			ReportVertexOccupancyError(2, uint(index), slot);
+			return;
 		}
 		
 

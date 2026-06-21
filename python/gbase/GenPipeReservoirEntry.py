@@ -166,17 +166,17 @@ class GenPipeReservoirEntry():
         f.write(fstr)
         fstr = f"cell_occupancy_list_size = {run_cfg.cell_occupancy_list_size};\n"
         f.write(fstr)
-        fstr = f"wallXMIN = {run_cfg.WallXMIN};\n"
+        fstr = f"wallXMIN = {self.wallxmin};\n"
         f.write(fstr)
-        fstr = f"wallXMAX = {run_cfg.WallXMAX};\n"
+        fstr = f"wallXMAX = {self.wallxmax};\n"
         f.write(fstr)
-        fstr = f"wallYMIN = {run_cfg.WallYMIN};\n"
+        fstr = f"wallYMIN = {self.wallymin};\n"
         f.write(fstr)
-        fstr = f"wallYMAX = {run_cfg.WallYMAX};\n"
+        fstr = f"wallYMAX = {self.wallymax};\n"
         f.write(fstr)
-        fstr = f"wallZMIN = {run_cfg.WallZMIN};\n"
+        fstr = f"wallZMIN = {self.wallymin};\n"
         f.write(fstr)
-        fstr = f"wallZMAX = {run_cfg.WallZMAX};\n"
+        fstr = f"wallZMAX = {self.wallymax};\n"
         f.write(fstr)
         fstr = f"DT = {run_cfg.dt};\n"
         f.write(fstr)
@@ -188,8 +188,6 @@ class GenPipeReservoirEntry():
         fstr = f"hsv_sat = {run_cfg.hsv_sat:0.4f};\n"
         f.write(fstr)
         fstr = f"hsv_val = {run_cfg.hsv_val:0.4f};\n"
-        f.write(fstr)
-        fstr = f"DT = {run_cfg.dt};\n"
         f.write(fstr)
         f.flush()
         f.close()
@@ -210,6 +208,7 @@ class GenPipeReservoirEntry():
         collision_stiffness_q = float(self.cfg_value(RUN_CONFIGURATION, "collision_stiffness_q", 0.0))
         WallYMAX = float(self.cfg_value(RUN_CONFIGURATION, "WallYMAX", 10.0))
         WallYMIN = float(self.cfg_value(RUN_CONFIGURATION, "WallYMIN", 10.0))
+
         # Paticle length is twice the radius times the fraction of diameter separation.
         particle_length =2.0*radius+2.0*radius*self.itemcfg.fraction_of_diameter_separation
         # The particle row length is the number of particles per cell row times the particle length. 
@@ -229,18 +228,23 @@ class GenPipeReservoirEntry():
 
         particles_per_row = self.itemcfg.particles_per_row
         required_width = particles_per_row/self.itemcfg.particles_per_cell_row
-        width = RUN_CONFIGURATION.WallYMAX - RUN_CONFIGURATION.WallYMIN
-        if required_width > width:
-            print(f"Error: Particles per row is {particles_per_row} which requires a width of {required_width:.2f} but the width is only {width:.2f}. ")
-            return
+        #width = RUN_CONFIGURATION.WallYMAX - RUN_CONFIGURATION.WallYMIN
+        #if required_width > width:
+         #   print(f"Error: Particles per row is {particles_per_row} which requires a width of {required_width:.2f} but the width is only {width:.2f}. ")
+         #   return
         self.side_len = math.ceil(self.itemcfg.particles_per_row/self.itemcfg.particles_per_cell_row)+2.0
         print(f"Side length is {self.side_len} for particles per row of {particles_per_row} and particles per cell row of {self.itemcfg.particles_per_cell_row}")
-        wall_cell_diff = self.side_len-WallYMAX
-        if wall_cell_diff < 1.0:
-            print(f"Error: Side length is {self.side_len} but WallYMAX is {WallYMAX}")
-            print(f"Maximum WallYMAX is {self.side_len-1.0}")
-            return
+        self.wallymax = self.side_len-1.0
+        self.wallxmax = self.side_len-1.0
+        self.wallxmin = 0.5
+        self.wallymin = 0.5
+        #wall_cell_diff = self.side_len-WallYMAX
+        #if wall_cell_diff < 1.0:
+         #   print(f"Error: Side length is {self.side_len} but WallYMAX is {WallYMAX}")
+          #  print(f"Maximum WallYMAX is {self.side_len-1.0}")
+           # return
         
+
         total_cell_row_length = self.itemcfg.particles_per_cell_row*particle_length
         empty_space = 1.0 - total_cell_row_length 
         empty_particle_count = math.floor(empty_space/particle_length)
@@ -282,9 +286,10 @@ class GenPipeReservoirEntry():
             print(f"Failed adding Particle:{e} ")   
             return
         cfg_data_name = self.itemcfg["STUDY_NAME"]
-        self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.tst"
-        self.test_bin_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.bin"
-        self.report_file = f"{self.itemcfg.data_dir}/{cfg_data_name}.rpt"
+        suffix = f"{self.itemcfg.particle_columns}x{self.itemcfg.particles_per_row}x{self.itemcfg.particles_per_cell_row}"
+        self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.tst"
+        self.test_bin_name = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.bin"
+        self.report_file = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.rpt"
         self.write_test_file(RUN_CONFIGURATION)
         self.create_bin_file()
         self.write_bin_file(self.p_list)
