@@ -32,6 +32,11 @@ GENERATED_GLSL_METHODS = [
     "particle_overlap_area",
     "ProcessParticleCollision",
     "ProcessWallCollision",
+    "IsBoundaryParticle",
+    "BoundaryParticleWallFlag",
+    "EvaluateWallSegment",
+    "ProcessBoundaryParticleWallCollision",
+    "InitializeBoundaryParticleWallContactState",
     "InitializeWallContactState",
     "InitializeContactState",
     "GetContactState",
@@ -65,8 +70,15 @@ PYTHON_WRAPPER_METHODS = [
     "NaiveContactDetermination",
     "AddContactTargetID",
     "BuildWallContactLists",
+    "BoundaryParticleAppliesToSource",
+    "BoundaryParticleWallsEnabled",
     "CalculateVelocities",
     "CalculatePositions",
+]
+
+CUSTOM_GLSL_HELPERS = [
+    "StartReservoir",
+    "RetireParticlePastXMax",
 ]
 
 GLSL_SIGNATURES = {
@@ -82,6 +94,22 @@ GLSL_SIGNATURES = {
     ),
     "ProcessWallCollision": (
         "bool ProcessWallCollision(uint SourceID, uint wall, inout vec3 totalForce)"
+    ),
+    "IsBoundaryParticle": "bool IsBoundaryParticle(uint ParticleID)",
+    "BoundaryParticleWallFlag": (
+        "uint BoundaryParticleWallFlag(uint SourceID, uint BoundaryID)"
+    ),
+    "EvaluateWallSegment": (
+        "BoundaryWallSegment EvaluateWallSegment("
+        "uint SourceID, uint BoundaryID)"
+    ),
+    "ProcessBoundaryParticleWallCollision": (
+        "bool ProcessBoundaryParticleWallCollision("
+        "uint SourceID, uint BoundaryID, inout vec3 totalForce)"
+    ),
+    "InitializeBoundaryParticleWallContactState": (
+        "bool InitializeBoundaryParticleWallContactState("
+        "uint SourceID, uint BoundaryID)"
     ),
     "InitializeWallContactState": (
         "bool InitializeWallContactState(uint SourceID, uint wall)"
@@ -133,6 +161,8 @@ GLSL_SIGNATURES = {
     "CalcVelocity": "bool CalcVelocity(uint SourceID, vec3 totalForce)",
     "GetParticleMass": "float GetParticleMass(uint ParticleID)",
     "CalcPosition": "bool CalcPosition(uint SourceID)",
+    "StartReservoir": "bool StartReservoir(uint SourceID)",
+    "RetireParticlePastXMax": "bool RetireParticlePastXMax(uint SourceID)",
     "SetError": "bool SetError(uint error_code)",
 }
 
@@ -146,6 +176,7 @@ GLSL_DEFAULT_RETURNS = {
     "ParticlePotentialGeometry": "ParticlePotentialGeometry(0.0, 0.0, false)",
     "WallPhysicalGhostGeometry": "WallPhysicalGhostGeometry(vec3(0.0), 0.0, 0.0, false)",
     "WallGhostGeometry": "WallGhostGeometry(vec3(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false)",
+    "BoundaryWallSegment": "BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false)",
 }
 
 GLSL_RESULT_STRUCTS = [
@@ -205,6 +236,16 @@ GLSL_RESULT_STRUCTS = [
         ],
     ),
     (
+        "BoundaryWallSegment",
+        [
+            "vec3 normal;",
+            "float overlapArea;",
+            "float centerDistance;",
+            "uint wallFlag;",
+            "bool valid;",
+        ],
+    ),
+    (
         "ContactForceInput",
         [
             "uint targetID;",
@@ -233,6 +274,9 @@ TRANSLATION_STATUS = {
         "AccumulateContactForce",
         "ProcessParticleCollision",
         "ProcessWallCollision",
+        "IsBoundaryParticle",
+        "BoundaryParticleWallFlag",
+        "ProcessBoundaryParticleWallCollision",
         "SetError",
     ],
     "needs_struct": [
@@ -241,6 +285,7 @@ TRANSLATION_STATUS = {
         "GetParticlePotentialGeometry",
         "GetPhysicalWallGhostGeometry",
         "GetWallGhostGeometry",
+        "EvaluateWallSegment",
     ],
     "needs_buffer": [
         "StartingParticleKey",
@@ -254,6 +299,7 @@ TRANSLATION_STATUS = {
         "AppendContactSlot",
         "GetContactSlots",
         "AppendWallContactSlot",
+        "InitializeBoundaryParticleWallContactState",
     ],
 }
 
@@ -282,6 +328,10 @@ TEMPLATE_GENERATED_METHODS = {
     "CalcPosition",
     "GetPhysicalWallGhostGeometry",
     "GetWallGhostGeometry",
+    "IsBoundaryParticle",
+    "BoundaryParticleWallFlag",
+    "EvaluateWallSegment",
+    "ProcessBoundaryParticleWallCollision",
     "SetError",
 }
 
@@ -349,6 +399,61 @@ GLSL_BODY_TEMPLATES = {
         "    geometry.normal,",
         "    geometry.overlapArea,",
         "    geometry.valid",
+        ");",
+        "return AccumulateContactForce(SourceID, contact, totalForce);",
+    ],
+    "IsBoundaryParticle": [
+        "return P[ParticleID].ptype > 0.5;",
+    ],
+    "BoundaryParticleWallFlag": [
+        "if (!IsBoundaryParticle(BoundaryID)) {",
+        "    return 0u;",
+        "}",
+        "",
+        "vec4 boundary_position = GetParticlePosition(BoundaryID);",
+        "float mid_y = 0.5 * (BOUNDARY_YMIN + BOUNDARY_YMAX);",
+        "return (boundary_position.y < mid_y) ? 3u : 4u;",
+    ],
+    "EvaluateWallSegment": [
+        "uint wall_flag = BoundaryParticleWallFlag(SourceID, BoundaryID);",
+        "if (wall_flag == 0u) {",
+        "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
+        "}",
+        "",
+        "vec4 source_position = GetParticlePosition(SourceID);",
+        "vec4 boundary_position = GetParticlePosition(BoundaryID);",
+        "float radius = P[SourceID].Data.x;",
+        "float offset = WallContactOffsetDistance(radius);",
+        "vec3 ghost = vec3(0.0);",
+        "vec3 normal = vec3(0.0);",
+        "",
+        "if (wall_flag == 3u) {",
+        "    ghost = vec3(source_position.x, boundary_position.y - radius + offset, source_position.z);",
+        "    normal = vec3(0.0, -1.0, 0.0);",
+        "} else if (wall_flag == 4u) {",
+        "    ghost = vec3(source_position.x, boundary_position.y + radius - offset, source_position.z);",
+        "    normal = vec3(0.0, 1.0, 0.0);",
+        "} else {",
+        "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, wall_flag, false);",
+        "}",
+        "",
+        "vec3 delta = ghost - source_position.xyz;",
+        "float center_distance = length(delta);",
+        "if (center_distance >= 2.0 * radius) {",
+        "    return BoundaryWallSegment(normal, 0.0, center_distance, wall_flag, false);",
+        "}",
+        "",
+        "float overlap_area = particle_overlap_area(radius, radius, center_distance);",
+        "return BoundaryWallSegment(normal, overlap_area, center_distance, wall_flag, true);",
+    ],
+    "ProcessBoundaryParticleWallCollision": [
+        "BoundaryWallSegment segment = EvaluateWallSegment(SourceID, BoundaryID);",
+        "ContactForceInput contact = ContactForceInput(",
+        "    segment.wallFlag,",
+        "    CONTACT_WALL,",
+        "    segment.normal,",
+        "    segment.overlapArea,",
+        "    segment.valid",
         ");",
         "return AccumulateContactForce(SourceID, contact, totalForce);",
     ],
@@ -585,6 +690,66 @@ GLSL_BODY_TEMPLATES = {
         "    true",
         ");",
     ],
+    "StartReservoir": [
+        "float state_flag = P[SourceID].Data.w;",
+        "if (state_flag < 0.0) {",
+        "    return false;",
+        "}",
+        "if (state_flag == 0.0) {",
+        "    return true;",
+        "}",
+        "if (ShaderFlags.frameNum < state_flag) {",
+        "    return false;",
+        "}",
+        "",
+        "uint position_buffer = uint(ShaderFlags.positionBuffer);",
+        "vec4 current_position = particle_position(SourceID, position_buffer);",
+        "float radius = P[SourceID].Data.x;",
+        "float inlet_x = BOUNDARY_XMIN;",
+        "#ifdef INLET_X",
+        "inlet_x = INLET_X;",
+        "#endif",
+        "",
+        "vec3 start_position = vec3(",
+        "    inlet_x + 2.2 * radius,",
+        "    current_position.y,",
+        "    current_position.z",
+        ");",
+        "P[SourceID].PosLocA.xyz = start_position;",
+        "P[SourceID].PosLocB.xyz = start_position;",
+        "P[SourceID].PosLocA.w = position_buffer == 0u ? 0.0 : 1.0;",
+        "P[SourceID].PosLocB.w = position_buffer == 0u ? 1.0 : 0.0;",
+        "P[SourceID].Data.w = 0.0;",
+        "return true;",
+    ],
+    "RetireParticlePastXMax": [
+        "uint next_position_buffer = 1u - uint(ShaderFlags.positionBuffer);",
+        "vec4 next_position = particle_position(SourceID, next_position_buffer);",
+        "float outlet_x = BOUNDARY_XMAX;",
+        "#ifdef OUTLET_X",
+        "outlet_x = OUTLET_X;",
+        "#endif",
+        "if (next_position.x > outlet_x) {",
+        "    float inlet_x = BOUNDARY_XMIN;",
+        "#ifdef INLET_X",
+        "    inlet_x = INLET_X;",
+        "#endif",
+        "    vec3 reservoir_position = vec3(",
+        "        inlet_x,",
+        "        next_position.y,",
+        "        next_position.z",
+        "    );",
+        "    P[SourceID].PosLocA.xyz = reservoir_position;",
+        "    P[SourceID].PosLocB.xyz = reservoir_position;",
+        "    P[SourceID].PosLocA.w = next_position_buffer == 0u ? 0.0 : 1.0;",
+        "    P[SourceID].PosLocB.w = next_position_buffer == 0u ? 1.0 : 0.0;",
+        "    P[SourceID].VelRad.xyz = vec3(0.0);",
+        "    P[SourceID].VelRad.w = 0.0;",
+        "    P[SourceID].Data.w = -1.0;",
+        "    return false;",
+        "}",
+        "return true;",
+    ],
     "SetError": [
         "collOut.ErrorNumber = error_code;",
         "return false;",
@@ -664,7 +829,14 @@ def validate_export_surface(visitor: ForceDynamicsVisitor) -> tuple[bool, list[s
     stale_status = classified_methods - generated_methods
 
     generated_calls: dict[str, set[int]] = {}
-    for method_name in GENERATED_GLSL_METHODS:
+    dependency_checked_methods = [
+        method_name
+        for method_name in GENERATED_GLSL_METHODS
+        if method_name not in GLSL_BODY_TEMPLATES
+        and method_name not in TRANSLATION_STATUS["defer"]
+        and method_name not in TRANSLATION_STATUS["needs_buffer"]
+    ]
+    for method_name in dependency_checked_methods:
         for call_name, lines in visitor.method_self_calls.get(method_name, {}).items():
             generated_calls.setdefault(call_name, set()).update(lines)
     generated_external_calls = set(generated_calls) - generated_methods
@@ -747,6 +919,8 @@ def render_stub_file(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
     lines.append("// Forward declarations for generated methods.")
     for method_name in GENERATED_GLSL_METHODS:
         lines.append(f"{GLSL_SIGNATURES[method_name]};")
+    for method_name in CUSTOM_GLSL_HELPERS:
+        lines.append(f"{GLSL_SIGNATURES[method_name]};")
     lines.append("")
 
     for method_name in GENERATED_GLSL_METHODS:
@@ -765,6 +939,16 @@ def render_stub_file(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
             default_return = GLSL_DEFAULT_RETURNS.get(return_type)
             if default_return is not None:
                 lines.append(f"    return {default_return};")
+        lines.append("}")
+        lines.append("")
+
+    for method_name in CUSTOM_GLSL_HELPERS:
+        signature = GLSL_SIGNATURES[method_name]
+        lines.append(f"// Custom GLSL helper: {method_name}")
+        lines.append(signature)
+        lines.append("{")
+        for body_line in GLSL_BODY_TEMPLATES[method_name]:
+            lines.append(f"    {body_line}" if body_line else "")
         lines.append("}")
         lines.append("")
 
@@ -821,7 +1005,14 @@ def main() -> int:
     stale_status = classified_methods - generated_methods
 
     generated_calls: dict[str, set[int]] = {}
-    for method_name in GENERATED_GLSL_METHODS:
+    dependency_checked_methods = [
+        method_name
+        for method_name in GENERATED_GLSL_METHODS
+        if method_name not in GLSL_BODY_TEMPLATES
+        and method_name not in TRANSLATION_STATUS["defer"]
+        and method_name not in TRANSLATION_STATUS["needs_buffer"]
+    ]
+    for method_name in dependency_checked_methods:
         for call_name, lines in visitor.method_self_calls.get(method_name, {}).items():
             generated_calls.setdefault(call_name, set()).update(lines)
     generated_external_calls = set(generated_calls) - generated_methods

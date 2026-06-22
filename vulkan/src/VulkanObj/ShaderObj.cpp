@@ -40,7 +40,7 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 		WriteShaderHeader();
 		WriteShaderDbgHeader();
 		WriteWalls();
-		Reservoir();
+		//Reservoir();
 		GenWorkGroups();
 }
 void ShaderObj::Reservoir()
@@ -103,6 +103,7 @@ void ShaderObj::WriteWalls()
 			"const float BOUNDARY_YMIN  = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallYMIN", true) << ";\n"
 			"const float BOUNDARY_YMAX  = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallYMAX", true) << ";\n"
 			"const float wall_contact_offset = " << std::fixed << std::setprecision(2) << 0.20 << ";\n"
+			"#define " << CfgApp->GetString("application.wall_type",true) << "\n"
 			"#endif\n";
 	}
 	
@@ -242,11 +243,9 @@ void  ShaderObj::WriteShaderHeader()
 			<< "const float point_size = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.gl_point_size", true) << ";\n"
 			<< "vec3 ncolcolor = " << ncol_color.str() << ";\n"
 			<< "vec3 colcolor = " << col_color.str() << ";\n";
-		if (has_hsv == true)
-		{
+		
 			ostrm << hsv_color_on.str() << hsv_sat.str() << hsv_val.str();
-		}
-			
+					
 		ostrm.flush();
 		ostrm.close();
     }

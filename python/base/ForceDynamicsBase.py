@@ -427,6 +427,7 @@ class ForceDynamics(ForceContactDynamics):
             particle["mass"] = pp.molar_mass
             particle["radius"] = pp.radius
             particle["ptype"] = pp.ptype
+            particle["collision_stiffness_q"] = pp.collision_stiffness_q
             particle["state_flg"] = int(pp.state_flg)
             particle["edge"] = (100, 170, 255)
             particle["fill"] = (160, 210, 255)
@@ -512,7 +513,9 @@ class ForceDynamics(ForceContactDynamics):
             return
         current_frame = float(self.ShaderFlags.frameNum)
         inlet_x = float(self.run_configuration.get("inlet_x", self.run_configuration.get("WallXMIN", 0.0)))
-        for particle in self.particles:
+        for particle_index, particle in enumerate(self.particles):
+            if hasattr(self, "IsBoundaryParticle") and self.IsBoundaryParticle(particle_index):
+                continue
             birth_frame = float(particle.Data.w)
             if birth_frame <= 0.0 or current_frame < birth_frame:
                 continue
@@ -528,7 +531,7 @@ class ForceDynamics(ForceContactDynamics):
         outlet_x = float(self.run_configuration.get("outlet_x", self.run_configuration.get("WallXMAX", self.ShaderFlags.SideLength)))
         output_buffer = 1 - int(self.ShaderFlags.positionBuffer)
         for particle_index, particle in enumerate(self.particles):
-            if not self.IsParticleActiveForDynamics(particle_index):
+            if not self.IsMobileParticleActiveForDynamics(particle_index):
                 continue
             position = self.particle_position(particle, output_buffer)
             if position.x >= outlet_x:

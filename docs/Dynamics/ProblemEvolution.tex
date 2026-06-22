@@ -532,3 +532,62 @@ from the current contact normal at release time, not from a stored arbitrary
 vector.  For a wall contact, the same idea represents local pressure against
 the wall segment or constraint.  Energy diagnostics may later report the
 consequence of this bookkeeping, but they must not govern the update.
+
+\subsection{GLSL Wall Models And Boundary-Particle Export}
+
+\subsubsection{<previous form>}
+
+The generated \texttt{ForceDynamics.glsl} path was validated for ordinary
+particle contacts and manual wall scans, but the scenario compute wrappers
+owned different hardcoded wall loops.  Simple walls scanned flags \(1..4\),
+pipe/reservoir walls scanned flags \(3..4\), and boundary-particle walls were
+still a Python-side model rule.  Regenerating the common include could also
+drop hand-maintained reservoir helpers such as \texttt{StartReservoir} and
+\texttt{RetireParticlePastXMax}.
+
+\subsubsection{<current form>}
+
+\texttt{ForceDynamics.glsl} now exports reusable boundary-particle wall
+helpers:
+
+\begin{verbatim}
+IsBoundaryParticle
+BoundaryParticleWallFlag
+EvaluateWallSegment
+ProcessBoundaryParticleWallCollision
+\end{verbatim}
+
+The scenario \texttt{*P.comp} wrapper selects exactly one wall model:
+
+\begin{verbatim}
+WALL_MODEL_SIMPLE
+WALL_MODEL_PIPE
+WALL_MODEL_BOUNDARY_PARTICLE
+\end{verbatim}
+
+Simple wrappers scan wall flags \(1..4\).  Pipe wrappers scan wall flags
+\(3..4\).  Boundary-particle wrappers do not run a manual wall scan; they
+route \texttt{ptype=1.0} target records from cell occupancy to
+\texttt{ProcessBoundaryParticleWallCollision}.  The exporter also emits
+\texttt{StartReservoir} and \texttt{RetireParticlePastXMax} as custom GLSL
+helpers so reservoir wrappers survive regeneration of the common include.
+
+\subsubsection{difference outcome}
+
+Full solution for wall-model wrapper selection and boundary-particle export.
+Tunneling detection remains an error-detection extension.
+
+\subsubsection{<Analysis>}
+
+The important architectural separation is now explicit.  The generated
+dynamics include owns reusable force and geometry functions.  The stable
+scenario wrapper owns contact discovery, lifecycle gates, and wall-model
+selection.  Boundary-particle locality is supplied by the GPU cell occupancy
+structure; the Python-only \texttt{BoundaryParticleAppliesToSource} helper is
+not exported because it only imitates that locality during direct scans.
+
+The current contact queries remain sampled overlap tests.  They can report
+contact when the current distance is inside the radius tolerance, but they do
+not yet perform swept crossing tests.  Tunneling should therefore be detected
+as an error in the hand-maintained contact-query or wall-segment shader path,
+not hidden as a dynamics correction.

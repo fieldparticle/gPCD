@@ -123,6 +123,8 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 				}
 			}
 		}
+		//if (m_NumParticles > 1000)
+			//mout << "here" << ende;
 		part.PosLocA		= glm::vec4(part_pos.rx, part_pos.ry,part_pos.rz, 0.0);
 		part.VelRad			= glm::vec4(part_pos.vx, part_pos.vy, part_pos.vz,1.0);
 		part.PosLocB		= glm::vec4(part_pos.rx, part_pos.ry, part_pos.rz, 0.0);
@@ -132,6 +134,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		part.parms			= glm::vec4(part_pos.molar_mass, 0.0, 0.0, 0.0);
 		part.colFlg			= 0;
 		part.contactCount = 0;
+		
 #if 0
 		for (size_t nn = 0; nn < MAX_CONTACTS; nn++)
 		{
@@ -141,19 +144,16 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		}
 #endif
 
-		if (part_pos.ptype == 1.0)
+		if (part_pos.ptype > 0.5)
 			BoundaryParticleLimit++;
 
 		count++;
 
-		if (count > dataStart)
-		{
-			m_NumParticles++;
-			m_Particles.push_back(part);
-		}
+		m_NumParticles++;
+		m_Particles.push_back(part);
 	}
 	
-	mout << "========================= Read " << m_NumParticles << " From Binary =====================" << ende;
+	mout << "====== Read " << m_NumParticles << " From Binary. Boundary:" << BoundaryParticleLimit << "=====================" << ende;
 	uint32_t sidelen = CfgTst->GetUInt("CellAryL", true);
 	m_SideLength = static_cast<float>(sidelen);
 	/*

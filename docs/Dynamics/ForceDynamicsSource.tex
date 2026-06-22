@@ -14,6 +14,22 @@ source-local \texttt{totalForce}, and writes only the source velocity and
 position.  The implementation is shaped to transfer directly to one GLSL
 compute invocation per source particle.
 
+\texttt{ForceDynamics} currently supports three wall interpretations:
+\begin{itemize}
+    \item \emph{simple walls}: all four configured wall planes are solid;
+    \item \emph{pipe walls}: the configured \(y_{\min}\) and \(y_{\max}\)
+    planes are solid while \(x_{\min}\) and \(x_{\max}\) are lifecycle inlet
+    and outlet planes;
+    \item \emph{boundary-particle walls}: particles with \texttt{ptype=1.0}
+    are occupancy markers that represent local wall segments.
+\end{itemize}
+
+Simple and pipe walls use the configured wall-ghost geometry.  Boundary
+particles are not mobile dynamics sources.  They remain active for display
+and broad-phase placement, but when a mobile source sees a boundary marker as
+a target, it evaluates the represented wall segment and accumulates a wall
+force instead of a particle-particle force.
+
 The current generated GLSL path validates the ordinary particle and wall force
 model in Vulkan.  Starting-contact effective geometry remains Python-side
 model behavior until the \texttt{StartingContactState.glsl} buffer/export path
@@ -23,7 +39,19 @@ from the current Vulkan export validation.
 \begin{figure}[ht]
 \centering
 \resizebox{\textwidth}{!}{\input{ForceDynamicsFlowTikz}}
-\caption{Current ForceDynamics source-owned force flow}
+\caption{ForceDynamics simple-wall flow: particle targets plus wall flags 1--4}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\resizebox{\textwidth}{!}{\input{ForceDynamicsFlowPTikz}}
+\caption{ForceDynamics pipe-wall flow: reservoir lifecycle plus wall flags 3--4}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\resizebox{\textwidth}{!}{\input{ForceDynamicsFlowBTikz}}
+\caption{ForceDynamics boundary-particle flow: marker targets become wall segments}
 \end{figure}
 
 \clearpage
@@ -38,10 +66,14 @@ snapshot frame-start positions and velocities
 initialize starting-contact effective geometry
 initialize totalForce for every source
 for each SourceID:
-    detect particle contacts
-        ProcessParticleCollision(TargetID, SourceID, totalForce)
+    scan possible targets
+        if TargetID is a mobile particle:
+            ProcessParticleCollision(TargetID, SourceID, totalForce)
+        if TargetID is a boundary marker:
+            ProcessBoundaryParticleWallCollision(SourceID, TargetID, totalForce)
 for each SourceID:
-    for each configured wall:
+    if boundary-particle walls are not enabled:
+    for each configured wall flag selected by the wall mode:
         ProcessWallCollision(SourceID, wall, totalForce)
 capture frame-start pair diagnostics
 for each SourceID:
@@ -58,28 +90,85 @@ particle-particle and particle-wall overlaps present in the initial
 configuration can be treated as zero-force contact limits.  The end-position
 snapshot is diagnostic only and is not a second force scan.
 
+The Python harness uses a direct scan over particles where GLSL uses cell
+occupancy lists.  Boundary-particle wall mode changes the meaning of a target
+record during that scan; it does not change source ownership or introduce a
+target write.
+
 \ForceFunctionSection{InitializeStartingContactState}
 
-\texttt{InitializeStartingContactState()} records particle and wall contacts
-that already overlap when the model starts.  For each starting contact, the
-current center distance becomes the effective separation limit.  The physical
-radii are still retained, but force and potential energy use the effective
-geometry until the contact rebounds to its starting separation and then clears
-the physical overlap.
+\texttt{InitializeStartingContactState()} records mobile particle and manual
+wall contacts that already overlap when the model starts.  Boundary marker
+particles are not recorded as mobile starting contacts.  For each starting
+contact, the current center distance becomes the effective separation limit.
+The physical radii are still retained, but force and potential energy use the
+effective geometry until the contact rebounds to its starting separation and
+then clears the physical overlap.
 
 \ForceFunctionSection{ProcessParticleCollision}
 
 \texttt{ProcessParticleCollision(TargetID, SourceID, totalForce)} initializes
 the current contact geometry, records a diagnostic contact slot, and
 immediately adds the contact force to the source-local \texttt{totalForce}.
-It does not write the target particle.
+It does not write the target particle.  Boundary markers are not processed by
+this function; they are routed to the boundary-particle wall path.
 
 \ForceFunctionSection{ProcessWallCollision}
 
 \texttt{ProcessWallCollision(SourceID, wall, totalForce)} creates the
 configured wall ghost geometry and immediately adds its force to
-\texttt{totalForce}.  Each of the four configured walls is scanned exactly
-once for each source particle.
+\texttt{totalForce}.  In simple-wall mode the selected wall flags are
+\(1,2,3,4\).  In pipe-wall mode the selected wall flags are \(3,4\), because
+the \(x\) planes are lifecycle inlet/outlet planes rather than solid walls.
+When boundary-particle walls are enabled, the manual wall scan is suppressed.
+
+\ForceFunctionSection{ProcessBoundaryParticleWallCollision}
+
+\texttt{ProcessBoundaryParticleWallCollision(SourceID, BoundaryID,
+totalForce)} treats a boundary marker target as a source-owned wall contact.
+It evaluates the wall segment represented by the boundary marker, appends the
+ordinary wall diagnostic contact slot, and immediately accumulates that wall
+force into \texttt{totalForce}.
+
+\ForceFunctionSection{EvaluateWallSegment}
+
+\texttt{EvaluateWallSegment(SourceID, BoundaryID)} is the boundary-particle
+wall geometry evaluator.  For the current reservoir model, each boundary
+marker represents a straight horizontal wall segment through the marker's
+cell.  The evaluator classifies the marker as the lower or upper wall from
+the boundary-marker geometry, constructs the stationary wall ghost for the
+mobile source, and returns normal, overlap area, center distance, and wall
+flag.  Later sloped or curved boundaries should extend this evaluator without
+changing the source-owned force accumulation rule.
+
+\ForceFunctionSection{BoundaryParticleAppliesToSource}
+
+\texttt{BoundaryParticleAppliesToSource(SourceID, BoundaryID)} is the current
+Python locality guard for boundary markers.  It approximates the GLSL
+cell-list broad phase by accepting only markers near the source in \(x\) and
+\(z\).  The GLSL boundary-particle path should receive marker candidates from
+cell occupancy rather than from a full direct scan.
+
+\ForceFunctionSection{IsBoundaryParticle}
+
+\texttt{IsBoundaryParticle(ParticleID)} returns true when the particle record
+has \texttt{ptype=1.0}.  Boundary particles are occupancy and wall-geometry
+markers, not mobile dynamics sources.
+
+\ForceFunctionSection{IsMobileParticleActiveForDynamics}
+
+\texttt{IsMobileParticleActiveForDynamics(ParticleID)} combines reservoir
+lifecycle state with particle type.  It is true only for live, non-boundary
+particles.  Contact scans, velocity writes, position writes, diagnostics, and
+reservoir birth/death updates use this mobile-source predicate.
+
+\ForceFunctionSection{WallFlagsForDynamics}
+
+\texttt{WallFlagsForDynamics()} selects the manual wall flags for the current
+wall mode.  Ordinary simple boundaries use all four walls.  Reservoir pipe
+flow uses only flags \(3\) and \(4\).  Boundary-particle wall mode bypasses
+this manual wall scan because wall contacts are discovered as boundary-marker
+targets.
 
 \ForceFunctionSection{InitializeWallContactState}
 
@@ -138,6 +227,30 @@ physical-radius overlap.
 
 \texttt{GetParticlePosition(ParticleID)} returns a particle position from the
 selected immutable position snapshot.
+
+\ForceFunctionSection{TunnelingDetection}
+
+The current GLSL contact query in \texttt{isParticleContactMotion.glsl}
+detects overlap or near-overlap at the sampled frame position:
+
+\begin{verbatim}
+float rddiff = dsq - rsq;
+if (rddiff < 0.00001)
+    return 1;
+\end{verbatim}
+
+This is an instantaneous overlap test.  It does not prove that the segment
+traced from the previous position to the current position avoided the contact
+radius.  A fast particle can therefore tunnel if it is outside the overlap
+band at both sampled endpoints but crosses the band between them.
+
+The planned tunneling error path should add a swept closest-approach test to
+the hand-maintained contact-query shader infrastructure.  If the swept path
+crosses the particle-particle contact radius, the shader should set the
+compute error field and return a tunneling error rather than silently
+continuing.  Boundary-particle wall tunneling requires the analogous test in
+the wall-segment evaluator because the crossing is against a wall plane or
+segment, not a particle center.
 
 \ForceFunctionSection{GetStartFrameVelocity}
 

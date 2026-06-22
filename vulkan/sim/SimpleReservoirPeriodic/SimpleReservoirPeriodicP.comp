@@ -55,6 +55,7 @@
 #include "../common/particle.glsl"
 #include "workgroups.glsl"
 #include "../common/isParticleContactMotion.glsl"
+#define WALL_MODEL_PIPE
 #include "../common/ForceDynamics.glsl"
  
 
@@ -182,10 +183,19 @@ void main()
 			}
 		}
 	}
-	for (uint wall = 3; wall <= 4; wall++)
+	#if defined(WALL_MODEL_SIMPLE)
+	for (uint wall = 1u; wall <= 4u; wall++)
 	{
 		ProcessWallCollision(SourceID, wall, totalForce);
 	}
+	#elif defined(WALL_MODEL_PIPE)
+	for (uint wall = 3u; wall <= 4u; wall++)
+	{
+		ProcessWallCollision(SourceID, wall, totalForce);
+	}
+	#elif defined(WALL_MODEL_BOUNDARY_PARTICLE)
+	// No manual wall scan. Boundary marker targets are handled in the cell scan.
+	#endif
 	#if 0 && defined(DEBUG)
 		if(uint(ShaderFlags.frameNum) > 3 && SourceID == 1)
 			debugPrintfEXT("positionBuffer:%f",ShaderFlags.positionBuffer);

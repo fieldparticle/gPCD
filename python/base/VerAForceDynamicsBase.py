@@ -418,6 +418,7 @@ class ForceDynamics(ForceContactDynamics):
             particle["mass"] = pp.molar_mass
             particle["radius"] = pp.radius
             particle["ptype"] = pp.ptype
+            particle["collision_stiffness_q"] = pp.collision_stiffness_q
             particle["state_flg"] = int(pp.state_flg)
             particle["edge"] = (100, 170, 255)
             particle["fill"] = (160, 210, 255)

@@ -18,6 +18,37 @@ and may be regenerated.  Existing contact-query helpers such as
 \texttt{isParticleContact.glsl} remain hand-maintained shader infrastructure
 and are not rewritten by the ForceDynamics export.
 
+\texttt{ForceDynamics.glsl} exports reusable dynamics functions.  It does not
+own the scenario contact-discovery schedule and it does not choose the wall
+model.  The scenario \texttt{*P.comp} file owns wall-model selection with
+compile-time defines and calls the generated ForceDynamics functions in the
+appropriate order.
+
+Exactly one wall model must be selected by the scenario compute shader:
+\begin{verbatim}
+#define WALL_MODEL_SIMPLE
+#define WALL_MODEL_PIPE
+#define WALL_MODEL_BOUNDARY_PARTICLE
+\end{verbatim}
+
+The shader wrapper must guard against missing or conflicting wall-model
+selection:
+\begin{verbatim}
+#if defined(WALL_MODEL_SIMPLE) && defined(WALL_MODEL_PIPE)
+#error Select only one wall model.
+#endif
+#if defined(WALL_MODEL_SIMPLE) && defined(WALL_MODEL_BOUNDARY_PARTICLE)
+#error Select only one wall model.
+#endif
+#if defined(WALL_MODEL_PIPE) && defined(WALL_MODEL_BOUNDARY_PARTICLE)
+#error Select only one wall model.
+#endif
+#if !defined(WALL_MODEL_SIMPLE) && !defined(WALL_MODEL_PIPE) && \
+    !defined(WALL_MODEL_BOUNDARY_PARTICLE)
+#error Select one wall model.
+#endif
+\end{verbatim}
+
 \subsection{Generated Files}
 
 \texttt{ForceDynamics.glsl} is generated dynamics logic.
@@ -346,7 +377,46 @@ The cfg may later provide z-wall constants, but Step 7 does not enable z-wall
 processing.  The current generated wall path remains 2D to match the live
 Python wall loop.
 
-\subsection{Step 8: Use Transient Contact Force Input}
+\subsection{Step 8: Generate Boundary-Particle Wall Helpers}
+
+After ordinary wall geometry is available, the exporter may generate the
+boundary-particle wall helper path.  Boundary particles are occupancy markers,
+not mobile dynamics targets.  When the wrapper selects
+\texttt{WALL\_MODEL\_BOUNDARY\_PARTICLE}, marker targets discovered during the
+ordinary target scan are evaluated as wall segments and accumulated as wall
+forces.
+
+The required generated methods are:
+\begin{itemize}
+    \item \texttt{IsBoundaryParticle(...)};
+    \item \texttt{BoundaryParticleWallFlag(...)};
+    \item \texttt{EvaluateWallSegment(...)};
+    \item \texttt{ProcessBoundaryParticleWallCollision(...)}.
+\end{itemize}
+
+\texttt{BoundaryParticleAppliesToSource(...)} is Python-only and must not be
+exported.  The Python implementation uses it to imitate cell locality during
+direct scans.  GLSL receives that locality from the cell occupancy structure,
+so the wrapper only sees boundary marker targets that already share a relevant
+cell with the source.
+
+\texttt{EvaluateWallSegment(...)} returns the transient wall geometry for the
+marker target.  The boundary-particle processor should build a local
+\texttt{ContactForceInput} with \texttt{CONTACT\_WALL} and accumulate the force
+immediately, just as \texttt{ProcessWallCollision(...)} does for manual wall
+flags.
+
+The Python diagnostic initializer:
+\begin{itemize}
+    \item \texttt{InitializeBoundaryParticleWallContactState(...)}
+\end{itemize}
+may be exported later for Python diagnostic parity, but it is not required for
+the generated GLSL force path.  Generated GLSL should not export the Python
+contact-slot initializer when the boundary-particle wall collision can be
+computed directly from \texttt{EvaluateWallSegment(...)} and transient force
+input.
+
+\subsection{Step 9: Use Transient Contact Force Input}
 
 Generated ForceDynamics GLSL does not store contacts in particle-owned contact
 slots.  The active \texttt{particle.glsl} ABI does not contain
@@ -377,13 +447,14 @@ diagnostic contact slots, such as \texttt{AppendContactSlot(...)},
 deferred for Python parity and are not part of the generated force-storage
 model.
 
-\subsection{Step 9: Generate Collision Processors}
+\subsection{Step 10: Generate Collision Processors}
 
 Once transient force input exists, generated GLSL may implement the collision
 processor methods:
 \begin{itemize}
     \item \texttt{ProcessParticleCollision(...)};
-    \item \texttt{ProcessWallCollision(...)}.
+    \item \texttt{ProcessWallCollision(...)};
+    \item \texttt{ProcessBoundaryParticleWallCollision(...)}.
 \end{itemize}
 
 These generated processors do not initialize, append, or store contact slots.
@@ -392,6 +463,8 @@ builds a local \texttt{ContactForceInput} with
 \texttt{CONTACT\_PARTICLE}, and calls \texttt{AccumulateContactForce(...)}.
 \texttt{ProcessWallCollision(...)} does the same with
 \texttt{WallGhostGeometry} and \texttt{CONTACT\_WALL}.
+\texttt{ProcessBoundaryParticleWallCollision(...)} does the same with the wall
+segment geometry returned by \texttt{EvaluateWallSegment(...)}.
 
 The Python diagnostic setup methods \texttt{InitializeContactState(...)},
 \texttt{InitializeWallContactState(...)}, \texttt{GetContactState(...)},
@@ -399,7 +472,7 @@ The Python diagnostic setup methods \texttt{InitializeContactState(...)},
 \texttt{AppendWallContactSlot(...)} remain deferred.  They describe Python
 reporting/contact-slot behavior, not the generated GLSL force path.
 
-\subsection{Step 10: Generate ForceDynamics Constants}
+\subsection{Step 11: Generate ForceDynamics Constants}
 
 Before compiling the generated include, \texttt{ForceDynamics.glsl} must
 define the constants used by generated ForceDynamics code.  These constants
@@ -418,7 +491,7 @@ Do not modify \texttt{sim/common/constants.glsl} for ForceDynamics-only
 constants.  Wall dimensions and wall-contact configuration are the exception:
 those are generated from scenario configuration into \texttt{boundary.glsl}.
 
-\subsection{Step 11: Export Wall Contact Configuration}
+\subsection{Step 12: Export Wall Contact Configuration}
 
 \texttt{wall\_contact\_offset} is generated by the application with the other
 wall parameters in \texttt{boundary.glsl}.  Generated ForceDynamics wall
@@ -431,18 +504,28 @@ Generated ForceDynamics wall code should read the application-generated symbol
 rather than hardcoding a cfg value.  If the symbol is absent, wall geometry
 export is not complete even if the Python dynamics are correct.
 
-\subsection{Step 12: Direct Four-Wall Scan}
+\subsection{Step 13: Wrapper-Owned Wall Model Selection}
 
-\texttt{isWallContact(...)} is not required for the current ForceDynamics
-wrapper.  The compute shader calls \texttt{ProcessWallCollision(...)} once for
-each configured wall.  The generated wall collision processor calculates the
-wall ghost geometry and returns without adding force when the source particle
-does not overlap that wall.
+\texttt{ForceDynamics.glsl} exports reusable wall and contact processors, but
+the scenario wrapper owns the wall-model schedule.  The selected wall model
+determines whether the wrapper performs a manual wall scan or treats boundary
+marker targets as local wall segments.
 
-The wall numbering convention is \texttt{1} for xmin, \texttt{2} for xmax,
-\texttt{3} for ymin, and \texttt{4} for ymax.
+\begin{itemize}
+    \item \texttt{WALL\_MODEL\_SIMPLE}: scan manual wall flags
+    \texttt{1..4}.
+    \item \texttt{WALL\_MODEL\_PIPE}: scan manual wall flags
+    \texttt{3..4}; the \(x\) planes are reservoir lifecycle planes rather
+    than solid walls.
+    \item \texttt{WALL\_MODEL\_BOUNDARY\_PARTICLE}: do not run a manual wall
+    scan.  Boundary marker targets discovered during the target scan are
+    evaluated as wall segments.
+\end{itemize}
 
-\subsection{Step 13: Match Error Reporting To The Active Atomic Include}
+The wall numbering convention for manual wall models is \texttt{1} for xmin,
+\texttt{2} for xmax, \texttt{3} for ymin, and \texttt{4} for ymax.
+
+\subsection{Step 14: Match Error Reporting To The Active Atomic Include}
 
 \texttt{BoundarySpheresReservoirP.comp} includes \texttt{atomic.glsl}, whose
 error field is \texttt{collOut.ErrorNumber}.  Generated
@@ -455,22 +538,33 @@ It must not write \texttt{collIn.ErrorReturn}.  That field belongs to the
 graphics pipeline \texttt{atomicg.glsl} layout, not the compute shader
 \texttt{atomic.glsl} layout.
 
-\subsection{Step 14: Compile Trial}
+\subsection{Step 15: Compile Trial}
 
-Only after Steps 10 through 13 are satisfied should the generated include be
-compiled through the permanent compute shader.  The expected first compile
-target is:
+Only after Steps 11 through 14 are satisfied should the generated include be
+compiled through permanent compute shaders for each wall model.  The compile
+trial is now a three-model check:
 \begin{verbatim}
-C:/_DJ/gPCD/vulkan/sim/BoundarySpheresReservoir/BoundarySpheresReservoirP.comp
+WALL_MODEL_SIMPLE
+WALL_MODEL_PIPE
+WALL_MODEL_BOUNDARY_PARTICLE
+\end{verbatim}
+
+The expected compute targets include:
+\begin{verbatim}
+sim/BoundarySpheresReservoir/
+    BoundarySpheresReservoirP.comp
+sim/BoundaryParticleReservoirPeriodic/
+    BoundaryParticleReservoirPeriodicP.comp
 \end{verbatim}
 
 A compile failure at this stage should be classified as either a missing
-wrapper/helper symbol, a missing generated boundary/config symbol, or an
-incorrect particle/atomic ABI name.  It should not be fixed by hand-editing
-the generated \texttt{ForceDynamics.glsl}; fixes belong in the exporter, the
-stable wrapper shader, or the generated config includes.
+wrapper/helper symbol, a missing generated boundary/config symbol, an
+incorrect wall-model define, or an incorrect particle/atomic ABI name.  It
+should not be fixed by hand-editing the generated
+\texttt{ForceDynamics.glsl}; fixes belong in the exporter, the stable wrapper
+shader, or the generated config includes.
 
-\subsection{Step 14A: Reservoir Lifecycle Helpers}
+\subsection{Step 15A: Reservoir Lifecycle Helpers}
 
 The reservoir compute path uses the newer \texttt{Data.w} lifecycle rule:
 \begin{itemize}
@@ -479,12 +573,18 @@ The reservoir compute path uses the newer \texttt{Data.w} lifecycle rule:
     \item \(\texttt{Data.w} < 0\): dead particle.
 \end{itemize}
 
-The common generated dynamics include provides two reservoir utility
-functions for \texttt{BoundarySpheresReservoirP.comp}:
+The common generated dynamics include provides two custom reservoir utility
+functions for reservoir compute wrappers:
 \begin{verbatim}
 StartReservoir(SourceID)
 RetireParticlePastXMax(SourceID)
 \end{verbatim}
+
+These helpers are emitted by the exporter as custom GLSL helpers after the
+Python-derived generated methods.  They are not AST-translated from
+\texttt{ForceDynamics.py}, but they are still generated into
+\texttt{ForceDynamics.glsl} so reservoir wrappers do not depend on hand edits
+to the common include.
 
 \texttt{StartReservoir(SourceID)} is called at the beginning of the source
 invocation.  It returns \texttt{false} for dead particles and for unborn
@@ -512,15 +612,18 @@ RetireParticlePastXMax(SourceID);
 These helpers are lifecycle gates.  They do not alter the ForceDynamics force
 law, and they do not write target particles.
 
-\subsection{Step 15: Vulkan Runtime Validation}
+\subsection{Step 16: Vulkan Runtime Validation}
 
-After the compile trial succeeds, run the ordinary ForceDynamics scenarios
-through the Vulkan compute path.  The current generated
-\texttt{ForceDynamics.glsl} has been tested successfully for the ordinary
+After the compile trial succeeds, run the ForceDynamics scenarios through the
+Vulkan compute path for all selected wall models.  The current generated
+\texttt{ForceDynamics.glsl} has been tested successfully for the compiled
 particle and wall scenarios exercised so far.  That validation covers:
 \begin{itemize}
     \item ordinary particle contacts;
-    \item ordinary wall contacts through the direct four-wall scan;
+    \item \texttt{WALL\_MODEL\_SIMPLE};
+    \item \texttt{WALL\_MODEL\_PIPE};
+    \item \texttt{WALL\_MODEL\_BOUNDARY\_PARTICLE}, including
+    \texttt{BoundaryParticleReservoirPeriodicP.comp};
     \item source-local \texttt{totalForce};
     \item \texttt{CalcVelocity(...)};
     \item \texttt{CalcPosition(...)}.

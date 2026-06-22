@@ -901,7 +901,7 @@ class ForceContactDynamics:
     def CalculateVelocities(self, total_forces):
         """Calculate each source velocity after all source contacts are known."""
         for SourceID in range(len(self.particles)):
-            if not self.IsParticleActiveForDynamics(SourceID):
+            if not self.IsMobileParticleActiveForDynamics(SourceID):
                 continue
             if not self.CalcVelocity(SourceID, total_forces[SourceID]):
                 return False
@@ -910,7 +910,7 @@ class ForceContactDynamics:
     def CalculatePositions(self):
         """Move every source using its newly calculated velocity."""
         for SourceID in range(len(self.particles)):
-            if not self.IsParticleActiveForDynamics(SourceID):
+            if not self.IsMobileParticleActiveForDynamics(SourceID):
                 continue
             if not self.CalcPosition(SourceID):
                 return False

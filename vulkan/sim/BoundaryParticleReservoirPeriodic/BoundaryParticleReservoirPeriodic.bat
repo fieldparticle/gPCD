@@ -1,2 +1,3 @@
 echo off  
-CompileShaders BoundaryParticleReservoirPeriodic  
+call CompileShaders BoundaryParticleReservoirPeriodic  
+pause

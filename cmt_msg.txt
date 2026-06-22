@@ -1,12 +1,12 @@
 Current status:
-    - Documented the momentum-first dynamics rule: force and momentum govern the model, while energy remains diagnostic bookkeeping.
-    - Documented boundary-particle walls for reservoir flow using wall_type=1 and EvaluateWallSegment(SourceID, BoundaryID).
-    - Recorded the crowding/tunneling interpretation: the missing physical channel is internal normal momentum/contact stress, not energy repair.
+	- Updated Dynamics documentation after the wall-model/export refresh.
+	- Recorded the current ForceDynamics GLSL boundary model structure.
+	- Documented that reservoir lifecycle helpers are exporter-emitted custom GLSL.
+	- Captured the remaining tunneling-detection gap as sampled overlap vs swept crossing.
 
 Code Changes:
-    - Updated DynamicsConventions.tex with Momentum-First Causality.
-    - Updated FlowDynamicsConventions.tex with Boundary Particle Wall Rule, including ptype=1.0 markers and straight segment evaluation.
-    - Updated ProblemEvolution.tex with Crowding Requires Internal Momentum, Not Energy Repair.
-    - Rebuilt docs/Dynamics/main.pdf successfully.
+	- Updated Porting.tex with the reusable ForceDynamics.glsl export model and wrapper-owned wall selection.
+	- Updated ForceDynamicsSource.tex with the tunneling-detection analysis and planned error path.
+	- Updated ProblemEvolution.tex with the boundary-particle export and wall-model transition.
 
-Next: Implement the internal normal momentum/contact stress ledger for crowded particle and wall contacts.
+Next: Add swept tunneling detection for particle contacts and boundary-particle wall segments, then wire that into the compute error/termination path.

@@ -16,10 +16,15 @@
         draw=green!40!black,
         line width=0.65pt
     },
-    wall/.style={
+    lifecycle/.style={
         function,
-        fill=blue!7,
-        draw=blue!45!black
+        fill=purple!7,
+        draw=purple!50!black
+    },
+    boundary/.style={
+        function,
+        fill=violet!7,
+        draw=violet!55!black
     },
     reused/.style={
         draw=orange!55!black,
@@ -39,76 +44,79 @@
 
 \providecommand{\ForceFlowNode}[2]{\hyperref[force:#1]{\strut #2}}
 
-\node[entry] (main) {main(SourceID)\\{\scriptsize WALL\_MODEL\_SIMPLE}};
-\node[function, below=of main] (start-state)
+\node[entry] (main) {main(SourceID)\\{\scriptsize WALL\_MODEL\_BOUNDARY\_PARTICLE}};
+\node[lifecycle, below=of main] (start-reservoir)
+    {StartReservoir(SourceID)};
+\node[function, below=of start-reservoir] (start-state)
     {\ForceFlowNode{InitializeStartingContactState}{InitStartingContactState}};
-
-\node[function, below left=0.34in and 0.74in of start-state] (particle-scan)
+\node[function, below=of start-state] (target-scan)
     {target scan};
-\node[function, below=of particle-scan] (particle-process)
-    {ProcessParticleCollision};
+
+\node[function, below left=0.34in and 0.74in of target-scan] (particle-process)
+    {ProcessParticleCollision\\{\scriptsize mobile target}};
 \node[function, below=of particle-process] (geometry)
     {\ForceFlowNode{GetParticleGeometry}{GetParticleGeometry}};
 \node[function, below=of geometry] (particle-force)
     {AccumulateContactForce};
 
-\node[wall, below right=0.34in and 0.74in of start-state] (wall-scan)
-    {manual wall scan\\{\scriptsize wall flags 1--4}};
-\node[wall, below=of wall-scan] (wall-process)
-    {ProcessWallCollision};
-\node[wall, below=of wall-process] (wall-geometry)
-    {GetWallGhostGeometry};
-\node[wall, below=of wall-geometry] (wall-force)
+\node[boundary, below right=0.34in and 0.74in of target-scan] (bp-process)
+    {\ForceFlowNode{ProcessBoundaryParticleWallCollision}{ProcessBoundaryWallCollision}};
+\node[boundary, below=of bp-process] (bp-eval)
+    {\ForceFlowNode{EvaluateWallSegment}{EvaluateWallSegment}};
+\node[boundary, below=of bp-eval] (bp-force)
     {AccumulateContactForce};
 
 \node[entry, below=0.55in of main |- particle-force.south] (velocity)
     {CalcVelocity(SourceID, totalForce)};
 \node[entry, below=of velocity] (position)
     {CalcPosition(SourceID)};
+\node[lifecycle, below=of position] (retire)
+    {RetirePastXMax(SourceID)};
 
 \node[reused, left=0.16in of geometry] (particle-position)
     {\ForceFlowNode{GetParticlePosition}{GetParticlePosition}};
 \node[reused, left=0.16in of particle-force] (particle-stiffness)
     {GetContactStiffness};
-\node[reused, right=0.16in of wall-geometry] (wall-position)
+\node[reused, right=0.16in of bp-eval] (bp-position)
     {\ForceFlowNode{GetParticlePosition}{GetParticlePosition}};
-\node[reused, right=0.16in of wall-force] (wall-stiffness)
+\node[reused, right=0.16in of bp-force] (bp-stiffness)
     {GetContactStiffness};
 \node[reused, left=of velocity] (velocity-mass)
     {\ForceFlowNode{GetParticleMass}{GetParticleMass}};
 \node[reused, right=of velocity] (velocity-start)
     {\ForceFlowNode{GetStartFrameVelocity}{GetStartFrameVelocity}};
 
-\draw[flow] (main) -- (start-state);
-\draw[flow] (start-state) -- (particle-scan);
-\draw[flow] (start-state) -- (wall-scan);
+\draw[flow] (main) -- (start-reservoir);
+\draw[flow] (start-reservoir) -- node[right,font=\scriptsize]{active source} (start-state);
+\draw[flow] (start-state) -- (target-scan);
 
-\draw[flow] (particle-scan) -- node[right,font=\scriptsize]{mobile target} (particle-process);
+\draw[flow] (target-scan) -- node[left,font=\scriptsize]{mobile target} (particle-process);
 \draw[flow] (particle-process) -- (geometry);
 \draw[flow] (geometry) -- (particle-force);
 \draw[loop] (particle-force.west) -- ++(-0.18in,0)
-    |- node[pos=0.12,left,font=\scriptsize]{next target} (particle-scan.west);
+    |- node[pos=0.12,left,font=\scriptsize]{next target} (target-scan.west);
 
-\draw[flow] (wall-scan) -- node[right,font=\scriptsize]{next wall} (wall-process);
-\draw[flow] (wall-process) -- (wall-geometry);
-\draw[flow] (wall-geometry) -- (wall-force);
-\draw[loop] (wall-force.east) -- ++(0.18in,0)
-    |- node[pos=0.12,right,font=\scriptsize]{wall 1--4} (wall-scan.east);
+\draw[flow] (target-scan) -- node[right,font=\scriptsize]{boundary marker} (bp-process);
+\draw[flow] (bp-process) -- (bp-eval);
+\draw[flow] (bp-eval) -- (bp-force);
+\draw[loop] (bp-force.east) -- ++(0.18in,0)
+    |- node[pos=0.12,right,font=\scriptsize]{next target} (target-scan.east);
 
 \draw[flow] (particle-force.south) -- ++(0,-0.18in) -| (velocity.north);
-\draw[flow] (wall-force.south) -- ++(0,-0.18in) -| (velocity.north);
+\draw[flow] (bp-force.south) -- ++(0,-0.18in) -| (velocity.north);
 \draw[flow] (velocity) -- (position);
+\draw[flow] (position) -- (retire);
 
 \draw[reusecall] (geometry) -- (particle-position);
 \draw[reusecall] (particle-force) -- (particle-stiffness);
-\draw[reusecall] (wall-geometry) -- (wall-position);
-\draw[reusecall] (wall-force) -- (wall-stiffness);
+\draw[reusecall] (bp-eval) -- (bp-position);
+\draw[reusecall] (bp-force) -- (bp-stiffness);
 \draw[reusecall] (velocity) -- (velocity-mass);
 \draw[reusecall] (velocity) -- (velocity-start);
 
-\node[font=\sffamily\scriptsize, text=black!65, above=0.08in of particle-scan]
+\node[font=\sffamily\scriptsize, text=black!65, above left=0.08in and 0.08in of particle-process]
     {particle contacts};
-\node[font=\sffamily\scriptsize, text=blue!55!black, above=0.08in of wall-scan]
-    {simple walls};
+\node[font=\sffamily\scriptsize, text=violet!65!black, above right=0.08in and 0.08in of bp-process]
+    {boundary-particle walls};
 
 \end{tikzpicture}
