@@ -8,7 +8,7 @@ ProgrammingConventions.tex
 ProgrammingStyle.tex
 Porting.tex
 
-Pay special attentioin to defintions of :
+Pay special attentioin to definitions of :
 "update project"
 git message
 .venv location

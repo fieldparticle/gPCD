@@ -6,5 +6,7 @@ const float BOUNDARY_XMAX  = 26.00;
 const float BOUNDARY_YMIN  = 0.50;
 const float BOUNDARY_YMAX  = 26.00;
 const float wall_contact_offset = 0.20;
+#define WALL_FUNC vertical_wall
+#define PERIODIC_DIRECTION vertical
 #define WALL_MODEL_BOUNDARY_PARTICLE
 #endif

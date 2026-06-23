@@ -8,6 +8,10 @@ class ForceContactDynamics:
     CONTACT_PARTICLE = 1
     CONTACT_WALL = 2
     CONTACT_ACTIVE_THIS_FRAME = 1
+    BOUNDARY_PARTICLE_FUNCTIONS = {
+        "horizontal_wall": "EvaluateHorizontalWallSegment",
+        "vertical_wall": "EvaluateVerticalWallSegment",
+    }
 
     @staticmethod
     def VelocityAngle(vx, vy):
@@ -94,8 +98,45 @@ class ForceContactDynamics:
             return 3
         return 4
 
+    def BoundaryParticleVerticalWallFlag(self, SourceID, BoundaryID):
+        """Infer the left/right wall represented by a boundary marker."""
+        boundary_position = self.GetParticlePosition(BoundaryID)
+        boundary_particles = [
+            particle_id
+            for particle_id in range(len(self.particles))
+            if self.IsBoundaryParticle(particle_id)
+        ]
+        if boundary_particles:
+            boundary_x_values = [
+                float(self.GetParticlePosition(particle_id).x)
+                for particle_id in boundary_particles
+            ]
+            min_x = min(boundary_x_values)
+            max_x = max(boundary_x_values)
+        else:
+            cfg = self.run_configuration
+            min_x = float(cfg.get("WallXMIN", 0.0))
+            max_x = float(cfg.get("WallXMAX", self.ShaderFlags.SideLength))
+        mid_x = 0.5 * (min_x + max_x)
+        if boundary_position.x < mid_x:
+            return 1
+        return 2
+
     def EvaluateWallSegment(self, SourceID, BoundaryID):
-        """Evaluate the straight wall segment represented by a boundary marker.
+        """Evaluate the configured wall segment represented by a boundary marker."""
+        function_key = str(
+            getattr(self, "run_configuration", {}).get(
+                "boundary_particle_function",
+                "horizontal_wall",
+            )
+        ).lower()
+        evaluator_name = self.BOUNDARY_PARTICLE_FUNCTIONS.get(function_key)
+        if evaluator_name is None:
+            return None
+        return getattr(self, evaluator_name)(SourceID, BoundaryID)
+
+    def EvaluateHorizontalWallSegment(self, SourceID, BoundaryID):
+        """Evaluate a horizontal wall segment represented by a boundary marker.
 
         Boundary particles are occupancy markers.  For this first reservoir
         model, each marker represents a horizontal wall segment through the
@@ -126,6 +167,50 @@ class ForceContactDynamics:
                 source_position.z,
             )
             normal = (0.0, 1.0, 0.0)
+        else:
+            return None
+
+        dx = ghost[0] - source_position.x
+        dy = ghost[1] - source_position.y
+        dz = ghost[2] - source_position.z
+        center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if center_distance >= 2.0 * radius:
+            return None
+        overlap_area = self.particle_overlap_area(radius, radius, center_distance)
+        return (*normal, overlap_area, center_distance, wall_flag)
+
+    def EvaluateVerticalWallSegment(self, SourceID, BoundaryID):
+        """Evaluate a vertical wall segment represented by a boundary marker.
+
+        Boundary particles are occupancy markers.  Each marker represents a
+        vertical wall segment through the marker's cell center.  The returned
+        tuple contains normal x/y/z, overlap area, ghost-center distance, and
+        wall flag.
+        """
+        wall_flag = self.BoundaryParticleVerticalWallFlag(SourceID, BoundaryID)
+        if wall_flag == 0:
+            return None
+
+        source = self.particles[SourceID]
+        source_position = self.GetParticlePosition(SourceID)
+        boundary_position = self.GetParticlePosition(BoundaryID)
+        radius = float(source.Data.x)
+        offset = self.WallContactOffsetDistance(radius)
+
+        if wall_flag == 1:
+            ghost = (
+                boundary_position.x - radius + offset,
+                source_position.y,
+                source_position.z,
+            )
+            normal = (-1.0, 0.0, 0.0)
+        elif wall_flag == 2:
+            ghost = (
+                boundary_position.x + radius - offset,
+                source_position.y,
+                source_position.z,
+            )
+            normal = (1.0, 0.0, 0.0)
         else:
             return None
 

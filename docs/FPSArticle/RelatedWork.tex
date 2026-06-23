@@ -1,12 +1,10 @@
 % !TeX root = main_fps.tex
 \section{Background and Related Work}
-Particle-based simulation encompasses a broad family of methodologies including molecular dynamics (MD), 
-discrete element methods (DEM), smoothed particle hydrodynamics (SPH), material point methods (MPM), 
-dissipative particle dynamics (DPD), and numerous other specialized formulations. Although these approaches 
-differ substantially in their mathematical formulation and intended applications, they generally share a 
-common objective: the determination of forces that govern particle motion. Consequently, the primary 
-distinction between particle methodologies often lies not in their particle representation, but in the 
-assumptions and interaction models used to generate particle behavior.
+Particle-based simulation encompasses a broad family of methodologies including molecular dynamics (MD),
+discrete element methods (DEM), smoothed particle hydrodynamics (SPH), material point methods (MPM),
+dissipative particle dynamics (DPD), and numerous other specialized formulations. These methods employ
+different interaction models and mathematical formulations to represent particle behavior across a
+wide range of physical applications.
 
 Molecular dynamics (MD) derives particle interactions from interatomic potential functions that describe attraction, repulsion, 
 and bonding behavior. Forces are obtained from the gradient of the potential-energy function and subsequently integrated to 
@@ -25,7 +23,13 @@ fields and their derivatives. Consequently, particle motion is governed by conti
 formulation rather than direct particle-contact interactions.
 
 Despite their differences, existing particle methodologies commonly derive particle interactions from potential functions, 
-contact laws, continuum approximations, or specialized response models. The present work investigates an alternative 
-formulation in which particle interactions arise directly from geometric relationships between particles. Rather than 
-beginning from a prescribed physical model associated with a particular phenomenon, the Field Particle System derives 
-particle behavior from geometric interaction states and their evolution through time.
+contact laws, continuum approximations, or specialized response models. Particle methodologies also differ in the manner in
+which interactions are evaluated and state updates are performed. These can significantly influence parallel
+execution characteristics, synchronization requirements, and computational efficiency.
+
+The Field Particle System adopts the source-owned interaction model introduced by gPCD. Particle
+interactions are evaluated from the perspective of the source particle, and state updates are restricted
+to quantities owned by the evaluating particle. This ownership model eliminates shared-state
+modification during pair interactions, reduces synchronization requirements, and naturally supports
+parallel execution. Consequently, force evaluation, acceleration accumulation, and state evolution
+remain locally owned by each particle throughout the simulation.

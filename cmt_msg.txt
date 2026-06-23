@@ -1,12 +1,10 @@
 Current status:
-	- Updated Dynamics documentation after the wall-model/export refresh.
-	- Recorded the current ForceDynamics GLSL boundary model structure.
-	- Documented that reservoir lifecycle helpers are exporter-emitted custom GLSL.
-	- Captured the remaining tunneling-detection gap as sampled overlap vs swept crossing.
+	- Documented vertical boundary-particle reservoir flow in Vulkan.
+	- Recorded the WALL_FUNC versus PERIODIC_DIRECTION selector split.
+	- Captured the GeneralViewing orientation finding as a display-side issue.
 
 Code Changes:
-	- Updated Porting.tex with the reusable ForceDynamics.glsl export model and wrapper-owned wall selection.
-	- Updated ForceDynamicsSource.tex with the tunneling-detection analysis and planned error path.
-	- Updated ProblemEvolution.tex with the boundary-particle export and wall-model transition.
+	- Documentation changes in this update-project pass.
+	- Updated FlowDynamicsConventions, ForceDynamicsSource, Porting, and ProblemEvolution.
 
-Next: Add swept tunneling detection for particle contacts and boundary-particle wall segments, then wire that into the compute error/termination path.
+Next: Verify Vulkan view orientation by testing or correcting GeneralViewing initial rotations or scenario initial_view.

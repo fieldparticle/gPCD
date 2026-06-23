@@ -591,3 +591,66 @@ contact when the current distance is inside the radius tolerance, but they do
 not yet perform swept crossing tests.  Tunneling should therefore be detected
 as an error in the hand-maintained contact-query or wall-segment shader path,
 not hidden as a dynamics correction.
+
+\subsection{Vertical Boundary-Particle Reservoir Flow In Vulkan}
+
+\subsubsection{<previous form>}
+
+The boundary-particle reservoir Vulkan path initially reused the horizontal
+reservoir assumptions.  Boundary marker contacts could be routed through the
+boundary-particle wall path, but the reservoir lifecycle helpers still placed
+newly born particles and retired escaped particles along the \(x\) direction.
+The active wall-segment function and the reservoir flow direction were also
+easy to confuse because both appeared in generated shader configuration.
+
+\subsubsection{<current form>}
+
+The generated boundary configuration now separates the two selectors:
+
+\begin{verbatim}
+#define WALL_FUNC vertical_wall
+#define PERIODIC_DIRECTION vertical
+\end{verbatim}
+
+\texttt{WALL\_FUNC} chooses the boundary-marker wall-segment evaluator:
+\texttt{EvaluateHorizontalWallSegment} or
+\texttt{EvaluateVerticalWallSegment}.  \texttt{PERIODIC\_DIRECTION} chooses
+the reservoir lifecycle direction.  When it is \texttt{vertical},
+\texttt{StartReservoir(SourceID)} preserves the generated \(x\) coordinate
+and moves the particle to \(y_{\min}+2.2r\).  The existing
+\texttt{RetireParticlePastXMax(SourceID)} wrapper-compatible helper then
+retires the particle when its next position passes \(y_{\max}\).  When the
+selector is not vertical, the historical \(x\)-direction behavior remains.
+
+During validation, apparent downward screen motion was traced to the viewing
+transform rather than to the reservoir force or lifecycle rule.  In
+\texttt{Resource::GeneralViewing}, the configured zero-angle view still
+receives hard-coded \(180^\circ\) rotations about \(z\) and \(y\), and the
+Vulkan projection applies the normal clip-space y correction.  Therefore a
+positive simulation \(y\) velocity can appear as downward motion depending on
+the current view.
+
+\subsubsection{difference outcome}
+
+Full solution for generated GLSL wall-function selection and vertical
+reservoir lifecycle selection.  View-orientation cleanup remains a display
+task.
+
+\subsubsection{<Analysis>}
+
+The key correction was not to infer reservoir flow from wall geometry inside
+the dynamics law.  Wall response and lifecycle direction are separate
+configuration facts:
+
+\begin{itemize}
+    \item \texttt{WALL\_FUNC} describes the wall segment represented by a
+    boundary marker.
+    \item \texttt{PERIODIC\_DIRECTION} describes the axis used for reservoir
+    birth and retirement.
+\end{itemize}
+
+This keeps the generated \texttt{ForceDynamics.glsl} reusable while letting
+the scenario wrapper and generated config includes own scenario-specific
+selection.  The remaining view issue should be diagnosed as rendering
+orientation, not particle dynamics, unless direct position/velocity reports
+show negative \(y\) motion in simulation coordinates.

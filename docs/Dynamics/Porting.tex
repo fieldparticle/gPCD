@@ -97,6 +97,24 @@ Boundary parameters are generated from the scenario cfg into
 Generated ForceDynamics code assumes those symbols exist and must not hardcode
 the cfg values.
 
+Boundary-particle scenarios also generate selector defines.  Wall-segment
+shape is selected by:
+\begin{verbatim}
+#define WALL_FUNC horizontal_wall
+#define WALL_FUNC vertical_wall
+\end{verbatim}
+
+Reservoir periodic direction is selected separately by:
+\begin{verbatim}
+#define PERIODIC_DIRECTION horizontal
+#define PERIODIC_DIRECTION vertical
+\end{verbatim}
+
+\texttt{ForceDynamics.glsl} defines numeric selector tokens for
+\texttt{horizontal\_wall}, \texttt{vertical\_wall}, \texttt{horizontal}, and
+\texttt{vertical} so preprocessor comparisons do not accidentally compare
+undefined identifiers.
+
 \subsection{Python-Only Infrastructure}
 
 Config loading, reports, inline tests, scenario hooks, CSV diagnostics, and UI
@@ -596,7 +614,10 @@ updates both position buffers, sets \texttt{Data.w=0}, and returns
 \texttt{RetireParticlePastXMax(SourceID)} is called after
 \texttt{CalcPosition(SourceID)}.  It reads the next position buffer, the buffer
 written by \texttt{CalcPosition}, and sets \texttt{Data.w=-1} when the source
-center passes the x outlet boundary.
+center passes the selected outlet boundary.  The historical function name is
+retained for wrapper compatibility.  The generated body uses
+\texttt{PERIODIC\_DIRECTION}: horizontal flow births and retires along \(x\),
+while vertical flow births and retires along \(y\).
 
 The compute shader sequence is:
 \begin{verbatim}

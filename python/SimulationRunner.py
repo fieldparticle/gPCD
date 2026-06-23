@@ -243,6 +243,17 @@ def _sequential_contact_diagnostics(particles):
     return 0.0, 0.0
 
 
+def _has_active_wall_contact(particle):
+    contacts = getattr(particle, "contacts", getattr(particle, "gcs", []))
+    for contact in contacts:
+        ids = getattr(contact, "ids", None)
+        if ids is None:
+            continue
+        if int(getattr(ids, "y", 0)) == 2 and int(getattr(ids, "w", 0)) == 1:
+            return True
+    return False
+
+
 def _run_start_diagnostics(dynamics):
     particles = dynamics.particles
     ke = _total_kinetic_energy(particles, dynamics)
@@ -440,6 +451,9 @@ def _draw_particles(
         if hsv_color:
             fill = hsv_angle(particle.VelRad.w, hsv_val, hsv_sat)
             edge = fill
+        elif _has_active_wall_contact(particle):
+            fill = (255, 60, 60)
+            edge = (255, 220, 220)
         elif particle.collision_list:
             fill = (255, 140, 110)
             edge = (255, 220, 200)

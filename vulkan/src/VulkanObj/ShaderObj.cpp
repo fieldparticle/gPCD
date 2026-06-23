@@ -103,6 +103,8 @@ void ShaderObj::WriteWalls()
 			"const float BOUNDARY_YMIN  = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallYMIN", true) << ";\n"
 			"const float BOUNDARY_YMAX  = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallYMAX", true) << ";\n"
 			"const float wall_contact_offset = " << std::fixed << std::setprecision(2) << 0.20 << ";\n"
+			"#define WALL_FUNC "  << CfgApp->GetString("application.boundary_particle_function", true) << "\n"
+			"#define PERIODIC_DIRECTION " << CfgApp->GetString("application.periodic_direction", true) << "\n"
 			"#define " << CfgApp->GetString("application.wall_type",true) << "\n"
 			"#endif\n";
 	}
@@ -183,14 +185,15 @@ void  ShaderObj::WriteShaderHeader()
 		std::ostringstream hsv_sat;
 		std::ostringstream hsv_val;
 		bool has_hsv = false;
-		if (CfgTst->CheckKey("hsv_color"))
+		
+		if (CfgApp->CheckKey("application.hsv_color"))
 		{
-			if (CfgTst->GetInt("hsv_color", true) == 1)
+			if (CfgApp->GetBool("application.hsv_color", true) == 1)
 			{
 				has_hsv = true;
 				hsv_color_on << "const uint HSV_ON = 1u;\n";
-				hsv_sat << "const float HSV_SAT = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("hsv_sat", true) << ";\n";
-				hsv_val << "const float HSV_VAL = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("hsv_val", true) << ";\n";
+				hsv_sat << "const float HSV_SAT = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_sat", true) << ";\n";
+				hsv_val << "const float HSV_VAL = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_val", true) << ";\n";
 			}
 			else
 			{

@@ -108,7 +108,11 @@ RetireParticlePastXMax(SourceID)
 The compute shader calls this function after \texttt{CalcPosition(SourceID)}.
 It reads the next position buffer, the buffer just written by
 \texttt{CalcPosition}, and sets \texttt{Data.w=-1} when the particle has
-passed the outlet x boundary.
+passed the selected outlet boundary.  For horizontal reservoir flow this is
+the \(x_{\max}\) outlet.  For vertical reservoir flow this is the
+\(y_{\max}\) outlet.  The legacy function name is retained for shader-wrapper
+compatibility even though the implementation now respects the generated
+\texttt{PERIODIC\_DIRECTION} selector.
 
 \subsection{Boundary Rule}
 
@@ -156,10 +160,12 @@ The current straight-wall implementation is:
 EvaluateWallSegment(SourceID, BoundaryID)
 \end{verbatim}
 
-For now, each boundary marker represents a straight horizontal wall segment
-through the center of the marker's cell.  The evaluator determines whether
-the marker belongs to the lower or upper wall from the boundary-marker
-geometry, calculates the current source-to-segment wall ghost geometry, and
+For now, each boundary marker represents either a straight horizontal or
+straight vertical wall segment through the center of the marker's cell.  The
+selected wall function is generated into \texttt{boundary.glsl} as
+\texttt{WALL\_FUNC}.  Horizontal segments classify markers as lower or upper
+walls.  Vertical segments classify markers as left or right walls.  The
+evaluator calculates the current source-to-segment wall ghost geometry and
 returns the normal, overlap area, center distance, and wall flag needed by the
 ordinary wall contact slot.  Later sloped or curved boundaries should extend
 \texttt{EvaluateWallSegment} without changing the source-owned force
@@ -248,6 +254,13 @@ RetireParticlePastXMax(SourceID);
 This preserves source ownership.  The reservoir state gates only the current
 source invocation; it does not write target particles and does not introduce a
 separate global reservoir pass.
+
+The generated \texttt{PERIODIC\_DIRECTION} selector controls whether the inlet
+and outlet are interpreted along \(x\) or \(y\).  When
+\texttt{PERIODIC\_DIRECTION} is \texttt{vertical}, birth preserves the
+generated \(x\) coordinate and offsets the \(y\) coordinate from
+\(y_{\min}\).  Retirement then checks \(y_{\max}\).  When the selector is not
+vertical, the historical horizontal \(x\)-axis behavior is used.
 
 
 \subsection{Birth Placement Rule}

@@ -8,7 +8,7 @@
 \contentsline {subsection}{\numberline {1.7}ForceDynamics:BoundaryParticleAppliesToSource}{9}{subsection.1.7}%
 \contentsline {subsection}{\numberline {1.8}ForceDynamics:IsBoundaryParticle}{9}{subsection.1.8}%
 \contentsline {subsection}{\numberline {1.9}ForceDynamics:IsMobileParticleActiveForDynamics}{9}{subsection.1.9}%
-\contentsline {subsection}{\numberline {1.10}ForceDynamics:WallFlagsForDynamics}{9}{subsection.1.10}%
+\contentsline {subsection}{\numberline {1.10}ForceDynamics:WallFlagsForDynamics}{10}{subsection.1.10}%
 \contentsline {subsection}{\numberline {1.11}ForceDynamics:InitializeWallContactState}{10}{subsection.1.11}%
 \contentsline {subsection}{\numberline {1.12}ForceDynamics:InitializeContactState}{10}{subsection.1.12}%
 \contentsline {subsection}{\numberline {1.13}ForceDynamics:GetContactState}{10}{subsection.1.13}%
@@ -16,17 +16,17 @@
 \contentsline {subsection}{\numberline {1.15}ForceDynamics:GetContactSlots}{10}{subsection.1.15}%
 \contentsline {subsection}{\numberline {1.16}ForceDynamics:GetParticleGeometry}{10}{subsection.1.16}%
 \contentsline {subsection}{\numberline {1.17}ForceDynamics:GetParticleEffectiveContactGeometry}{10}{subsection.1.17}%
-\contentsline {subsection}{\numberline {1.18}ForceDynamics:GetParticlePosition}{10}{subsection.1.18}%
+\contentsline {subsection}{\numberline {1.18}ForceDynamics:GetParticlePosition}{11}{subsection.1.18}%
 \contentsline {subsection}{\numberline {1.19}ForceDynamics:TunnelingDetection}{11}{subsection.1.19}%
 \contentsline {subsection}{\numberline {1.20}ForceDynamics:GetStartFrameVelocity}{11}{subsection.1.20}%
 \contentsline {subsection}{\numberline {1.21}ForceDynamics:AccumulateContactForce}{11}{subsection.1.21}%
 \contentsline {subsection}{\numberline {1.22}ForceDynamics:GetContactStiffness}{11}{subsection.1.22}%
-\contentsline {subsection}{\numberline {1.23}ForceDynamics:GetPairStiffness}{11}{subsection.1.23}%
+\contentsline {subsection}{\numberline {1.23}ForceDynamics:GetPairStiffness}{12}{subsection.1.23}%
 \contentsline {subsection}{\numberline {1.24}ForceDynamics:CalcVelocity}{12}{subsection.1.24}%
 \contentsline {subsection}{\numberline {1.25}ForceDynamics:GetParticleMass}{12}{subsection.1.25}%
 \contentsline {subsection}{\numberline {1.26}ForceDynamics:CalcPosition}{12}{subsection.1.26}%
 \contentsline {subsection}{\numberline {1.27}Potential Energy and Diagnostics}{12}{subsection.1.27}%
-\contentsline {subsection}{\numberline {1.28}Current Numerical Results}{12}{subsection.1.28}%
+\contentsline {subsection}{\numberline {1.28}Current Numerical Results}{13}{subsection.1.28}%
 \contentsline {section}{\numberline {2}Dynamics Conventions}{13}{section.2}%
 \contentsline {subsection}{\numberline {2.1}Purpose}{13}{subsection.2.1}%
 \contentsline {subsection}{\numberline {2.2}Source-Owned Execution}{13}{subsection.2.2}%
@@ -34,7 +34,7 @@
 \contentsline {subsection}{\numberline {2.4}Frame State}{13}{subsection.2.4}%
 \contentsline {subsection}{\numberline {2.5}Force-Field Contact Response}{14}{subsection.2.5}%
 \contentsline {subsection}{\numberline {2.6}Diagnostics}{14}{subsection.2.6}%
-\contentsline {subsection}{\numberline {2.7}Momentum-First Causality}{14}{subsection.2.7}%
+\contentsline {subsection}{\numberline {2.7}Momentum-First Causality}{15}{subsection.2.7}%
 \contentsline {subsection}{\numberline {2.8}Visual Diagnostics}{15}{subsection.2.8}%
 \contentsline {subsection}{\numberline {2.9}Boundary Convention}{15}{subsection.2.9}%
 \contentsline {section}{\numberline {3}Simple Reservoir Flow}{16}{section.3}%
@@ -48,7 +48,7 @@
 \contentsline {subsection}{\numberline {3.8}ForceDynamics Invariance}{18}{subsection.3.8}%
 \contentsline {subsection}{\numberline {3.9}Unborn Particle Rule}{18}{subsection.3.9}%
 \contentsline {subsection}{\numberline {3.10}Birth Frame Rule}{19}{subsection.3.10}%
-\contentsline {subsection}{\numberline {3.11}Birth Placement Rule}{19}{subsection.3.11}%
+\contentsline {subsection}{\numberline {3.11}Birth Placement Rule}{20}{subsection.3.11}%
 \contentsline {subsection}{\numberline {3.12}Death Rule}{20}{subsection.3.12}%
 \contentsline {subsection}{\numberline {3.13}Vertex Lifecycle Rule}{20}{subsection.3.13}%
 \contentsline {section}{\numberline {4}Programming Conventions}{21}{section.4}%
@@ -91,7 +91,7 @@
 \contentsline {subsection}{\numberline {7.5}Compute Atomics}{29}{subsection.7.5}%
 \contentsline {subsection}{\numberline {7.6}Generated Boundary File}{29}{subsection.7.6}%
 \contentsline {subsection}{\numberline {7.7}Python-Only Infrastructure}{29}{subsection.7.7}%
-\contentsline {subsection}{\numberline {7.8}Rendering Diagnostics}{29}{subsection.7.8}%
+\contentsline {subsection}{\numberline {7.8}Rendering Diagnostics}{30}{subsection.7.8}%
 \contentsline {subsection}{\numberline {7.9}Known Translation Rules}{30}{subsection.7.9}%
 \contentsline {subsection}{\numberline {7.10}Porting Issues Found}{30}{subsection.7.10}%
 \contentsline {subsection}{\numberline {7.11}permanent host form}{30}{subsection.7.11}%
@@ -109,7 +109,7 @@
 \contentsline {subsection}{\numberline {8.9}Step 8: Generate Boundary-Particle Wall Helpers}{34}{subsection.8.9}%
 \contentsline {subsection}{\numberline {8.10}Step 9: Use Transient Contact Force Input}{35}{subsection.8.10}%
 \contentsline {subsection}{\numberline {8.11}Step 10: Generate Collision Processors}{35}{subsection.8.11}%
-\contentsline {subsection}{\numberline {8.12}Step 11: Generate ForceDynamics Constants}{35}{subsection.8.12}%
+\contentsline {subsection}{\numberline {8.12}Step 11: Generate ForceDynamics Constants}{36}{subsection.8.12}%
 \contentsline {subsection}{\numberline {8.13}Step 12: Export Wall Contact Configuration}{36}{subsection.8.13}%
 \contentsline {subsection}{\numberline {8.14}Step 13: Wrapper-Owned Wall Model Selection}{36}{subsection.8.14}%
 \contentsline {subsection}{\numberline {8.15}Step 14: Match Error Reporting To The Active Atomic Include}{36}{subsection.8.15}%
@@ -182,16 +182,21 @@
 \contentsline {subsubsection}{\numberline {9.13.2}<current form>}{47}{subsubsection.9.13.2}%
 \contentsline {subsubsection}{\numberline {9.13.3}difference outcome}{47}{subsubsection.9.13.3}%
 \contentsline {subsubsection}{\numberline {9.13.4}<Analysis>}{48}{subsubsection.9.13.4}%
-\contentsline {section}{\numberline {10}Programming Conventions}{48}{section.10}%
-\contentsline {subsection}{\numberline {10.1}File Boundaries}{48}{subsection.10.1}%
-\contentsline {subsection}{\numberline {10.2}Creating New Dynamics}{48}{subsection.10.2}%
+\contentsline {subsection}{\numberline {9.14}Vertical Boundary-Particle Reservoir Flow In Vulkan}{48}{subsection.9.14}%
+\contentsline {subsubsection}{\numberline {9.14.1}<previous form>}{48}{subsubsection.9.14.1}%
+\contentsline {subsubsection}{\numberline {9.14.2}<current form>}{48}{subsubsection.9.14.2}%
+\contentsline {subsubsection}{\numberline {9.14.3}difference outcome}{48}{subsubsection.9.14.3}%
+\contentsline {subsubsection}{\numberline {9.14.4}<Analysis>}{48}{subsubsection.9.14.4}%
+\contentsline {section}{\numberline {10}Programming Conventions}{49}{section.10}%
+\contentsline {subsection}{\numberline {10.1}File Boundaries}{49}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}Creating New Dynamics}{49}{subsection.10.2}%
 \contentsline {subsection}{\numberline {10.3}Programming Styles}{49}{subsection.10.3}%
-\contentsline {subsection}{\numberline {10.4}Control-Oriented (Hierarchical) Design}{49}{subsection.10.4}%
-\contentsline {subsection}{\numberline {10.5}Data-Oriented (Pipeline) Design}{50}{subsection.10.5}%
-\contentsline {subsection}{\numberline {10.6}Application to GPU and HPC Systems}{51}{subsection.10.6}%
-\contentsline {subsection}{\numberline {10.7}Summary}{52}{subsection.10.7}%
-\contentsline {subsection}{\numberline {10.8}Source-Complete Linear Dynamics}{52}{subsection.10.8}%
-\contentsline {subsection}{\numberline {10.9}Interactive Source Documentation}{52}{subsection.10.9}%
-\contentsline {subsection}{\numberline {10.10}Naming Convention}{52}{subsection.10.10}%
-\contentsline {subsection}{\numberline {10.11}Data Convention}{53}{subsection.10.11}%
-\contentsline {subsection}{\numberline {10.12}Runtime Names}{53}{subsection.10.12}%
+\contentsline {subsection}{\numberline {10.4}Control-Oriented (Hierarchical) Design}{50}{subsection.10.4}%
+\contentsline {subsection}{\numberline {10.5}Data-Oriented (Pipeline) Design}{51}{subsection.10.5}%
+\contentsline {subsection}{\numberline {10.6}Application to GPU and HPC Systems}{52}{subsection.10.6}%
+\contentsline {subsection}{\numberline {10.7}Summary}{53}{subsection.10.7}%
+\contentsline {subsection}{\numberline {10.8}Source-Complete Linear Dynamics}{53}{subsection.10.8}%
+\contentsline {subsection}{\numberline {10.9}Interactive Source Documentation}{53}{subsection.10.9}%
+\contentsline {subsection}{\numberline {10.10}Naming Convention}{53}{subsection.10.10}%
+\contentsline {subsection}{\numberline {10.11}Data Convention}{54}{subsection.10.11}%
+\contentsline {subsection}{\numberline {10.12}Runtime Names}{54}{subsection.10.12}%

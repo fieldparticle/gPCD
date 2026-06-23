@@ -71,13 +71,13 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
     
     m_UBO.model = glm::rotate(
         m_UBO.model,
-        glm::radians((rRotZ+180)),
+        glm::radians((rRotZ)),
         glm::vec3(0.0f, 0.0f, 1.0f)
     );
 
     m_UBO.model = glm::rotate(
         m_UBO.model,
-        glm::radians((rRotY+180)),
+        glm::radians((rRotY)),
         glm::vec3(0.0f, 1.0f, 0.0f)
     );
 

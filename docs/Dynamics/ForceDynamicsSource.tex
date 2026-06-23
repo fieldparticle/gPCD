@@ -133,12 +133,20 @@ force into \texttt{totalForce}.
 \ForceFunctionSection{EvaluateWallSegment}
 
 \texttt{EvaluateWallSegment(SourceID, BoundaryID)} is the boundary-particle
-wall geometry evaluator.  For the current reservoir model, each boundary
-marker represents a straight horizontal wall segment through the marker's
-cell.  The evaluator classifies the marker as the lower or upper wall from
-the boundary-marker geometry, constructs the stationary wall ghost for the
-mobile source, and returns normal, overlap area, center distance, and wall
-flag.  Later sloped or curved boundaries should extend this evaluator without
+wall geometry dispatcher.  The selected wall-segment function is supplied by
+the scenario configuration and generated into \texttt{boundary.glsl} as
+\texttt{WALL\_FUNC}.  The current generated GLSL path supports:
+
+\begin{verbatim}
+EvaluateHorizontalWallSegment(SourceID, BoundaryID)
+EvaluateVerticalWallSegment(SourceID, BoundaryID)
+\end{verbatim}
+
+Horizontal marker segments classify targets as lower or upper wall markers.
+Vertical marker segments classify targets as left or right wall markers.  In
+both cases the evaluator constructs the stationary wall ghost for the mobile
+source and returns normal, overlap area, center distance, and wall flag.
+Later sloped or curved boundaries should extend this dispatcher without
 changing the source-owned force accumulation rule.
 
 \ForceFunctionSection{BoundaryParticleAppliesToSource}
