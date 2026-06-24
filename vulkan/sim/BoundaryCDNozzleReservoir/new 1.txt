@@ -1,0 +1,4 @@
+particle_columns = 100;
+particles_per_row = 100;
+particles_per_cell_row = 4;
+fraction_of_diameter_separation = 0.1;

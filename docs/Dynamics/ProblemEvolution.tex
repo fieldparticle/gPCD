@@ -773,3 +773,81 @@ the non-flow max wall; instead the physical wall must be placed far enough
 inside the cell array.  Manual side-length selection will make this explicit
 and prevent generated \texttt{params.glsl}, \texttt{boundary.glsl}, and the
 binary particle distribution from drifting out of agreement.
+
+\subsection{CD Nozzle Boundary-Only Generator}
+
+\subsubsection{<previous form>}
+
+The project had straight boundary-particle reservoir generators for horizontal
+and vertical pipe-wall tests.  The older MATLAB CD nozzle scripts generated a
+boundary-particle nozzle by sweeping a piecewise radius profile along an axial
+direction, but that geometry was not yet represented as a Python generator.
+The MATLAB setup also encoded fixed section lengths directly in
+\texttt{GetDevalleRadius.m}, so entry length, convergence length, throat
+length, divergence length, and exit length were not separately configurable.
+
+\subsubsection{<current form>}
+
+\texttt{BoundaryCDNozzleReservoir.py} is now a boundary-only generator.  It
+does not generate mobile reservoir particles and does not run birth/death
+lifecycle setup.  The generated particle records are boundary markers:
+\begin{verbatim}
+ptype = 1.0
+Data.w = 0.0
+\end{verbatim}
+and \texttt{dispatchx} remains one because there are no mobile source
+particles to process.
+
+The nozzle profile is parameterized by section lengths and radii:
+\begin{verbatim}
+dim
+nozzle_inlet_length
+nozzle_converge_length
+nozzle_throat_length
+nozzle_diverge_length
+nozzle_exit_length
+nozzle_inlet_radius
+nozzle_throat_radius
+nozzle_exit_radius
+\end{verbatim}
+The total axial length is calculated from the section lengths:
+\[
+L =
+L_{\mathrm{inlet}}+
+L_{\mathrm{converge}}+
+L_{\mathrm{throat}}+
+L_{\mathrm{diverge}}+
+L_{\mathrm{exit}}.
+\]
+
+When \texttt{dim=2}, the generator writes the upper and lower nozzle profile
+in a single \(z\) plane.  When \texttt{dim=3}, it writes circular boundary
+marker rings along the axial direction.  This allows the project to verify the
+boundary-particle cloud in Python and Vulkan before adding mobile particles or
+curved-wall dynamics.
+
+\subsubsection{difference outcome}
+
+Particle solution for geometry generation.  The nozzle boundary cloud can now
+be generated independently of mobile flow.  The next step is to add a curved
+wall function so a boundary marker can represent the local nozzle wall segment
+instead of only horizontal or vertical straight-wall segments.
+
+\subsubsection{<Analysis>}
+
+The CD nozzle should not be treated as another horizontal or vertical pipe
+case.  It is a boundary-particle geometry family with a radius function.  The
+generator's first responsibility is to produce a trustworthy marker cloud; the
+dynamics law should then receive those markers through the same
+boundary-particle wall path used by straight walls.
+
+For the next step, \texttt{EvaluateWallSegment(SourceID, BoundaryID)} needs a
+curve-aware function selected by configuration, for example:
+\begin{verbatim}
+boundary_particle_function = "cd_nozzle_wall";
+\end{verbatim}
+In 2D this function should evaluate the local nozzle profile curve and return
+the wall normal, penetration/overlap geometry, wall flag, and validity.  In 3D
+the corresponding function should evaluate the radial wall from the nozzle
+centerline.  The source-owned force accumulation rule does not change; only
+the wall-segment evaluator changes.

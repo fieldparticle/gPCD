@@ -287,9 +287,8 @@ class BoundaryParticleReservoirPeriodic():
         fstr = f"index = {self.index};\n"     
         f.write(fstr)
         # size lengths must be plus 1 since the cell locations start as <0,0,0>
-        # THIS is the only place you so this - The vulkan code nees to check this
-        if "over_ride_side_length" in run_cfg:
-            self.side_len = run_cfg.over_ride_side_length
+        # Side length is selected before geometry is generated so walls,
+        # particles, and test metadata agree.
         fstr = f"CellAryW = {int(self.side_len)};\n"     
         f.write(fstr)
         fstr = f"CellAryH = {int(self.side_len)};\n"     
@@ -384,25 +383,47 @@ class BoundaryParticleReservoirPeriodic():
             self.itemcfg.particles_per_row / self.itemcfg.particles_per_cell_row
         ) + 2.0
 
-    def configure_vertical_pipe_geometry(self):
-        margin = self.boundary_guard_margin_cells()
-        base_side_len = self.base_pipe_side_len()
-        self.side_len = base_side_len + (2.0 * margin)
-        self.wallxmin = margin + 0.5
-        self.wallxmax = margin + base_side_len - 1.0
-        self.wallymin = 0.5
-        self.wallymax = self.side_len - 1.0
-        return margin, base_side_len
+    def configured_side_len(self, run_cfg, base_side_len, margin):
+        override = float(
+            self.cfg_value(
+                run_cfg,
+                "over_ride_side_length",
+                self.cfg_value(self.itemcfg, "over_ride_side_length", 0.0),
+            )
+        )
+        if override > 0.0:
+            return override
+        return base_side_len + (2.0 * margin)
 
-    def configure_horizontal_pipe_geometry(self):
+    def centered_pipe_offset(self, side_len, base_side_len):
+        return max(0.0, 0.5 * (side_len - base_side_len))
+
+    def boundary_wall_length(self, run_cfg):
+        return float(self.cfg_value(run_cfg, "wall_boundary_length", self.side_len - 1.0))
+
+    def configure_vertical_pipe_geometry(self, run_cfg):
         margin = self.boundary_guard_margin_cells()
         base_side_len = self.base_pipe_side_len()
-        self.side_len = base_side_len + (2.0 * margin)
+        self.side_len = self.configured_side_len(run_cfg, base_side_len, margin)
+        pipe_offset = self.centered_pipe_offset(self.side_len, base_side_len)
+        wall_length = self.boundary_wall_length(run_cfg)
+        self.wallxmin = pipe_offset + 0.5
+        self.wallxmax = pipe_offset + base_side_len - 1.0
+        self.wallymin = 0.5
+        self.wallymax = min(self.side_len - 1.0, self.wallymin + wall_length)
+        return margin, base_side_len, pipe_offset, wall_length
+
+    def configure_horizontal_pipe_geometry(self, run_cfg):
+        margin = self.boundary_guard_margin_cells()
+        base_side_len = self.base_pipe_side_len()
+        self.side_len = self.configured_side_len(run_cfg, base_side_len, margin)
+        pipe_offset = self.centered_pipe_offset(self.side_len, base_side_len)
+        wall_length = self.boundary_wall_length(run_cfg)
         self.wallxmin = 0.5
-        self.wallxmax = self.side_len - 1.0
-        self.wallymin = margin + 0.5
-        self.wallymax = margin + base_side_len - 1.0
-        return margin, base_side_len
+        self.wallxmax = min(self.side_len - 1.0, self.wallxmin + wall_length)
+        self.wallymin = pipe_offset + 0.5
+        self.wallymax = pipe_offset + base_side_len - 1.0
+        return margin, base_side_len, pipe_offset, wall_length
     
     # Generate vertical-wall boundary flow.
     def gen_vert(self):
@@ -437,11 +458,14 @@ class BoundaryParticleReservoirPeriodic():
         print(f"Particle row length difference is {particle_row_length_difference:.2f} can fit {can_fit:.2f} particles")
         particles_per_row = self.itemcfg.particles_per_row
         required_width = particles_per_row/self.itemcfg.particles_per_cell_row
-        margin, base_side_len = self.configure_vertical_pipe_geometry()
+        margin, base_side_len, pipe_offset, wall_length = self.configure_vertical_pipe_geometry(
+            RUN_CONFIGURATION
+        )
         print(
             f"Side length is {self.side_len} for particles per row of {particles_per_row} "
             f"and particles per cell row of {self.itemcfg.particles_per_cell_row}; "
-            f"vertical pipe walls use {margin} guard cells outside base side length {base_side_len}"
+            f"vertical pipe is centered with cross-axis offset {pipe_offset} "
+            f"inside base side length {base_side_len}; wall boundary length {wall_length}"
         )
         total_cell_row_length = self.itemcfg.particles_per_cell_row*particle_length
         empty_space = 1.0 - total_cell_row_length 
@@ -456,7 +480,7 @@ class BoundaryParticleReservoirPeriodic():
             particle_length,
             particles_per_row,
         )
-        release_cfg["base_x"] = release_cfg["base_x"] + margin
+        release_cfg["base_x"] = release_cfg["base_x"] + pipe_offset
         try:
             for col in range(1,self.itemcfg.particle_columns+1):    
                 for row in range(1,particles_per_row+1):     
@@ -520,11 +544,14 @@ class BoundaryParticleReservoirPeriodic():
         print(f"Particle row length difference is {particle_row_length_difference:.2f} can fit {can_fit:.2f} particles")
         particles_per_row = self.itemcfg.particles_per_row
         required_width = particles_per_row/self.itemcfg.particles_per_cell_row
-        margin, base_side_len = self.configure_horizontal_pipe_geometry()
+        margin, base_side_len, pipe_offset, wall_length = self.configure_horizontal_pipe_geometry(
+            RUN_CONFIGURATION
+        )
         print(
             f"Side length is {self.side_len} for particles per row of {particles_per_row} "
             f"and particles per cell row of {self.itemcfg.particles_per_cell_row}; "
-            f"horizontal pipe walls use {margin} guard cells outside base side length {base_side_len}"
+            f"horizontal pipe is centered with cross-axis offset {pipe_offset} "
+            f"inside base side length {base_side_len}; wall boundary length {wall_length}"
         )
         total_cell_row_length = self.itemcfg.particles_per_cell_row*particle_length
         empty_space = 1.0 - total_cell_row_length 
@@ -540,7 +567,7 @@ class BoundaryParticleReservoirPeriodic():
             particle_length,
             particles_per_row,
         )
-        release_cfg["base_y"] = release_cfg["base_y"] + margin
+        release_cfg["base_y"] = release_cfg["base_y"] + pipe_offset
         try:
             for col in range(1,total_colums+1):    
                 for row in range(1,particles_per_row+1):     

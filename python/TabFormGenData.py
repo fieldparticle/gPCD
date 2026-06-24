@@ -117,16 +117,16 @@ class TabGenData(QTabWidget):
         except BaseException as e:
             self.log.log(self,f"Unable to open item configurations file:{e}")
             self.hasConfig = False
-            return 
+            return False
         if self.itemcfg.type != "verfperf":
             self.study_mode = False
             self.batch_mode = False
             if self.itemcfg.type == "batch":
                 self.batch_mode = True
-                return
+                return True
             if self.itemcfg.study == True:
                 self.study_mode = True
-                return
+                return True
         try:
             notepad_plus_plus_path = "C:\\Program Files\\Notepad++\\notepad++.exe" # Adjust as needed
             subprocess.Popen([notepad_plus_plus_path, self.CfgFile])
@@ -139,7 +139,7 @@ class TabGenData(QTabWidget):
             self.gen_class.create(self,self.itemcfg) 
         except BaseException as e:
             self.log.log(self,f"Unable to import data generation file: error:{e}")
-            return 
+            return False
         self.update_data_list_widget()
         self.plot_obj.create(self.itemcfg,self)
         
@@ -152,7 +152,7 @@ class TabGenData(QTabWidget):
     # reload the configuration file
     #
     def refresh(self):
-        self.load_item_cfg(self.CfgFile)
+        return self.load_item_cfg(self.CfgFile)
     #******************************************************************
     # Browse to an existing cfg file
     #
@@ -188,7 +188,9 @@ class TabGenData(QTabWidget):
     #
     def gen_data(self):
          # Pass the function to execute
-        self.refresh()
+        if self.refresh() == False:
+            print("Config file error")
+            return
         index = 0
         os.system('cls' if os.name == 'nt' else 'clear')
         self.current_test_file = 0

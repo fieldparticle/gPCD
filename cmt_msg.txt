@@ -1,9 +1,9 @@
 Current status:
-	- Diagnosed boundary-particle reservoir cell_guard max-side retirement.
-	- Documented that physical boundary-particle walls and cell-array guard limits must be separated.
-	- Recorded that the next step is manually setting reservoir cell-array side length.
+	- Added boundary-only CD nozzle generator documentation.
+	- Recorded parameterized nozzle profile lengths and 2D/3D generation modes.
+	- Identified curve wall evaluation as the next dynamics step.
 
 Code Changes:
-	- Updated ProblemEvolution.tex with the cell-guard margin investigation and next implementation direction.
+	- Updated ProblemEvolution.tex with CD nozzle boundary-only generator state.
 
-Next: Add manual cell-array side length control to BoundaryParticleReservoirPeriodic generation.
+Next: Add curve-aware boundary wall function for CD nozzle walls.

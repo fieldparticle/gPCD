@@ -1,7 +1,7 @@
 @echo off
 
-set newPrefix=BoundaryParticleReservoirPeriodic
-set oldPrefix=SimpleReservoirPeriodic
+set newPrefix=BoundaryCDNozzleReservoir
+set oldPrefix=BoundaryParticleReservoirPeriodic
 
 set old_dir=%~dp0%oldPrefix%
 set new_dir=%~dp0%newPrefix%
