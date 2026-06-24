@@ -5,7 +5,7 @@ bool ParticleLifeActive(uint SourceID,uint FrameNum)
     if (state_flag < 0.0)
         return false;
 
-    if (state_flag > float(FrameNum))
+    if (state_flag > 0.0)
         return false;
 
     return true;

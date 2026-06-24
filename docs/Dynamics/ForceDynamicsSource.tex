@@ -7,12 +7,22 @@
   \label{force:#1}%
 }
 
-\texttt{ForceDynamics} treats overlap area as an instantaneous central
-repulsive force field.  One source-particle invocation detects all current
-particle and wall contacts, immediately vector-sums their forces into a
-source-local \texttt{totalForce}, and writes only the source velocity and
-position.  The implementation is shaped to transfer directly to one GLSL
-compute invocation per source particle.
+\texttt{ForceDynamics} treats contact geometry as an instantaneous central
+repulsive force field.  Python still calculates and records overlap area for
+diagnostics and for the optional area-force mode.  The current default
+configuration uses penetration depth as the force measure:
+\begin{verbatim}
+contact_force_measure = "depth";
+\end{verbatim}
+The alternate supported mode is:
+\begin{verbatim}
+contact_force_measure = "area";
+\end{verbatim}
+One source-particle invocation detects all current particle and wall contacts,
+immediately vector-sums their forces into a source-local \texttt{totalForce},
+and writes only the source velocity and position.  The implementation is
+shaped to transfer directly to one GLSL compute invocation per source
+particle.
 
 \texttt{ForceDynamics} currently supports three wall interpretations:
 \begin{itemize}
@@ -145,9 +155,10 @@ EvaluateVerticalWallSegment(SourceID, BoundaryID)
 Horizontal marker segments classify targets as lower or upper wall markers.
 Vertical marker segments classify targets as left or right wall markers.  In
 both cases the evaluator constructs the stationary wall ghost for the mobile
-source and returns normal, overlap area, center distance, and wall flag.
-Later sloped or curved boundaries should extend this dispatcher without
-changing the source-owned force accumulation rule.
+source and returns normal, overlap area, center distance, and wall flag.  The
+force accumulator then uses the configured contact-force measure.  Later
+sloped or curved boundaries should extend this dispatcher without changing
+the source-owned force accumulation rule.
 
 \ForceFunctionSection{BoundaryParticleAppliesToSource}
 
@@ -214,8 +225,12 @@ array owned by the source particle.
 
 \texttt{GetParticleGeometry(SourceID, TargetID)} calculates overlap area,
 center distance, penetration depth, and the source-to-target normal from the
-immutable frame-start position snapshot.  Ordinary contacts use the physical
-particle radii.  If the pair belongs to a starting contact,
+immutable frame-start position snapshot.  In depth mode, the source orientation
+vector points from the source center to the source boundary in the collision
+direction, the proximity vector points from the source center to the target
+leading edge, and penetration depth is the orientation magnitude minus the
+proximity magnitude.  Ordinary contacts use the physical particle radii.  If
+the pair belongs to a starting contact,
 \texttt{GetParticleGeometry} obtains effective radii from
 \texttt{GetParticleEffectiveContactGeometry}.  The effective radii make the
 starting separation a zero-force limit.  If a resolved starting contact is
@@ -271,17 +286,51 @@ For every current particle or wall contact,
 \texttt{AccumulateContactForce(SourceID, contact\_state, totalForce)} applies:
 
 \begin{equation}
-F_{ij}=q_{ij}A_{ij},
+F_{ij}=q_{ij}M_{ij},
 \end{equation}
 
 \begin{equation}
 \mathbf F_i \mathrel{+}= -F_{ij}\mathbf n_{ij}.
 \end{equation}
 
-The force is applied during both compression and rebound.  Ordinary contacts
-use physical overlap area.  Starting contacts use effective overlap area
-measured from their starting separation.  There is no contact weighting,
-available-momentum cap, collision phase, or stored internal momentum.
+\(M_{ij}\) is selected by \texttt{contact\_force\_measure}.  In the default
+\texttt{depth} mode, \(M_{ij}\) is penetration depth.  With
+\(\mathbf O_i\) as the source orientation vector and \(\mathbf P_{ij}\) as the
+source-to-target-leading-edge proximity vector:
+\begin{equation}
+M_{ij}=\delta_{ij}=\lVert\mathbf O_i\rVert-\lVert\mathbf P_{ij}\rVert,
+\end{equation}
+which reduces to:
+\begin{equation}
+M_{ij}=r_i+r_j-\lVert \mathbf x_j-\mathbf x_i\rVert.
+\end{equation}
+For wall contacts the equal-radius wall ghost gives
+\(M_{ij}=2r_i-d_{\mathrm{wall}}\).  In \texttt{area} mode, \(M_{ij}\) is the
+circle-overlap area \(A_{ij}\), preserving the earlier force law.  Python
+continues to calculate overlap area in both modes for diagnostics and for
+area-mode comparison.
+
+The force is applied during both compression and rebound.  Starting contacts
+use effective geometry measured from their starting separation.  There is no
+contact weighting, available-momentum cap, or collision phase.  Source-owned
+recoverable internal momentum is recorded as a diagnostic only and does not
+feed back into velocity.
+
+\ForceFunctionSection{RecoverableInternalMomentum}
+
+Each source particle owns a recoverable internal momentum vector in
+\texttt{parms.yzw}.  \texttt{parms.x} remains particle mass.  During
+compression, \texttt{AccumulateContactForce} adds the current contact impulse
+along the contact normal to this vector.  During rebound, it releases the
+stored component along the same normal, limited by the current contact
+impulse.  The scalar magnitude is mirrored to \texttt{Data.z} and to the
+Python \texttt{internal\_momentum} report field.
+
+This is diagnostic bookkeeping only.  It is intended to show recoverable
+collision compression rising during approach, draining during rebound, and
+remaining nonzero when crowding or confinement blocks release.  Heat,
+thermalization, and heat-transfer coefficients are later model layers and are
+not part of the current ForceDynamics update.
 
 \ForceFunctionSection{GetContactStiffness}
 
@@ -296,6 +345,10 @@ the two particle-owned stiffness values:
 \begin{equation}
 q_{ij}=\max\left(0,\frac{q_i+q_j}{2}\right).
 \end{equation}
+
+The units of \(q\) depend on \texttt{contact\_force\_measure}.  In
+\texttt{depth} mode, \(q\) is depth stiffness.  In \texttt{area} mode, \(q\)
+is area stiffness.
 
 \ForceFunctionSection{CalcVelocity}
 

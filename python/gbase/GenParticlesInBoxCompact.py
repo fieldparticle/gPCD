@@ -145,6 +145,9 @@ class GenParticlesInBox():
         else:
             fstr = f"hsv_color = 0;\n"
         f.write(fstr)
+        contact_force_measure = getattr(run_cfg, "contact_force_measure", "area")
+        fstr = f"contact_force_measure = \"{contact_force_measure}\";\n"
+        f.write(fstr)
         fstr = f"hsv_sat = {run_cfg.hsv_sat:0.4f};\n"
         f.write(fstr)
         fstr = f"hsv_val = {run_cfg.hsv_val:0.4f};\n"

@@ -49,20 +49,21 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
 }void Resource::GeneralViewing(uint32_t SideLength, uint32_t CurrentBuffer)
 {
     float s = static_cast<float>(SideLength);
+    float cellCenter = 0.5f * s;
 
     glm::vec3 center(
-        0.5f * s,
-        0.5f * s,
-        0.5f * s
+        cellCenter,
+        cellCenter,
+        cellCenter
     );
 
     m_UBO = {};
 
     // ============================================================
     // Model
-    // Cube vertices are assumed to span:
-    // (0,0,0) to (s,s,s)
-    // Rotate about cube center.
+    // The rendered cell-array extent spans 0..SideLength.
+    // Rotate about the extent center so the cell array remains
+    // centered in the view.
     // ============================================================
 
     m_UBO.model = glm::mat4(1.0f);
@@ -148,9 +149,9 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
     // Ortho is centered in view space.
     // ============================================================
 
-    float aspect =
-        static_cast<float>(m_SCO->m_SwapChainExtent.width) /
-        static_cast<float>(m_SCO->m_SwapChainExtent.height);
+    float viewWidth = static_cast<float>(m_SCO->m_SwapChainExtent.width);
+    float viewHeight = static_cast<float>(m_SCO->m_SwapChainExtent.height);
+    float aspect = viewWidth / viewHeight;
 
     if (ZoomX == 0.0f)
     {
@@ -158,7 +159,20 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
         ZoomX = 1.0f;
     }
 
-    float half = (0.5f * s) / ZoomX;
+    float pixelMargin = 100.0f;
+    float usableWidth = viewWidth - (2.0f * pixelMargin);
+    float usableHeight = viewHeight - (2.0f * pixelMargin);
+
+    if (usableWidth <= 1.0f || usableHeight <= 1.0f)
+    {
+        usableWidth = viewWidth;
+        usableHeight = viewHeight;
+    }
+
+    float fitPixels = (usableWidth < usableHeight) ? usableWidth : usableHeight;
+    float pixelsPerWorldUnit = fitPixels / s;
+    float half = (0.5f * viewHeight / pixelsPerWorldUnit) / ZoomX;
+    //float half = 100.0f;
 
     m_UBO.proj = glm::ortho(
         -half * aspect,

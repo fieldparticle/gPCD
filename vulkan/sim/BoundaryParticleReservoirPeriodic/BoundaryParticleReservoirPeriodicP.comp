@@ -230,7 +230,11 @@ void main()
 	{
 		return;
 	}
+	#if defined(WALL_MODEL_BOUNDARY_PARTICLE) && defined(BOUNDARY_GUARD) && BOUNDARY_GUARD == cell_guard
+	RetireParticleAtCellGuard(SourceID);
+	#else
 	RetireParticlePastXMax(SourceID);
+	#endif
 	
 	#if 1 && defined(DEBUG)
 		if(uint(ShaderFlags.frameNum) == 10 && SourceID == 4)

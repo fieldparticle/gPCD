@@ -147,8 +147,8 @@ void main(){
 	// Render the particle from the same selected position buffer used to build
 	// the corner list and drive compute collision detection.
 	vec3 particleCenter = vec3(cx, cy, cz);
-	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz + particleCenter, 1.0);
-	//gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
+	//gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz + particleCenter, 1.0);
+	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
 
 	uint duplist[8];
 	uint dupcntr = 0;

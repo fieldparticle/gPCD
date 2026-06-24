@@ -75,6 +75,10 @@ class ForceDynamics(ForceContactDynamics):
             "contact_potential_energy",
             "compression_impulse",
             "release_impulse",
+            "internal_momentum_px",
+            "internal_momentum_py",
+            "internal_momentum_pz",
+            "internal_momentum_mag",
             "source_available_momentum",
             "source_available_share",
             "target_available_momentum",
@@ -125,8 +129,7 @@ class ForceDynamics(ForceContactDynamics):
         source.collision_list = []
         source.contactCount = 0
         source.colFlg = 0
-        source.internal_momentum = 0.0
-        source.Data.z = 0.0
+        self.SyncInternalMomentumMagnitude(source)
         source.total_overlap_area = 0.0
         for contact_state in self.GetContactSlots(SourceID):
             self.ClearContactSlot(contact_state)
@@ -198,12 +201,86 @@ class ForceDynamics(ForceContactDynamics):
             )
         )
         contact_state.raw_impulse = contact_state.force_magnitude * dt
+        self.RecordRecoverableInternalMomentum(SourceID, contact_state)
         contact_state.contact_potential_energy = self.GetOverlapPotentialEnergy(
             source_radius,
             target_radius,
             stiffness,
             float(contact_state.aux.x),
         )
+        return True
+
+    def SyncInternalMomentumMagnitude(self, particle):
+        """Mirror source-owned internal momentum vector magnitude for reports."""
+        px = float(getattr(particle.parms, "y", 0.0))
+        py = float(getattr(particle.parms, "z", 0.0))
+        pz = float(getattr(particle.parms, "w", 0.0))
+        magnitude = math.sqrt(px * px + py * py + pz * pz)
+        particle.internal_momentum = magnitude
+        particle.Data.z = magnitude
+        particle.report_stored_mom = magnitude
+        return magnitude
+
+    def ClearRecoverableInternalMomentum(self, particle):
+        """Clear diagnostic recoverable internal momentum for an inactive contact."""
+        particle.parms.y = 0.0
+        particle.parms.z = 0.0
+        particle.parms.w = 0.0
+        particle.internal_momentum = 0.0
+        particle.Data.z = 0.0
+        particle.report_stored_mom = 0.0
+
+    def ClearInactiveRecoverableInternalMomentum(self):
+        """Clear recoverable internal momentum when a source has no contacts."""
+        for particle_index, particle in enumerate(self.particles):
+            if not self.IsMobileParticleActiveForDynamics(particle_index):
+                continue
+            if int(getattr(particle, "contactCount", 0)) == 0:
+                self.ClearRecoverableInternalMomentum(particle)
+
+    def RecordRecoverableInternalMomentum(self, SourceID, contact_state):
+        """Diagnostic-only source-owned compression/rebound momentum storage."""
+        source = self.particles[SourceID]
+        normal_x = float(contact_state.geom.x)
+        normal_y = float(contact_state.geom.y)
+        normal_z = float(contact_state.geom.z)
+        impulse = max(0.0, float(contact_state.raw_impulse))
+        rel_vn = float(getattr(contact_state, "rel_vn", 0.0))
+
+        stored_x = float(source.parms.y)
+        stored_y = float(source.parms.z)
+        stored_z = float(source.parms.w)
+        compression_impulse = 0.0
+        release_impulse = 0.0
+
+        if rel_vn < -self.EPSILON:
+            compression_impulse = impulse
+            stored_x += compression_impulse * normal_x
+            stored_y += compression_impulse * normal_y
+            stored_z += compression_impulse * normal_z
+        elif rel_vn > self.EPSILON:
+            stored_along_normal = (
+                stored_x * normal_x
+                + stored_y * normal_y
+                + stored_z * normal_z
+            )
+            release_impulse = min(max(0.0, stored_along_normal), impulse)
+            stored_x -= release_impulse * normal_x
+            stored_y -= release_impulse * normal_y
+            stored_z -= release_impulse * normal_z
+
+        source.parms.y = stored_x
+        source.parms.z = stored_y
+        source.parms.w = stored_z
+        internal_mag = self.SyncInternalMomentumMagnitude(source)
+
+        contact_state.compression_impulse = compression_impulse
+        contact_state.release_impulse = release_impulse
+        contact_state.internal_momentum_px = stored_x
+        contact_state.internal_momentum_py = stored_y
+        contact_state.internal_momentum_pz = stored_z
+        contact_state.internal_momentum_mag = internal_mag
+        contact_state.aux.z = internal_mag
         return True
 
     def CalcVelocity(self, SourceID, totalForce):
@@ -256,6 +333,11 @@ class ForceDynamics(ForceContactDynamics):
             0.0,
             float(self.run_configuration.get("wall_contact_offset", 0.0)),
         )
+        self.contact_force_measure = str(
+            self.run_configuration.get("contact_force_measure", "area")
+        ).strip().lower()
+        if self.contact_force_measure not in {"area", "depth"}:
+            self.contact_force_measure = "area"
         self.pair_phase_totals = {}
         self.pair_phase_frame_diagnostics = []
         self.pair_phase_energy_reference = None
@@ -318,7 +400,7 @@ class ForceDynamics(ForceContactDynamics):
         particle.VelRad = self.create_vec4(vx, vy, vz, velocity_angle)
         particle.Data = self.create_vec4(radius, fields.get("collision_stiffness_q", 0.0), 0.0, fields.get("state_flg", 1.0))
         particle.parms = self.create_vec4(mass, 0.0, 0.0, 0.0)
-        particle.internal_momentum = particle.Data.z
+        particle.internal_momentum = 0.0
         particle.contacts = [self.create_geo_contact_state() for _ in range(16)]
         particle.gcs = particle.contacts
         particle.contactCount = 0
@@ -628,6 +710,7 @@ class ForceDynamics(ForceContactDynamics):
             return self.particles
         if not self.BuildWallContactLists(total_forces):
             return self.particles
+        self.ClearInactiveRecoverableInternalMomentum()
         frame_start_pairs = self.CapturePairGeometryDiagnostics()
         if not self.CalculateVelocities(total_forces):
             return self.particles
@@ -744,14 +827,8 @@ class ForceDynamics(ForceContactDynamics):
             )
             for particle in self.particles
         ]
-        ##JMB Huge model break. This would require 
-        ## Frame-start VelRad snapshot: x/y/z are velocity components, and w
-        ## is the velocity angle used by particle.glsl.
-        ## Solution is to store in parms
-        ## parms.x = mass
-        ## parms.y = frame_start_vx
-        ## parms.z = frame_start_vy
-        ## parms.w = frame_start_vz
+        ## Frame-start velocity lives in VelRadFrame. Runtime parms keeps
+        ## parms.x = mass and parms.yzw = recoverable internal momentum.
         self.VelRadFrame = [
             self.create_vec4(particle.VelRad.x, particle.VelRad.y, particle.VelRad.z, particle.VelRad.w)
             for particle in self.particles

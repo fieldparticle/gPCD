@@ -1,2 +1,347 @@
 % !TeX root = main_fps.tex
 \section{Methodology}
+
+The Field Particle System (FPS) is a particle methodology
+in which particle interactions are governed by locally
+accessible quantities evaluated at the present instant.
+Particle interactions are represented through geometric
+contact states, and forces arise directly from the
+evolving interaction geometry. State updates are
+performed through a source-owned formulation in which
+particles evaluate interactions independently and modify
+only their own state variables. Consequently, force
+evaluation, acceleration accumulation, and state
+evolution remain locally owned throughout the simulation.
+
+FPS is source-owned, meaning that particle interactions are evaluated from the 
+perspective of the source particle and state updates are restricted to quantities 
+owned by the evaluating particle. Shared-state modification does not occur 
+during pair interactions.
+
+The interaction model is purely geometric, with
+forces arising from geometric relationships between
+particles. Particle separation, overlap depth, and
+contact orientation define the interaction state
+from which force and particle motion are
+subsequently determined.
+
+The governing dynamics are instantaneous, meaning that
+particle interactions are evaluated from quantities
+available at the present instant. Previous states and
+future states do not participate directly in the
+governing dynamics.
+
+The contact model permits particles to occupy a common
+geometric region during interaction. The resulting
+penetration depth is treated as a physical interaction
+state rather than a numerical error requiring immediate
+correction.
+
+The methodology does not employ energy as a governing
+state variable. Energy may be computed as a diagnostic
+quantity but does not directly participate in the
+governing dynamics.
+
+The present implementation employs normalized state variables 
+rather than dimensional physical quantities. Variables such as 
+velocity, force, acceleration, momentum, and particle size are 
+represented using relative values that typically lie within the 
+interval $[0,1]$. Particle behavior is therefore governed by the 
+relative relationships between quantities rather than their absolute 
+physical magnitudes. The present work focuses on the geometric 
+and dynamical behavior of the methodology independent of a 
+particular physical scale.
+
+The methodology of FPS is founded upon a set of
+fundamental properties that define the governing
+dynamics and interaction model. The following sections 
+describe the geometric quantities and 
+dynamic relationships used to evolve the system 
+through time.
+
+
+\subsection{FPS Dynamics}
+
+Particles are represented by circular boundaries
+defined by a center location $\mathbf{x}_i$ and an
+effective radius $r_i$. Particle interactions occur
+when the boundaries of two particles interpenetrate,
+establishing an interaction state. The resulting penetration 
+depth serves as the fundamental interaction quantity 
+from which force, acceleration, and particle motion 
+are subsequently determined.
+
+Consider two particles having center locations
+$\mathbf{x}_i$ and $\mathbf{x}_j$ and radii
+$r_i$ and $r_j$. The center separation distance is
+
+\begin{equation}
+d_{ij}
+=
+\left\|
+\mathbf{x}_j-\mathbf{x}_i
+\right\|.
+\end{equation}
+
+Particle interaction occurs whenever
+
+\begin{equation}
+d_{ij}<r_i+r_j.
+\end{equation}
+
+Under these conditions the particle boundaries
+occupy a common geometric region. The penetration
+depth is
+
+\begin{equation}
+\delta_{ij}
+=
+r_i+r_j-d_{ij}.
+\end{equation}
+
+The penetration depth defines the interaction state
+of the particle pair. As the particle boundaries
+separate, the penetration depth continuously
+decreases to zero. As interpenetration increases,
+the penetration depth increases continuously.
+
+The penetration depth therefore defines the
+interaction state from which subsequent force
+evaluation and state evolution are derived.
+
+
+\subsubsection{Interaction Geometry}
+The interaction state is described by the geometric
+relationship between the source particle and the
+target particle. The source orientation vector
+
+\begin{equation}
+\mathbf O_i
+=
+r_i\mathbf n_{ij}
+\end{equation}
+
+extends from the source center to the source
+boundary along the interaction direction. The
+proximity vector
+
+\begin{equation}
+\mathbf P_{ij}
+=
+\mathbf x_j-r_j\mathbf n_{ij}-\mathbf x_i
+\end{equation}
+
+extends from the source center to the leading edge
+of the target particle.
+
+The penetration depth is therefore
+
+\begin{equation}
+\delta_{ij}
+=
+\|\mathbf O_i\|
+-
+\|\mathbf P_{ij}\|.
+\end{equation}
+
+\subsubsection{Force Generation}
+
+Interaction forces are generated directly from the
+geometric interaction state established by the
+penetration depth. Increasing penetration depth
+corresponds to increasing geometric incompatibility
+between the particle boundaries and therefore
+produces larger interaction forces.
+
+Each particle stores a particle-owned interaction
+strength $q_i$ specified by the particle
+configuration. For a particle pair, the pair
+interaction strength is defined as
+
+\begin{equation}
+q_{ij}
+=
+\max\left(
+0,
+\frac{q_i+q_j}{2}
+\right).
+\end{equation}
+
+The interaction force magnitude is determined from
+the product of the pair interaction strength and an
+interaction measure,
+
+\begin{equation}
+F_{ij}
+=
+q_{ij} M_{ij},
+\end{equation}
+
+where $M_{ij}$ is the interaction measure. In the
+present implementation the interaction measure is
+taken as the penetration depth,
+
+\begin{equation}
+M_{ij}
+=
+\delta_{ij},
+\end{equation}
+
+yielding
+
+\begin{equation}
+F_{ij}
+=
+q_{ij}\delta_{ij}.
+\end{equation}
+
+The interaction strength $q_{ij}$ controls the
+magnitude of the force generated for a given
+penetration depth and therefore acts as an effective
+interaction stiffness between the particle pair.
+
+The interaction strength $q_{ij}$ controls the
+magnitude of the force generated for a given
+penetration depth.
+
+\begin{equation}
+\mathbf{n}_{ij}
+=
+\frac{\mathbf{x}_j-\mathbf{x}_i}
+     {\left\|
+      \mathbf{x}_j-\mathbf{x}_i
+      \right\|}.
+\end{equation}
+
+The force acting on particle $i$ is therefore
+
+\begin{equation}
+\mathbf{F}_{ij}
+=
+-F_{ij}\mathbf{n}_{ij}.
+\end{equation}
+
+\subsubsection{Acceleration and State Evolution}
+
+The interaction force produces an acceleration that
+acts along the line joining the particle centers.
+The acceleration of particle $i$ is determined from
+
+\begin{equation}
+\mathbf{a}_i
+=
+\frac{\mathbf{F}_i}{m_i},
+\end{equation}
+
+where $m_i$ is the particle mass and
+$\mathbf{F}_i$ is the accumulated source-owned force
+acting on the particle.
+
+The acceleration acts opposite the direction of
+penetration and therefore reduces the component of
+particle velocity directed toward the interacting
+particle. As the penetration depth increases, the
+resulting interaction force increases, producing a
+corresponding increase in acceleration.
+
+During the interaction, the component of particle
+velocity along the interaction normal continuously
+decreases until it reaches zero. Because the
+interaction force remains active while penetration
+exists, continued acceleration causes the normal
+velocity component to change sign, resulting in
+particle separation.
+
+Consequently, rebound behavior emerges directly from
+the evolution of the interaction force and does not
+require explicit reflection, collision impulses, or
+velocity reversal operations.
+
+\subsubsection{Acceleration and State Evolution}
+
+After force evaluation, the accumulated source-owned
+force is converted into acceleration. For particle $i$,
+
+\begin{equation}
+\mathbf{a}_i
+=
+\frac{\mathbf{F}_i}{m_i},
+\end{equation}
+
+where $\mathbf{F}_i$ is the total force accumulated
+by the source particle and $m_i$ is the particle mass.
+
+Velocity is then updated from the current acceleration,
+
+\begin{equation}
+\mathbf{v}_i^{\,n+1}=\mathbf{v}_i^{\,n}+\mathbf{a}_i^{\,n}\Delta t .
+\end{equation}
+
+During penetration, the interaction force acts along
+the line of interaction and opposes continued motion
+into the neighboring particle. As the penetration
+depth increases, the force and acceleration increase,
+reducing the velocity component along the interaction
+normal. When this normal velocity component reaches
+zero, continued acceleration causes it to change sign.
+The particle therefore transitions from compression to
+rebound through the velocity update itself, without
+requiring an explicit reflection or velocity-reversal
+operation.
+
+\subsubsection{Momentum Conservation}
+
+The interaction force acts along the line joining the
+particle centers and therefore produces a central
+force pair. For a particle pair, the interaction
+strength is symmetric,
+
+\begin{equation}
+q_{ij}=q_{ji},
+\end{equation}
+
+and the penetration depth is identical for both
+particles,
+
+\begin{equation}
+\delta_{ij}=\delta_{ji}.
+\end{equation}
+
+Consequently, the pair force magnitudes satisfy
+
+\begin{equation}
+F_{ij}=F_{ji},
+\end{equation}
+
+while the interaction normals satisfy
+
+\begin{equation}
+\mathbf{n}_{ji}
+=
+-\mathbf{n}_{ij}.
+\end{equation}
+
+The resulting forces are therefore equal and
+opposite,
+
+\begin{equation}
+\mathbf{F}_{ji}
+=
+-\mathbf{F}_{ij}.
+\end{equation}
+
+Because the interaction forces form a central
+equal-and-opposite pair, the total linear momentum
+of the particle pair is conserved.
+
+Each particle independently evaluates the same
+interaction geometry from its own source
+perspective. The resulting pair forces are equal
+in magnitude and opposite in direction, ensuring
+momentum conservation while preserving source-owned
+state updates.
+
+Momentum conservation therefore emerges from the
+symmetry of the interaction geometry and does not
+require explicit pair updates or shared-state
+modification.

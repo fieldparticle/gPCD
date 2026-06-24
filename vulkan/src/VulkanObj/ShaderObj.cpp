@@ -86,6 +86,11 @@ void ShaderObj::WriteWalls()
 	float wallXMIN = 0.0;
 	float wallXMAX = 0.0;
 	float wallYMIN = 0.0;
+	std::string boundaryGuard = "wall_guard";
+	if (CfgApp->CheckKey("application.boundary_guard") != NULL)
+	{
+		boundaryGuard = CfgApp->GetString("application.boundary_guard", true);
+	}
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
 	std::string filename = fildir + "/boundary.glsl";
 	{
@@ -105,6 +110,7 @@ void ShaderObj::WriteWalls()
 			"const float wall_contact_offset = " << std::fixed << std::setprecision(2) << 0.20 << ";\n"
 			"#define WALL_FUNC "  << CfgApp->GetString("application.boundary_particle_function", true) << "\n"
 			"#define PERIODIC_DIRECTION " << CfgApp->GetString("application.periodic_direction", true) << "\n"
+			"#define BOUNDARY_GUARD " << CfgApp->GetString("application.boundary_guard", true)  << "\n"
 			"#define " << CfgApp->GetString("application.wall_type",true) << "\n"
 			"#endif\n";
 	}

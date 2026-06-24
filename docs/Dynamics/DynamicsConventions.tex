@@ -19,17 +19,58 @@ The opposing source evaluation reads the same frame-start geometry.  Pair
 compatibility and whole-system conservation must therefore emerge from the
 contact rule used independently by both sources.
 
-\subsection{Overlap Area Convention}
+\subsection{Contact Geometry Convention}
 
-Overlap area is a geometric contact property.  For a particle-particle contact,
-the source-side and target-side overlap areas are the same geometric area, even
-when the two particles have different velocities.  Therefore, once the overlap
-area is computed for a source-target pair, the target particle's overlap area is
-known from the same calculation.
+Contact overlap is a geometric property of the current frame-start particle
+positions and radii.  For a particle-particle contact, the source-side and
+target-side contact geometry is the same geometry, even when the two particles
+have different velocities.  Therefore, once contact geometry is computed for a
+source-target pair, the target particle's contact geometry is known from the
+same calculation.
 
 Velocity may affect momentum transfer, phase, or future position, but it does
-not make the instantaneous geometric overlap area different for the two
-particles in the same contact.
+not make the instantaneous geometric overlap different for the two particles in
+the same contact.
+
+\texttt{ForceDynamics} currently supports two scalar contact measures:
+
+\begin{itemize}
+    \item penetration depth, \(\delta_{ij}\), the default force measure;
+    \item overlap area, \(A_{ij}\), retained for diagnostics and optional
+    area-force comparison.
+\end{itemize}
+
+Both measures are geometric and source-target symmetric for a particle pair.
+Documentation must not assume that overlap area is the active force measure
+unless \texttt{contact\_force\_measure = "area"} is explicitly selected.
+
+For depth-mode particle contacts, the project uses the following vector names.
+Let \(\mathbf n_{ij}\) be the unit collision normal from the source particle
+center to the target particle center:
+
+\begin{itemize}
+    \item source orientation vector:
+    \(\mathbf O_i = r_i\mathbf n_{ij}\);
+    \item source-to-target-leading-edge proximity vector:
+    \(\mathbf P_{ij}=(\mathbf x_j-r_j\mathbf n_{ij})-\mathbf x_i\);
+    \item penetration vector:
+    \(\mathbf D_{ij}=\mathbf O_i-\mathbf P_{ij}\).
+\end{itemize}
+
+The magnitude of the source orientation vector is the source radius.  The
+magnitude of the proximity vector is the distance from the source center to the
+leading edge of the target particle along the collision line.  The penetration
+depth is the orientation magnitude minus the proximity magnitude:
+
+\begin{equation}
+\delta_{ij}=\lVert\mathbf O_i\rVert-\lVert\mathbf P_{ij}\rVert
+=r_i-(d_{ij}-r_j)=r_i+r_j-d_{ij}.
+\end{equation}
+
+Thus the proximity vector points to the intruding target edge, but the depth of
+penetration is the distance from the source boundary to that target leading
+edge.  The penetration vector has this depth as its magnitude when the vectors
+are collinear.
 
 \subsection{Frame State}
 
@@ -49,11 +90,16 @@ source-local force sum; its contact slots are diagnostic only.
 
 \subsection{Force-Field Contact Response}
 
-\texttt{ForceDynamics} treats overlap area as a central repulsive pair force:
+\texttt{ForceDynamics} treats contact geometry as a central repulsive pair
+force:
 
 \begin{equation}
-F_{ij}=q_{ij}A_{ij}.
+F_{ij}=q_{ij}M_{ij}.
 \end{equation}
+
+Here \(M_{ij}\) is the selected scalar contact measure.  In the current default
+\texttt{depth} mode, \(M_{ij}=\delta_{ij}\).  In optional \texttt{area} mode,
+\(M_{ij}=A_{ij}\).
 
 Every overlapping frame applies:
 
@@ -61,11 +107,13 @@ Every overlapping frame applies:
 \Delta\mathbf p_i=-F_{ij}\mathbf n_{ij}\Delta t.
 \end{equation}
 
-There are no compression/release phases, available-momentum caps, or
-internal-momentum ledgers.  The corresponding pair potential is:
+There are no force-law compression/release phases and no available-momentum
+caps.  Source-owned internal momentum may be recorded as diagnostic
+bookkeeping, but it does not currently feed back into the force calculation or
+the velocity update.  The corresponding diagnostic pair potential is:
 
 \begin{equation}
-U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}A_{ij}(s)\,ds.
+U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}M_{ij}(s)\,ds.
 \end{equation}
 
 The ordinary Force contact law is instantaneous and purely geometric.  Each
@@ -111,6 +159,30 @@ must occur only through current contact geometry and current contact normals.
 Energy diagnostics may expose whether the bookkeeping is consistent, but the
 governing question is where the impulse went: translational particle momentum,
 stored contact/internal momentum, or wall/constraint momentum.
+
+\subsection{Internal Momentum And Heat}
+
+Internal momentum is the local bookkeeping layer for compression that cannot be
+fully expressed as translational motion during the current timestep.  It is not
+a global energy repair, and it must not require knowledge of the future contact
+arc.  A particle may only record or release internal momentum from current
+contact geometry, current relative motion, current contact normal, and its own
+source-owned state.
+
+The current \texttt{ForceDynamics} implementation records diagnostic
+recoverable internal momentum in \texttt{parms.yzw}.  \texttt{parms.x} remains
+particle mass.  During compression, contact impulse is added along the current
+normal.  During rebound, the stored component along the current normal is
+drained.  The scalar magnitude is mirrored to \texttt{Data.z} for reporting.
+This value is diagnostic only and is not read by \texttt{CalcVelocity}.
+
+Heat is a later material model layer.  Real compressed matter can convert some
+stored mechanical compression into thermal state and later transfer that heat
+to surrounding particles or boundaries according to a heat-transfer
+coefficient.  That future model must still be local and causal: heat may be
+derived from force, momentum, compression, and material coefficients, but it
+must not be introduced as an after-the-fact command to make total energy match
+a desired value.
 
 \subsection{Visual Diagnostics}
 

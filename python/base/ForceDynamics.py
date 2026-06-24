@@ -315,8 +315,10 @@ class ForceContactDynamics:
             overlap_area,
         )
         contact_state.aux.x = center_distance
-        contact_state.aux.y = (
-            effective_source_radius + effective_target_radius - center_distance
+        contact_state.aux.y = self.ParticlePenetrationDepth(
+            effective_source_radius,
+            effective_target_radius,
+            center_distance,
         )
         contact_state.aux.z = 0.0
         contact_state.effective_source_radius = effective_source_radius
@@ -334,7 +336,9 @@ class ForceContactDynamics:
 
         Positions come from the frame-start snapshot.  When the particle radii
         overlap, return the source-to-target unit normal, circular overlap area,
-        and center distance.  Return None when no overlap exists.  Coincident
+        center distance, and effective radii.  In depth mode, penetration is
+        the source orientation magnitude minus the source-to-target-leading-edge
+        proximity magnitude.  Return None when no overlap exists.  Coincident
         centers use +x as a deterministic fallback normal.
         """
         if not self.IsParticleActiveForDynamics(SourceID):
@@ -391,6 +395,22 @@ class ForceContactDynamics:
             starting_contact,
             starting_resolved,
         )
+
+    @staticmethod
+    def ParticleProximityMagnitude(source_radius, target_radius, center_distance):
+        """Distance from source center to target leading edge along the normal."""
+        return max(0.0, center_distance - target_radius)
+
+    @classmethod
+    def ParticlePenetrationDepth(cls, source_radius, target_radius, center_distance):
+        """Return orientation magnitude minus proximity magnitude."""
+        orientation_magnitude = source_radius
+        proximity_magnitude = cls.ParticleProximityMagnitude(
+            source_radius,
+            target_radius,
+            center_distance,
+        )
+        return orientation_magnitude - proximity_magnitude
 
     def GetParticlePosition(self, ParticleID):
         """Return a particle's frame-start position.
@@ -627,7 +647,11 @@ class ForceContactDynamics:
             TargetID,
             contact_type,
         )
-        force_magnitude = pair_stiffness * max(0.0, float(contact_state.geom.w))
+        if self.contact_force_measure == "depth":
+            contact_measure = float(contact_state.aux.y)
+        else:
+            contact_measure = float(contact_state.geom.w)
+        force_magnitude = pair_stiffness * max(0.0, contact_measure)
         contact_state.force_magnitude = force_magnitude
         totalForce.x -= force_magnitude * float(contact_state.geom.x)
         totalForce.y -= force_magnitude * float(contact_state.geom.y)
@@ -793,7 +817,11 @@ class ForceContactDynamics:
             overlap_area,
         )
         contact_state.aux.x = center_distance
-        contact_state.aux.y = 2.0 * effective_radius - center_distance
+        contact_state.aux.y = self.ParticlePenetrationDepth(
+            effective_radius,
+            effective_radius,
+            center_distance,
+        )
         contact_state.aux.z = 0.0
         contact_state.effective_source_radius = effective_radius
         contact_state.effective_target_radius = effective_radius
@@ -900,8 +928,10 @@ class ForceContactDynamics:
             center_distance,
         )
         source.oa = max(source.oa, overlap_area)
-        penetration_depth = (
-            effective_source_radius + _effective_target_radius - center_distance
+        penetration_depth = self.ParticlePenetrationDepth(
+            effective_source_radius,
+            _effective_target_radius,
+            center_distance,
         )
         source.max_penetration_depth = max(
             source.max_penetration_depth,

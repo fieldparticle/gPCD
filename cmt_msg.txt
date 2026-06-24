@@ -1,10 +1,9 @@
 Current status:
-	- Documented vertical boundary-particle reservoir flow in Vulkan.
-	- Recorded the WALL_FUNC versus PERIODIC_DIRECTION selector split.
-	- Captured the GeneralViewing orientation finding as a display-side issue.
+	- Diagnosed boundary-particle reservoir cell_guard max-side retirement.
+	- Documented that physical boundary-particle walls and cell-array guard limits must be separated.
+	- Recorded that the next step is manually setting reservoir cell-array side length.
 
 Code Changes:
-	- Documentation changes in this update-project pass.
-	- Updated FlowDynamicsConventions, ForceDynamicsSource, Porting, and ProblemEvolution.
+	- Updated ProblemEvolution.tex with the cell-guard margin investigation and next implementation direction.
 
-Next: Verify Vulkan view orientation by testing or correcting GeneralViewing initial rotations or scenario initial_view.
+Next: Add manual cell-array side length control to BoundaryParticleReservoirPeriodic generation.

@@ -42,7 +42,7 @@ struct Particle {
     vec4 VelRad;               // xyz=velocity, w=velocity angle
 
     vec4 Data;                 // x=radius, y=collision_stiffness_q, z=reserved, w=state/flags
-    vec4 parms;                // x=mass, y=delta_vx, z=delta_vy, w=delta_speed
+    vec4 parms;                // x=mass, yzw=source-owned recoverable internal momentum
 
     lstr CornerList[8];
 

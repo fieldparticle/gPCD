@@ -1,5 +1,8 @@
 These are the session rules for Field Particle System.
 
+Always assume code changes are for Pythin only.
+Never modify c++ code without asking.
+
 to refresh all of the convention read 
 DocumentConventions.tex
 DynamicsConventions.tex
@@ -12,4 +15,5 @@ Pay special attentioin to definitions of :
 "update project"
 git message
 .venv location
+
 

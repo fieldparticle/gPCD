@@ -110,10 +110,19 @@ Reservoir periodic direction is selected separately by:
 #define PERIODIC_DIRECTION vertical
 \end{verbatim}
 
+The contact-force measure is selected by:
+\begin{verbatim}
+#define CONTACT_FORCE_MEASURE depth
+#define CONTACT_FORCE_MEASURE area
+\end{verbatim}
+The current default cfg-generated value is \texttt{depth}.  Python still
+computes overlap area for diagnostics and for the optional \texttt{area}
+force mode.
+
 \texttt{ForceDynamics.glsl} defines numeric selector tokens for
-\texttt{horizontal\_wall}, \texttt{vertical\_wall}, \texttt{horizontal}, and
-\texttt{vertical} so preprocessor comparisons do not accidentally compare
-undefined identifiers.
+\texttt{horizontal\_wall}, \texttt{vertical\_wall}, \texttt{horizontal},
+\texttt{vertical}, \texttt{depth}, and \texttt{area} so preprocessor
+comparisons do not accidentally compare undefined identifiers.
 
 \subsection{Python-Only Infrastructure}
 
@@ -448,6 +457,7 @@ struct ContactForceInput {
     uint contactType;
     vec3 normal;
     float overlapArea;
+    float penetrationDepth;
     bool valid;
 };
 \end{verbatim}
@@ -459,7 +469,15 @@ This keeps the generated force path independent of Python diagnostic contact
 slots.
 
 \texttt{AccumulateContactForce(...)} is therefore generated against
-\texttt{ContactForceInput}.  Python methods that allocate or populate
+\texttt{ContactForceInput}.  The generated accumulator selects the force
+measure with \texttt{CONTACT\_FORCE\_MEASURE}.  The current default generated
+configuration uses \texttt{depth}, which multiplies stiffness by
+\texttt{penetrationDepth}.  The alternate \texttt{area} mode multiplies
+stiffness by \texttt{overlapArea}, preserving the earlier overlap-area force
+law.  The accumulator also updates source-owned diagnostic internal momentum
+in \texttt{P[SourceID].parms.yzw} and mirrors its magnitude to
+\texttt{P[SourceID].Data.z}.  This value is not used by
+\texttt{CalcVelocity(...)}.  Python methods that allocate or populate
 diagnostic contact slots, such as \texttt{AppendContactSlot(...)},
 \texttt{GetContactSlots(...)}, and \texttt{GetContactState(...)}, remain
 deferred for Python parity and are not part of the generated force-storage

@@ -288,6 +288,8 @@ class BoundaryParticleReservoirPeriodic():
         f.write(fstr)
         # size lengths must be plus 1 since the cell locations start as <0,0,0>
         # THIS is the only place you so this - The vulkan code nees to check this
+        if "over_ride_side_length" in run_cfg:
+            self.side_len = run_cfg.over_ride_side_length
         fstr = f"CellAryW = {int(self.side_len)};\n"     
         f.write(fstr)
         fstr = f"CellAryH = {int(self.side_len)};\n"     
@@ -344,6 +346,9 @@ class BoundaryParticleReservoirPeriodic():
         f.write(fstr)
         fstr = f"DT = {run_cfg.dt};\n"
         f.write(fstr)
+        contact_force_measure = getattr(run_cfg, "contact_force_measure", "area")
+        fstr = f"contact_force_measure = \"{contact_force_measure}\";\n"
+        f.write(fstr)
         if run_cfg.hsv_color == True:
             fstr = f"hsv_color = 1;\n"
         else:
@@ -369,6 +374,35 @@ class BoundaryParticleReservoirPeriodic():
             self.gen_vert()
         else:
             self.gen_horz()
+
+    def boundary_guard_margin_cells(self):
+        """Return cell-array safety margin outside the physical pipe walls."""
+        return 3.0
+
+    def base_pipe_side_len(self):
+        return math.ceil(
+            self.itemcfg.particles_per_row / self.itemcfg.particles_per_cell_row
+        ) + 2.0
+
+    def configure_vertical_pipe_geometry(self):
+        margin = self.boundary_guard_margin_cells()
+        base_side_len = self.base_pipe_side_len()
+        self.side_len = base_side_len + (2.0 * margin)
+        self.wallxmin = margin + 0.5
+        self.wallxmax = margin + base_side_len - 1.0
+        self.wallymin = 0.5
+        self.wallymax = self.side_len - 1.0
+        return margin, base_side_len
+
+    def configure_horizontal_pipe_geometry(self):
+        margin = self.boundary_guard_margin_cells()
+        base_side_len = self.base_pipe_side_len()
+        self.side_len = base_side_len + (2.0 * margin)
+        self.wallxmin = 0.5
+        self.wallxmax = self.side_len - 1.0
+        self.wallymin = margin + 0.5
+        self.wallymax = margin + base_side_len - 1.0
+        return margin, base_side_len
     
     # Generate vertical-wall boundary flow.
     def gen_vert(self):
@@ -403,12 +437,12 @@ class BoundaryParticleReservoirPeriodic():
         print(f"Particle row length difference is {particle_row_length_difference:.2f} can fit {can_fit:.2f} particles")
         particles_per_row = self.itemcfg.particles_per_row
         required_width = particles_per_row/self.itemcfg.particles_per_cell_row
-        self.side_len = math.ceil(self.itemcfg.particles_per_row/self.itemcfg.particles_per_cell_row)+2.0
-        print(f"Side length is {self.side_len} for particles per row of {particles_per_row} and particles per cell row of {self.itemcfg.particles_per_cell_row}")
-        self.wallymax = self.side_len-1.0
-        self.wallxmax = self.side_len-1.0
-        self.wallxmin = 0.5
-        self.wallymin = 0.5
+        margin, base_side_len = self.configure_vertical_pipe_geometry()
+        print(
+            f"Side length is {self.side_len} for particles per row of {particles_per_row} "
+            f"and particles per cell row of {self.itemcfg.particles_per_cell_row}; "
+            f"vertical pipe walls use {margin} guard cells outside base side length {base_side_len}"
+        )
         total_cell_row_length = self.itemcfg.particles_per_cell_row*particle_length
         empty_space = 1.0 - total_cell_row_length 
         empty_particle_count = math.floor(empty_space/particle_length)
@@ -422,6 +456,7 @@ class BoundaryParticleReservoirPeriodic():
             particle_length,
             particles_per_row,
         )
+        release_cfg["base_x"] = release_cfg["base_x"] + margin
         try:
             for col in range(1,self.itemcfg.particle_columns+1):    
                 for row in range(1,particles_per_row+1):     
@@ -485,12 +520,12 @@ class BoundaryParticleReservoirPeriodic():
         print(f"Particle row length difference is {particle_row_length_difference:.2f} can fit {can_fit:.2f} particles")
         particles_per_row = self.itemcfg.particles_per_row
         required_width = particles_per_row/self.itemcfg.particles_per_cell_row
-        self.side_len = math.ceil(self.itemcfg.particles_per_row/self.itemcfg.particles_per_cell_row)+2.0
-        print(f"Side length is {self.side_len} for particles per row of {particles_per_row} and particles per cell row of {self.itemcfg.particles_per_cell_row}")
-        self.wallymax = self.side_len-1.0
-        self.wallxmax = self.side_len-1.0
-        self.wallxmin = 0.5
-        self.wallymin = 0.5
+        margin, base_side_len = self.configure_horizontal_pipe_geometry()
+        print(
+            f"Side length is {self.side_len} for particles per row of {particles_per_row} "
+            f"and particles per cell row of {self.itemcfg.particles_per_cell_row}; "
+            f"horizontal pipe walls use {margin} guard cells outside base side length {base_side_len}"
+        )
         total_cell_row_length = self.itemcfg.particles_per_cell_row*particle_length
         empty_space = 1.0 - total_cell_row_length 
         empty_particle_count = math.floor(empty_space/particle_length)
@@ -505,6 +540,7 @@ class BoundaryParticleReservoirPeriodic():
             particle_length,
             particles_per_row,
         )
+        release_cfg["base_y"] = release_cfg["base_y"] + margin
         try:
             for col in range(1,total_colums+1):    
                 for row in range(1,particles_per_row+1):     

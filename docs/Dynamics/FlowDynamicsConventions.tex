@@ -5,9 +5,10 @@
 \subsection{Purpose}
 
 \texttt{SimpleReservoir} is a particle birth/life/death process used with
-\texttt{ForceDynamics}.  It does not change the ForceDynamics overlap-area
-force law.  It decides when particles become active, which particles are
-eligible for dynamics, and when particles leave the active simulation.
+\texttt{ForceDynamics}.  It does not change the ForceDynamics contact-force
+law or the configured \texttt{contact\_force\_measure}.  It decides when
+particles become active, which particles are eligible for dynamics, and when
+particles leave the active simulation.
 
 \subsection{State Field}
 
@@ -176,7 +177,7 @@ accumulation rule.
 \texttt{SimpleReservoir} does not modify the ForceDynamics equations:
 
 \[
-F_{ij}=q_{ij}A_{ij}
+F_{ij}=q_{ij}M_{ij}
 \]
 
 and
@@ -187,7 +188,10 @@ and
 \mathbf v_n+\frac{\mathbf F_n}{m}\Delta t.
 \]
 
-It only controls particle eligibility and boundary interpretation.
+\(M_{ij}\) is selected by \texttt{contact\_force\_measure}.  The current
+default is penetration depth; overlap area remains available as the optional
+\texttt{area} mode.  \texttt{SimpleReservoir} only controls particle
+eligibility and boundary interpretation.
 
 
 \subsection{Unborn Particle Rule}

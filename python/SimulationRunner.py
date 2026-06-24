@@ -211,17 +211,31 @@ def _total_report_kinetic_energy(particles, field_name, dynamics=None):
     )
 
 
-def _total_internal_momentum(particles, dynamics=None):
-    total_internal_momentum = 0.0
-    for particle in _active_particles(particles, dynamics):
-        total_internal_momentum += float(
-            getattr(
-                particle,
-                "internal_momentum",
-                getattr(getattr(particle, "Data", object()), "z", 0.0),
-            )
+def _particle_internal_momentum(particle):
+    parms = getattr(particle, "parms", None)
+    if parms is not None:
+        return (
+            float(getattr(parms, "y", 0.0)),
+            float(getattr(parms, "z", 0.0)),
+            float(getattr(parms, "w", 0.0)),
         )
-    return total_internal_momentum
+    return (
+        float(getattr(particle, "internal_momentum_px", 0.0)),
+        float(getattr(particle, "internal_momentum_py", 0.0)),
+        float(getattr(particle, "internal_momentum_pz", 0.0)),
+    )
+
+
+def _total_internal_momentum(particles, dynamics=None):
+    total_x = 0.0
+    total_y = 0.0
+    total_z = 0.0
+    for particle in _active_particles(particles, dynamics):
+        internal_x, internal_y, internal_z = _particle_internal_momentum(particle)
+        total_x += internal_x
+        total_y += internal_y
+        total_z += internal_z
+    return total_x, total_y, total_z
 
 
 def _sequential_contact_diagnostics(particles):
@@ -273,8 +287,13 @@ def _motion_summary(start_diagnostics, particles, dynamics=None):
     current_total_p = math.hypot(current_x, current_y)
     momentum_drift_x = current_x - start_x
     momentum_drift_y = current_y - start_y
-    total_internal_momentum = _total_internal_momentum(particles, dynamics)
-    curr_plus_internal_mom = current_total_p + total_internal_momentum
+    internal_x, internal_y, internal_z = _total_internal_momentum(particles, dynamics)
+    total_internal_momentum = math.sqrt(
+        internal_x * internal_x
+        + internal_y * internal_y
+        + internal_z * internal_z
+    )
+    curr_plus_internal_mom = math.hypot(current_x + internal_x, current_y + internal_y)
     start_ke = start_diagnostics["ke"]
     current_ke = _total_kinetic_energy(particles, dynamics)
     potential_energy = _total_potential_energy(dynamics) if dynamics is not None else 0.0
@@ -301,6 +320,9 @@ def _motion_summary(start_diagnostics, particles, dynamics=None):
         "momentum_drift_y": momentum_drift_y,
         "momentum_drift": math.hypot(momentum_drift_x, momentum_drift_y),
         "total_internal_mom": total_internal_momentum,
+        "internal_px": internal_x,
+        "internal_py": internal_y,
+        "internal_pz": internal_z,
         "curr_plus_internal_mom": curr_plus_internal_mom,
         "start_minus_curr_plus_internal_mom": (
             math.hypot(start_x, start_y) - curr_plus_internal_mom
@@ -509,6 +531,8 @@ def _draw_particles(
         _summary_table_row(
             "internal_p",
             motion_summary["total_internal_mom"],
+            motion_summary["internal_px"],
+            motion_summary["internal_py"],
             combined=motion_summary["curr_plus_internal_mom"],
             drift=motion_summary["start_minus_curr_plus_internal_mom"],
         ),

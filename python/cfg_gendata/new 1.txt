@@ -1,93 +1,36 @@
-Step 1: Update Porting.tex
-Add the new rule:
-ForceDynamics.glsl exports reusable dynamics functions.
-The scenario *P.comp owns wall-model selection using defines.
-Add the defines:
-#define WALL_MODEL_SIMPLE
-#define WALL_MODEL_PIPE
-#define WALL_MODEL_BOUNDARY_PARTICLE
-Add the rule that exactly one must be selected.
+For GLSL, the orientation/proximity/depth vocabulary is mostly already wired into the generated path.
+Already updated:
+ForceDynamics.glsl now has:ParticleProximityMagnitude(...)
+ParticlePenetrationDepth(...)
 
+ProcessParticleCollision(...) now fills ContactForceInput.penetrationDepth using ParticlePenetrationDepth(...).
+ProcessWallCollision(...) uses the same helper with equal-radius ghost geometry.
+ProcessBoundaryParticleWallCollision(...) also uses the helper.
+AccumulateContactForce(...) still selects:penetrationDepth when CONTACT_FORCE_MEASURE == depth
+overlapArea when CONTACT_FORCE_MEASURE == area
 
+What still needs attention for GLSL parity:
+Porting.tex should mention the new helper functions
+Add ParticleProximityMagnitude and ParticlePenetrationDepth to the generated-method/export discussion.
 
-Step 2: Replace “Direct Four-Wall Scan”
-Current Porting.tex section says the wrapper directly scans four walls. Replace with:
-Wrapper-Owned Wall Model Selection
-Then define:
-WALL_MODEL_SIMPLE: wall 1..4
-WALL_MODEL_PIPE: wall 3..4
-WALL_MODEL_BOUNDARY_PARTICLE: boundary marker targets, no manual wal
+Compute wrappers may need no geometry changes
+The *P.comp files do not need to know orientation/proximity directly. They just call:
+ProcessParticleCollision(...)
+ProcessWallCollision(...)
+ProcessBoundaryParticleWallCollision(...)
+The generated functions now own the depth calculation.
 
+Internal momentum cleanup is not yet mirrored in GLSL
+Python now clears recoverable internal momentum when a source has no active contacts. GLSL does not yet have the equivalent. If we want exact parity, the *P.comp wrapper needs a way to know whether the source had at least one valid contact this frame, then clear:
+P[SourceID].parms.yzw = vec3(0.0);
+P[SourceID].Data.z = 0.0;
+when no valid contact occurred.
 
-Step 3: Add Boundary-Particle Export Step
-Add a new export step after ordinary wall geometry:
-Generate Boundary-Particle Wall Helpers
-Required generated methods:
-IsBoundaryParticle
-BoundaryParticleWallFlag
-EvaluateWallSegment
-ProcessBoundaryParticleWallCollision
-Possibly generated but maybe deferred:
-InitializeBoundaryParticleWallContactState
-But if generated GLSL uses transient ContactForceInput, we may not need to export the Python contact-slot initializer. GLSL can implement ProcessBoundaryParticleWallCollision directly from EvaluateWallSegment.
+Compile all active compute targets
+We compiled BoundaryParticleReservoirPeriodicP.comp, but should also compile:
+BoundarySpheresAndCubeP.comp
+SimpleReservoirPeriodicP.comp
 
-step 4: Mark Python-only boundary helper
-Document that this is not exported:
-BoundaryParticleAppliesToSource
-Reason:
-Python uses it to imitate cell locality during direct scans.
-GLSL receives locality from cell occupancy.
+So the main missing GLSL work is not the penetration-depth math. That part is in. The main remaining behavioral mismatch is the no-active-contact internal momentum clearing.
 
-Step 5: Update Exporter Method Lists
-After the doc is clear, modify ExportForceDynamicsGLSL.py:
-Add to GENERATED_GLSL_METHODS:
-"IsBoundaryParticle",
-"BoundaryParticleWallFlag",
-"EvaluateWallSegment",
-"ProcessBoundaryParticleWallCollision",
-Maybe do not add:
-"BoundaryParticleAppliesToSource"
-Move or classify any boundary-only Python wrapper functions accordingly.
-
-tep 6: Add GLSL Signatures
-Likely signatures:
-bool IsBoundaryParticle(uint ParticleID);
-uint BoundaryParticleWallFlag(uint SourceID, uint BoundaryID);
-BoundaryWallSegment EvaluateWallSegment(uint SourceID, uint BoundaryID);
-bool ProcessBoundaryParticleWallCollision(uint SourceID, uint BoundaryID, inout vec3 totalForce);
-This requires a new result struct:
-struct BoundaryWallSegment {
-    vec3 normal;
-    float overlapArea;
-    float centerDistance;
-    uint wallFlag;
-    bool valid;
-};
-
-Step 7: Add Translation Status
-Classify:
-IsBoundaryParticle: direct
-BoundaryParticleWallFlag: direct or needs_struct? likely direct
-EvaluateWallSegment: needs_struct
-ProcessBoundaryParticleWallCollision: direct after struct exists
-
-
-Step 8: Add Templates
-Add explicit templates rather than AST inference, same as the current exporter style.
-
-
-Step 9: Update Compile Trial Section
-Validation now becomes three compile targets or three wall models:
-WALL_MODEL_SIMPLE
-WALL_MODEL_PIPE
-WALL_MODEL_BOUNDARY_PARTICLE
-And include:
-BoundaryParticleReservoirPeriodicP.comp
-
-
-Step 10: Only Then Generate
-Run:
-& "c:\_DJ\gPCD\python\.venv\Scripts\python.exe" tools\ExportForceDynamicsGLSL.py
-Then:
-& "c:\_DJ\gPCD\python\.venv\Scripts\python.exe" tools\ExportForceDynamicsGLSL.py --write-stubs
-
+10:16 AM

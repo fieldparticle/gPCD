@@ -654,3 +654,122 @@ the scenario wrapper and generated config includes own scenario-specific
 selection.  The remaining view issue should be diagnosed as rendering
 orientation, not particle dynamics, unless direct position/velocity reports
 show negative \(y\) motion in simulation coordinates.
+
+\subsection{Depth Default For Contact Force Measure}
+
+\subsubsection{<previous form>}
+
+\texttt{ForceDynamics} originally used overlap area directly as the contact
+force measure:
+\begin{equation}
+F_{ij}=q_{ij}A_{ij}.
+\end{equation}
+This made overlap-area geometry both the diagnostic quantity and the default
+force magnitude input.
+
+\subsubsection{<current form>}
+
+\texttt{ForceDynamics} now keeps overlap area in Python diagnostics and keeps
+area mode available, but the default configuration uses penetration depth:
+\begin{verbatim}
+contact_force_measure = "depth";
+\end{verbatim}
+The generated GLSL path receives the same selection through:
+\begin{verbatim}
+#define CONTACT_FORCE_MEASURE depth
+\end{verbatim}
+In depth mode the force measure is \(r_i+r_j-d_{ij}\) for particle contacts
+and the analogous wall-ghost penetration depth for wall contacts.  In area
+mode the earlier \(A_{ij}\) measure is used.
+
+\subsubsection{difference outcome}
+
+The default force law is simpler and cheaper to reason about while preserving
+overlap-area reporting and comparison.  Existing stiffness values now act as
+depth stiffness values, so the project reset the Python generation cfg
+\texttt{collision\_stiffness\_q} values to a smaller baseline.
+
+\subsubsection{<Analysis>}
+
+Area remains useful as a conservative geometric diagnostic, but penetration
+depth is the more direct instantaneous compression measure for the active
+force calculation.  The selectable mode keeps the older area model available
+without forcing diagnostics, plots, or historical reports to change names in
+the same step.
+
+\subsection{Boundary-Particle Reservoir Cell-Guard Margin}
+
+\subsubsection{<previous form>}
+
+The boundary-particle reservoir generator derived the cell-array side length
+from the number of particles per release row and the configured particles per
+cell row.  The physical pipe walls were then placed very near the cell-array
+minimum and maximum bounds.  This worked with \texttt{wall\_guard}, because
+particles were retired only by the selected wall/outlet rule, but it created a
+failure mode for \texttt{cell\_guard}.
+
+With \texttt{cell\_guard}, a particle approaching a boundary-particle pipe
+wall could also enter the cell-array guard band.  The left/min side was
+protected by the inlet exemption for vertical reservoir flow, but the right/max
+side still used the general upper cell guard:
+\begin{verbatim}
+next_position.x >= float(WIDTH - 2u)
+\end{verbatim}
+for vertical flow.  Therefore particles near the right pipe wall could be
+retired as escaped particles even though they were still inside the intended
+physical pipe.
+
+\subsubsection{<current form>}
+
+The generator has been changed so boundary-particle reservoirs reserve an
+internal guard margin between the physical pipe walls and the cell-array
+guard.  For vertical boundary-particle flow, the physical pipe walls are moved
+inward on \(x\); for horizontal boundary-particle flow, they are moved inward
+on \(y\).  Mobile release positions are shifted by the same margin so new
+particles are born inside the physical pipe, not inside the cell guard band.
+
+During Vulkan validation, the generated shader files still showed the earlier
+cell-array size and boundary values:
+\begin{verbatim}
+WIDTH = 27
+BOUNDARY_XMAX = 26.00
+\end{verbatim}
+With these values, the max-side cell guard remains close to the old pipe wall.
+The immediate next step is therefore to stop relying on a fully inferred side
+length and manually set the cell-array side length for this reservoir family.
+The generator should use that configured side length to place the physical
+pipe walls with an explicit guard margin inside the cell-array bounds.
+
+\subsubsection{difference outcome}
+
+Partial solution.  The reason for the max-side retirement was identified, and
+the generator now has the first margin-aware geometry rule.  The next
+implementation step is to make cell-array side length manually selectable so
+the physical pipe, guard band, and generated Vulkan constants agree.
+
+\subsubsection{<Analysis>}
+
+The important design distinction is that boundary particles define physical
+wall response, while \texttt{cell\_guard} defines cell-array safety.  These are
+not the same boundary.  When the physical wall is placed too close to the
+cell-array guard, the guard becomes an accidental wall-death rule and prevents
+the boundary-particle wall model from doing its work.
+
+For boundary-particle reservoirs, the generated layout must satisfy:
+\begin{verbatim}
+cell-array min/max
+    guard margin
+        physical boundary-particle wall
+            active pipe region
+        physical boundary-particle wall
+    guard margin
+cell-array min/max
+\end{verbatim}
+
+The max-side failure is more visible than the min-side failure because the
+vertical-flow inlet exemption intentionally skips the lower flow-axis guard so
+particles can be born from the reservoir.  There is no equivalent exemption on
+the non-flow max wall; instead the physical wall must be placed far enough
+inside the cell array.  Manual side-length selection will make this explicit
+and prevent generated \texttt{params.glsl}, \texttt{boundary.glsl}, and the
+binary particle distribution from drifting out of agreement.
