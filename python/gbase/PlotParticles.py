@@ -78,16 +78,22 @@ class PlotParticles():
         p_count = 0
         # Get the number facets for smoothness
         sphere_facets = self.itemcfg.sphere_facets
-        # Get the start particle number
-        p_start = self.itemcfg.particle_range[0]
-        # Get the end particle number
-        p_end = int(self.itemcfg.particle_range[1])
+        # The caller already applies particle_range when reading the binary file.
+        # Plot every record provided here.
+        p_end = len(self.particle_data)
         # Set up the sphere data
         theta = np.linspace(0, 2 * np.pi, sphere_facets)
         phi = np.linspace(0, np.pi, sphere_facets)
         theta, phi = np.meshgrid(theta, phi)
         # Set the default color
         pcolor = self.itemcfg.particle_color
+        x_min = 10000.0 
+        x_max = 10.0
+        y_min = 10000.0 
+        y_max = 0.0
+        z_min = 10000.0 
+        z_max = 0.0
+        
         # If plotting as points just do a scatter
         if self.itemcfg.as_points == True:    
             px = [[dic.rx] for dic in self.particle_data]
@@ -99,28 +105,43 @@ class PlotParticles():
         else:
             # Traverse particle data
             for ii in self.particle_data:
-                if (p_count >= p_start):
-                    # Convert to Cartesian coordinates
-                    x = ii.rx + ii.radius * np.sin(phi) * np.cos(theta)
-                    y = ii.ry + ii.radius * np.sin(phi) * np.sin(theta)
-                    z = ii.rz + ii.radius * np.cos(phi)
-                    # If the particle is in collision use a different color
-                    if ii.ptype == 1:
-                        if self.itemcfg.vary_color == False:
-                            self.ax.plot_surface(x, y, z, color='blue',alpha=0.8)
-                        else:
-                            self.ax.plot_surface(x, y, z,alpha=0.8)
-                    # Else use standard color
+                # Convert to Cartesian coordinates
+                x = ii.rx + ii.radius * np.sin(phi) * np.cos(theta)
+                y = ii.ry + ii.radius * np.sin(phi) * np.sin(theta)
+                z = ii.rz + ii.radius * np.cos(phi)
+                if x_min > ii.rx:
+                    x_min = ii.rx
+                if x_max  < ii.rx:
+                    x_max = ii.rx
+
+                if y_min > ii.ry:
+                    y_min = ii.ry
+                if y_max  < ii.ry:
+                    y_max = ii.ry
+
+                if z_min > ii.rz:
+                    z_min = ii.rz
+                if z_max  < ii.rz:
+                    z_max = ii.rz
+
+                # If the particle is in collision use a different color
+                if ii.ptype == 1:
+                    if self.itemcfg.vary_color == False:
+                        self.ax.plot_surface(x, y, z, color='blue',alpha=0.8)
                     else:
-                        if self.itemcfg.vary_color == False:
-                            self.ax.plot_surface(x, y, z, color=pcolor,alpha=0.8)
-                        else:
-                            self.ax.plot_surface(x, y, z,alpha=0.8)
-                    #print(f"Particle {p_count} Loc: <{ii.rx:2f},{ii.ry:2f},{ii.rz:2f})>")
-                    
+                        self.ax.plot_surface(x, y, z,alpha=0.8)
+                # Else use standard color
+                else:
+                    if self.itemcfg.vary_color == False:
+                        self.ax.plot_surface(x, y, z, color=pcolor,alpha=0.8)
+                    else:
+                        self.ax.plot_surface(x, y, z,alpha=0.8)
+                #print(f"Particle {p_count} Loc: <{ii.rx:2f},{ii.ry:2f},{ii.rz:2f})>")
+
                 p_count +=1
-                if(p_count > p_end):
+                if(p_count >= p_end):
                     break
+            print(f"xmin:{x_min:2f}, xmax:{x_max:2f},ymin:{y_min:2f}, ymax:{y_max:2f},zmin:{z_min:2f}, zmax:{z_max:2f}" )    
     #******************************************************************
     # plot the cells
     #                
@@ -160,20 +181,22 @@ class PlotParticles():
         self.ax.set_xlabel('X')
         self.ax.set_ylabel('Y')
         self.ax.set_zlabel('Z')
-        lims = self.itemcfg.axis_lims
+        xlims = self.itemcfg.x_axis_lims
+        ylims = self.itemcfg.y_axis_lims
+        zlims = self.itemcfg.z_axis_lims
         if sidelen != None:
             lims = [0,sidelen+1]
             self.ax.set_xlim(lims)
             self.ax.set_ylim(lims)
             self.ax.set_zlim(lims)
         else:
-            self.ax.set_xlim(lims)
-            self.ax.set_ylim(lims)
-            self.ax.set_zlim(lims)
+            self.ax.set_xlim(xlims)
+            self.ax.set_ylim(ylims)
+            self.ax.set_zlim(zlims)
         self.ax.set_title('3D Sphere')
         plt.gca().set_aspect('equal')
         #plt.get_current_fig_manager().full_screen_toggle()
-    
+        
     
     def on_scroll(self, event):
         #print(event.button, event.step)

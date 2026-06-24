@@ -90,32 +90,26 @@ def read_all_particle_data(file_name):
 # Read particle data in range
 #
 #
-def read_particle_data(file_name,particle_range):
-    struct_fmt = 'dddddddddddddd'
-    struct_len = struct.calcsize(struct_fmt)
-    #print(struct_len)
-    struct_unpack = struct.Struct(struct_fmt).unpack_from
-    count = 0
+def read_particle_data(file_name,particle_range=None):
+    if particle_range is None:
+        return read_all_particle_data(file_name)
+
     results = []
     counter = 0
     slist = particle_range
     start_it = int(slist[0])
     end_it = int(slist[1])
     with open(file_name, "rb") as f:
-        
         while True:
-            if counter >= start_it: 
-                record = pdata()
-                ret = f.readinto(record)
-                if ret == 0:
-                    break
-                #print(record.pnum)
+            record = pdata()
+            ret = f.readinto(record)
+            if ret == 0:
+                break
+            if start_it <= counter <= end_it:
                 results.append(record)
-                if counter > end_it:
-                    break
+            if counter >= end_it:
+                break
             counter += 1
-            
-    p_lst = []
     return results
 
 def test_ArrayToIndex(x,y,z,side_length,max_loc):

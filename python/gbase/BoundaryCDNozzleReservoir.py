@@ -1,4 +1,5 @@
 import random
+import os
 
 from gbase.utilities import *
 from gbase.GenDataBase import *
@@ -260,8 +261,14 @@ class BoundaryCDNozzleReservoir():
         self.nozzle_center_z = float(
             self.cfg_value(run_cfg, "nozzle_center_z", 0.5 * self.side_len)
         )
+        self.boundary_particle_function = str(
+            self.cfg_value(run_cfg, "boundary_particle_function", "horizontal_wall")
+        ).lower()
+        self.nozzle_start_x = float(self.cfg_value(run_cfg, "nozzle_start_x", 1.0))
+        self.nozzle_start_y = float(self.cfg_value(run_cfg, "nozzle_start_y", 1.0))
+        default_profile_z = 2.0 if self.dim == 2 else self.nozzle_center_z
         self.nozzle_profile_z = float(
-            self.cfg_value(run_cfg, "nozzle_profile_z", self.nozzle_center_z)
+            self.cfg_value(run_cfg, "nozzle_profile_z", default_profile_z)
         )
         self.nozzle_theta_step = float(
             self.cfg_value(run_cfg, "nozzle_theta_step", math.pi / 100.0)
@@ -277,10 +284,22 @@ class BoundaryCDNozzleReservoir():
             self.cd_nozzle_radius(axial)
             for axial in range(1, self.nozzle_total_length + 1)
         )
-        self.wallxmin = max(0.5, self.nozzle_center_x - max_radius)
-        self.wallxmax = min(self.side_len - 1.0, self.nozzle_center_x + max_radius)
-        self.wallymin = max(0.5, self.nozzle_center_y - max_radius)
-        self.wallymax = min(self.side_len - 1.0, self.nozzle_center_y + max_radius)
+        if self.boundary_particle_function == "vertical_wall":
+            self.wallxmin = max(0.5, self.nozzle_center_x - max_radius)
+            self.wallxmax = min(self.side_len - 1.0, self.nozzle_center_x + max_radius)
+            self.wallymin = max(0.5, self.nozzle_start_y)
+            self.wallymax = min(
+                self.side_len - 1.0,
+                self.nozzle_start_y + self.nozzle_total_length - 1.0,
+            )
+        else:
+            self.wallxmin = max(0.5, self.nozzle_start_x)
+            self.wallxmax = min(
+                self.side_len - 1.0,
+                self.nozzle_start_x + self.nozzle_total_length - 1.0,
+            )
+            self.wallymin = max(0.5, self.nozzle_center_y - max_radius)
+            self.wallymax = min(self.side_len - 1.0, self.nozzle_center_y + max_radius)
         self.wallzmin = 0.5
         if self.dim == 3:
             self.wallzmax = min(self.side_len - 1.0, float(self.nozzle_total_length))
@@ -297,8 +316,121 @@ class BoundaryCDNozzleReservoir():
         self.index = 0
         run_cfg = self.itemcfg["RUN_CONFIGURATION"]
         self.configure_cd_nozzle_geometry(run_cfg)
+        self.MobileParticlesCDNozzle(run_cfg)
         self.BoundaryParticlesCDNozzle(run_cfg)
+        self.write_cd_nozzle_obj(run_cfg)
         self.writeCFGData(run_cfg)
+
+    def cd_mobile_spacing(self, run_cfg):
+        radius = float(self.cfg_value(run_cfg, "radius", 0.1))
+        fraction = float(
+            self.cfg_value(
+                self.itemcfg,
+                "fraction_of_diameter_separation",
+                0.0,
+            )
+        )
+        return 2.0 * radius * (1.0 + fraction)
+
+    def cd_frames_between_waves(self, run_cfg, particle_spacing):
+        dt = float(self.cfg_value(run_cfg, "dt", 1.0))
+        forward_speed = abs(
+            float(
+                self.cfg_value(
+                    run_cfg,
+                    "reservoir_flow_speed",
+                    self.cfg_value(run_cfg, "reservoir_starting_vx", 0.02),
+                )
+            )
+        )
+        if dt <= 0.0:
+            raise ValueError("dt must be positive")
+        if forward_speed <= 0.0:
+            raise ValueError("reservoir forward speed must be positive")
+        frames = particle_spacing / (forward_speed * dt)
+        return max(1, int(math.ceil(frames - 1.0e-9)))
+
+    def MobileParticlesCDNozzle(self, run_cfg):
+        if self.dim != 2:
+            print("BoundaryCDNozzleReservoir: mobile particles are only generated for dim=2")
+            return
+
+        radius = float(self.cfg_value(run_cfg, "radius", 0.1))
+        particle_spacing = self.cd_mobile_spacing(run_cfg)
+        particle_cell_row_length = self.itemcfg.particles_per_cell_row * particle_spacing
+        if particle_cell_row_length > 1.0 + 1.0e-9:
+            raise ValueError(
+                "particles_per_cell_row does not fit in one cell for the "
+                f"configured radius and spacing: {particle_cell_row_length:.4f}"
+            )
+        frames_between = self.cd_frames_between_waves(run_cfg, particle_spacing)
+        start_birth = float(self.cfg_value(run_cfg, "reservoir_start_birth", 10.0))
+        forward_speed = float(
+            self.cfg_value(
+                run_cfg,
+                "reservoir_flow_speed",
+                self.cfg_value(run_cfg, "reservoir_starting_vx", 0.02),
+            )
+        )
+        collision_stiffness_q = float(
+            self.cfg_value(run_cfg, "collision_stiffness_q", 0.0)
+        )
+
+        z = float(self.cfg_value(run_cfg, "nozzle_profile_z", self.nozzle_profile_z))
+        if self.boundary_particle_function == "vertical_wall":
+            inlet_x = self.nozzle_center_x
+            inlet_y = float(
+                self.cfg_value(run_cfg, "reservoir_inlet_y", self.nozzle_start_y)
+            )
+            x_min = self.nozzle_center_x - self.nozzle_inlet_radius + radius
+            x_max = self.nozzle_center_x + self.nozzle_inlet_radius - radius
+            particles_per_wave = int(
+                math.floor(((x_max - x_min) / particle_spacing) + 1.0e-9)
+            ) + 1
+        else:
+            inlet_x = float(
+                self.cfg_value(run_cfg, "reservoir_inlet_x", self.nozzle_start_x)
+            )
+            inlet_y = self.nozzle_center_y
+            y_min = self.nozzle_center_y - self.nozzle_inlet_radius + radius
+            y_max = self.nozzle_center_y + self.nozzle_inlet_radius - radius
+            particles_per_wave = int(
+                math.floor(((y_max - y_min) / particle_spacing) + 1.0e-9)
+            ) + 1
+        if particles_per_wave <= 0:
+            raise ValueError("CD nozzle inlet is too small for mobile particle radius")
+
+        for col in range(self.itemcfg.particle_columns):
+            birth_frame = start_birth + col * frames_between
+            for row in range(particles_per_wave):
+                if self.boundary_particle_function == "vertical_wall":
+                    x = x_min + row * particle_spacing
+                    y = inlet_y
+                    vx = 0.0
+                    vy = forward_speed
+                else:
+                    x = inlet_x
+                    y = y_min + row * particle_spacing
+                    vx = forward_speed
+                    vy = 0.0
+                self.addMobileParticle(
+                    run_cfg,
+                    rx=x,
+                    ry=y,
+                    rz=z,
+                    vx=vx,
+                    vy=vy,
+                    vz=0.0,
+                    radius=radius,
+                    birth_frame=birth_frame,
+                    collision_stiffness_q=collision_stiffness_q,
+                )
+
+        print(
+            f"BoundaryCDNozzleReservoir: generated {self.number_active_particles} "
+            f"mobile particles, {particles_per_wave} per wave, "
+            f"{frames_between} frames between waves"
+        )
 
     def BoundaryParticlesCDNozzle(self, run_cfg):
         if self.dim == 3:
@@ -310,12 +442,21 @@ class BoundaryCDNozzleReservoir():
         marker_locations = set()
         for axial in range(1, self.nozzle_total_length + 1):
             radius = self.cd_nozzle_radius(axial)
-            x = round(float(axial))
             z = round(self.nozzle_profile_z)
-            for y in (
-                round(self.nozzle_center_y + radius),
-                round(self.nozzle_center_y - radius),
-            ):
+            axial_offset = float(axial - 1)
+            if self.boundary_particle_function == "vertical_wall":
+                y = round(self.nozzle_start_y + axial_offset)
+                locations = (
+                    (round(self.nozzle_center_x + radius), y, z),
+                    (round(self.nozzle_center_x - radius), y, z),
+                )
+            else:
+                x = round(self.nozzle_start_x + axial_offset)
+                locations = (
+                    (x, round(self.nozzle_center_y + radius), z),
+                    (x, round(self.nozzle_center_y - radius), z),
+                )
+            for x, y, z in locations:
                 key = (x, y, z)
                 if key not in marker_locations:
                     marker_locations.add(key)
@@ -346,6 +487,136 @@ class BoundaryCDNozzleReservoir():
             f"{self.nozzle_total_length}"
         )
 
+    def write_cd_nozzle_obj(self, run_cfg):
+        if self.dim != 2:
+            print("BoundaryCDNozzleReservoir: OBJ generation is only implemented for dim=2")
+            return
+
+        obj_file = str(
+            self.cfg_value(
+                run_cfg,
+                "cd_nozzle_obj_file",
+                "C:/_DJ/gPCD/vulkan/sim/BoundaryCDNozzleReservoir/CDNozzleGenerated.obj",
+            )
+        )
+        wall_thickness = float(
+            self.cfg_value(run_cfg, "cd_nozzle_obj_wall_thickness", 0.25)
+        )
+        os.makedirs(os.path.dirname(obj_file), exist_ok=True)
+
+        vertices = []
+        faces = []
+
+        def add_vertex(x, y, z):
+            vertices.append((float(x), float(y), float(z)))
+            return len(vertices)
+
+        def add_double_sided_quad(a, b, c, d):
+            faces.append((a, b, c, 1))
+            faces.append((a, c, d, 1))
+            faces.append((c, b, a, 2))
+            faces.append((d, c, a, 2))
+
+        upper_inner = []
+        upper_outer = []
+        lower_inner = []
+        lower_outer = []
+        z = self.nozzle_profile_z
+
+        for axial in range(1, self.nozzle_total_length + 1):
+            radius = self.cd_nozzle_radius(axial)
+            axial_offset = float(axial - 1)
+            if self.boundary_particle_function == "vertical_wall":
+                y = self.nozzle_start_y + axial_offset
+                upper_inner.append(add_vertex(self.nozzle_center_x + radius, y, z))
+                upper_outer.append(
+                    add_vertex(self.nozzle_center_x + radius + wall_thickness, y, z)
+                )
+                lower_inner.append(add_vertex(self.nozzle_center_x - radius, y, z))
+                lower_outer.append(
+                    add_vertex(self.nozzle_center_x - radius - wall_thickness, y, z)
+                )
+            else:
+                x = self.nozzle_start_x + axial_offset
+                upper_inner.append(add_vertex(x, self.nozzle_center_y + radius, z))
+                upper_outer.append(
+                    add_vertex(x, self.nozzle_center_y + radius + wall_thickness, z)
+                )
+                lower_inner.append(add_vertex(x, self.nozzle_center_y - radius, z))
+                lower_outer.append(
+                    add_vertex(x, self.nozzle_center_y - radius - wall_thickness, z)
+                )
+
+        for ii in range(self.nozzle_total_length - 1):
+            add_double_sided_quad(
+                upper_inner[ii],
+                upper_inner[ii + 1],
+                upper_outer[ii + 1],
+                upper_outer[ii],
+            )
+            add_double_sided_quad(
+                lower_outer[ii],
+                lower_outer[ii + 1],
+                lower_inner[ii + 1],
+                lower_inner[ii],
+            )
+
+        with open(obj_file, "w", encoding="ascii") as obj:
+            obj.write("# Generated by BoundaryCDNozzleReservoir.py\n")
+            obj.write("# Visual nozzle wall mesh; dynamics use boundary particles.\n")
+            obj.write("o CDNozzleGenerated\n")
+            for x, y, z in vertices:
+                obj.write(f"v {x:.6f} {y:.6f} {z:.6f}\n")
+            for _ in vertices:
+                obj.write("vt 0.000000 0.000000\n")
+            obj.write("vn 0.000000 0.000000 1.000000\n")
+            obj.write("vn 0.000000 0.000000 -1.000000\n")
+            for a, b, c, normal_index in faces:
+                obj.write(
+                    f"f {a}/{a}/{normal_index} "
+                    f"{b}/{b}/{normal_index} "
+                    f"{c}/{c}/{normal_index}\n"
+                )
+
+        print(
+            f"BoundaryCDNozzleReservoir: wrote triangle OBJ with "
+            f"{len(vertices)} vertices and {len(faces)} faces to {obj_file}"
+        )
+
+    def addMobileParticle(
+        self,
+        RUN_CONFIGURATION,
+        rx,
+        ry,
+        rz,
+        vx,
+        vy,
+        vz,
+        radius,
+        birth_frame,
+        collision_stiffness_q,
+    ):
+        try:
+            particle_struct = pdata()
+            self.number_active_particles += 1
+            self.number_particles += 1
+            particle_struct.pnum = self.number_particles
+            particle_struct.rx = rx
+            particle_struct.ry = ry
+            particle_struct.rz = rz
+            particle_struct.vx = vx
+            particle_struct.vy = vy
+            particle_struct.vz = vz
+            particle_struct.ptype = 0.0
+            particle_struct.molar_mass = 1.0
+            particle_struct.radius = radius
+            particle_struct.state_flg = birth_frame
+            particle_struct.collision_stiffness_q = collision_stiffness_q
+            self.p_list.append(particle_struct)
+        except BaseException as e:
+            print(f"Failed adding mobile particle:{e} ")
+            return
+
     def addBoundaryParticle(self,RUN_CONFIGURATION,rx,ry,rz=2.0):
         try:
             particle_struct = pdata()
@@ -370,9 +641,20 @@ class BoundaryCDNozzleReservoir():
 
     
     def writeCFGData(self,RUN_CONFIGURATION):
-        
+        cfg_data_name = self.itemcfg["STUDY_NAME"]
+        suffix = (
+            f"{self.itemcfg.particle_columns}x"
+            f"{self.itemcfg.particles_per_row}x"
+            f"{self.itemcfg.particles_per_cell_row}"
+        )
+        self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.tst"
+        self.test_bin_name = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.bin"
+        self.report_file = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.rpt"
         self.write_test_file(RUN_CONFIGURATION)
         self.create_bin_file()
         self.write_bin_file(self.p_list)
         self.close_bin_file()
-        print(f"PipeReservoirEntry: Wrote {self.number_particles} reservoir particles to {self.test_bin_name}")
+        print(
+            f"BoundaryCDNozzleReservoir: Wrote {self.number_particles} "
+            f"particles to {self.test_bin_name}"
+        )

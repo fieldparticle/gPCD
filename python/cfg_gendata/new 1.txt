@@ -1,36 +1,41 @@
-For GLSL, the orientation/proximity/depth vocabulary is mostly already wired into the generated path.
-Already updated:
-ForceDynamics.glsl now has:ParticleProximityMagnitude(...)
-ParticlePenetrationDepth(...)
+Add CD nozzle mobile generation only for dim=2 first.
 
-ProcessParticleCollision(...) now fills ContactForceInput.penetrationDepth using ParticlePenetrationDepth(...).
-ProcessWallCollision(...) uses the same helper with equal-radius ghost geometry.
-ProcessBoundaryParticleWallCollision(...) also uses the helper.
-AccumulateContactForce(...) still selects:penetrationDepth when CONTACT_FORCE_MEASURE == depth
-overlapArea when CONTACT_FORCE_MEASURE == area
+Compute spatial spacing:
 
-What still needs attention for GLSL parity:
-Porting.tex should mention the new helper functions
-Add ParticleProximityMagnitude and ParticlePenetrationDepth to the generated-method/export discussion.
+diameter = 2.0 * radius
+particle_spacing = diameter * (1.0 + fraction_of_diameter_separation)
+Compute particles per inlet wave from the inlet opening:
+y_min = center_y - inlet_radius + radius
+y_max = center_y + inlet_radius - radius
+particles_per_wave = floor((y_max - y_min) / particle_spacing) + 1
+Compute minimum frame spacing between waves:
+forward_speed = reservoir_starting_vx or reservoir_flow_speed
+distance_per_frame = forward_speed * dt
+frames_between_waves = max(1, ceil(particle_spacing / distance_per_frame))
+Generate mobile particles before boundary particles:
+null particle
+mobile particles
+boundary particles
+For each column/wave:
+birth_frame = reservoir_start_birth + col * frames_between_waves
+x = inlet_x
+y = y_min + row * particle_spacing
+z = nozzle_profile_z
+vx = forward_speed
+vy = 0
+vz = 0
+ptype = 0.0
+state_flg = birth_frame
+Keep boundary particles unchanged:
+ptype = 1.0
+state_flg = 0.0
+Verify .tst:
+dispatchx = number_active_particles + 1
+num_particles = active + boundary
+Run generation and inspect:first few mobile particles
+first boundary particle index
+dispatchx
+no overlap at birth
+boundary particles still after mobile particles
 
-Compute wrappers may need no geometry changes
-The *P.comp files do not need to know orientation/proximity directly. They just call:
-ProcessParticleCollision(...)
-ProcessWallCollision(...)
-ProcessBoundaryParticleWallCollision(...)
-The generated functions now own the depth calculation.
-
-Internal momentum cleanup is not yet mirrored in GLSL
-Python now clears recoverable internal momentum when a source has no active contacts. GLSL does not yet have the equivalent. If we want exact parity, the *P.comp wrapper needs a way to know whether the source had at least one valid contact this frame, then clear:
-P[SourceID].parms.yzw = vec3(0.0);
-P[SourceID].Data.z = 0.0;
-when no valid contact occurred.
-
-Compile all active compute targets
-We compiled BoundaryParticleReservoirPeriodicP.comp, but should also compile:
-BoundarySpheresAndCubeP.comp
-SimpleReservoirPeriodicP.comp
-
-So the main missing GLSL work is not the penetration-depth math. That part is in. The main remaining behavioral mismatch is the no-active-contact internal momentum clearing.
-
-10:16 AM
+That gets us a CD nozzle inlet reservoir without touching wall dynamics yet.

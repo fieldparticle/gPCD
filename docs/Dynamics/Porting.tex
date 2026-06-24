@@ -674,3 +674,38 @@ that state is still deferred to the \texttt{StartingContactState.glsl}
 buffer/export path.  Until that buffer path is implemented, the generated GLSL
 ordinary force path should be considered validated separately from starting
 overlap resolution.
+
+\subsection{Step 17: Boundary OBJ Visualization}
+
+Boundary OBJ meshes are visualization resources, not dynamics resources.  For
+boundary-particle models, the dynamics still come from marker particles and
+the selected \texttt{EvaluateWallSegment} path.  A generated OBJ such as:
+\begin{verbatim}
+sim/BoundaryCDNozzleReservoir/CDNozzleGenerated.obj
+\end{verbatim}
+is used only to draw the intended wall shape.
+
+The current Vulkan OBJ loader accepts only triangle faces in
+\texttt{v/vt/vn} form.  Generated OBJ files must therefore include dummy
+texture coordinates and normals even when the renderer does not use them:
+\begin{verbatim}
+v  ...
+vt ...
+vn ...
+f v/vt/vn v/vt/vn v/vt/vn
+\end{verbatim}
+
+The graphics command path must select its draw call from
+\texttt{application.boundary\_as\_obj}.  When \texttt{boundary\_as\_obj} is
+true, the boundary resource is a non-indexed OBJ vertex list and must be drawn
+with:
+\begin{verbatim}
+vkCmdDraw(..., dvo->m_NumElements, 1, 0, 0);
+\end{verbatim}
+When \texttt{boundary\_as\_obj} is false, the old cube/cell-boundary path
+retains its indexed cube draw:
+\begin{verbatim}
+vkCmdDrawIndexed(..., 36, 1, 0, 0, 0);
+\end{verbatim}
+This preserves old cube and sphere rendering while allowing generated nozzle
+OBJ visualization.

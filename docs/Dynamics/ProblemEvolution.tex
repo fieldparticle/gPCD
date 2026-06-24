@@ -774,7 +774,7 @@ inside the cell array.  Manual side-length selection will make this explicit
 and prevent generated \texttt{params.glsl}, \texttt{boundary.glsl}, and the
 binary particle distribution from drifting out of agreement.
 
-\subsection{CD Nozzle Boundary-Only Generator}
+\subsection{CD Nozzle Reservoir Generator}
 
 \subsubsection{<previous form>}
 
@@ -788,14 +788,15 @@ length, divergence length, and exit length were not separately configurable.
 
 \subsubsection{<current form>}
 
-\texttt{BoundaryCDNozzleReservoir.py} is now a boundary-only generator.  It
-does not generate mobile reservoir particles and does not run birth/death
-lifecycle setup.  The generated particle records are boundary markers:
+\texttt{BoundaryCDNozzleReservoir.py} began as a boundary-only generator.  In
+that first form, it did not generate mobile reservoir particles and did not
+run birth/death lifecycle setup.  The generated particle records were boundary
+markers:
 \begin{verbatim}
 ptype = 1.0
 Data.w = 0.0
 \end{verbatim}
-and \texttt{dispatchx} remains one because there are no mobile source
+and \texttt{dispatchx} remained one because there were no mobile source
 particles to process.
 
 The nozzle profile is parameterized by section lengths and radii:
@@ -821,17 +822,50 @@ L_{\mathrm{exit}}.
 \]
 
 When \texttt{dim=2}, the generator writes the upper and lower nozzle profile
-in a single \(z\) plane.  When \texttt{dim=3}, it writes circular boundary
-marker rings along the axial direction.  This allows the project to verify the
-boundary-particle cloud in Python and Vulkan before adding mobile particles or
-curved-wall dynamics.
+in a single \(z\) plane.  The 2D profile plane now defaults to \(z=2.0\), so
+the nozzle lies in the same shallow layer used by the other two-dimensional
+particle studies.  When \texttt{dim=3}, the generator writes circular boundary
+marker rings along the axial direction.
+
+The generator now also creates mobile reservoir particles.  Mobile particles
+are written first with \texttt{ptype=0.0}; boundary marker particles are
+written after the active particles with \texttt{ptype=1.0}.  Therefore
+\texttt{dispatchx} is written as the number of active particles plus the null
+particle, while \texttt{num\_particles} includes both active and boundary
+particles.  The mobile spacing is:
+\[
+2r(1+\texttt{fraction\_of\_diameter\_separation})
+\]
+and the frame spacing is calculated from that distance, the timestep, and the
+configured forward reservoir speed.
+
+The nozzle entrance is anchored by a start-plane convention.  For horizontal
+flow, \texttt{nozzle\_start\_x} defaults to \(1.0\); for vertical flow,
+\texttt{nozzle\_start\_y} defaults to \(1.0\).  The process inlet/outlet
+values written as \texttt{wallXMIN}/\texttt{wallXMAX} or
+\texttt{wallYMIN}/\texttt{wallYMAX} now describe the reservoir lifecycle
+planes, not the radius envelope around the nozzle centerline.  This prevents
+Vulkan \texttt{StartReservoir} from moving born particles to the middle of the
+cell array.
+
+For visual validation, the generator writes:
+\begin{verbatim}
+vulkan/sim/BoundaryCDNozzleReservoir/CDNozzleGenerated.obj
+\end{verbatim}
+The OBJ is a triangle mesh generated from the same radius profile as the
+boundary particles.  It is visualization-only; contact dynamics still use
+boundary particle markers and \texttt{EvaluateWallSegment}.  The OBJ emits
+\texttt{v}, \texttt{vt}, and \texttt{vn} records and faces in
+\texttt{v/vt/vn} form so it is compatible with the current simple Vulkan OBJ
+loader.
 
 \subsubsection{difference outcome}
 
-Particle solution for geometry generation.  The nozzle boundary cloud can now
-be generated independently of mobile flow.  The next step is to add a curved
-wall function so a boundary marker can represent the local nozzle wall segment
-instead of only horizontal or vertical straight-wall segments.
+Particle solution for geometry generation and reservoir staging.  The nozzle
+boundary cloud, mobile reservoir particles, lifecycle metadata, and visual OBJ
+mesh can now be generated from one Python source.  The next step is to add a
+curved wall function so a boundary marker can represent the local nozzle wall
+segment instead of only horizontal or vertical straight-wall segments.
 
 \subsubsection{<Analysis>}
 
@@ -840,6 +874,13 @@ case.  It is a boundary-particle geometry family with a radius function.  The
 generator's first responsibility is to produce a trustworthy marker cloud; the
 dynamics law should then receive those markers through the same
 boundary-particle wall path used by straight walls.
+
+The generated OBJ exposed one Vulkan rendering distinction: OBJ boundaries
+are loaded as non-indexed vertex lists, while the old cube boundary uses an
+indexed cube draw.  The command buffer now selects the draw method from
+\texttt{boundary\_as\_obj}: OBJ boundaries use \texttt{vkCmdDraw}; cube
+boundaries retain \texttt{vkCmdDrawIndexed}.  This preserves old cube and
+sphere rendering while allowing generated nozzle OBJ visualization.
 
 For the next step, \texttt{EvaluateWallSegment(SourceID, BoundaryID)} needs a
 curve-aware function selected by configuration, for example:

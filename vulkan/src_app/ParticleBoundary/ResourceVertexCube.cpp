@@ -32,13 +32,13 @@
 #include "VulkanObj/VulkanApp.hpp"
 void ResourceVertexCube::Create(ResourceVertexParticle* PartVert)
 {
-#if 0
-	ConfigObj* cfg = CfgApp;
-	float nside = (float)CfgTst->GetInt("boundary_side_length", true);
-	m_FileName = CfgApp->GetString("boundary_file_obj", true);
-	ResourceVertexObj::Create(0, PartVert);
-	bool boundaryFlag = CfgApp->GetBool("boundary_flag", true);
-	if (boundaryFlag != true)
+
+	bool show_boundary_as_obj = CfgApp->GetBool("application.boundary_as_obj", true);
+
+	if (show_boundary_as_obj == true)
+	{
+		m_FileName = CfgApp->GetString("application.boundary_file", true);
+		ResourceVertexObj::Create(0, PartVert);
 		for (size_t ii = 0; ii < m_vtemp.size(); ii++)
 		{
 			CartVert tmp = {};
@@ -46,14 +46,15 @@ void ResourceVertexCube::Create(ResourceVertexParticle* PartVert)
 			tmp.pos.y = m_vtemp[ii].y; //*m_ParticleVert->m_SideLength;
 			tmp.pos.z = m_vtemp[ii].z; //*m_ParticleVert->m_SideLength;
 			tmp.pos.w = 1.0;
-			tmp.color = glm::vec4(1.0, 0.0, 1.0, 0.1);
+			tmp.color = glm::vec4(1.0, 1.0, 1.0, 1.0);
 			m_Verts.push_back(tmp);
 		}
+	}
+	else
+		{
 
-	if(boundaryFlag ==true)
-#endif
-		MakeAxes(PartVert->m_SideLength);
-	
+			MakeAxes(PartVert->m_SideLength);
+		}
 	
 	Resource::CheckBindPoint(0);
 
@@ -90,21 +91,29 @@ void ResourceVertexCube::Create(ResourceVertexParticle* PartVert)
 	vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, m_Verts.data(), m_Allocation[0],
 		0, m_BufSize);
 
-	m_BufSize = sizeof(CartVert) * (uint32_t)m_CubeIndices.size();
-	objtxt << m_Name << " Number:" << 0 << std::ends;
-	m_App->VMACreateDeviceBuffer(m_BufSize,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-		VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_Buffers[1], m_Allocation[1], objtxt.str());
 
-	vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, m_CubeIndices.data(), m_Allocation[1],
-		0, m_BufSize);
 
+	if (show_boundary_as_obj == false)
+	{
+		m_BufSize = sizeof(CartVert) * (uint32_t)m_CubeIndices.size();
+		objtxt << m_Name << " Number:" << 0 << std::ends;
+		m_App->VMACreateDeviceBuffer(m_BufSize,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+			VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			m_Buffers[1], m_Allocation[1], objtxt.str());
+
+		vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, m_CubeIndices.data(), m_Allocation[1],
+			0, m_BufSize);
+	}
 
 	m_Verts.clear();
+	std::vector<CartVert> vempty;
+	m_Verts.swap(vempty);
 	m_CubeIndices.clear();
+	std::vector<uint32_t> cempty;
+	m_CubeIndices.swap(cempty);
 
 
 

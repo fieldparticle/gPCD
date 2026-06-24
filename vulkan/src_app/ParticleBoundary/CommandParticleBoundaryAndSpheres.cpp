@@ -186,8 +186,17 @@ void CommandParticleBoundaryAndSpheres::RecordSubPassCube(uint32_t imageindex, u
 		upcosize,
 		sfl);
 
-	uint16_t vnum = 36;// 2 * dvo->m_NumElements;
-	vkCmdDrawIndexed(m_CommandBuffers[currentBuffer], vnum, 1, 0, 0,0);
+	bool show_boundary_as_obj = CfgApp->GetBool("application.boundary_as_obj", true);
+	if (show_boundary_as_obj == true)
+	{
+		uint32_t vnum = static_cast<uint32_t>(dvo->m_NumElements);
+		vkCmdDraw(m_CommandBuffers[currentBuffer], vnum, 1, 0, 0);
+	}
+	else
+	{
+		uint32_t vnum = 36;
+		vkCmdDrawIndexed(m_CommandBuffers[currentBuffer], vnum, 1, 0, 0,0);
+	}
 
 	//############################ 2nd Draw ###################################
 	//############################ 2nd Draw ###################################
@@ -308,4 +317,3 @@ void CommandParticleBoundaryAndSpheres::RecordSubPassParticle(uint32_t imageinde
 	vkCmdDraw(m_CommandBuffers[currentBuffer], vnum, 1, 0, 0);
 	
 }
-

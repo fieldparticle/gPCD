@@ -120,6 +120,7 @@ int main(int argc, const char* argv[]) try
 		bool show_cell_boundary_cube = CfgApp->GetBool("application.show_cell_boundary_cube", true);
 		bool show_wall_as_boundary_cube = CfgApp->GetBool("application.show_wall_as_boundary_cube", true);
 		bool particle_as_spheres = CfgApp->GetBool("application.particle_as_spheres", true);
+		bool show_boundary_as_obj = CfgApp->GetBool("application.boundary_as_obj", true);
 
 
 		// If this has both a boundary and spheres.
@@ -132,7 +133,8 @@ int main(int argc, const char* argv[]) try
 			}
 		}
 		// If this has a boundary and no spheres.
-		else if ((show_cell_boundary_cube == true || show_wall_as_boundary_cube == true) && particle_as_spheres == false)
+		else if ((show_cell_boundary_cube == true || show_wall_as_boundary_cube == true || show_boundary_as_obj == true) 
+			&& particle_as_spheres == false)
 		{
 			if (ParticleBoundaryOnly(pf, nullptr, nullptr, false))
 			{

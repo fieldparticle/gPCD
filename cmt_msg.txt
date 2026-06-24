@@ -1,9 +1,11 @@
 Current status:
-	- Added boundary-only CD nozzle generator documentation.
-	- Recorded parameterized nozzle profile lengths and 2D/3D generation modes.
-	- Identified curve wall evaluation as the next dynamics step.
+	- CD nozzle reservoir now generates mobile particles, boundary markers, and a matching visual OBJ.
+	- Vulkan boundary drawing now selects non-indexed OBJ draw or indexed cube draw from boundary_as_obj.
+	- Documentation has been updated for CD nozzle reservoir conventions and OBJ visualization.
 
 Code Changes:
-	- Updated ProblemEvolution.tex with CD nozzle boundary-only generator state.
+	- Added CD nozzle mobile reservoir generation, start-plane anchoring, z=2.0 profile placement, and generated OBJ output.
+	- Updated OBJ generation to emit v/vt/vn triangle faces compatible with the simple Vulkan OBJ loader.
+	- Updated Vulkan boundary command paths to preserve old cube drawing while supporting OBJ vertex-list drawing.
 
-Next: Add curve-aware boundary wall function for CD nozzle walls.
+Next: Add a curve-aware cd_nozzle_wall evaluator so boundary particles use the local nozzle profile normal instead of straight horizontal/vertical wall logic.

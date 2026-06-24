@@ -342,3 +342,37 @@ A bare vertex-stage \texttt{return} is not sufficient because it prevents
 occupancy processing but can leave \texttt{gl\_Position} and color outputs
 undefined.  \texttt{discard} is not available in vertex shaders, so moving the
 vertex outside clip space is the required suppression method.
+
+\subsection{CD Nozzle Reservoir Convention}
+
+\texttt{BoundaryCDNozzleReservoir} is the reservoir generator for
+converging-diverging nozzle studies.  The nozzle is described by a piecewise
+radius profile with independently configured inlet, converging, throat,
+diverging, and exit lengths.  For \texttt{dim=2}, the profile is generated in
+the \(xy\) plane at a fixed \texttt{nozzle\_profile\_z}, which defaults to
+\(2.0\).  The \(x\) axis is the default axial flow direction.
+
+The generator writes mobile particles first and boundary marker particles
+after them.  Mobile particles have \texttt{ptype=0.0}; boundary markers have
+\texttt{ptype=1.0}.  The generated \texttt{dispatchx} covers only the null
+particle plus mobile source particles.  The generated \texttt{num\_particles}
+includes mobile and boundary particles.
+
+The nozzle entrance must be anchored to the reservoir inlet plane.  For
+horizontal flow, \texttt{nozzle\_start\_x} defaults to \(1.0\).  For vertical
+flow, \texttt{nozzle\_start\_y} defaults to \(1.0\).  These start-plane
+values are also the default reservoir inlet coordinates and the process
+minimum written to the generated test file.  The process maximum is the start
+plane plus the nozzle axial length.  These process bounds are lifecycle
+planes; they are not the physical curved wall.
+
+The generated CD nozzle OBJ is a visualization aid:
+\begin{verbatim}
+vulkan/sim/BoundaryCDNozzleReservoir/CDNozzleGenerated.obj
+\end{verbatim}
+It is generated from the same profile as the boundary particles, but it does
+not define dynamics.  Contact response remains owned by boundary marker
+particles and the selected wall-segment evaluator.  A future
+\texttt{cd\_nozzle\_wall} evaluator should calculate the local curved wall
+normal and contact geometry from the nozzle profile while preserving the
+source-owned force accumulation rule.
