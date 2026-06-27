@@ -21,6 +21,8 @@ DEFAULT_OUTPUT = (
     / "common"
     / "ForceDynamics.glsl"
 )
+DEFAULT_BOUNDARY_OUTPUT = DEFAULT_OUTPUT.with_name("ForceDynamicsBoundaryParticle.glsl")
+DEFAULT_CD_NOZZLE_OUTPUT = DEFAULT_OUTPUT.with_name("ForceDynamicsCDNozzle.glsl")
 
 KNOWN_TRANSLATION_PRIMITIVES = {
     "create_vec4": "Python vector factory; maps to vec4(...) in GLSL.",
@@ -37,9 +39,13 @@ GENERATED_GLSL_METHODS = [
     "IsBoundaryParticle",
     "BoundaryParticleWallFlag",
     "BoundaryParticleVerticalWallFlag",
+    "BoundaryParticleCDNozzleWallFlag",
+    "CDNozzleRadius",
+    "CDNozzleRadiusSlope",
     "EvaluateWallSegment",
     "EvaluateHorizontalWallSegment",
     "EvaluateVerticalWallSegment",
+    "EvaluateCDNozzleWallSegment",
     "ProcessBoundaryParticleWallCollision",
     "InitializeBoundaryParticleWallContactState",
     "InitializeWallContactState",
@@ -67,6 +73,31 @@ GENERATED_GLSL_METHODS = [
     "GetParticleMass",
     "CalcPosition",
     "SetError",
+]
+
+BOUNDARY_PARTICLE_GLSL_METHODS = [
+    "IsBoundaryParticle",
+    "BoundaryParticleWallFlag",
+    "BoundaryParticleVerticalWallFlag",
+    "EvaluateHorizontalWallSegment",
+    "EvaluateVerticalWallSegment",
+    "ProcessBoundaryParticleWallCollision",
+    "InitializeBoundaryParticleWallContactState",
+]
+
+CD_NOZZLE_GLSL_METHODS = [
+    "BoundaryParticleCDNozzleWallFlag",
+    "CDNozzleRadius",
+    "CDNozzleRadiusSlope",
+    "EvaluateCDNozzleWallSegment",
+]
+
+CORE_GLSL_METHODS = [
+    method_name
+    for method_name in GENERATED_GLSL_METHODS
+    if method_name not in set(BOUNDARY_PARTICLE_GLSL_METHODS)
+    and method_name not in set(CD_NOZZLE_GLSL_METHODS)
+    and method_name != "EvaluateWallSegment"
 ]
 
 PYTHON_WRAPPER_METHODS = [
@@ -116,6 +147,11 @@ GLSL_SIGNATURES = {
     "BoundaryParticleVerticalWallFlag": (
         "uint BoundaryParticleVerticalWallFlag(uint SourceID, uint BoundaryID)"
     ),
+    "BoundaryParticleCDNozzleWallFlag": (
+        "uint BoundaryParticleCDNozzleWallFlag(uint SourceID, uint BoundaryID)"
+    ),
+    "CDNozzleRadius": "float CDNozzleRadius(float axial_position)",
+    "CDNozzleRadiusSlope": "float CDNozzleRadiusSlope(float axial_position)",
     "EvaluateWallSegment": (
         "BoundaryWallSegment EvaluateWallSegment("
         "uint SourceID, uint BoundaryID)"
@@ -126,6 +162,10 @@ GLSL_SIGNATURES = {
     ),
     "EvaluateVerticalWallSegment": (
         "BoundaryWallSegment EvaluateVerticalWallSegment("
+        "uint SourceID, uint BoundaryID)"
+    ),
+    "EvaluateCDNozzleWallSegment": (
+        "BoundaryWallSegment EvaluateCDNozzleWallSegment("
         "uint SourceID, uint BoundaryID)"
     ),
     "ProcessBoundaryParticleWallCollision": (
@@ -304,6 +344,9 @@ TRANSLATION_STATUS = {
         "IsBoundaryParticle",
         "BoundaryParticleWallFlag",
         "BoundaryParticleVerticalWallFlag",
+        "BoundaryParticleCDNozzleWallFlag",
+        "CDNozzleRadius",
+        "CDNozzleRadiusSlope",
         "ParticleProximityMagnitude",
         "ParticlePenetrationDepth",
         "ProcessBoundaryParticleWallCollision",
@@ -318,6 +361,7 @@ TRANSLATION_STATUS = {
         "EvaluateWallSegment",
         "EvaluateHorizontalWallSegment",
         "EvaluateVerticalWallSegment",
+        "EvaluateCDNozzleWallSegment",
     ],
     "needs_buffer": [
         "StartingParticleKey",
@@ -365,9 +409,13 @@ TEMPLATE_GENERATED_METHODS = {
     "IsBoundaryParticle",
     "BoundaryParticleWallFlag",
     "BoundaryParticleVerticalWallFlag",
+    "BoundaryParticleCDNozzleWallFlag",
+    "CDNozzleRadius",
+    "CDNozzleRadiusSlope",
     "EvaluateWallSegment",
     "EvaluateHorizontalWallSegment",
     "EvaluateVerticalWallSegment",
+    "EvaluateCDNozzleWallSegment",
     "ProcessBoundaryParticleWallCollision",
     "SetError",
 }
@@ -482,8 +530,63 @@ GLSL_BODY_TEMPLATES = {
         "float mid_x = 0.5 * (BOUNDARY_XMIN + BOUNDARY_XMAX);",
         "return (boundary_position.x < mid_x) ? 1u : 2u;",
     ],
+    "BoundaryParticleCDNozzleWallFlag": [
+        "if (!IsBoundaryParticle(BoundaryID)) {",
+        "    return 0u;",
+        "}",
+        "",
+        "vec4 boundary_position = GetParticlePosition(BoundaryID);",
+        "return (boundary_position.y < CD_NOZZLE_CENTER_Y) ? 3u : 4u;",
+    ],
+    "CDNozzleRadius": [
+        "float inlet_end = CD_NOZZLE_INLET_LENGTH;",
+        "float converge_end = inlet_end + CD_NOZZLE_CONVERGE_LENGTH;",
+        "float throat_end = converge_end + CD_NOZZLE_THROAT_LENGTH;",
+        "float diverge_end = throat_end + CD_NOZZLE_DIVERGE_LENGTH;",
+        "",
+        "if (axial_position >= 1.0 && axial_position < inlet_end) {",
+        "    return CD_NOZZLE_INLET_RADIUS;",
+        "}",
+        "if (axial_position >= inlet_end && axial_position < converge_end) {",
+        "    float span = max(CD_NOZZLE_CONVERGE_LENGTH, EPSILON);",
+        "    float t = (axial_position - inlet_end) / span;",
+        "    return CD_NOZZLE_INLET_RADIUS",
+        "        + t * (CD_NOZZLE_THROAT_RADIUS - CD_NOZZLE_INLET_RADIUS);",
+        "}",
+        "if (axial_position >= converge_end && axial_position < throat_end) {",
+        "    return CD_NOZZLE_THROAT_RADIUS;",
+        "}",
+        "if (axial_position >= throat_end && axial_position < diverge_end) {",
+        "    float span = max(CD_NOZZLE_DIVERGE_LENGTH, EPSILON);",
+        "    float t = (axial_position - throat_end) / span;",
+        "    return CD_NOZZLE_THROAT_RADIUS",
+        "        + t * (CD_NOZZLE_EXIT_RADIUS - CD_NOZZLE_THROAT_RADIUS);",
+        "}",
+        "if (axial_position >= diverge_end) {",
+        "    return CD_NOZZLE_EXIT_RADIUS;",
+        "}",
+        "return CD_NOZZLE_INLET_RADIUS;",
+    ],
+    "CDNozzleRadiusSlope": [
+        "float inlet_end = CD_NOZZLE_INLET_LENGTH;",
+        "float converge_end = inlet_end + CD_NOZZLE_CONVERGE_LENGTH;",
+        "float throat_end = converge_end + CD_NOZZLE_THROAT_LENGTH;",
+        "float diverge_end = throat_end + CD_NOZZLE_DIVERGE_LENGTH;",
+        "",
+        "if (axial_position >= inlet_end && axial_position < converge_end) {",
+        "    return (CD_NOZZLE_THROAT_RADIUS - CD_NOZZLE_INLET_RADIUS)",
+        "        / max(CD_NOZZLE_CONVERGE_LENGTH, EPSILON);",
+        "}",
+        "if (axial_position >= throat_end && axial_position < diverge_end) {",
+        "    return (CD_NOZZLE_EXIT_RADIUS - CD_NOZZLE_THROAT_RADIUS)",
+        "        / max(CD_NOZZLE_DIVERGE_LENGTH, EPSILON);",
+        "}",
+        "return 0.0;",
+    ],
     "EvaluateWallSegment": [
-        "#if defined(WALL_FUNC) && WALL_FUNC == horizontal_wall",
+        "#if defined(WALL_FUNC) && WALL_FUNC == cd_nozzle_wall",
+        "return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
+        "#elif defined(WALL_FUNC) && WALL_FUNC == horizontal_wall",
         "return EvaluateHorizontalWallSegment(SourceID, BoundaryID);",
         "#elif defined(WALL_FUNC) && WALL_FUNC == vertical_wall",
         "return EvaluateVerticalWallSegment(SourceID, BoundaryID);",
@@ -546,6 +649,51 @@ GLSL_BODY_TEMPLATES = {
         "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, wall_flag, false);",
         "}",
         "",
+        "vec3 delta = ghost - source_position.xyz;",
+        "float center_distance = length(delta);",
+        "if (center_distance >= 2.0 * radius) {",
+        "    return BoundaryWallSegment(normal, 0.0, center_distance, wall_flag, false);",
+        "}",
+        "",
+        "float overlap_area = particle_overlap_area(radius, radius, center_distance);",
+        "return BoundaryWallSegment(normal, overlap_area, center_distance, wall_flag, true);",
+    ],
+    "EvaluateCDNozzleWallSegment": [
+        "uint wall_flag = BoundaryParticleCDNozzleWallFlag(SourceID, BoundaryID);",
+        "if (wall_flag == 0u) {",
+        "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
+        "}",
+        "",
+        "vec4 source_position = GetParticlePosition(SourceID);",
+        "float radius = P[SourceID].Data.x;",
+        "float axial = source_position.x - CD_NOZZLE_START_X + 1.0;",
+        "float total_length = CD_NOZZLE_INLET_LENGTH",
+        "    + CD_NOZZLE_CONVERGE_LENGTH",
+        "    + CD_NOZZLE_THROAT_LENGTH",
+        "    + CD_NOZZLE_DIVERGE_LENGTH",
+        "    + CD_NOZZLE_EXIT_LENGTH;",
+        "if (axial < 1.0 || axial > total_length) {",
+        "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, wall_flag, false);",
+        "}",
+        "",
+        "float nozzle_radius = CDNozzleRadius(axial);",
+        "float radius_slope = CDNozzleRadiusSlope(axial);",
+        "float offset = WallContactOffsetDistance(radius);",
+        "float wall_y = 0.0;",
+        "vec3 normal = vec3(0.0);",
+        "",
+        "if (wall_flag == 3u) {",
+        "    wall_y = CD_NOZZLE_CENTER_Y - nozzle_radius;",
+        "    normal = normalize(vec3(-radius_slope, -1.0, 0.0));",
+        "} else if (wall_flag == 4u) {",
+        "    wall_y = CD_NOZZLE_CENTER_Y + nozzle_radius;",
+        "    normal = normalize(vec3(-radius_slope, 1.0, 0.0));",
+        "} else {",
+        "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, wall_flag, false);",
+        "}",
+        "",
+        "vec3 wall_point = vec3(source_position.x, wall_y, source_position.z);",
+        "vec3 ghost = wall_point + normal * (radius - offset);",
         "vec3 delta = ghost - source_position.xyz;",
         "float center_distance = length(delta);",
         "if (center_distance >= 2.0 * radius) {",
@@ -1094,14 +1242,55 @@ def glsl_return_type(signature: str) -> str:
     return signature.split(" ", 1)[0]
 
 
-def render_stub_file(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
+def render_method_bodies(
+    source_path: Path,
+    visitor: ForceDynamicsVisitor,
+    method_names: list[str],
+) -> list[str]:
+    lines = []
+    for method_name in method_names:
+        method = visitor.methods[method_name]
+        signature = GLSL_SIGNATURES[method_name]
+        return_type = glsl_return_type(signature)
+        lines.append(f"// Python source: {source_path.name}:{method.lineno}")
+        lines.append(signature)
+        lines.append("{")
+        body_template = GLSL_BODY_TEMPLATES.get(method_name)
+        if body_template is not None:
+            for body_line in body_template:
+                lines.append(f"    {body_line}" if body_line else "")
+        else:
+            lines.append(f"    // TODO: generate body for {method_name}.")
+            default_return = GLSL_DEFAULT_RETURNS.get(return_type)
+            if default_return is not None:
+                lines.append(f"    return {default_return};")
+        lines.append("}")
+        lines.append("")
+    return lines
+
+
+def render_helper_bodies(method_names: list[str]) -> list[str]:
+    lines = []
+    for method_name in method_names:
+        signature = GLSL_SIGNATURES[method_name]
+        lines.append(f"// Custom GLSL helper: {method_name}")
+        lines.append(signature)
+        lines.append("{")
+        for body_line in GLSL_BODY_TEMPLATES[method_name]:
+            lines.append(f"    {body_line}" if body_line else "")
+        lines.append("}")
+        lines.append("")
+    return lines
+
+
+def render_core_glsl_file(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
     lines = [
         "#ifndef FORCE_DYNAMICS_GLSL",
         "#define FORCE_DYNAMICS_GLSL",
         "",
         "// Generated from base/ForceDynamics.py by tools/ExportForceDynamicsGLSL.py.",
-        "// Some direct read-only/math bodies are generated from explicit templates.",
-        "// Methods without templates remain non-functional stubs.",
+        "// Core reusable force dynamics. Boundary-particle wall helpers are split",
+        "// into ForceDynamicsBoundaryParticle.glsl and ForceDynamicsCDNozzle.glsl.",
         "// Do not hand edit generated dynamics content.",
         "",
         "const float EPSILON = 1.0e-12;",
@@ -1122,6 +1311,9 @@ def render_stub_file(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
         "#endif",
         "#ifndef vertical_wall",
         "#define vertical_wall 2",
+        "#endif",
+        "#ifndef cd_nozzle_wall",
+        "#define cd_nozzle_wall 3",
         "#endif",
         "#ifndef horizontal",
         "#define horizontal 1",
@@ -1151,51 +1343,106 @@ def render_stub_file(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
         lines.append("};")
         lines.append("")
 
-    lines.append("// Forward declarations for generated methods.")
-    for method_name in GENERATED_GLSL_METHODS:
+    lines.append("// Forward declarations for generated core methods.")
+    for method_name in CORE_GLSL_METHODS:
         lines.append(f"{GLSL_SIGNATURES[method_name]};")
     for method_name in CUSTOM_GLSL_HELPERS:
         lines.append(f"{GLSL_SIGNATURES[method_name]};")
     lines.append("")
 
-    for method_name in GENERATED_GLSL_METHODS:
-        method = visitor.methods[method_name]
-        signature = GLSL_SIGNATURES[method_name]
-        return_type = glsl_return_type(signature)
-        lines.append(f"// Python source: {source_path.name}:{method.lineno}")
-        lines.append(signature)
-        lines.append("{")
-        body_template = GLSL_BODY_TEMPLATES.get(method_name)
-        if body_template is not None:
-            for body_line in body_template:
-                lines.append(f"    {body_line}" if body_line else "")
-        else:
-            lines.append(f"    // TODO: generate body for {method_name}.")
-            default_return = GLSL_DEFAULT_RETURNS.get(return_type)
-            if default_return is not None:
-                lines.append(f"    return {default_return};")
-        lines.append("}")
-        lines.append("")
-
-    for method_name in CUSTOM_GLSL_HELPERS:
-        signature = GLSL_SIGNATURES[method_name]
-        lines.append(f"// Custom GLSL helper: {method_name}")
-        lines.append(signature)
-        lines.append("{")
-        for body_line in GLSL_BODY_TEMPLATES[method_name]:
-            lines.append(f"    {body_line}" if body_line else "")
-        lines.append("}")
-        lines.append("")
+    lines.extend(render_method_bodies(source_path, visitor, CORE_GLSL_METHODS))
+    lines.extend(render_helper_bodies(CUSTOM_GLSL_HELPERS))
 
     lines.append("#endif")
     lines.append("")
     return "\n".join(lines)
 
 
+def render_boundary_particle_glsl_file(
+    source_path: Path, visitor: ForceDynamicsVisitor
+) -> str:
+    lines = [
+        "#ifndef FORCE_DYNAMICS_BOUNDARY_PARTICLE_GLSL",
+        "#define FORCE_DYNAMICS_BOUNDARY_PARTICLE_GLSL",
+        "",
+        "// Generated from base/ForceDynamics.py by tools/ExportForceDynamicsGLSL.py.",
+        "// Generic boundary-particle wall helpers. Requires ForceDynamics.glsl.",
+        "// Do not hand edit generated dynamics content.",
+        "",
+        "// Forward declarations for boundary-particle methods.",
+    ]
+    for method_name in BOUNDARY_PARTICLE_GLSL_METHODS:
+        lines.append(f"{GLSL_SIGNATURES[method_name]};")
+    lines.append(GLSL_SIGNATURES["EvaluateWallSegment"] + ";")
+    lines.append("")
+    lines.extend(
+        render_method_bodies(source_path, visitor, BOUNDARY_PARTICLE_GLSL_METHODS)
+    )
+    lines.extend(
+        [
+            "#if !defined(WALL_FUNC) || WALL_FUNC != cd_nozzle_wall",
+            "BoundaryWallSegment EvaluateWallSegment(uint SourceID, uint BoundaryID)",
+            "{",
+            "#if defined(WALL_FUNC) && WALL_FUNC == horizontal_wall",
+            "    return EvaluateHorizontalWallSegment(SourceID, BoundaryID);",
+            "#elif defined(WALL_FUNC) && WALL_FUNC == vertical_wall",
+            "    return EvaluateVerticalWallSegment(SourceID, BoundaryID);",
+            "#else",
+            "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
+            "#endif",
+            "}",
+            "#endif",
+            "",
+        ]
+    )
+    lines.append("#endif")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_cd_nozzle_glsl_file(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
+    lines = [
+        "#ifndef FORCE_DYNAMICS_CD_NOZZLE_GLSL",
+        "#define FORCE_DYNAMICS_CD_NOZZLE_GLSL",
+        "",
+        "// Generated from base/ForceDynamics.py by tools/ExportForceDynamicsGLSL.py.",
+        "// CD nozzle boundary-particle wall helpers. Requires ForceDynamics.glsl",
+        "// and ForceDynamicsBoundaryParticle.glsl.",
+        "// Do not hand edit generated dynamics content.",
+        "",
+        "// Forward declarations for CD nozzle methods.",
+    ]
+    for method_name in CD_NOZZLE_GLSL_METHODS:
+        lines.append(f"{GLSL_SIGNATURES[method_name]};")
+    lines.append("")
+    lines.extend(render_method_bodies(source_path, visitor, CD_NOZZLE_GLSL_METHODS))
+    lines.extend(
+        [
+            "#if defined(WALL_FUNC) && WALL_FUNC == cd_nozzle_wall",
+            "BoundaryWallSegment EvaluateWallSegment(uint SourceID, uint BoundaryID)",
+            "{",
+            "    return EvaluateCDNozzleWallSegment(SourceID, BoundaryID);",
+            "}",
+            "#endif",
+            "",
+            "#endif",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def write_stub_file(output_path: Path, source_path: Path, visitor: ForceDynamicsVisitor) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(render_stub_file(source_path, visitor), encoding="utf-8")
-
+    output_path.write_text(render_core_glsl_file(source_path, visitor), encoding="utf-8")
+    DEFAULT_BOUNDARY_OUTPUT.write_text(
+        render_boundary_particle_glsl_file(source_path, visitor),
+        encoding="utf-8",
+    )
+    DEFAULT_CD_NOZZLE_OUTPUT.write_text(
+        render_cd_nozzle_glsl_file(source_path, visitor),
+        encoding="utf-8",
+    )
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -1358,6 +1605,8 @@ def main() -> int:
         output_path = args.output.resolve()
         write_stub_file(output_path, source_path, visitor)
         print(f"Wrote stub GLSL: {output_path}")
+        print(f"Wrote boundary-particle GLSL: {DEFAULT_BOUNDARY_OUTPUT}")
+        print(f"Wrote CD nozzle GLSL: {DEFAULT_CD_NOZZLE_OUTPUT}")
     return 0
 
 

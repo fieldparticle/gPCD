@@ -1,6 +1,7 @@
 import csv
 import argparse
 from pathlib import Path
+from gbase.utilities import get_run_configuration
 
 
 class InLineTest:
@@ -79,17 +80,11 @@ class InLineTest:
         return 0.0 if new_stiffness is None else new_stiffness
 
     def RunConfiguration(self):
-        if "RUN_CONFIGURATION" in self.item_cfg:
-            return self.item_cfg.get("RUN_CONFIGURATION", {})
-        return self.item_cfg
+        return get_run_configuration(self.item_cfg)
 
     def OutputDir(self, run_configuration):
         if "run_debug_dir" in run_configuration:
             return Path(run_configuration["run_debug_dir"])
-        if "RUN_CONFIGURATION" in self.item_cfg:
-            data_dir = Path(self.item_cfg.get("data_dir", "C:/_DJ/gPCDData/examples"))
-            study_name = self.item_cfg.get("STUDY_NAME", "inline_test")
-            return data_dir / "rpt" / study_name
         return Path("C:/_DJ/gPCDData/examples/rpt/inline_test")
 
     def StartRun(self, particles):

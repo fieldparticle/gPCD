@@ -63,19 +63,19 @@ class BoundaryCDNozzleReservoir():
 
         if res == False:
             return
-        cfg_data_name = self.itemcfg["STUDY_NAME"]
-        suffix = f"{self.itemcfg.particle_columns}x{self.itemcfg.particles_per_row}x{self.itemcfg.particles_per_cell_row}"
-        self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.tst"
+        cfg_data_name = self.itemcfg["output_file_prefix"]
+        
+        self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.tst"
         try:
             os.remove(self.test_file_name)
         except BaseException as e:
-            print(f"Delete bin file:{e}")
-        self.test_bin_name = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.bin"
+            print(f"Delete bin file does not exist yet {self.test_file_name}")
+        self.test_bin_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.bin"
         try:
             os.remove(self.test_bin_name)
         except BaseException as e:
-            print(f"Delete tst file:{e}")
-        self.report_file = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.rpt"
+            print(f"Delete bin file does not exist yet {self.test_file_name}")
+        self.report_file = f"{self.itemcfg.data_dir}/{cfg_data_name}.rpt"
         
 
     def close_bin_file(self):
@@ -183,6 +183,34 @@ class BoundaryCDNozzleReservoir():
         fstr = f"hsv_sat = {run_cfg.hsv_sat:0.4f};\n"
         f.write(fstr)
         fstr = f"hsv_val = {run_cfg.hsv_val:0.4f};\n"
+        f.write(fstr)
+        fstr = f'boundary_particle_function = "{run_cfg.boundary_particle_function}";\n'
+        f.write(fstr)
+        fstr = f"over_ride_side_length = {run_cfg.over_ride_side_length:0.2f};\n"
+        f.write(fstr)
+        fstr = f"nozzle_inlet_length = {run_cfg.nozzle_inlet_length:0.2f};\n"
+        f.write(fstr)
+        fstr = f"nozzle_converge_length = {run_cfg.nozzle_converge_length:0.2f};\n"
+        f.write(fstr)
+        fstr = f"nozzle_throat_length= {run_cfg.nozzle_throat_length:0.2f};\n"
+        f.write(fstr)
+        fstr = f"nozzle_diverge_length= {run_cfg.nozzle_diverge_length:0.2f};\n"
+        f.write(fstr)
+        fstr = f"nozzle_exit_length= {run_cfg.nozzle_exit_length:0.2f};\n"
+        f.write(fstr)
+        fstr = f"nozzle_inlet_radius= {run_cfg.nozzle_inlet_radius:0.2f};\n"
+        f.write(fstr)
+        fstr = f"nozzle_throat_radius= {run_cfg.nozzle_throat_radius:0.2f};\n"
+        f.write(fstr)
+        fstr = f"nozzle_exit_radius= {run_cfg.nozzle_exit_radius:0.2f};\n"
+        f.write(fstr)
+        fstr = f'periodic_direction = "horizontal";\n'
+        f.write(fstr)
+        fstr = f'boundary_guard = "cell_guard";\n'
+        f.write(fstr)
+        fstr = f'wall = "horizontal";\n'
+        f.write(fstr)
+        fstr = f'wall_type= "{run_cfg.wall_type}";\n'
         f.write(fstr)
         f.flush()
         f.close()
@@ -314,7 +342,7 @@ class BoundaryCDNozzleReservoir():
         self.number_boundary_particles = 0
         self.add_null_particle(self.p_list)
         self.index = 0
-        run_cfg = self.itemcfg["RUN_CONFIGURATION"]
+        run_cfg = get_run_configuration(self.itemcfg)
         self.configure_cd_nozzle_geometry(run_cfg)
         self.MobileParticlesCDNozzle(run_cfg)
         self.BoundaryParticlesCDNozzle(run_cfg)
@@ -350,6 +378,20 @@ class BoundaryCDNozzleReservoir():
         frames = particle_spacing / (forward_speed * dt)
         return max(1, int(math.ceil(frames - 1.0e-9)))
 
+    def cd_particles_per_wave(self, inlet_min, inlet_max, particle_spacing):
+        max_particles = int(
+            math.floor(((inlet_max - inlet_min) / particle_spacing) + 1.0e-9)
+        ) + 1
+        configured_particles = int(self.itemcfg.particles_per_row)
+        particles_per_wave = min(configured_particles, max_particles)
+        if particles_per_wave <= 0:
+            raise ValueError("CD nozzle inlet is too small for mobile particle radius")
+
+        occupied_span = (particles_per_wave - 1) * particle_spacing
+        available_span = inlet_max - inlet_min
+        start = inlet_min + 0.5 * (available_span - occupied_span)
+        return particles_per_wave, start, max_particles
+
     def MobileParticlesCDNozzle(self, run_cfg):
         if self.dim != 2:
             print("BoundaryCDNozzleReservoir: mobile particles are only generated for dim=2")
@@ -384,9 +426,9 @@ class BoundaryCDNozzleReservoir():
             )
             x_min = self.nozzle_center_x - self.nozzle_inlet_radius + radius
             x_max = self.nozzle_center_x + self.nozzle_inlet_radius - radius
-            particles_per_wave = int(
-                math.floor(((x_max - x_min) / particle_spacing) + 1.0e-9)
-            ) + 1
+            particles_per_wave, x_start, max_particles_per_wave = (
+                self.cd_particles_per_wave(x_min, x_max, particle_spacing)
+            )
         else:
             inlet_x = float(
                 self.cfg_value(run_cfg, "reservoir_inlet_x", self.nozzle_start_x)
@@ -394,23 +436,21 @@ class BoundaryCDNozzleReservoir():
             inlet_y = self.nozzle_center_y
             y_min = self.nozzle_center_y - self.nozzle_inlet_radius + radius
             y_max = self.nozzle_center_y + self.nozzle_inlet_radius - radius
-            particles_per_wave = int(
-                math.floor(((y_max - y_min) / particle_spacing) + 1.0e-9)
-            ) + 1
-        if particles_per_wave <= 0:
-            raise ValueError("CD nozzle inlet is too small for mobile particle radius")
+            particles_per_wave, y_start, max_particles_per_wave = (
+                self.cd_particles_per_wave(y_min, y_max, particle_spacing)
+            )
 
         for col in range(self.itemcfg.particle_columns):
             birth_frame = start_birth + col * frames_between
             for row in range(particles_per_wave):
                 if self.boundary_particle_function == "vertical_wall":
-                    x = x_min + row * particle_spacing
+                    x = x_start + row * particle_spacing
                     y = inlet_y
                     vx = 0.0
                     vy = forward_speed
                 else:
                     x = inlet_x
-                    y = y_min + row * particle_spacing
+                    y = y_start + row * particle_spacing
                     vx = forward_speed
                     vy = 0.0
                 self.addMobileParticle(
@@ -429,7 +469,8 @@ class BoundaryCDNozzleReservoir():
         print(
             f"BoundaryCDNozzleReservoir: generated {self.number_active_particles} "
             f"mobile particles, {particles_per_wave} per wave, "
-            f"{frames_between} frames between waves"
+            f"{frames_between} frames between waves "
+            f"(max fit {max_particles_per_wave})"
         )
 
     def BoundaryParticlesCDNozzle(self, run_cfg):
@@ -585,7 +626,7 @@ class BoundaryCDNozzleReservoir():
 
     def addMobileParticle(
         self,
-        RUN_CONFIGURATION,
+        run_cfg,
         rx,
         ry,
         rz,
@@ -617,7 +658,7 @@ class BoundaryCDNozzleReservoir():
             print(f"Failed adding mobile particle:{e} ")
             return
 
-    def addBoundaryParticle(self,RUN_CONFIGURATION,rx,ry,rz=2.0):
+    def addBoundaryParticle(self,run_cfg,rx,ry,rz=2.0):
         try:
             particle_struct = pdata()
             self.number_boundary_particles += 1
@@ -640,17 +681,12 @@ class BoundaryCDNozzleReservoir():
             return
 
     
-    def writeCFGData(self,RUN_CONFIGURATION):
-        cfg_data_name = self.itemcfg["STUDY_NAME"]
-        suffix = (
-            f"{self.itemcfg.particle_columns}x"
-            f"{self.itemcfg.particles_per_row}x"
-            f"{self.itemcfg.particles_per_cell_row}"
-        )
-        self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.tst"
-        self.test_bin_name = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.bin"
-        self.report_file = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.rpt"
-        self.write_test_file(RUN_CONFIGURATION)
+    def writeCFGData(self,run_cfg):
+        cfg_data_name = self.itemcfg["output_file_prefix"]
+        self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.tst"
+        self.test_bin_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.bin"
+        self.report_file = f"{self.itemcfg.data_dir}/{cfg_data_name}.rpt"
+        self.write_test_file(run_cfg)
         self.create_bin_file()
         self.write_bin_file(self.p_list)
         self.close_bin_file()

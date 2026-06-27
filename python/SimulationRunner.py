@@ -6,7 +6,8 @@ from base.ForceDynamicsBase import ForceDynamics
 from base.VerAForceDynamicsBase import ForceDynamics as VerAForceDynamics
 from base.Reporting import Reporting
 from base.InLineTest import InLineTest
-from gbase import libconf
+#from gbase import libconf
+import io, libconf
 from gbase.utilities import hsv_angle
 
 
@@ -113,7 +114,7 @@ def _radius_to_pixels(radius, view_box, screen_width, screen_height):
     x_min, x_max, y_min, y_max = view_box
     scale_x = screen_width / (x_max - x_min)
     scale_y = screen_height / (y_max - y_min)
-    return max(1, int(radius * min(scale_x, scale_y)))
+    return max(3, int(radius * min(scale_x, scale_y)))
 
 
 def _draw_overlap_lens(screen, left_center, left_radius, right_center, right_radius):
@@ -468,8 +469,8 @@ def _draw_particles(
             continue
         center = _to_screen(particle.rx, particle.ry, view_box, screen_width, screen_height)
         radius = _radius_to_pixels(particle.radius, view_box, screen_width, screen_height)
-        fill = (100, 170, 255)
-        edge = (210, 230, 255)
+        fill = (255, 255, 255)
+        edge = (80, 220, 255)
         if hsv_color:
             fill = hsv_angle(particle.VelRad.w, hsv_val, hsv_sat)
             edge = fill
@@ -499,12 +500,13 @@ def _draw_particles(
             _target_index, _target_particle, target_center, target_radius, _target_edge = target_screen_data
             _draw_overlap_lens(screen, center, radius, target_center, target_radius)
 
-    particle_label_font = pygame.font.Font(None, 22)
+    show_particle_numbers = bool(run_configuration.get("simulation_particle_numbers", True))
+    particle_label_font = pygame.font.Font(None, 22) if show_particle_numbers else None
     for _index, particle, center, radius, edge in particle_screen_data:
-        pygame.draw.circle(screen, edge, center, radius, 2)
-        pygame.draw.circle(screen, (20, 26, 35), center, 3)
-        label = particle_label_font.render(str(int(particle.pnum)), True, (20, 26, 35))
-        screen.blit(label, (center[0] + 5, center[1] - 16))
+        pygame.draw.circle(screen, edge, center, max(1, radius), 2)
+        if show_particle_numbers:
+            label = particle_label_font.render(str(int(particle.pnum)), True, (255, 255, 255))
+            screen.blit(label, (center[0] + 5, center[1] - 16))
 
     row_y = 10
     row_font = pygame.font.SysFont("consolas", 18)
@@ -607,7 +609,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
         run_configuration["end_frame"] = end_frame
     if "run_debug_dir" not in run_configuration:
         raise ValueError(
-            "SimulationRunner requires RUN_CONFIGURATION.run_debug_dir; "
+            "SimulationRunner requires run_debug_dir; "
             "capture output has no fallback directory."
         )
     report_dir = Path(run_configuration["run_debug_dir"])

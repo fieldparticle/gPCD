@@ -163,7 +163,7 @@ class GenMotionData():
         self.add_null_particle(self.p_list)
         self.index = 0
         try:
-            RUN_CONFIGURATION = self.itemcfg["RUN_CONFIGURATION"]
+            run_cfg = get_run_configuration(self.itemcfg)
             PARTICLE_DATA = AttrDict()
             PP = self.itemcfg["PARTICLE_DATA"]
         
@@ -183,7 +183,7 @@ class GenMotionData():
                 particle_struct.radius = part.radius
                 particle_struct.collision_stiffness_q = part.get(
                     "collision_stiffness_q",
-                    RUN_CONFIGURATION.collision_stiffness_q,
+                    run_cfg.collision_stiffness_q,
                 )
                 self.p_list.append(particle_struct)
                 self.number_particles = pp+1
@@ -194,7 +194,7 @@ class GenMotionData():
         self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.tst"
         self.test_bin_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.bin"
         self.report_file = f"{self.itemcfg.data_dir}/{cfg_data_name}.rpt"
-        self.write_test_file(RUN_CONFIGURATION)
+        self.write_test_file(run_cfg)
         self.create_bin_file()
         self.write_bin_file(self.p_list)
         self.close_bin_file()

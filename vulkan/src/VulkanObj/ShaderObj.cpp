@@ -83,13 +83,46 @@ void ShaderObj::WriteWalls()
 	wlflg = "1u;";
 	bool show_wall_as_boundary_cube = CfgApp->GetBool("application.show_wall_as_boundary_cube", true);
 	bool show_cell_boundary_cube = CfgApp->GetBool("application.show_cell_boundary_cube", true);
+	bool cdnoz = false;
+	std::string boundary_particle_function;
+	std::string model_type = CfgTst->GetString("boundary_particle_function", true);
+
+
+	std::ostringstream cdnoz_str;
+		
+	if (model_type.compare("cd_nozzle_wall") == 0)
+	{
+		cdnoz = true;
+		
+		cdnoz_str << "const float CD_NOZZLE_START_X = BOUNDARY_XMIN" << ";\n"
+			<< "const float CD_NOZZLE_CENTER_Y = 0.5 * (BOUNDARY_YMIN + BOUNDARY_YMAX)" << ";\n"
+			<< "const float CD_NOZZLE_INLET_LENGTH = " << std::fixed << std::setprecision(2)
+			<< CfgTst->GetFloat("nozzle_inlet_length", true) << ";\n"
+			<< "const float CD_NOZZLE_CONVERGE_LENGTH = " << std::fixed << std::setprecision(2)
+			<< CfgTst->GetFloat("nozzle_converge_length", true) << ";\n"
+			<< "const float CD_NOZZLE_THROAT_LENGTH = " << std::fixed << std::setprecision(2)
+			<< CfgTst->GetFloat("nozzle_throat_length", true) << ";\n"
+			<< "const float CD_NOZZLE_DIVERGE_LENGTH = " << std::fixed << std::setprecision(2)
+			<< CfgTst->GetFloat("nozzle_diverge_length", true) << ";\n"
+			<< "const float CD_NOZZLE_EXIT_LENGTH = " << std::fixed << std::setprecision(2)
+			<< CfgTst->GetFloat("nozzle_exit_length", true) << ";\n"
+			<< "const float CD_NOZZLE_INLET_RADIUS = " << std::fixed << std::setprecision(2)
+			<< CfgTst->GetFloat("nozzle_inlet_radius", true) << ";\n"
+			<< "const float CD_NOZZLE_THROAT_RADIUS = " << std::fixed << std::setprecision(2)
+			<< CfgTst->GetFloat("nozzle_throat_radius", true) << ";\n"
+			<< "const float CD_NOZZLE_EXIT_RADIUS = " << std::fixed << std::setprecision(2)
+			<< CfgTst->GetFloat("nozzle_exit_radius", true) << ";\n";
+
+	}
+	
+
 	float wallXMIN = 0.0;
 	float wallXMAX = 0.0;
 	float wallYMIN = 0.0;
 	std::string boundaryGuard = "wall_guard";
-	if (CfgApp->CheckKey("application.boundary_guard") != NULL)
+	if (CfgTst->CheckKey("boundary_guard") != NULL)
 	{
-		boundaryGuard = CfgApp->GetString("application.boundary_guard", true);
+		boundaryGuard = CfgTst->GetString("boundary_guard", true);
 	}
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
 	std::string filename = fildir + "/boundary.glsl";
@@ -108,12 +141,17 @@ void ShaderObj::WriteWalls()
 			"const float BOUNDARY_YMIN  = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallYMIN", true) << ";\n"
 			"const float BOUNDARY_YMAX  = " << std::fixed << std::setprecision(2) << CfgTst->GetFloat("wallYMAX", true) << ";\n"
 			"const float wall_contact_offset = " << std::fixed << std::setprecision(2) << 0.20 << ";\n"
-			"#define WALL_FUNC "  << CfgApp->GetString("application.boundary_particle_function", true) << "\n"
-			"#define PERIODIC_DIRECTION " << CfgApp->GetString("application.periodic_direction", true) << "\n"
-			"#define BOUNDARY_GUARD " << CfgApp->GetString("application.boundary_guard", true)  << "\n"
-			"#define " << CfgApp->GetString("application.wall_type",true) << "\n"
-			"#endif\n";
+			"#define WALL_FUNC " << CfgTst->GetString("boundary_particle_function", true) << "\n"
+			"#define PERIODIC_DIRECTION " << CfgTst->GetString("periodic_direction", true) << "\n"
+			"#define BOUNDARY_GUARD " << CfgTst->GetString("boundary_guard", true) << "\n"
+			"#define " << CfgTst->GetString("wall_type", true) << "\n";
+			
+
+		if (cdnoz == true)
+			ostrm << cdnoz_str.str();
+		ostrm << "#endif\n";
 	}
+
 	
 }
 void ShaderObj::GenWorkGroups()

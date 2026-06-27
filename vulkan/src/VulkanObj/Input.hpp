@@ -33,6 +33,9 @@
 #define INPUT_HPP
 
 extern bool QuitEvent;
+extern float PanX;
+extern float PanY;
+extern bool PanOn;
 extern float ZoomX;
 extern float Zoomy;
 extern float Zoomz;

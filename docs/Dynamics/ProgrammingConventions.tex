@@ -22,10 +22,19 @@ The Python HSV velocity-angle helper is:
 gbase/utilities.py:hsv_angle(angle, value, sat)
 \end{verbatim}
 
-\texttt{SimulationRunner.py} applies this helper when
-\texttt{RUN\_CONFIGURATION.hsv\_color} is true.  The helper reads the angle in
+\texttt{SimulationRunner.py} applies this helper when the flat configuration
+item \texttt{hsv\_color} is true.  The helper reads the angle in
 radians, maps it to hue with \(1/(2\pi)\), clamps saturation and value to
 \([0,1]\), and returns an RGB tuple for the Python renderer.
+
+\subsection{Flat Runtime Configuration}
+
+Runtime and generator configuration items are stored directly in the cfg root.
+The retired \texttt{RUN\_CONFIGURATION} subgroup must not be added to new cfg
+files or required by Python code.  Python consumers use
+\texttt{get\_run\_configuration(config)} during the transition so old external
+cfg files with the subgroup remain readable, but active project cfg files use
+the flat form.
 
 Future GLSL color utilities should mirror this interface but remain separate
 from generated ForceDynamics collision code.  Color is diagnostic display

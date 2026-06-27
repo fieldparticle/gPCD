@@ -5,6 +5,15 @@ import math
 import sys
 
 
+def get_run_configuration(config):
+    """Return the active run configuration from flat or legacy cfg layouts."""
+    if config is None:
+        return {}
+    if "RUN_CONFIGURATION" in config:
+        return config.get("RUN_CONFIGURATION", {})
+    return config
+
+
 def hsv_angle(angle, value=1.0, sat=0.707):
     hue = (angle / (2.0 * math.pi)) % 1.0
     sat = max(0.0, min(1.0, sat))

@@ -53,6 +53,10 @@ then the particle is born.  Birth performs:
 A particle is born before the frame-start snapshot is built, so the newly born
 particle participates in the current frame using ordinary ForceDynamics rules.
 
+This is the current implementation.  It does not yet test whether the proposed
+birth position overlaps an already-live mobile particle.  The approved next
+birth rule is the deferred-admission process described below.
+
 In the GLSL compute path this rule is owned by:
 
 \begin{verbatim}
@@ -266,6 +270,35 @@ generated \(x\) coordinate and offsets the \(y\) coordinate from
 \(y_{\min}\).  Retirement then checks \(y_{\max}\).  When the selector is not
 vertical, the historical horizontal \(x\)-axis behavior is used.
 
+\subsection{Planned Deferred Birth Admission}
+
+When a scheduled birth frame arrives, the particle will become a birth
+candidate rather than becoming live immediately.  The reserved lifecycle
+states are:
+
+\begin{verbatim}
+colFlg = 2  waiting for a birth attempt
+colFlg = 3  testing a birth attempt
+colFlg = 0  admitted live particle
+\end{verbatim}
+
+The candidate birth position is tested only against already-live mobile
+particles.  Dead particles, unborn particles, simultaneous birth candidates,
+and boundary markers are excluded.  If the motion contact query reports a
+starting collision, the source search terminates immediately, the particle
+returns to \texttt{colFlg=2}, and \texttt{Data.w} is changed to
+\texttt{frameNum+1}.  It receives no force or motion update in that frame.
+
+If no live target overlaps the candidate position, the particle is admitted by
+setting \texttt{Data.w=0} and \texttt{colFlg=0}.  Delaying one particle does
+not move the scheduled birth frames of later particles, so the generated wave
+spacing is preserved.
+
+The GPU implementation must test target liveness from immutable frame-start
+state.  Birth testing and activation cannot depend on the order in which source
+invocations happen to execute; separate test and commit phases, or an
+equivalent synchronized design, are required.
+
 
 \subsection{Birth Placement Rule}
 
@@ -372,7 +405,15 @@ vulkan/sim/BoundaryCDNozzleReservoir/CDNozzleGenerated.obj
 \end{verbatim}
 It is generated from the same profile as the boundary particles, but it does
 not define dynamics.  Contact response remains owned by boundary marker
-particles and the selected wall-segment evaluator.  A future
-\texttt{cd\_nozzle\_wall} evaluator should calculate the local curved wall
-normal and contact geometry from the nozzle profile while preserving the
-source-owned force accumulation rule.
+particles and the selected wall-segment evaluator.
+
+The current two-dimensional CD nozzle wall function is selected with:
+\begin{verbatim}
+boundary_particle_function = "cd_nozzle_wall";
+\end{verbatim}
+For horizontal CD nozzle flow, boundary particles are locality markers.  The
+evaluator calculates the actual wall point and wall normal from the analytic
+nozzle profile at the source particle's current \(x\) coordinate.  The wall
+profile uses the same inlet, converging, throat, diverging, and exit lengths
+and radii as the generator.  The source-owned force accumulation rule does not
+change; only the wall-segment geometry evaluator changes.

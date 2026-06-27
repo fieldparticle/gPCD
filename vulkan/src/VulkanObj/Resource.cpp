@@ -105,6 +105,7 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
 
     glm::vec3 eye;
     glm::vec3 up;
+    glm::vec3 screenRight;
 
     float dist = s * 4.0f;
 
@@ -115,6 +116,7 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
         // screen out   = +Z
         eye = center + glm::vec3(0.0f, 0.0f, dist);
         up = glm::vec3(0.0f, 1.0f, 0.0f);
+        screenRight = glm::vec3(1.0f, 0.0f, 0.0f);
     }
     else if (rCoordView == VIEW_ZY)
     {
@@ -123,6 +125,7 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
         // screen out   = +X
         eye = center + glm::vec3(dist, 0.0f, 0.0f);
         up = glm::vec3(0.0f, 1.0f, 0.0f);
+        screenRight = glm::vec3(0.0f, 0.0f, 1.0f);
     }
     else if (rCoordView == VIEW_XZ)
     {
@@ -131,12 +134,18 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
         // screen out   = +Y
         eye = center + glm::vec3(0.0f, dist, 0.0f);
         up = glm::vec3(0.0f, 0.0f, 1.0f);
+        screenRight = glm::vec3(1.0f, 0.0f, 0.0f);
     }
     else
     {
         eye = center + glm::vec3(0.0f, 0.0f, dist);
         up = glm::vec3(0.0f, 1.0f, 0.0f);
+        screenRight = glm::vec3(1.0f, 0.0f, 0.0f);
     }
+
+    glm::vec3 pan = (PanX * screenRight) + (PanY * up);
+    eye += pan;
+    center += pan;
 
     m_UBO.view = glm::lookAt(
         eye,

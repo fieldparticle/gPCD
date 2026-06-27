@@ -57,6 +57,8 @@
 #include "../common/isParticleContactMotion.glsl"
 #define WALL_MODEL_BOUNDARY_PARTICLE
 #include "../common/ForceDynamics.glsl"
+#include "../common/ForceDynamicsBoundaryParticle.glsl"
+#include "../common/ForceDynamicsCDNozzle.glsl"
  
 
 ///

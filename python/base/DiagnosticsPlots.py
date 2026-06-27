@@ -6,6 +6,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from gbase import libconf
+from gbase.utilities import get_run_configuration
 
 
 PLOT_WIDTH = 1100
@@ -102,7 +103,7 @@ def _run_dt_from_cfg(cfg_path):
         return None
     with cfg_path.open("r", encoding="utf-8") as cfg_file:
         cfg = libconf.load(cfg_file)
-    run_cfg = cfg.get("RUN_CONFIGURATION", {})
+    run_cfg = get_run_configuration(cfg)
     if "dt" not in run_cfg:
         return None
     return float(run_cfg["dt"])
@@ -246,11 +247,11 @@ def _batch_momentum_items(batch_cfg, report_mode="live"):
         batch = libconf.load(cfg_file)
 
     if "batch_items" not in batch:
-        run_configuration = batch.get("RUN_CONFIGURATION", {})
+        run_configuration = get_run_configuration(batch)
         report_dir = run_configuration.get("run_debug_dir")
         if not report_dir:
             raise ValueError(
-                f"{batch_cfg} does not define RUN_CONFIGURATION.run_debug_dir"
+                f"{batch_cfg} does not define run_debug_dir"
             )
         momentum_csv = _report_path(report_dir, "momentum", report_mode)
         if not momentum_csv.exists():
@@ -273,7 +274,7 @@ def _batch_momentum_items(batch_cfg, report_mode="live"):
         cfg_path = base_dir / cfg_name
         with cfg_path.open("r", encoding="utf-8") as cfg_file:
             cfg = libconf.load(cfg_file)
-        report_dir = Path(cfg["RUN_CONFIGURATION"]["run_debug_dir"])
+        report_dir = Path(get_run_configuration(cfg)["run_debug_dir"])
         momentum_csv = _report_path(report_dir, "momentum", report_mode)
         if not momentum_csv.exists():
             continue

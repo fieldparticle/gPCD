@@ -3,6 +3,7 @@ from gbase import libconf
 from base.VerAForceDynamics import ForceContactDynamics
 from base.InLineTest import InLineTest
 from gbase import BinaryFileUtilities
+from gbase.utilities import get_run_configuration
 import math
 import re
 from pathlib import Path
@@ -223,14 +224,25 @@ class ForceDynamics(ForceContactDynamics):
             contact_state.delta_pz = -applied_impulse * float(contact_state.geom.z)
         return True
 
+    def load_include(self):
+        #include_items = libconf.load(self.config.include_file)
+        with open(self.config.include_file, "r", encoding="utf-8") as cfg_file:
+            include_config = libconf.load(cfg_file)
+        for key, value in include_config.items():
+            self.config[key] = value
+
+
     def load_cfg_file(self, cfg_file_name):
         self.load_constants()
         self.collIn.ErrorReturn = self.constants.ERROR_NONE
         with open(cfg_file_name, "r", encoding="utf-8") as cfg_file:
             self.config = libconf.load(cfg_file)
 
+        if 'include_file' in self.config:
+                self.load_include()
+
         self.config_error_return = None
-        self.run_configuration = self.config.get("RUN_CONFIGURATION", {})
+        self.run_configuration = get_run_configuration(self.config)
         if self.config.pdata_from_file == True:
             self.particle_data = self.getParticleData(self.config)
         else:
@@ -245,7 +257,7 @@ class ForceDynamics(ForceContactDynamics):
         self.pair_phase_totals = {}
         self.pair_phase_frame_diagnostics = []
         self.pair_phase_energy_reference = None
-        if "in_line_obj" in self.config.RUN_CONFIGURATION or self.study == True:
+        if "in_line_obj" in self.run_configuration or self.study == True:
             self.inline_test_flag = True
         else:
             self.inline_test_flag = False
@@ -390,7 +402,8 @@ class ForceDynamics(ForceContactDynamics):
         )
 
     def getParticleData(self,config):
-        file_name = config.bin_file
+        cfg_data_name = config["output_file_prefix"]
+        file_name = f"{config.data_dir}/{cfg_data_name}.bin"
         results = BinaryFileUtilities.read_all_particle_data(file_name)
         particle_data = AttrDict()
         particles = AttrDict()

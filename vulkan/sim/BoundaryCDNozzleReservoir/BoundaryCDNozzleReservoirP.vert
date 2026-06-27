@@ -115,7 +115,7 @@ void main(){
 	
 	
 	// Set point size 
-	gl_PointSize = 2.0;
+	gl_PointSize = 0.5;
 	if(uint(ShaderFlags.frameNum) == 0u)
 	{
 		gl_Position = vec4(0.0, 0.0, 0.0, 1.0);

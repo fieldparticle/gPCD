@@ -197,10 +197,6 @@ int NoPerfLoop(PerfObj* perfObj, TCPObj* tcp, TCPObj* tcpsapp,DrawObj* DrawInsta
 				}
 				if(tcp->m_SRecvBuf.compare("tgrun")==0)
 				{
-					if(G_Stop == true)
-						G_Stop = false;
-					else
-						G_Stop = true;
 				}
 				if(tcp->m_SRecvBuf.compare("colorc")==0)
 				{

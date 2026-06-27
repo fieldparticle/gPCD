@@ -204,13 +204,13 @@ class SimpleReservoirPeriodic():
         self.index = 0
         
         
-        RUN_CONFIGURATION = self.itemcfg["RUN_CONFIGURATION"]
+        run_cfg = get_run_configuration(self.itemcfg)
         
-        radius = float(self.cfg_value(RUN_CONFIGURATION, "radius", 0.25))
-        dt = float(self.cfg_value(RUN_CONFIGURATION, "dt", 1.0))
-        collision_stiffness_q = float(self.cfg_value(RUN_CONFIGURATION, "collision_stiffness_q", 0.0))
-        WallYMAX = float(self.cfg_value(RUN_CONFIGURATION, "WallYMAX", 10.0))
-        WallYMIN = float(self.cfg_value(RUN_CONFIGURATION, "WallYMIN", 10.0))
+        radius = float(self.cfg_value(run_cfg, "radius", 0.25))
+        dt = float(self.cfg_value(run_cfg, "dt", 1.0))
+        collision_stiffness_q = float(self.cfg_value(run_cfg, "collision_stiffness_q", 0.0))
+        WallYMAX = float(self.cfg_value(run_cfg, "WallYMAX", 10.0))
+        WallYMIN = float(self.cfg_value(run_cfg, "WallYMIN", 10.0))
 
         # Paticle length is twice the radius times the fraction of diameter separation.
         particle_length =2.0*radius+2.0*radius*self.itemcfg.fraction_of_diameter_separation
@@ -231,7 +231,7 @@ class SimpleReservoirPeriodic():
 
         particles_per_row = self.itemcfg.particles_per_row
         required_width = particles_per_row/self.itemcfg.particles_per_cell_row
-        #width = RUN_CONFIGURATION.WallYMAX - RUN_CONFIGURATION.WallYMIN
+        #width = run_cfg.WallYMAX - run_cfg.WallYMIN
         #if required_width > width:
          #   print(f"Error: Particles per row is {particles_per_row} which requires a width of {required_width:.2f} but the width is only {width:.2f}. ")
          #   return
@@ -284,15 +284,15 @@ class SimpleReservoirPeriodic():
         except BaseException as e:
             print(f"Failed adding Particle:{e} ")   
             return
-        self.writeCFGData(RUN_CONFIGURATION)
+        self.writeCFGData(run_cfg)
 
-    def writeCFGData(self,RUN_CONFIGURATION):
+    def writeCFGData(self,run_cfg):
         cfg_data_name = self.itemcfg["STUDY_NAME"]
         suffix = f"{self.itemcfg.particle_columns}x{self.itemcfg.particles_per_row}x{self.itemcfg.particles_per_cell_row}"
         self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.tst"
         self.test_bin_name = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.bin"
         self.report_file = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.rpt"
-        self.write_test_file(RUN_CONFIGURATION)
+        self.write_test_file(run_cfg)
         self.create_bin_file()
         self.write_bin_file(self.p_list)
         self.close_bin_file()

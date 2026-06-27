@@ -150,15 +150,21 @@ the scenario configuration and generated into \texttt{boundary.glsl} as
 \begin{verbatim}
 EvaluateHorizontalWallSegment(SourceID, BoundaryID)
 EvaluateVerticalWallSegment(SourceID, BoundaryID)
+EvaluateCDNozzleWallSegment(SourceID, BoundaryID)
 \end{verbatim}
 
 Horizontal marker segments classify targets as lower or upper wall markers.
 Vertical marker segments classify targets as left or right wall markers.  In
 both cases the evaluator constructs the stationary wall ghost for the mobile
 source and returns normal, overlap area, center distance, and wall flag.  The
-force accumulator then uses the configured contact-force measure.  Later
-sloped or curved boundaries should extend this dispatcher without changing
-the source-owned force accumulation rule.
+force accumulator then uses the configured contact-force measure.
+
+\texttt{EvaluateCDNozzleWallSegment} is the current curved two-dimensional
+nozzle evaluator.  Boundary markers still provide locality, but the wall point
+and wall normal are calculated from the analytic CD nozzle radius profile at
+the source particle's current axial coordinate.  This preserves the same
+source-owned accumulation rule used by straight boundary-particle walls while
+allowing the wall segment to be curved.
 
 \ForceFunctionSection{BoundaryParticleAppliesToSource}
 

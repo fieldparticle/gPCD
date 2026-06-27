@@ -14,17 +14,19 @@ class ConfigUtility:
         #self.log.log(self,"gPCD into Create.");
         self.CfgFileName = CfgFileName
         self.configPath = self.CfgFileName
+        self.config = self.open_log(self.configPath)
+        self.log.log(self,"Successfully Loaded Config File.")       
+            
+    def open_log(self,filename):
         try:
-            with io.open(self.configPath) as f:
+            with io.open(filename) as f:
                 #self.log.log(self,"gPCD into Open config file.")
-                self.config = libconf.load(f)
+                return libconf.load(f)
         except IOError as e:
             self.log.log(self,f"Config File Open error {e}")
             exit()
 
-        self.log.log(self,"Successfully Loaded Config File.")       
-            
-            
+
     def get_repo_root(self):
         """Gets the absolute path of the project root directory."""
         current_dir = os.path.dirname(os.path.abspath(__file__))

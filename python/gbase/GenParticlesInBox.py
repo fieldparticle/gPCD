@@ -166,7 +166,7 @@ class GenParticlesInBox():
         self.number_particles = 0
         self.add_null_particle(self.p_list)
         self.index = 0
-        RUN_CONFIGURATION = self.itemcfg["RUN_CONFIGURATION"]
+        run_cfg = get_run_configuration(self.itemcfg)
         count = 0
         local_particles_in_row = self.itemcfg.num_particles_y
         local_particles_in_col = self.itemcfg.num_particles_x
@@ -196,7 +196,7 @@ class GenParticlesInBox():
         self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.tst"
         self.test_bin_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.bin"
         self.report_file = f"{self.itemcfg.data_dir}/{cfg_data_name}.rpt"
-        self.write_test_file(RUN_CONFIGURATION)
+        self.write_test_file(run_cfg)
         self.create_bin_file()
         self.write_bin_file(self.p_list)
         self.close_bin_file()

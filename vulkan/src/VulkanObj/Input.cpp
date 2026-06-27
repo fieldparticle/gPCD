@@ -32,6 +32,10 @@
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
 #include "Input.hpp"
+float PanX = 0.0;
+float PanY = 0.0;
+bool PanOn = false;
+
 bool QuitEvent=false;
 float ZoomX = 1.0;
 float ZoomY = 1.0;
@@ -79,6 +83,7 @@ void SetCallBacks(VulkanObj* VO)
 	glfwSetScrollCallback(VO->GetGLFWWindow(), scroll_callback);
 	glfwSetKeyCallback(VO->GetGLFWWindow(), key_callback);
 	glfwSetMouseButtonCallback(VO->GetGLFWWindow(), onMouseButton);
+	
 	QuitEvent = false;
 	rRotZ = CfgApp->GetFloat("application.initial_view.rRotZ", true);
 	rRotY = CfgApp->GetFloat("application.initial_view.rRotY", true);
@@ -145,10 +150,26 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	{
 		QuitEvent = 1;
 	}
-	if (key == GLFW_KEY_P && action == GLFW_PRESS)
+
+	if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS)
 	{
-		TranslateX += 1.0;
-		//std::cout << TranslateX << std::endl;
+		PanX += 1.0f;
+	}
+
+	if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
+	{
+
+		PanX -= 1.0f;
+	}
+
+	if (key == GLFW_KEY_UP && action == GLFW_PRESS)
+	{
+		PanY += 1.0f;
+	}
+
+	if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
+	{
+		PanY -= 1.0f;
 	}
 	if (key == GLFW_KEY_X && action == GLFW_PRESS)
 	{

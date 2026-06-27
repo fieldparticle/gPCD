@@ -51,7 +51,20 @@ selection:
 
 \subsection{Generated Files}
 
-\texttt{ForceDynamics.glsl} is generated dynamics logic.
+Generated dynamics are divided by dependency:
+\begin{itemize}
+    \item \texttt{ForceDynamics.glsl} contains reusable core dynamics;
+    \item \texttt{ForceDynamicsBoundaryParticle.glsl} contains straight
+    boundary-marker wall helpers and the generic wall-segment declaration;
+    \item \texttt{ForceDynamicsCDNozzle.glsl} contains CD nozzle profile and
+    curved wall helpers that require generated nozzle constants.
+\end{itemize}
+
+Ordinary wall and straight boundary-particle scenarios must not require CD
+nozzle symbols.  A CD nozzle wrapper includes the core file, the generic
+boundary-particle file, and then the CD nozzle file.  Other boundary-particle
+wrappers include only the first two files.
+
 \texttt{StartingContactState.glsl} is shared ABI/state layout and should be
 edited carefully because C++ must match it.
 
@@ -102,6 +115,7 @@ shape is selected by:
 \begin{verbatim}
 #define WALL_FUNC horizontal_wall
 #define WALL_FUNC vertical_wall
+#define WALL_FUNC cd_nozzle_wall
 \end{verbatim}
 
 Reservoir periodic direction is selected separately by:
@@ -120,9 +134,10 @@ computes overlap area for diagnostics and for the optional \texttt{area}
 force mode.
 
 \texttt{ForceDynamics.glsl} defines numeric selector tokens for
-\texttt{horizontal\_wall}, \texttt{vertical\_wall}, \texttt{horizontal},
-\texttt{vertical}, \texttt{depth}, and \texttt{area} so preprocessor
-comparisons do not accidentally compare undefined identifiers.
+\texttt{horizontal\_wall}, \texttt{vertical\_wall},
+\texttt{cd\_nozzle\_wall}, \texttt{horizontal}, \texttt{vertical},
+\texttt{depth}, and \texttt{area} so preprocessor comparisons do not
+accidentally compare undefined identifiers.
 
 \subsection{Python-Only Infrastructure}
 
@@ -141,6 +156,12 @@ invocation before contact processing.  The generated force path may set
 \texttt{P[SourceID].colFlg=1u} when \texttt{AccumulateContactForce(...)}
 receives a valid particle or wall contact.  This mirrors the Python diagnostic
 flag without reintroducing contact-slot storage as a force input.
+
+Reservoir deferred-birth processing is the exception to diagnostic-only use of
+\texttt{colFlg}.  Reserved values \texttt{2} and \texttt{3} represent waiting
+and birth-candidate lifecycle states.  They remain outside the force law and
+must not be cleared by the ordinary collision-color initialization before the
+birth admission decision is complete.
 
 For sphere rendering, the mesh resource should provide a unit-radius sphere
 and the vertex shader should scale each instance by \texttt{P[index].Data.x}.
@@ -417,7 +438,14 @@ The required generated methods are:
 \begin{itemize}
     \item \texttt{IsBoundaryParticle(...)};
     \item \texttt{BoundaryParticleWallFlag(...)};
+    \item \texttt{BoundaryParticleVerticalWallFlag(...)};
+    \item \texttt{BoundaryParticleCDNozzleWallFlag(...)};
+    \item \texttt{CDNozzleRadius(...)};
+    \item \texttt{CDNozzleRadiusSlope(...)};
     \item \texttt{EvaluateWallSegment(...)};
+    \item \texttt{EvaluateHorizontalWallSegment(...)};
+    \item \texttt{EvaluateVerticalWallSegment(...)};
+    \item \texttt{EvaluateCDNozzleWallSegment(...)};
     \item \texttt{ProcessBoundaryParticleWallCollision(...)}.
 \end{itemize}
 
@@ -432,6 +460,16 @@ marker target.  The boundary-particle processor should build a local
 \texttt{ContactForceInput} with \texttt{CONTACT\_WALL} and accumulate the force
 immediately, just as \texttt{ProcessWallCollision(...)} does for manual wall
 flags.
+
+The CD nozzle wall function is selected by:
+\begin{verbatim}
+#define WALL_FUNC cd_nozzle_wall
+\end{verbatim}
+It treats boundary particles as locality markers and calculates the actual
+wall point and wall normal from the generated CD nozzle constants in
+\texttt{boundary.glsl}.  Required CD nozzle symbols include
+\texttt{CD\_NOZZLE\_START\_X}, \texttt{CD\_NOZZLE\_CENTER\_Y}, the five
+section lengths, and the inlet, throat, and exit radii.
 
 The Python diagnostic initializer:
 \begin{itemize}
@@ -591,6 +629,8 @@ sim/BoundarySpheresReservoir/
     BoundarySpheresReservoirP.comp
 sim/BoundaryParticleReservoirPeriodic/
     BoundaryParticleReservoirPeriodicP.comp
+sim/BoundaryCDNozzleReservoir/
+    BoundaryCDNozzleReservoirP.comp
 \end{verbatim}
 
 A compile failure at this stage should be classified as either a missing
@@ -650,6 +690,18 @@ RetireParticlePastXMax(SourceID);
 
 These helpers are lifecycle gates.  They do not alter the ForceDynamics force
 law, and they do not write target particles.
+
+The current helper activates a particle immediately when its birth frame
+arrives.  The next porting step is deferred birth admission.  The contact query
+used by the motion wrapper must distinguish \texttt{NO\_CONTACT}, ordinary
+\texttt{CONTACT}, and \texttt{STARTING\_COLLISION}.  On a starting collision,
+the source must stop its remaining target search, restore the waiting state,
+and set \texttt{Data.w=frameNum+1} without running force or integration.
+
+Only frame-start live mobile targets may block admission.  Because GLSL source
+invocations cannot safely make admission depend on invocation order, target
+lifecycle reads must come from an immutable snapshot and admission requires a
+separate commit phase or equivalent synchronization.
 
 \subsection{Step 16: Vulkan Runtime Validation}
 

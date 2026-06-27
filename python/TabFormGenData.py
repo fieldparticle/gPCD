@@ -96,6 +96,14 @@ class TabGenData(QTabWidget):
             if self.selected_run_analysis(self.CfgFile, batch_mode=True, end_frame=ii[1]) == True:
                 break
         self.batch_mode = False
+
+    def load_include(self):
+        include_items = self.itemcfgFile.open_log(self.itemcfg.include_file)
+        for key, value in include_items.items():
+            self.itemcfg[key] = value
+            print(f'{key}')
+
+        pass
     #******************************************************************
     # Load the configuration data
     #
@@ -112,6 +120,8 @@ class TabGenData(QTabWidget):
             self.itemcfgFile = ConfigUtility(self.CfgFile)
             self.itemcfgFile.Create(self.bobj.log,self.CfgFile)
             self.itemcfg = self.itemcfgFile.config
+            if 'include_file' in self.itemcfg:
+                self.load_include()
             if self.itemcfg.get("type") == "batch":
                 self.diagnostics_cfg_file = file
         except BaseException as e:
@@ -190,7 +200,7 @@ class TabGenData(QTabWidget):
          # Pass the function to execute
         if self.refresh() == False:
             print("Config file error")
-            return
+            retur
         index = 0
         os.system('cls' if os.name == 'nt' else 'clear')
         self.current_test_file = 0
@@ -548,7 +558,7 @@ class TabGenData(QTabWidget):
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/BoundaryParticleReservoirPeriodicPy.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/BoundaryParticleReservoirPeriodic.cfg")
         self.update_list_widget()
         self.update_data_list_widget()
         

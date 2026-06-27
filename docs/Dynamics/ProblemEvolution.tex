@@ -859,13 +859,35 @@ boundary particle markers and \texttt{EvaluateWallSegment}.  The OBJ emits
 \texttt{v/vt/vn} form so it is compatible with the current simple Vulkan OBJ
 loader.
 
+The CD nozzle wall response is now represented by:
+\begin{verbatim}
+boundary_particle_function = "cd_nozzle_wall";
+\end{verbatim}
+In Python, \texttt{EvaluateWallSegment(SourceID, BoundaryID)} dispatches to
+\texttt{EvaluateCDNozzleWallSegment}.  Boundary markers provide broad-phase
+locality and upper/lower wall identity, while the evaluator calculates the
+actual wall point and wall normal from the analytic CD nozzle profile at the
+source particle's current axial coordinate.  The Python direct-scan loop now
+lets the selected evaluator decide whether a marker produces a valid segment,
+instead of using the old flat \texttt{BoundaryParticleWallFlag} pre-filter.
+
+The GLSL exporter now emits the corresponding CD nozzle functions:
+\begin{verbatim}
+BoundaryParticleCDNozzleWallFlag
+CDNozzleRadius
+CDNozzleRadiusSlope
+EvaluateCDNozzleWallSegment
+\end{verbatim}
+and the generated \texttt{EvaluateWallSegment} dispatcher includes the
+\texttt{cd\_nozzle\_wall} branch.  The CD nozzle constants are generated into
+\texttt{boundary.glsl}.
+
 \subsubsection{difference outcome}
 
-Particle solution for geometry generation and reservoir staging.  The nozzle
-boundary cloud, mobile reservoir particles, lifecycle metadata, and visual OBJ
-mesh can now be generated from one Python source.  The next step is to add a
-curved wall function so a boundary marker can represent the local nozzle wall
-segment instead of only horizontal or vertical straight-wall segments.
+Particle solution for geometry generation, reservoir staging, Python curved
+wall response, and generated GLSL CD nozzle wall-function export.  Vulkan
+runtime validation of the generated CD nozzle wall response remains the next
+test step.
 
 \subsubsection{<Analysis>}
 
@@ -882,13 +904,68 @@ indexed cube draw.  The command buffer now selects the draw method from
 boundaries retain \texttt{vkCmdDrawIndexed}.  This preserves old cube and
 sphere rendering while allowing generated nozzle OBJ visualization.
 
-For the next step, \texttt{EvaluateWallSegment(SourceID, BoundaryID)} needs a
-curve-aware function selected by configuration, for example:
+The current curve-aware wall function is selected by configuration:
 \begin{verbatim}
 boundary_particle_function = "cd_nozzle_wall";
 \end{verbatim}
-In 2D this function should evaluate the local nozzle profile curve and return
-the wall normal, penetration/overlap geometry, wall flag, and validity.  In 3D
-the corresponding function should evaluate the radial wall from the nozzle
-centerline.  The source-owned force accumulation rule does not change; only
-the wall-segment evaluator changes.
+In 2D this function evaluates the local nozzle profile curve and returns the
+wall normal, penetration/overlap geometry, wall flag, and validity.  In 3D the
+corresponding radial wall evaluator from the nozzle centerline remains future
+work.  The source-owned force accumulation rule does not change; only the
+wall-segment evaluator changes.
+
+\subsection{Reservoir Birth Admission Must Reject Starting Overlap}
+
+\subsubsection{<previous form>}
+
+Reservoir particles carry a scheduled frame in \texttt{Data.w}.  When the
+frame arrives, Python and GLSL immediately place the particle at the inlet,
+set \texttt{Data.w=0}, and process it as live.  If an earlier particle has
+been pushed back into the inlet region, the new particle can therefore be born
+inside that live particle.  Ordinary collision processing sees the overlap
+only after admission and may report a starting collision or tunneling error.
+
+\subsubsection{<current form>}
+
+The approved next rule separates a birth attempt from successful admission.
+\texttt{Data.w} remains the lifecycle authority, while reserved
+\texttt{colFlg} values describe the attempt:
+
+\begin{verbatim}
+colFlg = 2  waiting
+colFlg = 3  wants to become live
+colFlg = 0  admitted live
+\end{verbatim}
+
+At its scheduled frame, a candidate is tested only against frame-start live
+mobile targets.  Boundary markers, dead particles, unborn particles, and other
+birth candidates do not block the test.  The contact query must return a
+distinct \texttt{STARTING\_COLLISION} result so the wrapper can terminate the
+remaining neighbor search.  A blocked candidate returns to \texttt{colFlg=2},
+sets \texttt{Data.w=frameNum+1}, and receives no force or motion update.  An
+unblocked candidate sets \texttt{Data.w=0} and \texttt{colFlg=0} before
+entering ordinary dynamics.
+
+Each blocked particle is delayed independently.  Later particles retain their
+original scheduled frames, preserving the generated release schedule rather
+than shifting an entire reservoir wave train.
+
+\subsubsection{difference outcome}
+
+No solution yet.  The lifecycle and contact-return contract is documented, but
+the current Python and GLSL paths still activate particles immediately.  The
+next work is to implement and test deferred birth admission.
+
+\subsubsection{<Analysis>}
+
+A boolean contact result can report overlap but cannot tell the wrapper whether
+it found an ordinary live collision or a birth-blocking starting collision.
+The distinct result is needed because the latter must end the source search and
+skip all force and integration work for that frame.
+
+The GPU implementation also has an ordering constraint.  If one candidate
+writes itself live while another candidate is still scanning targets, results
+can depend on invocation scheduling.  Admission must therefore read immutable
+frame-start lifecycle state and commit successful births in a separate phase or
+through an equivalent synchronized design.  This preserves source ownership:
+each invocation decides and writes only its own lifecycle state.

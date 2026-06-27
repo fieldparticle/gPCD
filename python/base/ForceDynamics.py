@@ -11,6 +11,7 @@ class ForceContactDynamics:
     BOUNDARY_PARTICLE_FUNCTIONS = {
         "horizontal_wall": "EvaluateHorizontalWallSegment",
         "vertical_wall": "EvaluateVerticalWallSegment",
+        "cd_nozzle_wall": "EvaluateCDNozzleWallSegment",
     }
 
     @staticmethod
@@ -122,6 +123,102 @@ class ForceContactDynamics:
             return 1
         return 2
 
+    def BoundaryParticleCDNozzleWallFlag(self, SourceID, BoundaryID):
+        """Infer upper/lower CD nozzle wall identity from a boundary marker."""
+        boundary_position = self.GetParticlePosition(BoundaryID)
+        center_y = self.CDNozzleCenterY()
+        if boundary_position.y < center_y:
+            return 3
+        return 4
+
+    def CDNozzleCenterY(self):
+        """Return the CD nozzle centerline y coordinate."""
+        cfg = self.run_configuration
+        default_center_y = 0.5 * (
+            float(cfg.get("WallYMIN", 0.0))
+            + float(cfg.get("WallYMAX", getattr(self.ShaderFlags, "SideLength", 1.0)))
+        )
+        return float(cfg.get("nozzle_center_y", default_center_y))
+
+    def CDNozzleAxialPosition(self, x_position):
+        """Return one-based axial position along the horizontal CD nozzle."""
+        cfg = self.run_configuration
+        nozzle_start_x = float(cfg.get("nozzle_start_x", cfg.get("WallXMIN", 1.0)))
+        return float(x_position) - nozzle_start_x + 1.0
+
+    def CDNozzleTotalLength(self):
+        """Return the configured analytic CD nozzle length."""
+        cfg = self.run_configuration
+        return (
+            float(cfg.get("nozzle_inlet_length", 5.0))
+            + float(cfg.get("nozzle_converge_length", 20.0))
+            + float(cfg.get("nozzle_throat_length", 5.0))
+            + float(cfg.get("nozzle_diverge_length", 20.0))
+            + float(cfg.get("nozzle_exit_length", 14.0))
+        )
+
+    def CDNozzleRadius(self, axial_position):
+        """Return the analytic CD nozzle radius at a one-based axial position."""
+        cfg = self.run_configuration
+        x = float(axial_position)
+        inlet_length = float(cfg.get("nozzle_inlet_length", 5.0))
+        converge_length = float(cfg.get("nozzle_converge_length", 20.0))
+        throat_length = float(cfg.get("nozzle_throat_length", 5.0))
+        diverge_length = float(cfg.get("nozzle_diverge_length", 20.0))
+        inlet_radius = float(cfg.get("nozzle_inlet_radius", 10.0))
+        throat_radius = float(cfg.get("nozzle_throat_radius", 8.1))
+        exit_radius = float(cfg.get("nozzle_exit_radius", 10.0))
+
+        inlet_end = inlet_length
+        converge_end = inlet_end + converge_length
+        throat_end = converge_end + throat_length
+        diverge_end = throat_end + diverge_length
+
+        if 1.0 <= x < inlet_end:
+            return inlet_radius
+        if inlet_end <= x < converge_end:
+            span = max(converge_length, self.EPSILON)
+            t = (x - inlet_end) / span
+            return inlet_radius + t * (throat_radius - inlet_radius)
+        if converge_end <= x < throat_end:
+            return throat_radius
+        if throat_end <= x < diverge_end:
+            span = max(diverge_length, self.EPSILON)
+            t = (x - throat_end) / span
+            return throat_radius + t * (exit_radius - throat_radius)
+        if x >= diverge_end:
+            return exit_radius
+        return inlet_radius
+
+    def CDNozzleRadiusSlope(self, axial_position):
+        """Return dr/dx for the analytic CD nozzle profile."""
+        cfg = self.run_configuration
+        x = float(axial_position)
+        inlet_length = float(cfg.get("nozzle_inlet_length", 5.0))
+        converge_length = float(cfg.get("nozzle_converge_length", 20.0))
+        throat_length = float(cfg.get("nozzle_throat_length", 5.0))
+        diverge_length = float(cfg.get("nozzle_diverge_length", 20.0))
+        inlet_radius = float(cfg.get("nozzle_inlet_radius", 10.0))
+        throat_radius = float(cfg.get("nozzle_throat_radius", 8.1))
+        exit_radius = float(cfg.get("nozzle_exit_radius", 10.0))
+
+        inlet_end = inlet_length
+        converge_end = inlet_end + converge_length
+        throat_end = converge_end + throat_length
+        diverge_end = throat_end + diverge_length
+
+        if inlet_end <= x < converge_end:
+            return (throat_radius - inlet_radius) / max(
+                converge_length,
+                self.EPSILON,
+            )
+        if throat_end <= x < diverge_end:
+            return (exit_radius - throat_radius) / max(
+                diverge_length,
+                self.EPSILON,
+            )
+        return 0.0
+
     def EvaluateWallSegment(self, SourceID, BoundaryID):
         """Evaluate the configured wall segment represented by a boundary marker."""
         function_key = str(
@@ -213,6 +310,68 @@ class ForceContactDynamics:
             normal = (1.0, 0.0, 0.0)
         else:
             return None
+
+        dx = ghost[0] - source_position.x
+        dy = ghost[1] - source_position.y
+        dz = ghost[2] - source_position.z
+        center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if center_distance >= 2.0 * radius:
+            return None
+        overlap_area = self.particle_overlap_area(radius, radius, center_distance)
+        return (*normal, overlap_area, center_distance, wall_flag)
+
+    def EvaluateCDNozzleWallSegment(self, SourceID, BoundaryID):
+        """Evaluate an analytic CD nozzle wall represented by a marker cell.
+
+        Boundary particles only provide broad-phase locality.  The wall
+        position and normal are calculated from the analytic nozzle profile at
+        the source particle's current axial position.
+        """
+        wall_flag = self.BoundaryParticleCDNozzleWallFlag(SourceID, BoundaryID)
+        if wall_flag == 0:
+            return None
+
+        source = self.particles[SourceID]
+        source_position = self.GetParticlePosition(SourceID)
+        radius = float(source.Data.x)
+        axial = self.CDNozzleAxialPosition(source_position.x)
+        if axial < 1.0 or axial > self.CDNozzleTotalLength():
+            return None
+
+        center_y = self.CDNozzleCenterY()
+        nozzle_radius = self.CDNozzleRadius(axial)
+        radius_slope = self.CDNozzleRadiusSlope(axial)
+        offset = self.WallContactOffsetDistance(radius)
+
+        if wall_flag == 3:
+            wall_y = center_y - nozzle_radius
+            normal_x = -radius_slope
+            normal_y = -1.0
+        elif wall_flag == 4:
+            wall_y = center_y + nozzle_radius
+            normal_x = -radius_slope
+            normal_y = 1.0
+        else:
+            return None
+
+        normal_mag = math.sqrt(normal_x * normal_x + normal_y * normal_y)
+        if normal_mag <= self.EPSILON:
+            return None
+        normal = (
+            normal_x / normal_mag,
+            normal_y / normal_mag,
+            0.0,
+        )
+        wall_point = (
+            source_position.x,
+            wall_y,
+            source_position.z,
+        )
+        ghost = (
+            wall_point[0] + normal[0] * (radius - offset),
+            wall_point[1] + normal[1] * (radius - offset),
+            wall_point[2],
+        )
 
         dx = ghost[0] - source_position.x
         dy = ghost[1] - source_position.y
@@ -958,7 +1117,10 @@ class ForceContactDynamics:
                 if self.IsBoundaryParticle(target_id):
                     if not self.BoundaryParticleAppliesToSource(source_id, target_id):
                         continue
-                    wall_flag = self.BoundaryParticleWallFlag(source_id, target_id)
+                    segment = self.EvaluateWallSegment(source_id, target_id)
+                    if segment is None:
+                        continue
+                    wall_flag = int(segment[-1])
                     if wall_flag in processed_boundary_walls:
                         continue
                     if not self.ProcessBoundaryParticleWallCollision(

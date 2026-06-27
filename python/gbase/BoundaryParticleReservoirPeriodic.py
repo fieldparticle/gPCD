@@ -62,19 +62,19 @@ class BoundaryParticleReservoirPeriodic():
 
         if res == False:
             return
-        cfg_data_name = self.itemcfg["STUDY_NAME"]
-        suffix = f"{self.itemcfg.particle_columns}x{self.itemcfg.particles_per_row}x{self.itemcfg.particles_per_cell_row}"
-        self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.tst"
+        cfg_data_name = self.itemcfg["output_file_prefix"]
+        
+        self.test_file_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.tst"
         try:
             os.remove(self.test_file_name)
         except BaseException as e:
             print(f"Delete bin file:{e}")
-        self.test_bin_name = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.bin"
+        self.test_bin_name = f"{self.itemcfg.data_dir}/{cfg_data_name}.bin"
         try:
             os.remove(self.test_bin_name)
         except BaseException as e:
             print(f"Delete tst file:{e}")
-        self.report_file = f"{self.itemcfg.data_dir}/{cfg_data_name}{suffix}.rpt"
+        self.report_file = f"{self.itemcfg.data_dir}/{cfg_data_name}.rpt"
         
 
     def close_bin_file(self):
@@ -357,14 +357,25 @@ class BoundaryParticleReservoirPeriodic():
         f.write(fstr)
         fstr = f"hsv_val = {run_cfg.hsv_val:0.4f};\n"
         f.write(fstr)
+        fstr = f'boundary_particle_function = "{run_cfg.boundary_particle_function}";\n'
+        f.write(fstr)
+        fstr = f'periodic_direction = "horizontal";\n'
+        f.write(fstr)
+        fstr = f'boundary_guard = "cell_guard";\n'
+        f.write(fstr)
+        fstr = f'wall = "horizontal";\n'
+        f.write(fstr)
+        fstr = f'wall_type= "{run_cfg.wall_type}";\n'
+        f.write(fstr)
+
         f.flush()
         f.close()
 
     def runner(self):
-        RUN_CONFIGURATION = self.itemcfg["RUN_CONFIGURATION"]
+        run_cfg = get_run_configuration(self.itemcfg)
         boundary_particle_function = str(
             self.cfg_value(
-                RUN_CONFIGURATION,
+                run_cfg,
                 "boundary_particle_function",
                 "horizontal_wall",
             )
@@ -398,15 +409,29 @@ class BoundaryParticleReservoirPeriodic():
     def centered_pipe_offset(self, side_len, base_side_len):
         return max(0.0, 0.5 * (side_len - base_side_len))
 
-    def boundary_wall_length(self, run_cfg):
-        return float(self.cfg_value(run_cfg, "wall_boundary_length", self.side_len - 1.0))
+    def boundary_wall_length(self, run_cfg, axis):
+        if "wall_boundary_length" in run_cfg:
+            return float(self.cfg_value(run_cfg, "wall_boundary_length", 0.0))
+        if axis == "x":
+            return max(
+                0.0,
+                float(self.cfg_value(run_cfg, "WallXMAX", self.side_len - 1.0))
+                - float(self.cfg_value(run_cfg, "WallXMIN", 0.5)),
+            )
+        if axis == "y":
+            return max(
+                0.0,
+                float(self.cfg_value(run_cfg, "WallYMAX", self.side_len - 1.0))
+                - float(self.cfg_value(run_cfg, "WallYMIN", 0.5)),
+            )
+        return self.side_len - 1.0
 
     def configure_vertical_pipe_geometry(self, run_cfg):
         margin = self.boundary_guard_margin_cells()
         base_side_len = self.base_pipe_side_len()
         self.side_len = self.configured_side_len(run_cfg, base_side_len, margin)
         pipe_offset = self.centered_pipe_offset(self.side_len, base_side_len)
-        wall_length = self.boundary_wall_length(run_cfg)
+        wall_length = self.boundary_wall_length(run_cfg, "y")
         self.wallxmin = pipe_offset + 0.5
         self.wallxmax = pipe_offset + base_side_len - 1.0
         self.wallymin = 0.5
@@ -418,7 +443,7 @@ class BoundaryParticleReservoirPeriodic():
         base_side_len = self.base_pipe_side_len()
         self.side_len = self.configured_side_len(run_cfg, base_side_len, margin)
         pipe_offset = self.centered_pipe_offset(self.side_len, base_side_len)
-        wall_length = self.boundary_wall_length(run_cfg)
+        wall_length = self.boundary_wall_length(run_cfg, "x")
         self.wallxmin = 0.5
         self.wallxmax = min(self.side_len - 1.0, self.wallxmin + wall_length)
         self.wallymin = pipe_offset + 0.5
@@ -434,12 +459,12 @@ class BoundaryParticleReservoirPeriodic():
         self.number_boundary_particles = 0
         self.add_null_particle(self.p_list)
         self.index = 0
-        RUN_CONFIGURATION = self.itemcfg["RUN_CONFIGURATION"]
-        radius = float(self.cfg_value(RUN_CONFIGURATION, "radius", 0.25))
-        dt = float(self.cfg_value(RUN_CONFIGURATION, "dt", 1.0))
-        collision_stiffness_q = float(self.cfg_value(RUN_CONFIGURATION, "collision_stiffness_q", 0.0))
-        WallYMAX = float(self.cfg_value(RUN_CONFIGURATION, "WallYMAX", 10.0))
-        WallYMIN = float(self.cfg_value(RUN_CONFIGURATION, "WallYMIN", 10.0))
+        run_cfg = get_run_configuration(self.itemcfg)
+        radius = float(self.cfg_value(run_cfg, "radius", 0.25))
+        dt = float(self.cfg_value(run_cfg, "dt", 1.0))
+        collision_stiffness_q = float(self.cfg_value(run_cfg, "collision_stiffness_q", 0.0))
+        WallYMAX = float(self.cfg_value(run_cfg, "WallYMAX", 10.0))
+        WallYMIN = float(self.cfg_value(run_cfg, "WallYMIN", 10.0))
         # Paticle length is twice the radius times the fraction of diameter separation.
         particle_length =2.0*radius+2.0*radius*self.itemcfg.fraction_of_diameter_separation
         # The particle row length is the number of particles per cell row times the particle length. 
@@ -459,7 +484,7 @@ class BoundaryParticleReservoirPeriodic():
         particles_per_row = self.itemcfg.particles_per_row
         required_width = particles_per_row/self.itemcfg.particles_per_cell_row
         margin, base_side_len, pipe_offset, wall_length = self.configure_vertical_pipe_geometry(
-            RUN_CONFIGURATION
+            run_cfg
         )
         print(
             f"Side length is {self.side_len} for particles per row of {particles_per_row} "
@@ -474,7 +499,7 @@ class BoundaryParticleReservoirPeriodic():
         tot_particles = self.itemcfg.particle_columns*self.itemcfg.particles_per_row
         particles_per_row = self.itemcfg.particles_per_row
         release_cfg = self.build_release_config(
-            RUN_CONFIGURATION,
+            run_cfg,
             radius,
             dt,
             particle_length,
@@ -508,8 +533,8 @@ class BoundaryParticleReservoirPeriodic():
         except BaseException as e:
             print(f"Failed adding Particle:{e} ")   
             return
-        self.BoundaryParticlesVert(RUN_CONFIGURATION)
-        self.writeCFGData(RUN_CONFIGURATION)
+        self.BoundaryParticlesVert(run_cfg)
+        self.writeCFGData(run_cfg)
 
     # Generate horizontal flow        
     def gen_horz(self):
@@ -520,12 +545,12 @@ class BoundaryParticleReservoirPeriodic():
         self.number_boundary_particles = 0
         self.add_null_particle(self.p_list)
         self.index = 0
-        RUN_CONFIGURATION = self.itemcfg["RUN_CONFIGURATION"]
-        radius = float(self.cfg_value(RUN_CONFIGURATION, "radius", 0.25))
-        dt = float(self.cfg_value(RUN_CONFIGURATION, "dt", 1.0))
-        collision_stiffness_q = float(self.cfg_value(RUN_CONFIGURATION, "collision_stiffness_q", 0.0))
-        WallYMAX = float(self.cfg_value(RUN_CONFIGURATION, "WallYMAX", 10.0))
-        WallYMIN = float(self.cfg_value(RUN_CONFIGURATION, "WallYMIN", 10.0))
+        run_cfg = get_run_configuration(self.itemcfg)
+        radius = float(self.cfg_value(run_cfg, "radius", 0.25))
+        dt = float(self.cfg_value(run_cfg, "dt", 1.0))
+        collision_stiffness_q = float(self.cfg_value(run_cfg, "collision_stiffness_q", 0.0))
+        WallYMAX = float(self.cfg_value(run_cfg, "WallYMAX", 10.0))
+        WallYMIN = float(self.cfg_value(run_cfg, "WallYMIN", 10.0))
         # Paticle length is twice the radius times the fraction of diameter separation.
         particle_length =2.0*radius+2.0*radius*self.itemcfg.fraction_of_diameter_separation
         # The particle row length is the number of particles per cell row times the particle length. 
@@ -545,7 +570,7 @@ class BoundaryParticleReservoirPeriodic():
         particles_per_row = self.itemcfg.particles_per_row
         required_width = particles_per_row/self.itemcfg.particles_per_cell_row
         margin, base_side_len, pipe_offset, wall_length = self.configure_horizontal_pipe_geometry(
-            RUN_CONFIGURATION
+            run_cfg
         )
         print(
             f"Side length is {self.side_len} for particles per row of {particles_per_row} "
@@ -561,7 +586,7 @@ class BoundaryParticleReservoirPeriodic():
         total_colums = self.itemcfg.particle_columns
         particles_per_row = self.itemcfg.particles_per_row
         release_cfg = self.build_release_config(
-            RUN_CONFIGURATION,
+            run_cfg,
             radius,
             dt,
             particle_length,
@@ -595,27 +620,27 @@ class BoundaryParticleReservoirPeriodic():
         except BaseException as e:
             print(f"Failed adding Particle:{e} ")   
             return
-        self.BoundaryParticlesHorz(RUN_CONFIGURATION)
-        self.writeCFGData(RUN_CONFIGURATION)
+        self.BoundaryParticlesHorz(run_cfg)
+        self.writeCFGData(run_cfg)
 
 
 
-    def BoundaryParticlesHorz(self,RUN_CONFIGURATION):
+    def BoundaryParticlesHorz(self,run_cfg):
         for wx in range(int(self.wallxmax)):
-            self.addBoundaryParticle(RUN_CONFIGURATION,float(wx+1.0),self.wallymax-0.75)
+            self.addBoundaryParticle(run_cfg,float(wx+1.0),self.wallymax-0.75)
 
         for wx in range(int(self.wallxmax)):
-            self.addBoundaryParticle(RUN_CONFIGURATION,float(wx+1.0),self.wallymin+0.5)
+            self.addBoundaryParticle(run_cfg,float(wx+1.0),self.wallymin+0.5)
         
-    def BoundaryParticlesVert(self,RUN_CONFIGURATION):
+    def BoundaryParticlesVert(self,run_cfg):
         for wy in range(int(self.wallymax)):
-            self.addBoundaryParticle(RUN_CONFIGURATION,self.wallxmin+0.5,float(wy+1.0))
+            self.addBoundaryParticle(run_cfg,self.wallxmin+0.5,float(wy+1.0))
 
         for wy in range(int(self.wallymax)):
-            self.addBoundaryParticle(RUN_CONFIGURATION,self.wallxmax-0.75,float(wy+1.0))
+            self.addBoundaryParticle(run_cfg,self.wallxmax-0.75,float(wy+1.0))
 
 
-    def addBoundaryParticle(self,RUN_CONFIGURATION,rx,ry,rz=2.0):
+    def addBoundaryParticle(self,run_cfg,rx,ry,rz=2.0):
         try:
             particle_struct = pdata()
             self.number_boundary_particles += 1
@@ -638,9 +663,9 @@ class BoundaryParticleReservoirPeriodic():
             return
 
     
-    def writeCFGData(self,RUN_CONFIGURATION):
+    def writeCFGData(self,run_cfg):
         
-        self.write_test_file(RUN_CONFIGURATION)
+        self.write_test_file(run_cfg)
         self.create_bin_file()
         self.write_bin_file(self.p_list)
         self.close_bin_file()

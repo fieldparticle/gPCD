@@ -202,14 +202,115 @@ This colorization is a visualization aid for flow direction and particle
 motion.  The dynamics model owns the velocity angle; the renderer owns the
 conversion from angle to RGB.
 
-The collision-color flag \texttt{colFlg} is also diagnostic display state.
-Shader paths that use it must clear it once per source invocation and set it
-only when a valid particle or wall contact is accumulated for the current
-frame.  It is not a force input.
+For ordinary live particles, the collision-color flag \texttt{colFlg} is
+diagnostic display state.  Shader paths that use it must clear it once per
+source invocation and set it only when a valid particle or wall contact is
+accumulated for the current frame.  Reservoir lifecycle processing may assign
+reserved nonzero values to \texttt{colFlg} while a particle is waiting for or
+attempting birth, as defined in the reservoir convention below.  These values
+are lifecycle state, not force input.
 
 Rendered sphere radius must be derived from the particle radius stored in
 \texttt{Data.x}.  Mesh files may provide a convenient unit sphere, but they
 must not bake a separate configuration radius into the rendered particle size.
+
+\subsection{Reservoir Boundary And Deferred Birth Convention}
+
+This subsection defines the approved next reservoir behavior.  The current
+Python and GLSL implementations still activate a particle immediately when its
+stored frame arrives; deferred admission has not yet been implemented.
+
+A reservoir boundary is a lifecycle boundary rather than a solid contact
+wall.  Reservoir particles are created with scheduled birth frames and remain
+outside ordinary dynamics until successfully admitted into the live particle
+population.  The authoritative lifecycle field is \texttt{Data.w}:
+
+\begin{itemize}
+    \item \(\texttt{Data.w}>0\): waiting particle; the value is its next birth
+    attempt frame;
+    \item \(\texttt{Data.w}=0\): live particle;
+    \item \(\texttt{Data.w}<0\): dead particle.
+\end{itemize}
+
+The reservoir uses the following reserved \texttt{colFlg} values during birth:
+
+\begin{itemize}
+    \item \(\texttt{colFlg}=2\): waiting for its scheduled or deferred birth
+    attempt;
+    \item \(\texttt{colFlg}=3\): birth candidate whose scheduled frame has
+    arrived and which wants to become live;
+    \item \(\texttt{colFlg}=0\): successfully admitted live particle with no
+    current diagnostic collision color.
+\end{itemize}
+
+When the current frame reaches a waiting particle's value in
+\texttt{Data.w}, the source becomes a birth candidate.  It is placed at its
+configured birth position and tested for particle overlap before it is allowed
+to participate in force accumulation or motion.  This test concerns only
+particle starting overlap; wall starting overlap is a separate problem.
+
+A birth candidate is compared only with already-live mobile targets.  A valid
+birth-blocking target must satisfy all of the following:
+
+\begin{itemize}
+    \item the target is not the source;
+    \item the target is a mobile particle, not a boundary marker;
+    \item \(\texttt{Target.Data.w}=0\);
+    \item the target is not another waiting or birth-candidate particle.
+\end{itemize}
+
+Dead particles, unborn particles, other birth candidates, and boundary marker
+particles do not block this birth test.  Consequently, particles scheduled for
+the same frame must already have nonoverlapping configured birth positions;
+the live-target test does not resolve overlap among simultaneous candidates.
+
+The contact search must distinguish an ordinary live-particle contact from a
+birth-blocking starting collision.  A boolean result is insufficient for the
+wrapper because it cannot indicate whether ordinary force processing should
+continue.  The motion contact function should therefore return distinct
+results equivalent to:
+
+\begin{verbatim}
+NO_CONTACT = 0
+CONTACT = 1
+STARTING_COLLISION = 2
+\end{verbatim}
+
+On the first \texttt{STARTING\_COLLISION}, the source invocation must stop its
+remaining neighbor search.  The candidate is returned to waiting state:
+
+\begin{equation}
+\texttt{Data.w}=\texttt{frameNum}+1,
+\qquad
+\texttt{colFlg}=2.
+\end{equation}
+
+It receives no contact force, velocity update, or position update during that
+frame.  On the next frame it attempts birth again from the configured birth
+position.  Each blocked particle is delayed independently by one frame.  The
+original scheduled frames of later particles and waves are not shifted, so the
+generator's original release spacing remains unchanged.
+
+If the complete live-target search finds no starting collision, birth
+succeeds:
+
+\begin{equation}
+\texttt{Data.w}=0,
+\qquad
+\texttt{colFlg}=0.
+\end{equation}
+
+The particle may then enter ordinary contact, force, velocity, and position
+processing as a live source.
+
+GPU admission must not depend on invocation execution order.  If one birth
+candidate writes \texttt{Data.w}=0 while another candidate is still scanning,
+the second candidate may observe either the old or new state.  Therefore birth
+testing and birth-state commitment require separate phases, separate snapshots,
+or an equivalent synchronization design.  During the test phase, target
+liveness must come from an immutable frame-start lifecycle state.  This keeps
+the rule source-owned and deterministic without allowing one source invocation
+to modify another particle.
 
 \subsection{Boundary Convention}
 
