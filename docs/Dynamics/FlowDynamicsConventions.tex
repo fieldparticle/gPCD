@@ -159,6 +159,17 @@ sources.  When a mobile source encounters a boundary marker as a target, it
 must evaluate the wall segment represented by that marker rather than process
 the marker as an ordinary particle-particle collision.
 
+Each newly generated boundary marker is self-describing.  Its evaluator ID is
+written through \texttt{pdata.temp\_vel} and loaded into \texttt{Data.z}:
+\begin{verbatim}
+1 = horizontal_wall
+2 = vertical_wall
+3 = cd_nozzle_wall
+\end{verbatim}
+\texttt{EvaluateWallSegment(SourceID, BoundaryID)} dispatches from this target-
+owned value.  There is no runtime global-function fallback.  Binary files whose
+boundary markers have evaluator ID zero must be regenerated.
+
 The current straight-wall implementation is:
 
 \begin{verbatim}
@@ -167,14 +178,31 @@ EvaluateWallSegment(SourceID, BoundaryID)
 
 For now, each boundary marker represents either a straight horizontal or
 straight vertical wall segment through the center of the marker's cell.  The
-selected wall function is generated into \texttt{boundary.glsl} as
-\texttt{WALL\_FUNC}.  Horizontal segments classify markers as lower or upper
+generator configuration selects which evaluator ID is written into each
+marker; runtime Python dispatch reads that marker-owned ID from
+\texttt{Data.z}.  Horizontal segments classify markers as lower or upper
 walls.  Vertical segments classify markers as left or right walls.  The
 evaluator calculates the current source-to-segment wall ghost geometry and
 returns the normal, overlap area, center distance, and wall flag needed by the
 ordinary wall contact slot.  Later sloped or curved boundaries should extend
 \texttt{EvaluateWallSegment} without changing the source-owned force
 accumulation rule.
+
+The Python path has completed this marker-owned dispatch migration.  The next
+Vulkan update must load \texttt{pdata.temp\_vel} into runtime
+\texttt{Data.z}, dispatch generated \texttt{EvaluateWallSegment} from the
+target marker's value, and remove the global \texttt{WALL\_FUNC} decision from
+runtime wall evaluation.  \texttt{WALL\_MODEL\_BOUNDARY\_PARTICLE} remains the
+wrapper-level selection that enables marker-target wall processing.
+
+The closed horizontal reservoir test emits horizontal-evaluator markers along
+the derived \(y_{\min}\) and \(y_{\max}\) walls and vertical-evaluator markers
+along \(x_{\min}\) and \(x_{\max}\).  Marker coordinates are deduplicated, so
+an exact corner coordinate is stored once.  The inlet wall is
+\texttt{reservoir\_inlet\_x}; the outlet wall is that inlet plus
+\texttt{wall\_boundary\_length}.  The lifecycle retirement plane is configured
+separately beyond the physical outlet wall, so a normal wall rebound is
+attempted before a particle can be retired as an escape.
 
 \subsection{ForceDynamics Invariance}
 
@@ -322,6 +350,12 @@ This places the newly live particle slightly more than one particle diameter
 away from particles that remain in the reservoir column.  The factor \(1.1\)
 adds a small clearance margin so the particle is not born in contact due to
 rounding or exact-diameter placement.
+
+\texttt{reservoir\_birth\_spacing\_factor} may request a larger offset, but
+the runtime clamps the factor to a minimum of \(1.1\).  For a closed
+boundary-particle reservoir, the inlet wall is placed at
+\texttt{reservoir\_inlet\_x}; positive-x birth therefore occurs at least
+\(1.1(2r)\) inside that wall.
 
 After birth:
 

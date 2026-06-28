@@ -176,6 +176,14 @@ normal.  During rebound, the stored component along the current normal is
 drained.  The scalar magnitude is mirrored to \texttt{Data.z} for reporting.
 This value is diagnostic only and is not read by \texttt{CalcVelocity}.
 
+\texttt{Data.z} has a type-dependent meaning.  For mobile particles
+(\texttt{ptype=0}), it is the internal-momentum magnitude described above.  A
+boundary marker is never processed as a mobile source, so for boundary
+particles (\texttt{ptype=1}) \texttt{Data.z} stores the wall-evaluator ID.
+The binary \texttt{pdata.temp\_vel} field transports that ID into runtime
+\texttt{Data.z}.  Per-frame contact reset and internal-momentum synchronization
+must not overwrite \texttt{Data.z} for boundary particles.
+
 Heat is a later material model layer.  Real compressed matter can convert some
 stored mechanical compression into thermal state and later transfer that heat
 to surrounding particles or boundaries according to a heat-transfer

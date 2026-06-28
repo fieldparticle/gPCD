@@ -83,10 +83,30 @@ def _window_size(run_configuration):
 
 
 def _view_box(run_configuration):
-    x_min = float(run_configuration.get("WallXMIN", 0.0))
-    x_max = float(run_configuration.get("WallXMAX", run_configuration.get("side_len", 1.0)))
-    y_min = float(run_configuration.get("WallYMIN", 0.0))
-    y_max = float(run_configuration.get("WallYMAX", run_configuration.get("side_len", 1.0)))
+    x_axis_lims = run_configuration.get("x_axis_lims")
+    y_axis_lims = run_configuration.get("y_axis_lims")
+    if x_axis_lims is not None and len(x_axis_lims) >= 2:
+        x_min = float(x_axis_lims[0])
+        x_max = float(x_axis_lims[1])
+    else:
+        x_min = float(run_configuration.get("WallXMIN", 0.0))
+        x_max = float(
+            run_configuration.get(
+                "WallXMAX",
+                run_configuration.get("side_len", 1.0),
+            )
+        )
+    if y_axis_lims is not None and len(y_axis_lims) >= 2:
+        y_min = float(y_axis_lims[0])
+        y_max = float(y_axis_lims[1])
+    else:
+        y_min = float(run_configuration.get("WallYMIN", 0.0))
+        y_max = float(
+            run_configuration.get(
+                "WallYMAX",
+                run_configuration.get("side_len", 1.0),
+            )
+        )
     zoom = float(run_configuration.get("zoom", 1.0))
     if zoom <= 0.0:
         zoom = 1.0

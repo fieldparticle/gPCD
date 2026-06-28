@@ -8,10 +8,10 @@ class ForceContactDynamics:
     CONTACT_PARTICLE = 1
     CONTACT_WALL = 2
     CONTACT_ACTIVE_THIS_FRAME = 1
-    BOUNDARY_PARTICLE_FUNCTIONS = {
-        "horizontal_wall": "EvaluateHorizontalWallSegment",
-        "vertical_wall": "EvaluateVerticalWallSegment",
-        "cd_nozzle_wall": "EvaluateCDNozzleWallSegment",
+    BOUNDARY_PARTICLE_EVALUATORS = {
+        1: "EvaluateHorizontalWallSegment",
+        2: "EvaluateVerticalWallSegment",
+        3: "EvaluateCDNozzleWallSegment",
     }
 
     @staticmethod
@@ -220,14 +220,10 @@ class ForceContactDynamics:
         return 0.0
 
     def EvaluateWallSegment(self, SourceID, BoundaryID):
-        """Evaluate the configured wall segment represented by a boundary marker."""
-        function_key = str(
-            getattr(self, "run_configuration", {}).get(
-                "boundary_particle_function",
-                "horizontal_wall",
-            )
-        ).lower()
-        evaluator_name = self.BOUNDARY_PARTICLE_FUNCTIONS.get(function_key)
+        """Evaluate the self-described wall segment for a boundary marker."""
+        boundary = self.particles[BoundaryID]
+        evaluator_id = int(round(float(boundary.Data.z)))
+        evaluator_name = self.BOUNDARY_PARTICLE_EVALUATORS.get(evaluator_id)
         if evaluator_name is None:
             return None
         return getattr(self, evaluator_name)(SourceID, BoundaryID)

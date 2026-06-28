@@ -461,15 +461,23 @@ marker target.  The boundary-particle processor should build a local
 immediately, just as \texttt{ProcessWallCollision(...)} does for manual wall
 flags.
 
-The CD nozzle wall function is selected by:
-\begin{verbatim}
-#define WALL_FUNC cd_nozzle_wall
-\end{verbatim}
-It treats boundary particles as locality markers and calculates the actual
-wall point and wall normal from the generated CD nozzle constants in
-\texttt{boundary.glsl}.  Required CD nozzle symbols include
+The current Python implementation no longer selects the evaluator through a
+global wall-function define.  Each boundary marker stores its evaluator ID in
+\texttt{Data.z}, transported from \texttt{pdata.temp\_vel}, and
+\texttt{EvaluateWallSegment(SourceID, BoundaryID)} dispatches from the target
+marker.  The Vulkan export must be updated to match this contract.  The
+generated dispatcher must support horizontal, vertical, and CD-nozzle IDs;
+zero or unknown IDs must return an invalid wall segment.
+
+The CD-nozzle evaluator treats boundary particles as locality markers and
+calculates the actual wall point and wall normal from the generated CD nozzle
+constants in \texttt{boundary.glsl}.  Required CD nozzle symbols include
 \texttt{CD\_NOZZLE\_START\_X}, \texttt{CD\_NOZZLE\_CENTER\_Y}, the five
 section lengths, and the inlet, throat, and exit radii.
+
+\texttt{WALL\_MODEL\_BOUNDARY\_PARTICLE} remains a wrapper-owned compile-time
+selection.  It controls whether marker targets are processed as walls; it does
+not choose which evaluator a particular marker represents.
 
 The Python diagnostic initializer:
 \begin{itemize}

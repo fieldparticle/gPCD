@@ -1,5 +1,403 @@
-
 % !TeX root = main.tex
 \newpage
 \section{Python Configuration Variables}
 
+\subsection{Purpose And Scope}
+
+This section documents the configuration surface exercised by
+\texttt{BoundaryParticleReservoirPeriodic.py}.  The scenario cfg currently
+contains settings owned by several different systems:
+
+\begin{itemize}
+    \item the data-generation front end;
+    \item the particle preview plotter;
+    \item the Python simulation game UI;
+    \item \texttt{ForceDynamics};
+    \item the reservoir particle generator;
+    \item generated Vulkan \texttt{.tst} compatibility data;
+    \item global dynamics-model selection in \texttt{ParticleUtil.cfg}.
+\end{itemize}
+
+The fields are intentionally grouped below by owner.  A field being present in
+the cfg does not mean that every subsystem uses it.
+
+\subsection{Configuration Assembly}
+
+The active scenario begins with:
+
+\begin{verbatim}
+cfg_gendata/BoundaryParticleReservoirPeriodic.cfg
+\end{verbatim}
+
+The optional \texttt{include\_file} is loaded after the parent cfg.  Every key
+in the included file replaces the same key from the parent.  Keys absent from
+the include retain their parent values.  Therefore the effective configuration
+cannot be determined by reading only one of the two files.
+
+The usual selections are:
+
+\begin{verbatim}
+include_file = ".../sub_BPRPPy.cfg";  // reduced Python case
+include_file = ".../sub_BPRPVk.cfg";  // larger Vulkan case
+\end{verbatim}
+
+Only one include assignment should be active.  Active project cfg files use a
+flat key layout.  \texttt{get\_run\_configuration(config)} retains temporary
+read compatibility with old files containing a \texttt{RUN\_CONFIGURATION}
+subgroup.
+
+\subsection{Global Dynamics Selection}
+
+These fields belong to \texttt{ParticleUtil.cfg}, not the scenario cfg:
+
+\begin{description}
+    \item[\texttt{live\_base}] Selects the primary Python dynamics model.
+    For this scenario the normal value is \texttt{"ForceDynamics"}.
+
+    \item[\texttt{shadow\_base}] Selects an independently running comparison
+    model.  Set it to \texttt{"none"} to disable the shadow simulation.
+
+    \item[\texttt{display\_base}] Selects \texttt{"live"} or
+    \texttt{"shadow"} for display.  It does not stop either model from
+    running.  It must be \texttt{"live"} when \texttt{shadow\_base} is
+    \texttt{"none"}.
+\end{description}
+
+\subsection{Generator And File Selection}
+
+\begin{description}
+    \item[\texttt{type}] Front-end generator category.  The current scenario
+    uses \texttt{"flow"}.
+
+    \item[\texttt{module\_dir}] Directory from which the generator module is
+    loaded.
+
+    \item[\texttt{module\_class}] Generator filename.  This scenario uses
+    \texttt{"BoundaryParticleReservoirPeriodic.py"}.
+
+    \item[\texttt{data\_dir}] Directory receiving generated \texttt{.bin},
+    \texttt{.tst}, and \texttt{.rpt} paths.
+
+    \item[\texttt{output\_file\_prefix}] Base output filename.  It also tells
+    \texttt{ForceDynamicsBase} which binary file to load when
+    \texttt{pdata\_from\_file} is true.
+
+    \item[\texttt{STUDY\_NAME}] Human-readable scenario name used by the
+    simulation window and reports.
+
+    \item[\texttt{pdata\_from\_file}] When true, the Python dynamics runner
+    loads \texttt{data\_dir/output\_file\_prefix.bin}.  When false, it expects
+    inline \texttt{PARTICLE\_DATA} instead.  This reservoir generator normally
+    requires true.
+\end{description}
+
+\subsection{Particle Preview Plotter}
+
+These fields control the static preview in \texttt{TabFormGenData}.  The axis
+limits also control the Python simulation game camera when they are present:
+
+\begin{description}
+    \item[\texttt{cell\_range}] Cell-neighborhood range retained by
+    \texttt{PlotParticles}.
+
+    \item[\texttt{sphere\_facets}] Number of facets used to draw preview
+    spheres.
+
+    \item[\texttt{particle\_range}] Inclusive particle-number range read for
+    preview.  A small range can hide boundary particles because mobile
+    particles are written first.
+
+    \item[\texttt{particle\_color}] Default preview RGB color.
+
+    \item[\texttt{as\_points}] Draws preview particles as points rather than
+    sphere surfaces when true.
+
+    \item[\texttt{vary\_color}] Allows preview color to vary with particle
+    type or state when true.
+
+    \item[\texttt{x\_axis\_lims}, \texttt{y\_axis\_lims},
+    \texttt{z\_axis\_lims}] Preview axes.  \texttt{SimulationRunner} also
+    uses the x and y limits for its game camera, falling back to legacy
+    \texttt{Wall*} values when the limits are absent.  The current
+    two-dimensional game view does not use \texttt{z\_axis\_lims}.
+\end{description}
+
+\subsection{Python Simulation Game UI}
+
+\begin{description}
+    \item[\texttt{window\_size}] Pygame window size in pixels, for example
+    \texttt{(1000,1000)}.
+
+    \item[\texttt{frame\_rate}] Maximum displayed frames per second.
+
+    \item[\texttt{zoom}] Expands or contracts the game view around the center
+    of \texttt{x\_axis\_lims} and \texttt{y\_axis\_lims}.  When those fields
+    are absent, the legacy \texttt{WallXMIN/WallXMAX} and
+    \texttt{WallYMIN/WallYMAX} rectangle is used.  It does not inspect the
+    generated particle distribution.
+
+    \item[\texttt{simulation\_particle\_numbers}] Draws particle numbers in
+    the game UI when true.
+
+    \item[\texttt{hsv\_color}] Colors live particles from velocity angle when
+    true.
+
+    \item[\texttt{hsv\_sat}] HSV saturation in the interval \([0,1]\).
+
+    \item[\texttt{hsv\_val}] HSV value/brightness in the interval \([0,1]\).
+
+    \item[\texttt{exit\_on\_error}] Closes the simulation on a dynamics error
+    when true.  When false, the current runner pauses instead.
+
+    \item[\texttt{run\_debug\_dir}] Required output directory for Python
+    simulation reports.
+
+    \item[\texttt{rpt\_frames}] Optional report-frame filter.  If absent,
+    reporting uses its normal all-frame behavior.
+
+    \item[\texttt{end\_frame}] Optional automatic final frame.  The caller may
+    also supply an end frame directly for batch or headless runs.
+
+\end{description}
+
+\subsection{Dynamics And Lifecycle}
+
+\begin{description}
+    \item[\texttt{dt}] Simulation timestep.  It controls integration and is
+    also used by the generator to convert required release distance into a
+    whole number of frames.
+
+    \item[\texttt{contact\_force\_measure}] Selects \texttt{"depth"} or
+    \texttt{"area"}.  The current reservoir configurations select penetration
+    depth.  Overlap area remains available for diagnostics and optional force
+    comparison.
+
+    \item[\texttt{collision\_stiffness\_q}] Written to each mobile particle's
+    \texttt{Data.y}; it scales contact force.  Boundary marker particles are
+    currently generated with zero stiffness because they are locality markers,
+    not ordinary particle targets.
+
+    \item[\texttt{wall\_contact\_offset}] Configures wall ghost placement as a
+    fraction of particle radius.
+
+    \item[\texttt{walls\_on}] Enables wall processing in Python dynamics.
+
+    \item[\texttt{flow\_type}] Enables the \texttt{Data.w} reservoir lifecycle.
+    \texttt{"pipe\_reservoir\_entry"} and \texttt{"simple\_reservoir"}
+    are recognized.  Other values disable reservoir birth/death gating.
+
+    \item[\texttt{WallXMIN}, \texttt{WallXMAX}, \texttt{WallYMIN},
+    \texttt{WallYMAX}] Legacy manual-wall planes.  Manual-wall configurations
+    retain them.  Boundary-particle reservoir and CD-nozzle configurations use
+    dedicated lifecycle, geometry, and axis-limit fields instead.  The Python
+    camera prefers \texttt{x\_axis\_lims} and \texttt{y\_axis\_lims}, with a
+    legacy \texttt{Wall*} fallback only for older configurations.
+
+    \item[\texttt{side\_len}] Python shader-flag fallback and cfg value written
+    for general cell-array use.  It is distinct from
+    \texttt{over\_ride\_side\_length}, which controls this generator's actual
+    generated geometry.
+\end{description}
+
+\subsection{Reservoir Population And Spacing}
+
+\begin{description}
+    \item[\texttt{radius}] Mobile particle radius.
+
+    \item[\texttt{particle\_columns}] Number of release waves generated.
+
+    \item[\texttt{particles\_per\_row}] Number of mobile particles in each
+    release wave.
+
+    \item[\texttt{particles\_per\_cell\_row}] Packing target used to derive
+    the pipe cross-section in cells.  The generator rejects a configuration
+    when this many particle spacings exceeds one cell.
+
+    \item[\texttt{fraction\_of\_diameter\_separation}] Additional
+    center-to-center gap as a fraction of diameter.  The generated spacing is:
+    \[
+    \ell_p=2r(1+f).
+    \]
+
+    \item[\texttt{reservoir\_start\_birth}] Birth frame of the first wave.
+
+    \item[\texttt{reservoir\_spacing\_factor}] Required wave clearance in
+    particle diameters.  The minimum whole-frame interval is:
+    \[
+    k=\left\lceil
+    \frac{s(2r)}{v_{\mathrm{forward}}\Delta t}
+    \right\rceil.
+    \]
+
+    \item[\texttt{reservoir\_starting\_vx}] Legacy nominal inlet speed.  It is
+    also the default magnitude for \texttt{reservoir\_flow\_speed}.
+
+    \item[\texttt{reservoir\_flow\_speed}] Optional actual velocity magnitude
+    used by the angle/alignment velocity generator.  Its default is
+    \(\lvert\texttt{reservoir\_starting\_vx}\rvert\).
+
+    \item[\texttt{reservoir\_forward\_speed\_for\_spacing}] Optional
+    conservative forward speed used only in the frame-spacing equation.  Its
+    default is \texttt{reservoir\_flow\_speed} multiplied by
+    \(\max(\texttt{flow\_alignment},0.1)\).
+
+    \item[\texttt{reservoir\_birth\_jitter\_frames}] Adds random per-particle
+    birth jitter from zero through this value.  The current generator also adds
+    this maximum to the base wave step, so consecutive wave bases are separated
+    by \(k+\texttt{jitter}\).
+
+    \item[\texttt{reservoir\_random\_seed}] Makes position, direction, and birth
+    jitter reproducible.
+
+    \item[\texttt{reservoir\_position\_jitter\_fraction}] Fraction of the
+    available inter-particle gap used for random cross-axis position jitter.
+    It does not jitter by a fraction of the full particle diameter.
+
+    \item[\texttt{flow\_angle}] Preferred velocity direction in degrees.
+    Zero degrees points along positive \(x\).  This is independent of wall
+    orientation.
+
+    \item[\texttt{flow\_alignment}] Blend between preferred direction and a
+    random unit direction.  One is fully aligned; zero is fully random.  The
+    blended direction is normalized before multiplying by flow speed.
+
+    \item[\texttt{reservoir\_random\_lateral\_velocity}] Selects random legacy
+    lateral velocity when true.
+
+    \item[\texttt{reservoir\_lateral\_velocity}] Magnitude used by the legacy
+    lateral-velocity path.  When \texttt{flow\_alignment < 1}, the angle-based
+    generated lateral component replaces this legacy value.
+
+    \item[\texttt{reservoir\_inlet\_x}, \texttt{reservoir\_inlet\_y}]
+    Dedicated runtime birth planes.  ForceDynamics uses the field for the
+    selected flow axis and falls back directly to the corresponding legacy
+    \texttt{Wall*} minimum or maximum when it is absent.  Generic
+    \texttt{inlet\_x}/\texttt{inlet\_y} aliases are not used.
+
+    \item[\texttt{reservoir\_outlet\_x}, \texttt{reservoir\_outlet\_y}]
+    Dedicated center-crossing retirement planes.  ForceDynamics falls back
+    directly to the corresponding legacy \texttt{Wall*} value when the field
+    for the selected flow axis is absent.  Generic
+    \texttt{outlet\_x}/\texttt{outlet\_y} aliases are not used.
+
+    \item[\texttt{reservoir\_base\_x}, \texttt{reservoir\_base\_y}]
+    Optional cross-axis row origins before the generator adds its centering
+    offset.  Defaults are \(1.0\).
+
+    \item[\texttt{reservoir\_z}] Optional particle plane coordinate.  The
+    default is \(2.0\).
+\end{description}
+
+\subsection{Boundary-Particle Geometry}
+
+\begin{description}
+    \item[\texttt{boundary\_particle\_function}] Selects generator orientation
+    and the wall evaluator.  \texttt{"horizontal\_wall"} creates horizontal
+    pipe flow with upper/lower marker rows.  \texttt{"vertical\_wall"}
+    creates vertical flow with left/right marker columns.
+
+    \item[\texttt{wall\_type}] Written to the generated \texttt{.tst} file for
+    the Vulkan wrapper.  Python \texttt{ForceDynamics} currently recognizes
+    boundary-particle walls by finding particles with \texttt{ptype=1}, not by
+    branching on this string.
+
+    \item[\texttt{over\_ride\_side\_length}] If positive, directly selects the
+    generator's cubic cell-array side length.  If absent or nonpositive, the
+    generator uses \texttt{side\_len}.  Derivation from row packing plus a
+    hardcoded three-cell guard on each side is retained only for legacy cfg
+    files that provide neither positive field.
+
+    \item[\texttt{wall\_boundary\_length}] Explicit marker-wall length
+    along the flow axis.  It is required and must be positive for
+    \texttt{BoundaryParticleReservoirPeriodic}; marker geometry is no longer
+    derived from \texttt{WallXMIN...WallYMAX}.
+
+\end{description}
+
+The boundary marker radius is currently hardcoded to \(0.25\), marker
+\texttt{ptype} is \(1\), marker \texttt{Data.w} is zero, and marker stiffness
+is zero.  Each marker writes its evaluator ID through \texttt{pdata.temp\_vel}
+to runtime \texttt{Data.z}: horizontal is 1, vertical is 2, and CD nozzle is
+3.  These are current implementation facts, not configurable fields.
+
+\subsection{Generated Test Metadata}
+
+The generator calculates \texttt{dispatchx} as the null particle plus the
+number of mobile particles; it is not a cfg input for this scenario.  Boundary
+markers are stored after mobile particles and are included in
+\texttt{num\_particles}, but they are not compute sources.
+
+The following cfg fields are copied into the generated \texttt{.tst} file:
+
+\begin{verbatim}
+dispatchy, dispatchz
+workGroupsx, workGroupsy, workGroupsz
+cell_occupancy_list_size
+\end{verbatim}
+
+The boundary-particle reservoir generator no longer writes the retired
+zero-valued collision-density compatibility fields.
+
+\subsection{Generator Simulation Checks}
+
+Both boundary-particle generators run a preflight check after calculating
+their geometry and before writing particles.  Manual configuration values are
+compared with the calculated simulation domain.  Generation stops with one
+aggregated error when a physical inconsistency is found.
+
+For \texttt{BoundaryParticleReservoirPeriodic}, the checks include positive
+particle and timestep values, valid population counts, cell-row packing,
+required inlet/outlet fields, inlet agreement with the calculated inlet marker
+wall, an outlet beyond the terminal marker wall, and all lifecycle planes
+inside the cell domain.  The birth center must clear the inlet wall by at least
+the configured minimum diameter factor.
+
+For \texttt{BoundaryCDNozzleReservoir}, the checks additionally require valid
+dimension, positive section lengths and radii, a throat radius no larger than
+the inlet or exit radius, and:
+\[
+\texttt{wall\_boundary\_length}=
+L_{\mathrm{inlet}}+L_{\mathrm{converge}}+L_{\mathrm{throat}}+
+L_{\mathrm{diverge}}+L_{\mathrm{exit}}.
+\]
+The lifecycle outlet must lie beyond the calculated nozzle end while remaining
+inside the cell domain.  Axis limits that exclude valid generated geometry are
+reported as warnings because they affect visibility rather than dynamics.
+
+\subsection{Important Cross-System Effects}
+
+The boundary-particle cfg families now declare dedicated migration fields:
+
+\begin{verbatim}
+reservoir_inlet_x, reservoir_outlet_x
+wall_boundary_length
+nozzle_start_x, nozzle_center_y  // CD nozzle only
+\end{verbatim}
+
+The boundary-particle reservoir and CD nozzle cfg families no longer define
+legacy \texttt{WallXMIN...WallYMAX}.  Manual-wall cfg families retain those
+fields unchanged.  Display bounds are shared through
+\texttt{x\_axis\_lims} and \texttt{y\_axis\_lims} rather than duplicated as
+separate game-view fields.
+
+\begin{enumerate}
+    \item The include file overrides the parent cfg.  Always inspect the merged
+    values before diagnosing a run.
+
+    \item \texttt{over\_ride\_side\_length} can center generated particles far
+    from the original cfg wall rectangle.  Both preview and game UI use the
+    configured axis limits, so those limits must cover the generated geometry
+    or valid particles can remain offscreen.
+
+    \item \texttt{side\_len} and \texttt{over\_ride\_side\_length} are not
+    aliases.  Conflicting values can make Python runtime bounds, generated test
+    metadata, and particle geometry describe different domains.
+
+    \item \texttt{flow\_angle} controls velocity direction; it does not select
+    wall orientation.  \texttt{boundary\_particle\_function} selects the
+    current straight-wall orientation.
+
+    \item Setting \texttt{display\_base="live"} does not disable shadow
+    computation.  Set \texttt{shadow\_base="none"} in
+    \texttt{ParticleUtil.cfg} when only one model should run.
+\end{enumerate}

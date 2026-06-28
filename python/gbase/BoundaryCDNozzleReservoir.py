@@ -214,6 +214,9 @@ class BoundaryCDNozzleReservoir():
         f.write(fstr)
         f.flush()
         f.close()
+        bnf = BinaryFileUtilities()
+        bnf.read_particle_data(self.test_bin_name)
+
 
     def runner(self):
         self.gen_nozzle_boundary_only()
@@ -335,6 +338,157 @@ class BoundaryCDNozzleReservoir():
             self.wallzmin = self.nozzle_profile_z
             self.wallzmax = self.nozzle_profile_z
 
+    # ------------------------------------------------------------------
+    # Simulation configuration checks
+    # ------------------------------------------------------------------
+    def validate_simulation_configuration(self, run_cfg):
+        """Validate manual cfg inputs against calculated nozzle geometry."""
+        errors = []
+        warnings = []
+        section_lengths = (
+            self.nozzle_inlet_length,
+            self.nozzle_converge_length,
+            self.nozzle_throat_length,
+            self.nozzle_diverge_length,
+            self.nozzle_exit_length,
+        )
+        exact_total_length = sum(section_lengths)
+        configured_wall_length = float(
+            self.cfg_value(run_cfg, "wall_boundary_length", exact_total_length)
+        )
+        radius = float(self.cfg_value(run_cfg, "radius", 0.1))
+        dt = float(self.cfg_value(run_cfg, "dt", 0.0))
+        spacing = self.cd_mobile_spacing(run_cfg)
+        packed_cell_length = (
+            int(self.itemcfg.particles_per_cell_row) * spacing
+        )
+
+        if self.dim not in (2, 3):
+            errors.append("dim must be 2 or 3")
+        if self.side_len <= 0.0:
+            errors.append("side_len must be positive")
+        if any(length <= 0.0 for length in section_lengths):
+            errors.append("all five nozzle section lengths must be positive")
+        if any(
+            value <= 0.0
+            for value in (
+                self.nozzle_inlet_radius,
+                self.nozzle_throat_radius,
+                self.nozzle_exit_radius,
+            )
+        ):
+            errors.append("all nozzle radii must be positive")
+        if self.nozzle_throat_radius > min(
+            self.nozzle_inlet_radius, self.nozzle_exit_radius
+        ):
+            errors.append(
+                "nozzle_throat_radius must not exceed the inlet or exit radius"
+            )
+        if abs(configured_wall_length - exact_total_length) > 1.0e-9:
+            errors.append(
+                f"wall_boundary_length={configured_wall_length:g} must equal "
+                "the sum of the nozzle section lengths "
+                f"({exact_total_length:g})"
+            )
+        if radius <= 0.0:
+            errors.append("radius must be positive")
+        if dt <= 0.0:
+            errors.append("dt must be positive")
+        if int(self.itemcfg.particle_columns) <= 0:
+            errors.append("particle_columns must be positive")
+        if int(self.itemcfg.particles_per_row) <= 0:
+            errors.append("particles_per_row must be positive")
+        if int(self.itemcfg.particles_per_cell_row) <= 0:
+            errors.append("particles_per_cell_row must be positive")
+        if packed_cell_length > 1.0 + 1.0e-9:
+            errors.append(
+                "particles_per_cell_row does not fit in one cell: "
+                f"packed length={packed_cell_length:.6g}"
+            )
+
+        if self.boundary_particle_function == "vertical_wall":
+            inlet_key = "reservoir_inlet_y"
+            outlet_key = "reservoir_outlet_y"
+            nozzle_start = self.nozzle_start_y
+            wall_max = self.wallymax
+        else:
+            inlet_key = "reservoir_inlet_x"
+            outlet_key = "reservoir_outlet_x"
+            nozzle_start = self.nozzle_start_x
+            wall_max = self.wallxmax
+
+        if inlet_key not in run_cfg:
+            errors.append(f"{inlet_key} is required")
+            inlet = nozzle_start
+        else:
+            inlet = float(run_cfg[inlet_key])
+        if outlet_key not in run_cfg:
+            errors.append(f"{outlet_key} is required")
+            outlet = wall_max
+        else:
+            outlet = float(run_cfg[outlet_key])
+
+        if abs(inlet - nozzle_start) > 1.0e-9:
+            errors.append(
+                f"{inlet_key}={inlet:g} must match the nozzle entrance at "
+                f"{nozzle_start:g}"
+            )
+        if outlet <= wall_max:
+            errors.append(
+                f"{outlet_key}={outlet:g} must be beyond the calculated "
+                f"nozzle end at {wall_max:g}"
+            )
+        if outlet > self.side_len:
+            errors.append(
+                f"{outlet_key}={outlet:g} exceeds cell-domain side_len="
+                f"{self.side_len:g}"
+            )
+        for name, lower, upper in (
+            ("x", self.wallxmin, self.wallxmax),
+            ("y", self.wallymin, self.wallymax),
+            ("z", self.wallzmin, self.wallzmax),
+        ):
+            if lower < 0.0 or upper > self.side_len:
+                errors.append(
+                    f"calculated {name} wall bounds [{lower:g},{upper:g}] "
+                    f"must remain inside side_len={self.side_len:g}"
+                )
+
+        for key, wall_minimum, wall_maximum in (
+            ("x_axis_lims", self.wallxmin, self.wallxmax),
+            ("y_axis_lims", self.wallymin, self.wallymax),
+        ):
+            limits = run_cfg.get(key)
+            if limits is None or len(limits) < 2:
+                errors.append(f"{key} must contain [minimum, maximum]")
+            elif float(limits[0]) >= float(limits[1]):
+                errors.append(f"{key} minimum must be less than maximum")
+            elif wall_minimum < float(limits[0]) or wall_maximum > float(limits[1]):
+                warnings.append(f"{key} does not contain the complete nozzle")
+
+        print("Simulation configuration check: BoundaryCDNozzleReservoir")
+        print(
+            f"  manual: side_len={self.side_len:g}, wall_boundary_length="
+            f"{configured_wall_length:g}, radius={radius:g}, dt={dt:g}"
+        )
+        print(
+            f"  calculated nozzle: length={exact_total_length:g}, "
+            f"x=[{self.wallxmin:g},{self.wallxmax:g}], "
+            f"y=[{self.wallymin:g},{self.wallymax:g}]"
+        )
+        print(
+            f"  lifecycle: inlet={inlet:g}, outlet={outlet:g}; "
+            f"packed cell length={packed_cell_length:g}"
+        )
+        for warning in warnings:
+            print(f"  WARNING: {warning}")
+        if errors:
+            raise ValueError(
+                "BoundaryCDNozzleReservoir configuration error(s):\n  - "
+                + "\n  - ".join(errors)
+            )
+        print("  PASS")
+
     def gen_nozzle_boundary_only(self):
         self.p_list = []
         self.number_particles = 0
@@ -344,6 +498,7 @@ class BoundaryCDNozzleReservoir():
         self.index = 0
         run_cfg = get_run_configuration(self.itemcfg)
         self.configure_cd_nozzle_geometry(run_cfg)
+        self.validate_simulation_configuration(run_cfg)
         self.MobileParticlesCDNozzle(run_cfg)
         self.BoundaryParticlesCDNozzle(run_cfg)
         self.write_cd_nozzle_obj(run_cfg)
@@ -501,7 +656,13 @@ class BoundaryCDNozzleReservoir():
                 key = (x, y, z)
                 if key not in marker_locations:
                     marker_locations.add(key)
-                    self.addBoundaryParticle(run_cfg, float(x), float(y), float(z))
+                    self.addBoundaryParticle(
+                        run_cfg,
+                        float(x),
+                        float(y),
+                        float(z),
+                        evaluator_id=BOUNDARY_EVALUATOR_CD_NOZZLE,
+                    )
         print(
             f"BoundaryCDNozzleReservoir: generated {self.number_boundary_particles} "
             f"2D boundary particles, side length {self.side_len}, axial length "
@@ -520,7 +681,13 @@ class BoundaryCDNozzleReservoir():
                 key = (x, y, z)
                 if key not in marker_locations:
                     marker_locations.add(key)
-                    self.addBoundaryParticle(run_cfg, float(x), float(y), float(z))
+                    self.addBoundaryParticle(
+                        run_cfg,
+                        float(x),
+                        float(y),
+                        float(z),
+                        evaluator_id=BOUNDARY_EVALUATOR_CD_NOZZLE,
+                    )
                 theta += self.nozzle_theta_step
         print(
             f"BoundaryCDNozzleReservoir: generated {self.number_boundary_particles} "
@@ -658,7 +825,14 @@ class BoundaryCDNozzleReservoir():
             print(f"Failed adding mobile particle:{e} ")
             return
 
-    def addBoundaryParticle(self,run_cfg,rx,ry,rz=2.0):
+    def addBoundaryParticle(
+        self,
+        run_cfg,
+        rx,
+        ry,
+        rz=2.0,
+        evaluator_id=BOUNDARY_EVALUATOR_NONE,
+    ):
         try:
             particle_struct = pdata()
             self.number_boundary_particles += 1
@@ -671,6 +845,7 @@ class BoundaryCDNozzleReservoir():
             particle_struct.vy = 0.0
             particle_struct.vz = 0.0
             particle_struct.ptype = 1.0
+            particle_struct.temp_vel = float(evaluator_id)
             particle_struct.molar_mass = 1.0
             particle_struct.radius = 0.25
             particle_struct.state_flg = 0.0

@@ -58,7 +58,7 @@ def count_all_particle_data(file_name):
         while True:
             record = pdata()
             ret = f.readinto(record)
-            print(f"pnum: {record.pnum}, ptype:{record.ptype},live frame:{record.state_flg},vx:{record.vx:.2f},vy:{record.vy:.2f} x: {record.rx:.2f}, y: {record.ry:.2f}, z: {record.rz:.2f}")
+            #print(f"pnum: {record.pnum}, ptype:{record.ptype},live frame:{record.state_flg},vx:{record.vx:.2f},vy:{record.vy:.2f} x: {record.rx:.2f}, y: {record.ry:.2f}, z: {record.rz:.2f}")
             count += 1
             if ret == 0:
                 break
@@ -71,6 +71,12 @@ def count_all_particle_data(file_name):
 # 
 #
 def read_all_particle_data(file_name):
+    xmin = 10000.0
+    xmax = 0.0
+    ymin = 10000.0
+    ymax = 0.0
+    zmin = 10000.0
+    zmax = 0.0
     struct_fmt = 'dddddddddddddd'
     struct_len = struct.calcsize(struct_fmt)
     #print(struct_len)
@@ -84,6 +90,25 @@ def read_all_particle_data(file_name):
             if ret == 0:
                 break
             results.append(record)
+            
+            if count != 0:
+                if record.rx < xmin:
+                    xmin = record.rx
+                if xmax < record.rx:
+                    xmax = record.rx
+
+                if record.ry < ymin:
+                    ymin = record.ry
+                if ymax < record.ry:
+                    ymax = record.ry
+        
+                if record.rz < zmin:
+                    zmin = record.rz
+
+                if zmax < record.rz:
+                    zmax = record.rz
+            count+=1
+    print(f"xmin:{xmin:0.2f},xmax:{xmax:0.2f},ymin:{ymin:0.2f},ymax:{ymax:0.2f},zmin:{zmin:0.2f},zmax:{zmax:0.2f}")
     p_lst = []
     return results
  #******************************************************************
@@ -93,7 +118,6 @@ def read_all_particle_data(file_name):
 def read_particle_data(file_name,particle_range=None):
     if particle_range is None:
         return read_all_particle_data(file_name)
-
     results = []
     counter = 0
     slist = particle_range
@@ -110,6 +134,8 @@ def read_particle_data(file_name,particle_range=None):
             if counter >= end_it:
                 break
             counter += 1
+
+           
     return results
 
 def test_ArrayToIndex(x,y,z,side_length,max_loc):

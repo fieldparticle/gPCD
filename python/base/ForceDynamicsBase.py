@@ -131,7 +131,11 @@ class ForceDynamics(ForceContactDynamics):
         source.collision_list = []
         source.contactCount = 0
         source.colFlg = 0
-        self.SyncInternalMomentumMagnitude(source)
+        if not (
+            hasattr(self, "IsBoundaryParticle")
+            and self.IsBoundaryParticle(SourceID)
+        ):
+            self.SyncInternalMomentumMagnitude(source)
         source.total_overlap_area = 0.0
         for contact_state in self.GetContactSlots(SourceID):
             self.ClearContactSlot(contact_state)
@@ -407,11 +411,22 @@ class ForceDynamics(ForceContactDynamics):
         vz = fields.get("vz", 0.0)
         mass = fields.get("mass", fields.get("molar_mass", 1.0))
         radius = fields.get("radius", 0.0)
+        ptype = fields.get("ptype", 0.0)
+        boundary_evaluator_id = (
+            float(fields.get("boundary_evaluator_id", 0.0))
+            if float(ptype) > 0.5
+            else 0.0
+        )
         velocity_angle = self.VelocityAngle(vx, vy)
         particle.PosLocA = self.create_vec4(rx, ry, rz, 0.0)
         particle.PosLocB = self.create_vec4(rx, ry, rz, 1.0)
         particle.VelRad = self.create_vec4(vx, vy, vz, velocity_angle)
-        particle.Data = self.create_vec4(radius, fields.get("collision_stiffness_q", 0.0), 0.0, fields.get("state_flg", 1.0))
+        particle.Data = self.create_vec4(
+            radius,
+            fields.get("collision_stiffness_q", 0.0),
+            boundary_evaluator_id,
+            fields.get("state_flg", 1.0),
+        )
         particle.parms = self.create_vec4(mass, 0.0, 0.0, 0.0)
         particle.internal_momentum = 0.0
         particle.contacts = [self.create_geo_contact_state() for _ in range(16)]
@@ -426,7 +441,8 @@ class ForceDynamics(ForceContactDynamics):
         particle.vz = vz
         particle.mass = mass
         particle.radius = radius
-        particle.ptype = fields.get("ptype", 0.0)
+        particle.ptype = ptype
+        particle.boundary_evaluator_id = boundary_evaluator_id
         particle.state_flg = fields.get("state_flg", 1.0)
         particle.collision_list = fields.get("collision_list", [])
         particle.oa = fields.get("oa", 0.0)
@@ -489,6 +505,7 @@ class ForceDynamics(ForceContactDynamics):
             mass=particle_cfg.get("mass", 1.0),
             radius=particle_cfg.get("radius", 0.0),
             ptype=particle_cfg.get("ptype", 0.0),
+            boundary_evaluator_id=particle_cfg.get("boundary_evaluator_id", 0.0),
             collision_stiffness_q=collision_stiffness_q,
             state_flg=particle_cfg.get("state_flg", 1.0),
         )
@@ -524,6 +541,7 @@ class ForceDynamics(ForceContactDynamics):
             particle["mass"] = pp.molar_mass
             particle["radius"] = pp.radius
             particle["ptype"] = pp.ptype
+            particle["boundary_evaluator_id"] = pp.temp_vel
             particle["collision_stiffness_q"] = pp.collision_stiffness_q
             particle["state_flg"] = int(pp.state_flg)
             particle["edge"] = (100, 170, 255)
@@ -585,7 +603,15 @@ class ForceDynamics(ForceContactDynamics):
         )
 
     def ReservoirBirthSpacingFactor(self):
-        return float(self.run_configuration.get("reservoir_birth_spacing_factor", 1.1))
+        return max(
+            1.1,
+            float(
+                self.run_configuration.get(
+                    "reservoir_birth_spacing_factor",
+                    1.1,
+                )
+            ),
+        )
 
     def ReservoirBirthOffset(self, particle):
         return self.ReservoirBirthSpacingFactor() * 2.0 * float(particle.Data.x)
@@ -615,7 +641,7 @@ class ForceDynamics(ForceContactDynamics):
             inlet_y = float(
                 self.run_configuration.get(
                     "reservoir_inlet_y",
-                    self.run_configuration.get("inlet_y", default_inlet),
+                    default_inlet,
                 )
             )
             y = inlet_y + direction * offset
@@ -628,7 +654,7 @@ class ForceDynamics(ForceContactDynamics):
             inlet_x = float(
                 self.run_configuration.get(
                     "reservoir_inlet_x",
-                    self.run_configuration.get("inlet_x", default_inlet),
+                    default_inlet,
                 )
             )
             x = inlet_x + direction * offset
@@ -646,7 +672,7 @@ class ForceDynamics(ForceContactDynamics):
             outlet_y = float(
                 self.run_configuration.get(
                     "reservoir_outlet_y",
-                    self.run_configuration.get("outlet_y", default_outlet),
+                    default_outlet,
                 )
             )
             return position.y >= outlet_y if direction > 0.0 else position.y <= outlet_y
@@ -659,7 +685,7 @@ class ForceDynamics(ForceContactDynamics):
         outlet_x = float(
             self.run_configuration.get(
                 "reservoir_outlet_x",
-                self.run_configuration.get("outlet_x", default_outlet),
+                default_outlet,
             )
         )
         return position.x >= outlet_x if direction > 0.0 else position.x <= outlet_x

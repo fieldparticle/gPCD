@@ -603,7 +603,7 @@ newly born particles and retired escaped particles along the \(x\) direction.
 The active wall-segment function and the reservoir flow direction were also
 easy to confuse because both appeared in generated shader configuration.
 
-\subsubsection{<current form>}
+\subsubsection{<current form at that stage>}
 
 The generated boundary configuration now separates the two selectors:
 
@@ -612,7 +612,7 @@ The generated boundary configuration now separates the two selectors:
 #define PERIODIC_DIRECTION vertical
 \end{verbatim}
 
-\texttt{WALL\_FUNC} chooses the boundary-marker wall-segment evaluator:
+At that stage, \texttt{WALL\_FUNC} chose the boundary-marker wall-segment evaluator:
 \texttt{EvaluateHorizontalWallSegment} or
 \texttt{EvaluateVerticalWallSegment}.  \texttt{PERIODIC\_DIRECTION} chooses
 the reservoir lifecycle direction.  When it is \texttt{vertical},
@@ -621,6 +621,12 @@ and moves the particle to \(y_{\min}+2.2r\).  The existing
 \texttt{RetireParticlePastXMax(SourceID)} wrapper-compatible helper then
 retires the particle when its next position passes \(y_{\max}\).  When the
 selector is not vertical, the historical \(x\)-direction behavior remains.
+
+The later Python self-describing-marker migration supersedes the
+\texttt{WALL\_FUNC} evaluator decision: marker \texttt{Data.z} now selects the
+wall evaluator.  \texttt{PERIODIC\_DIRECTION} remains a separate lifecycle
+direction.  Vulkan synchronization with marker-owned evaluator IDs is the next
+porting step.
 
 During validation, apparent downward screen motion was traced to the viewing
 transform rather than to the reservoir force or lifecycle rule.  In
@@ -969,3 +975,54 @@ can depend on invocation scheduling.  Admission must therefore read immutable
 frame-start lifecycle state and commit successful births in a separate phase or
 through an equivalent synchronized design.  This preserves source ownership:
 each invocation decides and writes only its own lifecycle state.
+
+\subsection{Boundary Marker Configuration Becomes Self-Checking}
+
+\subsubsection{<previous form>}
+
+Boundary-particle reservoir geometry, lifecycle planes, camera bounds, and
+cell-domain size were partly inferred from overloaded \texttt{Wall*} values.
+Boundary wall evaluation also depended on a scenario-wide wall-function
+selection.  A configuration could place its retirement plane on or before the
+terminal marker wall, or place valid marker geometry outside the visible plot,
+without a focused generator error.
+
+\subsubsection{<current form>}
+
+The Python boundary-particle families now separate their responsibilities:
+
+\begin{itemize}
+    \item \texttt{reservoir\_inlet\_*} and
+    \texttt{reservoir\_outlet\_*} own lifecycle planes;
+    \item \texttt{x\_axis\_lims}, \texttt{y\_axis\_lims}, and
+    \texttt{z\_axis\_lims} own display bounds;
+    \item \texttt{wall\_boundary\_length} and nozzle profile fields own
+    physical marker geometry;
+    \item \texttt{side\_len} or \texttt{over\_ride\_side\_length} owns the
+    cell domain;
+    \item each \texttt{ptype=1} marker carries its evaluator ID through
+    \texttt{pdata.temp\_vel} into \texttt{Data.z}.
+\end{itemize}
+
+The periodic reservoir generator now creates closed test walls without
+duplicate corner markers and places the lifecycle outlet beyond the terminal
+marker wall.  Both periodic-reservoir and CD-nozzle generators run a simulation
+configuration check before particle generation.  Impossible geometry,
+packing, lifecycle, or nozzle-profile combinations stop generation with an
+aggregated error; display clipping is reported as a warning.
+
+\subsubsection{difference outcome}
+
+Particle solution.  The Python generation and dynamics paths have been
+verified with self-describing boundary markers and dedicated configuration
+roles.  Vulkan still requires the corresponding marker-owned evaluator-ID
+transport and dispatch update.
+
+\subsubsection{<Analysis>}
+
+Calculated geometry should be authoritative once generation begins, but manual
+configuration remains useful for selecting the domain, lifecycle planes, and
+population.  A preflight comparison is the correct boundary between those two
+roles: it rejects contradictory inputs before they become difficult runtime
+failures.  Marker-owned evaluator IDs also allow horizontal, vertical, and
+curved wall segments to coexist without a global wall-function interpretation.

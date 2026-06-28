@@ -1,8 +1,15 @@
 Current status:
-	- Documented current immediate reservoir birth behavior
-	- Defined deferred admission for starting overlaps
-	- Recorded GPU synchronization and live-target requirements
-	- Updated generated GLSL file boundaries and flat configuration conventions
+	- Verified Python boundary-particle reservoir and CD-nozzle simulations
+	- Separated lifecycle planes, display bounds, wall geometry, and cell-domain configuration
+	- Made boundary markers self-describing through evaluator IDs in Data.z
+	- Added generator preflight checks for geometry, packing, lifecycle, and nozzle consistency
+	- Documented symbolic configuration equations and the completed Python migration
+
 Code Changes:
-	- No code changes in this documentation update
-Next: Implement and test the reservoir deferred-birth convention
+	- Updated reservoir and CD-nozzle generators for dedicated configuration roles
+	- Added closed periodic test walls and marker-owned wall-evaluator dispatch
+	- Added simulation configuration validation before particle generation
+	- Updated Python camera and reservoir lifecycle configuration handling
+	- Updated Dynamics conventions, porting guidance, configuration reference, and problem evolution
+
+Next: Update Vulkan to transport boundary evaluator IDs into Data.z and dispatch EvaluateWallSegment from each target marker

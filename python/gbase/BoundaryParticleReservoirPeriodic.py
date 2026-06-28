@@ -297,25 +297,11 @@ class BoundaryParticleReservoirPeriodic():
         f.write(fstr)
         fstr = f"radius = {run_cfg.radius};\n"
         f.write(fstr)
-        fstr = f"particles_per_cell = {run_cfg.particles_per_cell};\n"
-        f.write(fstr)
         fstr = f"num_particles = {self.number_particles};\n"
-        f.write(fstr)
-        fstr = f"num_particle_colliding =  {run_cfg.num_particle_colliding};\n"
-        f.write(fstr)
-        fstr = f"exp_collisions_per_cell = {run_cfg.exp_collisions_per_cell};\n"
-        f.write(fstr)
-        fstr = f"act_collisions_per_cell = {run_cfg.act_collisions_per_cell};\n"
-        f.write(fstr)
-        fstr = f"particles_in_row =  {run_cfg.particles_in_row};\n"
         f.write(fstr)
         fstr = f"particle_data_bin_file = \"{self.test_bin_name}\";\n"
         f.write(fstr)
         fstr = f"report_file = \"{self.report_file}\";\n"
-        f.write(fstr)
-        fstr = f"collsion_density = {run_cfg.collision_density};\n"
-        f.write(fstr)
-        fstr = f"pdensity = {run_cfg.pdensity};\n"
         f.write(fstr)
         fstr = f"dispatchx = {self.number_active_particles+1};\n"
         f.write(fstr)
@@ -370,6 +356,7 @@ class BoundaryParticleReservoirPeriodic():
 
         f.flush()
         f.close()
+        
 
     def runner(self):
         run_cfg = get_run_configuration(self.itemcfg)
@@ -385,6 +372,8 @@ class BoundaryParticleReservoirPeriodic():
         else:
             self.gen_horz()
 
+        read_particle_data(self.test_bin_name)
+
     def boundary_guard_margin_cells(self):
         """Return cell-array safety margin outside the physical pipe walls."""
         return 3.0
@@ -395,6 +384,12 @@ class BoundaryParticleReservoirPeriodic():
         ) + 2.0
 
     def configured_side_len(self, run_cfg, base_side_len, margin):
+        """Return the configured cell-domain side length.
+
+        The explicit override wins when positive. Otherwise use side_len from
+        the merged cfg. Derivation from packed pipe width is retained only for
+        old configurations that provide neither field.
+        """
         override = float(
             self.cfg_value(
                 run_cfg,
@@ -404,38 +399,172 @@ class BoundaryParticleReservoirPeriodic():
         )
         if override > 0.0:
             return override
+        configured = float(self.cfg_value(run_cfg, "side_len", 0.0))
+        if configured > 0.0:
+            return configured
         return base_side_len + (2.0 * margin)
 
     def centered_pipe_offset(self, side_len, base_side_len):
         return max(0.0, 0.5 * (side_len - base_side_len))
 
-    def boundary_wall_length(self, run_cfg, axis):
-        if "wall_boundary_length" in run_cfg:
-            return float(self.cfg_value(run_cfg, "wall_boundary_length", 0.0))
-        if axis == "x":
-            return max(
-                0.0,
-                float(self.cfg_value(run_cfg, "WallXMAX", self.side_len - 1.0))
-                - float(self.cfg_value(run_cfg, "WallXMIN", 0.5)),
+    def boundary_wall_length(self, run_cfg):
+        """Return the configured physical marker-wall length."""
+        wall_length = float(
+            self.cfg_value(run_cfg, "wall_boundary_length", 0.0)
+        )
+        if wall_length <= 0.0:
+            raise ValueError("wall_boundary_length must be positive")
+        return wall_length
+
+    def validate_pipe_geometry(self, cross_max, axial_max):
+        """Ensure generated wall coordinates fit the selected cell domain."""
+        if cross_max > self.side_len:
+            raise ValueError(
+                "Packed pipe width exceeds the configured cell-domain "
+                f"side length: cross_max={cross_max}, side_len={self.side_len}"
             )
-        if axis == "y":
-            return max(
-                0.0,
-                float(self.cfg_value(run_cfg, "WallYMAX", self.side_len - 1.0))
-                - float(self.cfg_value(run_cfg, "WallYMIN", 0.5)),
+        if axial_max > self.side_len:
+            raise ValueError(
+                "wall_boundary_length exceeds the configured cell-domain "
+                f"side length: axial_max={axial_max}, side_len={self.side_len}"
             )
-        return self.side_len - 1.0
+
+    # ------------------------------------------------------------------
+    # Simulation configuration checks
+    # ------------------------------------------------------------------
+    def validate_simulation_configuration(
+        self,
+        run_cfg,
+        orientation,
+        radius,
+        dt,
+        particle_length,
+    ):
+        """Validate manual cfg inputs against calculated reservoir geometry."""
+        errors = []
+        warnings = []
+        diameter = 2.0 * radius
+        packed_cell_length = (
+            float(self.itemcfg.particles_per_cell_row) * particle_length
+        )
+
+        if radius <= 0.0:
+            errors.append("radius must be positive")
+        if dt <= 0.0:
+            errors.append("dt must be positive")
+        if int(self.itemcfg.particle_columns) <= 0:
+            errors.append("particle_columns must be positive")
+        if int(self.itemcfg.particles_per_row) <= 0:
+            errors.append("particles_per_row must be positive")
+        if int(self.itemcfg.particles_per_cell_row) <= 0:
+            errors.append("particles_per_cell_row must be positive")
+        if packed_cell_length > 1.0 + 1.0e-9:
+            errors.append(
+                "particles_per_cell_row does not fit in one cell: "
+                f"packed length={packed_cell_length:.6g}"
+            )
+
+        if orientation == "horizontal":
+            inlet_key = "reservoir_inlet_x"
+            outlet_key = "reservoir_outlet_x"
+            wall_min = self.wallxmin
+            wall_max = self.wallxmax
+        else:
+            inlet_key = "reservoir_inlet_y"
+            outlet_key = "reservoir_outlet_y"
+            wall_min = self.wallymin
+            wall_max = self.wallymax
+
+        if inlet_key not in run_cfg:
+            errors.append(f"{inlet_key} is required")
+            inlet = wall_min
+        else:
+            inlet = float(run_cfg[inlet_key])
+        if outlet_key not in run_cfg:
+            errors.append(f"{outlet_key} is required")
+            outlet = wall_max
+        else:
+            outlet = float(run_cfg[outlet_key])
+
+        if abs(inlet - wall_min) > 1.0e-9:
+            errors.append(
+                f"{inlet_key}={inlet:g} does not match the calculated "
+                f"inlet marker wall at {wall_min:g}"
+            )
+        if outlet <= wall_max:
+            errors.append(
+                f"{outlet_key}={outlet:g} must be beyond the XMAX/YMAX "
+                f"marker wall at {wall_max:g}"
+            )
+        if outlet > self.side_len:
+            errors.append(
+                f"{outlet_key}={outlet:g} exceeds cell-domain side_len="
+                f"{self.side_len:g}"
+            )
+
+        birth_factor = max(
+            1.1,
+            float(run_cfg.get("reservoir_birth_spacing_factor", 1.1)),
+        )
+        birth_position = inlet + birth_factor * diameter
+        minimum_birth_position = wall_min + 1.1 * diameter
+        if birth_position + 1.0e-12 < minimum_birth_position:
+            errors.append(
+                f"birth position {birth_position:g} does not clear the inlet "
+                f"wall by 1.1 diameters ({minimum_birth_position:g})"
+            )
+
+        x_limits = run_cfg.get("x_axis_lims")
+        y_limits = run_cfg.get("y_axis_lims")
+        for key, limits in (
+            ("x_axis_lims", x_limits),
+            ("y_axis_lims", y_limits),
+        ):
+            if limits is None or len(limits) < 2:
+                errors.append(f"{key} must contain [minimum, maximum]")
+            elif float(limits[0]) >= float(limits[1]):
+                errors.append(f"{key} minimum must be less than maximum")
+
+        if x_limits is not None and len(x_limits) >= 2:
+            if self.wallxmin < float(x_limits[0]) or self.wallxmax > float(x_limits[1]):
+                warnings.append("x_axis_lims does not contain all marker walls")
+        if y_limits is not None and len(y_limits) >= 2:
+            if self.wallymin < float(y_limits[0]) or self.wallymax > float(y_limits[1]):
+                warnings.append("y_axis_lims does not contain all marker walls")
+
+        print("Simulation configuration check: BoundaryParticleReservoirPeriodic")
+        print(
+            f"  manual: side_len={self.side_len:g}, wall_boundary_length="
+            f"{float(run_cfg.wall_boundary_length):g}, radius={radius:g}, dt={dt:g}"
+        )
+        print(
+            f"  calculated walls: x=[{self.wallxmin:g},{self.wallxmax:g}], "
+            f"y=[{self.wallymin:g},{self.wallymax:g}]"
+        )
+        print(
+            f"  lifecycle: inlet={inlet:g}, birth={birth_position:g}, "
+            f"outlet={outlet:g}; packed cell length={packed_cell_length:g}"
+        )
+        for warning in warnings:
+            print(f"  WARNING: {warning}")
+        if errors:
+            raise ValueError(
+                "BoundaryParticleReservoirPeriodic configuration error(s):\n  - "
+                + "\n  - ".join(errors)
+            )
+        print("  PASS")
 
     def configure_vertical_pipe_geometry(self, run_cfg):
         margin = self.boundary_guard_margin_cells()
         base_side_len = self.base_pipe_side_len()
         self.side_len = self.configured_side_len(run_cfg, base_side_len, margin)
         pipe_offset = self.centered_pipe_offset(self.side_len, base_side_len)
-        wall_length = self.boundary_wall_length(run_cfg, "y")
+        wall_length = self.boundary_wall_length(run_cfg)
         self.wallxmin = pipe_offset + 0.5
         self.wallxmax = pipe_offset + base_side_len - 1.0
         self.wallymin = 0.5
-        self.wallymax = min(self.side_len - 1.0, self.wallymin + wall_length)
+        self.wallymax = self.wallymin + wall_length
+        self.validate_pipe_geometry(self.wallxmax, self.wallymax)
         return margin, base_side_len, pipe_offset, wall_length
 
     def configure_horizontal_pipe_geometry(self, run_cfg):
@@ -443,11 +572,14 @@ class BoundaryParticleReservoirPeriodic():
         base_side_len = self.base_pipe_side_len()
         self.side_len = self.configured_side_len(run_cfg, base_side_len, margin)
         pipe_offset = self.centered_pipe_offset(self.side_len, base_side_len)
-        wall_length = self.boundary_wall_length(run_cfg, "x")
-        self.wallxmin = 0.5
-        self.wallxmax = min(self.side_len - 1.0, self.wallxmin + wall_length)
+        wall_length = self.boundary_wall_length(run_cfg)
+        self.wallxmin = float(
+            self.cfg_value(run_cfg, "reservoir_inlet_x", 0.5)
+        )
+        self.wallxmax = self.wallxmin + wall_length
         self.wallymin = pipe_offset + 0.5
         self.wallymax = pipe_offset + base_side_len - 1.0
+        self.validate_pipe_geometry(self.wallymax, self.wallxmax)
         return margin, base_side_len, pipe_offset, wall_length
     
     # Generate vertical-wall boundary flow.
@@ -463,16 +595,10 @@ class BoundaryParticleReservoirPeriodic():
         radius = float(self.cfg_value(run_cfg, "radius", 0.25))
         dt = float(self.cfg_value(run_cfg, "dt", 1.0))
         collision_stiffness_q = float(self.cfg_value(run_cfg, "collision_stiffness_q", 0.0))
-        WallYMAX = float(self.cfg_value(run_cfg, "WallYMAX", 10.0))
-        WallYMIN = float(self.cfg_value(run_cfg, "WallYMIN", 10.0))
         # Paticle length is twice the radius times the fraction of diameter separation.
         particle_length =2.0*radius+2.0*radius*self.itemcfg.fraction_of_diameter_separation
         # The particle row length is the number of particles per cell row times the particle length. 
         particle_cell_row_length = self.itemcfg.particles_per_cell_row*particle_length
-        # if the length of the particles in a cell row is larger than one then there is overlap.
-        if particle_cell_row_length > 1.0:
-            print(f"Error: Particles per cell row is {particle_cell_row_length:.2f} which is greater than 1.0. ")
-            return
         print(f"Paricle row length is {particle_cell_row_length:.2f} with separation distance of {self.itemcfg.fraction_of_diameter_separation} and radius of {radius}")
         # Take the difference between the particle row length and 1.0 to see how much space is 
         # left in a cell row. Then divide by the particle length to see how 
@@ -485,6 +611,13 @@ class BoundaryParticleReservoirPeriodic():
         required_width = particles_per_row/self.itemcfg.particles_per_cell_row
         margin, base_side_len, pipe_offset, wall_length = self.configure_vertical_pipe_geometry(
             run_cfg
+        )
+        self.validate_simulation_configuration(
+            run_cfg,
+            "vertical",
+            radius,
+            dt,
+            particle_length,
         )
         print(
             f"Side length is {self.side_len} for particles per row of {particles_per_row} "
@@ -549,16 +682,10 @@ class BoundaryParticleReservoirPeriodic():
         radius = float(self.cfg_value(run_cfg, "radius", 0.25))
         dt = float(self.cfg_value(run_cfg, "dt", 1.0))
         collision_stiffness_q = float(self.cfg_value(run_cfg, "collision_stiffness_q", 0.0))
-        WallYMAX = float(self.cfg_value(run_cfg, "WallYMAX", 10.0))
-        WallYMIN = float(self.cfg_value(run_cfg, "WallYMIN", 10.0))
         # Paticle length is twice the radius times the fraction of diameter separation.
         particle_length =2.0*radius+2.0*radius*self.itemcfg.fraction_of_diameter_separation
         # The particle row length is the number of particles per cell row times the particle length. 
         particle_cell_row_length = self.itemcfg.particles_per_cell_row*particle_length
-        # if the length of the particles in a cell row is larger than one then there is overlap.
-        if particle_cell_row_length > 1.0:
-            print(f"Error: Particles per cell row is {particle_cell_row_length:.2f} which is greater than 1.0. ")
-            return
         print(f"Paricle row length is {particle_cell_row_length:.2f} with separation distance of {self.itemcfg.fraction_of_diameter_separation} and radius of {radius}")
         # Take the difference between the particle row length and 1.0 to see how much space is 
         # left in a cell row. Then divide by the particle length to see how 
@@ -571,6 +698,13 @@ class BoundaryParticleReservoirPeriodic():
         required_width = particles_per_row/self.itemcfg.particles_per_cell_row
         margin, base_side_len, pipe_offset, wall_length = self.configure_horizontal_pipe_geometry(
             run_cfg
+        )
+        self.validate_simulation_configuration(
+            run_cfg,
+            "horizontal",
+            radius,
+            dt,
+            particle_length,
         )
         print(
             f"Side length is {self.side_len} for particles per row of {particles_per_row} "
@@ -626,21 +760,80 @@ class BoundaryParticleReservoirPeriodic():
 
 
     def BoundaryParticlesHorz(self,run_cfg):
-        for wx in range(int(self.wallxmax)):
-            self.addBoundaryParticle(run_cfg,float(wx+1.0),self.wallymax-0.75)
+        marker_locations = set()
 
-        for wx in range(int(self.wallxmax)):
-            self.addBoundaryParticle(run_cfg,float(wx+1.0),self.wallymin+0.5)
+        def add_marker(x, y, evaluator_id):
+            key = (float(x), float(y), 2.0)
+            if key in marker_locations:
+                return
+            marker_locations.add(key)
+            self.addBoundaryParticle(
+                run_cfg,
+                key[0],
+                key[1],
+                key[2],
+                evaluator_id=evaluator_id,
+            )
+
+        # Add the closed inlet and outlet first so exact corner coordinates
+        # belong to the vertical evaluator. Horizontal insertion then skips
+        # those duplicate coordinates.
+        for wy in range(
+            int(math.ceil(self.wallymin)),
+            int(math.floor(self.wallymax)) + 1,
+        ):
+            add_marker(
+                self.wallxmin,
+                float(wy),
+                BOUNDARY_EVALUATOR_VERTICAL,
+            )
+            add_marker(
+                self.wallxmax,
+                float(wy),
+                BOUNDARY_EVALUATOR_VERTICAL,
+            )
+
+        for wx in range(
+            int(math.ceil(self.wallxmin)),
+            int(math.floor(self.wallxmax)) + 1,
+        ):
+            add_marker(
+                float(wx),
+                self.wallymin,
+                BOUNDARY_EVALUATOR_HORIZONTAL,
+            )
+            add_marker(
+                float(wx),
+                self.wallymax,
+                BOUNDARY_EVALUATOR_HORIZONTAL,
+            )
         
     def BoundaryParticlesVert(self,run_cfg):
         for wy in range(int(self.wallymax)):
-            self.addBoundaryParticle(run_cfg,self.wallxmin+0.5,float(wy+1.0))
+            self.addBoundaryParticle(
+                run_cfg,
+                self.wallxmin+0.5,
+                float(wy+1.0),
+                evaluator_id=BOUNDARY_EVALUATOR_VERTICAL,
+            )
 
         for wy in range(int(self.wallymax)):
-            self.addBoundaryParticle(run_cfg,self.wallxmax-0.75,float(wy+1.0))
+            self.addBoundaryParticle(
+                run_cfg,
+                self.wallxmax-0.75,
+                float(wy+1.0),
+                evaluator_id=BOUNDARY_EVALUATOR_VERTICAL,
+            )
 
 
-    def addBoundaryParticle(self,run_cfg,rx,ry,rz=2.0):
+    def addBoundaryParticle(
+        self,
+        run_cfg,
+        rx,
+        ry,
+        rz=2.0,
+        evaluator_id=BOUNDARY_EVALUATOR_NONE,
+    ):
         try:
             particle_struct = pdata()
             self.number_boundary_particles += 1
@@ -653,6 +846,7 @@ class BoundaryParticleReservoirPeriodic():
             particle_struct.vy = 0.0
             particle_struct.vz = 0.0
             particle_struct.ptype = 1.0
+            particle_struct.temp_vel = float(evaluator_id)
             particle_struct.molar_mass = 1.0
             particle_struct.radius = 0.25
             particle_struct.state_flg = 0.0

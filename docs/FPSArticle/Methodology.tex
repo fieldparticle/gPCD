@@ -159,22 +159,15 @@ configuration. For a particle pair, the pair
 interaction strength is defined as
 
 \begin{equation}
-q_{ij}
-=
-\max\left(
-0,
-\frac{q_i+q_j}{2}
-\right).
+q_{ij}=\max\left(0,\frac{q_i+q_j}{2}\right).
 \end{equation}
 
 The interaction force magnitude is determined from
 the product of the pair interaction strength and an
-interaction measure,
+interaction measure, 
 
 \begin{equation}
-F_{ij}
-=
-q_{ij} M_{ij},
+F_{ij}=q_{ij} M_{ij}
 \end{equation}
 
 where $M_{ij}$ is the interaction measure. In the
@@ -182,43 +175,34 @@ present implementation the interaction measure is
 taken as the penetration depth,
 
 \begin{equation}
-M_{ij}
-=
-\delta_{ij},
+M_{ij}=\delta_{ij},
 \end{equation}
 
 yielding
 
 \begin{equation}
-F_{ij}
-=
-q_{ij}\delta_{ij}.
+F_{ij}=q_{ij}\delta_{ij}.
 \end{equation}
+
+The interaction force is assumed proportional 
+to the penetration depth, 
+providing a linear geometric response in 
+the present implementation.
 
 The interaction strength $q_{ij}$ controls the
 magnitude of the force generated for a given
 penetration depth and therefore acts as an effective
 interaction stiffness between the particle pair.
 
-The interaction strength $q_{ij}$ controls the
-magnitude of the force generated for a given
-penetration depth.
 
 \begin{equation}
-\mathbf{n}_{ij}
-=
-\frac{\mathbf{x}_j-\mathbf{x}_i}
-     {\left\|
-      \mathbf{x}_j-\mathbf{x}_i
-      \right\|}.
+\mathbf{n}_{ij}=\frac{\mathbf{x}_j-\mathbf{x}_i}{\left\|\mathbf{x}_j-\mathbf{x}_i\right\|}.
 \end{equation}
 
 The force acting on particle $i$ is therefore
 
 \begin{equation}
-\mathbf{F}_{ij}
-=
--F_{ij}\mathbf{n}_{ij}.
+\mathbf{F}_{ij}=-F_{ij}\mathbf{n}_{ij}.
 \end{equation}
 
 \subsubsection{Acceleration and State Evolution}
@@ -228,9 +212,7 @@ acts along the line joining the particle centers.
 The acceleration of particle $i$ is determined from
 
 \begin{equation}
-\mathbf{a}_i
-=
-\frac{\mathbf{F}_i}{m_i},
+\mathbf{a}_i = \frac{\mathbf{F}_i}{m_i},
 \end{equation}
 
 where $m_i$ is the particle mass and
@@ -257,8 +239,6 @@ the evolution of the interaction force and does not
 require explicit reflection, collision impulses, or
 velocity reversal operations.
 
-\subsubsection{Acceleration and State Evolution}
-
 After force evaluation, the accumulated source-owned
 force is converted into acceleration. For particle $i$,
 
@@ -277,17 +257,28 @@ Velocity is then updated from the current acceleration,
 \mathbf{v}_i^{\,n+1}=\mathbf{v}_i^{\,n}+\mathbf{a}_i^{\,n}\Delta t .
 \end{equation}
 
-During penetration, the interaction force acts along
-the line of interaction and opposes continued motion
-into the neighboring particle. As the penetration
-depth increases, the force and acceleration increase,
-reducing the velocity component along the interaction
-normal. When this normal velocity component reaches
-zero, continued acceleration causes it to change sign.
-The particle therefore transitions from compression to
-rebound through the velocity update itself, without
-requiring an explicit reflection or velocity-reversal
-operation.
+The particle position is subsequently advanced using
+the updated velocity,
+
+\begin{equation}
+\mathbf{x}_i^{\,n+1}
+=
+\mathbf{x}_i^{\,n}
++
+\mathbf{v}_i^{\,n+1}\Delta t.
+\end{equation}
+
+The updated position defines the interaction geometry
+for the subsequent time step, completing the
+source-owned state evolution. During compression, the
+interaction force reduces the component of particle
+velocity directed along the interaction normal. As
+this component approaches zero, continued
+acceleration causes it to change sign, naturally
+transitioning the interaction from compression to
+rebound without requiring explicit reflection or
+velocity-reversal operations.
+
 
 \subsubsection{Momentum Conservation}
 
@@ -316,18 +307,14 @@ F_{ij}=F_{ji},
 while the interaction normals satisfy
 
 \begin{equation}
-\mathbf{n}_{ji}
-=
--\mathbf{n}_{ij}.
+\mathbf{n}_{ji}=-\mathbf{n}_{ij}.
 \end{equation}
 
 The resulting forces are therefore equal and
 opposite,
 
 \begin{equation}
-\mathbf{F}_{ji}
-=
--\mathbf{F}_{ij}.
+\mathbf{F}_{ji}=-\mathbf{F}_{ij}.
 \end{equation}
 
 Because the interaction forces form a central
@@ -345,3 +332,225 @@ Momentum conservation therefore emerges from the
 symmetry of the interaction geometry and does not
 require explicit pair updates or shared-state
 modification.
+
+\subsubsection{Time-Step Algorithm}
+
+The governing dynamics of FPS are executed through a
+sequence of source-owned operations performed during
+each simulation time step. The algorithm consists of
+the following stages:
+
+\begin{enumerate}
+\item Construct the interaction geometry for each
+source particle by identifying neighboring particles
+within the interaction radius.
+
+\item Compute the separation distance, interaction
+normal, proximity vector, orientation vector, and
+penetration depth for each interacting particle pair.
+
+\item Determine the pair interaction strength and
+evaluate the interaction force acting on the source
+particle.
+
+\item Accumulate all source-owned interaction forces
+to obtain the total force acting on the particle.
+
+\item Compute the particle acceleration from the
+accumulated force.
+
+\item Update the particle velocity using the computed
+acceleration.
+
+\item Update the particle position using the updated
+velocity.
+
+\item Advance the simulation to the next time step,
+where the updated particle positions define the new
+interaction geometry.
+\end{enumerate}
+
+
+\subsubsection{Time-Step Buffering}
+
+At each time step, the graphics stage constructs the
+Potentially Colliding Set (PCS) from the current particle
+positions. The PCS defines the complete set of candidate
+particle interactions that may be evaluated during the
+subsequent compute stage. Once constructed, the PCS
+remains immutable for the duration of the compute pass.
+Modifying particle positions during collision evaluation
+could move particles into or out of cells, thereby
+changing the PCS and invalidating the collision search.
+
+To preserve a consistent collision state, FPS employs
+double-buffered particle positions. The graphics stage
+constructs the PCS using the current-position buffer,
+while the compute stage performs collision detection
+using this fixed PCS. Updated particle positions are
+written exclusively to a separate next-position buffer,
+leaving the current-position buffer unchanged throughout
+collision evaluation.
+
+Let
+
+\[
+\mathcal{P}^n=
+\left\{\mathbf{x}_i^n\right\}_{i=1}^{N}
+\]
+
+denote the current particle positions used to construct
+the PCS at time step \(n\). Collision detection is
+performed entirely using \(\mathcal{P}^n\), while the
+updated positions
+
+\[
+\mathbf{x}_i^{\,n+1}
+\]
+
+are written to the next-position buffer.
+
+After completion of the compute stage, the
+next-position buffer becomes the current-position buffer.
+The graphics stage then constructs a new PCS from these
+updated positions for the following time step.
+
+
+\subsubsection{Internal Momentum}
+
+During interpenetrating contact, particle velocity may
+be reduced as penetration depth increases. The loss of
+translational motion during compression is not treated
+as an explicit energy-storage process. Instead, FPS
+interprets the compressed interaction state as carrying
+recoverable internal momentum. As the interaction force
+continues to act, this internal momentum is converted
+back into translational motion during rebound.
+
+This interpretation is useful for boundary and reservoir
+modeling. Since particles are permitted to overlap,
+walls, reservoirs, and inlet regions may be represented
+using the same geometric interaction rules applied to
+particle--particle contact. Boundary particles resist
+penetration through the interaction force, while
+reservoir particles may introduce, confine, or sustain
+particle motion through prescribed geometric states.
+The same penetration-depth mechanism therefore supports
+contact, rebound, confinement, and injection without
+requiring separate collision-response rules.
+
+\subsection{Environmental Models}
+
+\subsubsection{Boundary Particles}
+
+
+Boundary particles are particles whose configuration
+flag identifies them as fixed boundary entities rather
+than mobile particles. When a mobile particle enters a
+cell containing a boundary particle, the interaction is
+not evaluated as an ordinary particle--particle contact.
+Instead, a boundary-specific interaction function is
+called.
+
+The boundary function evaluates the local boundary
+geometry at the current particle position. In the
+present implementation, the boundary geometry is
+defined analytically as a function of position. The
+penetration depth is computed from the geometric
+relation between the mobile particle and the boundary,
+while the interaction direction is obtained from the
+local boundary orientation.
+
+Because FPS permits interpenetration, boundary
+interactions do not require exact nonpenetration
+constraints or explicit reflection rules. A particle may
+temporarily penetrate the boundary region, experience a
+force directed along the local boundary normal, and
+subsequently rebound through the ordinary acceleration
+and velocity-update process.
+
+\subsubsection{Flow}
+
+Flow in FPS is represented as a statistical reduction of
+directional randomness rather than by prescribing a
+particle velocity directly. Each particle is assigned a
+preferred flow direction, specified by a flow angle
+$\theta_f$, together with a flow-alignment parameter
+$\alpha_f \in [0,1]$.
+
+The alignment parameter controls the degree to which
+random directional variation is reduced in favor of the
+prescribed flow direction. A value of
+$\alpha_f=0$ corresponds to fully random particle
+directions, while $\alpha_f=1$ produces complete
+directional ordering along $\theta_f$. Intermediate
+values represent partially ordered flow. For example,
+$\alpha_f=0.85$ corresponds to an $85\%$ reduction in
+directional randomness toward the prescribed flow
+direction.
+
+This formulation preserves stochastic particle motion
+while introducing a controllable directional bias.
+Consequently, flow emerges as an increase in directional
+order rather than as the explicit assignment of particle
+velocities.
+
+\subsubsection{Reservoir Particles}
+
+Reservoir particles provide a mechanism for introducing
+mobile particles into the active domain through a
+time-staggered release process. During initialization,
+each particle is assigned a prescribed release state
+consisting of an initial position, velocity, particle
+properties, and a birth frame. The birth frame,
+$B_i$, specifies the simulation frame at which
+particle $i$ becomes active.
+
+For horizontal flow, particles are arranged in release
+columns. Let $c_i$ denote the release column of particle
+$i$. The birth frame is computed as
+
+\begin{equation}
+B_i=B_0+c_i,\Delta B+J_B ,
+\end{equation}
+
+where $B_0$ is the initial release frame,
+$\Delta B$ is the spacing between successive release
+waves, and $J_B$ is an optional birth-frame jitter.
+
+The release-wave spacing is determined from the
+particle radius, the forward velocity, the simulation
+time step, and a prescribed spacing factor,
+
+\begin{equation}
+\Delta B=\left\lceil\frac{2Rs_f}{v_f\Delta t}\right\rceil ,
+\end{equation}
+
+where $R$ is the particle radius,
+$s_f$ is the spacing factor,
+$v_f$ is the forward flow speed used for release
+spacing, and $\Delta t$ is the simulation time step.
+This expression ensures that one release wave advances
+approximately the prescribed clearance distance before
+the next wave is introduced.
+
+For horizontal flow, particles are placed at a fixed
+streamwise inlet location while their transverse
+locations are distributed across the inlet,
+
+\begin{equation}
+\mathbf{x}_i =\begin{bmatrix}x_{\mathrm{inlet}} \\y_0 + r_iL_p + J_y\end{bmatrix}.
+\end{equation}
+
+where $r_i$ is the particle row number,
+$L_p$ is the particle spacing,
+$J_y$ is an optional transverse position jitter,
+and $y_0$ is the lower inlet coordinate.
+
+The reservoir velocity is determined from the flow
+model. A preferred flow direction is combined with a
+random direction according to the flow-alignment
+parameter described in the preceding section. The
+resulting normalized direction is multiplied by the
+specified flow speed to obtain the particle release
+velocity.

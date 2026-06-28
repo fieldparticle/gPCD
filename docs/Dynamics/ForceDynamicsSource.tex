@@ -143,9 +143,11 @@ force into \texttt{totalForce}.
 \ForceFunctionSection{EvaluateWallSegment}
 
 \texttt{EvaluateWallSegment(SourceID, BoundaryID)} is the boundary-particle
-wall geometry dispatcher.  The selected wall-segment function is supplied by
-the scenario configuration and generated into \texttt{boundary.glsl} as
-\texttt{WALL\_FUNC}.  The current generated GLSL path supports:
+wall geometry dispatcher.  In Python, the target boundary marker owns its
+evaluator ID in \texttt{Data.z}; the dispatcher does not read a global wall-
+function selection.  Evaluator ID zero or an unknown ID produces no wall
+segment, so older binary files must be regenerated.  The supported evaluators
+are:
 
 \begin{verbatim}
 EvaluateHorizontalWallSegment(SourceID, BoundaryID)
