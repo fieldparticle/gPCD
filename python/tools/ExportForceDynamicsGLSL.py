@@ -584,15 +584,21 @@ GLSL_BODY_TEMPLATES = {
         "return 0.0;",
     ],
     "EvaluateWallSegment": [
-        "#if defined(WALL_FUNC) && WALL_FUNC == cd_nozzle_wall",
-        "return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
-        "#elif defined(WALL_FUNC) && WALL_FUNC == horizontal_wall",
-        "return EvaluateHorizontalWallSegment(SourceID, BoundaryID);",
-        "#elif defined(WALL_FUNC) && WALL_FUNC == vertical_wall",
-        "return EvaluateVerticalWallSegment(SourceID, BoundaryID);",
+        "uint evaluator_id = uint(round(P[BoundaryID].Data.z));",
+        "if (evaluator_id == 1u) {",
+        "    return EvaluateHorizontalWallSegment(SourceID, BoundaryID);",
+        "}",
+        "if (evaluator_id == 2u) {",
+        "    return EvaluateVerticalWallSegment(SourceID, BoundaryID);",
+        "}",
+        "if (evaluator_id == 3u) {",
+        "#if defined(FORCE_DYNAMICS_CD_NOZZLE_AVAILABLE)",
+        "    return EvaluateCDNozzleWallSegment(SourceID, BoundaryID);",
         "#else",
-        "return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
+        "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
         "#endif",
+        "}",
+        "return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
     ],
     "EvaluateHorizontalWallSegment": [
         "uint wall_flag = BoundaryParticleWallFlag(SourceID, BoundaryID);",
@@ -1373,28 +1379,16 @@ def render_boundary_particle_glsl_file(
     ]
     for method_name in BOUNDARY_PARTICLE_GLSL_METHODS:
         lines.append(f"{GLSL_SIGNATURES[method_name]};")
+    lines.append(GLSL_SIGNATURES["EvaluateCDNozzleWallSegment"] + ";")
     lines.append(GLSL_SIGNATURES["EvaluateWallSegment"] + ";")
     lines.append("")
     lines.extend(
         render_method_bodies(source_path, visitor, BOUNDARY_PARTICLE_GLSL_METHODS)
     )
     lines.extend(
-        [
-            "#if !defined(WALL_FUNC) || WALL_FUNC != cd_nozzle_wall",
-            "BoundaryWallSegment EvaluateWallSegment(uint SourceID, uint BoundaryID)",
-            "{",
-            "#if defined(WALL_FUNC) && WALL_FUNC == horizontal_wall",
-            "    return EvaluateHorizontalWallSegment(SourceID, BoundaryID);",
-            "#elif defined(WALL_FUNC) && WALL_FUNC == vertical_wall",
-            "    return EvaluateVerticalWallSegment(SourceID, BoundaryID);",
-            "#else",
-            "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
-            "#endif",
-            "}",
-            "#endif",
-            "",
-        ]
+        render_method_bodies(source_path, visitor, ["EvaluateWallSegment"])
     )
+    lines.append("")
     lines.append("#endif")
     lines.append("")
     return "\n".join(lines)
@@ -1416,19 +1410,7 @@ def render_cd_nozzle_glsl_file(source_path: Path, visitor: ForceDynamicsVisitor)
         lines.append(f"{GLSL_SIGNATURES[method_name]};")
     lines.append("")
     lines.extend(render_method_bodies(source_path, visitor, CD_NOZZLE_GLSL_METHODS))
-    lines.extend(
-        [
-            "#if defined(WALL_FUNC) && WALL_FUNC == cd_nozzle_wall",
-            "BoundaryWallSegment EvaluateWallSegment(uint SourceID, uint BoundaryID)",
-            "{",
-            "    return EvaluateCDNozzleWallSegment(SourceID, BoundaryID);",
-            "}",
-            "#endif",
-            "",
-            "#endif",
-            "",
-        ]
-    )
+    lines.extend(["", "#endif", ""])
     return "\n".join(lines)
 
 

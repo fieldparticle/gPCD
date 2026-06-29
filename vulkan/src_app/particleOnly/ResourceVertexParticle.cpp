@@ -125,14 +125,18 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		}
 		//if (m_NumParticles > 1000)
 			//mout << "here" << ende;
+		
+		float particleType = static_cast<float>(part_pos.ptype);
+		float evaluatorID = particleType > 0.5f ? particleType : 0.0f;
+		
 		part.PosLocA		= glm::vec4(part_pos.rx, part_pos.ry,part_pos.rz, 0.0);
 		part.VelRad			= glm::vec4(part_pos.vx, part_pos.vy, part_pos.vz,1.0);
 		part.PosLocB		= glm::vec4(part_pos.rx, part_pos.ry, part_pos.rz, 0.0);
-		part.Data			= glm::vec4(part_pos.radius, part_pos.collision_stiffness_q, 0.0, part_pos.state_flg);
-		part.ptype			= static_cast<float>(part_pos.ptype);
-		part.temp_vel		= static_cast<float>(0.04);
+		part.Data			= glm::vec4(part_pos.radius, part_pos.collision_stiffness_q, evaluatorID, part_pos.state_flg);
+		part.ptype			= particleType;
 		part.parms			= glm::vec4(part_pos.molar_mass, 0.0, 0.0, 0.0);
 		part.colFlg			= 0;
+		part.temp_vel		= static_cast<float>(part_pos.temp_vel);
 		part.contactCount = 0;
 		
 #if 0

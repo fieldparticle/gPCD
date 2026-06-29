@@ -298,8 +298,8 @@ limits also control the Python simulation game camera when they are present:
 
     \item[\texttt{wall\_type}] Written to the generated \texttt{.tst} file for
     the Vulkan wrapper.  Python \texttt{ForceDynamics} currently recognizes
-    boundary-particle walls by finding particles with \texttt{ptype=1}, not by
-    branching on this string.
+    boundary-particle walls by finding particles with positive
+    evaluator-valued \texttt{ptype}, not by branching on this string.
 
     \item[\texttt{over\_ride\_side\_length}] If positive, directly selects the
     generator's cubic cell-array side length.  If absent or nonpositive, the
@@ -315,10 +315,11 @@ limits also control the Python simulation game camera when they are present:
 \end{description}
 
 The boundary marker radius is currently hardcoded to \(0.25\), marker
-\texttt{ptype} is \(1\), marker \texttt{Data.w} is zero, and marker stiffness
-is zero.  Each marker writes its evaluator ID through \texttt{pdata.temp\_vel}
-to runtime \texttt{Data.z}: horizontal is 1, vertical is 2, and CD nozzle is
-3.  These are current implementation facts, not configurable fields.
+\texttt{Data.w} is zero, and marker stiffness is zero.  Each marker writes its
+evaluator ID directly to \texttt{pdata.ptype}: horizontal is 1, vertical is 2,
+and CD nozzle is 3.  Python and the Vulkan loader copy that value into runtime
+\texttt{ptype} and \texttt{Data.z}.  \texttt{pdata.temp\_vel} remains reserved.
+These are current implementation facts, not configurable fields.
 
 \subsection{Generated Test Metadata}
 

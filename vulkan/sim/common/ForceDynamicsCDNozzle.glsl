@@ -74,7 +74,7 @@ float CDNozzleRadiusSlope(float axial_position)
     return 0.0;
 }
 
-// Python source: ForceDynamics.py:323
+// Python source: ForceDynamics.py:319
 BoundaryWallSegment EvaluateCDNozzleWallSegment(uint SourceID, uint BoundaryID)
 {
     uint wall_flag = BoundaryParticleCDNozzleWallFlag(SourceID, BoundaryID);
@@ -122,11 +122,5 @@ BoundaryWallSegment EvaluateCDNozzleWallSegment(uint SourceID, uint BoundaryID)
     return BoundaryWallSegment(normal, overlap_area, center_distance, wall_flag, true);
 }
 
-#if defined(WALL_FUNC) && WALL_FUNC == cd_nozzle_wall
-BoundaryWallSegment EvaluateWallSegment(uint SourceID, uint BoundaryID)
-{
-    return EvaluateCDNozzleWallSegment(SourceID, BoundaryID);
-}
-#endif
 
 #endif

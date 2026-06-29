@@ -116,12 +116,6 @@ void main(){
 	
 	// Set point size 
 	gl_PointSize = 2.0;
-	if(uint(ShaderFlags.frameNum) == 0u)
-	{
-		gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
-		gl_PointSize = 0.0;
-		return;
-	}
 	
 	// Clear this paricles corner array
 	for (uint kk = 0;kk<8;kk++)

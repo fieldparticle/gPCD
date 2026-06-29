@@ -125,7 +125,7 @@ class PlotParticles():
                     z_max = ii.rz
 
                 # If the particle is in collision use a different color
-                if ii.ptype == 1:
+                if ii.ptype > 0.5:
                     if self.itemcfg.vary_color == False:
                         self.ax.plot_surface(x, y, z, color='blue',alpha=0.8)
                     else:

@@ -46,7 +46,7 @@ class BoundaryCDNozzleReservoir():
 
    
     def do_all_files_dbg(self):
-        self.runner()
+        return self.runner()
     
     def create_bin_file(self):
         try:
@@ -89,12 +89,63 @@ class BoundaryCDNozzleReservoir():
     # cell
     #
     def write_bin_file(self,p_lst):
+        center_min = [float("inf")] * 3
+        center_max = [float("-inf")] * 3
+        rendered_min = [float("inf")] * 3
+        rendered_max = [float("-inf")] * 3
         try:
             for ii in p_lst:
                 self.bin_file.write(ii)
                 self.count+=1
+                if int(ii.pnum) == 0:
+                    continue
+                center = (float(ii.rx), float(ii.ry), float(ii.rz))
+                radius = float(ii.radius)
+                for axis in range(3):
+                    center_min[axis] = min(center_min[axis], center[axis])
+                    center_max[axis] = max(center_max[axis], center[axis])
+                    rendered_min[axis] = min(
+                        rendered_min[axis], center[axis] - radius
+                    )
+                    rendered_max[axis] = max(
+                        rendered_max[axis], center[axis] + radius
+                    )
         except BaseException as e:
             self.log.log(self,e)
+        if center_min[0] != float("inf"):
+            self.generated_bounds = {
+                "center": {
+                    "x": (center_min[0], center_max[0]),
+                    "y": (center_min[1], center_max[1]),
+                    "z": (center_min[2], center_max[2]),
+                },
+                "rendered": {
+                    "x": (rendered_min[0], rendered_max[0]),
+                    "y": (rendered_min[1], rendered_max[1]),
+                    "z": (rendered_min[2], rendered_max[2]),
+                },
+            }
+        else:
+            self.generated_bounds = None
+
+    def report_generated_bounds(self):
+        if not self.generated_bounds:
+            print("Generated particle bounds: no non-null particles")
+            return
+        center = self.generated_bounds["center"]
+        rendered = self.generated_bounds["rendered"]
+        print(
+            "Generated center bounds: "
+            f"x=[{center['x'][0]:.6g},{center['x'][1]:.6g}], "
+            f"y=[{center['y'][0]:.6g},{center['y'][1]:.6g}], "
+            f"z=[{center['z'][0]:.6g},{center['z'][1]:.6g}]"
+        )
+        print(
+            "Generated rendered bounds: "
+            f"x=[{rendered['x'][0]:.6g},{rendered['x'][1]:.6g}], "
+            f"y=[{rendered['y'][0]:.6g},{rendered['y'][1]:.6g}], "
+            f"z=[{rendered['z'][0]:.6g},{rendered['z'][1]:.6g}]"
+        )
 
     def cfg_value(self, cfg, key, default):
         if key in cfg:
@@ -110,7 +161,9 @@ class BoundaryCDNozzleReservoir():
         try:
             f = open(self.test_file_name,'w')
         except BaseException as e:
-            raise BaseException(f"Can't open testfile {self.test_file_name} err{e}")
+            raise RuntimeError(
+                f"Can't open test file {self.test_file_name}: {e}"
+            ) from e
         fstr = f"index = {self.index};\n"     
         f.write(fstr)
         # size lengths must be plus 1 since the cell locations start as <0,0,0>
@@ -150,7 +203,7 @@ class BoundaryCDNozzleReservoir():
         f.write(fstr)
         fstr = f"dispatchz = {run_cfg.dispatchz};\n"
         f.write(fstr)
-        fstr = f"workGroupsx = {run_cfg.workGroupsx}\n"
+        fstr = f"workGroupsx = {run_cfg.workGroupsx};\n"
         f.write(fstr)
         fstr = f"workGroupsy = {run_cfg.workGroupsy};\n"
         f.write(fstr)
@@ -158,17 +211,19 @@ class BoundaryCDNozzleReservoir():
         f.write(fstr)
         fstr = f"cell_occupancy_list_size = {run_cfg.cell_occupancy_list_size};\n"
         f.write(fstr)
-        fstr = f"wallXMIN = {self.wallxmin};\n"
+        fstr = f"boundary_x_min = {self.wallxmin:0.6f};\n"
         f.write(fstr)
-        fstr = f"wallXMAX = {self.wallxmax};\n"
+        fstr = f"boundary_x_max = {self.wallxmax:0.6f};\n"
         f.write(fstr)
-        fstr = f"wallYMIN = {self.wallymin};\n"
+        fstr = f"boundary_y_min = {self.wallymin:0.6f};\n"
         f.write(fstr)
-        fstr = f"wallYMAX = {self.wallymax};\n"
+        fstr = f"boundary_y_max = {self.wallymax:0.6f};\n"
         f.write(fstr)
-        fstr = f"wallZMIN = {getattr(self, 'wallzmin', self.wallymin)};\n"
+        fstr = f"boundary_z_min = {float(self.wallzmin):0.6f};\n"
         f.write(fstr)
-        fstr = f"wallZMAX = {getattr(self, 'wallzmax', self.wallymax)};\n"
+        fstr = f"boundary_z_max = {float(self.wallzmax):0.6f};\n"
+        f.write(fstr)
+        fstr = f"wall_contact_offset = {float(run_cfg.wall_contact_offset):0.6f};\n"
         f.write(fstr)
         fstr = f"DT = {run_cfg.dt};\n"
         f.write(fstr)
@@ -186,26 +241,58 @@ class BoundaryCDNozzleReservoir():
         f.write(fstr)
         fstr = f'boundary_particle_function = "{run_cfg.boundary_particle_function}";\n'
         f.write(fstr)
-        fstr = f"over_ride_side_length = {run_cfg.over_ride_side_length:0.2f};\n"
+        fstr = f"nozzle_start_x = {float(self.nozzle_start_x):0.6f};\n"
         f.write(fstr)
-        fstr = f"nozzle_inlet_length = {run_cfg.nozzle_inlet_length:0.2f};\n"
+        fstr = f"nozzle_center_y = {float(self.nozzle_center_y):0.6f};\n"
         f.write(fstr)
-        fstr = f"nozzle_converge_length = {run_cfg.nozzle_converge_length:0.2f};\n"
+        fstr = f"over_ride_side_length = {run_cfg.over_ride_side_length:0.6f};\n"
         f.write(fstr)
-        fstr = f"nozzle_throat_length= {run_cfg.nozzle_throat_length:0.2f};\n"
+        fstr = f"nozzle_inlet_length = {run_cfg.nozzle_inlet_length:0.6f};\n"
         f.write(fstr)
-        fstr = f"nozzle_diverge_length= {run_cfg.nozzle_diverge_length:0.2f};\n"
+        fstr = f"nozzle_converge_length = {run_cfg.nozzle_converge_length:0.6f};\n"
         f.write(fstr)
-        fstr = f"nozzle_exit_length= {run_cfg.nozzle_exit_length:0.2f};\n"
+        fstr = f"nozzle_throat_length= {run_cfg.nozzle_throat_length:0.6f};\n"
         f.write(fstr)
-        fstr = f"nozzle_inlet_radius= {run_cfg.nozzle_inlet_radius:0.2f};\n"
+        fstr = f"nozzle_diverge_length= {run_cfg.nozzle_diverge_length:0.6f};\n"
         f.write(fstr)
-        fstr = f"nozzle_throat_radius= {run_cfg.nozzle_throat_radius:0.2f};\n"
+        fstr = f"nozzle_exit_length= {run_cfg.nozzle_exit_length:0.6f};\n"
         f.write(fstr)
-        fstr = f"nozzle_exit_radius= {run_cfg.nozzle_exit_radius:0.2f};\n"
+        fstr = f"nozzle_inlet_radius= {run_cfg.nozzle_inlet_radius:0.6f};\n"
         f.write(fstr)
-        fstr = f'periodic_direction = "horizontal";\n'
+        fstr = f"nozzle_throat_radius= {run_cfg.nozzle_throat_radius:0.6f};\n"
         f.write(fstr)
+        fstr = f"nozzle_exit_radius= {run_cfg.nozzle_exit_radius:0.6f};\n"
+        f.write(fstr)
+        boundary_function = str(run_cfg.boundary_particle_function).lower()
+        periodic_direction = (
+            "vertical" if boundary_function == "vertical_wall" else "horizontal"
+        )
+        fstr = f'periodic_direction = "{periodic_direction}";\n'
+        f.write(fstr)
+        fstr = f'flow_type = "{run_cfg.flow_type}";\n'
+        f.write(fstr)
+        if periodic_direction == "vertical":
+            fstr = (
+                f"reservoir_inlet_y = "
+                f"{float(run_cfg.reservoir_inlet_y):0.6f};\n"
+            )
+            f.write(fstr)
+            fstr = (
+                f"reservoir_outlet_y = "
+                f"{float(run_cfg.reservoir_outlet_y):0.6f};\n"
+            )
+            f.write(fstr)
+        else:
+            fstr = (
+                f"reservoir_inlet_x = "
+                f"{float(run_cfg.reservoir_inlet_x):0.6f};\n"
+            )
+            f.write(fstr)
+            fstr = (
+                f"reservoir_outlet_x = "
+                f"{float(run_cfg.reservoir_outlet_x):0.6f};\n"
+            )
+            f.write(fstr)
         fstr = f'boundary_guard = "cell_guard";\n'
         f.write(fstr)
         fstr = f'wall = "horizontal";\n'
@@ -214,12 +301,16 @@ class BoundaryCDNozzleReservoir():
         f.write(fstr)
         f.flush()
         f.close()
-        bnf = BinaryFileUtilities()
-        bnf.read_particle_data(self.test_bin_name)
 
 
     def runner(self):
-        self.gen_nozzle_boundary_only()
+        try:
+            self.gen_nozzle_boundary_only()
+        except Exception as error:
+            print("BoundaryCDNozzleReservoir generation failed:")
+            print(f"  {type(error).__name__}: {error}")
+            return False
+        return True
 
     def cd_nozzle_radius(self, axial_position):
         x = float(axial_position)
@@ -636,9 +727,56 @@ class BoundaryCDNozzleReservoir():
 
     def BoundaryParticlesCDNozzle2D(self, run_cfg):
         marker_locations = set()
+
+        def add_marker(x, y, z, evaluator_id):
+            key = (float(x), float(y), float(z))
+            if key in marker_locations:
+                return
+            marker_locations.add(key)
+            self.addBoundaryParticle(
+                run_cfg,
+                key[0],
+                key[1],
+                key[2],
+                evaluator_id=evaluator_id,
+            )
+
+        def marker_axis_positions(axis_min, axis_max):
+            lower = float(axis_min)
+            upper = float(axis_max)
+            span = upper - lower
+            whole_steps = int(math.floor(span))
+            positions = [lower + float(step) for step in range(whole_steps + 1)]
+            if upper - positions[-1] > 1.0e-12:
+                positions.append(upper)
+            else:
+                positions[-1] = upper
+            return positions
+
+        z = float(round(self.nozzle_profile_z))
+        if self.boundary_particle_function == "vertical_wall":
+            inlet_min = self.nozzle_center_x - self.nozzle_inlet_radius
+            inlet_max = self.nozzle_center_x + self.nozzle_inlet_radius
+            for x in marker_axis_positions(inlet_min, inlet_max):
+                add_marker(
+                    x,
+                    self.nozzle_start_y,
+                    z,
+                    BOUNDARY_EVALUATOR_HORIZONTAL,
+                )
+        else:
+            inlet_min = self.nozzle_center_y - self.nozzle_inlet_radius
+            inlet_max = self.nozzle_center_y + self.nozzle_inlet_radius
+            for y in marker_axis_positions(inlet_min, inlet_max):
+                add_marker(
+                    self.nozzle_start_x,
+                    y,
+                    z,
+                    BOUNDARY_EVALUATOR_VERTICAL,
+                )
+
         for axial in range(1, self.nozzle_total_length + 1):
             radius = self.cd_nozzle_radius(axial)
-            z = round(self.nozzle_profile_z)
             axial_offset = float(axial - 1)
             if self.boundary_particle_function == "vertical_wall":
                 y = round(self.nozzle_start_y + axial_offset)
@@ -653,16 +791,12 @@ class BoundaryCDNozzleReservoir():
                     (x, round(self.nozzle_center_y - radius), z),
                 )
             for x, y, z in locations:
-                key = (x, y, z)
-                if key not in marker_locations:
-                    marker_locations.add(key)
-                    self.addBoundaryParticle(
-                        run_cfg,
-                        float(x),
-                        float(y),
-                        float(z),
-                        evaluator_id=BOUNDARY_EVALUATOR_CD_NOZZLE,
-                    )
+                add_marker(
+                    x,
+                    y,
+                    z,
+                    BOUNDARY_EVALUATOR_CD_NOZZLE,
+                )
         print(
             f"BoundaryCDNozzleReservoir: generated {self.number_boundary_particles} "
             f"2D boundary particles, side length {self.side_len}, axial length "
@@ -844,8 +978,7 @@ class BoundaryCDNozzleReservoir():
             particle_struct.vx = 0.0
             particle_struct.vy = 0.0
             particle_struct.vz = 0.0
-            particle_struct.ptype = 1.0
-            particle_struct.temp_vel = float(evaluator_id)
+            particle_struct.ptype = float(evaluator_id)
             particle_struct.molar_mass = 1.0
             particle_struct.radius = 0.25
             particle_struct.state_flg = 0.0
@@ -865,6 +998,7 @@ class BoundaryCDNozzleReservoir():
         self.create_bin_file()
         self.write_bin_file(self.p_list)
         self.close_bin_file()
+        self.report_generated_bounds()
         print(
             f"BoundaryCDNozzleReservoir: Wrote {self.number_particles} "
             f"particles to {self.test_bin_name}"

@@ -30,8 +30,9 @@ particle.
     \item \emph{pipe walls}: the configured \(y_{\min}\) and \(y_{\max}\)
     planes are solid while \(x_{\min}\) and \(x_{\max}\) are lifecycle inlet
     and outlet planes;
-    \item \emph{boundary-particle walls}: particles with \texttt{ptype=1.0}
-    are occupancy markers that represent local wall segments.
+    \item \emph{boundary-particle walls}: particles with positive
+    evaluator-valued \texttt{ptype} are occupancy markers that represent
+    local wall segments.
 \end{itemize}
 
 Simple and pipe walls use the configured wall-ghost geometry.  Boundary
@@ -179,8 +180,8 @@ cell occupancy rather than from a full direct scan.
 \ForceFunctionSection{IsBoundaryParticle}
 
 \texttt{IsBoundaryParticle(ParticleID)} returns true when the particle record
-has \texttt{ptype=1.0}.  Boundary particles are occupancy and wall-geometry
-markers, not mobile dynamics sources.
+has positive evaluator-valued \texttt{ptype}.  Boundary particles are
+occupancy and wall-geometry markers, not mobile dynamics sources.
 
 \ForceFunctionSection{IsMobileParticleActiveForDynamics}
 

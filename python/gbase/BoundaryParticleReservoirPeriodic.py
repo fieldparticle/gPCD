@@ -88,12 +88,63 @@ class BoundaryParticleReservoirPeriodic():
     # cell
     #
     def write_bin_file(self,p_lst):
+        center_min = [float("inf")] * 3
+        center_max = [float("-inf")] * 3
+        rendered_min = [float("inf")] * 3
+        rendered_max = [float("-inf")] * 3
         try:
             for ii in p_lst:
                 self.bin_file.write(ii)
                 self.count+=1
+                if int(ii.pnum) == 0:
+                    continue
+                center = (float(ii.rx), float(ii.ry), float(ii.rz))
+                radius = float(ii.radius)
+                for axis in range(3):
+                    center_min[axis] = min(center_min[axis], center[axis])
+                    center_max[axis] = max(center_max[axis], center[axis])
+                    rendered_min[axis] = min(
+                        rendered_min[axis], center[axis] - radius
+                    )
+                    rendered_max[axis] = max(
+                        rendered_max[axis], center[axis] + radius
+                    )
         except BaseException as e:
             self.log.log(self,e)
+        if center_min[0] != float("inf"):
+            self.generated_bounds = {
+                "center": {
+                    "x": (center_min[0], center_max[0]),
+                    "y": (center_min[1], center_max[1]),
+                    "z": (center_min[2], center_max[2]),
+                },
+                "rendered": {
+                    "x": (rendered_min[0], rendered_max[0]),
+                    "y": (rendered_min[1], rendered_max[1]),
+                    "z": (rendered_min[2], rendered_max[2]),
+                },
+            }
+        else:
+            self.generated_bounds = None
+
+    def report_generated_bounds(self):
+        if not self.generated_bounds:
+            print("Generated particle bounds: no non-null particles")
+            return
+        center = self.generated_bounds["center"]
+        rendered = self.generated_bounds["rendered"]
+        print(
+            "Generated center bounds: "
+            f"x=[{center['x'][0]:.6g},{center['x'][1]:.6g}], "
+            f"y=[{center['y'][0]:.6g},{center['y'][1]:.6g}], "
+            f"z=[{center['z'][0]:.6g},{center['z'][1]:.6g}]"
+        )
+        print(
+            "Generated rendered bounds: "
+            f"x=[{rendered['x'][0]:.6g},{rendered['x'][1]:.6g}], "
+            f"y=[{rendered['y'][0]:.6g},{rendered['y'][1]:.6g}], "
+            f"z=[{rendered['z'][0]:.6g},{rendered['z'][1]:.6g}]"
+        )
 
     def cfg_value(self, cfg, key, default):
         if key in cfg:
@@ -177,8 +228,8 @@ class BoundaryParticleReservoirPeriodic():
             "birth_jitter_frames": max(0, birth_jitter_frames),
             "inlet_x": float(self.cfg_value(run_cfg, "reservoir_inlet_x", 0.5)),
             "inlet_y": float(self.cfg_value(run_cfg, "reservoir_inlet_y", 0.5)),
-            "base_x": float(self.cfg_value(run_cfg, "reservoir_base_x", 1.0)),
-            "base_y": float(self.cfg_value(run_cfg, "reservoir_base_y", 1.0)),
+            "row_start_x": float(self.cfg_value(run_cfg, "reservoir_base_x", 1.0)),
+            "row_start_y": float(self.cfg_value(run_cfg, "reservoir_base_y", 1.0)),
             "z": float(self.cfg_value(run_cfg, "reservoir_z", 2.0)),
             "particle_length": particle_length,
             "starting_vx": starting_vx,
@@ -246,7 +297,12 @@ class BoundaryParticleReservoirPeriodic():
             vy = -release_cfg["lateral_velocity"]
 
         rx = release_cfg["inlet_x"]
-        ry = release_cfg["base_y"] + row * release_cfg["particle_length"] + y_jitter
+        row_index = int(row) - 1
+        ry = (
+            release_cfg["row_start_y"]
+            + row_index * release_cfg["particle_length"]
+            + y_jitter
+        )
         rz = release_cfg["z"]
         vx, flow_vy = self.flow_velocity_for_particle(release_cfg)
         if release_cfg["flow_alignment"] < 1.0:
@@ -270,7 +326,12 @@ class BoundaryParticleReservoirPeriodic():
                 release_cfg["max_position_jitter"],
             )
 
-        rx = release_cfg["base_x"] + row * release_cfg["particle_length"] + x_jitter
+        row_index = int(row) - 1
+        rx = (
+            release_cfg["row_start_x"]
+            + row_index * release_cfg["particle_length"]
+            + x_jitter
+        )
         ry = release_cfg["inlet_y"]
         return birth_frame, rx, ry, rz, vx, vy, vz
 
@@ -299,6 +360,14 @@ class BoundaryParticleReservoirPeriodic():
         f.write(fstr)
         fstr = f"num_particles = {self.number_particles};\n"
         f.write(fstr)
+        fstr = f"num_particle_colliding =  0;\n"
+        f.write(fstr)
+        fstr = f"exp_collisions_per_cell = 0;\n"
+        f.write(fstr)
+        fstr = f"act_collisions_per_cell = 0;\n"
+        f.write(fstr)
+        fstr = f"particles_in_row =  0;\n"
+        f.write(fstr)
         fstr = f"particle_data_bin_file = \"{self.test_bin_name}\";\n"
         f.write(fstr)
         fstr = f"report_file = \"{self.report_file}\";\n"
@@ -309,7 +378,7 @@ class BoundaryParticleReservoirPeriodic():
         f.write(fstr)
         fstr = f"dispatchz = {run_cfg.dispatchz};\n"
         f.write(fstr)
-        fstr = f"workGroupsx = {run_cfg.workGroupsx}\n"
+        fstr = f"workGroupsx = {run_cfg.workGroupsx};\n"
         f.write(fstr)
         fstr = f"workGroupsy = {run_cfg.workGroupsy};\n"
         f.write(fstr)
@@ -317,17 +386,20 @@ class BoundaryParticleReservoirPeriodic():
         f.write(fstr)
         fstr = f"cell_occupancy_list_size = {run_cfg.cell_occupancy_list_size};\n"
         f.write(fstr)
-        fstr = f"wallXMIN = {self.wallxmin};\n"
+        fstr = f"boundary_x_min = {self.wallxmin:0.6f};\n"
         f.write(fstr)
-        fstr = f"wallXMAX = {self.wallxmax};\n"
+        fstr = f"boundary_x_max = {self.wallxmax:0.6f};\n"
         f.write(fstr)
-        fstr = f"wallYMIN = {self.wallymin};\n"
+        fstr = f"boundary_y_min = {self.wallymin:0.6f};\n"
         f.write(fstr)
-        fstr = f"wallYMAX = {self.wallymax};\n"
+        fstr = f"boundary_y_max = {self.wallymax:0.6f};\n"
         f.write(fstr)
-        fstr = f"wallZMIN = {self.wallymin};\n"
+        boundary_z = float(self.cfg_value(run_cfg, "reservoir_z", 2.0))
+        fstr = f"boundary_z_min = {boundary_z:0.6f};\n"
         f.write(fstr)
-        fstr = f"wallZMAX = {self.wallymax};\n"
+        fstr = f"boundary_z_max = {boundary_z:0.6f};\n"
+        f.write(fstr)
+        fstr = f"wall_contact_offset = {float(run_cfg.wall_contact_offset):0.6f};\n"
         f.write(fstr)
         fstr = f"DT = {run_cfg.dt};\n"
         f.write(fstr)
@@ -345,8 +417,36 @@ class BoundaryParticleReservoirPeriodic():
         f.write(fstr)
         fstr = f'boundary_particle_function = "{run_cfg.boundary_particle_function}";\n'
         f.write(fstr)
-        fstr = f'periodic_direction = "horizontal";\n'
+        boundary_function = str(run_cfg.boundary_particle_function).lower()
+        periodic_direction = (
+            "vertical" if boundary_function == "vertical_wall" else "horizontal"
+        )
+        fstr = f'periodic_direction = "{periodic_direction}";\n'
         f.write(fstr)
+        fstr = f'flow_type = "{run_cfg.flow_type}";\n'
+        f.write(fstr)
+        if periodic_direction == "vertical":
+            fstr = (
+                f"reservoir_inlet_y = "
+                f"{float(run_cfg.reservoir_inlet_y):0.6f};\n"
+            )
+            f.write(fstr)
+            fstr = (
+                f"reservoir_outlet_y = "
+                f"{float(run_cfg.reservoir_outlet_y):0.6f};\n"
+            )
+            f.write(fstr)
+        else:
+            fstr = (
+                f"reservoir_inlet_x = "
+                f"{float(run_cfg.reservoir_inlet_x):0.6f};\n"
+            )
+            f.write(fstr)
+            fstr = (
+                f"reservoir_outlet_x = "
+                f"{float(run_cfg.reservoir_outlet_x):0.6f};\n"
+            )
+            f.write(fstr)
         fstr = f'boundary_guard = "cell_guard";\n'
         f.write(fstr)
         fstr = f'wall = "horizontal";\n'
@@ -372,8 +472,6 @@ class BoundaryParticleReservoirPeriodic():
         else:
             self.gen_horz()
 
-        read_particle_data(self.test_bin_name)
-
     def boundary_guard_margin_cells(self):
         """Return cell-array safety margin outside the physical pipe walls."""
         return 3.0
@@ -382,6 +480,40 @@ class BoundaryParticleReservoirPeriodic():
         return math.ceil(
             self.itemcfg.particles_per_row / self.itemcfg.particles_per_cell_row
         ) + 2.0
+
+    def cross_axis_geometry(self, run_cfg):
+        """Return particle spacing, jitter-safe clearance, and wall span."""
+        radius = float(self.cfg_value(run_cfg, "radius", 0.25))
+        separation = float(
+            self.cfg_value(run_cfg, "fraction_of_diameter_separation", 0.0)
+        )
+        particle_spacing = 2.0 * radius * (1.0 + separation)
+        spacing_gap = max(0.0, particle_spacing - 2.0 * radius)
+        jitter_fraction = max(
+            0.0,
+            min(
+                1.0,
+                float(
+                    self.cfg_value(
+                        run_cfg,
+                        "reservoir_position_jitter_fraction",
+                        0.0,
+                    )
+                ),
+            ),
+        )
+        max_position_jitter = 0.5 * spacing_gap * jitter_fraction
+        wall_offset = min(
+            radius,
+            radius * float(self.cfg_value(run_cfg, "wall_contact_offset", 0.0)),
+        )
+        epsilon = max(1.0e-9, radius * 1.0e-6)
+        safe_clearance = radius + wall_offset + max_position_jitter + epsilon
+        wave_span = (
+            max(0, int(self.itemcfg.particles_per_row) - 1) * particle_spacing
+        )
+        wall_span = wave_span + 2.0 * safe_clearance
+        return particle_spacing, max_position_jitter, safe_clearance, wall_span
 
     def configured_side_len(self, run_cfg, base_side_len, margin):
         """Return the configured cell-domain side length.
@@ -558,29 +690,45 @@ class BoundaryParticleReservoirPeriodic():
         margin = self.boundary_guard_margin_cells()
         base_side_len = self.base_pipe_side_len()
         self.side_len = self.configured_side_len(run_cfg, base_side_len, margin)
-        pipe_offset = self.centered_pipe_offset(self.side_len, base_side_len)
+        _, _, safe_clearance, cross_axis_span = self.cross_axis_geometry(run_cfg)
+        pipe_offset = 0.5 * (self.side_len - cross_axis_span)
+        if pipe_offset < 0.0:
+            raise ValueError(
+                "Particle row and wall clearance exceed the configured "
+                f"side length: required={cross_axis_span:g}, "
+                f"side_len={self.side_len:g}"
+            )
         wall_length = self.boundary_wall_length(run_cfg)
-        self.wallxmin = pipe_offset + 0.5
-        self.wallxmax = pipe_offset + base_side_len - 1.0
+        self.wallxmin = pipe_offset
+        self.wallxmax = self.wallxmin + cross_axis_span
         self.wallymin = 0.5
         self.wallymax = self.wallymin + wall_length
+        self.cross_axis_safe_clearance = safe_clearance
         self.validate_pipe_geometry(self.wallxmax, self.wallymax)
-        return margin, base_side_len, pipe_offset, wall_length
+        return margin, cross_axis_span, pipe_offset, wall_length
 
     def configure_horizontal_pipe_geometry(self, run_cfg):
         margin = self.boundary_guard_margin_cells()
         base_side_len = self.base_pipe_side_len()
         self.side_len = self.configured_side_len(run_cfg, base_side_len, margin)
-        pipe_offset = self.centered_pipe_offset(self.side_len, base_side_len)
+        _, _, safe_clearance, cross_axis_span = self.cross_axis_geometry(run_cfg)
+        pipe_offset = 0.5 * (self.side_len - cross_axis_span)
+        if pipe_offset < 0.0:
+            raise ValueError(
+                "Particle row and wall clearance exceed the configured "
+                f"side length: required={cross_axis_span:g}, "
+                f"side_len={self.side_len:g}"
+            )
         wall_length = self.boundary_wall_length(run_cfg)
         self.wallxmin = float(
             self.cfg_value(run_cfg, "reservoir_inlet_x", 0.5)
         )
         self.wallxmax = self.wallxmin + wall_length
-        self.wallymin = pipe_offset + 0.5
-        self.wallymax = pipe_offset + base_side_len - 1.0
+        self.wallymin = pipe_offset
+        self.wallymax = self.wallymin + cross_axis_span
+        self.cross_axis_safe_clearance = safe_clearance
         self.validate_pipe_geometry(self.wallymax, self.wallxmax)
-        return margin, base_side_len, pipe_offset, wall_length
+        return margin, cross_axis_span, pipe_offset, wall_length
     
     # Generate vertical-wall boundary flow.
     def gen_vert(self):
@@ -609,7 +757,7 @@ class BoundaryParticleReservoirPeriodic():
         print(f"Particle row length difference is {particle_row_length_difference:.2f} can fit {can_fit:.2f} particles")
         particles_per_row = self.itemcfg.particles_per_row
         required_width = particles_per_row/self.itemcfg.particles_per_cell_row
-        margin, base_side_len, pipe_offset, wall_length = self.configure_vertical_pipe_geometry(
+        margin, cross_axis_span, pipe_offset, wall_length = self.configure_vertical_pipe_geometry(
             run_cfg
         )
         self.validate_simulation_configuration(
@@ -622,8 +770,8 @@ class BoundaryParticleReservoirPeriodic():
         print(
             f"Side length is {self.side_len} for particles per row of {particles_per_row} "
             f"and particles per cell row of {self.itemcfg.particles_per_cell_row}; "
-            f"vertical pipe is centered with cross-axis offset {pipe_offset} "
-            f"inside base side length {base_side_len}; wall boundary length {wall_length}"
+            f"vertical pipe has jitter-safe cross-axis span {cross_axis_span} "
+            f"and offset {pipe_offset}; wall boundary length {wall_length}"
         )
         total_cell_row_length = self.itemcfg.particles_per_cell_row*particle_length
         empty_space = 1.0 - total_cell_row_length 
@@ -638,7 +786,9 @@ class BoundaryParticleReservoirPeriodic():
             particle_length,
             particles_per_row,
         )
-        release_cfg["base_x"] = release_cfg["base_x"] + pipe_offset
+        release_cfg["row_start_x"] = (
+            self.wallxmin + self.cross_axis_safe_clearance
+        )
         try:
             for col in range(1,self.itemcfg.particle_columns+1):    
                 for row in range(1,particles_per_row+1):     
@@ -696,7 +846,7 @@ class BoundaryParticleReservoirPeriodic():
         print(f"Particle row length difference is {particle_row_length_difference:.2f} can fit {can_fit:.2f} particles")
         particles_per_row = self.itemcfg.particles_per_row
         required_width = particles_per_row/self.itemcfg.particles_per_cell_row
-        margin, base_side_len, pipe_offset, wall_length = self.configure_horizontal_pipe_geometry(
+        margin, cross_axis_span, pipe_offset, wall_length = self.configure_horizontal_pipe_geometry(
             run_cfg
         )
         self.validate_simulation_configuration(
@@ -709,8 +859,8 @@ class BoundaryParticleReservoirPeriodic():
         print(
             f"Side length is {self.side_len} for particles per row of {particles_per_row} "
             f"and particles per cell row of {self.itemcfg.particles_per_cell_row}; "
-            f"horizontal pipe is centered with cross-axis offset {pipe_offset} "
-            f"inside base side length {base_side_len}; wall boundary length {wall_length}"
+            f"horizontal pipe has jitter-safe cross-axis span {cross_axis_span} "
+            f"and offset {pipe_offset}; wall boundary length {wall_length}"
         )
         total_cell_row_length = self.itemcfg.particles_per_cell_row*particle_length
         empty_space = 1.0 - total_cell_row_length 
@@ -726,7 +876,9 @@ class BoundaryParticleReservoirPeriodic():
             particle_length,
             particles_per_row,
         )
-        release_cfg["base_y"] = release_cfg["base_y"] + pipe_offset
+        release_cfg["row_start_y"] = (
+            self.wallymin + self.cross_axis_safe_clearance
+        )
         try:
             for col in range(1,total_colums+1):    
                 for row in range(1,particles_per_row+1):     
@@ -757,7 +909,22 @@ class BoundaryParticleReservoirPeriodic():
         self.BoundaryParticlesHorz(run_cfg)
         self.writeCFGData(run_cfg)
 
-
+    def marker_axis_positions(self, axis_min, axis_max):
+        """Return positions no farther than one cell apart, including bounds."""
+        lower = float(axis_min)
+        upper = float(axis_max)
+        if upper < lower:
+            raise ValueError("marker axis maximum must not be below its minimum")
+        span = upper - lower
+        if span <= 1.0e-12:
+            return [lower]
+        whole_steps = int(math.floor(span))
+        positions = [lower + float(step) for step in range(whole_steps + 1)]
+        if upper - positions[-1] > 1.0e-12:
+            positions.append(upper)
+        else:
+            positions[-1] = upper
+        return positions
 
     def BoundaryParticlesHorz(self,run_cfg):
         marker_locations = set()
@@ -778,51 +945,70 @@ class BoundaryParticleReservoirPeriodic():
         # Add the closed inlet and outlet first so exact corner coordinates
         # belong to the vertical evaluator. Horizontal insertion then skips
         # those duplicate coordinates.
-        for wy in range(
-            int(math.ceil(self.wallymin)),
-            int(math.floor(self.wallymax)) + 1,
-        ):
+        for wy in self.marker_axis_positions(self.wallymin, self.wallymax):
             add_marker(
                 self.wallxmin,
-                float(wy),
+                wy,
                 BOUNDARY_EVALUATOR_VERTICAL,
             )
             add_marker(
                 self.wallxmax,
-                float(wy),
+                wy,
                 BOUNDARY_EVALUATOR_VERTICAL,
             )
 
-        for wx in range(
-            int(math.ceil(self.wallxmin)),
-            int(math.floor(self.wallxmax)) + 1,
-        ):
+        for wx in self.marker_axis_positions(self.wallxmin, self.wallxmax):
             add_marker(
-                float(wx),
+                wx,
                 self.wallymin,
                 BOUNDARY_EVALUATOR_HORIZONTAL,
             )
             add_marker(
-                float(wx),
+                wx,
                 self.wallymax,
                 BOUNDARY_EVALUATOR_HORIZONTAL,
             )
         
     def BoundaryParticlesVert(self,run_cfg):
-        for wy in range(int(self.wallymax)):
+        marker_locations = set()
+
+        def add_marker(x, y, evaluator_id):
+            key = (float(x), float(y), 2.0)
+            if key in marker_locations:
+                return
+            marker_locations.add(key)
             self.addBoundaryParticle(
                 run_cfg,
-                self.wallxmin+0.5,
-                float(wy+1.0),
-                evaluator_id=BOUNDARY_EVALUATOR_VERTICAL,
+                key[0],
+                key[1],
+                key[2],
+                evaluator_id=evaluator_id,
             )
 
-        for wy in range(int(self.wallymax)):
-            self.addBoundaryParticle(
-                run_cfg,
-                self.wallxmax-0.75,
-                float(wy+1.0),
-                evaluator_id=BOUNDARY_EVALUATOR_VERTICAL,
+        # Add the inlet and outlet first so corner coordinates use the
+        # horizontal evaluator. The side-wall insertion skips duplicates.
+        for wx in self.marker_axis_positions(self.wallxmin, self.wallxmax):
+            add_marker(
+                wx,
+                self.wallymin,
+                BOUNDARY_EVALUATOR_HORIZONTAL,
+            )
+            add_marker(
+                wx,
+                self.wallymax,
+                BOUNDARY_EVALUATOR_HORIZONTAL,
+            )
+
+        for wy in self.marker_axis_positions(self.wallymin, self.wallymax):
+            add_marker(
+                self.wallxmin,
+                wy,
+                BOUNDARY_EVALUATOR_VERTICAL,
+            )
+            add_marker(
+                self.wallxmax,
+                wy,
+                BOUNDARY_EVALUATOR_VERTICAL,
             )
 
 
@@ -845,8 +1031,7 @@ class BoundaryParticleReservoirPeriodic():
             particle_struct.vx = 0.0
             particle_struct.vy = 0.0
             particle_struct.vz = 0.0
-            particle_struct.ptype = 1.0
-            particle_struct.temp_vel = float(evaluator_id)
+            particle_struct.ptype = float(evaluator_id)
             particle_struct.molar_mass = 1.0
             particle_struct.radius = 0.25
             particle_struct.state_flg = 0.0
@@ -863,4 +1048,5 @@ class BoundaryParticleReservoirPeriodic():
         self.create_bin_file()
         self.write_bin_file(self.p_list)
         self.close_bin_file()
+        self.report_generated_bounds()
         print(f"PipeReservoirEntry: Wrote {self.number_particles} reservoir particles to {self.test_bin_name}")

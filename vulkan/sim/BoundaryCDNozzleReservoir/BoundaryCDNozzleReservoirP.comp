@@ -43,7 +43,7 @@
 #extension GL_EXT_shader_atomic_float:enable
 
 
-
+#include "flow.glsl"
 #include "params.glsl"
 #include "../common/constants.glsl"
 #include "boundary.glsl"
@@ -57,6 +57,7 @@
 #include "../common/isParticleContactMotion.glsl"
 #define WALL_MODEL_BOUNDARY_PARTICLE
 #include "../common/ForceDynamics.glsl"
+#define FORCE_DYNAMICS_CD_NOZZLE_AVAILABLE
 #include "../common/ForceDynamicsBoundaryParticle.glsl"
 #include "../common/ForceDynamicsCDNozzle.glsl"
  

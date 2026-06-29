@@ -395,6 +395,26 @@ class TabGenData(QTabWidget):
         diagnostics_cfg = self.diagnostics_cfg_file or self.CfgFile
         self.diagnostics_figure = run_force_plots([diagnostics_cfg])
 
+    def test_config(self):
+        selected_item = self.DataList.selectedItems()
+        self.selected_item = selected_item
+
+        if self.selected_item:
+            tst_file_full = self.selected_item[0].text()
+            tst_file_pre = os.path.splitext(tst_file_full)
+            tst_file = f"{tst_file_pre[0]}.tst"
+            try:
+                with open(tst_file, "r", encoding="utf-8") as cfg_file:
+                    include_config = libconf.load(cfg_file)
+            except BaseException as e:
+                self.log.log(self,f"Could not read particle data:{e}")
+                return
+            print("Config file passed")
+        else:
+            self.no_selection()
+
+        
+
     #******************************************************************
     # Creatwe the tab
     #
@@ -468,11 +488,11 @@ class TabGenData(QTabWidget):
             self.GenDataButton.setEnabled(False)
             dirgrid.addWidget(self.GenDataButton,2,4)
 
-            self.StopButton = QPushButton("Stop Gen")
+            self.StopButton = QPushButton("Test Config")
             self.setSize(self.StopButton,30,100)
             self.StopButton.setStyleSheet("background-color:  #dddddd")
-            self.StopButton.clicked.connect(self.gen_data)
-            self.StopButton.setEnabled(False)
+            self.StopButton.clicked.connect(self.test_config)
+            #self.StopButton.setEnabled(False)
             dirgrid.addWidget(self.StopButton,2,5)
 
             self.ToggleCellsBtn = QPushButton("Toggle Cells")

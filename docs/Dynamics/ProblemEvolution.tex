@@ -1000,8 +1000,9 @@ The Python boundary-particle families now separate their responsibilities:
     physical marker geometry;
     \item \texttt{side\_len} or \texttt{over\_ride\_side\_length} owns the
     cell domain;
-    \item each \texttt{ptype=1} marker carries its evaluator ID through
-    \texttt{pdata.temp\_vel} into \texttt{Data.z}.
+    \item each marker carries its positive evaluator ID in
+    \texttt{pdata.ptype}, which is copied into runtime \texttt{ptype} and
+    \texttt{Data.z}; \texttt{pdata.temp\_vel} remains reserved.
 \end{itemize}
 
 The periodic reservoir generator now creates closed test walls without
@@ -1015,8 +1016,8 @@ aggregated error; display clipping is reported as a warning.
 
 Particle solution.  The Python generation and dynamics paths have been
 verified with self-describing boundary markers and dedicated configuration
-roles.  Vulkan still requires the corresponding marker-owned evaluator-ID
-transport and dispatch update.
+roles.  Vulkan now transports and dispatches the marker-owned evaluator ID;
+scenario runtime validation remains model-specific.
 
 \subsubsection{<Analysis>}
 
@@ -1026,3 +1027,57 @@ population.  A preflight comparison is the correct boundary between those two
 roles: it rejects contradictory inputs before they become difficult runtime
 failures.  Marker-owned evaluator IDs also allow horizontal, vertical, and
 curved wall segments to coexist without a global wall-function interpretation.
+
+\subsection{Boundary Marker Dispatch And Closed Nozzle Inlet}
+
+\subsubsection{<previous form>}
+
+The Python marker path had become self-describing, but active documentation and
+generated GLSL still described evaluator transport through
+\texttt{pdata.temp\_vel} or a global \texttt{WALL\_FUNC}.  The vertical
+periodic generator retained approximate marker offsets rather than exact wall
+bounds.  The CD nozzle emitted only upper and lower profile markers, leaving
+the inlet open.  Its generated test file also wrote
+\texttt{num\_particle\_colliding} twice; Python accepted the duplicate while
+the C++ configuration parser rejected it.
+
+\subsubsection{<current form>}
+
+Boundary evaluator identity is now carried by \texttt{pdata.ptype} and copied
+to runtime \texttt{ptype} and \texttt{Data.z}.  Generated GLSL dispatches
+\texttt{EvaluateWallSegment} from \texttt{P[BoundaryID].Data.z}: 1 is
+horizontal, 2 is vertical, and 3 is CD nozzle.  The global
+\texttt{WALL\_FUNC} dispatcher has been removed; the CD wrapper uses only an
+optional-module availability define.
+
+Horizontal and vertical periodic reservoirs now generate exact closed marker
+walls without duplicate corners.  Their mobile rows were tested at maximum
+configured position jitter and produced no starting wall contact.  The 2D CD
+nozzle now adds a vertical-evaluator inlet cap, shares its two corners with the
+CD profile markers, leaves the outlet open, and preserves the 1.1-diameter
+runtime birth offset.  The generated CD test writer emits each setting once.
+
+The periodic vertex shader no longer suppresses all live vertices on frame
+zero.  Unborn and dead particles are still rejected by the lifecycle test,
+while boundary markers render and populate occupancy immediately.
+
+\subsubsection{difference outcome}
+
+Particle solution.  Python worst-case-jitter checks pass for horizontal
+periodic, vertical periodic, and CD-nozzle births.  The periodic Vulkan shader
+set compiles with marker-owned dispatch.  CD runtime wall response remains the
+next focused Vulkan validation.
+
+\subsubsection{<Analysis>}
+
+Marker type and marker evaluator are the same immutable classification, so one
+positive \texttt{ptype} value should own both roles.  Reserving
+\texttt{temp\_vel} avoids consuming a field needed by later dynamics work.
+Closed inlet geometry must be represented by its own straight-wall evaluator;
+the curved CD evaluator remains responsible only for the upper and lower
+analytic profile.  Exact shared corner coordinates prevent duplicate occupancy
+without weakening either wall rule.
+
+The current 2D nozzle profile is still piecewise linear.  The next geometry
+change is to implement quadratic converging and diverging radius functions and
+their analytic slopes in Python and generated GLSL.

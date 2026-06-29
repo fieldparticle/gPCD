@@ -152,7 +152,8 @@ planes must not be used as the physical wall-collision geometry for those
 pipe walls.
 
 A boundary particle is an occupancy marker, not a moving dynamics particle.
-It is stored in the same particle buffer with \texttt{ptype=1.0} and
+It is stored in the same particle buffer with a positive evaluator-valued
+\texttt{ptype} and
 \texttt{Data.w=0.0} so the vertex/cell placement pass includes it.  The
 compute/source dynamics dispatch still processes only mobile particles as
 sources.  When a mobile source encounters a boundary marker as a target, it
@@ -160,7 +161,8 @@ must evaluate the wall segment represented by that marker rather than process
 the marker as an ordinary particle-particle collision.
 
 Each newly generated boundary marker is self-describing.  Its evaluator ID is
-written through \texttt{pdata.temp\_vel} and loaded into \texttt{Data.z}:
+written to \texttt{pdata.ptype} and copied into runtime \texttt{ptype} and
+\texttt{Data.z}:
 \begin{verbatim}
 1 = horizontal_wall
 2 = vertical_wall
@@ -188,12 +190,12 @@ ordinary wall contact slot.  Later sloped or curved boundaries should extend
 \texttt{EvaluateWallSegment} without changing the source-owned force
 accumulation rule.
 
-The Python path has completed this marker-owned dispatch migration.  The next
-Vulkan update must load \texttt{pdata.temp\_vel} into runtime
-\texttt{Data.z}, dispatch generated \texttt{EvaluateWallSegment} from the
-target marker's value, and remove the global \texttt{WALL\_FUNC} decision from
-runtime wall evaluation.  \texttt{WALL\_MODEL\_BOUNDARY\_PARTICLE} remains the
-wrapper-level selection that enables marker-target wall processing.
+Python and Vulkan have completed this marker-owned dispatch migration.  The
+Vulkan loader copies positive \texttt{pdata.ptype} values into
+\texttt{Data.z}, and generated \texttt{EvaluateWallSegment} dispatches from
+the target marker's value.  The old global \texttt{WALL\_FUNC} evaluator
+decision has been removed.  \texttt{WALL\_MODEL\_BOUNDARY\_PARTICLE} remains
+the wrapper-level selection that enables marker-target wall processing.
 
 The closed horizontal reservoir test emits horizontal-evaluator markers along
 the derived \(y_{\min}\) and \(y_{\max}\) walls and vertical-evaluator markers
@@ -203,6 +205,11 @@ an exact corner coordinate is stored once.  The inlet wall is
 \texttt{wall\_boundary\_length}.  The lifecycle retirement plane is configured
 separately beyond the physical outlet wall, so a normal wall rebound is
 attempted before a particle can be retired as an escape.
+
+The vertical periodic test uses the rotated form of the same construction:
+exact horizontal inlet/outlet caps, exact vertical side walls, and one marker
+per corner.  Mobile row clearance includes particle radius, wall-contact
+offset, maximum configured position jitter, and a small numerical epsilon.
 
 \subsection{ForceDynamics Invariance}
 
@@ -420,8 +427,9 @@ the \(xy\) plane at a fixed \texttt{nozzle\_profile\_z}, which defaults to
 \(2.0\).  The \(x\) axis is the default axial flow direction.
 
 The generator writes mobile particles first and boundary marker particles
-after them.  Mobile particles have \texttt{ptype=0.0}; boundary markers have
-\texttt{ptype=1.0}.  The generated \texttt{dispatchx} covers only the null
+after them.  Mobile particles have \texttt{ptype=0.0}.  The inlet cap uses
+\texttt{ptype=2.0} for the vertical-wall evaluator, and curved nozzle markers
+use \texttt{ptype=3.0}.  The generated \texttt{dispatchx} covers only the null
 particle plus mobile source particles.  The generated \texttt{num\_particles}
 includes mobile and boundary particles.
 
@@ -451,3 +459,22 @@ nozzle profile at the source particle's current \(x\) coordinate.  The wall
 profile uses the same inlet, converging, throat, diverging, and exit lengths
 and radii as the generator.  The source-owned force accumulation rule does not
 change; only the wall-segment geometry evaluator changes.
+
+The current 2D analytic profile uses straight inlet, throat, and exit sections
+with linearly converging and diverging radius sections.  The next profile
+revision will replace the two linear transitions with throat-centered
+quadratic radius functions while preserving the same source-owned wall-force
+path.  For a transition of axial length \(L\), endpoint radius \(r_e\), throat
+radius \(r_t\), and throat-centered coordinate \(\xi\), the intended form is
+
+\begin{equation}
+r(\xi)=r_t+(r_e-r_t)\left(\frac{\xi}{L}\right)^2,
+\qquad
+\frac{dr}{dx}=\frac{2(r_e-r_t)\xi}{L^2}.
+\end{equation}
+
+The 2D inlet is closed by a vertical-evaluator marker column at
+\texttt{nozzle\_start\_x}, spanning the inlet lower and upper radii.  Its two
+corner coordinates are shared with the nozzle profile and stored only once.
+The outlet remains open.  Reservoir birth places a mobile center at least
+\(1.1\) diameters inside the inlet cap before dynamics processing.

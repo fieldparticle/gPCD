@@ -110,13 +110,16 @@ Boundary parameters are generated from the scenario cfg into
 Generated ForceDynamics code assumes those symbols exist and must not hardcode
 the cfg values.
 
-Boundary-particle scenarios also generate selector defines.  Wall-segment
-shape is selected by:
+Boundary-particle wall model participation is selected by the wrapper, but
+wall-segment shape is target-owned.  The generated dispatcher reads:
 \begin{verbatim}
-#define WALL_FUNC horizontal_wall
-#define WALL_FUNC vertical_wall
-#define WALL_FUNC cd_nozzle_wall
+uint evaluator_id = uint(round(P[BoundaryID].Data.z));
 \end{verbatim}
+Evaluator ID 1 selects the horizontal wall, 2 selects the vertical wall, and 3
+selects the CD nozzle wall.  Unknown IDs return an invalid segment.  CD nozzle
+wrappers define \texttt{FORCE\_DYNAMICS\_CD\_NOZZLE\_AVAILABLE} to make the
+optional CD implementation available; this is a module-availability guard,
+not a global wall-shape selection.
 
 Reservoir periodic direction is selected separately by:
 \begin{verbatim}
@@ -461,13 +464,13 @@ marker target.  The boundary-particle processor should build a local
 immediately, just as \texttt{ProcessWallCollision(...)} does for manual wall
 flags.
 
-The current Python implementation no longer selects the evaluator through a
-global wall-function define.  Each boundary marker stores its evaluator ID in
-\texttt{Data.z}, transported from \texttt{pdata.temp\_vel}, and
-\texttt{EvaluateWallSegment(SourceID, BoundaryID)} dispatches from the target
-marker.  The Vulkan export must be updated to match this contract.  The
-generated dispatcher must support horizontal, vertical, and CD-nozzle IDs;
-zero or unknown IDs must return an invalid wall segment.
+Python and generated GLSL no longer select the evaluator through a global
+wall-function define.  Each boundary marker stores its evaluator ID in
+\texttt{pdata.ptype}; Python and the Vulkan loader copy it into runtime
+\texttt{ptype} and \texttt{Data.z}.  Generated
+\texttt{EvaluateWallSegment(SourceID, BoundaryID)} dispatches from that target
+value and supports horizontal, vertical, and CD-nozzle IDs.  Zero or unknown
+IDs return an invalid wall segment.  \texttt{pdata.temp\_vel} remains reserved.
 
 The CD-nozzle evaluator treats boundary particles as locality markers and
 calculates the actual wall point and wall normal from the generated CD nozzle

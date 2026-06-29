@@ -43,7 +43,7 @@
 #extension GL_EXT_shader_atomic_float:enable
 
 
-
+#include "flow.glsl"
 #include "params.glsl"
 #include "../common/constants.glsl"
 #include "boundary.glsl"

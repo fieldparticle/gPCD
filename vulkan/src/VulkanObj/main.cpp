@@ -114,8 +114,17 @@ int main(int argc, const char* argv[]) try
 	else
 	{
 		// Get the name of the simulation file *.tst that was created by the generation software
-		std::string testfile = "application.testfile";
-		CfgTst->Create(CfgApp->GetString(testfile, true));
+		
+		std::string testfile = CfgApp->GetString("application.testfile", true);
+#if 0
+		std::ofstream ostrm(testfile, std::ofstream::in | std::ofstream::app);
+		if (!ostrm.is_open())
+		{
+			std::string rpt = "Failed to open file:" + testfile;
+			throw std::runtime_error(rpt.c_str());
+		}
+#endif
+		CfgTst->Create(testfile);
 
 		bool show_cell_boundary_cube = CfgApp->GetBool("application.show_cell_boundary_cube", true);
 		bool show_wall_as_boundary_cube = CfgApp->GetBool("application.show_wall_as_boundary_cube", true);
