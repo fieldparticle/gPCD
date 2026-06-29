@@ -1078,6 +1078,47 @@ the curved CD evaluator remains responsible only for the upper and lower
 analytic profile.  Exact shared corner coordinates prevent duplicate occupancy
 without weakening either wall rule.
 
-The current 2D nozzle profile is still piecewise linear.  The next geometry
-change is to implement quadratic converging and diverging radius functions and
-their analytic slopes in Python and generated GLSL.
+The Python 2D nozzle profile now uses quadratic converging and diverging radius
+functions and their analytic slopes.  Generated GLSL still uses the previous
+linear templates and must be synchronized after Python runtime validation.
+
+\subsection{Adjacent Markers Can Represent One Physical Wall}
+
+\subsubsection{<previous form>}
+
+Boundary-marker duplicate suppression used marker \texttt{TargetID}.  This
+prevents processing one marker repeatedly when several source corners discover
+the same occupancy record, but it does not recognize two different markers as
+representations of one physical wall.
+
+At a rounded CD-nozzle profile step, the ending marker of one horizontal row
+and the starting marker of the adjacent row can occupy neighboring cells.  A
+mobile particle whose extent spans both cells can discover both target IDs.
+Both markers then evaluate the same analytic upper or lower wall at the source
+axial coordinate, so target-ID-only suppression can accumulate the same wall
+force twice.
+
+\subsubsection{<current form>}
+
+Python already evaluates the candidate segment and records its physical wall
+flag in \texttt{processed\_boundary\_walls}.  Only the first valid segment for
+each wall flag contributes force to a source during a frame.  The CD Vulkan
+wrapper still uses its target-ID duplicate list and therefore does not yet have
+equivalent protection.
+
+\subsubsection{difference outcome}
+
+Particle solution in Python; no Vulkan solution yet.
+
+\subsubsection{<Analysis>}
+
+Marker identity belongs to the broad phase, while wall flag identifies the
+physical response.  The GLSL wrapper should maintain a source-local processed
+wall mask keyed by \texttt{BoundaryWallSegment.wallFlag}.  It should evaluate a
+candidate first, accumulate only the first valid segment for that flag, and
+then set the flag bit.  Ordinary mobile-particle duplicate suppression remains
+target-ID based.
+
+The next Vulkan work is therefore paired: export the quadratic CD radius and
+slope templates, and replace boundary-marker target-ID force suppression with
+valid wall-flag suppression.

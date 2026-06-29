@@ -178,14 +178,15 @@ class ForceContactDynamics:
             return inlet_radius
         if inlet_end <= x < converge_end:
             span = max(converge_length, self.EPSILON)
-            t = (x - inlet_end) / span
-            return inlet_radius + t * (throat_radius - inlet_radius)
+            throat_distance = converge_end - x
+            t = throat_distance / span
+            return throat_radius + (inlet_radius - throat_radius) * t * t
         if converge_end <= x < throat_end:
             return throat_radius
         if throat_end <= x < diverge_end:
             span = max(diverge_length, self.EPSILON)
             t = (x - throat_end) / span
-            return throat_radius + t * (exit_radius - throat_radius)
+            return throat_radius + (exit_radius - throat_radius) * t * t
         if x >= diverge_end:
             return exit_radius
         return inlet_radius
@@ -208,14 +209,22 @@ class ForceContactDynamics:
         diverge_end = throat_end + diverge_length
 
         if inlet_end <= x < converge_end:
-            return (throat_radius - inlet_radius) / max(
-                converge_length,
-                self.EPSILON,
+            span = max(converge_length, self.EPSILON)
+            throat_distance = converge_end - x
+            return (
+                -2.0
+                * (inlet_radius - throat_radius)
+                * throat_distance
+                / (span * span)
             )
         if throat_end <= x < diverge_end:
-            return (exit_radius - throat_radius) / max(
-                diverge_length,
-                self.EPSILON,
+            span = max(diverge_length, self.EPSILON)
+            throat_distance = x - throat_end
+            return (
+                2.0
+                * (exit_radius - throat_radius)
+                * throat_distance
+                / (span * span)
             )
         return 0.0
 

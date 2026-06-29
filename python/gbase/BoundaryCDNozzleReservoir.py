@@ -323,10 +323,13 @@ class BoundaryCDNozzleReservoir():
             return self.nozzle_inlet_radius
         if inlet_end <= x < converge_end:
             span = max(self.nozzle_converge_length, 1.0e-12)
-            t = (x - inlet_end) / span
+            throat_distance = converge_end - x
+            t = throat_distance / span
             return (
-                self.nozzle_inlet_radius
-                + t * (self.nozzle_throat_radius - self.nozzle_inlet_radius)
+                self.nozzle_throat_radius
+                + (self.nozzle_inlet_radius - self.nozzle_throat_radius)
+                * t
+                * t
             )
         if converge_end <= x < throat_end:
             return self.nozzle_throat_radius
@@ -335,7 +338,9 @@ class BoundaryCDNozzleReservoir():
             t = (x - throat_end) / span
             return (
                 self.nozzle_throat_radius
-                + t * (self.nozzle_exit_radius - self.nozzle_throat_radius)
+                + (self.nozzle_exit_radius - self.nozzle_throat_radius)
+                * t
+                * t
             )
         if x >= diverge_end:
             return self.nozzle_exit_radius

@@ -169,6 +169,18 @@ the source particle's current axial coordinate.  This preserves the same
 source-owned accumulation rule used by straight boundary-particle walls while
 allowing the wall segment to be curved.
 
+The current Python profile uses endpoint-constrained quadratic converging and
+diverging sections.  \texttt{CDNozzleRadius(...)} evaluates
+\(r_t+(r_e-r_t)(\xi/L)^2\), and
+\texttt{CDNozzleRadiusSlope(...)} evaluates the signed analytic derivative
+\(2(r_e-r_t)\xi/L^2\).  Straight inlet, throat, and exit sections have zero
+slope.
+
+The Python direct scan may encounter several marker targets representing the
+same physical wall side.  It evaluates marker geometry and records the
+returned wall flag in \texttt{processed\_boundary\_walls}; only the first valid
+segment for each wall flag contributes force to a source during a frame.
+
 \ForceFunctionSection{BoundaryParticleAppliesToSource}
 
 \texttt{BoundaryParticleAppliesToSource(SourceID, BoundaryID)} is the current

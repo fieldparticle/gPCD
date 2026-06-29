@@ -478,6 +478,20 @@ constants in \texttt{boundary.glsl}.  Required CD nozzle symbols include
 \texttt{CD\_NOZZLE\_START\_X}, \texttt{CD\_NOZZLE\_CENTER\_Y}, the five
 section lengths, and the inlet, throat, and exit radii.
 
+The Python CD profile now uses quadratic converging and diverging radius
+sections and their analytic slopes.  Before the next CD compile trial, the
+explicit exporter templates for \texttt{CDNozzleRadius(...)} and
+\texttt{CDNozzleRadiusSlope(...)} must be changed from linear interpolation to
+the same quadratic equations and the generated CD include must be regenerated.
+
+Marker target IDs are broad-phase records, not physical wall identities.  A
+source may discover two adjacent markers for one wall when its extent spans
+their cells.  The wrapper must therefore deduplicate valid boundary contacts by
+the returned \texttt{BoundaryWallSegment.wallFlag}, not only by
+\texttt{TargetID}.  At most one force contribution per physical wall flag may
+be accumulated for a source in one frame.  This is required for GLSL parity
+with Python's \texttt{processed\_boundary\_walls} set.
+
 \texttt{WALL\_MODEL\_BOUNDARY\_PARTICLE} remains a wrapper-owned compile-time
 selection.  It controls whether marker targets are processed as walls; it does
 not choose which evaluator a particular marker represents.

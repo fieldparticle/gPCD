@@ -1,15 +1,12 @@
 Current status:
-	- Completed self-described boundary-marker dispatch in Python and GLSL
-	- Verified worst-case jitter clearance for periodic and CD-nozzle reservoirs
-	- Added exact closed periodic walls and a closed CD-nozzle inlet cap
-	- Synchronized active dynamics and porting documentation
+	- Implemented and verified the quadratic 2D CD-nozzle profile in Python
+	- Identified duplicate wall-force risk from adjacent boundary markers
+	- Documented the remaining Python-to-Vulkan differences
 
 Code Changes:
-	- Transported boundary evaluator IDs through ptype into runtime Data.z
-	- Removed global WALL_FUNC evaluator dispatch
-	- Corrected vertical periodic marker geometry and frame-zero rendering
-	- Removed duplicate CD test configuration output
-	- Added deduplicated straight-wall inlet markers to the 2D CD nozzle
-	- Updated conventions, source documentation, porting, configuration reference, and problem evolution
+	- Replaced linear nozzle transitions with quadratic radius functions
+	- Added matching analytic wall slopes
+	- Reduced the Python CD profile to four mobile particles
+	- Updated flow, source, porting, and problem-evolution documentation
 
-Next: Implement quadratic 2D CD-nozzle convergence/divergence and analytic wall slopes in Python and generated GLSL
+Next: Update GLSL quadratic nozzle templates and deduplicate boundary contacts by valid wall flag

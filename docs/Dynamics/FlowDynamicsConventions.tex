@@ -460,18 +460,23 @@ profile uses the same inlet, converging, throat, diverging, and exit lengths
 and radii as the generator.  The source-owned force accumulation rule does not
 change; only the wall-segment geometry evaluator changes.
 
-The current 2D analytic profile uses straight inlet, throat, and exit sections
-with linearly converging and diverging radius sections.  The next profile
-revision will replace the two linear transitions with throat-centered
-quadratic radius functions while preserving the same source-owned wall-force
-path.  For a transition of axial length \(L\), endpoint radius \(r_e\), throat
-radius \(r_t\), and throat-centered coordinate \(\xi\), the intended form is
+The current Python 2D analytic profile uses straight inlet, throat, and exit
+sections with throat-centered quadratic converging and diverging radius
+sections.  For a transition of axial length \(L\), endpoint radius \(r_e\),
+throat radius \(r_t\), and throat-centered coordinate \(\xi\), the implemented
+form is
 
 \begin{equation}
 r(\xi)=r_t+(r_e-r_t)\left(\frac{\xi}{L}\right)^2,
 \qquad
 \frac{dr}{dx}=\frac{2(r_e-r_t)\xi}{L^2}.
 \end{equation}
+
+The converging side uses a signed coordinate whose derivative is negative; the
+diverging side uses a positive coordinate.  Radius is continuous at every
+section boundary and the slope is zero through the throat.  The generated GLSL
+templates still contain the previous linear transitions and must be updated
+and regenerated after Python runtime validation.
 
 The 2D inlet is closed by a vertical-evaluator marker column at
 \texttt{nozzle\_start\_x}, spanning the inlet lower and upper radii.  Its two
