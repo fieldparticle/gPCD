@@ -39,6 +39,7 @@ extern bool PanOn;
 extern float ZoomX;
 extern float Zoomy;
 extern float Zoomz;
+extern bool G_ExportFrame;
 extern float ColorMap;
 extern bool G_Boundary;
 extern bool G_Stop;
@@ -53,9 +54,9 @@ extern float RotateZ;
 extern float rRotX;
 extern float rRotY;
 extern float rRotZ;
-extern uint32_t VIEW_XY;
-extern uint32_t VIEW_ZY;
-extern uint32_t VIEW_XZ;
+extern float VIEW_XY;
+extern float VIEW_ZY;
+extern float VIEW_XZ;
 extern float rCoordView;
 
 

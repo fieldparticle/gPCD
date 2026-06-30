@@ -192,6 +192,7 @@
     <ClInclude Include="..\..\src\VulkanObj\ContainerObj.hpp" />
     <ClInclude Include="..\..\src\VulkanObj\Core.hpp" />
     <ClInclude Include="..\..\src\VulkanObj\DrawObj.hpp" />
+    <ClInclude Include="..\..\src\VulkanObj\ExportObject.hpp" />
     <ClInclude Include="..\..\src\VulkanObj\FrameBufferObj.hpp" />
     <ClInclude Include="..\..\src\VulkanObj\ImageObject.hpp" />
     <ClInclude Include="..\..\src\VulkanObj\Input.hpp" />
@@ -292,6 +293,7 @@
     <ClCompile Include="..\..\src\VulkanObj\ConfigObj.cpp" />
     <ClCompile Include="..\..\src\VulkanObj\ContainerObj.cpp" />
     <ClCompile Include="..\..\src\VulkanObj\DrawObj.cpp" />
+    <ClCompile Include="..\..\src\VulkanObj\ExportObject.cpp" />
     <ClCompile Include="..\..\src\VulkanObj\FrameBufferObj.cpp" />
     <ClCompile Include="..\..\src\VulkanObj\ImageObject.cpp" />
     <ClCompile Include="..\..\src\VulkanObj\Input.cpp" />

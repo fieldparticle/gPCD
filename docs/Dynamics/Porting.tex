@@ -478,19 +478,20 @@ constants in \texttt{boundary.glsl}.  Required CD nozzle symbols include
 \texttt{CD\_NOZZLE\_START\_X}, \texttt{CD\_NOZZLE\_CENTER\_Y}, the five
 section lengths, and the inlet, throat, and exit radii.
 
-The Python CD profile now uses quadratic converging and diverging radius
-sections and their analytic slopes.  Before the next CD compile trial, the
-explicit exporter templates for \texttt{CDNozzleRadius(...)} and
-\texttt{CDNozzleRadiusSlope(...)} must be changed from linear interpolation to
-the same quadratic equations and the generated CD include must be regenerated.
+Python and generated GLSL use the same quadratic converging and diverging
+radius sections and analytic slopes.  The explicit exporter templates for
+\texttt{CDNozzleRadius(...)} and \texttt{CDNozzleRadiusSlope(...)} emit those
+equations into \texttt{ForceDynamicsCDNozzle.glsl}; the CD shader compile trial
+passes with the generated quadratic profile.
 
 Marker target IDs are broad-phase records, not physical wall identities.  A
 source may discover two adjacent markers for one wall when its extent spans
-their cells.  The wrapper must therefore deduplicate valid boundary contacts by
-the returned \texttt{BoundaryWallSegment.wallFlag}, not only by
-\texttt{TargetID}.  At most one force contribution per physical wall flag may
-be accumulated for a source in one frame.  This is required for GLSL parity
-with Python's \texttt{processed\_boundary\_walls} set.
+their cells.  The periodic and CD wrappers therefore evaluate the candidate
+segment and deduplicate valid boundary contacts with a source-local bit mask
+keyed by \texttt{BoundaryWallSegment.wallFlag}.  The bit is set only after a
+valid segment is successfully accumulated.  At most one force contribution
+per physical wall flag is applied to a source in one frame.  Ordinary mobile
+particle contacts retain their target-ID duplicate list.
 
 \texttt{WALL\_MODEL\_BOUNDARY\_PARTICLE} remains a wrapper-owned compile-time
 selection.  It controls whether marker targets are processed as walls; it does
@@ -717,16 +718,12 @@ These helpers are lifecycle gates.  They do not alter the ForceDynamics force
 law, and they do not write target particles.
 
 The current helper activates a particle immediately when its birth frame
-arrives.  The next porting step is deferred birth admission.  The contact query
-used by the motion wrapper must distinguish \texttt{NO\_CONTACT}, ordinary
-\texttt{CONTACT}, and \texttt{STARTING\_COLLISION}.  On a starting collision,
-the source must stop its remaining target search, restore the waiting state,
-and set \texttt{Data.w=frameNum+1} without running force or integration.
-
-Only frame-start live mobile targets may block admission.  Because GLSL source
-invocations cannot safely make admission depend on invocation order, target
-lifecycle reads must come from an immutable snapshot and admission requires a
-separate commit phase or equivalent synchronization.
+arrives.  Capture analysis confirmed that this can admit a new wave into a
+slowed live particle near the inlet, creating artificial overlap compression
+and kinetic energy.  Deferred admission was specified but not implemented.
+The selected next porting work instead replaces scheduled birth with a
+prefilled moving-piston reservoir.  That work requires rectangular cell-array
+dimensions, moving-wall relative velocity, and piston-impulse diagnostics.
 
 \subsection{Step 16: Vulkan Runtime Validation}
 

@@ -10,6 +10,13 @@ law or the configured \texttt{contact\_force\_measure}.  It decides when
 particles become active, which particles are eligible for dynamics, and when
 particles leave the active simulation.
 
+The scheduled-birth reservoir documented below is the current implementation,
+not the selected next architecture.  Capture diagnostics showed that a slowed
+particle can remain at the inlet when a later wave is admitted.  The resulting
+deep starting overlap preserves pair momentum but injects artificial contact
+compression and kinetic energy.  The selected replacement is the prefilled
+moving-piston reservoir defined in \texttt{DynamicsConventions.tex}.
+
 \subsection{State Field}
 
 For \texttt{SimpleReservoir}, the model-owned particle state is stored in
@@ -53,9 +60,10 @@ then the particle is born.  Birth performs:
 A particle is born before the frame-start snapshot is built, so the newly born
 particle participates in the current frame using ordinary ForceDynamics rules.
 
-This is the current implementation.  It does not yet test whether the proposed
-birth position overlaps an already-live mobile particle.  The approved next
-birth rule is the deferred-admission process described below.
+This is the current implementation.  It does not test whether the proposed
+birth position overlaps an already-live mobile particle.  Deferred admission
+was analyzed as one repair, but the selected next model removes runtime birth
+and uses a prefilled moving-piston reservoir.
 
 In the GLSL compute path this rule is owned by:
 
@@ -475,8 +483,8 @@ r(\xi)=r_t+(r_e-r_t)\left(\frac{\xi}{L}\right)^2,
 The converging side uses a signed coordinate whose derivative is negative; the
 diverging side uses a positive coordinate.  Radius is continuous at every
 section boundary and the slope is zero through the throat.  The generated GLSL
-templates still contain the previous linear transitions and must be updated
-and regenerated after Python runtime validation.
+radius and slope templates use the same equations and the CD shader set
+compiles with the quadratic profile.
 
 The 2D inlet is closed by a vertical-evaluator marker column at
 \texttt{nozzle\_start\_x}, spanning the inlet lower and upper radii.  Its two

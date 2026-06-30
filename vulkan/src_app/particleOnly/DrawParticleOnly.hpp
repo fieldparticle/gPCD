@@ -63,7 +63,8 @@ class DrawParticleOnly : public DrawObj
 		SwapChainObj* SCO,
 		RenderPassObj* RPO,
 		FrameBufferObj* FBO,
-		SyncObj* SO);
+		SyncObj* SO,
+		ExportObject* EO);
 
 
 	

@@ -36,9 +36,11 @@ float CDNozzleRadius(float axial_position)
     }
     if (axial_position >= inlet_end && axial_position < converge_end) {
         float span = max(CD_NOZZLE_CONVERGE_LENGTH, EPSILON);
-        float t = (axial_position - inlet_end) / span;
-        return CD_NOZZLE_INLET_RADIUS
-            + t * (CD_NOZZLE_THROAT_RADIUS - CD_NOZZLE_INLET_RADIUS);
+        float throat_distance = converge_end - axial_position;
+        float t = throat_distance / span;
+        return CD_NOZZLE_THROAT_RADIUS
+            + (CD_NOZZLE_INLET_RADIUS - CD_NOZZLE_THROAT_RADIUS)
+            * t * t;
     }
     if (axial_position >= converge_end && axial_position < throat_end) {
         return CD_NOZZLE_THROAT_RADIUS;
@@ -47,7 +49,8 @@ float CDNozzleRadius(float axial_position)
         float span = max(CD_NOZZLE_DIVERGE_LENGTH, EPSILON);
         float t = (axial_position - throat_end) / span;
         return CD_NOZZLE_THROAT_RADIUS
-            + t * (CD_NOZZLE_EXIT_RADIUS - CD_NOZZLE_THROAT_RADIUS);
+            + (CD_NOZZLE_EXIT_RADIUS - CD_NOZZLE_THROAT_RADIUS)
+            * t * t;
     }
     if (axial_position >= diverge_end) {
         return CD_NOZZLE_EXIT_RADIUS;
@@ -55,7 +58,7 @@ float CDNozzleRadius(float axial_position)
     return CD_NOZZLE_INLET_RADIUS;
 }
 
-// Python source: ForceDynamics.py:193
+// Python source: ForceDynamics.py:194
 float CDNozzleRadiusSlope(float axial_position)
 {
     float inlet_end = CD_NOZZLE_INLET_LENGTH;
@@ -64,17 +67,23 @@ float CDNozzleRadiusSlope(float axial_position)
     float diverge_end = throat_end + CD_NOZZLE_DIVERGE_LENGTH;
 
     if (axial_position >= inlet_end && axial_position < converge_end) {
-        return (CD_NOZZLE_THROAT_RADIUS - CD_NOZZLE_INLET_RADIUS)
-            / max(CD_NOZZLE_CONVERGE_LENGTH, EPSILON);
+        float span = max(CD_NOZZLE_CONVERGE_LENGTH, EPSILON);
+        float throat_distance = converge_end - axial_position;
+        return -2.0
+            * (CD_NOZZLE_INLET_RADIUS - CD_NOZZLE_THROAT_RADIUS)
+            * throat_distance / (span * span);
     }
     if (axial_position >= throat_end && axial_position < diverge_end) {
-        return (CD_NOZZLE_EXIT_RADIUS - CD_NOZZLE_THROAT_RADIUS)
-            / max(CD_NOZZLE_DIVERGE_LENGTH, EPSILON);
+        float span = max(CD_NOZZLE_DIVERGE_LENGTH, EPSILON);
+        float throat_distance = axial_position - throat_end;
+        return 2.0
+            * (CD_NOZZLE_EXIT_RADIUS - CD_NOZZLE_THROAT_RADIUS)
+            * throat_distance / (span * span);
     }
     return 0.0;
 }
 
-// Python source: ForceDynamics.py:319
+// Python source: ForceDynamics.py:328
 BoundaryWallSegment EvaluateCDNozzleWallSegment(uint SourceID, uint BoundaryID)
 {
     uint wall_flag = BoundaryParticleCDNozzleWallFlag(SourceID, BoundaryID);

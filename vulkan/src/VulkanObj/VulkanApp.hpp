@@ -50,10 +50,13 @@ extern ConfigObj* MpsApp;
 #include "VulkanObj/CommandObj.hpp"
 #include "VulkanObj/CommandPoolObj.hpp"
 #include "VulkanObj/DrawObj.hpp"
+
 #include "VulkanObj/Input.hpp"
 #include "VulkanObj/PhysDevObj.hpp"
 #include "VulkanObj/InstanceObj.hpp"
 #include "VulkanObj/ResourceVertexObj.hpp"
+#include "VulkanObj/ExportObject.hpp"
+
 #include "TCPIP/TCPSObj.hpp"
 #include "TCPIP/TCPCObj.hpp"
 #include "particleOnly/ParticleOnly.hpp"

@@ -176,10 +176,11 @@ diverging sections.  \texttt{CDNozzleRadius(...)} evaluates
 \(2(r_e-r_t)\xi/L^2\).  Straight inlet, throat, and exit sections have zero
 slope.
 
-The Python direct scan may encounter several marker targets representing the
-same physical wall side.  It evaluates marker geometry and records the
-returned wall flag in \texttt{processed\_boundary\_walls}; only the first valid
-segment for each wall flag contributes force to a source during a frame.
+Python and the Vulkan wrappers may encounter several marker targets
+representing the same physical wall side.  They evaluate marker geometry and
+record the returned wall flag in source-local processed-wall state; only the
+first valid segment for each wall flag contributes force to a source during a
+frame.  Ordinary mobile-particle duplicates remain keyed by target ID.
 
 \ForceFunctionSection{BoundaryParticleAppliesToSource}
 

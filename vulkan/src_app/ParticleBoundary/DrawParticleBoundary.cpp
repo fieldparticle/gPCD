@@ -35,12 +35,14 @@ void DrawParticleBoundary::Create(CommandPoolObj* CPL,
 	SwapChainObj* SCO,
 	RenderPassObj* RPO,
 	FrameBufferObj* FBO,
-	SyncObj* SO)
+	SyncObj* SO,
+	ExportObject* EO)
 {
 	m_CPL = CPL;
 	m_SCO = SCO;
 	m_FBO = FBO; 
 	m_SO = SO;
+	m_EO = EO;
 	m_ComputeCommandObj = m_CPL->GetCommandObjByName("CommandParticleCompute");
 	m_GraphicsCommandObj = m_CPL->GetCommandObjByName("CommandObjParticleGraphics");
 	m_Graphicslst = m_GraphicsCommandObj->m_RCO->m_DRList;

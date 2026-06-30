@@ -99,6 +99,7 @@ int ParticleBoundaryandSphere(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool
 		= new SyncObj(vulkanObj, "cubeSyncObj");
 	DrawParticleBoundary* drawParticleBoundary
 		= new DrawParticleBoundary(vulkanObj, "Draw Instance Particle");
+	ExportObject* exportObject = new ExportObject(vulkanObj, "SSBO Export");
 	
 
 	//================================= Create =================================
@@ -169,6 +170,7 @@ int ParticleBoundaryandSphere(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool
 	
 	commandPool->Create(physDevObj, swapChain, renderPass, frameBuffer,
 		{ commandParticleGraphicsSub,commandParticleCompute });
+	exportObject->Create(resourceVertexParticle);
 			
 	syncObjects->Create();
 	syncObjects->AddFence("inflightFence");
@@ -183,7 +185,7 @@ int ParticleBoundaryandSphere(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool
 		return 1;
 
 	// Draw object needs command pool, swap chain, render pass, frame buffer, and sync ojects
-	drawParticleBoundary->Create(commandPool, swapChain, renderPass, frameBuffer, syncObjects);
+	drawParticleBoundary->Create(commandPool, swapChain, renderPass, frameBuffer, syncObjects,exportObject);
 
 	double		lastTime = glfwGetTime();
 	int			nbFrames = 0;

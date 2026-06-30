@@ -40,6 +40,7 @@ bool QuitEvent=false;
 float ZoomX = 1.0;
 float ZoomY = 1.0;
 float ZoomZ = 1.0;
+bool G_ExportFrame = false;
 float ColorMap = 0.0;
 bool G_Boundary = true;
 float G_OrthoMin =-100.0f;
@@ -54,9 +55,9 @@ float RotateZ=0.0;
 float rRotX = 0.0;
 float rRotY = 0.0;
 float rRotZ = 0.0;
-uint32_t VIEW_XY = 1;
-uint32_t VIEW_ZY = 2;
-uint32_t VIEW_XZ = 3;
+float VIEW_XY = 1;
+float VIEW_ZY = 2;
+float VIEW_XZ = 3;
 float rCoordView = VIEW_XY;
 
 float ox = -1;
@@ -114,6 +115,11 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if (key == GLFW_KEY_C && action == GLFW_PRESS)
 	{
 		ColorMap = 0.0;
+	}
+	if (key == GLFW_KEY_E && action == GLFW_PRESS)
+	{
+		G_ExportFrame = true;
+
 	}
 	if (key == GLFW_KEY_B && action == GLFW_PRESS)
 	{

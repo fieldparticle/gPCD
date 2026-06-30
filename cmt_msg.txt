@@ -1,12 +1,10 @@
 Current status:
-	- Implemented and verified the quadratic 2D CD-nozzle profile in Python
-	- Identified duplicate wall-force risk from adjacent boundary markers
-	- Documented the remaining Python-to-Vulkan differences
-
+	- Added Vulkan particle capture analysis with CSV momentum and kinetic-energy reporting
+	- Isolated counterflow to scheduled particles entering deeply overlapped at the inlet
+	- Selected a prefilled moving-piston reservoir as the next flow model
+	- Recorded rectangular cell arrays as necessary for reservoir memory efficiency
 Code Changes:
-	- Replaced linear nozzle transitions with quadratic radius functions
-	- Added matching analytic wall slopes
-	- Reduced the Python CD profile to four mobile particles
-	- Updated flow, source, porting, and problem-evolution documentation
-
-Next: Update GLSL quadratic nozzle templates and deduplicate boundary contacts by valid wall flag
+	- Added binary capture discovery and frame-ordered CSV reporting
+	- Added reverse-flow momentum and kinetic-energy diagnostics
+	- Updated reservoir, flow, porting, and problem-evolution documentation
+Next: Implement the prefilled moving-piston reservoir with rectangular cell-array dimensions and piston-impulse diagnostics

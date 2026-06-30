@@ -255,6 +255,9 @@
     <ClInclude Include="..\..\src_app\ParticleBoundary\CommandParticleBoundaryOnly.hpp">
       <Filter>BoundaryOnly</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\VulkanObj\ExportObject.hpp">
+      <Filter>vulkanobj</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\libconfig\scanctx.c">
@@ -493,6 +496,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src_app\ParticleBoundary\CommandParticleBoundaryOnly.cpp">
       <Filter>BoundaryOnly</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\VulkanObj\ExportObject.cpp">
+      <Filter>vulkanobj</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

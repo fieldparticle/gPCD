@@ -26,6 +26,7 @@ from gbase.pdata import *
 from gbase.GenPQBData import *
 from SimulationRunner import run_analysis as simulation_run_analysis
 from base.ForcePlots import run_force_plots
+from gbase.ReadCaptureFile import *
 #from GenMotionData import *
 #from subprocess import Popen
 import subprocess
@@ -75,7 +76,29 @@ class TabGenData(QTabWidget):
         msgBox.setText(text)
         msgBox.exec()
     
+    def read_capture(self):
+        read_obj = ReadCaptureFile()
+        selected_item = self.DataList.selectedItems()
+        self.selected_item = selected_item
+        if not self.selected_item:
+            self.no_selection()
+            return
+        try:
+            bin_file = selected_item[0].text()
+            capture_files = read_obj.FindCaptureFiles(bin_file)
+            if not capture_files:
+                self.log.log(
+                    self,
+                    f"No capture files match {Path(bin_file).stem}_<frame>.cap",
+                )
+                return
 
+            read_obj.ReadBinFile(bin_file)
+            for capture_file in capture_files:
+                read_obj.ReadCapFile(capture_file)
+                read_obj.Report()
+        except BaseException as e:
+            self.log.log(self, f"Could not create capture report: {e}")
 
     ##############################################################################
     # Configuration file stuff
@@ -531,6 +554,11 @@ class TabGenData(QTabWidget):
             self.CountCollBtn.clicked.connect(self.count_collisions)
             dirgrid.addWidget(self.CountCollBtn,3,4)
 
+            self.ReadCapBtn = QPushButton("Read Capture File")
+            self.setSize(self.ReadCapBtn,30,120)
+            self.ReadCapBtn.setStyleSheet("background-color:  #dddddd")
+            self.ReadCapBtn.clicked.connect(self.read_capture)
+            dirgrid.addWidget(self.ReadCapBtn,3,5)
 
             list_label = QLabel("Data Set")
             dirgrid.addWidget(list_label,4,0,1,2)

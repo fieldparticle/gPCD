@@ -224,11 +224,12 @@ Rendered sphere radius must be derived from the particle radius stored in
 \texttt{Data.x}.  Mesh files may provide a convenient unit sphere, but they
 must not bake a separate configuration radius into the rendered particle size.
 
-\subsection{Reservoir Boundary And Deferred Birth Convention}
+\subsection{Reservoir Deferred-Birth Investigation}
 
-This subsection defines the approved next reservoir behavior.  The current
-Python and GLSL implementations still activate a particle immediately when its
-stored frame arrives; deferred admission has not yet been implemented.
+This subsection records the deferred-birth design investigated for the staged
+reservoir.  It was not implemented and is no longer the selected next
+reservoir model.  It remains here because it defines the failure discovered in
+the staged-birth system and the synchronization cost of repairing that system.
 
 A reservoir boundary is a lifecycle boundary rather than a solid contact
 wall.  Reservoir particles are created with scheduled birth frames and remain
@@ -321,6 +322,35 @@ or an equivalent synchronization design.  During the test phase, target
 liveness must come from an immutable frame-start lifecycle state.  This keeps
 the rule source-owned and deterministic without allowing one source invocation
 to modify another particle.
+
+\subsection{Prefilled Moving-Piston Reservoir Convention}
+
+The selected next reservoir model removes runtime particle birth.  A finite
+reservoir is prefilled with nonoverlapping mobile particles.  At the release
+frame the mobile population and rear wall begin moving in the flow direction.
+The rear wall then moves with the configured inlet velocity and acts as a
+piston.  Particle and piston motion must begin together; otherwise an
+equal-speed piston cannot close a gap created before it starts.
+
+The piston supplies external impulse, so particle momentum alone is not a
+closed-system conservation diagnostic.  Runtime diagnostics must record
+particle momentum together with piston impulse.  Contact response must use
+particle velocity relative to piston velocity rather than stationary-wall
+relative velocity.
+
+The useful run duration is finite and is set by reservoir length, piston
+speed, and distance to the nozzle entrance.  Downstream restriction may slow
+and compress particles while the piston maintains supply without creating
+geometric overlap through birth.
+
+The cell domain should be rectangular rather than cubic.  Independent
+\texttt{CellAryW}, \texttt{CellAryH}, and \texttt{CellAryL} dimensions bound
+the long flow axis, narrow cross-axis span, and shallow 2D depth.  Allocation,
+index validation, cell guards, and loops must use the corresponding axis
+dimension.  Linear indexing remains:
+\begin{equation}
+i=x+W(y+Hz).
+\end{equation}
 
 \subsection{Boundary Convention}
 

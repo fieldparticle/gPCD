@@ -80,6 +80,7 @@ int ParticleOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 
 	SyncObj* syncObjects = new SyncObj(vulkanObj, "cubeSyncObj");
 	DrawParticleOnly* drawParticleOnly = new DrawParticleOnly(vulkanObj, "Draw Instance Particle");
+	ExportObject* exportObject = new ExportObject(vulkanObj, "SSBO Export");
 	
 
 	//================================= Create =================================
@@ -141,6 +142,8 @@ int ParticleOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	// frame buffer and pipelines
 	commandPool->Create(physDevObj,swapChain, renderPass, frameBuffer,
 			{ commandParticleGraphics,commandParticleCompute });
+	exportObject->Create(resourceVertexParticle);
+
 	Extflg = false;
 	if(Extflg == true)
 			return 1;
@@ -158,7 +161,7 @@ int ParticleOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 			return 1;
 	
 	// Draw object needs command pool, swap chain, render pass, frame buffer, and sync ojects
-	drawParticleOnly->Create(commandPool, swapChain, renderPass, frameBuffer, syncObjects);
+	drawParticleOnly->Create(commandPool, swapChain, renderPass, frameBuffer, syncObjects, exportObject);
 	
 	double		lastTime = glfwGetTime();
 	int			nbFrames = 0;

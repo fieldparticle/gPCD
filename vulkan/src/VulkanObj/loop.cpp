@@ -31,15 +31,20 @@
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
 #include <filesystem>
-
+#include <cstdint>
+#include <sstream>
+#include <string>
+#include <unordered_set>
+#include <vector>
 namespace fs = std::filesystem;
-
+std::unordered_set<uint32_t> ParseCaptureFrames(
+	const std::vector<const char*>& entries);
 int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, VulkanObj* VulkanWin, ResourceGraphicsContainer* rgc, ResourceComputeContainer* rcc)
 {
 	TimerObj* timerstep;
 	uint32_t			endFrame		= CfgApp->GetUInt("application.end_frame", true);
 	bool				stopondata		= CfgApp->GetBool("application.stopondata", true);
-	uint32_t			frameDelay		= CfgApp->GetFloat("application.frame_delay", true);
+	float			frameDelay		= CfgApp->GetFloat("application.frame_delay", true);
 	float				deltaTime		= 0.0f;
 	float				lastFrame		= 0.0f;
 	uint32_t			quit_event		= 0;
@@ -55,6 +60,24 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 	bool				doCap			= MpsApp->GetBool("do_cap", true);
 	bool				stopOnError		= CfgApp->GetBool("application.stopOnError", true);
 	uint32_t			imgNum			= 0;
+	std::string			oringcap_dir = CfgApp->GetString("application.testfile", true);
+	std::string fileNameWithoutExtension = oringcap_dir.substr(0, oringcap_dir.rfind("."));
+	std::string cap_dir = fileNameWithoutExtension;
+	bool auto_cap_frames = CfgApp->GetBool("application.auto_cap_frames", true);
+	std::vector<const char*> cap_ary = CfgApp->GetArray("application.capture_frames");
+	std::unordered_set<uint32_t> cap_frames = ParseCaptureFrames(cap_ary);
+	if (CfgTst->CheckKey("DT"))
+	{	float cfg_dt = CfgApp->GetFloat("application.dt", true);
+		float tst_dt = CfgTst->GetFloat("DT", false);
+		if (tst_dt != cfg_dt)
+		{
+			mout << "Delta Time Mismatch->ConfigFile Val:" << cfg_dt << " *.tst file Val:" << tst_dt << ende;
+			std::ostringstream  objtxt;
+			objtxt << "Quit initialization:dt mismatch: Vulkan Comfig:" << cfg_dt << " testfile dt:" << tst_dt << std::ends;
+			throw std::runtime_error(objtxt.str());
+		}
+	}
+
 	int ret = 0;
 	uint32_t partErrC=0;
 	uint32_t partErrG=0;
@@ -114,6 +137,28 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 			// Draw the frame.
 			DrawInstance->DrawFrame();
 
+			// is true capture this frame
+			if (G_ExportFrame == true && auto_cap_frames == false)
+			{
+				G_ExportFrame = false;
+				std::ostringstream out_file;
+				out_file << cap_dir << "_" << VulkanWin->m_FrameNumber << ".cap";
+				DrawInstance->CaptureFrame(out_file.str());
+			}
+			else if (auto_cap_frames == true)
+			{
+				if (cap_frames.find(VulkanWin->m_FrameNumber) != cap_frames.end())
+				{
+					std::ostringstream out_file;
+					out_file << cap_dir << "_" << VulkanWin->m_FrameNumber << ".cap";
+					DrawInstance->CaptureFrame(out_file.str());
+				}
+			}
+			
+			// Draw the frame.
+			DrawInstance->DrawFrame();
+
+			 
 			// If the global exit flag has been set exit.
 			if(Extflg == true)
 				throw std::runtime_error("External Flag Exit.");
@@ -268,3 +313,80 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 	
 	return 0;
 };
+
+std::unordered_set<uint32_t> ParseCaptureFrames(
+	const std::vector<const char*>& entries)
+{
+	std::unordered_set<uint32_t> frames;
+
+	for (const char* entryPtr : entries)
+	{
+		const std::string entry(entryPtr);
+		std::vector<uint32_t> values;
+		std::stringstream stream(entry);
+		std::string token;
+
+		while (std::getline(stream, token, ':'))
+		{
+			if (token.empty())
+				throw std::runtime_error(
+					"Empty value in capture_frames entry: " + entry);
+
+			size_t parsed = 0;
+			unsigned long value = std::stoul(token, &parsed);
+
+			if (parsed != token.size() || value > UINT32_MAX)
+				throw std::runtime_error(
+					"Invalid capture_frames entry: " + entry);
+
+			values.push_back(static_cast<uint32_t>(value));
+		}
+
+		if (values.size() == 1)
+		{
+			frames.insert(values[0]);
+			continue;
+		}
+
+		uint32_t start;
+		uint32_t step;
+		uint32_t end;
+
+		if (values.size() == 2)
+		{
+			start = values[0];
+			step = 1;
+			end = values[1];
+		}
+		else if (values.size() == 3)
+		{
+			start = values[0];
+			step = values[1];
+			end = values[2];
+		}
+		else
+		{
+			throw std::runtime_error(
+				"Expected frame, start:end, or start:step:end: " + entry);
+		}
+
+		if (step == 0)
+			throw std::runtime_error(
+				"Capture frame step cannot be zero: " + entry);
+
+		if (start > end)
+			throw std::runtime_error(
+				"Descending capture frame range: " + entry);
+
+		for (uint64_t frame = start; frame <= end; frame += step)
+		{
+			frames.insert(static_cast<uint32_t>(frame));
+
+			// Prevent overflow when the range approaches UINT32_MAX.
+			if (frame + step > UINT32_MAX)
+				break;
+		}
+	}
+
+	return frames;
+}

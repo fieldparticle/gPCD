@@ -1,0 +1,1191 @@
+from gbase.AttrDictFields import *
+#from gbase import libconf
+from gbase import libconf
+from base.ForceDynamics import ForceContactDynamics
+from base.InLineTest import InLineTest
+from gbase import BinaryFileUtilities
+from gbase.utilities import get_run_configuration
+import math
+import re
+from pathlib import Path
+from gbase.libconf import AttrDict
+
+class ParticleFields(AttrDictFields):
+    def __setattr__(self, attr, value):
+        if attr.startswith("_"):
+            super().__setattr__(attr, value)
+        else:
+            self[attr] = value
+
+
+class ShaderFlagsFields(AttrDictFields):
+    def __setattr__(self, attr, value):
+        if attr.startswith("_"):
+            super().__setattr__(attr, value)
+        else:
+            self[attr] = value
+
+
+class Vec4Fields(AttrDictFields):
+    def __setattr__(self, attr, value):
+        if attr.startswith("_"):
+            super().__setattr__(attr, value)
+        else:
+            self[attr] = value
+
+
+class CollisionInFields(AttrDictFields):
+    def __setattr__(self, attr, value):
+        if attr.startswith("_"):
+            super().__setattr__(attr, value)
+        else:
+            self[attr] = value
+
+
+class ForceDynamics(ForceContactDynamics):
+    
+    def __init__(self, senario=None):
+        ##JMB If senario is passed in then 
+        #       assign it to self.senario, otherwise set self.senario to None
+        if senario is not None:
+            self.senario = senario
+        else:
+            self.senario = None
+        self.study = senario is not None
+        self.config = None
+        self.run_configuration = None
+        self.particle_data = None
+        self.constants = AttrDictFields()
+        self.error_names = {}
+        self.collIn = self.create_collision_in()
+        self.particles = []
+        self.ShaderFlags = self.create_shader_flags()
+        self.inline_test_flag = False
+        self.config_error_return = None
+        self.pair_phase_totals = {}
+        self.pair_phase_frame_diagnostics = []
+        self.pair_phase_energy_reference = None
+        self.wall_contact_offset = 0.0
+        self.starting_contacts_initialized = False
+        self.starting_contact_states = {}
+
+    def ClearContactDiagnostics(self, contact_state):
+        """Reset reporting-only diagnostics on one reusable contact slot."""
+        for field_name in (
+            "raw_impulse",
+            "force_magnitude",
+            "contact_potential_energy",
+            "compression_impulse",
+            "release_impulse",
+            "internal_momentum_px",
+            "internal_momentum_py",
+            "internal_momentum_pz",
+            "internal_momentum_mag",
+            "source_available_momentum",
+            "source_available_share",
+            "target_available_momentum",
+            "target_available_share",
+            "source_vn",
+            "target_vn",
+            "rel_vn",
+            "delta_px",
+            "delta_py",
+            "delta_pz",
+            "source_vx_before",
+            "source_vy_before",
+            "source_vz_before",
+            "source_vx_after",
+            "source_vy_after",
+            "source_vz_after",
+            "source_ke_before",
+            "source_ke_after",
+            "source_ke_delta",
+            "contact_ke_delta_estimate",
+            "source_net_delta_px",
+            "source_net_delta_py",
+            "source_net_delta_pz",
+            "source_net_ke_delta_estimate",
+            "source_contact_ke_delta_sum",
+            "source_ke_cross_term",
+            "source_ke_residual",
+            "wall_ghost_mass",
+            "starting_contact",
+            "starting_resolved",
+            "effective_source_radius",
+            "effective_target_radius",
+            "effective_separation_limit",
+            "physical_separation_limit",
+        ):
+            setattr(contact_state, field_name, 0.0)
+
+    def ClearContactSlot(self, contact_state):
+        """Reset one reusable current-frame contact slot."""
+        contact_state.ids = self.create_uvec4()
+        contact_state.geom = self.create_vec4()
+        contact_state.aux = self.create_vec4()
+        self.ClearContactDiagnostics(contact_state)
+
+    def BeginContactFrame(self, SourceID):
+        """Reset Python current-frame contact and reporting state."""
+        source = self.particles[SourceID]
+        source.collision_list = []
+        source.contactCount = 0
+        source.colFlg = 0
+        if not (
+            hasattr(self, "IsBoundaryParticle")
+            and self.IsBoundaryParticle(SourceID)
+        ):
+            self.SyncInternalMomentumMagnitude(source)
+        source.total_overlap_area = 0.0
+        for contact_state in self.GetContactSlots(SourceID):
+            self.ClearContactSlot(contact_state)
+
+    def GetContactSlots(self, SourceID):
+        """Return contact slots while preserving legacy Python structures."""
+        particle = self.particles[SourceID]
+        if hasattr(particle, "contacts"):
+            return particle.contacts
+        return particle.gcs
+
+    def InitializeContactState(self, SourceID, TargetID):
+        """Initialize a physical contact, then attach Python diagnostics."""
+        contact_state = super().InitializeContactState(SourceID, TargetID)
+        if contact_state is None:
+            return None
+        source = self.particles[SourceID]
+        source.report_contacts = len(source.collision_list)
+        source.report_target = TargetID
+        self.RecordContactParameters(SourceID, TargetID, contact_state)
+        return contact_state
+
+    def RecordContactParameters(self, SourceID, TargetID, contact_state):
+        """Record relative motion and overlap totals without affecting dynamics."""
+        source = self.particles[SourceID]
+        overlap_area = max(0.0, float(contact_state.geom.w))
+        normal_x = float(contact_state.geom.x)
+        normal_y = float(contact_state.geom.y)
+        normal_z = float(contact_state.geom.z)
+        source_velocity = self.GetStartFrameVelocity(SourceID)
+        target_velocity = (
+            self.create_vec4()
+            if int(contact_state.ids.y) == self.constants.CONTACT_WALL
+            else self.GetStartFrameVelocity(TargetID)
+        )
+        contact_state.rel_vn = (
+            (target_velocity.x - source_velocity.x) * normal_x
+            + (target_velocity.y - source_velocity.y) * normal_y
+            + (target_velocity.z - source_velocity.z) * normal_z
+        )
+        source.total_overlap_area += overlap_area
+
+    def InitializeWallContactState(self, SourceID, wall):
+        """Initialize a physical wall contact, then attach Python diagnostics."""
+        contact_state = super().InitializeWallContactState(SourceID, wall)
+        if contact_state is not None:
+            self.RecordContactParameters(SourceID, wall, contact_state)
+        return contact_state
+
+    def AccumulateContactForce(self, SourceID, contact_state, totalForce):
+        """Accumulate one physical force, then attach Python diagnostics."""
+        if not super().AccumulateContactForce(SourceID, contact_state, totalForce):
+            return False
+        source = self.particles[SourceID]
+        dt = max(0.0, float(self.ShaderFlags.dt))
+        target_id = int(contact_state.ids.x)
+        contact_type = int(contact_state.ids.y)
+        stiffness = self.GetContactStiffness(SourceID, target_id, contact_type)
+        source_radius = float(
+            getattr(contact_state, "effective_source_radius", source.Data.x)
+        )
+        target_radius = float(
+            getattr(
+                contact_state,
+                "effective_target_radius",
+                source_radius
+                if contact_type == self.constants.CONTACT_WALL
+                else self.particles[target_id].Data.x,
+            )
+        )
+        contact_state.raw_impulse = contact_state.force_magnitude * dt
+        self.RecordRecoverableInternalMomentum(SourceID, contact_state)
+        contact_state.contact_potential_energy = self.GetOverlapPotentialEnergy(
+            source_radius,
+            target_radius,
+            stiffness,
+            float(contact_state.aux.x),
+        )
+        return True
+
+    def SyncInternalMomentumMagnitude(self, particle):
+        """Mirror source-owned internal momentum vector magnitude for reports."""
+        px = float(getattr(particle.parms, "y", 0.0))
+        py = float(getattr(particle.parms, "z", 0.0))
+        pz = float(getattr(particle.parms, "w", 0.0))
+        magnitude = math.sqrt(px * px + py * py + pz * pz)
+        particle.internal_momentum = magnitude
+        particle.Data.z = magnitude
+        particle.report_stored_mom = magnitude
+        return magnitude
+
+    def ClearRecoverableInternalMomentum(self, particle):
+        """Clear diagnostic recoverable internal momentum for an inactive contact."""
+        particle.parms.y = 0.0
+        particle.parms.z = 0.0
+        particle.parms.w = 0.0
+        particle.internal_momentum = 0.0
+        particle.Data.z = 0.0
+        particle.report_stored_mom = 0.0
+
+    def ClearInactiveRecoverableInternalMomentum(self):
+        """Clear recoverable internal momentum when a source has no contacts."""
+        for particle_index, particle in enumerate(self.particles):
+            if not self.IsMobileParticleActiveForDynamics(particle_index):
+                continue
+            if int(getattr(particle, "contactCount", 0)) == 0:
+                self.ClearRecoverableInternalMomentum(particle)
+
+    def RecordRecoverableInternalMomentum(self, SourceID, contact_state):
+        """Diagnostic-only source-owned compression/rebound momentum storage."""
+        source = self.particles[SourceID]
+        normal_x = float(contact_state.geom.x)
+        normal_y = float(contact_state.geom.y)
+        normal_z = float(contact_state.geom.z)
+        impulse = max(0.0, float(contact_state.raw_impulse))
+        rel_vn = float(getattr(contact_state, "rel_vn", 0.0))
+
+        stored_x = float(source.parms.y)
+        stored_y = float(source.parms.z)
+        stored_z = float(source.parms.w)
+        compression_impulse = 0.0
+        release_impulse = 0.0
+
+        if rel_vn < -self.EPSILON:
+            compression_impulse = impulse
+            stored_x += compression_impulse * normal_x
+            stored_y += compression_impulse * normal_y
+            stored_z += compression_impulse * normal_z
+        elif rel_vn > self.EPSILON:
+            stored_along_normal = (
+                stored_x * normal_x
+                + stored_y * normal_y
+                + stored_z * normal_z
+            )
+            release_impulse = min(max(0.0, stored_along_normal), impulse)
+            stored_x -= release_impulse * normal_x
+            stored_y -= release_impulse * normal_y
+            stored_z -= release_impulse * normal_z
+
+        source.parms.y = stored_x
+        source.parms.z = stored_y
+        source.parms.w = stored_z
+        internal_mag = self.SyncInternalMomentumMagnitude(source)
+
+        contact_state.compression_impulse = compression_impulse
+        contact_state.release_impulse = release_impulse
+        contact_state.internal_momentum_px = stored_x
+        contact_state.internal_momentum_py = stored_y
+        contact_state.internal_momentum_pz = stored_z
+        contact_state.internal_momentum_mag = internal_mag
+        contact_state.aux.z = internal_mag
+        return True
+
+    def CalcVelocity(self, SourceID, totalForce):
+        """Calculate source velocity, then attach impulse diagnostics."""
+        start_velocity = self.GetStartFrameVelocity(SourceID)
+        if not super().CalcVelocity(SourceID, totalForce):
+            return False
+        source = self.particles[SourceID]
+        source.vx = source.VelRad.x
+        source.vy = source.VelRad.y
+        source.vz = source.VelRad.z
+        mass = self.GetParticleMass(SourceID)
+        delta_momentum_x = mass * (source.VelRad.x - start_velocity.x)
+        delta_momentum_y = mass * (source.VelRad.y - start_velocity.y)
+        delta_momentum_z = mass * (source.VelRad.z - start_velocity.z)
+        for slot_index in range(source.contactCount):
+            contact_state = self.GetContactSlots(SourceID)[slot_index]
+            contact_state.source_vx_before = start_velocity.x
+            contact_state.source_vy_before = start_velocity.y
+            contact_state.source_vz_before = start_velocity.z
+            contact_state.source_vx_after = source.VelRad.x
+            contact_state.source_vy_after = source.VelRad.y
+            contact_state.source_vz_after = source.VelRad.z
+            contact_state.source_net_delta_px = delta_momentum_x
+            contact_state.source_net_delta_py = delta_momentum_y
+            contact_state.source_net_delta_pz = delta_momentum_z
+            applied_impulse = max(0.0, float(contact_state.raw_impulse))
+            contact_state.aux.w = applied_impulse
+            contact_state.delta_px = -applied_impulse * float(contact_state.geom.x)
+            contact_state.delta_py = -applied_impulse * float(contact_state.geom.y)
+            contact_state.delta_pz = -applied_impulse * float(contact_state.geom.z)
+        return True
+
+    def load_include(self):
+        #include_items = libconf.load(self.config.include_file)
+        with open(self.config.include_file, "r", encoding="utf-8") as cfg_file:
+            include_config = libconf.load(cfg_file)
+        for key, value in include_config.items():
+            self.config[key] = value
+        
+    def load_cfg_file(self, cfg_file_name):
+        self.load_constants()
+        self.collIn.ErrorReturn = self.constants.ERROR_NONE
+        with open(cfg_file_name, "r", encoding="utf-8") as cfg_file:
+            self.config = libconf.load(cfg_file)
+
+        if 'include_file' in self.config:
+                self.load_include()
+
+
+        self.config_error_return = None
+        self.run_configuration = get_run_configuration(self.config)
+        if self.config.pdata_from_file == True:
+            self.particle_data = self.getParticleData(self.config)
+        else:
+            self.particle_data = self.config.get("PARTICLE_DATA", {})
+
+        self.particles = self.create_particle_array_from_cfg(self.particle_data)
+        self.ShaderFlags = self.create_shader_flags_from_cfg(self.run_configuration)
+        self.wall_contact_offset = max(
+            0.0,
+            float(self.run_configuration.get("wall_contact_offset", 0.0)),
+        )
+        self.contact_force_measure = str(
+            self.run_configuration.get("contact_force_measure", "area")
+        ).strip().lower()
+        if self.contact_force_measure not in {"area", "depth"}:
+            self.contact_force_measure = "area"
+        self.pair_phase_totals = {}
+        self.pair_phase_frame_diagnostics = []
+        self.pair_phase_energy_reference = None
+        self.starting_contacts_initialized = False
+        self.starting_contact_states = {}
+        if "in_line_obj" in self.run_configuration or self.study == True:
+            self.inline_test_flag = True
+        else:
+            self.inline_test_flag = False
+        # If there is a 
+        return self.particles
+
+    def load_constants(self, constants_file_name=None):
+        if constants_file_name is None:
+            constants_file_name = Path(__file__).resolve().parents[1] / "constants.glsl"
+        constants_path = Path(constants_file_name)
+        constants = AttrDictFields()
+        constants_pattern = re.compile(r"const\s+uint\s+(\w+)\s*=\s*(\d+)\s*;")
+        with constants_path.open("r", encoding="utf-8") as constants_file:
+            for line in constants_file:
+                match = constants_pattern.search(line)
+                if match is None:
+                    continue
+                constants[match.group(1)] = int(match.group(2))
+        self.constants = constants
+        self.error_names = {
+            value: name
+            for name, value in constants.items()
+            if name.startswith("ERROR_")
+        }
+        return self.constants
+
+    def ErrorDescription(self):
+        return self.error_names.get(self.collIn.ErrorReturn, "ERROR_UNKNOWN")
+
+    def create_collision_in(self):
+        coll_in = CollisionInFields()
+        coll_in.ErrorReturn = 0
+        coll_in.numParticles = 0
+        coll_in.maxCells = 0
+        coll_in.particleNumber = 0
+        coll_in.ReadWriteConflict = 0
+        coll_in.ExcessSlots = 0
+        return coll_in
+
+    def create_particle(self, **fields):
+        particle = ParticleFields()
+        particle.pnum = fields.get("pnum", 0)
+        rx = fields.get("rx", 0.0)
+        ry = fields.get("ry", 0.0)
+        rz = fields.get("rz", 0.0)
+        vx = fields.get("vx", 0.0)
+        vy = fields.get("vy", 0.0)
+        vz = fields.get("vz", 0.0)
+        mass = fields.get("mass", fields.get("molar_mass", 1.0))
+        radius = fields.get("radius", 0.0)
+        ptype = fields.get("ptype", 0.0)
+        boundary_evaluator_id = float(ptype) if float(ptype) > 0.5 else 0.0
+        temp_vel = fields.get("temp_vel", 0.0)
+        velocity_angle = self.VelocityAngle(vx, vy)
+        particle.PosLocA = self.create_vec4(rx, ry, rz, 0.0)
+        particle.PosLocB = self.create_vec4(rx, ry, rz, 1.0)
+        particle.VelRad = self.create_vec4(vx, vy, vz, velocity_angle)
+        particle.Data = self.create_vec4(
+            radius,
+            fields.get("collision_stiffness_q", 0.0),
+            boundary_evaluator_id,
+            fields.get("state_flg", 1.0),
+        )
+        particle.parms = self.create_vec4(mass, 0.0, 0.0, 0.0)
+        particle.internal_momentum = 0.0
+        particle.contacts = [self.create_geo_contact_state() for _ in range(16)]
+        particle.gcs = particle.contacts
+        particle.contactCount = 0
+        particle.colFlg = 0
+        particle.rx = rx
+        particle.ry = ry
+        particle.rz = rz
+        particle.vx = vx
+        particle.vy = vy
+        particle.vz = vz
+        particle.mass = mass
+        particle.radius = radius
+        particle.ptype = ptype
+        particle.boundary_evaluator_id = boundary_evaluator_id
+        particle.temp_vel = temp_vel
+        particle.state_flg = fields.get("state_flg", 1.0)
+        particle.collision_list = fields.get("collision_list", [])
+        particle.oa = fields.get("oa", 0.0)
+        particle.max_penetration_depth = fields.get("max_penetration_depth", 0.0)
+        particle.report_contacts = 0
+        particle.report_phase = 0
+        particle.report_target = 0
+        particle.report_center_distance = 0.0
+        particle.report_normal_x = 0.0
+        particle.report_normal_y = 0.0
+        particle.report_stored_mom = 0.0
+        particle.report_alpha_zero = 0.0
+        particle.report_zero_area = 0.0
+        particle.report_compression_fraction = 0.0
+        particle.report_rel_vn = 0.0
+        particle.report_closing_mom = 0.0
+        particle.report_collision_stiffness_q = 0.0
+        return particle
+
+    def create_vec4(self, x=0.0, y=0.0, z=0.0, w=0.0):
+        vec4 = Vec4Fields()
+        vec4.x = x
+        vec4.y = y
+        vec4.z = z
+        vec4.w = w
+        return vec4
+
+    def create_uvec4(self, x=0, y=0, z=0, w=0):
+        uvec4 = Vec4Fields()
+        uvec4.x = int(x)
+        uvec4.y = int(y)
+        uvec4.z = int(z)
+        uvec4.w = int(w)
+        return uvec4
+
+    def create_geo_contact_state(self):
+        contact_state = ParticleFields()
+        contact_state.ids = self.create_uvec4()
+        contact_state.geom = self.create_vec4()
+        contact_state.aux = self.create_vec4()
+        self.ClearContactDiagnostics(contact_state)
+        return contact_state
+
+    def create_particle_from_cfg(self, particle_name, particle_cfg):
+        particle_number = int(str(particle_name).lstrip("p") or 0)
+        location = particle_cfg.get("location", {})
+        if "collision_stiffness_q" not in particle_cfg:
+            collision_stiffness_q = 4.0
+        else:
+            collision_stiffness_q = particle_cfg.get("collision_stiffness_q", 0.0)
+
+        return self.create_particle(
+            pnum=particle_number,
+            rx=location.get("x1", 0.0),
+            ry=location.get("y1", 0.0),
+            rz=location.get("z1", 0.0),
+            vx=particle_cfg.get("vx", 0.0),
+            vy=particle_cfg.get("vy", 0.0),
+            vz=particle_cfg.get("vz", 0.0),
+            mass=particle_cfg.get("mass", 1.0),
+            radius=particle_cfg.get("radius", 0.0),
+            ptype=particle_cfg.get("ptype", 0.0),
+            temp_vel=particle_cfg.get("temp_vel", 0.0),
+            collision_stiffness_q=collision_stiffness_q,
+            state_flg=particle_cfg.get("state_flg", 1.0),
+        )
+
+    def getParticleData(self,config):
+        cfg_data_name = config["output_file_prefix"]
+        file_name = f"{config.data_dir}/{cfg_data_name}.bin"
+        
+        results = BinaryFileUtilities.read_all_particle_data(file_name)
+        particle_data = AttrDict()
+        particles = AttrDict()
+        for pp in results:
+            if pp.pnum == 0:
+                continue  # Skip null particle
+
+            dict_location = {
+                "use": 0,
+                "x1": pp.rx,
+                "y1": pp.ry,
+                "z1": pp.rz,
+                "x2": pp.rx,
+                "y2": pp.ry,
+                "z2": pp.rz,
+                "vx": pp.vx,
+                "vy": pp.vy,
+                "vz": pp.vz
+            }
+            particle = AttrDict()
+            particle["location"] = AttrDict(dict_location)
+            particle["vx"] = pp.vx
+            particle["vy"] = pp.vy
+            particle["vz"] = pp.vz
+            particle["mass"] = pp.molar_mass
+            particle["radius"] = pp.radius
+            particle["ptype"] = pp.ptype
+            particle["boundary_evaluator_id"] = (
+                pp.ptype if pp.ptype > 0.5 else 0.0
+            )
+            particle["temp_vel"] = pp.temp_vel
+            particle["collision_stiffness_q"] = pp.collision_stiffness_q
+            particle["state_flg"] = int(pp.state_flg)
+            particle["edge"] = (100, 170, 255)
+            particle["fill"] = (160, 210, 255)
+            particle_data[pp.pnum] = particle
+            pnumtxt = f"p{int(pp.pnum)}"
+            particles[pnumtxt] =  particle
+
+            #print(f"Read particle: {pp.pnum} at ({pp.rx}, {pp.ry}, {pp.rz}) with velocity ({pp.vx}, {pp.vy}, {pp.vz})")
+
+        return particles
+
+    def create_particle_array_from_cfg(self, particle_data):
+        particles = []
+
+        for particle_name in sorted(
+            particle_data.keys(),
+            key=lambda name: int(str(name).lstrip("p") or 0),
+        ):
+            particles.append(
+                self.create_particle_from_cfg(
+                    particle_name,
+                    particle_data[particle_name],
+                )
+            )
+        return particles
+
+    def create_particle_array(self, count=0):
+        self.particles = [
+            self.create_particle(pnum=index)
+            for index in range(count)
+        ]
+        return self.particles
+
+    def create_shader_flags(self, **fields):
+        shader_flags = ShaderFlagsFields()
+        
+        self.item_cfg = shader_flags
+        shader_flags.DrawInstance = fields.get("DrawInstance", 0.0)
+        shader_flags.SideLength = fields.get("SideLength", 0.0)
+        shader_flags.Ptot = fields.get("Ptot", 0.0)
+        shader_flags.dt = fields.get("dt", 0.0)
+        shader_flags.systemp = fields.get("systemp", 0.0)
+        shader_flags.ColorMap = fields.get("ColorMap", 0.0)
+        shader_flags.Boundary = fields.get("Boundary", 0.0)
+        shader_flags.StopFlg = fields.get("StopFlg", 0.0)
+        shader_flags.frameNum = fields.get("frameNum", 0.0)
+        shader_flags.actualFrame = fields.get("actualFrame", 0.0)
+        shader_flags.positionBuffer = fields.get("positionBuffer", 0.0)
+        return shader_flags
+
+    def create_shader_flags_from_cfg(self, run_configuration):
+        return self.create_shader_flags(
+            SideLength=run_configuration.get("side_len", 0.0),
+            Ptot=len(self.particles),
+            dt=run_configuration.get("dt", 0.0),
+            Boundary=1.0 if run_configuration.get("walls_on", False) else 0.0,
+            positionBuffer=run_configuration.get("positionBuffer", 0.0),
+        )
+
+    def ReservoirBirthSpacingFactor(self):
+        return max(
+            1.1,
+            float(
+                self.run_configuration.get(
+                    "reservoir_birth_spacing_factor",
+                    1.1,
+                )
+            ),
+        )
+
+    def ReservoirBirthOffset(self, particle):
+        return self.ReservoirBirthSpacingFactor() * 2.0 * float(particle.Data.x)
+
+    def ReservoirFlowAxisAndSign(self):
+        """Return the dominant flow axis and sign from flow_angle in degrees."""
+        flow_angle = math.radians(float(self.run_configuration.get("flow_angle", 0.0)))
+        flow_x = math.cos(flow_angle)
+        flow_y = math.sin(flow_angle)
+        if abs(flow_y) > abs(flow_x):
+            return "y", 1.0 if flow_y >= 0.0 else -1.0
+        return "x", 1.0 if flow_x >= 0.0 else -1.0
+
+    def ReservoirBirthPosition(self, particle):
+        """Return the runtime birth position for the current reservoir flow axis."""
+        axis, direction = self.ReservoirFlowAxisAndSign()
+        offset = self.ReservoirBirthOffset(particle)
+        x = float(particle.rx)
+        y = float(particle.ry)
+        z = float(particle.rz)
+        if axis == "y":
+            default_inlet = (
+                self.run_configuration.get("WallYMIN", 0.0)
+                if direction > 0.0
+                else self.run_configuration.get("WallYMAX", self.ShaderFlags.SideLength)
+            )
+            inlet_y = float(
+                self.run_configuration.get(
+                    "reservoir_inlet_y",
+                    default_inlet,
+                )
+            )
+            y = inlet_y + direction * offset
+        else:
+            default_inlet = (
+                self.run_configuration.get("WallXMIN", 0.0)
+                if direction > 0.0
+                else self.run_configuration.get("WallXMAX", self.ShaderFlags.SideLength)
+            )
+            inlet_x = float(
+                self.run_configuration.get(
+                    "reservoir_inlet_x",
+                    default_inlet,
+                )
+            )
+            x = inlet_x + direction * offset
+        return x, y, z
+
+    def ReservoirParticleEscaped(self, position):
+        """Return True when a live reservoir particle crosses the outlet plane."""
+        axis, direction = self.ReservoirFlowAxisAndSign()
+        if axis == "y":
+            default_outlet = (
+                self.run_configuration.get("WallYMAX", self.ShaderFlags.SideLength)
+                if direction > 0.0
+                else self.run_configuration.get("WallYMIN", 0.0)
+            )
+            outlet_y = float(
+                self.run_configuration.get(
+                    "reservoir_outlet_y",
+                    default_outlet,
+                )
+            )
+            return position.y >= outlet_y if direction > 0.0 else position.y <= outlet_y
+
+        default_outlet = (
+            self.run_configuration.get("WallXMAX", self.ShaderFlags.SideLength)
+            if direction > 0.0
+            else self.run_configuration.get("WallXMIN", 0.0)
+        )
+        outlet_x = float(
+            self.run_configuration.get(
+                "reservoir_outlet_x",
+                default_outlet,
+            )
+        )
+        return position.x >= outlet_x if direction > 0.0 else position.x <= outlet_x
+
+    def SetParticlePosition(self, particle, x, y, z):
+        position_buffer = int(self.ShaderFlags.positionBuffer)
+        particle.PosLocA.x = x
+        particle.PosLocA.y = y
+        particle.PosLocA.z = z
+        particle.PosLocB.x = x
+        particle.PosLocB.y = y
+        particle.PosLocB.z = z
+        particle.PosLocA.w = 0.0 if position_buffer == 0 else 1.0
+        particle.PosLocB.w = 1.0 if position_buffer == 0 else 0.0
+        particle.rx = x
+        particle.ry = y
+        particle.rz = z
+
+    def ApplyReservoirBirths(self):
+        """Activate particles whose Data.w birth frame has arrived."""
+        if not self.ReservoirLifecycleEnabled():
+            return
+        current_frame = float(self.ShaderFlags.frameNum)
+        for particle_index, particle in enumerate(self.particles):
+            if hasattr(self, "IsBoundaryParticle") and self.IsBoundaryParticle(particle_index):
+                continue
+            birth_frame = float(particle.Data.w)
+            if birth_frame <= 0.0 or current_frame < birth_frame:
+                continue
+            x, y, z = self.ReservoirBirthPosition(particle)
+            self.SetParticlePosition(particle, x, y, z)
+            particle.Data.w = 0.0
+            particle.state_flg = 0.0
+
+    def RetireReservoirEscapes(self):
+        """Mark live reservoir particles dead after their center crosses outlet."""
+        if not self.ReservoirLifecycleEnabled():
+            return
+        output_buffer = 1 - int(self.ShaderFlags.positionBuffer)
+        for particle_index, particle in enumerate(self.particles):
+            if not self.IsMobileParticleActiveForDynamics(particle_index):
+                continue
+            position = self.particle_position(particle, output_buffer)
+            if self.ReservoirParticleEscaped(position):
+                particle.Data.w = -1.0
+                particle.state_flg = -1.0
+
+    def CollisionRun(self):
+        """Run one source-owned semi-implicit ForceDynamics frame."""
+        if not self.BeginFrame():
+            return self.particles
+        self.ApplyBeforeContactScanHook()
+        self.ApplyReservoirBirths()
+        self.ResetFrameState()
+        self.ApplyStartRunHook()
+        self.BuildFrameSnapshot()
+        self.InitializeStartingContactState()
+        self.RecordFrameStartDiagnostics()
+        self.InitializePairPhaseEnergyReference()
+
+        total_forces = [self.create_vec4() for _ in self.particles]
+        if not self.DetectContacts(total_forces):
+            return self.particles
+        if not self.BuildWallContactLists(total_forces):
+            return self.particles
+        self.ClearInactiveRecoverableInternalMomentum()
+        frame_start_pairs = self.CapturePairGeometryDiagnostics()
+        if not self.CalculateVelocities(total_forces):
+            return self.particles
+        if not self.CalculatePositions():
+            return self.particles
+        self.RetireReservoirEscapes()
+        self.BuildEndPositionSnapshot()
+        frame_end_pairs = self.CapturePairGeometryDiagnostics()
+        self.RecordAfterResolveDiagnostics()
+        self.RecordPairPhaseDiagnostics(frame_start_pairs, frame_end_pairs)
+        self.EndFrame()
+        return self.particles
+
+    def BeginFrame(self):
+        """Start a shadow dynamics frame and validate configuration state.
+
+        Each shadow frame begins with a clean runtime error value.  If cfg
+        loading found a persistent configuration error, restore that error and
+        return False so CollisionRun exits before contact detection, planning,
+        resolution, or motion.  This does not reset particle state or contact
+        ledgers; it only gates whether the frame is allowed to run.
+        """
+        self.collIn.ErrorReturn = self.constants.ERROR_NONE
+        if self.config_error_return is not None:
+            self.collIn.ErrorReturn = self.config_error_return
+            return False
+        return True
+
+    def ApplyBeforeContactScanHook(self):
+        """Run the optional scenario hook before shadow contact scanning.
+
+        This hook is called after BeginFrame() and before frame reset,
+        snapshot building, and contact-list construction.  When a scenario
+        object is attached, its BeforeContactScan(particles) callback can make
+        test-harness adjustments to the shadow particle list before contacts
+        are detected for the frame.  If no scenario is attached, this stage is
+        a no-op.
+        """
+        if self.senario:
+            self.senario.BeforeContactScan(self.particles)
+
+    def ResetFrameState(self):
+        """Reset shadow per-frame contact and reporting state.
+
+        This clears state that must be rebuilt from the current shadow frame:
+        current-frame contact slots/list/count, overlap and penetration
+        accumulators, and report fields consumed by UI/capture output.  It
+        does not clear persistent shadow dynamics memory such as
+        contact-owned internal momentum, contact phase, velocity references,
+        or rebound references; those survive across frames until the shadow
+        dynamics prunes or drains them.
+
+        For each shadow particle this function:
+        - calls BeginContactFrame(), which clears the current-frame contact
+          list, contact count, and reusable contact slots;
+        - resets overlap and maximum penetration measurements;
+        - resets report fields so the current frame can repopulate them;
+        - copies particle-owned collision stiffness from Data.y into the
+          report field.
+        """
+        for particle_index, particle in enumerate(self.particles):
+            self.BeginContactFrame(particle_index)
+            particle.oa = 0.0
+            particle.max_penetration_depth = 0.0
+            particle.report_contacts = 0
+            particle.report_phase = 0
+            particle.report_target = 0
+            particle.report_center_distance = 0.0
+            particle.report_normal_x = 0.0
+            particle.report_normal_y = 0.0
+            particle.report_stored_mom = 0.0
+            particle.report_alpha_zero = 0.0
+            particle.report_zero_area = 0.0
+            particle.report_compression_fraction = 0.0
+            particle.report_rel_vn = 0.0
+            particle.report_closing_mom = 0.0
+            particle.report_collision_stiffness_q = particle.Data.y
+
+    def ApplyStartRunHook(self):
+        """Run the optional inline-test StartRun hook for this frame.
+
+        This hook executes after frame-local state has been reset and before
+        the frame snapshot is built.  When inline-test mode is active and a
+        scenario object is attached, senario.StartRun(particles) may adjust or
+        replace the particle list used by the rest of the frame.  If inline
+        testing is not active, or no scenario is attached, this stage is a
+        no-op.
+        """
+        if self.inline_test_flag == True and self.senario is not None:
+            self.particles = self.senario.StartRun(self.particles)
+    
+    def BuildFrameSnapshot(self):
+        """Capture frame-start positions and velocities for dynamics logic.
+
+        The snapshot freezes the state that contact geometry and relative
+        velocity calculations should read for this frame.  Position data is
+        copied from the currently active position buffer selected by
+        ShaderFlags.positionBuffer.  Velocity data is copied from each
+        particle's current VelRad value.
+
+        Later stages may update particle velocities or move particles, but
+        functions that read PosLocFrame or VelRadFrame continue to see this
+        frame-start state.  This keeps contact detection, contact weighting,
+        and impulse planning based on one consistent moment rather than on
+        partially updated particle state.
+        """
+        position_buffer = int(self.ShaderFlags.positionBuffer)
+        self.PosLocFrame = [
+            self.create_vec4(
+                self.particle_position(particle, position_buffer).x,
+                self.particle_position(particle, position_buffer).y,
+                self.particle_position(particle, position_buffer).z,
+                self.particle_position(particle, position_buffer).w,
+            )
+            for particle in self.particles
+        ]
+        ## Frame-start velocity lives in VelRadFrame. Runtime parms keeps
+        ## parms.x = mass and parms.yzw = recoverable internal momentum.
+        self.VelRadFrame = [
+            self.create_vec4(particle.VelRad.x, particle.VelRad.y, particle.VelRad.z, particle.VelRad.w)
+            for particle in self.particles
+        ]
+
+    def BuildEndPositionSnapshot(self):
+        """Expose end positions for diagnostics after dynamics is complete."""
+        end_buffer = 1 - int(self.ShaderFlags.positionBuffer)
+        self.PosLocFrame = [
+            self.create_vec4(position.x, position.y, position.z, position.w)
+            for position in (
+                self.particle_position(particle, end_buffer)
+                for particle in self.particles
+            )
+        ]
+
+    def ParticleKineticEnergy(self, particle_index, velocity=None):
+        if velocity is None:
+            velocity = self.particles[particle_index].VelRad
+        mass = self.GetParticleMass(particle_index)
+        return 0.5 * mass * (
+            velocity.x * velocity.x
+            + velocity.y * velocity.y
+            + velocity.z * velocity.z
+        )
+
+    def RecordFrameStartDiagnostics(self):
+        """Record per-particle kinetic energy at the frame-start snapshot.
+
+        This uses VelRadFrame, not the mutable particle.VelRad, so the report
+        captures kinetic energy before contact resolution changes velocities.
+        The value is stored on each particle as report_frame_start_ke and is
+        later written to the particle capture files.
+        """
+        for particle_index, particle in enumerate(self.particles):
+            if not self.IsMobileParticleActiveForDynamics(particle_index):
+                particle.report_frame_start_ke = 0.0
+                continue
+            velocity = self.VelRadFrame[particle_index]
+            particle.report_frame_start_ke = self.ParticleKineticEnergy(
+                particle_index,
+                velocity,
+            )
+
+    def RecordAfterResolveDiagnostics(self):
+        for particle_index, particle in enumerate(self.particles):
+            if not self.IsMobileParticleActiveForDynamics(particle_index):
+                particle.report_after_resolve_ke = 0.0
+                continue
+            particle.report_after_resolve_ke = self.ParticleKineticEnergy(
+                particle_index,
+            )
+
+    def GetContactPotentialEnergy(self, SourceID, TargetID, center_distance):
+        """Return diagnostic pair potential energy from current geometry."""
+        self.InitializeStartingContactState()
+        geometry = self.GetParticlePotentialGeometry(
+            SourceID,
+            TargetID,
+            center_distance,
+        )
+        if geometry is None:
+            return 0.0
+        source_radius, target_radius = geometry
+        return self.GetOverlapPotentialEnergy(
+            source_radius,
+            target_radius,
+            self.GetPairStiffness(SourceID, TargetID),
+            center_distance,
+        )
+
+    def GetOverlapPotentialEnergy(
+        self,
+        source_radius,
+        target_radius,
+        stiffness,
+        center_distance,
+    ):
+        """Return diagnostic stiffness times the overlap-area integral."""
+        separation_limit = source_radius + target_radius
+        center_distance = max(0.0, float(center_distance))
+        if center_distance >= separation_limit:
+            return 0.0
+
+        interval_count = 32
+        step = (separation_limit - center_distance) / interval_count
+        area_sum = self.particle_overlap_area(
+            source_radius,
+            target_radius,
+            center_distance,
+        )
+        for interval in range(1, interval_count):
+            distance = center_distance + interval * step
+            coefficient = 4.0 if interval % 2 else 2.0
+            area_sum += coefficient * self.particle_overlap_area(
+                source_radius,
+                target_radius,
+                distance,
+            )
+        area_sum += self.particle_overlap_area(
+            source_radius,
+            target_radius,
+            separation_limit,
+        )
+        return stiffness * step * area_sum / 3.0
+
+    def TotalPotentialEnergy(self):
+        """Return diagnostic whole-system particle and wall potential energy."""
+        self.InitializeStartingContactState()
+        total_potential_energy = 0.0
+        for source_id in range(len(self.particles)):
+            if not self.IsMobileParticleActiveForDynamics(source_id):
+                continue
+            source_position = self.GetParticlePosition(source_id)
+            for target_id in range(source_id + 1, len(self.particles)):
+                if not self.IsMobileParticleActiveForDynamics(target_id):
+                    continue
+                target_position = self.GetParticlePosition(target_id)
+                dx = target_position.x - source_position.x
+                dy = target_position.y - source_position.y
+                dz = target_position.z - source_position.z
+                center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+                total_potential_energy += self.GetContactPotentialEnergy(
+                    source_id,
+                    target_id,
+                    center_distance,
+                )
+        return total_potential_energy + self.TotalWallPotentialEnergy()
+
+    def CapturePairGeometryDiagnostics(self):
+        """Capture unordered-pair geometry from the current position snapshot."""
+        pairs = {}
+        for source_id in range(len(self.particles)):
+            if not self.IsMobileParticleActiveForDynamics(source_id):
+                continue
+            source_position = self.GetParticlePosition(source_id)
+            for target_id in range(source_id + 1, len(self.particles)):
+                if not self.IsMobileParticleActiveForDynamics(target_id):
+                    continue
+                target_position = self.GetParticlePosition(target_id)
+                dx = target_position.x - source_position.x
+                dy = target_position.y - source_position.y
+                dz = target_position.z - source_position.z
+                center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+                if center_distance > 1.0e-12:
+                    normal = (dx / center_distance, dy / center_distance, dz / center_distance)
+                else:
+                    normal = (1.0, 0.0, 0.0)
+                geometry = self.GetParticlePotentialGeometry(
+                    source_id,
+                    target_id,
+                    center_distance,
+                )
+                if geometry is None:
+                    overlap_area = 0.0
+                else:
+                    source_radius, target_radius = geometry
+                    overlap_area = self.particle_overlap_area(
+                        source_radius,
+                        target_radius,
+                        center_distance,
+                    )
+                pairs[(source_id, target_id)] = {
+                    "center_distance": center_distance,
+                    "normal": normal,
+                    "overlap_area": overlap_area,
+                    "potential_energy": self.GetContactPotentialEnergy(
+                        source_id,
+                        target_id,
+                        center_distance,
+                    ),
+                }
+        return pairs
+
+    def CurrentDiagnosticTotalEnergy(self):
+        kinetic_energy = sum(
+            self.ParticleKineticEnergy(particle_index)
+            for particle_index in range(len(self.particles))
+            if self.IsMobileParticleActiveForDynamics(particle_index)
+        )
+        return kinetic_energy + self.TotalPotentialEnergy()
+
+    def InitializePairPhaseEnergyReference(self):
+        if self.pair_phase_energy_reference is None:
+            self.pair_phase_energy_reference = self.CurrentDiagnosticTotalEnergy()
+
+    def RecordPairPhaseDiagnostics(self, frame_start_pairs, frame_end_pairs):
+        """Accumulate diagnostics-only compression/rebound symmetry measures."""
+        dt = float(self.ShaderFlags.dt)
+        energy_drift = self.CurrentDiagnosticTotalEnergy() - self.pair_phase_energy_reference
+        self.pair_phase_frame_diagnostics = []
+        for pair, start in frame_start_pairs.items():
+            end = frame_end_pairs.get(pair)
+            if end is None:
+                continue
+            if start["overlap_area"] <= 0.0 and end["overlap_area"] <= 0.0:
+                continue
+
+            distance_change = end["center_distance"] - start["center_distance"]
+            if distance_change < -self.EPSILON:
+                phase = "compression"
+            elif distance_change > self.EPSILON:
+                phase = "rebound"
+            else:
+                phase = "stationary"
+
+            area_time = 0.5 * (start["overlap_area"] + end["overlap_area"]) * dt
+            pair_stiffness = self.GetPairStiffness(*pair)
+            start_force = tuple(
+                pair_stiffness * start["overlap_area"] * component
+                for component in start["normal"]
+            )
+            end_force = tuple(
+                pair_stiffness * end["overlap_area"] * component
+                for component in end["normal"]
+            )
+            relative_displacement = tuple(
+                end["normal"][axis] * end["center_distance"]
+                - start["normal"][axis] * start["center_distance"]
+                for axis in range(3)
+            )
+            force_work = sum(
+                0.5 * (start_force[axis] + end_force[axis])
+                * relative_displacement[axis]
+                for axis in range(3)
+            )
+
+            totals = self.pair_phase_totals.setdefault(
+                pair,
+                {
+                    "compression_steps": 0,
+                    "rebound_steps": 0,
+                    "stationary_steps": 0,
+                    "compression_area_time": 0.0,
+                    "rebound_area_time": 0.0,
+                    "stationary_area_time": 0.0,
+                    "compression_work": 0.0,
+                    "rebound_work": 0.0,
+                    "stationary_work": 0.0,
+                    "compression_min_energy_drift": 0.0,
+                    "compression_max_energy_drift": 0.0,
+                    "rebound_min_energy_drift": 0.0,
+                    "rebound_max_energy_drift": 0.0,
+                },
+            )
+            totals[f"{phase}_steps"] += 1
+            totals[f"{phase}_area_time"] += area_time
+            totals[f"{phase}_work"] += force_work
+            if phase != "stationary":
+                totals[f"{phase}_min_energy_drift"] = min(
+                    totals[f"{phase}_min_energy_drift"],
+                    energy_drift,
+                )
+                totals[f"{phase}_max_energy_drift"] = max(
+                    totals[f"{phase}_max_energy_drift"],
+                    energy_drift,
+                )
+
+            self.pair_phase_frame_diagnostics.append(
+                {
+                    "frame": int(self.ShaderFlags.frameNum),
+                    "source_index": pair[0],
+                    "target_index": pair[1],
+                    "phase": phase,
+                    "start_overlap_area": start["overlap_area"],
+                    "end_overlap_area": end["overlap_area"],
+                    "area_time": area_time,
+                    "force_work": force_work,
+                    "energy_drift": energy_drift,
+                    **totals,
+                    "step_count_difference": (
+                        totals["compression_steps"] - totals["rebound_steps"]
+                    ),
+                    "area_time_difference": (
+                        totals["compression_area_time"] - totals["rebound_area_time"]
+                    ),
+                    "work_residual": (
+                        totals["compression_work"] + totals["rebound_work"]
+                    ),
+                }
+            )
+
+    def TotalWallPotentialEnergy(self):
+        """Return current conservative potential energy stored against walls."""
+        if not bool(self.ShaderFlags.Boundary):
+            return 0.0
+        self.InitializeStartingContactState()
+        total = 0.0
+        for source_id, source in enumerate(self.particles):
+            if not self.IsMobileParticleActiveForDynamics(source_id):
+                continue
+            stiffness = max(0.0, float(source.Data.y or 0.0))
+            for wall_flag in self.WallFlagsForDynamics():
+                geometry = self.GetWallGhostGeometry(source_id, wall_flag)
+                if geometry is None:
+                    continue
+                radius = float(geometry[5])
+                total += self.GetOverlapPotentialEnergy(
+                    radius,
+                    radius,
+                    stiffness,
+                    geometry[4],
+                )
+        return total
+
+    def EndFrame(self):
+        position_buffer = int(self.ShaderFlags.positionBuffer)
+        self.ShaderFlags.positionBuffer = 1.0 if position_buffer == 0 else 0.0
+        self.sync_particle_alias_positions(int(self.ShaderFlags.positionBuffer))
+        self.PosLocFrame = []
+        self.VelRadFrame = []
+
+    def sync_particle_alias_positions(self, positionBuffer):
+        for particle in self.particles:
+            position = self.particle_position(particle, positionBuffer)
+            particle.rx = position.x
+            particle.ry = position.y
+            particle.rz = position.z

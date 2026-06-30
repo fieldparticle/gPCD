@@ -53,7 +53,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 #include <cstdint>
 
 	
-	
+
 	m_MaxColls				= MAXSPCOLLS;
 	m_thisFramesBuffered	= 1;
 	m_Particles				= {};
@@ -131,6 +131,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		
 		part.PosLocA		= glm::vec4(part_pos.rx, part_pos.ry,part_pos.rz, 0.0);
 		part.VelRad			= glm::vec4(part_pos.vx, part_pos.vy, part_pos.vz,1.0);
+		
 		part.PosLocB		= glm::vec4(part_pos.rx, part_pos.ry, part_pos.rz, 0.0);
 		part.Data			= glm::vec4(part_pos.radius, part_pos.collision_stiffness_q, evaluatorID, part_pos.state_flg);
 		part.ptype			= particleType;
@@ -138,6 +139,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		part.colFlg			= 0;
 		part.temp_vel		= static_cast<float>(part_pos.temp_vel);
 		part.contactCount = 0;
+		
 		
 #if 0
 		for (size_t nn = 0; nn < MAX_CONTACTS; nn++)

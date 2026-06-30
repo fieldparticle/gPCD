@@ -1,65 +1,11 @@
-1. Define dedicated fields
-reservoir_inlet_x
-reservoir_outlet_x
+Correct. Vulkan is behind Python in two places:
+Nozzle equation
+Python uses the new quadratic radius and analytic slope.
+Generated GLSL still uses linear interpolation.
 
-view_x_min
-view_x_max
-view_y_min
-view_y_max
+Wall-contact deduplication
+Python deduplicates valid boundary contacts by physical wallFlag.
+Vulkan deduplicates by boundary marker TargetID.
+Two adjacent markers representing the same wall can therefore apply the wall force twice in Vulkan.
 
-wall_boundary_length
-CD nozzle also needs:
-nozzle_start_x
-nozzle_center_y
-
-Update the Python game camera
-Make SimulationRunner._view_box() prefer view_*, falling back to legacy Wall*.
-
-Update reservoir lifecycle
-Make birth and retirement use only reservoir_inlet_* and reservoir_outlet_*, retaining Wall* fallbacks for old cfg files.
-
-Update boundary-particle generation
-Stop deriving marker dimensions from Wall*. Use:
-side_len or over_ride_side_length for the cell domain.
-wall_boundary_length for pipe length.
-Derived centered cross-axis coordinates for pipe width.
-
-Make boundary markers self-describing
-Use:
-ptype = 1
-Data.z = wall evaluator ID
-Transport the evaluator ID through pdata.temp_vel.
-
-Update wall evaluation
-Dispatch EvaluateWallSegment() from the target boundary particle’s Data.z, replacing the global boundary_particle_function decision.
-
-Generate closed reservoir test walls
-Create:
-Horizontal markers at YMIN and YMAX
-Vertical markers at XMIN and XMAX
-Birth position inside XMIN by at least 1.1 * diameter
-No duplicate corner markers
-
-Separate outlet retirement from the test wall
-Disable retirement for the closed test or place reservoir_outlet_x beyond the XMAX marker wall.
-
-Migrate the two cfg families
-Update only:
-BoundaryParticleReservoirPeriodic.cfg
-BoundaryCDNozzleReservoir.cfg
-Their include files
-Leave every manual-wall cfg unchanged.
-
-Validate Python first
-Check generation, preview, game camera, wall collisions, outlet rebound, crowding, and birth position.
-
-
-Port to GLSL
-Update exporter templates, generated includes, and marker dispatch.
-Update Vulkan loading
-With explicit C++ approval, map:
-pdata.temp_vel -> Particle.Data.z
-Remove legacy Wall* fields
-
-
-Only after Python and Vulkan pass, remove them from the two boundary-particle cfg families.
+Both must be updated before Python and Vulkan are behaviorally aligned.

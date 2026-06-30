@@ -1078,9 +1078,9 @@ the curved CD evaluator remains responsible only for the upper and lower
 analytic profile.  Exact shared corner coordinates prevent duplicate occupancy
 without weakening either wall rule.
 
-The Python 2D nozzle profile now uses quadratic converging and diverging radius
-functions and their analytic slopes.  Generated GLSL still uses the previous
-linear templates and must be synchronized after Python runtime validation.
+Python and generated GLSL now use the same quadratic converging and diverging
+radius functions and analytic slopes.  The regenerated CD shader set compiles
+with the quadratic profile.
 
 \subsection{Adjacent Markers Can Represent One Physical Wall}
 
@@ -1100,25 +1100,72 @@ force twice.
 
 \subsubsection{<current form>}
 
-Python already evaluates the candidate segment and records its physical wall
-flag in \texttt{processed\_boundary\_walls}.  Only the first valid segment for
-each wall flag contributes force to a source during a frame.  The CD Vulkan
-wrapper still uses its target-ID duplicate list and therefore does not yet have
-equivalent protection.
+Python evaluates the candidate segment and records its physical wall flag in
+\texttt{processed\_boundary\_walls}.  The periodic and CD Vulkan wrappers now
+use the equivalent source-local wall bit mask.  Only the first valid segment
+for each wall flag contributes force during a frame; marker target IDs are not
+inserted into the ordinary particle duplicate list.
 
 \subsubsection{difference outcome}
 
-Particle solution in Python; no Vulkan solution yet.
+Full solution for the current Python, periodic Vulkan, and CD Vulkan wrappers.
 
 \subsubsection{<Analysis>}
 
 Marker identity belongs to the broad phase, while wall flag identifies the
-physical response.  The GLSL wrapper should maintain a source-local processed
-wall mask keyed by \texttt{BoundaryWallSegment.wallFlag}.  It should evaluate a
-candidate first, accumulate only the first valid segment for that flag, and
-then set the flag bit.  Ordinary mobile-particle duplicate suppression remains
-target-ID based.
+physical response.  The GLSL wrappers maintain a source-local processed-wall
+mask keyed by \texttt{BoundaryWallSegment.wallFlag}.  They evaluate a candidate
+first, accumulate only the first valid segment for that flag, and then set the
+flag bit.  Ordinary mobile-particle duplicate suppression remains target-ID
+based.
 
-The next Vulkan work is therefore paired: export the quadratic CD radius and
-slope templates, and replace boundary-marker target-ID force suppression with
-valid wall-flag suppression.
+\subsection{Capture Diagnostics Expose Artificial Inlet Compression}
+
+\subsubsection{<previous form>}
+
+The Vulkan particle structure could be captured, but reservoir behavior was
+judged mainly from rendered motion.  Scheduled waves were admitted when their
+stored frame arrived.  Release spacing assumed that the preceding wave
+continued at its configured inlet speed and cleared the birth position.
+
+\subsubsection{<current form>}
+
+The Python capture reader now pairs an original particle binary with adjacent
+\texttt{<name>\_<frame>.cap} files.  It writes \texttt{<name>.csv} beside the
+original binary and reports lifecycle counts, momentum, kinetic energy,
+same-cohort initial baselines, and reverse-flow momentum and kinetic energy.
+Reverse flow is selected by a negative velocity projection onto the initial
+flow direction.
+
+Frame-by-frame captures isolated one inlet lane.  At frame 5722 an older
+particle remained at $x=1.16888058$ when a new particle was admitted at
+$x=1.22000003$.  For radius $0.1$, their center spacing was only
+$0.05111945$, producing artificial starting penetration of $0.14888055$.
+Across frames 5722--5725, pair momentum remained approximately $0.02449093$,
+while pair kinetic energy rose from approximately $0.00021008$ to
+$0.00118541$.  The older particle reversed and the new particle accelerated
+downstream, producing the observed counterflow line.
+
+The selected next model removes scheduled runtime birth.  A finite reservoir
+will be prefilled with nonoverlapping particles.  At release, the particles
+and rear wall begin moving together; the rear wall continues at inlet velocity
+as a piston.  The long reservoir will use a rectangular cell domain to avoid
+the memory cost of a cubic array.
+
+\subsubsection{difference outcome}
+
+Full diagnostic explanation of the counterflow source.  The staged-birth
+model is not repaired; it is superseded as the next development direction by
+the prefilled moving-piston reservoir.
+
+\subsubsection{<Analysis>}
+
+Scheduled frame separation is only a prediction based on unconstrained inlet
+speed.  It cannot guarantee clearance once downstream contacts slow or return
+a particle to the inlet.  Materializing a new particle inside that live
+particle creates compression without a causal mechanical source.  Momentum
+can remain pair-consistent while kinetic energy grows because the initial
+overlap supplies artificial contact potential.  A prefilled reservoir removes
+that discontinuity.  Its piston is an explicit external momentum source, so
+future diagnostics must include piston impulse rather than treating particle
+momentum as a closed-system quantity.

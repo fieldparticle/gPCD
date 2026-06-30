@@ -109,9 +109,8 @@ class VulkanObj
 
 
 	VulkanObj() {};
-	void InitImgui(VkDescriptorPool discriptorPool,
-		VkRenderPass renderPass,
-		uint32_t NumSwapImages);
+	VkCommandBuffer BeginSingleTimeCommands();
+	void EndSingleTimeCommands(VkCommandBuffer commandBuffer);
 	void		createSyncObjects();
 	void		NameObject(VkObjectType objectType,
 						uint64_t objectHandle, 

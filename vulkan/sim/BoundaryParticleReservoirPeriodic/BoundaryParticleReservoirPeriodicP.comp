@@ -98,6 +98,7 @@ void main()
 	const uint DUP_LIST_SIZE = 32;
 	uint duplst[DUP_LIST_SIZE];
 	uint dupcnt = 0;
+	uint processedWallMask = 0u;
 	vec3 totalForce = vec3(0.0);
 	bool dupflg = false;
 
@@ -145,19 +146,18 @@ void main()
 				#if defined(WALL_MODEL_BOUNDARY_PARTICLE)
 				if(IsBoundaryParticle(TargetID))
 				{
-					for(uint dd = 0; dd < DUP_LIST_SIZE; dd++)
+					BoundaryWallSegment segment = EvaluateWallSegment(SourceID, TargetID);
+					if(segment.valid)
 					{
-						if (duplst[dd] == TargetID)
-							break;
-						
-						if (duplst[dd] == 0)
+						uint wallBit = 1u << segment.wallFlag;
+						if((processedWallMask & wallBit) == 0u)
 						{
-							ProcessBoundaryParticleWallCollision(SourceID, TargetID, totalForce);
-							duplst[dd] = TargetID;
+							if(!ProcessBoundaryParticleWallCollision(SourceID, TargetID, totalForce))
+								return;
+							processedWallMask |= wallBit;
 							#ifdef DEBUG
 								atomicAdd(collOut.CollisionCount,1);
 							#endif
-							break;
 						}
 					}
 					continue;

@@ -34,13 +34,19 @@ void DrawObj::Create(CommandPoolObj* CPL,
 	SwapChainObj* SCO,
 	RenderPassObj* RPO,
 	FrameBufferObj* FBO,
-	SyncObj* SO)
+	SyncObj* SO,
+	ExportObject* EO)
 {
 	m_CPL = CPL;
 	m_SCO = SCO;
 	m_RPO = RPO;
 	m_FBO = FBO;
 	m_SO = SO;
+	m_EO = EO;
 
 };
 
+void DrawObj::CaptureFrame(const std::string& outputFile)
+{
+	m_EO->ExportBuffer(outputFile);
+}

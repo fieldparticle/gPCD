@@ -33,7 +33,7 @@
 
 #ifndef DRAWOBJ_HPP
 #define DRAWOBJ_HPP
-
+class ExportObject;
 class DrawObj : public BaseObj
 {
     public:
@@ -47,22 +47,24 @@ class DrawObj : public BaseObj
 	std::vector<PipelineObj*>			m_GPO{};
 	RenderPassObj*						m_RPO{};
 	FrameBufferObj*						m_FBO = {};
-	SyncObj* m_SO = {};
+	SyncObj*							m_SO = {};
+	ExportObject*						m_EO = {};
 	
 
 
 	virtual void SaveImage(uint32_t ImgNum){};
-    virtual void DrawFrame()=0; 
+    virtual void DrawFrame()=0;
+	void CaptureFrame(const std::string& outputFile);
 	void Create(CommandPoolObj* CPL,
 		SwapChainObj* SCO,
 		RenderPassObj* RPO,
 		FrameBufferObj* FBO,
-		SyncObj* SO);
+		SyncObj* SO,
+		ExportObject* EO
+		);
 	
 	DrawObj(std::string Name,VulkanObj* App ) : BaseObj(Name,0,App ){};
 	
-								
-
     void Cleanup(){
        
     };

@@ -38,10 +38,10 @@ class DrawParticleBoundary : public DrawObj
 {
     public:
     
-	std::vector<Resource*> m_Graphicslst;
-	std::vector<Resource*> m_Computelst;
-	CommandObj* m_ComputeCommandObj;
-	CommandObj* m_GraphicsCommandObj;
+		std::vector<Resource*> m_Graphicslst = {};
+		std::vector<Resource*> m_Computelst = {};
+		CommandObj* m_ComputeCommandObj = {};
+		CommandObj* m_GraphicsCommandObj = {};
 
 
     virtual void DrawFrame(); 
@@ -49,7 +49,8 @@ class DrawParticleBoundary : public DrawObj
 		SwapChainObj* SCO,
 		RenderPassObj* RPO,
 		FrameBufferObj* FBO,
-		SyncObj* SO);
+		SyncObj* SO,
+		ExportObject *EO);
 
 
 	
