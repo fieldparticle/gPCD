@@ -666,7 +666,13 @@ should not be fixed by hand-editing the generated
 \texttt{ForceDynamics.glsl}; fixes belong in the exporter, the stable wrapper
 shader, or the generated config includes.
 
-\subsection{Step 15A: Reservoir Lifecycle Helpers}
+\subsection{Historical Step 15A: Retired Reservoir Lifecycle Helpers}
+
+This step describes the previous scheduled-birth Vulkan path.  The live
+Python Force model and the new horizontal generator no longer use these
+helpers.  Do not port or regenerate them for the replacement prefilled
+reservoir.  They remain documented only to identify wrapper code that must be
+removed when Vulkan migration resumes.
 
 The reservoir compute path uses the newer \texttt{Data.w} lifecycle rule:
 \begin{itemize}

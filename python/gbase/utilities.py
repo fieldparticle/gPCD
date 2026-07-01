@@ -14,6 +14,38 @@ def get_run_configuration(config):
     return config
 
 
+def get_cell_dimensions(config):
+    """Return validated explicit cell counts for each axis."""
+    run_cfg = get_run_configuration(config)
+    dimension_keys = (
+        "cell_array_width",
+        "cell_array_height",
+        "cell_array_depth",
+    )
+    present = [key in run_cfg for key in dimension_keys]
+    if any(present) and not all(present):
+        missing = [key for key, exists in zip(dimension_keys, present) if not exists]
+        raise ValueError(
+            "Cell-array dimensions must be provided together; missing "
+            + ", ".join(missing)
+        )
+
+    if not all(present):
+        raise ValueError(
+            "Configuration requires cell_array_width, cell_array_height, "
+            "and cell_array_depth"
+        )
+    values = [run_cfg[key] for key in dimension_keys]
+
+    dimensions = []
+    for key, raw_value in zip(dimension_keys, values):
+        value = float(raw_value)
+        if value <= 0.0 or not value.is_integer():
+            raise ValueError(f"{key} must be a positive whole number")
+        dimensions.append(int(value))
+    return tuple(dimensions)
+
+
 def hsv_angle(angle, value=1.0, sat=0.707):
     hue = (angle / (2.0 * math.pi)) % 1.0
     sat = max(0.0, min(1.0, sat))
@@ -47,18 +79,19 @@ def hsv_angle(angle, value=1.0, sat=0.707):
 class ParticleUtilities():
 
     col_count = 0
-    def __init__(self,sidelen,col_ary_size):
-        self.side_len = sidelen
-        self.max_location = (sidelen)*(sidelen)*(sidelen)
-        # When allocating number of cells in one dimension
-        # side_len = 1 to n
-        # but the cell array goes from 0 to n which makes n=side_len+1
-        self.width = self.side_len
-        self.height = self.side_len
+    def __init__(self, width, col_ary_size, height=None, depth=None):
+        self.width = int(width)
+        self.height = self.width if height is None else int(height)
+        self.depth = self.width if depth is None else int(depth)
+        if self.width <= 0 or self.height <= 0 or self.depth <= 0:
+            raise ValueError("Cell-array dimensions must be positive")
+        self.side_len = self.width
+        self.max_location = self.width * self.height * self.depth
         self.col_ary_size = col_ary_size
-        self.cell_array = np.array([[0]*col_ary_size]*(self.width**3))
-        self.lock_array = np.array([0]*(self.width**3))
-        #print(f"Cell arry rows:{self.width**3} by cols:{col_ary_size}")
+        self.cell_array = np.zeros(
+            (self.max_location, col_ary_size), dtype=np.uint32
+        )
+        self.lock_array = np.zeros(self.max_location, dtype=np.uint32)
         self.sizeof_int = 32
         
     def get_cell_array_len(self):
@@ -74,18 +107,15 @@ class ParticleUtilities():
         return len(self.lock_array)*4
     
     def IndexToArray(self,index):
-
-        c1 = c2 = c3 = 0
-        w = self.width
-        h = self.height
-        c1 = index / (w * h)
-        c2 = (index - c1 * w * h) / w
-        c3 = index - w * (c2 + w * c1)
-        ary = []
-        ary.append(c3)
-        ary.append(c2)
-        ary.append(c1)
-        return ary
+        index = int(index)
+        if index < 0 or index >= self.max_location:
+            return None
+        plane = self.width * self.height
+        z = index // plane
+        remainder = index % plane
+        y = remainder // self.width
+        x = remainder % self.width
+        return [x, y, z]
     
 
     def gen_cell_ary(self,plist,file_name):
@@ -243,7 +273,7 @@ class ParticleUtilities():
             # If the cell_array_location is not 0 then test for bounds
             # The cell locatin cannot be greater than the size of the cell array
             
-            if(cell_array_location > self.max_location):
+            if cell_array_location < 0 or cell_array_location >= self.max_location:
                 print(f"particle corner at {cell_array_location} exceeds cell columns at {self.col_ary_size}")
                 print(f"P:{int(p.pnum)} at ({cell_array_location})<{round(p.rx)},{round(p.ry)},{round(p.rz)}>")
                 print(f"[",end=' ')
@@ -272,21 +302,17 @@ class ParticleUtilities():
 
 
     def ArrayToIndex(self,loc,p=None):
-        # This is the count of cells which is 1 greater than side length
-        w = self.width
-        h = self.height
-        indxLoc = 0
-        try :
-            indxLoc =  loc[0] + w * (loc[1] + h * loc[2])
-        except BaseException as e:
-            print("At Array to index:{e}")
-        
-        #if p != None:
-         #   print(f"P:{indxLoc} at <{loc[0][0]},{loc[0][1]},{loc[0][2]}for pnum {p.pnum}")
-       # if(indxLoc > self.max_location-1):
-        #    return -1
-        #else:
-        return indxLoc
+        try:
+            x, y, z = (int(loc[0]), int(loc[1]), int(loc[2]))
+        except (TypeError, ValueError, IndexError):
+            return -1
+        if (
+            x < 0 or x >= self.width
+            or y < 0 or y >= self.height
+            or z < 0 or z >= self.depth
+        ):
+            return -1
+        return x + self.width * (y + self.height * z)
     
 
     def fill_particle_corner_array(self,p):

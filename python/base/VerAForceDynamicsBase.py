@@ -3,7 +3,7 @@ from gbase import libconf
 from base.VerAForceDynamics import ForceContactDynamics
 from base.InLineTest import InLineTest
 from gbase import BinaryFileUtilities
-from gbase.utilities import get_run_configuration
+from gbase.utilities import get_cell_dimensions, get_run_configuration
 import math
 import re
 from pathlib import Path
@@ -471,6 +471,9 @@ class ForceDynamics(ForceContactDynamics):
         self.item_cfg = shader_flags
         shader_flags.DrawInstance = fields.get("DrawInstance", 0.0)
         shader_flags.SideLength = fields.get("SideLength", 0.0)
+        shader_flags.CellAryW = fields.get("CellAryW", shader_flags.SideLength)
+        shader_flags.CellAryH = fields.get("CellAryH", shader_flags.SideLength)
+        shader_flags.CellAryL = fields.get("CellAryL", shader_flags.SideLength)
         shader_flags.Ptot = fields.get("Ptot", 0.0)
         shader_flags.dt = fields.get("dt", 0.0)
         shader_flags.systemp = fields.get("systemp", 0.0)
@@ -483,8 +486,12 @@ class ForceDynamics(ForceContactDynamics):
         return shader_flags
 
     def create_shader_flags_from_cfg(self, run_configuration):
+        width, height, depth = get_cell_dimensions(run_configuration)
         return self.create_shader_flags(
-            SideLength=run_configuration.get("side_len", 0.0),
+            SideLength=width,
+            CellAryW=width,
+            CellAryH=height,
+            CellAryL=depth,
             Ptot=len(self.particles),
             dt=run_configuration.get("dt", 0.0),
             Boundary=1.0 if run_configuration.get("walls_on", False) else 0.0,

@@ -170,7 +170,17 @@ class GenPQBData(GenDataBase):
         if (rx < 0.5 or ry < 0.5 or rz < 0.5):
             print(f"Error: Particle {particle_struct.pnum} at <{rx},{ry},{rz}> is out of bounds for side length {self.side_length}")
             return 4
-        if (test_ArrayToIndex(rx,ry,rz,self.side_length,self.side_length**3) == -1):
+        if (
+            test_ArrayToIndex(
+                rx,
+                ry,
+                rz,
+                self.cell_x_len,
+                self.cell_y_len,
+                self.cell_z_len,
+            )
+            == -1
+        ):
             print(f"Error: Particle {particle_struct.pnum} at <{rx},{ry},{rz}> is out of bounds for side length {self.side_length}")
             return 4
         particle_struct.radius = self.radius

@@ -8,7 +8,7 @@ from base.Reporting import Reporting
 from base.InLineTest import InLineTest
 #from gbase import libconf
 import io, libconf
-from gbase.utilities import hsv_angle
+from gbase.utilities import get_cell_dimensions, hsv_angle
 
 
 BASE_CLASS_REGISTRY = {
@@ -83,6 +83,7 @@ def _window_size(run_configuration):
 
 
 def _view_box(run_configuration):
+    cell_width, cell_height, _ = get_cell_dimensions(run_configuration)
     x_axis_lims = run_configuration.get("x_axis_lims")
     y_axis_lims = run_configuration.get("y_axis_lims")
     if x_axis_lims is not None and len(x_axis_lims) >= 2:
@@ -93,7 +94,7 @@ def _view_box(run_configuration):
         x_max = float(
             run_configuration.get(
                 "WallXMAX",
-                run_configuration.get("side_len", 1.0),
+                cell_width,
             )
         )
     if y_axis_lims is not None and len(y_axis_lims) >= 2:
@@ -104,7 +105,7 @@ def _view_box(run_configuration):
         y_max = float(
             run_configuration.get(
                 "WallYMAX",
-                run_configuration.get("side_len", 1.0),
+                cell_height,
             )
         )
     zoom = float(run_configuration.get("zoom", 1.0))
@@ -186,19 +187,11 @@ def _particle_kinetic_energy(particle):
 
 
 def _active_particles(particles, dynamics=None):
-    if dynamics is None or not hasattr(dynamics, "IsParticleActiveForDynamics"):
-        return particles
-    return [
-        particle
-        for particle_index, particle in enumerate(particles)
-        if dynamics.IsParticleActiveForDynamics(particle_index)
-    ]
+    return particles
 
 
 def _is_active_particle(particle_index, dynamics=None):
-    if dynamics is None or not hasattr(dynamics, "IsParticleActiveForDynamics"):
-        return True
-    return dynamics.IsParticleActiveForDynamics(particle_index)
+    return True
 
 
 def _total_momentum(particles, dynamics=None):
@@ -448,10 +441,10 @@ def _draw_particles(
         abs(wall_bottom - wall_top),
     )
     pygame.draw.rect(screen, (120, 135, 155), wall_rect, 2)
-    side_len = float(run_configuration.get("side_len", 0.0))
-    if side_len > 0.0:
-        side_left, side_top = _to_screen(0.0, side_len, view_box, screen_width, screen_height)
-        side_right, side_bottom = _to_screen(side_len, 0.0, view_box, screen_width, screen_height)
+    cell_width, cell_height, _ = get_cell_dimensions(run_configuration)
+    if cell_width > 0 and cell_height > 0:
+        side_left, side_top = _to_screen(0.0, cell_height, view_box, screen_width, screen_height)
+        side_right, side_bottom = _to_screen(cell_width, 0.0, view_box, screen_width, screen_height)
         side_rect = pygame.Rect(
             min(side_left, side_right),
             min(side_top, side_bottom),

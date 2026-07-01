@@ -182,7 +182,12 @@ class GenDataBase:
         tst_file_obj = ConfigUtility(tst_file)
         tst_file_obj.Create(self.bobj.log,tst_file)
         tst_file_cfg = tst_file_obj.config
-        pu = ParticleUtilities(tst_file_cfg.CellAryW,tst_file_cfg.cell_occupancy_list_size)
+        pu = ParticleUtilities(
+            tst_file_cfg.CellAryW,
+            tst_file_cfg.cell_occupancy_list_size,
+            tst_file_cfg.CellAryH,
+            tst_file_cfg.CellAryL,
+        )
         index = 0
         for ii in p_list:
             cell_index = pu.ArrayToIndex([round(ii.rx),round(ii.ry),round(ii.rz)])

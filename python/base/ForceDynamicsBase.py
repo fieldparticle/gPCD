@@ -4,7 +4,7 @@ from gbase import libconf
 from base.ForceDynamics import ForceContactDynamics
 from base.InLineTest import InLineTest
 from gbase import BinaryFileUtilities
-from gbase.utilities import get_run_configuration
+from gbase.utilities import get_cell_dimensions, get_run_configuration
 import math
 import re
 from pathlib import Path
@@ -583,6 +583,9 @@ class ForceDynamics(ForceContactDynamics):
         self.item_cfg = shader_flags
         shader_flags.DrawInstance = fields.get("DrawInstance", 0.0)
         shader_flags.SideLength = fields.get("SideLength", 0.0)
+        shader_flags.CellAryW = fields.get("CellAryW", shader_flags.SideLength)
+        shader_flags.CellAryH = fields.get("CellAryH", shader_flags.SideLength)
+        shader_flags.CellAryL = fields.get("CellAryL", shader_flags.SideLength)
         shader_flags.Ptot = fields.get("Ptot", 0.0)
         shader_flags.dt = fields.get("dt", 0.0)
         shader_flags.systemp = fields.get("systemp", 0.0)
@@ -595,151 +598,23 @@ class ForceDynamics(ForceContactDynamics):
         return shader_flags
 
     def create_shader_flags_from_cfg(self, run_configuration):
+        width, height, depth = get_cell_dimensions(run_configuration)
         return self.create_shader_flags(
-            SideLength=run_configuration.get("side_len", 0.0),
+            SideLength=width,
+            CellAryW=width,
+            CellAryH=height,
+            CellAryL=depth,
             Ptot=len(self.particles),
             dt=run_configuration.get("dt", 0.0),
             Boundary=1.0 if run_configuration.get("walls_on", False) else 0.0,
             positionBuffer=run_configuration.get("positionBuffer", 0.0),
         )
 
-    def ReservoirBirthSpacingFactor(self):
-        return max(
-            1.1,
-            float(
-                self.run_configuration.get(
-                    "reservoir_birth_spacing_factor",
-                    1.1,
-                )
-            ),
-        )
-
-    def ReservoirBirthOffset(self, particle):
-        return self.ReservoirBirthSpacingFactor() * 2.0 * float(particle.Data.x)
-
-    def ReservoirFlowAxisAndSign(self):
-        """Return the dominant flow axis and sign from flow_angle in degrees."""
-        flow_angle = math.radians(float(self.run_configuration.get("flow_angle", 0.0)))
-        flow_x = math.cos(flow_angle)
-        flow_y = math.sin(flow_angle)
-        if abs(flow_y) > abs(flow_x):
-            return "y", 1.0 if flow_y >= 0.0 else -1.0
-        return "x", 1.0 if flow_x >= 0.0 else -1.0
-
-    def ReservoirBirthPosition(self, particle):
-        """Return the runtime birth position for the current reservoir flow axis."""
-        axis, direction = self.ReservoirFlowAxisAndSign()
-        offset = self.ReservoirBirthOffset(particle)
-        x = float(particle.rx)
-        y = float(particle.ry)
-        z = float(particle.rz)
-        if axis == "y":
-            default_inlet = (
-                self.run_configuration.get("WallYMIN", 0.0)
-                if direction > 0.0
-                else self.run_configuration.get("WallYMAX", self.ShaderFlags.SideLength)
-            )
-            inlet_y = float(
-                self.run_configuration.get(
-                    "reservoir_inlet_y",
-                    default_inlet,
-                )
-            )
-            y = inlet_y + direction * offset
-        else:
-            default_inlet = (
-                self.run_configuration.get("WallXMIN", 0.0)
-                if direction > 0.0
-                else self.run_configuration.get("WallXMAX", self.ShaderFlags.SideLength)
-            )
-            inlet_x = float(
-                self.run_configuration.get(
-                    "reservoir_inlet_x",
-                    default_inlet,
-                )
-            )
-            x = inlet_x + direction * offset
-        return x, y, z
-
-    def ReservoirParticleEscaped(self, position):
-        """Return True when a live reservoir particle crosses the outlet plane."""
-        axis, direction = self.ReservoirFlowAxisAndSign()
-        if axis == "y":
-            default_outlet = (
-                self.run_configuration.get("WallYMAX", self.ShaderFlags.SideLength)
-                if direction > 0.0
-                else self.run_configuration.get("WallYMIN", 0.0)
-            )
-            outlet_y = float(
-                self.run_configuration.get(
-                    "reservoir_outlet_y",
-                    default_outlet,
-                )
-            )
-            return position.y >= outlet_y if direction > 0.0 else position.y <= outlet_y
-
-        default_outlet = (
-            self.run_configuration.get("WallXMAX", self.ShaderFlags.SideLength)
-            if direction > 0.0
-            else self.run_configuration.get("WallXMIN", 0.0)
-        )
-        outlet_x = float(
-            self.run_configuration.get(
-                "reservoir_outlet_x",
-                default_outlet,
-            )
-        )
-        return position.x >= outlet_x if direction > 0.0 else position.x <= outlet_x
-
-    def SetParticlePosition(self, particle, x, y, z):
-        position_buffer = int(self.ShaderFlags.positionBuffer)
-        particle.PosLocA.x = x
-        particle.PosLocA.y = y
-        particle.PosLocA.z = z
-        particle.PosLocB.x = x
-        particle.PosLocB.y = y
-        particle.PosLocB.z = z
-        particle.PosLocA.w = 0.0 if position_buffer == 0 else 1.0
-        particle.PosLocB.w = 1.0 if position_buffer == 0 else 0.0
-        particle.rx = x
-        particle.ry = y
-        particle.rz = z
-
-    def ApplyReservoirBirths(self):
-        """Activate particles whose Data.w birth frame has arrived."""
-        if not self.ReservoirLifecycleEnabled():
-            return
-        current_frame = float(self.ShaderFlags.frameNum)
-        for particle_index, particle in enumerate(self.particles):
-            if hasattr(self, "IsBoundaryParticle") and self.IsBoundaryParticle(particle_index):
-                continue
-            birth_frame = float(particle.Data.w)
-            if birth_frame <= 0.0 or current_frame < birth_frame:
-                continue
-            x, y, z = self.ReservoirBirthPosition(particle)
-            self.SetParticlePosition(particle, x, y, z)
-            particle.Data.w = 0.0
-            particle.state_flg = 0.0
-
-    def RetireReservoirEscapes(self):
-        """Mark live reservoir particles dead after their center crosses outlet."""
-        if not self.ReservoirLifecycleEnabled():
-            return
-        output_buffer = 1 - int(self.ShaderFlags.positionBuffer)
-        for particle_index, particle in enumerate(self.particles):
-            if not self.IsMobileParticleActiveForDynamics(particle_index):
-                continue
-            position = self.particle_position(particle, output_buffer)
-            if self.ReservoirParticleEscaped(position):
-                particle.Data.w = -1.0
-                particle.state_flg = -1.0
-
     def CollisionRun(self):
         """Run one source-owned semi-implicit ForceDynamics frame."""
         if not self.BeginFrame():
             return self.particles
         self.ApplyBeforeContactScanHook()
-        self.ApplyReservoirBirths()
         self.ResetFrameState()
         self.ApplyStartRunHook()
         self.BuildFrameSnapshot()
@@ -758,7 +633,6 @@ class ForceDynamics(ForceContactDynamics):
             return self.particles
         if not self.CalculatePositions():
             return self.particles
-        self.RetireReservoirEscapes()
         self.BuildEndPositionSnapshot()
         frame_end_pairs = self.CapturePairGeometryDiagnostics()
         self.RecordAfterResolveDiagnostics()

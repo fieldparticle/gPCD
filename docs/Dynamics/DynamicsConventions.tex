@@ -212,13 +212,12 @@ This colorization is a visualization aid for flow direction and particle
 motion.  The dynamics model owns the velocity angle; the renderer owns the
 conversion from angle to RGB.
 
-For ordinary live particles, the collision-color flag \texttt{colFlg} is
+For ordinary mobile particles, the collision-color flag \texttt{colFlg} is
 diagnostic display state.  Shader paths that use it must clear it once per
 source invocation and set it only when a valid particle or wall contact is
-accumulated for the current frame.  Reservoir lifecycle processing may assign
-reserved nonzero values to \texttt{colFlg} while a particle is waiting for or
-attempting birth, as defined in the reservoir convention below.  These values
-are lifecycle state, not force input.
+accumulated for the current frame.  The retired deferred-birth investigation
+reserved additional values, but the live model no longer uses
+\texttt{colFlg} as lifecycle state.
 
 Rendered sphere radius must be derived from the particle radius stored in
 \texttt{Data.x}.  Mesh files may provide a convenient unit sphere, but they

@@ -41,8 +41,8 @@ class PlotParticles():
         self.set_up_plot()
         file_prefix = os.path.splitext(file_name)[0]
         self.test_file_name = file_prefix + ".tst"
-        self.tstcfg = ConfigUtility(self.test_file_name)
-        self.tstcfg.Create(self.parent.bobj.log,self.test_file_name)
+        #self.tstcfg = ConfigUtility(self.test_file_name)
+        #self.tstcfg.Create(self.parent.bobj.log,self.test_file_name)
         self.tst_side_length = self.itemcfg.cell_range
         self.do_plot()
         plt.show(block=False)

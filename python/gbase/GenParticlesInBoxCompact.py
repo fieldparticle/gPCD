@@ -84,13 +84,12 @@ class GenParticlesInBox():
             raise BaseException(f"Can't open testfile {self.test_file_name} err{e}")
         fstr = f"index = {self.index};\n"     
         f.write(fstr)
-        # size lengths must be plus 1 since the cell locations start as <0,0,0>
-        # THIS is the only place you so this - The vulkan code nees to check this
-        fstr = f"CellAryW = {run_cfg.side_len};\n"     
+        width, height, depth = get_cell_dimensions(run_cfg)
+        fstr = f"CellAryW = {width};\n"     
         f.write(fstr)
-        fstr = f"CellAryH = {run_cfg.side_len};\n"     
+        fstr = f"CellAryH = {height};\n"     
         f.write(fstr)
-        fstr = f"CellAryL = {run_cfg.side_len};\n"     
+        fstr = f"CellAryL = {depth};\n"     
         f.write(fstr)
         fstr = f"radius = {run_cfg.radius};\n"
         f.write(fstr)

@@ -24,18 +24,15 @@ and writes only the source velocity and position.  The implementation is
 shaped to transfer directly to one GLSL compute invocation per source
 particle.
 
-\texttt{ForceDynamics} currently supports three wall interpretations:
+\texttt{ForceDynamics} currently supports two active wall interpretations:
 \begin{itemize}
     \item \emph{simple walls}: all four configured wall planes are solid;
-    \item \emph{pipe walls}: the configured \(y_{\min}\) and \(y_{\max}\)
-    planes are solid while \(x_{\min}\) and \(x_{\max}\) are lifecycle inlet
-    and outlet planes;
     \item \emph{boundary-particle walls}: particles with positive
     evaluator-valued \texttt{ptype} are occupancy markers that represent
     local wall segments.
 \end{itemize}
 
-Simple and pipe walls use the configured wall-ghost geometry.  Boundary
+Simple walls use the configured wall-ghost geometry.  Boundary
 particles are not mobile dynamics sources.  They remain active for display
 and broad-phase placement, but when a mobile source sees a boundary marker as
 a target, it evaluates the represented wall segment and accumulates a wall
@@ -56,7 +53,7 @@ from the current Vulkan export validation.
 \begin{figure}[ht]
 \centering
 \resizebox{\textwidth}{!}{\input{ForceDynamicsFlowPTikz}}
-\caption{ForceDynamics pipe-wall flow: reservoir lifecycle plus wall flags 3--4}
+\caption{Historical pipe-wall flow retained for comparison}
 \end{figure}
 
 \begin{figure}[ht]
@@ -84,7 +81,7 @@ for each SourceID:
             ProcessBoundaryParticleWallCollision(SourceID, TargetID, totalForce)
 for each SourceID:
     if boundary-particle walls are not enabled:
-    for each configured wall flag selected by the wall mode:
+    for each configured manual wall flag:
         ProcessWallCollision(SourceID, wall, totalForce)
 capture frame-start pair diagnostics
 for each SourceID:
@@ -128,10 +125,8 @@ this function; they are routed to the boundary-particle wall path.
 
 \texttt{ProcessWallCollision(SourceID, wall, totalForce)} creates the
 configured wall ghost geometry and immediately adds its force to
-\texttt{totalForce}.  In simple-wall mode the selected wall flags are
-\(1,2,3,4\).  In pipe-wall mode the selected wall flags are \(3,4\), because
-the \(x\) planes are lifecycle inlet/outlet planes rather than solid walls.
-When boundary-particle walls are enabled, the manual wall scan is suppressed.
+\texttt{totalForce}.  Manual-wall mode scans flags \(1,2,3,4\).  When
+boundary-particle walls are enabled, the manual wall scan is suppressed.
 
 \ForceFunctionSection{ProcessBoundaryParticleWallCollision}
 
@@ -198,18 +193,15 @@ occupancy and wall-geometry markers, not mobile dynamics sources.
 
 \ForceFunctionSection{IsMobileParticleActiveForDynamics}
 
-\texttt{IsMobileParticleActiveForDynamics(ParticleID)} combines reservoir
-lifecycle state with particle type.  It is true only for live, non-boundary
-particles.  Contact scans, velocity writes, position writes, diagnostics, and
-reservoir birth/death updates use this mobile-source predicate.
+\texttt{IsMobileParticleActiveForDynamics(ParticleID)} excludes boundary
+markers from source integration.  Scheduled reservoir lifecycle filtering has
+been removed; mobile particles are active from their generated initial state.
 
 \ForceFunctionSection{WallFlagsForDynamics}
 
-\texttt{WallFlagsForDynamics()} selects the manual wall flags for the current
-wall mode.  Ordinary simple boundaries use all four walls.  Reservoir pipe
-flow uses only flags \(3\) and \(4\).  Boundary-particle wall mode bypasses
-this manual wall scan because wall contacts are discovered as boundary-marker
-targets.
+\texttt{WallFlagsForDynamics()} returns the four legacy manual-wall flags.
+Boundary-particle wall mode bypasses this manual scan because wall contacts are
+discovered as boundary-marker targets.
 
 \ForceFunctionSection{InitializeWallContactState}
 

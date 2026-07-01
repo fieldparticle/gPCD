@@ -1,3 +1,0 @@
-(a) illustrtaes the manner in which triangles are utilized to form objects. 
-(b) illustrtaes non-overlapping, thread-safe, triangles joined at the vertices. 
-(c) overlapping triangles where threads access the same memory location and may conflict.

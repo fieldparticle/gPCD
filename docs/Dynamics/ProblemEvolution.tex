@@ -1169,3 +1169,52 @@ overlap supplies artificial contact potential.  A prefilled reservoir removes
 that discontinuity.  Its piston is an explicit external momentum source, so
 future diagnostics must include piston impulse rather than treating particle
 momentum as a closed-system quantity.
+
+\subsection{Horizontal Prefilled Reservoir Reset}
+
+\subsubsection{<previous form>}
+
+\texttt{BoundaryParticleReservoirPeriodic.py} combined horizontal and vertical
+generation, scheduled birth, retirement, wall selection, packing, and test-file
+generation.  Repeated release columns occupied the same stored positions and
+depended on \texttt{Data.w} birth frames to avoid simultaneous overlap.  The
+configuration exposed lifecycle and implementation selectors that obscured
+the physical geometry.
+
+\subsubsection{<current form>}
+
+The periodic generator and its cfg have been retired.  Development restarted
+with \texttt{BoundaryParticleReservoirHorizontal.py} and
+\texttt{BoundaryParticleReservoirHorizontal.cfg}.  The generator owns its
+horizontal orientation.  Physical geometry is declared by six-value
+\texttt{reservoir\_bounds} and \texttt{pipe\_bounds} arrays inside an explicit
+rectangular cell domain.
+
+The current two-dimensional convention uses $z_{front}=0$, $z_{back}=3$,
+and particle plane $z=1$.  Validation checks bound ordering, cell-domain
+containment, the shared reservoir/pipe interface, and containment of the pipe
+opening within the reservoir face.
+
+Packing is currently diagnostic only.  Radius $0.1$, absolute surface gap
+$0.1$, and wall-contact clearance produce a centered $30\times13$ capacity
+report for the reduced Python geometry, or 390 possible mobile particles.
+No mobile records are emitted yet.
+
+The generator creates a closed reservoir inlet, reservoir and pipe side walls,
+optional interface shoulders, and an open pipe outlet.  Shared marker
+coordinates are emitted once.  The current reduced geometry contains 43
+boundary markers plus the null record.  The milestone writes only the binary
+particle file and deliberately does not write test metadata.
+
+\subsubsection{difference outcome}
+
+Particle solution for validated horizontal geometry, packing capacity, and
+boundary-only binary generation.  Mobile packing and piston motion remain
+unimplemented.
+
+\subsubsection{<Analysis>}
+
+Separating physical bounds from particle packing removes lifecycle timing from
+geometry generation.  The boundary-only binary provides a narrow test surface:
+wall topology and evaluator IDs can be inspected before mobile particles,
+piston state, GLSL generation, or Vulkan configuration are reintroduced.

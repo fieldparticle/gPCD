@@ -312,7 +312,12 @@ class TabGenData(QTabWidget):
             tst_file_obj = ConfigUtility(tst_file)
             tst_file_obj.Create(self.bobj.log,tst_file)
             tst_file_cfg = tst_file_obj.config
-            pu = ParticleUtilities(tst_file_cfg.CellAryW,tst_file_cfg.cell_occupancy_list_size)
+            pu = ParticleUtilities(
+                tst_file_cfg.CellAryW,
+                tst_file_cfg.cell_occupancy_list_size,
+                tst_file_cfg.CellAryH,
+                tst_file_cfg.CellAryL,
+            )
         except BaseException as e:
             print(f"Verify indexing error:{e}")
             return
@@ -320,7 +325,12 @@ class TabGenData(QTabWidget):
 
         [pcount,ccount] = pu.detect_collsions(self.particle_data,file_name)
         
-        totcol = int(tst_file_cfg.particles_per_cell* tst_file_cfg.CellAryW**3)
+        totcol = int(
+            tst_file_cfg.particles_per_cell
+            * tst_file_cfg.CellAryW
+            * tst_file_cfg.CellAryH
+            * tst_file_cfg.CellAryL
+        )
         totcells = int(tst_file_cfg.num_particles/tst_file_cfg.particles_per_cell)
         totcol = int(totcells*ccount)
         self.log.log(self,f"Number collsions per cell counted:{ccount}. Processed during generation {tst_file_cfg.num_particle_colliding}")
@@ -340,16 +350,18 @@ class TabGenData(QTabWidget):
             tst_file_obj = ConfigUtility(tst_file)
             tst_file_obj.Create(self.bobj.log,tst_file)
             tst_file_cfg = tst_file_obj.config
-            tst_side_length =  tst_file_cfg.CellAryW
-            col_file.write(f"Height:{ tst_side_length},Width{tst_side_length}\n")
+            width = int(tst_file_cfg.CellAryW)
+            height = int(tst_file_cfg.CellAryH)
+            depth = int(tst_file_cfg.CellAryL)
+            col_file.write(f"Width:{width},Height:{height},Depth:{depth}\n")
             col_ary_size = tst_file_cfg.cell_occupancy_list_size
-            pu = ParticleUtilities(tst_side_length,col_ary_size)
+            pu = ParticleUtilities(width, col_ary_size, height, depth)
         except BaseException as e:
             print(f"Verify indexing error:{e}")
             return
-        for zz in range(tst_side_length):
-            for yy in range(tst_side_length):
-                for xx in range(tst_side_length):
+        for zz in range(depth):
+            for yy in range(height):
+                for xx in range(width):
                     ary = [round(xx),round(yy),round(zz)]
                     index = pu.ArrayToIndex(ary)
                     col_file.write(f"Index:{index} at <{xx},{yy},{zz}>\n")
@@ -606,7 +618,7 @@ class TabGenData(QTabWidget):
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/BoundaryParticleReservoirPeriodic.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/BoundaryParticleReservoirHorizontal.cfg")
         self.update_list_widget()
         self.update_data_list_widget()
         

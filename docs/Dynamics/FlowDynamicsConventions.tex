@@ -1,493 +1,126 @@
 % !TeX root = main.tex
-\newpage
-\section{Simple Reservoir Flow}
+\section{Flow Dynamics Conventions}
 
-\subsection{Purpose}
+\subsection{Current Reservoir Direction}
 
-\texttt{SimpleReservoir} is a particle birth/life/death process used with
-\texttt{ForceDynamics}.  It does not change the ForceDynamics contact-force
-law or the configured \texttt{contact\_force\_measure}.  It decides when
-particles become active, which particles are eligible for dynamics, and when
-particles leave the active simulation.
+Scheduled particle birth, lifecycle gating through \texttt{Data.w}, and
+outlet retirement have been retired from the live Python
+\texttt{ForceDynamics} path.  Mobile particles are generated active from
+frame zero.  The selected replacement is a finite, prefilled reservoir whose
+rear wall will later move as a piston.  The piston model is not yet
+implemented.
 
-The scheduled-birth reservoir documented below is the current implementation,
-not the selected next architecture.  Capture diagnostics showed that a slowed
-particle can remain at the inlet when a later wave is admitted.  The resulting
-deep starting overlap preserves pair momentum but injects artificial contact
-compression and kinetic energy.  The selected replacement is the prefilled
-moving-piston reservoir defined in \texttt{DynamicsConventions.tex}.
+The former deferred-birth design remains documented as a historical
+investigation in \texttt{DynamicsConventions.tex} and
+\texttt{ProblemEvolution.tex}.  It is not an active generation or dynamics
+rule.
 
-\subsection{State Field}
+\subsection{Horizontal Reservoir Generator}
 
-For \texttt{SimpleReservoir}, the model-owned particle state is stored in
-\texttt{Particle.Data.w}.  When particles are loaded from a binary
-\texttt{pdata} file, the input field \texttt{state\_flg} is copied into
-\texttt{Particle.Data.w}.
+The active replacement work begins in:
+\begin{verbatim}
+gbase/BoundaryParticleReservoirHorizontal.py
+cfg_gendata/BoundaryParticleReservoirHorizontal.cfg
+\end{verbatim}
 
-The meaning of \texttt{Data.w} is:
+The generator owns the horizontal orientation.  Its cfg does not select a
+wall model, wall function, conduit axis, birth schedule, or retirement plane.
+The reduced Python profile remains selected through
+\texttt{sub\_BPRPPy.cfg}; the Vulkan profile is deferred until Python
+geometry and dynamics are verified.
+
+The physical domains are configured as:
+\begin{verbatim}
+reservoir_bounds = [
+    x_start, x_end,
+    y_bottom, y_top,
+    z_front, z_back
+];
+
+pipe_bounds = [
+    x_start, x_end,
+    y_bottom, y_top,
+    z_front, z_back
+];
+\end{verbatim}
+
+For the horizontal model, positive (x) is axial.  The reservoir outlet and
+pipe inlet must share a plane:
+\[
+x_{r,\max}=x_{p,\min}.
+\]
+The pipe (y) and (z) bounds must fit inside the reservoir outlet face.
+Every bound must lie inside the explicit rectangular cell domain defined by
+\texttt{cell\_array\_width}, \texttt{cell\_array\_height}, and
+\texttt{cell\_array\_depth}.
+
+The current two-dimensional convention is:
+\[
+z_{\mathrm{front}}=0,\qquad
+z_{\mathrm{back}}=3,\qquad
+z_{\mathrm{particle}}=1.
+\]
+The cell-array depth must therefore be greater than three.
+
+\subsection{Reservoir Packing Report}
+
+The current generator calculates reservoir capacity but does not yet create
+mobile particle records.  With particle radius (r) and configured
+surface-to-surface separation (s), center spacing is:
+\[
+\ell=2r+s.
+\]
+
+Initial particle centers reserve the wall-contact clearance:
+\[
+c=r(1+o)+\epsilon,
+\]
+where (o) is \texttt{wall\_contact\_offset}.  The usable center interval
+on each packed axis is the physical interval reduced by (c) at both ends.
+For usable span (L), the count is:
+\[
+N=\left\lfloor\frac{L}{\ell}\right\rfloor+1.
+\]
+The occupied grid is centered in any remaining space so opposing wall margins
+are equal.
+
+For the current reduced Python case, the report is a \(30\times13\) grid,
+or 390 possible mobile particles.  This is capacity only; no mobile particles
+are written yet.
+
+\subsection{Boundary Marker Geometry}
+
+The current horizontal generator writes boundary markers only.  It creates:
 
 \begin{itemize}
-    \item \(\texttt{Data.w} > 0\): unborn particle.  The value is the frame on
-    which the particle becomes active.
-    \item \(\texttt{Data.w} = 0\): live particle.  The particle participates in
-    ForceDynamics.
-    \item \(\texttt{Data.w} < 0\): dead particle.  The particle is removed from
-    ForceDynamics.
+    \item a closed vertical reservoir inlet;
+    \item upper and lower reservoir walls;
+    \item upper and lower pipe walls;
+    \item vertical shoulder segments where a narrower pipe joins the
+    reservoir;
+    \item no vertical wall across the pipe outlet.
 \end{itemize}
 
-These meanings apply only when the active configuration selects
-\texttt{SimpleReservoir}.  Other models may assign different meanings to
-\texttt{Data.w}.
-
-\subsection{Birth Rule}
-
-At the beginning of each frame, before contact detection, every unborn
-particle is tested against the current frame number:
-
-\[
-\texttt{if Data.w > 0 and frameNum >= Data.w}
-\]
-
-then the particle is born.  Birth performs:
-
-\begin{itemize}
-    \item set \(\texttt{Data.w}=0\);
-    \item place the particle at the inlet birth position;
-    \item assign the inlet velocity;
-    \item make both position buffers agree on the birth position.
-\end{itemize}
-
-A particle is born before the frame-start snapshot is built, so the newly born
-particle participates in the current frame using ordinary ForceDynamics rules.
-
-This is the current implementation.  It does not test whether the proposed
-birth position overlaps an already-live mobile particle.  Deferred admission
-was analyzed as one repair, but the selected next model removes runtime birth
-and uses a prefilled moving-piston reservoir.
-
-In the GLSL compute path this rule is owned by:
-
-\begin{verbatim}
-StartReservoir(SourceID)
-\end{verbatim}
-
-The compute shader calls this function before particle contact scans, wall
-contact scans, velocity update, or position update.  If the function returns
-\texttt{false}, the source invocation returns immediately.  This means unborn
-and dead particles do not participate in the current frame.  If the source
-particle reaches its stored birth frame, \texttt{StartReservoir} resets the
-active position to the inlet birth location, updates both position buffers,
-sets \texttt{Data.w=0}, and returns \texttt{true}.
-
-\subsection{Live Rule}
-
-A particle is live when:
-
-\[
-\texttt{Data.w = 0}.
-\]
-
-Only live particles are eligible for:
-
-\begin{itemize}
-    \item particle-particle contact detection;
-    \item wall contact detection;
-    \item force accumulation;
-    \item velocity update;
-    \item position update;
-    \item energy and momentum diagnostics.
-\end{itemize}
-
-Unborn and dead particles are skipped by the dynamics pass.
-
-\subsection{Death Rule}
-
-After position update, each live particle is tested against the outlet
-boundary.  If the particle has crossed the outlet boundary, then:
-
-\[
-\texttt{Data.w = -1}.
-\]
-
-A dead particle no longer participates in ForceDynamics and is not reused by
-\texttt{SimpleReservoir}.
-
-In the GLSL compute path this rule is owned by:
-
-\begin{verbatim}
-RetireParticlePastXMax(SourceID)
-\end{verbatim}
-
-The compute shader calls this function after \texttt{CalcPosition(SourceID)}.
-It reads the next position buffer, the buffer just written by
-\texttt{CalcPosition}, and sets \texttt{Data.w=-1} when the particle has
-passed the selected outlet boundary.  For horizontal reservoir flow this is
-the \(x_{\max}\) outlet.  For vertical reservoir flow this is the
-\(y_{\max}\) outlet.  The legacy function name is retained for shader-wrapper
-compatibility even though the implementation now respects the generated
-\texttt{PERIODIC\_DIRECTION} selector.
-
-\subsection{Boundary Rule}
-
-For \texttt{SimpleReservoir}, the inlet and outlet are not solid walls.  They
-are lifecycle planes.  Only the pipe walls are solid ForceDynamics walls.
-
-For the current two-dimensional pipe convention:
-
-\begin{itemize}
-    \item \(x_{\min}\): inlet birth plane, not a wall;
-    \item \(x_{\max}\): outlet death plane, not a wall;
-    \item \(y_{\min}\): solid lower wall;
-    \item \(y_{\max}\): solid upper wall.
-\end{itemize}
-
-Therefore the wall scan for \texttt{SimpleReservoir} includes only wall flags
-3 and 4.
-
-\subsection{Boundary Particle Wall Rule}
-
-Reservoir configurations may select the wall representation with:
-
-\begin{verbatim}
-wall_type = 0;  // manual configured wall planes
-wall_type = 1;  // particle boundary markers
-\end{verbatim}
-
-When \texttt{wall\_type=0}, the configured wall fields retain their legacy
-meaning as physical wall planes.  When \texttt{wall\_type=1}, boundary
-particles define the solid wall broad phase.  The configured manual wall
-planes must not be used as the physical wall-collision geometry for those
-pipe walls.
-
-A boundary particle is an occupancy marker, not a moving dynamics particle.
-It is stored in the same particle buffer with a positive evaluator-valued
-\texttt{ptype} and
-\texttt{Data.w=0.0} so the vertex/cell placement pass includes it.  The
-compute/source dynamics dispatch still processes only mobile particles as
-sources.  When a mobile source encounters a boundary marker as a target, it
-must evaluate the wall segment represented by that marker rather than process
-the marker as an ordinary particle-particle collision.
-
-Each newly generated boundary marker is self-describing.  Its evaluator ID is
-written to \texttt{pdata.ptype} and copied into runtime \texttt{ptype} and
-\texttt{Data.z}:
-\begin{verbatim}
-1 = horizontal_wall
-2 = vertical_wall
-3 = cd_nozzle_wall
-\end{verbatim}
-\texttt{EvaluateWallSegment(SourceID, BoundaryID)} dispatches from this target-
-owned value.  There is no runtime global-function fallback.  Binary files whose
-boundary markers have evaluator ID zero must be regenerated.
-
-The current straight-wall implementation is:
-
-\begin{verbatim}
-EvaluateWallSegment(SourceID, BoundaryID)
-\end{verbatim}
-
-For now, each boundary marker represents either a straight horizontal or
-straight vertical wall segment through the center of the marker's cell.  The
-generator configuration selects which evaluator ID is written into each
-marker; runtime Python dispatch reads that marker-owned ID from
-\texttt{Data.z}.  Horizontal segments classify markers as lower or upper
-walls.  Vertical segments classify markers as left or right walls.  The
-evaluator calculates the current source-to-segment wall ghost geometry and
-returns the normal, overlap area, center distance, and wall flag needed by the
-ordinary wall contact slot.  Later sloped or curved boundaries should extend
-\texttt{EvaluateWallSegment} without changing the source-owned force
-accumulation rule.
-
-Python and Vulkan have completed this marker-owned dispatch migration.  The
-Vulkan loader copies positive \texttt{pdata.ptype} values into
-\texttt{Data.z}, and generated \texttt{EvaluateWallSegment} dispatches from
-the target marker's value.  The old global \texttt{WALL\_FUNC} evaluator
-decision has been removed.  \texttt{WALL\_MODEL\_BOUNDARY\_PARTICLE} remains
-the wrapper-level selection that enables marker-target wall processing.
-
-The closed horizontal reservoir test emits horizontal-evaluator markers along
-the derived \(y_{\min}\) and \(y_{\max}\) walls and vertical-evaluator markers
-along \(x_{\min}\) and \(x_{\max}\).  Marker coordinates are deduplicated, so
-an exact corner coordinate is stored once.  The inlet wall is
-\texttt{reservoir\_inlet\_x}; the outlet wall is that inlet plus
-\texttt{wall\_boundary\_length}.  The lifecycle retirement plane is configured
-separately beyond the physical outlet wall, so a normal wall rebound is
-attempted before a particle can be retired as an escape.
-
-The vertical periodic test uses the rotated form of the same construction:
-exact horizontal inlet/outlet caps, exact vertical side walls, and one marker
-per corner.  Mobile row clearance includes particle radius, wall-contact
-offset, maximum configured position jitter, and a small numerical epsilon.
-
-\subsection{ForceDynamics Invariance}
-
-\texttt{SimpleReservoir} does not modify the ForceDynamics equations:
-
-\[
-F_{ij}=q_{ij}M_{ij}
-\]
-
-and
-
-\[
-\mathbf v_{n+1}
-=
-\mathbf v_n+\frac{\mathbf F_n}{m}\Delta t.
-\]
-
-\(M_{ij}\) is selected by \texttt{contact\_force\_measure}.  The current
-default is penetration depth; overlap area remains available as the optional
-\texttt{area} mode.  \texttt{SimpleReservoir} only controls particle
-eligibility and boundary interpretation.
-
-
-\subsection{Unborn Particle Rule}
-
-Reservoir particles may be stored in repeated columns of length
-\texttt{col\_length}.  Many unborn particles may therefore share the same
-stored position.  These stored positions are not physical particle positions
-until the particle is born.
-
-For \texttt{SimpleReservoir}, if:
-
-\[
-\texttt{Data.w > frameNum}
-\]
-
-then the particle is unborn.  An unborn particle is ignored by all
-ForceDynamics operations:
-
-\begin{itemize}
-    \item no particle-particle contact check;
-    \item no wall contact check;
-    \item no tunneling check;
-    \item no starting-contact check;
-    \item no force accumulation;
-    \item no velocity update;
-    \item no position update;
-    \item no energy or momentum diagnostics.
-\end{itemize}
-
-This prevents staged reservoir particles that share the same stored location
-from producing artificial overlap, tunneling, or starting-collision errors.
-
-\subsection{Birth Frame Rule}
-
-When:
-
-\[
-\texttt{Data.w <= frameNum}
-\]
-
-and \(\texttt{Data.w > 0}\), the particle becomes live.  The birth process
-sets:
-
-\[
-\texttt{Data.w = 0}
-\]
-
-and assigns the particle's active inlet position and velocity before the
-ForceDynamics frame snapshot is built.
-
-The corresponding GLSL source invocation order is:
-
-\begin{verbatim}
-if (!StartReservoir(SourceID))
-    return;
-
-// particle contact scan
-// wall contact scan
-CalcVelocity(SourceID, totalForce);
-CalcPosition(SourceID);
-RetireParticlePastXMax(SourceID);
-\end{verbatim}
-
-This preserves source ownership.  The reservoir state gates only the current
-source invocation; it does not write target particles and does not introduce a
-separate global reservoir pass.
-
-The generated \texttt{PERIODIC\_DIRECTION} selector controls whether the inlet
-and outlet are interpreted along \(x\) or \(y\).  When
-\texttt{PERIODIC\_DIRECTION} is \texttt{vertical}, birth preserves the
-generated \(x\) coordinate and offsets the \(y\) coordinate from
-\(y_{\min}\).  Retirement then checks \(y_{\max}\).  When the selector is not
-vertical, the historical horizontal \(x\)-axis behavior is used.
-
-\subsection{Planned Deferred Birth Admission}
-
-When a scheduled birth frame arrives, the particle will become a birth
-candidate rather than becoming live immediately.  The reserved lifecycle
-states are:
-
-\begin{verbatim}
-colFlg = 2  waiting for a birth attempt
-colFlg = 3  testing a birth attempt
-colFlg = 0  admitted live particle
-\end{verbatim}
-
-The candidate birth position is tested only against already-live mobile
-particles.  Dead particles, unborn particles, simultaneous birth candidates,
-and boundary markers are excluded.  If the motion contact query reports a
-starting collision, the source search terminates immediately, the particle
-returns to \texttt{colFlg=2}, and \texttt{Data.w} is changed to
-\texttt{frameNum+1}.  It receives no force or motion update in that frame.
-
-If no live target overlaps the candidate position, the particle is admitted by
-setting \texttt{Data.w=0} and \texttt{colFlg=0}.  Delaying one particle does
-not move the scheduled birth frames of later particles, so the generated wave
-spacing is preserved.
-
-The GPU implementation must test target liveness from immutable frame-start
-state.  Birth testing and activation cannot depend on the order in which source
-invocations happen to execute; separate test and commit phases, or an
-equivalent synchronized design, are required.
-
-
-\subsection{Birth Placement Rule}
-
-When an unborn particle becomes live, its stored reservoir position is not used
-as its active physical position.  The particle is moved to the inlet birth
-position before ForceDynamics contact detection.
-
-The birth position is offset from the reservoir/staging column by at least
-
-\[
-1.1(2r)
-\]
-
-where \(r\) is the particle radius.  Equivalently, the minimum birth offset is
-
-\[
-2.2r.
-\]
-
-This places the newly live particle slightly more than one particle diameter
-away from particles that remain in the reservoir column.  The factor \(1.1\)
-adds a small clearance margin so the particle is not born in contact due to
-rounding or exact-diameter placement.
-
-\texttt{reservoir\_birth\_spacing\_factor} may request a larger offset, but
-the runtime clamps the factor to a minimum of \(1.1\).  For a closed
-boundary-particle reservoir, the inlet wall is placed at
-\texttt{reservoir\_inlet\_x}; positive-x birth therefore occurs at least
-\(1.1(2r)\) inside that wall.
-
-After birth:
-
-\[
-\texttt{Data.w}=0
-\]
-
-and both position buffers are set to the active birth position.
-
-\subsection{Death Rule}
-
-After position update, every live particle is tested against the outlet
-boundary using its center position.  If the particle center has passed the
-outlet boundary, then:
-
-\[
-\texttt{Data.w}=-1.
-\]
-
-A particle with \(\texttt{Data.w}<0\) is dead.  Dead particles are no longer
-processed by ForceDynamics and are not checked for collision, wall contact,
-tunneling, starting overlap, force, motion, or ordinary energy/momentum
-diagnostics.
-
-\subsection{Vertex Lifecycle Rule}
-
-The graphics vertex stage must apply the same lifecycle rule before building
-particle cell occupancy or drawing particle markers.  A vertex invocation for
-an unborn or dead reservoir particle must not write cell-array occupancy and
-must not leave vertex outputs undefined.
-
-The shared GLSL vertex helper is:
-
-\begin{verbatim}
-ParticleLifeActive(SourceID, frameNum)
-\end{verbatim}
-
-For inactive particles, the vertex shader must write a defined offscreen
-position before returning:
-
-\begin{verbatim}
-if (!ParticleLifeActive(index, uint(ShaderFlags.frameNum))) {
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-    gl_PointSize = 0.0;
-    fragColor = vec3(0.0);
-    return;
-}
-\end{verbatim}
-
-A bare vertex-stage \texttt{return} is not sufficient because it prevents
-occupancy processing but can leave \texttt{gl\_Position} and color outputs
-undefined.  \texttt{discard} is not available in vertex shaders, so moving the
-vertex outside clip space is the required suppression method.
-
-\subsection{CD Nozzle Reservoir Convention}
-
-\texttt{BoundaryCDNozzleReservoir} is the reservoir generator for
-converging-diverging nozzle studies.  The nozzle is described by a piecewise
-radius profile with independently configured inlet, converging, throat,
-diverging, and exit lengths.  For \texttt{dim=2}, the profile is generated in
-the \(xy\) plane at a fixed \texttt{nozzle\_profile\_z}, which defaults to
-\(2.0\).  The \(x\) axis is the default axial flow direction.
-
-The generator writes mobile particles first and boundary marker particles
-after them.  Mobile particles have \texttt{ptype=0.0}.  The inlet cap uses
-\texttt{ptype=2.0} for the vertical-wall evaluator, and curved nozzle markers
-use \texttt{ptype=3.0}.  The generated \texttt{dispatchx} covers only the null
-particle plus mobile source particles.  The generated \texttt{num\_particles}
-includes mobile and boundary particles.
-
-The nozzle entrance must be anchored to the reservoir inlet plane.  For
-horizontal flow, \texttt{nozzle\_start\_x} defaults to \(1.0\).  For vertical
-flow, \texttt{nozzle\_start\_y} defaults to \(1.0\).  These start-plane
-values are also the default reservoir inlet coordinates and the process
-minimum written to the generated test file.  The process maximum is the start
-plane plus the nozzle axial length.  These process bounds are lifecycle
-planes; they are not the physical curved wall.
-
-The generated CD nozzle OBJ is a visualization aid:
-\begin{verbatim}
-vulkan/sim/BoundaryCDNozzleReservoir/CDNozzleGenerated.obj
-\end{verbatim}
-It is generated from the same profile as the boundary particles, but it does
-not define dynamics.  Contact response remains owned by boundary marker
-particles and the selected wall-segment evaluator.
-
-The current two-dimensional CD nozzle wall function is selected with:
-\begin{verbatim}
-boundary_particle_function = "cd_nozzle_wall";
-\end{verbatim}
-For horizontal CD nozzle flow, boundary particles are locality markers.  The
-evaluator calculates the actual wall point and wall normal from the analytic
-nozzle profile at the source particle's current \(x\) coordinate.  The wall
-profile uses the same inlet, converging, throat, diverging, and exit lengths
-and radii as the generator.  The source-owned force accumulation rule does not
-change; only the wall-segment geometry evaluator changes.
-
-The current Python 2D analytic profile uses straight inlet, throat, and exit
-sections with throat-centered quadratic converging and diverging radius
-sections.  For a transition of axial length \(L\), endpoint radius \(r_e\),
-throat radius \(r_t\), and throat-centered coordinate \(\xi\), the implemented
-form is
-
-\begin{equation}
-r(\xi)=r_t+(r_e-r_t)\left(\frac{\xi}{L}\right)^2,
-\qquad
-\frac{dr}{dx}=\frac{2(r_e-r_t)\xi}{L^2}.
-\end{equation}
-
-The converging side uses a signed coordinate whose derivative is negative; the
-diverging side uses a positive coordinate.  Radius is continuous at every
-section boundary and the slope is zero through the throat.  The generated GLSL
-radius and slope templates use the same equations and the CD shader set
-compiles with the quadratic profile.
-
-The 2D inlet is closed by a vertical-evaluator marker column at
-\texttt{nozzle\_start\_x}, spanning the inlet lower and upper radii.  Its two
-corner coordinates are shared with the nozzle profile and stored only once.
-The outlet remains open.  Reservoir birth places a mobile center at least
-\(1.1\) diameters inside the inlet cap before dynamics processing.
+Markers are no farther than one cell apart and shared coordinates are emitted
+once.  Horizontal segment markers use evaluator ID 1 and vertical segment
+markers use evaluator ID 2 through \texttt{pdata.ptype}; the Vulkan loader
+later transports that value to \texttt{Data.z}.  Boundary markers remain
+occupancy placeholders rather than mobile dynamics sources.
+
+The current binary-only milestone writes one null record followed by 43
+boundary-marker records for the reduced horizontal geometry.  It deliberately
+does not write a \texttt{.tst} file.
+
+\subsection{Future Piston Work}
+
+After wall geometry and prefilled particle packing are verified in Python, the
+next model stages are:
+
+\begin{enumerate}
+    \item materialize the reported nonoverlapping mobile grid;
+    \item assign the common initial axial velocity;
+    \item define the rear-wall piston start frame;
+    \item move the piston at the selected axial speed;
+    \item include piston impulse in momentum diagnostics;
+    \item only then update generated GLSL and Vulkan wrappers.
+\end{enumerate}

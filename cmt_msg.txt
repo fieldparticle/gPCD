@@ -1,10 +1,16 @@
 Current status:
-	- Added Vulkan particle capture analysis with CSV momentum and kinetic-energy reporting
-	- Isolated counterflow to scheduled particles entering deeply overlapped at the inlet
-	- Selected a prefilled moving-piston reservoir as the next flow model
-	- Recorded rectangular cell arrays as necessary for reservoir memory efficiency
+	- Retired scheduled reservoir birth and lifecycle filtering
+	- Started fresh horizontal prefilled-reservoir generator
+	- Validated reservoir and open-ended pipe bounds
+	- Calculated centered 30x13 reservoir packing capacity
+	- Generated 43 boundary markers plus null binary record
+
 Code Changes:
-	- Added binary capture discovery and frame-ordered CSV reporting
-	- Added reverse-flow momentum and kinetic-energy diagnostics
-	- Updated reservoir, flow, porting, and problem-evolution documentation
-Next: Implement the prefilled moving-piston reservoir with rectangular cell-array dimensions and piston-impulse diagnostics
+	- Added rectangular cell dimensions across active configurations
+	- Removed side_len and obsolete reservoir lifecycle fields
+	- Removed Force lifecycle calls and Data.w activity filtering
+	- Added horizontal reservoir validation, packing report, wall markers, and binary-only output
+	- Retired BoundaryParticleReservoirPeriodic generator and configuration
+	- Updated active dynamics and configuration documentation
+
+Next: Materialize the reported nonoverlapping mobile-particle grid in the horizontal reservoir

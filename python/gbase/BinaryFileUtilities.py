@@ -138,19 +138,22 @@ def read_particle_data(file_name,particle_range=None):
            
     return results
 
-def test_ArrayToIndex(x,y,z,side_length,max_loc):
-    # This is the count of cells which is 1 greater than side length
-    w = side_length
-    h = side_length
-    indxLoc = 0
+def test_ArrayToIndex(x, y, z, width, height, depth, max_loc=None):
+    w = int(width)
+    h = int(height)
+    d = int(depth)
+    if max_loc is None:
+        max_loc = w * h * d
     rx = round(x)
     ry = round(y)
     rz = round(z)
+    if rx < 0 or rx >= w or ry < 0 or ry >= h or rz < 0 or rz >= d:
+        return -1
     try :
         indxLoc =  rx + w * (ry + h * rz)
     except BaseException as e:
         print("At Array to index:{e}")
-    if indxLoc >= max_loc:
+    if indxLoc < 0 or indxLoc >= max_loc:
         print(f"Index out of bounds: {indxLoc} >= {max_loc}")
         return -1
     return 0

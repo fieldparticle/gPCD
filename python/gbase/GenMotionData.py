@@ -86,13 +86,12 @@ class GenMotionData():
             raise BaseException(f"Can't open testfile {self.test_file_name} err{e}")
         fstr = f"index = {self.index};\n"     
         f.write(fstr)
-        # size lengths must be plus 1 since the cell locations start as <0,0,0>
-        # THIS is the only place you so this - The vulkan code nees to check this
-        fstr = f"CellAryW = {run_cfg.side_len};\n"     
+        width, height, depth = get_cell_dimensions(run_cfg)
+        fstr = f"CellAryW = {width};\n"     
         f.write(fstr)
-        fstr = f"CellAryH = {run_cfg.side_len};\n"     
+        fstr = f"CellAryH = {height};\n"     
         f.write(fstr)
-        fstr = f"CellAryL = {run_cfg.side_len};\n"     
+        fstr = f"CellAryL = {depth};\n"     
         f.write(fstr)
         fstr = f"radius = {run_cfg.radius};\n"
         f.write(fstr)
@@ -183,7 +182,7 @@ class GenMotionData():
                 particle_struct.radius = part.radius
                 particle_struct.collision_stiffness_q = part.get(
                     "collision_stiffness_q",
-                    run_cfg.collision_stiffness_q,
+                    run_cfg.get("collision_stiffness_q", 0.0),
                 )
                 self.p_list.append(particle_struct)
                 self.number_particles = pp+1

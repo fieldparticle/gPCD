@@ -505,10 +505,6 @@ class ForceContactDynamics:
         proximity magnitude.  Return None when no overlap exists.  Coincident
         centers use +x as a deterministic fallback normal.
         """
-        if not self.IsParticleActiveForDynamics(SourceID):
-            return None
-        if not self.IsParticleActiveForDynamics(TargetID):
-            return None
         source_position = self.GetParticlePosition(SourceID)
         target_position = self.GetParticlePosition(TargetID)
         dx = target_position.x - source_position.x
@@ -590,28 +586,13 @@ class ForceContactDynamics:
             int(self.ShaderFlags.positionBuffer),
         )
 
-    def ReservoirLifecycleEnabled(self):
-        """Return True when Data.w is used as birth/live/dead state."""
-        flow_type = str(
-            getattr(self, "run_configuration", {}).get("flow_type", "")
-        ).lower()
-        return flow_type in ("pipe_reservoir_entry", "simple_reservoir")
-
-    def IsParticleActiveForDynamics(self, ParticleID):
-        """Return whether a particle participates in contacts and motion."""
-        if not self.ReservoirLifecycleEnabled():
-            return True
-        return abs(float(self.particles[ParticleID].Data.w)) <= self.EPSILON
-
     def IsBoundaryParticle(self, ParticleID):
         """Return True when a particle is an occupancy-only boundary marker."""
         return float(getattr(self.particles[ParticleID], "ptype", 0.0)) > 0.5
 
     def IsMobileParticleActiveForDynamics(self, ParticleID):
-        """Return True when a particle is a live mobile dynamics source."""
-        if self.IsBoundaryParticle(ParticleID):
-            return False
-        return self.IsParticleActiveForDynamics(ParticleID)
+        """Return True when a particle is a mobile dynamics source."""
+        return not self.IsBoundaryParticle(ParticleID)
 
     def BoundaryParticleWallsEnabled(self):
         """Return True when boundary markers provide wall broad phase."""
@@ -621,9 +602,7 @@ class ForceContactDynamics:
         )
 
     def WallFlagsForDynamics(self):
-        """Return wall flags that are solid for the current flow model."""
-        if self.ReservoirLifecycleEnabled():
-            return (3, 4)
+        """Return the four flags used by legacy manual-wall models."""
         return (1, 2, 3, 4)
 
     def StartingParticleKey(self, SourceID, TargetID):
@@ -1052,10 +1031,6 @@ class ForceContactDynamics:
         return True
 
     def isParticleContact(self, Frame, SourceID, TargetID, positionBuffer):
-        if not self.IsParticleActiveForDynamics(SourceID):
-            return False
-        if not self.IsParticleActiveForDynamics(TargetID):
-            return False
         source = self.particles[SourceID]
         target = self.particles[TargetID]
         if hasattr(self, "PosLocFrame") and self.PosLocFrame:
