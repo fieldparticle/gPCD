@@ -1,16 +1,15 @@
 Current status:
-	- Retired scheduled reservoir birth and lifecycle filtering
-	- Started fresh horizontal prefilled-reservoir generator
-	- Validated reservoir and open-ended pipe bounds
-	- Calculated centered 30x13 reservoir packing capacity
-	- Generated 43 boundary markers plus null binary record
+	- Exported source-owned ForceDynamics to the horizontal Vulkan reservoir
+	- Added double-buffered velocity state matching position buffering
+	- Added maximum-compression containment and internal momentum storage
+	- Added permanent six-plane mobile-particle death handling
+	- Updated capture analysis for the expanded particle ABI
 
 Code Changes:
-	- Added rectangular cell dimensions across active configurations
-	- Removed side_len and obsolete reservoir lifecycle fields
-	- Removed Force lifecycle calls and Data.w activity filtering
-	- Added horizontal reservoir validation, packing report, wall markers, and binary-only output
-	- Retired BoundaryParticleReservoirPeriodic generator and configuration
-	- Updated active dynamics and configuration documentation
+	- Added VelRadA/VelRadB selection and alternate-buffer integration
+	- Added boundary-marker contact dispatch and deduplication
+	- Added wall type and death bounds to generated test metadata
+	- Added dead-source, dead-target, occupancy, and rendering exclusion
+	- Updated ForceDynamics, porting, configuration, and evolution documentation
 
-Next: Materialize the reported nonoverlapping mobile-particle grid in the horizontal reservoir
+Next: Validate death-bound exits and begin the moving-piston reservoir boundary

@@ -17,8 +17,8 @@ Those fields are not used to define boundary-particle geometry.
     \item[\texttt{module\_class}] The horizontal reservoir selects
     \texttt{BoundaryParticleReservoirHorizontal.py}.
     \item[\texttt{include\_file}] Scale profile merged over the parent cfg.
-    Current Python work uses \texttt{sub\_BPRPPy.cfg}.  The Vulkan profile
-    remains available but is not part of the current validation stage.
+    \texttt{sub\_BPRPPy.cfg} provides the reduced Python profile and
+    \texttt{sub\_BPRPVk.cfg} provides the larger Vulkan profile.
     \item[\texttt{data\_dir}] Output directory.
     \item[\texttt{output\_file\_prefix}] Base name of generated output.
 \end{description}
@@ -43,6 +43,8 @@ through the corresponding dimension minus one.
     \item[\texttt{reservoir\_bounds}] Six values in the order
     $x_{start},x_{end},y_{bottom},y_{top},z_{front},z_{back}$.
     \item[\texttt{pipe\_bounds}] Six values in the same order.
+    \item[\texttt{death\_bounds}] Six permanent mobile-particle death planes
+    in the order \(x_{min},x_{max},y_{min},y_{max},z_{min},z_{max}\).
 \end{description}
 
 The generator requires positive $x$ and $y$ spans, finite numeric values,
@@ -62,8 +64,8 @@ the reservoir outlet face.  For the current 2D model, both arrays must use
 \end{description}
 
 The generator derives diameter, center spacing, wall clearance, row and column
-counts, first center, last center, and total capacity.  The current stage only
-reports these values.
+counts, first center, last center, and total capacity, then emits that complete
+mobile packing.
 
 The retired scheduled-release fields are absent:
 \begin{verbatim}
@@ -89,12 +91,15 @@ owns horizontal pipe geometry and emits local evaluator IDs in each marker's
 
 \begin{itemize}
     \item one null particle with \texttt{pnum=0};
-    \item boundary markers with positive evaluator-valued \texttt{ptype};
-    \item no mobile particle records.
+    \item mobile particles with \texttt{ptype=0};
+    \item boundary markers with positive evaluator-valued \texttt{ptype}.
 \end{itemize}
 
-The current stage writes only \texttt{.bin}.  Test metadata and GLSL generation
-are intentionally deferred.
+The generator writes both \texttt{.bin} and \texttt{.tst}.  It emits the
+generator-owned wall selection
+\texttt{wall\_type="WALL\_MODEL\_BOUNDARY\_PARTICLE"}, physical boundary
+extents, all six named death planes, contact-force measure, dispatch size, and
+rectangular cell dimensions.
 
 \subsection{Display And Diagnostics}
 

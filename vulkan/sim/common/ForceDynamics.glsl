@@ -14,8 +14,12 @@ const uint ERROR_INVALID_TARGET_ID = 2u;
 const uint ERROR_INVALID_DT = 3u;
 const uint ERROR_CONTACT_LIST_MISSING = 4u;
 const uint ERROR_PARTICLE_OUT_OF_BOUNDS = 5u;
-const uint ERROR_TUNNELING = 6u;
+const uint ERROR_PARTICLE_TUNNELING = 6u;
 const uint ERROR_MISSING_COLLISION_STIFFNESS_Q = 7u;
+const uint ERROR_WALL_TUNNELING = 8u;
+const uint ERROR_MAX_DEPTH_CONSTRAINT = 9u;
+const uint ERROR_PENETRATION_STEP_TOO_LARGE = 10u;
+const float MAXIMUM_PENETRATION_FRACTION = 0.5;
 const uint CONTACT_INACTIVE = 0u;
 const uint CONTACT_PARTICLE = 1u;
 const uint CONTACT_WALL = 2u;
@@ -109,6 +113,14 @@ struct ContactForceInput {
     bool valid;
 };
 
+#ifndef MAX_SOURCE_DEPTH_CONSTRAINTS
+#define MAX_SOURCE_DEPTH_CONSTRAINTS 16
+#endif
+uint maximumDepthConstraintOwner = 0xffffffffu;
+uint maximumDepthConstraintCount = 0u;
+vec3 maximumDepthConstraintNormals[MAX_SOURCE_DEPTH_CONSTRAINTS];
+float maximumDepthConstraintLimits[MAX_SOURCE_DEPTH_CONSTRAINTS];
+
 // Forward declarations for generated core methods.
 float VelocityAngle(float vx, float vy);
 vec4 particle_position(uint ParticleID, uint positionBuffer);
@@ -138,21 +150,28 @@ float WallContactOffsetDistance(float radius);
 WallPhysicalGhostGeometry GetPhysicalWallGhostGeometry(uint SourceID, uint wall_flag);
 WallGhostGeometry GetWallGhostGeometry(uint SourceID, uint wall_flag);
 bool AppendWallContactSlot(uint SourceID, uint wall_flag);
+bool CheckPenetrationStepResolution(uint SourceID, vec3 normal, float source_radius, vec3 target_velocity);
+bool ProjectSourceVelocityToContactSet(vec3 candidate_velocity, out vec3 contained_velocity);
+bool ApplySourceMaximumDepth(uint SourceID);
 bool CalcVelocity(uint SourceID, vec3 totalForce);
 float GetParticleMass(uint ParticleID);
 bool CalcPosition(uint SourceID);
 bool SetError(uint error_code);
-bool StartReservoir(uint SourceID);
-bool RetireParticlePastXMax(uint SourceID);
-bool RetireParticleAtCellGuard(uint SourceID);
+bool IsParticleDead(uint ParticleID);
+bool ApplyParticleDeathBounds(uint ParticleID);
+vec4 GetParticleVelocity(uint ParticleID);
+vec4 GetNextParticleVelocity(uint ParticleID);
+void SetNextParticleVelocity(uint ParticleID, vec4 velocity);
+bool RegisterMaximumDepthConstraint(uint SourceID, vec3 normal, float penetration_depth, float source_radius);
+bool SolveMaximumDepthSystem(mat3 matrix, vec3 values, uint size, out vec3 solution);
 
-// Python source: ForceDynamics.py:18
+// Python source: ForceDynamics.py:20
 float VelocityAngle(float vx, float vy)
 {
     return (vx != 0.0 || vy != 0.0) ? atan(vy, vx) : 0.0;
 }
 
-// Python source: ForceDynamics.py:23
+// Python source: ForceDynamics.py:25
 vec4 particle_position(uint ParticleID, uint positionBuffer)
 {
     return (positionBuffer == 0u)
@@ -160,7 +179,7 @@ vec4 particle_position(uint ParticleID, uint positionBuffer)
         : P[ParticleID].PosLocB;
 }
 
-// Python source: ForceDynamics.py:30
+// Python source: ForceDynamics.py:32
 float particle_overlap_area(float source_radius, float target_radius, float center_distance)
 {
     if (center_distance <= 0.0) {
@@ -199,13 +218,13 @@ float particle_overlap_area(float source_radius, float target_radius, float cent
     return source_area + target_area - triangle_area;
 }
 
-// Python source: ForceDynamics.py:564
+// Python source: ForceDynamics.py:695
 float ParticleProximityMagnitude(float source_radius, float target_radius, float center_distance)
 {
     return max(0.0, center_distance - target_radius);
 }
 
-// Python source: ForceDynamics.py:569
+// Python source: ForceDynamics.py:700
 float ParticlePenetrationDepth(float source_radius, float target_radius, float center_distance)
 {
     float orientation_magnitude = source_radius;
@@ -217,66 +236,103 @@ float ParticlePenetrationDepth(float source_radius, float target_radius, float c
     return orientation_magnitude - proximity_magnitude;
 }
 
-// Python source: ForceDynamics.py:64
+// Python source: ForceDynamics.py:66
 bool ProcessParticleCollision(uint TargetID, uint SourceID, inout vec3 totalForce)
 {
     ParticleGeometry geometry = GetParticleGeometry(SourceID, TargetID);
+    if (!geometry.valid) {
+        return true;
+    }
+    float penetration_depth = ParticlePenetrationDepth(
+        geometry.effectiveSourceRadius,
+        geometry.effectiveTargetRadius,
+        geometry.centerDistance
+    );
+    float directed_proximity = geometry.centerDistance
+        - geometry.effectiveTargetRadius;
+    if (directed_proximity < -EPSILON) {
+        return SetError(ERROR_PARTICLE_TUNNELING);
+    }
+    if (!CheckPenetrationStepResolution(
+            SourceID, geometry.normal, geometry.effectiveSourceRadius,
+            GetStartFrameVelocity(TargetID).xyz)) {
+        return false;
+    }
+    if (!RegisterMaximumDepthConstraint(
+            SourceID, geometry.normal, penetration_depth,
+            geometry.effectiveSourceRadius)) {
+        return false;
+    }
     ContactForceInput contact = ContactForceInput(
         TargetID,
         CONTACT_PARTICLE,
         geometry.normal,
         geometry.overlapArea,
-        ParticlePenetrationDepth(
-            geometry.effectiveSourceRadius,
-            geometry.effectiveTargetRadius,
-            geometry.centerDistance
-        ),
+        penetration_depth,
         geometry.valid
     );
     return AccumulateContactForce(SourceID, contact, totalForce);
 }
 
-// Python source: ForceDynamics.py:71
+// Python source: ForceDynamics.py:73
 bool ProcessWallCollision(uint SourceID, uint wall, inout vec3 totalForce)
 {
     WallGhostGeometry geometry = GetWallGhostGeometry(SourceID, wall);
+    if (!geometry.valid) {
+        return true;
+    }
+    float penetration_depth = ParticlePenetrationDepth(
+        geometry.effectiveRadius,
+        geometry.effectiveRadius,
+        geometry.centerDistance
+    );
+    float maximum_depth_distance = geometry.effectiveRadius
+        - WallContactOffsetDistance(geometry.effectiveRadius);
+    if (geometry.centerDistance - maximum_depth_distance < -EPSILON) {
+        return SetError(ERROR_WALL_TUNNELING);
+    }
+    if (!CheckPenetrationStepResolution(
+            SourceID, geometry.normal, geometry.effectiveRadius, vec3(0.0))) {
+        return false;
+    }
+    if (!RegisterMaximumDepthConstraint(
+            SourceID, geometry.normal, penetration_depth,
+            geometry.effectiveRadius)) {
+        return false;
+    }
     ContactForceInput contact = ContactForceInput(
         wall,
         CONTACT_WALL,
         geometry.normal,
         geometry.overlapArea,
-        ParticlePenetrationDepth(
-            geometry.effectiveRadius,
-            geometry.effectiveRadius,
-            geometry.centerDistance
-        ),
+        penetration_depth,
         geometry.valid
     );
     return AccumulateContactForce(SourceID, contact, totalForce);
 }
 
-// Python source: ForceDynamics.py:429
+// Python source: ForceDynamics.py:545
 bool InitializeWallContactState(uint SourceID, uint wall)
 {
     // TODO: generate body for InitializeWallContactState.
     return false;
 }
 
-// Python source: ForceDynamics.py:436
+// Python source: ForceDynamics.py:571
 bool InitializeContactState(uint SourceID, uint TargetID)
 {
     // TODO: generate body for InitializeContactState.
     return false;
 }
 
-// Python source: ForceDynamics.py:445
+// Python source: ForceDynamics.py:580
 bool GetContactState(uint SourceID, uint TargetID)
 {
     // TODO: generate body for GetContactState.
     return false;
 }
 
-// Python source: ForceDynamics.py:498
+// Python source: ForceDynamics.py:633
 ParticleGeometry GetParticleGeometry(uint SourceID, uint TargetID)
 {
     vec4 source_position = GetParticlePosition(SourceID);
@@ -314,33 +370,33 @@ ParticleGeometry GetParticleGeometry(uint SourceID, uint TargetID)
     );
 }
 
-// Python source: ForceDynamics.py:579
+// Python source: ForceDynamics.py:880
 vec4 GetParticlePosition(uint ParticleID)
 {
     return particle_position(ParticleID, uint(ShaderFlags.positionBuffer));
 }
 
-// Python source: ForceDynamics.py:629
+// Python source: ForceDynamics.py:925
 uint StartingParticleKey(uint SourceID, uint TargetID)
 {
     // TODO: generate body for StartingParticleKey.
     return 0u;
 }
 
-// Python source: ForceDynamics.py:635
+// Python source: ForceDynamics.py:931
 uint StartingWallKey(uint SourceID, uint wall_flag)
 {
     // TODO: generate body for StartingWallKey.
     return 0u;
 }
 
-// Python source: ForceDynamics.py:639
+// Python source: ForceDynamics.py:935
 void InitializeStartingContactState()
 {
     // TODO: generate body for InitializeStartingContactState.
 }
 
-// Python source: ForceDynamics.py:702
+// Python source: ForceDynamics.py:998
 float ParticleCenterDistance(uint SourceID, uint TargetID)
 {
     vec4 source_position = GetParticlePosition(SourceID);
@@ -349,7 +405,7 @@ float ParticleCenterDistance(uint SourceID, uint TargetID)
     return length(delta);
 }
 
-// Python source: ForceDynamics.py:711
+// Python source: ForceDynamics.py:1007
 ParticleEffectiveContactGeometry GetParticleEffectiveContactGeometry(uint SourceID, uint TargetID, float center_distance)
 {
     float source_radius = P[SourceID].Data.x;
@@ -368,7 +424,7 @@ ParticleEffectiveContactGeometry GetParticleEffectiveContactGeometry(uint Source
     );
 }
 
-// Python source: ForceDynamics.py:749
+// Python source: ForceDynamics.py:1045
 ParticlePotentialGeometry GetParticlePotentialGeometry(uint SourceID, uint TargetID, float center_distance)
 {
     ParticleEffectiveContactGeometry effective =
@@ -382,27 +438,27 @@ ParticlePotentialGeometry GetParticlePotentialGeometry(uint SourceID, uint Targe
     return ParticlePotentialGeometry(effective.sourceRadius, effective.targetRadius, true);
 }
 
-// Python source: ForceDynamics.py:769
+// Python source: ForceDynamics.py:1065
 bool AppendContactSlot(uint SourceID, uint TargetID)
 {
     // TODO: generate body for AppendContactSlot.
     return false;
 }
 
-// Python source: ForceDynamics.py:790
+// Python source: ForceDynamics.py:1086
 uint GetContactSlots(uint SourceID)
 {
     // TODO: generate body for GetContactSlots.
     return 0u;
 }
 
-// Python source: ForceDynamics.py:794
+// Python source: ForceDynamics.py:1090
 vec4 GetStartFrameVelocity(uint ParticleID)
 {
-    return P[ParticleID].VelRad;
+    return GetParticleVelocity(ParticleID);
 }
 
-// Python source: ForceDynamics.py:805
+// Python source: ForceDynamics.py:1101
 bool AccumulateContactForce(uint SourceID, ContactForceInput contact, inout vec3 totalForce)
 {
     if (!contact.valid) {
@@ -421,10 +477,10 @@ bool AccumulateContactForce(uint SourceID, ContactForceInput contact, inout vec3
     #endif
     float force_magnitude = stiffness * max(0.0, contact_measure);
     float impulse = force_magnitude * ShaderFlags.dt;
-    vec3 source_velocity = P[SourceID].VelRad.xyz;
+    vec3 source_velocity = GetParticleVelocity(SourceID).xyz;
     vec3 target_velocity = (contact.contactType == CONTACT_WALL)
         ? vec3(0.0)
-        : P[contact.targetID].VelRad.xyz;
+        : GetParticleVelocity(contact.targetID).xyz;
     float rel_vn = dot(target_velocity - source_velocity, contact.normal);
     vec3 internal_momentum = P[SourceID].parms.yzw;
     if (rel_vn < -EPSILON) {
@@ -442,7 +498,7 @@ bool AccumulateContactForce(uint SourceID, ContactForceInput contact, inout vec3
     return true;
 }
 
-// Python source: ForceDynamics.py:825
+// Python source: ForceDynamics.py:1121
 float GetPairStiffness(uint SourceID, uint TargetID)
 {
     float source_q = P[SourceID].Data.y;
@@ -450,7 +506,7 @@ float GetPairStiffness(uint SourceID, uint TargetID)
     return max(0.0, 0.5 * (source_q + target_q));
 }
 
-// Python source: ForceDynamics.py:831
+// Python source: ForceDynamics.py:1127
 float GetContactStiffness(uint SourceID, uint TargetID, uint contact_type)
 {
     if (contact_type == CONTACT_WALL) {
@@ -459,13 +515,13 @@ float GetContactStiffness(uint SourceID, uint TargetID, uint contact_type)
     return GetPairStiffness(SourceID, TargetID);
 }
 
-// Python source: ForceDynamics.py:837
+// Python source: ForceDynamics.py:1133
 float WallContactOffsetDistance(float radius)
 {
     return min(radius, radius * wall_contact_offset);
 }
 
-// Python source: ForceDynamics.py:841
+// Python source: ForceDynamics.py:1137
 WallPhysicalGhostGeometry GetPhysicalWallGhostGeometry(uint SourceID, uint wall_flag)
 {
     vec4 position = GetParticlePosition(SourceID);
@@ -499,7 +555,7 @@ WallPhysicalGhostGeometry GetPhysicalWallGhostGeometry(uint SourceID, uint wall_
     return WallPhysicalGhostGeometry(normal, overlap_area, center_distance, true);
 }
 
-// Python source: ForceDynamics.py:893
+// Python source: ForceDynamics.py:1189
 WallGhostGeometry GetWallGhostGeometry(uint SourceID, uint wall_flag)
 {
     WallPhysicalGhostGeometry physical =
@@ -552,14 +608,151 @@ WallGhostGeometry GetWallGhostGeometry(uint SourceID, uint wall_flag)
     );
 }
 
-// Python source: ForceDynamics.py:955
+// Python source: ForceDynamics.py:1251
 bool AppendWallContactSlot(uint SourceID, uint wall_flag)
 {
     // TODO: generate body for AppendWallContactSlot.
     return false;
 }
 
-// Python source: ForceDynamics.py:1002
+// Python source: ForceDynamics.py:104
+bool CheckPenetrationStepResolution(uint SourceID, vec3 normal, float source_radius, vec3 target_velocity)
+{
+    vec3 source_velocity = GetStartFrameVelocity(SourceID).xyz;
+    float relative_normal_velocity = dot(
+        target_velocity - source_velocity, normal);
+    float inward_displacement = max(
+        0.0, -relative_normal_velocity * ShaderFlags.dt);
+    float penetration_reserve =
+        (1.0 - MAXIMUM_PENETRATION_FRACTION) * source_radius;
+    if (inward_displacement > penetration_reserve + EPSILON) {
+        return SetError(ERROR_PENETRATION_STEP_TOO_LARGE);
+    }
+    return true;
+}
+
+// Python source: ForceDynamics.py:741
+bool ProjectSourceVelocityToContactSet(vec3 candidate_velocity, out vec3 contained_velocity)
+{
+    contained_velocity = candidate_velocity;
+    bool candidate_valid = true;
+    for (uint index = 0u; index < maximumDepthConstraintCount; ++index) {
+        if (dot(maximumDepthConstraintNormals[index], candidate_velocity)
+                > maximumDepthConstraintLimits[index] + EPSILON) {
+            candidate_valid = false;
+        }
+    }
+    if (candidate_valid) {
+        return true;
+    }
+
+    bool found = false;
+    float best_distance_sq = 0.0;
+    for (uint i = 0u; i < maximumDepthConstraintCount; ++i) {
+        for (uint j_code = 0u; j_code <= maximumDepthConstraintCount; ++j_code) {
+            for (uint k_code = 0u; k_code <= maximumDepthConstraintCount; ++k_code) {
+                uint active_count = 1u;
+                uint j = 0u;
+                uint k = 0u;
+                if (j_code > 0u) {
+                    j = j_code - 1u;
+                    if (j <= i) { continue; }
+                    active_count = 2u;
+                } else if (k_code > 0u) {
+                    continue;
+                }
+                if (k_code > 0u) {
+                    k = k_code - 1u;
+                    if (active_count != 2u || k <= j) { continue; }
+                    active_count = 3u;
+                }
+
+                vec3 n0 = maximumDepthConstraintNormals[i];
+                vec3 n1 = active_count >= 2u
+                    ? maximumDepthConstraintNormals[j] : vec3(0.0);
+                vec3 n2 = active_count >= 3u
+                    ? maximumDepthConstraintNormals[k] : vec3(0.0);
+                vec3 limits = vec3(
+                    maximumDepthConstraintLimits[i],
+                    active_count >= 2u ? maximumDepthConstraintLimits[j] : 0.0,
+                    active_count >= 3u ? maximumDepthConstraintLimits[k] : 0.0);
+                mat3 gram = mat3(0.0);
+                gram[0][0] = dot(n0, n0);
+                if (active_count >= 2u) {
+                    gram[0][1] = dot(n0, n1);
+                    gram[1][0] = gram[0][1];
+                    gram[1][1] = dot(n1, n1);
+                }
+                if (active_count >= 3u) {
+                    gram[0][2] = dot(n0, n2);
+                    gram[2][0] = gram[0][2];
+                    gram[1][2] = dot(n1, n2);
+                    gram[2][1] = gram[1][2];
+                    gram[2][2] = dot(n2, n2);
+                }
+                vec3 residual = vec3(
+                    dot(n0, candidate_velocity),
+                    active_count >= 2u ? dot(n1, candidate_velocity) : 0.0,
+                    active_count >= 3u ? dot(n2, candidate_velocity) : 0.0
+                ) - limits;
+                vec3 multipliers;
+                if (!SolveMaximumDepthSystem(
+                        gram, residual, active_count, multipliers)) {
+                    continue;
+                }
+                if (multipliers.x < -EPSILON
+                        || (active_count >= 2u && multipliers.y < -EPSILON)
+                        || (active_count >= 3u && multipliers.z < -EPSILON)) {
+                    continue;
+                }
+                vec3 velocity = candidate_velocity - multipliers.x * n0;
+                if (active_count >= 2u) { velocity -= multipliers.y * n1; }
+                if (active_count >= 3u) { velocity -= multipliers.z * n2; }
+                bool satisfies_all = true;
+                for (uint constraint = 0u;
+                        constraint < maximumDepthConstraintCount; ++constraint) {
+                    if (dot(maximumDepthConstraintNormals[constraint], velocity)
+                            > maximumDepthConstraintLimits[constraint] + EPSILON) {
+                        satisfies_all = false;
+                    }
+                }
+                if (!satisfies_all) { continue; }
+                float distance_sq = dot(
+                    candidate_velocity - velocity, candidate_velocity - velocity);
+                if (!found || distance_sq < best_distance_sq) {
+                    found = true;
+                    best_distance_sq = distance_sq;
+                    contained_velocity = velocity;
+                }
+            }
+        }
+    }
+    return found;
+}
+
+// Python source: ForceDynamics.py:803
+bool ApplySourceMaximumDepth(uint SourceID)
+{
+    if (maximumDepthConstraintOwner != SourceID
+            || maximumDepthConstraintCount == 0u) {
+        return true;
+    }
+    vec3 candidate = GetNextParticleVelocity(SourceID).xyz;
+    vec3 contained;
+    if (!ProjectSourceVelocityToContactSet(candidate, contained)) {
+        return SetError(ERROR_MAX_DEPTH_CONSTRAINT);
+    }
+    float source_mass = GetParticleMass(SourceID);
+    P[SourceID].parms.yzw +=
+        source_mass * (candidate - contained);
+    P[SourceID].Data.z = length(P[SourceID].parms.yzw);
+    SetNextParticleVelocity(SourceID, vec4(
+        contained, VelocityAngle(contained.x, contained.y)));
+    maximumDepthConstraintCount = 0u;
+    return true;
+}
+
+// Python source: ForceDynamics.py:1298
 bool CalcVelocity(uint SourceID, vec3 totalForce)
 {
     float dt = ShaderFlags.dt;
@@ -569,20 +762,21 @@ bool CalcVelocity(uint SourceID, vec3 totalForce)
 
     float source_mass = GetParticleMass(SourceID);
     vec4 start_velocity = GetStartFrameVelocity(SourceID);
-    P[SourceID].VelRad.x = start_velocity.x + totalForce.x * dt / source_mass;
-    P[SourceID].VelRad.y = start_velocity.y + totalForce.y * dt / source_mass;
-    P[SourceID].VelRad.z = start_velocity.z + totalForce.z * dt / source_mass;
-    P[SourceID].VelRad.w = VelocityAngle(P[SourceID].VelRad.x, P[SourceID].VelRad.y);
-    return true;
+    vec3 candidate_velocity = start_velocity.xyz + totalForce * dt / source_mass;
+    SetNextParticleVelocity(SourceID, vec4(
+        candidate_velocity,
+        VelocityAngle(candidate_velocity.x, candidate_velocity.y)
+    ));
+    return ApplySourceMaximumDepth(SourceID);
 }
 
-// Python source: ForceDynamics.py:1018
+// Python source: ForceDynamics.py:1314
 float GetParticleMass(uint ParticleID)
 {
     return max(P[ParticleID].parms.x, EPSILON);
 }
 
-// Python source: ForceDynamics.py:1022
+// Python source: ForceDynamics.py:1318
 bool CalcPosition(uint SourceID)
 {
     uint position_buffer = uint(ShaderFlags.positionBuffer);
@@ -592,7 +786,7 @@ bool CalcPosition(uint SourceID)
     }
 
     vec4 position = GetParticlePosition(SourceID);
-    vec4 velocity = P[SourceID].VelRad;
+    vec4 velocity = GetNextParticleVelocity(SourceID);
     vec4 output_position;
     if (position_buffer == 0u) {
         P[SourceID].PosLocB.x = position.x + velocity.x * dt;
@@ -616,156 +810,119 @@ bool CalcPosition(uint SourceID)
     return true;
 }
 
-// Python source: ForceDynamics.py:1201
+// Python source: ForceDynamics.py:1516
 bool SetError(uint error_code)
 {
     collOut.ErrorNumber = error_code;
     return false;
 }
 
-// Custom GLSL helper: StartReservoir
-bool StartReservoir(uint SourceID)
+// Custom GLSL helper: IsParticleDead
+bool IsParticleDead(uint ParticleID)
 {
-    float state_flag = P[SourceID].Data.w;
-    if (state_flag < 0.0) {
-        return false;
-    }
-    if (state_flag == 0.0) {
-        return true;
-    }
-    if (ShaderFlags.frameNum < state_flag) {
-        return false;
-    }
-
-    uint position_buffer = uint(ShaderFlags.positionBuffer);
-    vec4 current_position = particle_position(SourceID, position_buffer);
-    float radius = P[SourceID].Data.x;
-
-    #if defined(PERIODIC_DIRECTION) && PERIODIC_DIRECTION == vertical
-    float inlet_y = BOUNDARY_YMIN;
-    #ifdef INLET_Y
-    inlet_y = INLET_Y;
-    #endif
-    vec3 start_position = vec3(
-        current_position.x,
-        inlet_y + 2.2 * radius,
-        current_position.z
-    );
-    #else
-    float inlet_x = BOUNDARY_XMIN;
-    #ifdef INLET_X
-    inlet_x = INLET_X;
-    #endif
-
-    vec3 start_position = vec3(
-        inlet_x + 2.2 * radius,
-        current_position.y,
-        current_position.z
-    );
-    #endif
-    P[SourceID].PosLocA.xyz = start_position;
-    P[SourceID].PosLocB.xyz = start_position;
-    P[SourceID].PosLocA.w = position_buffer == 0u ? 0.0 : 1.0;
-    P[SourceID].PosLocB.w = position_buffer == 0u ? 1.0 : 0.0;
-    P[SourceID].Data.w = 0.0;
-    return true;
+    return P[ParticleID].Data.w < 0.0;
 }
 
-// Custom GLSL helper: RetireParticlePastXMax
-bool RetireParticlePastXMax(uint SourceID)
+// Custom GLSL helper: ApplyParticleDeathBounds
+bool ApplyParticleDeathBounds(uint ParticleID)
 {
-    uint next_position_buffer = 1u - uint(ShaderFlags.positionBuffer);
-    vec4 next_position = particle_position(SourceID, next_position_buffer);
-    #if defined(PERIODIC_DIRECTION) && PERIODIC_DIRECTION == vertical
-    float outlet_y = BOUNDARY_YMAX;
-    #ifdef OUTLET_Y
-    outlet_y = OUTLET_Y;
-    #endif
-    if (next_position.y > outlet_y) {
-        float inlet_y = BOUNDARY_YMIN;
-    #ifdef INLET_Y
-        inlet_y = INLET_Y;
-    #endif
-        vec3 reservoir_position = vec3(
-            next_position.x,
-            inlet_y,
-            next_position.z
-        );
-    #else
-    float outlet_x = BOUNDARY_XMAX;
-    #ifdef OUTLET_X
-    outlet_x = OUTLET_X;
-    #endif
-    if (next_position.x > outlet_x) {
-        float inlet_x = BOUNDARY_XMIN;
-    #ifdef INLET_X
-        inlet_x = INLET_X;
-    #endif
-        vec3 reservoir_position = vec3(
-            inlet_x,
-            next_position.y,
-            next_position.z
-        );
-    #endif
-        P[SourceID].PosLocA.xyz = reservoir_position;
-        P[SourceID].PosLocB.xyz = reservoir_position;
-        P[SourceID].PosLocA.w = next_position_buffer == 0u ? 0.0 : 1.0;
-        P[SourceID].PosLocB.w = next_position_buffer == 0u ? 1.0 : 0.0;
-        P[SourceID].VelRad.xyz = vec3(0.0);
-        P[SourceID].VelRad.w = 0.0;
-        P[SourceID].Data.w = -1.0;
+    if (P[ParticleID].ptype > 0.5) {
+        return true;
+    }
+    vec4 next_position = (uint(ShaderFlags.positionBuffer) == 0u)
+        ? P[ParticleID].PosLocB
+        : P[ParticleID].PosLocA;
+    if (next_position.x < death_x_min
+            || next_position.x > death_x_max
+            || next_position.y < death_y_min
+            || next_position.y > death_y_max
+            || next_position.z < death_z_min
+            || next_position.z > death_z_max) {
+        P[ParticleID].Data.w = -1.0;
         return false;
     }
     return true;
 }
 
-// Custom GLSL helper: RetireParticleAtCellGuard
-bool RetireParticleAtCellGuard(uint SourceID)
+// Custom GLSL helper: GetParticleVelocity
+vec4 GetParticleVelocity(uint ParticleID)
 {
-    uint next_position_buffer = 1u - uint(ShaderFlags.positionBuffer);
-    vec4 next_position = particle_position(SourceID, next_position_buffer);
-    float radius = P[SourceID].Data.x;
-    #if defined(PERIODIC_DIRECTION) && PERIODIC_DIRECTION == vertical
-    float inlet_guard_y = BOUNDARY_YMIN + 2.2 * radius;
-    #ifdef INLET_Y
-    inlet_guard_y = INLET_Y + 2.2 * radius;
-    #endif
-    if (next_position.y <= inlet_guard_y) {
+    return (uint(ShaderFlags.positionBuffer) == 0u)
+        ? P[ParticleID].VelRadA
+        : P[ParticleID].VelRadB;
+}
+
+// Custom GLSL helper: GetNextParticleVelocity
+vec4 GetNextParticleVelocity(uint ParticleID)
+{
+    return (uint(ShaderFlags.positionBuffer) == 0u)
+        ? P[ParticleID].VelRadB
+        : P[ParticleID].VelRadA;
+}
+
+// Custom GLSL helper: SetNextParticleVelocity
+void SetNextParticleVelocity(uint ParticleID, vec4 velocity)
+{
+    if (uint(ShaderFlags.positionBuffer) == 0u) {
+        P[ParticleID].VelRadB = velocity;
+    } else {
+        P[ParticleID].VelRadA = velocity;
+    }
+}
+
+// Custom GLSL helper: RegisterMaximumDepthConstraint
+bool RegisterMaximumDepthConstraint(uint SourceID, vec3 normal, float penetration_depth, float source_radius)
+{
+    if (maximumDepthConstraintOwner != SourceID) {
+        maximumDepthConstraintOwner = SourceID;
+        maximumDepthConstraintCount = 0u;
+    }
+    float maximum_depth = MAXIMUM_PENETRATION_FRACTION * source_radius;
+    if (penetration_depth < maximum_depth - EPSILON) {
         return true;
     }
-    #else
-    float inlet_guard_x = BOUNDARY_XMIN + 2.2 * radius;
-    #ifdef INLET_X
-    inlet_guard_x = INLET_X + 2.2 * radius;
-    #endif
-    if (next_position.x <= inlet_guard_x) {
-        return true;
+    if (maximumDepthConstraintCount >= MAX_SOURCE_DEPTH_CONSTRAINTS) {
+        return SetError(ERROR_MAX_DEPTH_CONSTRAINT);
     }
-    #endif
-    #if defined(PERIODIC_DIRECTION) && PERIODIC_DIRECTION == vertical
-    bool outside_cell_guard = (
-        next_position.x <= 1.0 ||
-        next_position.z <= 1.0 ||
-        next_position.x >= float(WIDTH - 2u) ||
-        next_position.y >= float(HEIGHT - 2u) ||
-        next_position.z >= float(DEPTH - 2u)
-    );
-    #else
-    bool outside_cell_guard = (
-        next_position.y <= 1.0 ||
-        next_position.z <= 1.0 ||
-        next_position.x >= float(WIDTH - 2u) ||
-        next_position.y >= float(HEIGHT - 2u) ||
-        next_position.z >= float(DEPTH - 2u)
-    );
-    #endif
-    if (outside_cell_guard) {
-        P[SourceID].VelRad.xyz = vec3(0.0);
-        P[SourceID].VelRad.w = 0.0;
-        P[SourceID].Data.w = -1.0;
-        return false;
-    }
+    maximumDepthConstraintNormals[maximumDepthConstraintCount] = normal;
+    maximumDepthConstraintLimits[maximumDepthConstraintCount] = 0.0;
+    maximumDepthConstraintCount += 1u;
     return true;
+}
+
+// Custom GLSL helper: SolveMaximumDepthSystem
+bool SolveMaximumDepthSystem(mat3 matrix, vec3 values, uint size, out vec3 solution)
+{
+    solution = vec3(0.0);
+    if (size == 1u) {
+        if (abs(matrix[0][0]) <= EPSILON) { return false; }
+        solution.x = values.x / matrix[0][0];
+        return true;
+    }
+    if (size == 2u) {
+        float det = matrix[0][0] * matrix[1][1]
+            - matrix[1][0] * matrix[0][1];
+        if (abs(det) <= EPSILON) { return false; }
+        solution.x = (values.x * matrix[1][1]
+            - matrix[1][0] * values.y) / det;
+        solution.y = (matrix[0][0] * values.y
+            - values.x * matrix[0][1]) / det;
+        return true;
+    }
+    if (size == 3u) {
+        float det = determinant(matrix);
+        if (abs(det) <= EPSILON) { return false; }
+        mat3 mx = matrix;
+        mat3 my = matrix;
+        mat3 mz = matrix;
+        mx[0] = values;
+        my[1] = values;
+        mz[2] = values;
+        solution = vec3(
+            determinant(mx), determinant(my), determinant(mz)) / det;
+        return true;
+    }
+    return false;
 }
 
 #endif

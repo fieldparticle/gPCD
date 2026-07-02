@@ -14,6 +14,7 @@ as an empty/end marker in cell occupancy lists.
 import ctypes
 
 
+PTYPE_NULL = -1.0
 PTYPE_MOBILE = 0.0
 BOUNDARY_EVALUATOR_NONE = PTYPE_MOBILE
 BOUNDARY_EVALUATOR_HORIZONTAL = 1.0
@@ -38,6 +39,7 @@ class pdata(ctypes.Structure):
     - ``vx``, ``vy``, ``vz`` become ``VelRad.xyz``.
     - ``radius`` becomes ``Data.x``.
     - ``collision_stiffness_q`` becomes ``Data.y``.
+    - ``ptype == -1`` identifies the reserved null particle at index zero.
     - ``ptype == 0`` identifies a mobile particle. Positive ``ptype`` values
       identify boundary markers and also select their wall evaluator:
       horizontal is 1, vertical is 2, and CD nozzle is 3. Vulkan copies a

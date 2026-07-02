@@ -33,6 +33,7 @@ class SimpleReservoirPeriodic():
     def add_null_particle(self,p_list):
         particle_struct = pdata()
         particle_struct.pnum = 0
+        particle_struct.ptype = PTYPE_NULL
         p_list.append(particle_struct)
 
     def create(self,parent,itemcfg):

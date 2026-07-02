@@ -71,7 +71,8 @@ edited carefully because C++ must match it.
 \subsection{Particle ABI}
 
 Only fields actually present in \texttt{particle.glsl} are legal shader
-particle fields: \texttt{PosLocA}, \texttt{PosLocB}, \texttt{VelRad},
+particle fields: \texttt{PosLocA}, \texttt{PosLocB}, \texttt{VelRadA},
+\texttt{VelRadB},
 \texttt{Data}, \texttt{parms}, \texttt{CornerList}, \texttt{contactCount},
 \texttt{colFlg}, etc.  Python aliases like \texttt{rx}, \texttt{vx},
 \texttt{mass}, \texttt{radius}, and reporting fields are not portable.
@@ -175,7 +176,7 @@ Velocity-angle HSV rendering uses scenario-generated constants such as
 \texttt{HSV\_ON}, \texttt{HSV\_SAT}, and \texttt{HSV\_VAL} from
 \texttt{params.glsl}.  The shared utility
 \texttt{colorizeVelocity(angle, sat, val)} expects \texttt{angle} in radians
-from \texttt{VelRad.w}.
+from the velocity buffer selected with \texttt{ShaderFlags.positionBuffer}.
 
 \subsection{Known Translation Rules}
 
@@ -360,10 +361,12 @@ state-writing integration methods:
     \item \texttt{CalcPosition(...)}.
 \end{itemize}
 
-\texttt{CalcVelocity(...)} writes only \texttt{P[SourceID].VelRad}.  It reads
+\texttt{CalcVelocity(...)} reads the current velocity through
+\texttt{GetParticleVelocity(...)} and writes only the alternate velocity
+through \texttt{SetNextParticleVelocity(...)}.  It reads
 \texttt{ShaderFlags.dt}, checks for invalid time step, reads the source
-particle mass, applies the source-local \texttt{totalForce}, and updates
-\texttt{VelRad.w} with the velocity angle.
+particle mass, applies the source-local \texttt{totalForce}, and stores the
+velocity angle in the selected output buffer's \texttt{.w} component.
 
 \texttt{CalcPosition(...)} implements the position double buffer.  When
 \texttt{ShaderFlags.positionBuffer == 0}, the method reads \texttt{PosLocA}
@@ -372,6 +375,13 @@ and writes the next position into \texttt{PosLocB}.  Otherwise it reads
 \texttt{.w} active flags using the same convention as Python.  The generated
 method must never update the same position buffer that contact detection is
 reading during that frame.
+
+Velocity uses the same selector and direction as position:
+\texttt{positionBuffer=0} reads \texttt{VelRadA} and writes
+\texttt{VelRadB}; selector one reads \texttt{VelRadB} and writes
+\texttt{VelRadA}.  \texttt{ApplySourceMaximumDepth(...)} modifies the alternate
+candidate velocity, and \texttt{CalcPosition(...)} integrates with that same
+accepted alternate velocity.
 
 The lower-bound out-of-bounds check remains matched to Python:
 \texttt{ERROR\_PARTICLE\_OUT\_OF\_BOUNDS} is set when boundary mode is off and
@@ -653,8 +663,8 @@ The expected compute targets include:
 \begin{verbatim}
 sim/BoundarySpheresReservoir/
     BoundarySpheresReservoirP.comp
-sim/BoundaryParticleReservoirPeriodic/
-    BoundaryParticleReservoirPeriodicP.comp
+sim/BoundaryParticleReservoirHorizontal/
+    BoundaryParticleReservoirHorizontalP.comp
 sim/BoundaryCDNozzleReservoir/
     BoundaryCDNozzleReservoirP.comp
 \end{verbatim}
@@ -681,18 +691,14 @@ The reservoir compute path uses the newer \texttt{Data.w} lifecycle rule:
     \item \(\texttt{Data.w} < 0\): dead particle.
 \end{itemize}
 
-The common generated dynamics include provides two custom reservoir utility
-functions for reservoir compute wrappers:
+The previous exporter emitted two custom reservoir utility functions:
 \begin{verbatim}
 StartReservoir(SourceID)
 RetireParticlePastXMax(SourceID)
 \end{verbatim}
 
-These helpers are emitted by the exporter as custom GLSL helpers after the
-Python-derived generated methods.  They are not AST-translated from
-\texttt{ForceDynamics.py}, but they are still generated into
-\texttt{ForceDynamics.glsl} so reservoir wrappers do not depend on hand edits
-to the common include.
+These helpers are no longer emitted.  Their names remain here only to identify
+and remove stale wrapper calls.
 
 \texttt{StartReservoir(SourceID)} is called at the beginning of the source
 invocation.  It returns \texttt{false} for dead particles and for unborn
@@ -741,12 +747,26 @@ particle and wall scenarios exercised so far.  That validation covers:
     \item ordinary particle contacts;
     \item \texttt{WALL\_MODEL\_SIMPLE};
     \item \texttt{WALL\_MODEL\_PIPE};
-    \item \texttt{WALL\_MODEL\_BOUNDARY\_PARTICLE}, including
-    \texttt{BoundaryParticleReservoirPeriodicP.comp};
+    \item \texttt{WALL\_MODEL\_BOUNDARY\_PARTICLE}, including the replacement
+    \texttt{BoundaryParticleReservoirHorizontalP.comp};
     \item source-local \texttt{totalForce};
     \item \texttt{CalcVelocity(...)};
-    \item \texttt{CalcPosition(...)}.
+    \item \texttt{CalcPosition(...)};
+    \item double-buffered \texttt{VelRadA}/\texttt{VelRadB} state;
+    \item source-local maximum-depth projection and blocked-momentum storage;
+    \item six-plane mobile-particle death bounds.
 \end{itemize}
+
+\subsection{Step 16A: Permanent Death State}
+
+The replacement prefilled reservoir uses \texttt{Data.w} only as permanent
+mobile-particle life state: zero is alive and a negative value is dead.
+\texttt{ApplyParticleDeathBounds(...)} reads the alternate position written by
+\texttt{CalcPosition(...)} and tests \texttt{death\_x\_min/max},
+\texttt{death\_y\_min/max}, and \texttt{death\_z\_min/max}.  Crossing any plane
+sets \texttt{Data.w=-1}.  Dead particles are skipped as compute sources,
+contact targets, occupancy entries, and rendered particles.  Positive
+boundary-marker \texttt{ptype} records are never killed.
 
 \texttt{ResolveStartingCollision} is not included in this Vulkan validation.
 Starting-contact behavior depends on persistent starting-contact state, and

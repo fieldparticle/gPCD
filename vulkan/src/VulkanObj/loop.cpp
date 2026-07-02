@@ -61,20 +61,34 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 	bool				stopOnError		= CfgApp->GetBool("application.stopOnError", true);
 	uint32_t			imgNum			= 0;
 	std::string			oringcap_dir = CfgApp->GetString("application.testfile", true);
-	std::string fileNameWithoutExtension = oringcap_dir.substr(0, oringcap_dir.rfind("."));
-	std::string cap_dir = fileNameWithoutExtension;
+	std::string			out_dir = CfgApp->GetString("application.capture_dir", true);
+	fs::path p = oringcap_dir;
+
+	std::cout << "Root name      : " << p.root_name() << '\n';
+	std::cout << "Root directory : " << p.root_directory() << '\n';
+	std::cout << "Root path      : " << p.root_path() << '\n';
+	std::cout << "Parent path    : " << p.parent_path() << '\n';
+	std::cout << "Filename       : " << p.filename() << '\n';
+	std::cout << "Stem           : " << p.stem() << '\n';
+	std::cout << "Extension      : " << p.extension() << '\n';
+			
+	std::ostringstream  cap_prfx;
+	cap_prfx << out_dir << "/" << p.stem().string();
+	
+
 	bool auto_cap_frames = CfgApp->GetBool("application.auto_cap_frames", true);
 	std::vector<const char*> cap_ary = CfgApp->GetArray("application.capture_frames");
 	std::unordered_set<uint32_t> cap_frames = ParseCaptureFrames(cap_ary);
+
 	if (CfgTst->CheckKey("DT"))
 	{	float cfg_dt = CfgApp->GetFloat("application.dt", true);
 		float tst_dt = CfgTst->GetFloat("DT", false);
+		VulkanWin->m_dt = CfgTst->GetFloat("DT", false);
+
 		if (tst_dt != cfg_dt)
 		{
-			mout << "Delta Time Mismatch->ConfigFile Val:" << cfg_dt << " *.tst file Val:" << tst_dt << ende;
-			std::ostringstream  objtxt;
-			objtxt << "Quit initialization:dt mismatch: Vulkan Comfig:" << cfg_dt << " testfile dt:" << tst_dt << std::ends;
-			throw std::runtime_error(objtxt.str());
+			mout << "WARNING:Delta Time Mismatch->ConfigFile Val:" << cfg_dt << " *.tst file Val:" << tst_dt << "Using the *.tst val" << ende;
+			
 		}
 	}
 
@@ -142,7 +156,7 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 			{
 				G_ExportFrame = false;
 				std::ostringstream out_file;
-				out_file << cap_dir << "_" << VulkanWin->m_FrameNumber << ".cap";
+				out_file << cap_prfx.str() << "_" << VulkanWin->m_FrameNumber << ".cap";
 				DrawInstance->CaptureFrame(out_file.str());
 			}
 			else if (auto_cap_frames == true)
@@ -150,7 +164,7 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 				if (cap_frames.find(VulkanWin->m_FrameNumber) != cap_frames.end())
 				{
 					std::ostringstream out_file;
-					out_file << cap_dir << "_" << VulkanWin->m_FrameNumber << ".cap";
+					out_file << cap_prfx.str() << "_" << VulkanWin->m_FrameNumber << ".cap";
 					DrawInstance->CaptureFrame(out_file.str());
 				}
 			}

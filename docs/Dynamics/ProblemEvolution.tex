@@ -1218,3 +1218,43 @@ Separating physical bounds from particle packing removes lifecycle timing from
 geometry generation.  The boundary-only binary provides a narrow test surface:
 wall topology and evaluator IDs can be inspected before mobile particles,
 piston state, GLSL generation, or Vulkan configuration are reintroduced.
+
+\subsection{Vulkan Immutable Velocity And Permanent Death Bounds}
+
+\subsubsection{<previous form>}
+
+Vulkan positions were double buffered, but all invocations read and wrote one
+\texttt{VelRad} field.  A source could therefore observe a target velocity
+already updated by another invocation in the same dispatch.  The replacement
+horizontal reservoir also had configured death bounds but no permanent
+post-integration death path.
+
+\subsubsection{<current form>}
+
+The particle ABI now contains \texttt{VelRadA} and \texttt{VelRadB}.  They use
+the same selector and direction as \texttt{PosLocA} and \texttt{PosLocB}.
+Generated dynamics read all relative motion from the current velocity buffer,
+write the candidate to the alternate velocity buffer, apply maximum-depth
+projection there, and integrate position with that accepted alternate
+velocity.
+
+\texttt{BoundaryParticleReservoirHorizontalP.comp} runs the generated
+source-owned dynamics and marker-wall path successfully.  After
+\texttt{CalcPosition}, generated \texttt{ApplyParticleDeathBounds} tests the
+new position against six cfg-generated planes.  A mobile particle crossing any
+plane receives \texttt{Data.w=-1}; dead particles are excluded from dynamics,
+contacts, occupancy, and rendering.  Boundary markers remain permanent.
+Capture parsing now matches the expanded ABI and selects velocity from the
+buffer paired with the active position.
+
+\subsubsection{difference outcome}
+
+full solution
+
+\subsubsection{<Analysis>}
+
+Velocity double buffering restores the immutable frame-start rule required by
+source-owned execution without cross-workgroup barriers.  Permanent death is
+separate from the retired scheduled-birth lifecycle: particles begin alive,
+may die once after leaving the configured domain, and never re-enter the
+simulation.

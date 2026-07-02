@@ -39,6 +39,7 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 
 		WriteShaderHeader();
 		WriteShaderDbgHeader();
+		WriteCDNoz();
 		WriteWalls();
 		Reservoir();
 		GenWorkGroups();
@@ -81,46 +82,46 @@ void ShaderObj::Reservoir()
 
 
 }
-
 // This function is only for walls that are passed to glsl.
 // It is up to the glsl version to use it or not. It has nothing to
 // do with drawing the boundaries. That is in ResourceVertexCube.cpp
-void ShaderObj::WriteWalls()
+void ShaderObj::WriteCDNoz()
 {
 	std::string wlflg = "0u";
 	wlflg = "1u;";
 	bool cdnoz = false;
 	std::string boundary_particle_function;
-	std::string model_type = CfgTst->GetString("boundary_particle_function", true);
+	//std::string model_type = CfgTst->GetString("boundary_particle_function", true);
 
 
 	std::ostringstream cdnoz_str;
-		
-	if (model_type.compare("cd_nozzle_wall") == 0)
+
+	//if (model_type.compare("cd_nozzle_wall") == 0)
+	if (cdnoz == true)
 	{
 		cdnoz = true;
-		
-		cdnoz_str 
+
+		cdnoz_str
 			<< "const float CD_NOZZLE_START_X =" << std::fixed << std::setprecision(9)
-				<< CfgTst->GetFloat("nozzle_start_x", true) << ";\n"
+			<< CfgTst->GetFloat("nozzle_start_x", true) << ";\n"
 			<< "const float CD_NOZZLE_CENTER_Y = " << std::fixed << std::setprecision(9)
-				<< CfgTst->GetFloat("nozzle_center_y", true) << ";\n"
+			<< CfgTst->GetFloat("nozzle_center_y", true) << ";\n"
 			<< "const float CD_NOZZLE_INLET_LENGTH = " << std::fixed << std::setprecision(9)
-				<< CfgTst->GetFloat("nozzle_inlet_length", true) << ";\n"
+			<< CfgTst->GetFloat("nozzle_inlet_length", true) << ";\n"
 			<< "const float CD_NOZZLE_CONVERGE_LENGTH = " << std::fixed << std::setprecision(9)
-				<< CfgTst->GetFloat("nozzle_converge_length", true) << ";\n"
+			<< CfgTst->GetFloat("nozzle_converge_length", true) << ";\n"
 			<< "const float CD_NOZZLE_THROAT_LENGTH = " << std::fixed << std::setprecision(9)
-				<< CfgTst->GetFloat("nozzle_throat_length", true) << ";\n"
+			<< CfgTst->GetFloat("nozzle_throat_length", true) << ";\n"
 			<< "const float CD_NOZZLE_DIVERGE_LENGTH = " << std::fixed << std::setprecision(9)
-				<< CfgTst->GetFloat("nozzle_diverge_length", true) << ";\n"
+			<< CfgTst->GetFloat("nozzle_diverge_length", true) << ";\n"
 			<< "const float CD_NOZZLE_EXIT_LENGTH = " << std::fixed << std::setprecision(9)
-				<< CfgTst->GetFloat("nozzle_exit_length", true) << ";\n"
+			<< CfgTst->GetFloat("nozzle_exit_length", true) << ";\n"
 			<< "const float CD_NOZZLE_INLET_RADIUS = " << std::fixed << std::setprecision(9)
-				<< CfgTst->GetFloat("nozzle_inlet_radius", true) << ";\n"
+			<< CfgTst->GetFloat("nozzle_inlet_radius", true) << ";\n"
 			<< "const float CD_NOZZLE_THROAT_RADIUS = " << std::fixed << std::setprecision(9)
-				<< CfgTst->GetFloat("nozzle_throat_radius", true) << ";\n"
+			<< CfgTst->GetFloat("nozzle_throat_radius", true) << ";\n"
 			<< "const float CD_NOZZLE_EXIT_RADIUS = " << std::fixed << std::setprecision(9)
-				<< CfgTst->GetFloat("nozzle_exit_radius", true) << ";\n";
+			<< CfgTst->GetFloat("nozzle_exit_radius", true) << ";\n";
 
 	}
 
@@ -135,41 +136,105 @@ void ShaderObj::WriteWalls()
 
 
 	std::ostringstream wall_str;
-	if (wall_type == 1 || wall_type == 2)
+	wall_str
+
+		<< "const float BOUNDARY_XMIN = " << std::fixed << std::setprecision(9)
+		<< CfgTst->GetFloat("boundary_x_min", true) << ";\n"
+
+		<< "const float BOUNDARY_XMAX = " << std::fixed << std::setprecision(9)
+		<< CfgTst->GetFloat("boundary_x_max", true) << ";\n"
+
+		<< "const float BOUNDARY_YMIN = " << std::fixed << std::setprecision(9)
+		<< CfgTst->GetFloat("boundary_y_min", true) << ";\n"
+
+		<< "const float BOUNDARY_YMAX = " << std::fixed << std::setprecision(9)
+		<< CfgTst->GetFloat("boundary_y_max", true) << ";\n"
+
+		<< "const float BOUNDARY_ZMIN = " << std::fixed << std::setprecision(9)
+		<< CfgTst->GetFloat("boundary_z_min", true) << ";\n"
+
+		<< "const float BOUNDARY_ZMAX = " << std::fixed << std::setprecision(9)
+		<< CfgTst->GetFloat("boundary_z_max", true) << ";\n";
+
+
+
+
+	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
+	std::string filename = fildir + "/boundary.glsl";
 	{
+		std::ofstream ostrm(filename);
+		if (!ostrm.is_open())
+		{
+			std::string rpt = "Failed to open file:" + filename;
+			throw std::runtime_error(rpt.c_str());
+		}
+		ostrm << "#ifndef BOUNDARY_GLSL\n#define BOUNDARY_GLSL\n" <<
 
+			"const uint BOUNDARY_ENABLED = " << wlflg << "\n" <<
+			"const float wall_contact_offset = " << std::fixed << std::setprecision(9) <<
+			CfgTst->GetFloat("wall_contact_offset", true) << ";\n"
+			"#define CONTACT_FORCE_MEASURE  " << CfgTst->GetString("contact_force_measure", true) << "\n"
+			"#define " << CfgTst->GetString("wall_type", true) << "\n";
 
-		wall_str << "const float BOUNDARY_XMIN = " << std::fixed << std::setprecision(9) << CfgTst->GetFloat("wallXMIN", true) << ";\n"
-			"const float BOUNDARY_XMAX  = " << std::fixed << std::setprecision(9) << CfgTst->GetFloat("wallXMAX", true) << ";\n"
-			"const float BOUNDARY_YMIN  = " << std::fixed << std::setprecision(9) << CfgTst->GetFloat("wallYMIN", true) << ";\n"
-			"const float BOUNDARY_YMAX  = " << std::fixed << std::setprecision(9) << CfgTst->GetFloat("wallYMAX", true) << ";\n";
+		ostrm << wall_str.str();
+		if (cdnoz == true)
+			ostrm << cdnoz_str.str();
+		ostrm << "#endif\n";
 	}
-	else
-	{
 
 
-		wall_str 
+}
+// This function is only for walls that are passed to glsl.
+// It is up to the glsl version to use it or not. It has nothing to
+// do with drawing the boundaries. That is in ResourceVertexCube.cpp
+void ShaderObj::WriteWalls()
+{
+	std::string wlflg = "0u";
+	wlflg = "1u;";
+	bool cdnoz = false;
+	std::string boundary_particle_function;
+	//std::string model_type = CfgTst->GetString("boundary_particle_function", true);
+
+
+	std::ostringstream death_str;
+	death_str
+		<< "const float death_x_min = " << std::fixed << std::setprecision(9)
+			<< CfgTst->GetFloat("death_x_min", true) << ";\n"
+		<< "const float death_x_max = " << std::fixed << std::setprecision(9)
+			<< CfgTst->GetFloat("death_x_max", true) << ";\n"
+		<< "const float death_y_min = " << std::fixed << std::setprecision(9)
+			<< CfgTst->GetFloat("death_y_min", true) << ";\n"
+		<< "const float death_y_max = " << std::fixed << std::setprecision(9)
+			<< CfgTst->GetFloat("death_y_max", true) << ";\n"
+		<< "const float death_z_min = " << std::fixed << std::setprecision(9)
+			<< CfgTst->GetFloat("death_z_min", true) << ";\n"
+		<< "const float death_z_max = " << std::fixed << std::setprecision(9)
+			<< CfgTst->GetFloat("death_z_max", true) << ";\n";
+
+		
+	std::ostringstream wall_str;
+	wall_str 
 			
-			<< "const float BOUNDARY_XMIN = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("boundary_x_min", true) << ";\n"
+		<< "const float BOUNDARY_XMIN = " << std::fixed << std::setprecision(9)
+		<< CfgTst->GetFloat("boundary_x_min", true) << ";\n"
 
-			<< "const float BOUNDARY_XMAX = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("boundary_x_max", true) << ";\n"
+		<< "const float BOUNDARY_XMAX = " << std::fixed << std::setprecision(9)
+		<< CfgTst->GetFloat("boundary_x_max", true) << ";\n"
 
-			<< "const float BOUNDARY_YMIN = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("boundary_y_min", true) << ";\n"
+		<< "const float BOUNDARY_YMIN = " << std::fixed << std::setprecision(9)
+		<< CfgTst->GetFloat("boundary_y_min", true) << ";\n"
 
-			<< "const float BOUNDARY_YMAX = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("boundary_y_max", true) << ";\n"
+		<< "const float BOUNDARY_YMAX = " << std::fixed << std::setprecision(9)
+		<< CfgTst->GetFloat("boundary_y_max", true) << ";\n"
 
-			<< "const float BOUNDARY_ZMIN = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("boundary_z_min", true) << ";\n"
+		<< "const float BOUNDARY_ZMIN = " << std::fixed << std::setprecision(9)
+		<< CfgTst->GetFloat("boundary_z_min", true) << ";\n"
 
-			<< "const float BOUNDARY_ZMAX = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("boundary_z_max", true) << ";\n";
+		<< "const float BOUNDARY_ZMAX = " << std::fixed << std::setprecision(9)
+		<< CfgTst->GetFloat("boundary_z_max", true) << ";\n";
 
-	}
 
+	
 
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
 	std::string filename = fildir + "/boundary.glsl";
@@ -185,12 +250,11 @@ void ShaderObj::WriteWalls()
 			"const uint BOUNDARY_ENABLED = " << wlflg << "\n" <<
 			"const float wall_contact_offset = " << std::fixed << std::setprecision(9) << 
 				CfgTst->GetFloat("wall_contact_offset", true) << ";\n"
-			"#define BOUNDARY_GUARD " << CfgTst->GetString("boundary_guard", true) << "\n"
+			"#define CONTACT_FORCE_MEASURE  " << CfgTst->GetString("contact_force_measure", true) << "\n"
 			"#define " << CfgTst->GetString("wall_type", true) << "\n";
 			
 		ostrm << wall_str.str();
-		if (cdnoz == true)
-			ostrm << cdnoz_str.str();
+		ostrm << death_str.str();
 		ostrm << "#endif\n";
 	}
 

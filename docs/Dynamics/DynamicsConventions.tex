@@ -108,9 +108,10 @@ Every overlapping frame applies:
 \end{equation}
 
 There are no force-law compression/release phases and no available-momentum
-caps.  Source-owned internal momentum may be recorded as diagnostic
-bookkeeping, but it does not currently feed back into the force calculation or
-the velocity update.  The corresponding diagnostic pair potential is:
+caps.  Contact impulse bookkeeping records recoverable internal momentum.
+When maximum compression blocks further inward source motion, the removed
+translational momentum is also stored in the source-owned internal-momentum
+vector.  The corresponding diagnostic pair potential is:
 
 \begin{equation}
 U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}M_{ij}(s)\,ds.
@@ -169,12 +170,14 @@ arc.  A particle may only record or release internal momentum from current
 contact geometry, current relative motion, current contact normal, and its own
 source-owned state.
 
-The current \texttt{ForceDynamics} implementation records diagnostic
-recoverable internal momentum in \texttt{parms.yzw}.  \texttt{parms.x} remains
+The current \texttt{ForceDynamics} implementation records recoverable internal
+momentum in \texttt{parms.yzw}.  \texttt{parms.x} remains
 particle mass.  During compression, contact impulse is added along the current
 normal.  During rebound, the stored component along the current normal is
 drained.  The scalar magnitude is mirrored to \texttt{Data.z} for reporting.
-This value is diagnostic only and is not read by \texttt{CalcVelocity}.
+The contact-force ledger remains diagnostic, while maximum-depth containment
+uses the same source-owned vector to store inward momentum removed from
+translation.  A complete release and thermal-transfer model remains deferred.
 
 \texttt{Data.z} has a type-dependent meaning.  For mobile particles
 (\texttt{ptype=0}), it is the internal-momentum magnitude described above.  A
@@ -203,7 +206,7 @@ momentum reports.
 When \texttt{RUN\_CONFIGURATION.hsv\_color} is enabled in the Python viewer,
 or when \texttt{HSV\_ON} is enabled in a Vulkan scenario
 \texttt{params.glsl}, particle color is derived from the velocity angle stored
-in \texttt{VelRad.w}.  The hue maps angle to the unit interval with
+in the selected \texttt{VelRadA.w} or \texttt{VelRadB.w}.  The hue maps angle to the unit interval with
 \(h=\theta/(2\pi)\), wrapped modulo one.  The configuration values
 \texttt{hsv\_sat}/\texttt{HSV\_SAT} and \texttt{hsv\_val}/\texttt{HSV\_VAL}
 control saturation and value and must remain in the interval \([0,1]\).

@@ -104,6 +104,5 @@ void ResourceBoundaryUBO::createBuffers()
 
 void ResourceBoundaryUBO::PushMem(uint32_t currentBuffer)
 {
-	float s = m_Particle->m_SideLength;
-	GeneralViewing(m_Particle->m_SideLength, currentBuffer);
+	GeneralViewing(currentBuffer);
 }

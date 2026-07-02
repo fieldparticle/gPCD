@@ -56,6 +56,9 @@ public:
 	float m_TranslateX = 10.0;
 	float m_TranslateY = 10.0;
 	float m_TranslateZ = 0.0;
+	uint32_t m_CellW = 0;
+	uint32_t m_CellL = 0;
+	uint32_t m_CellH = 0;
 	
 	UniformBufferObject m_UBO = {};
 	
@@ -98,7 +101,12 @@ public:
 	//============================================================
 	// Member Functions
 	Resource(VulkanObj* App, std::string Name, uint32_t Type) 
-		: BaseObj(Name, Type, App){ };
+		: BaseObj(Name, Type, App)
+	{ 
+		m_CellW = CfgTst->GetUInt("CellAryW", true);
+		m_CellL = CfgTst->GetUInt("CellAryL", true);
+		m_CellH = CfgTst->GetUInt("CellAryH", true);
+	};
 	Resource() {};
 	
 	//============================================================
@@ -118,7 +126,7 @@ public:
 	// Copy meme copies memory to the device
 	virtual void PullMem(uint32_t currentBuffer) = 0;
 
-	void GeneralViewing(uint32_t SideLength, uint32_t CurrentBuffer);
+	void GeneralViewing(uint32_t CurrentBuffer);
 
 	//============================================================
 		

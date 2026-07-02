@@ -9,6 +9,7 @@ import math
 import re
 from pathlib import Path
 from gbase.libconf import AttrDict
+from gbase.pdata import PTYPE_NULL
 
 class ParticleFields(AttrDictFields):
     def __setattr__(self, attr, value):
@@ -115,6 +116,10 @@ class ForceDynamics(ForceContactDynamics):
             "effective_target_radius",
             "effective_separation_limit",
             "physical_separation_limit",
+            "proximity",
+            "maximum_depth",
+            "remaining_depth",
+            "maximum_depth_reached",
         ):
             setattr(contact_state, field_name, 0.0)
 
@@ -131,9 +136,9 @@ class ForceDynamics(ForceContactDynamics):
         source.collision_list = []
         source.contactCount = 0
         source.colFlg = 0
-        if not (
-            hasattr(self, "IsBoundaryParticle")
-            and self.IsBoundaryParticle(SourceID)
+        if (
+            hasattr(self, "IsMobileParticleActiveForDynamics")
+            and self.IsMobileParticleActiveForDynamics(SourceID)
         ):
             self.SyncInternalMomentumMagnitude(source)
         source.total_overlap_area = 0.0
@@ -294,6 +299,8 @@ class ForceDynamics(ForceContactDynamics):
         start_velocity = self.GetStartFrameVelocity(SourceID)
         if not super().CalcVelocity(SourceID, totalForce):
             return False
+        if not self.ApplySourceMaximumDepth(SourceID):
+            return False
         source = self.particles[SourceID]
         source.vx = source.VelRad.x
         source.vy = source.VelRad.y
@@ -388,7 +395,57 @@ class ForceDynamics(ForceContactDynamics):
         return self.constants
 
     def ErrorDescription(self):
-        return self.error_names.get(self.collIn.ErrorReturn, "ERROR_UNKNOWN")
+        description = self.error_names.get(
+            self.collIn.ErrorReturn,
+            "ERROR_UNKNOWN",
+        )
+        if self.collIn.ErrorReturn not in {
+            self.constants.ERROR_PARTICLE_TUNNELING,
+            self.constants.ERROR_WALL_TUNNELING,
+            self.constants.ERROR_MAX_DEPTH_CONSTRAINT,
+            self.constants.ERROR_PENETRATION_STEP_TOO_LARGE,
+        }:
+            return description
+
+        error_kind = str(getattr(self.collIn, "ErrorKind", "unknown"))
+        source_id = int(getattr(self.collIn, "ErrorSourceID", -1))
+        if self.collIn.ErrorReturn == self.constants.ERROR_PARTICLE_TUNNELING:
+            target_id = int(getattr(self.collIn, "ErrorTargetID", -1))
+            return (
+                f"{description} particle-particle "
+                f"source={source_id} target={target_id}"
+            )
+        if self.collIn.ErrorReturn == self.constants.ERROR_WALL_TUNNELING:
+            wall_flag = int(getattr(self.collIn, "ErrorWallFlag", 0))
+            return (
+                f"{description} particle-wall "
+                f"source={source_id} wall={wall_flag}"
+            )
+        if self.collIn.ErrorReturn == self.constants.ERROR_MAX_DEPTH_CONSTRAINT:
+            target_id = int(getattr(self.collIn, "ErrorTargetID", -1))
+            wall_flag = int(getattr(self.collIn, "ErrorWallFlag", 0))
+            if target_id >= 0 and wall_flag > 0:
+                contact_text = f"mixed first_target={target_id} first_wall={wall_flag}"
+            elif target_id >= 0:
+                contact_text = f"particle first_target={target_id}"
+            elif wall_flag > 0:
+                contact_text = f"wall first_wall={wall_flag}"
+            else:
+                contact_text = "unknown"
+            return f"{description} source contact set source={source_id} {contact_text}"
+        if self.collIn.ErrorReturn == self.constants.ERROR_PENETRATION_STEP_TOO_LARGE:
+            target_id = int(getattr(self.collIn, "ErrorTargetID", -1))
+            wall_flag = int(getattr(self.collIn, "ErrorWallFlag", 0))
+            if error_kind == "particle-wall":
+                return (
+                    f"{description} particle-wall "
+                    f"source={source_id} wall={wall_flag}"
+                )
+            return (
+                f"{description} particle-particle "
+                f"source={source_id} target={target_id}"
+            )
+        return f"{description} kind={error_kind} source={source_id}"
 
     def create_collision_in(self):
         coll_in = CollisionInFields()
@@ -398,6 +455,10 @@ class ForceDynamics(ForceContactDynamics):
         coll_in.particleNumber = 0
         coll_in.ReadWriteConflict = 0
         coll_in.ExcessSlots = 0
+        coll_in.ErrorKind = "none"
+        coll_in.ErrorSourceID = -1
+        coll_in.ErrorTargetID = -1
+        coll_in.ErrorWallFlag = 0
         return coll_in
 
     def create_particle(self, **fields):
@@ -516,9 +577,6 @@ class ForceDynamics(ForceContactDynamics):
         particle_data = AttrDict()
         particles = AttrDict()
         for pp in results:
-            if pp.pnum == 0:
-                continue  # Skip null particle
-
             dict_location = {
                 "use": 0,
                 "x1": pp.rx,
@@ -538,7 +596,7 @@ class ForceDynamics(ForceContactDynamics):
             particle["vz"] = pp.vz
             particle["mass"] = pp.molar_mass
             particle["radius"] = pp.radius
-            particle["ptype"] = pp.ptype
+            particle["ptype"] = PTYPE_NULL if pp.pnum == 0 else pp.ptype
             particle["boundary_evaluator_id"] = (
                 pp.ptype if pp.ptype > 0.5 else 0.0
             )
@@ -558,6 +616,18 @@ class ForceDynamics(ForceContactDynamics):
     def create_particle_array_from_cfg(self, particle_data):
         particles = []
 
+        if not any(
+            int(str(particle_name).lstrip("p") or 0) == 0
+            for particle_name in particle_data.keys()
+        ):
+            particles.append(
+                self.create_particle(
+                    pnum=0,
+                    ptype=PTYPE_NULL,
+                    state_flg=1.0,
+                )
+            )
+
         for particle_name in sorted(
             particle_data.keys(),
             key=lambda name: int(str(name).lstrip("p") or 0),
@@ -568,11 +638,23 @@ class ForceDynamics(ForceContactDynamics):
                     particle_data[particle_name],
                 )
             )
+        if not particles or int(particles[0].pnum) != 0:
+            raise ValueError("Python particle array must begin with null particle p0")
+        particles[0].ptype = PTYPE_NULL
+        for particle_index, particle in enumerate(particles):
+            if int(particle.pnum) != particle_index:
+                raise ValueError(
+                    "Python particle ABI index mismatch: "
+                    f"particles[{particle_index}].pnum={particle.pnum}"
+                )
         return particles
 
     def create_particle_array(self, count=0):
         self.particles = [
-            self.create_particle(pnum=index)
+            self.create_particle(
+                pnum=index,
+                ptype=PTYPE_NULL if index == 0 else 0.0,
+            )
             for index in range(count)
         ]
         return self.particles
@@ -650,6 +732,10 @@ class ForceDynamics(ForceContactDynamics):
         ledgers; it only gates whether the frame is allowed to run.
         """
         self.collIn.ErrorReturn = self.constants.ERROR_NONE
+        self.collIn.ErrorKind = "none"
+        self.collIn.ErrorSourceID = -1
+        self.collIn.ErrorTargetID = -1
+        self.collIn.ErrorWallFlag = 0
         if self.config_error_return is not None:
             self.collIn.ErrorReturn = self.config_error_return
             return False

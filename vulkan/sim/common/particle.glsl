@@ -39,7 +39,8 @@ struct lstr {
 struct Particle {
     vec4 PosLocA;              // xyz=position, w=active flag: 0 active, 1 inactive
     vec4 PosLocB;              // xyz=alternate position buffer, w=active flag
-    vec4 VelRad;               // xyz=velocity, w=velocity angle
+    vec4 VelRadA;               // xyz=velocity, w=velocity angle
+	vec4 VelRadB;               // xyz=velocity, w=velocity angle
 
     vec4 Data;                 // x=radius, y=collision_stiffness_q, z=reserved, w=state/flags
     vec4 parms;                // x=mass, yzw=source-owned recoverable internal momentum

@@ -1,254 +1,262 @@
-\contentsline {section}{\numberline {1}ForceDynamics Source Flow}{2}{section.1}%
-\contentsline {subsection}{\numberline {1.1}ForceDynamics:CollisionRun}{5}{subsection.1.1}%
-\contentsline {subsection}{\numberline {1.2}ForceDynamics:InitializeStartingContactState}{5}{subsection.1.2}%
-\contentsline {subsection}{\numberline {1.3}ForceDynamics:ProcessParticleCollision}{5}{subsection.1.3}%
-\contentsline {subsection}{\numberline {1.4}ForceDynamics:ProcessWallCollision}{6}{subsection.1.4}%
-\contentsline {subsection}{\numberline {1.5}ForceDynamics:ProcessBoundaryParticleWallCollision}{6}{subsection.1.5}%
-\contentsline {subsection}{\numberline {1.6}ForceDynamics:EvaluateWallSegment}{6}{subsection.1.6}%
-\contentsline {subsection}{\numberline {1.7}ForceDynamics:BoundaryParticleAppliesToSource}{6}{subsection.1.7}%
-\contentsline {subsection}{\numberline {1.8}ForceDynamics:IsBoundaryParticle}{7}{subsection.1.8}%
-\contentsline {subsection}{\numberline {1.9}ForceDynamics:IsMobileParticleActiveForDynamics}{7}{subsection.1.9}%
-\contentsline {subsection}{\numberline {1.10}ForceDynamics:WallFlagsForDynamics}{7}{subsection.1.10}%
-\contentsline {subsection}{\numberline {1.11}ForceDynamics:InitializeWallContactState}{7}{subsection.1.11}%
-\contentsline {subsection}{\numberline {1.12}ForceDynamics:InitializeContactState}{7}{subsection.1.12}%
-\contentsline {subsection}{\numberline {1.13}ForceDynamics:GetContactState}{7}{subsection.1.13}%
-\contentsline {subsection}{\numberline {1.14}ForceDynamics:AppendContactSlot}{7}{subsection.1.14}%
-\contentsline {subsection}{\numberline {1.15}ForceDynamics:GetContactSlots}{7}{subsection.1.15}%
-\contentsline {subsection}{\numberline {1.16}ForceDynamics:GetParticleGeometry}{7}{subsection.1.16}%
-\contentsline {subsection}{\numberline {1.17}ForceDynamics:GetParticleEffectiveContactGeometry}{8}{subsection.1.17}%
-\contentsline {subsection}{\numberline {1.18}ForceDynamics:GetParticlePosition}{8}{subsection.1.18}%
-\contentsline {subsection}{\numberline {1.19}ForceDynamics:TunnelingDetection}{8}{subsection.1.19}%
-\contentsline {subsection}{\numberline {1.20}ForceDynamics:GetStartFrameVelocity}{8}{subsection.1.20}%
-\contentsline {subsection}{\numberline {1.21}ForceDynamics:AccumulateContactForce}{8}{subsection.1.21}%
-\contentsline {subsection}{\numberline {1.22}ForceDynamics:RecoverableInternalMomentum}{9}{subsection.1.22}%
-\contentsline {subsection}{\numberline {1.23}ForceDynamics:GetContactStiffness}{9}{subsection.1.23}%
-\contentsline {subsection}{\numberline {1.24}ForceDynamics:GetPairStiffness}{9}{subsection.1.24}%
-\contentsline {subsection}{\numberline {1.25}ForceDynamics:CalcVelocity}{9}{subsection.1.25}%
-\contentsline {subsection}{\numberline {1.26}ForceDynamics:GetParticleMass}{10}{subsection.1.26}%
-\contentsline {subsection}{\numberline {1.27}ForceDynamics:CalcPosition}{10}{subsection.1.27}%
-\contentsline {subsection}{\numberline {1.28}Potential Energy and Diagnostics}{10}{subsection.1.28}%
-\contentsline {subsection}{\numberline {1.29}Current Numerical Results}{10}{subsection.1.29}%
-\contentsline {section}{\numberline {2}Dynamics Conventions}{11}{section.2}%
-\contentsline {subsection}{\numberline {2.1}Purpose}{11}{subsection.2.1}%
-\contentsline {subsection}{\numberline {2.2}Source-Owned Execution}{11}{subsection.2.2}%
-\contentsline {subsection}{\numberline {2.3}Contact Geometry Convention}{11}{subsection.2.3}%
-\contentsline {subsection}{\numberline {2.4}Frame State}{12}{subsection.2.4}%
-\contentsline {subsection}{\numberline {2.5}Force-Field Contact Response}{12}{subsection.2.5}%
-\contentsline {subsection}{\numberline {2.6}Diagnostics}{13}{subsection.2.6}%
-\contentsline {subsection}{\numberline {2.7}Momentum-First Causality}{13}{subsection.2.7}%
-\contentsline {subsection}{\numberline {2.8}Internal Momentum And Heat}{13}{subsection.2.8}%
-\contentsline {subsection}{\numberline {2.9}Visual Diagnostics}{14}{subsection.2.9}%
-\contentsline {subsection}{\numberline {2.10}Reservoir Deferred-Birth Investigation}{14}{subsection.2.10}%
-\contentsline {subsection}{\numberline {2.11}Prefilled Moving-Piston Reservoir Convention}{15}{subsection.2.11}%
-\contentsline {subsection}{\numberline {2.12}Boundary Convention}{16}{subsection.2.12}%
-\contentsline {section}{\numberline {3}Flow Dynamics Conventions}{16}{section.3}%
-\contentsline {subsection}{\numberline {3.1}Current Reservoir Direction}{16}{subsection.3.1}%
-\contentsline {subsection}{\numberline {3.2}Horizontal Reservoir Generator}{16}{subsection.3.2}%
-\contentsline {subsection}{\numberline {3.3}Reservoir Packing Report}{17}{subsection.3.3}%
-\contentsline {subsection}{\numberline {3.4}Boundary Marker Geometry}{17}{subsection.3.4}%
-\contentsline {subsection}{\numberline {3.5}Future Piston Work}{18}{subsection.3.5}%
-\contentsline {section}{\numberline {4}Programming Conventions}{19}{section.4}%
-\contentsline {subsection}{\numberline {4.1}Current .venv environment}{19}{subsection.4.1}%
-\contentsline {subsection}{\numberline {4.2}Python Viewer Color Utilities}{19}{subsection.4.2}%
-\contentsline {subsection}{\numberline {4.3}Flat Runtime Configuration}{19}{subsection.4.3}%
-\contentsline {subsection}{\numberline {4.4}GLSL Viewer Color Utilities}{19}{subsection.4.4}%
-\contentsline {section}{\numberline {5}Document Conventions}{20}{section.5}%
-\contentsline {subsection}{\numberline {5.1}Update Project}{20}{subsection.5.1}%
-\contentsline {subsection}{\numberline {5.2}Problem Evolution}{20}{subsection.5.2}%
-\contentsline {subsection}{\numberline {5.3}git message}{20}{subsection.5.3}%
-\contentsline {subsection}{\numberline {5.4}Document Authority}{21}{subsection.5.4}%
-\contentsline {subsection}{\numberline {5.5}Model Documents}{21}{subsection.5.5}%
-\contentsline {subsection}{\numberline {5.6}Retiring Dynamics}{21}{subsection.5.6}%
-\contentsline {subsection}{\numberline {5.7}Generated Source Flowcharts}{21}{subsection.5.7}%
-\contentsline {section}{\numberline {6}VerAForceDynamics Source Flow}{23}{section.6}%
-\contentsline {subsection}{\numberline {6.1}VerAForceDynamics:CollisionRun}{24}{subsection.6.1}%
-\contentsline {subsection}{\numberline {6.2}VerAForceDynamics:ProcessParticleCollision}{24}{subsection.6.2}%
-\contentsline {subsection}{\numberline {6.3}VerAForceDynamics:ProcessWallCollision}{24}{subsection.6.3}%
-\contentsline {subsection}{\numberline {6.4}VerAForceDynamics:InitializeWallContactState}{24}{subsection.6.4}%
-\contentsline {subsection}{\numberline {6.5}VerAForceDynamics:InitializeContactState}{24}{subsection.6.5}%
-\contentsline {subsection}{\numberline {6.6}VerAForceDynamics:GetContactState}{24}{subsection.6.6}%
-\contentsline {subsection}{\numberline {6.7}VerAForceDynamics:AppendContactSlot}{25}{subsection.6.7}%
-\contentsline {subsection}{\numberline {6.8}VerAForceDynamics:GetContactSlots}{25}{subsection.6.8}%
-\contentsline {subsection}{\numberline {6.9}VerAForceDynamics:GetParticleGeometry}{25}{subsection.6.9}%
-\contentsline {subsection}{\numberline {6.10}VerAForceDynamics:GetParticlePosition}{25}{subsection.6.10}%
-\contentsline {subsection}{\numberline {6.11}VerAForceDynamics:GetStartFrameVelocity}{25}{subsection.6.11}%
-\contentsline {subsection}{\numberline {6.12}VerAForceDynamics:AccumulateContactForce}{25}{subsection.6.12}%
-\contentsline {subsection}{\numberline {6.13}VerAForceDynamics:GetContactStiffness}{25}{subsection.6.13}%
-\contentsline {subsection}{\numberline {6.14}VerAForceDynamics:GetPairStiffness}{25}{subsection.6.14}%
-\contentsline {subsection}{\numberline {6.15}VerAForceDynamics:CalcVelocity}{26}{subsection.6.15}%
-\contentsline {subsection}{\numberline {6.16}VerAForceDynamics:GetParticleMass}{26}{subsection.6.16}%
-\contentsline {subsection}{\numberline {6.17}VerAForceDynamics:CalcPosition}{26}{subsection.6.17}%
-\contentsline {subsection}{\numberline {6.18}Potential Energy and Diagnostics}{26}{subsection.6.18}%
-\contentsline {subsection}{\numberline {6.19}Current Numerical Results}{26}{subsection.6.19}%
-\contentsline {section}{\numberline {7}Python-glsl Export Rules }{27}{section.7}%
-\contentsline {subsection}{\numberline {7.1}Source Of Truth}{27}{subsection.7.1}%
-\contentsline {subsection}{\numberline {7.2}Stable Shader Wrapper}{27}{subsection.7.2}%
-\contentsline {subsection}{\numberline {7.3}Generated Files}{27}{subsection.7.3}%
-\contentsline {subsection}{\numberline {7.4}Particle ABI}{28}{subsection.7.4}%
-\contentsline {subsection}{\numberline {7.5}Compute Atomics}{28}{subsection.7.5}%
-\contentsline {subsection}{\numberline {7.6}Generated Boundary File}{28}{subsection.7.6}%
-\contentsline {subsection}{\numberline {7.7}Python-Only Infrastructure}{29}{subsection.7.7}%
-\contentsline {subsection}{\numberline {7.8}Rendering Diagnostics}{29}{subsection.7.8}%
-\contentsline {subsection}{\numberline {7.9}Known Translation Rules}{29}{subsection.7.9}%
-\contentsline {subsection}{\numberline {7.10}Porting Issues Found}{30}{subsection.7.10}%
-\contentsline {subsection}{\numberline {7.11}permanent host form}{30}{subsection.7.11}%
-\contentsline {subsection}{\numberline {7.12}Required Force Variable}{30}{subsection.7.12}%
-\contentsline {subsection}{\numberline {7.13}no source-ID validity check}{31}{subsection.7.13}%
-\contentsline {section}{\numberline {8}Python-glsl Export Process}{31}{section.8}%
-\contentsline {subsection}{\numberline {8.1}Step 1: Report The Export Surface}{31}{subsection.8.1}%
-\contentsline {subsection}{\numberline {8.2}Step 2: Generate The Stub Artifact}{31}{subsection.8.2}%
-\contentsline {subsection}{\numberline {8.3}Step 3: Classify Translation Status}{31}{subsection.8.3}%
-\contentsline {subsection}{\numberline {8.4}Step 4: Define Geometry Result Structs}{32}{subsection.8.4}%
-\contentsline {subsection}{\numberline {8.5}Step 5A: Generate Direct Read-Only And Math Bodies}{32}{subsection.8.5}%
-\contentsline {subsection}{\numberline {8.6}Step 5B: Generate Integration Write Bodies}{33}{subsection.8.6}%
-\contentsline {subsection}{\numberline {8.7}Step 6: Generate Ordinary Particle Geometry}{33}{subsection.8.7}%
-\contentsline {subsection}{\numberline {8.8}Step 7: Generate Ordinary 2D Wall Geometry}{33}{subsection.8.8}%
-\contentsline {subsection}{\numberline {8.9}Step 8: Generate Boundary-Particle Wall Helpers}{34}{subsection.8.9}%
-\contentsline {subsection}{\numberline {8.10}Step 9: Use Transient Contact Force Input}{35}{subsection.8.10}%
-\contentsline {subsection}{\numberline {8.11}Step 10: Generate Collision Processors}{36}{subsection.8.11}%
-\contentsline {subsection}{\numberline {8.12}Step 11: Generate ForceDynamics Constants}{36}{subsection.8.12}%
-\contentsline {subsection}{\numberline {8.13}Step 12: Export Wall Contact Configuration}{36}{subsection.8.13}%
-\contentsline {subsection}{\numberline {8.14}Step 13: Wrapper-Owned Wall Model Selection}{37}{subsection.8.14}%
-\contentsline {subsection}{\numberline {8.15}Step 14: Match Error Reporting To The Active Atomic Include}{37}{subsection.8.15}%
-\contentsline {subsection}{\numberline {8.16}Step 15: Compile Trial}{37}{subsection.8.16}%
-\contentsline {subsection}{\numberline {8.17}Historical Step 15A: Retired Reservoir Lifecycle Helpers}{38}{subsection.8.17}%
-\contentsline {subsection}{\numberline {8.18}Step 16: Vulkan Runtime Validation}{39}{subsection.8.18}%
-\contentsline {subsection}{\numberline {8.19}Step 17: Boundary OBJ Visualization}{39}{subsection.8.19}%
-\contentsline {section}{\numberline {9}Problem Evolution}{40}{section.9}%
-\contentsline {subsection}{\numberline {9.1}Source-Local Area Weighting Breaks Conservation}{40}{subsection.9.1}%
-\contentsline {subsubsection}{\numberline {9.1.1}<previous form>}{40}{subsubsection.9.1.1}%
-\contentsline {subsubsection}{\numberline {9.1.2}<current form>}{40}{subsubsection.9.1.2}%
-\contentsline {subsubsection}{\numberline {9.1.3}difference outcome}{40}{subsubsection.9.1.3}%
-\contentsline {subsubsection}{\numberline {9.1.4}<Analysis>}{40}{subsubsection.9.1.4}%
-\contentsline {subsection}{\numberline {9.2}Overlap Area as a Central Force Field}{41}{subsection.9.2}%
-\contentsline {subsubsection}{\numberline {9.2.1}<previous form>}{41}{subsubsection.9.2.1}%
-\contentsline {subsubsection}{\numberline {9.2.2}<current form>}{41}{subsubsection.9.2.2}%
-\contentsline {subsubsection}{\numberline {9.2.3}difference outcome}{41}{subsubsection.9.2.3}%
-\contentsline {subsubsection}{\numberline {9.2.4}<Analysis>}{41}{subsubsection.9.2.4}%
-\contentsline {subsection}{\numberline {9.3}Statistical Energy Validation Requires Walls}{41}{subsection.9.3}%
-\contentsline {subsubsection}{\numberline {9.3.1}<previous form>}{41}{subsubsection.9.3.1}%
-\contentsline {subsubsection}{\numberline {9.3.2}<current form>}{41}{subsubsection.9.3.2}%
-\contentsline {subsubsection}{\numberline {9.3.3}difference outcome}{41}{subsubsection.9.3.3}%
-\contentsline {subsubsection}{\numberline {9.3.4}<Analysis>}{42}{subsubsection.9.3.4}%
-\contentsline {subsection}{\numberline {9.4}Return ForceDynamics to One Source Invocation}{42}{subsection.9.4}%
-\contentsline {subsubsection}{\numberline {9.4.1}<previous form>}{42}{subsubsection.9.4.1}%
-\contentsline {subsubsection}{\numberline {9.4.2}<current form>}{42}{subsubsection.9.4.2}%
-\contentsline {subsubsection}{\numberline {9.4.3}difference outcome}{42}{subsubsection.9.4.3}%
-\contentsline {subsubsection}{\numberline {9.4.4}<Analysis>}{42}{subsubsection.9.4.4}%
-\contentsline {subsection}{\numberline {9.5}ForceDynamics GLSL Export Reaches Vulkan Runtime}{42}{subsection.9.5}%
-\contentsline {subsubsection}{\numberline {9.5.1}<previous form>}{42}{subsubsection.9.5.1}%
-\contentsline {subsubsection}{\numberline {9.5.2}<current form>}{42}{subsubsection.9.5.2}%
-\contentsline {subsubsection}{\numberline {9.5.3}difference outcome}{43}{subsubsection.9.5.3}%
-\contentsline {subsubsection}{\numberline {9.5.4}<Analysis>}{43}{subsubsection.9.5.4}%
-\contentsline {subsection}{\numberline {9.6}Retire MomentumDynamics}{43}{subsection.9.6}%
-\contentsline {subsubsection}{\numberline {9.6.1}<previous form>}{43}{subsubsection.9.6.1}%
-\contentsline {subsubsection}{\numberline {9.6.2}<current form>}{43}{subsubsection.9.6.2}%
-\contentsline {subsubsection}{\numberline {9.6.3}difference outcome}{43}{subsubsection.9.6.3}%
-\contentsline {subsubsection}{\numberline {9.6.4}<Analysis>}{43}{subsubsection.9.6.4}%
-\contentsline {subsection}{\numberline {9.7}Resolve Starting Overlap Without Extra Rebound}{43}{subsection.9.7}%
-\contentsline {subsubsection}{\numberline {9.7.1}<previous form>}{43}{subsubsection.9.7.1}%
-\contentsline {subsubsection}{\numberline {9.7.2}<current form>}{44}{subsubsection.9.7.2}%
-\contentsline {subsubsection}{\numberline {9.7.3}difference outcome}{44}{subsubsection.9.7.3}%
-\contentsline {subsubsection}{\numberline {9.7.4}<Analysis>}{44}{subsubsection.9.7.4}%
-\contentsline {subsection}{\numberline {9.8}Reservoir Flow Uses Data.w Lifecycle}{44}{subsection.9.8}%
-\contentsline {subsubsection}{\numberline {9.8.1}<previous form>}{44}{subsubsection.9.8.1}%
-\contentsline {subsubsection}{\numberline {9.8.2}<current form>}{44}{subsubsection.9.8.2}%
-\contentsline {subsubsection}{\numberline {9.8.3}difference outcome}{45}{subsubsection.9.8.3}%
-\contentsline {subsubsection}{\numberline {9.8.4}<Analysis>}{45}{subsubsection.9.8.4}%
-\contentsline {subsection}{\numberline {9.9}SimpleReservoirPeriodic Vertex Lifecycle Output}{45}{subsection.9.9}%
-\contentsline {subsubsection}{\numberline {9.9.1}<previous form>}{45}{subsubsection.9.9.1}%
-\contentsline {subsubsection}{\numberline {9.9.2}<current form>}{45}{subsubsection.9.9.2}%
-\contentsline {subsubsection}{\numberline {9.9.3}difference outcome}{46}{subsubsection.9.9.3}%
-\contentsline {subsubsection}{\numberline {9.9.4}<Analysis>}{46}{subsubsection.9.9.4}%
-\contentsline {subsection}{\numberline {9.10}Velocity-Angle HSV Python Visualization}{46}{subsection.9.10}%
-\contentsline {subsubsection}{\numberline {9.10.1}<previous form>}{46}{subsubsection.9.10.1}%
-\contentsline {subsubsection}{\numberline {9.10.2}<current form>}{46}{subsubsection.9.10.2}%
-\contentsline {subsubsection}{\numberline {9.10.3}difference outcome}{46}{subsubsection.9.10.3}%
-\contentsline {subsubsection}{\numberline {9.10.4}<Analysis>}{46}{subsubsection.9.10.4}%
-\contentsline {subsection}{\numberline {9.11}BoundarySpheresAndCube Vulkan Visualization Parity}{46}{subsection.9.11}%
-\contentsline {subsubsection}{\numberline {9.11.1}<previous form>}{46}{subsubsection.9.11.1}%
-\contentsline {subsubsection}{\numberline {9.11.2}<current form>}{47}{subsubsection.9.11.2}%
-\contentsline {subsubsection}{\numberline {9.11.3}difference outcome}{47}{subsubsection.9.11.3}%
-\contentsline {subsubsection}{\numberline {9.11.4}<Analysis>}{47}{subsubsection.9.11.4}%
-\contentsline {subsection}{\numberline {9.12}Crowding Requires Internal Momentum, Not Energy Repair}{47}{subsection.9.12}%
-\contentsline {subsubsection}{\numberline {9.12.1}<previous form>}{47}{subsubsection.9.12.1}%
-\contentsline {subsubsection}{\numberline {9.12.2}<current form>}{47}{subsubsection.9.12.2}%
-\contentsline {subsubsection}{\numberline {9.12.3}difference outcome}{48}{subsubsection.9.12.3}%
-\contentsline {subsubsection}{\numberline {9.12.4}<Analysis>}{48}{subsubsection.9.12.4}%
-\contentsline {subsection}{\numberline {9.13}GLSL Wall Models And Boundary-Particle Export}{48}{subsection.9.13}%
-\contentsline {subsubsection}{\numberline {9.13.1}<previous form>}{48}{subsubsection.9.13.1}%
-\contentsline {subsubsection}{\numberline {9.13.2}<current form>}{48}{subsubsection.9.13.2}%
-\contentsline {subsubsection}{\numberline {9.13.3}difference outcome}{49}{subsubsection.9.13.3}%
-\contentsline {subsubsection}{\numberline {9.13.4}<Analysis>}{49}{subsubsection.9.13.4}%
-\contentsline {subsection}{\numberline {9.14}Vertical Boundary-Particle Reservoir Flow In Vulkan}{49}{subsection.9.14}%
-\contentsline {subsubsection}{\numberline {9.14.1}<previous form>}{49}{subsubsection.9.14.1}%
-\contentsline {subsubsection}{\numberline {9.14.2}<current form at that stage>}{49}{subsubsection.9.14.2}%
-\contentsline {subsubsection}{\numberline {9.14.3}difference outcome}{50}{subsubsection.9.14.3}%
-\contentsline {subsubsection}{\numberline {9.14.4}<Analysis>}{50}{subsubsection.9.14.4}%
-\contentsline {subsection}{\numberline {9.15}Depth Default For Contact Force Measure}{50}{subsection.9.15}%
-\contentsline {subsubsection}{\numberline {9.15.1}<previous form>}{50}{subsubsection.9.15.1}%
-\contentsline {subsubsection}{\numberline {9.15.2}<current form>}{50}{subsubsection.9.15.2}%
-\contentsline {subsubsection}{\numberline {9.15.3}difference outcome}{50}{subsubsection.9.15.3}%
-\contentsline {subsubsection}{\numberline {9.15.4}<Analysis>}{51}{subsubsection.9.15.4}%
-\contentsline {subsection}{\numberline {9.16}Boundary-Particle Reservoir Cell-Guard Margin}{51}{subsection.9.16}%
-\contentsline {subsubsection}{\numberline {9.16.1}<previous form>}{51}{subsubsection.9.16.1}%
-\contentsline {subsubsection}{\numberline {9.16.2}<current form>}{51}{subsubsection.9.16.2}%
-\contentsline {subsubsection}{\numberline {9.16.3}difference outcome}{51}{subsubsection.9.16.3}%
-\contentsline {subsubsection}{\numberline {9.16.4}<Analysis>}{52}{subsubsection.9.16.4}%
-\contentsline {subsection}{\numberline {9.17}CD Nozzle Reservoir Generator}{52}{subsection.9.17}%
-\contentsline {subsubsection}{\numberline {9.17.1}<previous form>}{52}{subsubsection.9.17.1}%
-\contentsline {subsubsection}{\numberline {9.17.2}<current form>}{52}{subsubsection.9.17.2}%
-\contentsline {subsubsection}{\numberline {9.17.3}difference outcome}{54}{subsubsection.9.17.3}%
-\contentsline {subsubsection}{\numberline {9.17.4}<Analysis>}{54}{subsubsection.9.17.4}%
-\contentsline {subsection}{\numberline {9.18}Reservoir Birth Admission Must Reject Starting Overlap}{54}{subsection.9.18}%
-\contentsline {subsubsection}{\numberline {9.18.1}<previous form>}{54}{subsubsection.9.18.1}%
-\contentsline {subsubsection}{\numberline {9.18.2}<current form>}{54}{subsubsection.9.18.2}%
-\contentsline {subsubsection}{\numberline {9.18.3}difference outcome}{55}{subsubsection.9.18.3}%
-\contentsline {subsubsection}{\numberline {9.18.4}<Analysis>}{55}{subsubsection.9.18.4}%
-\contentsline {subsection}{\numberline {9.19}Boundary Marker Configuration Becomes Self-Checking}{55}{subsection.9.19}%
-\contentsline {subsubsection}{\numberline {9.19.1}<previous form>}{55}{subsubsection.9.19.1}%
-\contentsline {subsubsection}{\numberline {9.19.2}<current form>}{55}{subsubsection.9.19.2}%
-\contentsline {subsubsection}{\numberline {9.19.3}difference outcome}{56}{subsubsection.9.19.3}%
-\contentsline {subsubsection}{\numberline {9.19.4}<Analysis>}{56}{subsubsection.9.19.4}%
-\contentsline {subsection}{\numberline {9.20}Boundary Marker Dispatch And Closed Nozzle Inlet}{56}{subsection.9.20}%
-\contentsline {subsubsection}{\numberline {9.20.1}<previous form>}{56}{subsubsection.9.20.1}%
-\contentsline {subsubsection}{\numberline {9.20.2}<current form>}{56}{subsubsection.9.20.2}%
-\contentsline {subsubsection}{\numberline {9.20.3}difference outcome}{56}{subsubsection.9.20.3}%
-\contentsline {subsubsection}{\numberline {9.20.4}<Analysis>}{56}{subsubsection.9.20.4}%
-\contentsline {subsection}{\numberline {9.21}Adjacent Markers Can Represent One Physical Wall}{57}{subsection.9.21}%
-\contentsline {subsubsection}{\numberline {9.21.1}<previous form>}{57}{subsubsection.9.21.1}%
-\contentsline {subsubsection}{\numberline {9.21.2}<current form>}{57}{subsubsection.9.21.2}%
-\contentsline {subsubsection}{\numberline {9.21.3}difference outcome}{57}{subsubsection.9.21.3}%
-\contentsline {subsubsection}{\numberline {9.21.4}<Analysis>}{57}{subsubsection.9.21.4}%
-\contentsline {subsection}{\numberline {9.22}Capture Diagnostics Expose Artificial Inlet Compression}{57}{subsection.9.22}%
-\contentsline {subsubsection}{\numberline {9.22.1}<previous form>}{57}{subsubsection.9.22.1}%
-\contentsline {subsubsection}{\numberline {9.22.2}<current form>}{57}{subsubsection.9.22.2}%
-\contentsline {subsubsection}{\numberline {9.22.3}difference outcome}{58}{subsubsection.9.22.3}%
-\contentsline {subsubsection}{\numberline {9.22.4}<Analysis>}{58}{subsubsection.9.22.4}%
-\contentsline {subsection}{\numberline {9.23}Horizontal Prefilled Reservoir Reset}{58}{subsection.9.23}%
-\contentsline {subsubsection}{\numberline {9.23.1}<previous form>}{58}{subsubsection.9.23.1}%
-\contentsline {subsubsection}{\numberline {9.23.2}<current form>}{58}{subsubsection.9.23.2}%
-\contentsline {subsubsection}{\numberline {9.23.3}difference outcome}{59}{subsubsection.9.23.3}%
-\contentsline {subsubsection}{\numberline {9.23.4}<Analysis>}{59}{subsubsection.9.23.4}%
-\contentsline {section}{\numberline {10}Programming Conventions}{59}{section.10}%
-\contentsline {subsection}{\numberline {10.1}File Boundaries}{59}{subsection.10.1}%
-\contentsline {subsection}{\numberline {10.2}Creating New Dynamics}{59}{subsection.10.2}%
-\contentsline {subsection}{\numberline {10.3}Programming Styles}{60}{subsection.10.3}%
-\contentsline {subsection}{\numberline {10.4}Control-Oriented (Hierarchical) Design}{60}{subsection.10.4}%
-\contentsline {subsection}{\numberline {10.5}Data-Oriented (Pipeline) Design}{61}{subsection.10.5}%
-\contentsline {subsection}{\numberline {10.6}Application to GPU and HPC Systems}{62}{subsection.10.6}%
-\contentsline {subsection}{\numberline {10.7}Summary}{63}{subsection.10.7}%
-\contentsline {subsection}{\numberline {10.8}Source-Complete Linear Dynamics}{63}{subsection.10.8}%
-\contentsline {subsection}{\numberline {10.9}Interactive Source Documentation}{63}{subsection.10.9}%
-\contentsline {subsection}{\numberline {10.10}Naming Convention}{63}{subsection.10.10}%
-\contentsline {subsection}{\numberline {10.11}Data Convention}{64}{subsection.10.11}%
-\contentsline {subsection}{\numberline {10.12}Runtime Names}{64}{subsection.10.12}%
-\contentsline {section}{\numberline {11}Vulkan Configuration Variables}{65}{section.11}%
-\contentsline {section}{\numberline {12}Python Configuration Variables}{65}{section.12}%
-\contentsline {subsection}{\numberline {12.1}Scope}{65}{subsection.12.1}%
-\contentsline {subsection}{\numberline {12.2}Generator Selection}{65}{subsection.12.2}%
-\contentsline {subsection}{\numberline {12.3}Rectangular Cell Domain}{65}{subsection.12.3}%
-\contentsline {subsection}{\numberline {12.4}Horizontal Physical Bounds}{65}{subsection.12.4}%
-\contentsline {subsection}{\numberline {12.5}Packing Inputs}{65}{subsection.12.5}%
-\contentsline {subsection}{\numberline {12.6}Generator-Owned Wall Behavior}{66}{subsection.12.6}%
-\contentsline {subsection}{\numberline {12.7}Display And Diagnostics}{66}{subsection.12.7}%
+\contentsline {section}{\numberline {1}ForceDynamics Source Flow}{8}{section.1}%
+\contentsline {subsection}{\numberline {1.1}High-Level Model}{8}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}ForceDynamics:CollisionRun}{12}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}ForceDynamics:InitializeStartingContactState}{12}{subsection.1.3}%
+\contentsline {subsection}{\numberline {1.4}ForceDynamics:ProcessParticleCollision}{12}{subsection.1.4}%
+\contentsline {subsection}{\numberline {1.5}ForceDynamics:ProcessWallCollision}{13}{subsection.1.5}%
+\contentsline {subsection}{\numberline {1.6}ForceDynamics:ProcessBoundaryParticleWallCollision}{13}{subsection.1.6}%
+\contentsline {subsection}{\numberline {1.7}ForceDynamics:EvaluateWallSegment}{13}{subsection.1.7}%
+\contentsline {subsection}{\numberline {1.8}ForceDynamics:BoundaryParticleAppliesToSource}{13}{subsection.1.8}%
+\contentsline {subsection}{\numberline {1.9}ForceDynamics:IsBoundaryParticle}{14}{subsection.1.9}%
+\contentsline {subsection}{\numberline {1.10}ForceDynamics:IsMobileParticleActiveForDynamics}{14}{subsection.1.10}%
+\contentsline {subsection}{\numberline {1.11}ForceDynamics:WallFlagsForDynamics}{14}{subsection.1.11}%
+\contentsline {subsection}{\numberline {1.12}ForceDynamics:InitializeWallContactState}{14}{subsection.1.12}%
+\contentsline {subsection}{\numberline {1.13}ForceDynamics:InitializeContactState}{14}{subsection.1.13}%
+\contentsline {subsection}{\numberline {1.14}ForceDynamics:GetContactState}{14}{subsection.1.14}%
+\contentsline {subsection}{\numberline {1.15}ForceDynamics:AppendContactSlot}{14}{subsection.1.15}%
+\contentsline {subsection}{\numberline {1.16}ForceDynamics:GetContactSlots}{14}{subsection.1.16}%
+\contentsline {subsection}{\numberline {1.17}ForceDynamics:GetParticleGeometry}{14}{subsection.1.17}%
+\contentsline {subsection}{\numberline {1.18}ForceDynamics:GetParticleEffectiveContactGeometry}{15}{subsection.1.18}%
+\contentsline {subsection}{\numberline {1.19}ForceDynamics:GetParticlePosition}{15}{subsection.1.19}%
+\contentsline {subsection}{\numberline {1.20}ForceDynamics:MaximumCompression}{15}{subsection.1.20}%
+\contentsline {subsection}{\numberline {1.21}ForceDynamics:VulkanBufferedState}{15}{subsection.1.21}%
+\contentsline {subsection}{\numberline {1.22}ForceDynamics:GetStartFrameVelocity}{16}{subsection.1.22}%
+\contentsline {subsection}{\numberline {1.23}ForceDynamics:AccumulateContactForce}{16}{subsection.1.23}%
+\contentsline {subsection}{\numberline {1.24}ForceDynamics:RecoverableInternalMomentum}{16}{subsection.1.24}%
+\contentsline {subsection}{\numberline {1.25}ForceDynamics:GetContactStiffness}{16}{subsection.1.25}%
+\contentsline {subsection}{\numberline {1.26}ForceDynamics:GetPairStiffness}{17}{subsection.1.26}%
+\contentsline {subsection}{\numberline {1.27}ForceDynamics:CalcVelocity}{17}{subsection.1.27}%
+\contentsline {subsection}{\numberline {1.28}ForceDynamics:GetParticleMass}{17}{subsection.1.28}%
+\contentsline {subsection}{\numberline {1.29}ForceDynamics:CalcPosition}{17}{subsection.1.29}%
+\contentsline {subsection}{\numberline {1.30}Potential Energy and Diagnostics}{17}{subsection.1.30}%
+\contentsline {subsection}{\numberline {1.31}Current Numerical Results}{18}{subsection.1.31}%
+\contentsline {section}{\numberline {2}Dynamics Conventions}{18}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Purpose}{18}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Source-Owned Execution}{18}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Contact Geometry Convention}{18}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Frame State}{19}{subsection.2.4}%
+\contentsline {subsection}{\numberline {2.5}Force-Field Contact Response}{19}{subsection.2.5}%
+\contentsline {subsection}{\numberline {2.6}Diagnostics}{20}{subsection.2.6}%
+\contentsline {subsection}{\numberline {2.7}Momentum-First Causality}{20}{subsection.2.7}%
+\contentsline {subsection}{\numberline {2.8}Internal Momentum And Heat}{20}{subsection.2.8}%
+\contentsline {subsection}{\numberline {2.9}Visual Diagnostics}{21}{subsection.2.9}%
+\contentsline {subsection}{\numberline {2.10}Reservoir Deferred-Birth Investigation}{21}{subsection.2.10}%
+\contentsline {subsection}{\numberline {2.11}Prefilled Moving-Piston Reservoir Convention}{23}{subsection.2.11}%
+\contentsline {subsection}{\numberline {2.12}Boundary Convention}{23}{subsection.2.12}%
+\contentsline {section}{\numberline {3}Flow Dynamics Conventions}{24}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Current Reservoir Direction}{24}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Horizontal Reservoir Generator}{24}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Reservoir Packing Report}{25}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Boundary Marker Geometry}{25}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}Future Piston Work}{25}{subsection.3.5}%
+\contentsline {section}{\numberline {4}Programming Conventions}{26}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Current .venv environment}{26}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Python Viewer Color Utilities}{26}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Flat Runtime Configuration}{26}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}GLSL Viewer Color Utilities}{26}{subsection.4.4}%
+\contentsline {section}{\numberline {5}Document Conventions}{27}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Update Project}{27}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Problem Evolution}{27}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}git message}{27}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}Document Authority}{28}{subsection.5.4}%
+\contentsline {subsection}{\numberline {5.5}Model Documents}{28}{subsection.5.5}%
+\contentsline {subsection}{\numberline {5.6}Retiring Dynamics}{28}{subsection.5.6}%
+\contentsline {subsection}{\numberline {5.7}Generated Source Flowcharts}{28}{subsection.5.7}%
+\contentsline {section}{\numberline {6}VerAForceDynamics Source Flow}{30}{section.6}%
+\contentsline {subsection}{\numberline {6.1}VerAForceDynamics:CollisionRun}{31}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}VerAForceDynamics:ProcessParticleCollision}{31}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}VerAForceDynamics:ProcessWallCollision}{31}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}VerAForceDynamics:InitializeWallContactState}{31}{subsection.6.4}%
+\contentsline {subsection}{\numberline {6.5}VerAForceDynamics:InitializeContactState}{31}{subsection.6.5}%
+\contentsline {subsection}{\numberline {6.6}VerAForceDynamics:GetContactState}{31}{subsection.6.6}%
+\contentsline {subsection}{\numberline {6.7}VerAForceDynamics:AppendContactSlot}{32}{subsection.6.7}%
+\contentsline {subsection}{\numberline {6.8}VerAForceDynamics:GetContactSlots}{32}{subsection.6.8}%
+\contentsline {subsection}{\numberline {6.9}VerAForceDynamics:GetParticleGeometry}{32}{subsection.6.9}%
+\contentsline {subsection}{\numberline {6.10}VerAForceDynamics:GetParticlePosition}{32}{subsection.6.10}%
+\contentsline {subsection}{\numberline {6.11}VerAForceDynamics:GetStartFrameVelocity}{32}{subsection.6.11}%
+\contentsline {subsection}{\numberline {6.12}VerAForceDynamics:AccumulateContactForce}{32}{subsection.6.12}%
+\contentsline {subsection}{\numberline {6.13}VerAForceDynamics:GetContactStiffness}{32}{subsection.6.13}%
+\contentsline {subsection}{\numberline {6.14}VerAForceDynamics:GetPairStiffness}{32}{subsection.6.14}%
+\contentsline {subsection}{\numberline {6.15}VerAForceDynamics:CalcVelocity}{33}{subsection.6.15}%
+\contentsline {subsection}{\numberline {6.16}VerAForceDynamics:GetParticleMass}{33}{subsection.6.16}%
+\contentsline {subsection}{\numberline {6.17}VerAForceDynamics:CalcPosition}{33}{subsection.6.17}%
+\contentsline {subsection}{\numberline {6.18}Potential Energy and Diagnostics}{33}{subsection.6.18}%
+\contentsline {subsection}{\numberline {6.19}Current Numerical Results}{33}{subsection.6.19}%
+\contentsline {section}{\numberline {7}Python-glsl Export Rules }{34}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Source Of Truth}{34}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Stable Shader Wrapper}{34}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}Generated Files}{34}{subsection.7.3}%
+\contentsline {subsection}{\numberline {7.4}Particle ABI}{35}{subsection.7.4}%
+\contentsline {subsection}{\numberline {7.5}Compute Atomics}{35}{subsection.7.5}%
+\contentsline {subsection}{\numberline {7.6}Generated Boundary File}{35}{subsection.7.6}%
+\contentsline {subsection}{\numberline {7.7}Python-Only Infrastructure}{36}{subsection.7.7}%
+\contentsline {subsection}{\numberline {7.8}Rendering Diagnostics}{36}{subsection.7.8}%
+\contentsline {subsection}{\numberline {7.9}Known Translation Rules}{36}{subsection.7.9}%
+\contentsline {subsection}{\numberline {7.10}Porting Issues Found}{37}{subsection.7.10}%
+\contentsline {subsection}{\numberline {7.11}permanent host form}{37}{subsection.7.11}%
+\contentsline {subsection}{\numberline {7.12}Required Force Variable}{37}{subsection.7.12}%
+\contentsline {subsection}{\numberline {7.13}no source-ID validity check}{38}{subsection.7.13}%
+\contentsline {section}{\numberline {8}Python-glsl Export Process}{38}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Step 1: Report The Export Surface}{38}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Step 2: Generate The Stub Artifact}{38}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Step 3: Classify Translation Status}{38}{subsection.8.3}%
+\contentsline {subsection}{\numberline {8.4}Step 4: Define Geometry Result Structs}{39}{subsection.8.4}%
+\contentsline {subsection}{\numberline {8.5}Step 5A: Generate Direct Read-Only And Math Bodies}{39}{subsection.8.5}%
+\contentsline {subsection}{\numberline {8.6}Step 5B: Generate Integration Write Bodies}{40}{subsection.8.6}%
+\contentsline {subsection}{\numberline {8.7}Step 6: Generate Ordinary Particle Geometry}{40}{subsection.8.7}%
+\contentsline {subsection}{\numberline {8.8}Step 7: Generate Ordinary 2D Wall Geometry}{40}{subsection.8.8}%
+\contentsline {subsection}{\numberline {8.9}Step 8: Generate Boundary-Particle Wall Helpers}{41}{subsection.8.9}%
+\contentsline {subsection}{\numberline {8.10}Step 9: Use Transient Contact Force Input}{42}{subsection.8.10}%
+\contentsline {subsection}{\numberline {8.11}Step 10: Generate Collision Processors}{43}{subsection.8.11}%
+\contentsline {subsection}{\numberline {8.12}Step 11: Generate ForceDynamics Constants}{43}{subsection.8.12}%
+\contentsline {subsection}{\numberline {8.13}Step 12: Export Wall Contact Configuration}{43}{subsection.8.13}%
+\contentsline {subsection}{\numberline {8.14}Step 13: Wrapper-Owned Wall Model Selection}{44}{subsection.8.14}%
+\contentsline {subsection}{\numberline {8.15}Step 14: Match Error Reporting To The Active Atomic Include}{44}{subsection.8.15}%
+\contentsline {subsection}{\numberline {8.16}Step 15: Compile Trial}{44}{subsection.8.16}%
+\contentsline {subsection}{\numberline {8.17}Historical Step 15A: Retired Reservoir Lifecycle Helpers}{45}{subsection.8.17}%
+\contentsline {subsection}{\numberline {8.18}Step 16: Vulkan Runtime Validation}{46}{subsection.8.18}%
+\contentsline {subsection}{\numberline {8.19}Step 16A: Permanent Death State}{46}{subsection.8.19}%
+\contentsline {subsection}{\numberline {8.20}Step 17: Boundary OBJ Visualization}{46}{subsection.8.20}%
+\contentsline {section}{\numberline {9}Problem Evolution}{47}{section.9}%
+\contentsline {subsection}{\numberline {9.1}Source-Local Area Weighting Breaks Conservation}{47}{subsection.9.1}%
+\contentsline {subsubsection}{\numberline {9.1.1}<previous form>}{47}{subsubsection.9.1.1}%
+\contentsline {subsubsection}{\numberline {9.1.2}<current form>}{47}{subsubsection.9.1.2}%
+\contentsline {subsubsection}{\numberline {9.1.3}difference outcome}{47}{subsubsection.9.1.3}%
+\contentsline {subsubsection}{\numberline {9.1.4}<Analysis>}{47}{subsubsection.9.1.4}%
+\contentsline {subsection}{\numberline {9.2}Overlap Area as a Central Force Field}{48}{subsection.9.2}%
+\contentsline {subsubsection}{\numberline {9.2.1}<previous form>}{48}{subsubsection.9.2.1}%
+\contentsline {subsubsection}{\numberline {9.2.2}<current form>}{48}{subsubsection.9.2.2}%
+\contentsline {subsubsection}{\numberline {9.2.3}difference outcome}{48}{subsubsection.9.2.3}%
+\contentsline {subsubsection}{\numberline {9.2.4}<Analysis>}{48}{subsubsection.9.2.4}%
+\contentsline {subsection}{\numberline {9.3}Statistical Energy Validation Requires Walls}{48}{subsection.9.3}%
+\contentsline {subsubsection}{\numberline {9.3.1}<previous form>}{48}{subsubsection.9.3.1}%
+\contentsline {subsubsection}{\numberline {9.3.2}<current form>}{49}{subsubsection.9.3.2}%
+\contentsline {subsubsection}{\numberline {9.3.3}difference outcome}{49}{subsubsection.9.3.3}%
+\contentsline {subsubsection}{\numberline {9.3.4}<Analysis>}{49}{subsubsection.9.3.4}%
+\contentsline {subsection}{\numberline {9.4}Return ForceDynamics to One Source Invocation}{49}{subsection.9.4}%
+\contentsline {subsubsection}{\numberline {9.4.1}<previous form>}{49}{subsubsection.9.4.1}%
+\contentsline {subsubsection}{\numberline {9.4.2}<current form>}{49}{subsubsection.9.4.2}%
+\contentsline {subsubsection}{\numberline {9.4.3}difference outcome}{49}{subsubsection.9.4.3}%
+\contentsline {subsubsection}{\numberline {9.4.4}<Analysis>}{49}{subsubsection.9.4.4}%
+\contentsline {subsection}{\numberline {9.5}ForceDynamics GLSL Export Reaches Vulkan Runtime}{49}{subsection.9.5}%
+\contentsline {subsubsection}{\numberline {9.5.1}<previous form>}{49}{subsubsection.9.5.1}%
+\contentsline {subsubsection}{\numberline {9.5.2}<current form>}{50}{subsubsection.9.5.2}%
+\contentsline {subsubsection}{\numberline {9.5.3}difference outcome}{50}{subsubsection.9.5.3}%
+\contentsline {subsubsection}{\numberline {9.5.4}<Analysis>}{50}{subsubsection.9.5.4}%
+\contentsline {subsection}{\numberline {9.6}Retire MomentumDynamics}{50}{subsection.9.6}%
+\contentsline {subsubsection}{\numberline {9.6.1}<previous form>}{50}{subsubsection.9.6.1}%
+\contentsline {subsubsection}{\numberline {9.6.2}<current form>}{50}{subsubsection.9.6.2}%
+\contentsline {subsubsection}{\numberline {9.6.3}difference outcome}{50}{subsubsection.9.6.3}%
+\contentsline {subsubsection}{\numberline {9.6.4}<Analysis>}{50}{subsubsection.9.6.4}%
+\contentsline {subsection}{\numberline {9.7}Resolve Starting Overlap Without Extra Rebound}{51}{subsection.9.7}%
+\contentsline {subsubsection}{\numberline {9.7.1}<previous form>}{51}{subsubsection.9.7.1}%
+\contentsline {subsubsection}{\numberline {9.7.2}<current form>}{51}{subsubsection.9.7.2}%
+\contentsline {subsubsection}{\numberline {9.7.3}difference outcome}{51}{subsubsection.9.7.3}%
+\contentsline {subsubsection}{\numberline {9.7.4}<Analysis>}{51}{subsubsection.9.7.4}%
+\contentsline {subsection}{\numberline {9.8}Reservoir Flow Uses Data.w Lifecycle}{51}{subsection.9.8}%
+\contentsline {subsubsection}{\numberline {9.8.1}<previous form>}{51}{subsubsection.9.8.1}%
+\contentsline {subsubsection}{\numberline {9.8.2}<current form>}{51}{subsubsection.9.8.2}%
+\contentsline {subsubsection}{\numberline {9.8.3}difference outcome}{52}{subsubsection.9.8.3}%
+\contentsline {subsubsection}{\numberline {9.8.4}<Analysis>}{52}{subsubsection.9.8.4}%
+\contentsline {subsection}{\numberline {9.9}SimpleReservoirPeriodic Vertex Lifecycle Output}{52}{subsection.9.9}%
+\contentsline {subsubsection}{\numberline {9.9.1}<previous form>}{52}{subsubsection.9.9.1}%
+\contentsline {subsubsection}{\numberline {9.9.2}<current form>}{53}{subsubsection.9.9.2}%
+\contentsline {subsubsection}{\numberline {9.9.3}difference outcome}{53}{subsubsection.9.9.3}%
+\contentsline {subsubsection}{\numberline {9.9.4}<Analysis>}{53}{subsubsection.9.9.4}%
+\contentsline {subsection}{\numberline {9.10}Velocity-Angle HSV Python Visualization}{53}{subsection.9.10}%
+\contentsline {subsubsection}{\numberline {9.10.1}<previous form>}{53}{subsubsection.9.10.1}%
+\contentsline {subsubsection}{\numberline {9.10.2}<current form>}{53}{subsubsection.9.10.2}%
+\contentsline {subsubsection}{\numberline {9.10.3}difference outcome}{53}{subsubsection.9.10.3}%
+\contentsline {subsubsection}{\numberline {9.10.4}<Analysis>}{54}{subsubsection.9.10.4}%
+\contentsline {subsection}{\numberline {9.11}BoundarySpheresAndCube Vulkan Visualization Parity}{54}{subsection.9.11}%
+\contentsline {subsubsection}{\numberline {9.11.1}<previous form>}{54}{subsubsection.9.11.1}%
+\contentsline {subsubsection}{\numberline {9.11.2}<current form>}{54}{subsubsection.9.11.2}%
+\contentsline {subsubsection}{\numberline {9.11.3}difference outcome}{54}{subsubsection.9.11.3}%
+\contentsline {subsubsection}{\numberline {9.11.4}<Analysis>}{54}{subsubsection.9.11.4}%
+\contentsline {subsection}{\numberline {9.12}Crowding Requires Internal Momentum, Not Energy Repair}{54}{subsection.9.12}%
+\contentsline {subsubsection}{\numberline {9.12.1}<previous form>}{54}{subsubsection.9.12.1}%
+\contentsline {subsubsection}{\numberline {9.12.2}<current form>}{55}{subsubsection.9.12.2}%
+\contentsline {subsubsection}{\numberline {9.12.3}difference outcome}{55}{subsubsection.9.12.3}%
+\contentsline {subsubsection}{\numberline {9.12.4}<Analysis>}{55}{subsubsection.9.12.4}%
+\contentsline {subsection}{\numberline {9.13}GLSL Wall Models And Boundary-Particle Export}{55}{subsection.9.13}%
+\contentsline {subsubsection}{\numberline {9.13.1}<previous form>}{55}{subsubsection.9.13.1}%
+\contentsline {subsubsection}{\numberline {9.13.2}<current form>}{55}{subsubsection.9.13.2}%
+\contentsline {subsubsection}{\numberline {9.13.3}difference outcome}{56}{subsubsection.9.13.3}%
+\contentsline {subsubsection}{\numberline {9.13.4}<Analysis>}{56}{subsubsection.9.13.4}%
+\contentsline {subsection}{\numberline {9.14}Vertical Boundary-Particle Reservoir Flow In Vulkan}{56}{subsection.9.14}%
+\contentsline {subsubsection}{\numberline {9.14.1}<previous form>}{56}{subsubsection.9.14.1}%
+\contentsline {subsubsection}{\numberline {9.14.2}<current form at that stage>}{56}{subsubsection.9.14.2}%
+\contentsline {subsubsection}{\numberline {9.14.3}difference outcome}{57}{subsubsection.9.14.3}%
+\contentsline {subsubsection}{\numberline {9.14.4}<Analysis>}{57}{subsubsection.9.14.4}%
+\contentsline {subsection}{\numberline {9.15}Depth Default For Contact Force Measure}{57}{subsection.9.15}%
+\contentsline {subsubsection}{\numberline {9.15.1}<previous form>}{57}{subsubsection.9.15.1}%
+\contentsline {subsubsection}{\numberline {9.15.2}<current form>}{57}{subsubsection.9.15.2}%
+\contentsline {subsubsection}{\numberline {9.15.3}difference outcome}{58}{subsubsection.9.15.3}%
+\contentsline {subsubsection}{\numberline {9.15.4}<Analysis>}{58}{subsubsection.9.15.4}%
+\contentsline {subsection}{\numberline {9.16}Boundary-Particle Reservoir Cell-Guard Margin}{58}{subsection.9.16}%
+\contentsline {subsubsection}{\numberline {9.16.1}<previous form>}{58}{subsubsection.9.16.1}%
+\contentsline {subsubsection}{\numberline {9.16.2}<current form>}{58}{subsubsection.9.16.2}%
+\contentsline {subsubsection}{\numberline {9.16.3}difference outcome}{59}{subsubsection.9.16.3}%
+\contentsline {subsubsection}{\numberline {9.16.4}<Analysis>}{59}{subsubsection.9.16.4}%
+\contentsline {subsection}{\numberline {9.17}CD Nozzle Reservoir Generator}{59}{subsection.9.17}%
+\contentsline {subsubsection}{\numberline {9.17.1}<previous form>}{59}{subsubsection.9.17.1}%
+\contentsline {subsubsection}{\numberline {9.17.2}<current form>}{59}{subsubsection.9.17.2}%
+\contentsline {subsubsection}{\numberline {9.17.3}difference outcome}{61}{subsubsection.9.17.3}%
+\contentsline {subsubsection}{\numberline {9.17.4}<Analysis>}{61}{subsubsection.9.17.4}%
+\contentsline {subsection}{\numberline {9.18}Reservoir Birth Admission Must Reject Starting Overlap}{61}{subsection.9.18}%
+\contentsline {subsubsection}{\numberline {9.18.1}<previous form>}{61}{subsubsection.9.18.1}%
+\contentsline {subsubsection}{\numberline {9.18.2}<current form>}{62}{subsubsection.9.18.2}%
+\contentsline {subsubsection}{\numberline {9.18.3}difference outcome}{62}{subsubsection.9.18.3}%
+\contentsline {subsubsection}{\numberline {9.18.4}<Analysis>}{62}{subsubsection.9.18.4}%
+\contentsline {subsection}{\numberline {9.19}Boundary Marker Configuration Becomes Self-Checking}{62}{subsection.9.19}%
+\contentsline {subsubsection}{\numberline {9.19.1}<previous form>}{62}{subsubsection.9.19.1}%
+\contentsline {subsubsection}{\numberline {9.19.2}<current form>}{62}{subsubsection.9.19.2}%
+\contentsline {subsubsection}{\numberline {9.19.3}difference outcome}{63}{subsubsection.9.19.3}%
+\contentsline {subsubsection}{\numberline {9.19.4}<Analysis>}{63}{subsubsection.9.19.4}%
+\contentsline {subsection}{\numberline {9.20}Boundary Marker Dispatch And Closed Nozzle Inlet}{63}{subsection.9.20}%
+\contentsline {subsubsection}{\numberline {9.20.1}<previous form>}{63}{subsubsection.9.20.1}%
+\contentsline {subsubsection}{\numberline {9.20.2}<current form>}{63}{subsubsection.9.20.2}%
+\contentsline {subsubsection}{\numberline {9.20.3}difference outcome}{64}{subsubsection.9.20.3}%
+\contentsline {subsubsection}{\numberline {9.20.4}<Analysis>}{64}{subsubsection.9.20.4}%
+\contentsline {subsection}{\numberline {9.21}Adjacent Markers Can Represent One Physical Wall}{64}{subsection.9.21}%
+\contentsline {subsubsection}{\numberline {9.21.1}<previous form>}{64}{subsubsection.9.21.1}%
+\contentsline {subsubsection}{\numberline {9.21.2}<current form>}{64}{subsubsection.9.21.2}%
+\contentsline {subsubsection}{\numberline {9.21.3}difference outcome}{64}{subsubsection.9.21.3}%
+\contentsline {subsubsection}{\numberline {9.21.4}<Analysis>}{64}{subsubsection.9.21.4}%
+\contentsline {subsection}{\numberline {9.22}Capture Diagnostics Expose Artificial Inlet Compression}{65}{subsection.9.22}%
+\contentsline {subsubsection}{\numberline {9.22.1}<previous form>}{65}{subsubsection.9.22.1}%
+\contentsline {subsubsection}{\numberline {9.22.2}<current form>}{65}{subsubsection.9.22.2}%
+\contentsline {subsubsection}{\numberline {9.22.3}difference outcome}{65}{subsubsection.9.22.3}%
+\contentsline {subsubsection}{\numberline {9.22.4}<Analysis>}{65}{subsubsection.9.22.4}%
+\contentsline {subsection}{\numberline {9.23}Horizontal Prefilled Reservoir Reset}{65}{subsection.9.23}%
+\contentsline {subsubsection}{\numberline {9.23.1}<previous form>}{65}{subsubsection.9.23.1}%
+\contentsline {subsubsection}{\numberline {9.23.2}<current form>}{66}{subsubsection.9.23.2}%
+\contentsline {subsubsection}{\numberline {9.23.3}difference outcome}{66}{subsubsection.9.23.3}%
+\contentsline {subsubsection}{\numberline {9.23.4}<Analysis>}{66}{subsubsection.9.23.4}%
+\contentsline {subsection}{\numberline {9.24}Vulkan Immutable Velocity And Permanent Death Bounds}{66}{subsection.9.24}%
+\contentsline {subsubsection}{\numberline {9.24.1}<previous form>}{66}{subsubsection.9.24.1}%
+\contentsline {subsubsection}{\numberline {9.24.2}<current form>}{66}{subsubsection.9.24.2}%
+\contentsline {subsubsection}{\numberline {9.24.3}difference outcome}{67}{subsubsection.9.24.3}%
+\contentsline {subsubsection}{\numberline {9.24.4}<Analysis>}{67}{subsubsection.9.24.4}%
+\contentsline {section}{\numberline {10}Programming Conventions}{67}{section.10}%
+\contentsline {subsection}{\numberline {10.1}File Boundaries}{67}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}Creating New Dynamics}{67}{subsection.10.2}%
+\contentsline {subsection}{\numberline {10.3}Programming Styles}{67}{subsection.10.3}%
+\contentsline {subsection}{\numberline {10.4}Control-Oriented (Hierarchical) Design}{68}{subsection.10.4}%
+\contentsline {subsection}{\numberline {10.5}Data-Oriented (Pipeline) Design}{69}{subsection.10.5}%
+\contentsline {subsection}{\numberline {10.6}Application to GPU and HPC Systems}{70}{subsection.10.6}%
+\contentsline {subsection}{\numberline {10.7}Summary}{71}{subsection.10.7}%
+\contentsline {subsection}{\numberline {10.8}Source-Complete Linear Dynamics}{71}{subsection.10.8}%
+\contentsline {subsection}{\numberline {10.9}Interactive Source Documentation}{71}{subsection.10.9}%
+\contentsline {subsection}{\numberline {10.10}Naming Convention}{71}{subsection.10.10}%
+\contentsline {subsection}{\numberline {10.11}Data Convention}{72}{subsection.10.11}%
+\contentsline {subsection}{\numberline {10.12}Runtime Names}{72}{subsection.10.12}%
+\contentsline {section}{\numberline {11}Vulkan Configuration Variables}{73}{section.11}%
+\contentsline {section}{\numberline {12}Python Configuration Variables}{73}{section.12}%
+\contentsline {subsection}{\numberline {12.1}Scope}{73}{subsection.12.1}%
+\contentsline {subsection}{\numberline {12.2}Generator Selection}{73}{subsection.12.2}%
+\contentsline {subsection}{\numberline {12.3}Rectangular Cell Domain}{73}{subsection.12.3}%
+\contentsline {subsection}{\numberline {12.4}Horizontal Physical Bounds}{73}{subsection.12.4}%
+\contentsline {subsection}{\numberline {12.5}Packing Inputs}{74}{subsection.12.5}%
+\contentsline {subsection}{\numberline {12.6}Generator-Owned Wall Behavior}{74}{subsection.12.6}%
+\contentsline {subsection}{\numberline {12.7}Display And Diagnostics}{74}{subsection.12.7}%

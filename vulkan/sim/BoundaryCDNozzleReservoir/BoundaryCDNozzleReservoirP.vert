@@ -291,7 +291,12 @@ void main(){
 	}
 	
 	if(HSV_ON == 1)
-		fragColor = colorizeVelocity(P[index].VelRad.w,HSV_SAT,HSV_VAL);
+	{
+		if (P[index].ptype == 0)
+			fragColor = colorizeVelocity(P[index].VelRad.w,HSV_SAT,HSV_VAL);
+		else
+			fragColor = vec3{1.0,1.0,1.0);
+	}
 	else
 	{
 	if(uint(P[index].colFlg) == 1)

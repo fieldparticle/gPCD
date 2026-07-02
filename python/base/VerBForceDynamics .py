@@ -1102,7 +1102,7 @@ class ForceContactDynamics:
             penetration_depth,
         )
         if not suppress_contact and center_distance <= effective_source_radius:
-            self.collIn.ErrorReturn = self.constants.ERROR_TUNNELING
+            self.collIn.ErrorReturn = self.constants.ERROR_PARTICLE_TUNNELING
         return True
 
     def DetectContacts(self, total_forces):

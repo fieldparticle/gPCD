@@ -36,6 +36,7 @@ const float PI = (float)3.14159265359;
 
 void ResourceUBOSphere::Create(uint32_t BindPoint, SwapChainObj* SCO, ResourceVertexParticle* particle)
 {
+
 	m_Particle = particle;
 	Create(BindPoint, SCO);
 }
@@ -106,6 +107,5 @@ void ResourceUBOSphere::PushMem(uint32_t currentBuffer)
 {
 
 	
-	float s = m_Particle->m_SideLength;
-	GeneralViewing(m_Particle->m_SideLength, currentBuffer);
+	GeneralViewing(currentBuffer);
 }

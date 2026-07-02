@@ -108,7 +108,7 @@ int ParticleOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	resourceAtomic->Create(5,perObj);
 	// Graphics atomic counters for debugging
 	resourceAtomicG->Create(5,perObj);
-	// UBO for model,projectsion, and view matricies
+	// UBO for model,projectsion, and view matricies, needs cell array parameters
 	resourceUBO->Create(2, swapChain, resourceVertexParticle);
 	// Shader object needs particle list, particle cell hash table.  
 	shaderObj->Create(resourceVertexParticle, resourceCollMatrix, resourceLockMatrix, swapChain);

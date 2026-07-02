@@ -1,4 +1,5 @@
 import math
+import itertools
 
 
 class ForceContactDynamics:
@@ -8,6 +9,7 @@ class ForceContactDynamics:
     CONTACT_PARTICLE = 1
     CONTACT_WALL = 2
     CONTACT_ACTIVE_THIS_FRAME = 1
+    MAXIMUM_PENETRATION_FRACTION = 0.5
     BOUNDARY_PARTICLE_EVALUATORS = {
         1: "EvaluateHorizontalWallSegment",
         2: "EvaluateVerticalWallSegment",
@@ -72,12 +74,84 @@ class ForceContactDynamics:
         """Calculate and accumulate one wall-contact force."""
         contact_state = self.InitializeWallContactState(SourceID, wall)
         if contact_state is None:
+            if self.collIn.ErrorReturn != self.constants.ERROR_NONE:
+                return False
             return True
         return self.AccumulateContactForce(SourceID, contact_state, totalForce)
 
+    def CheckWallMaximumDepth(
+        self,
+        SourceID,
+        center_distance,
+        particle_radius,
+        wall_flag,
+    ):
+        """Reject a wall ghost whose leading edge passed the source center."""
+        maximum_depth_distance = (
+            float(particle_radius)
+            - self.WallContactOffsetDistance(particle_radius)
+        )
+        wall_proximity = float(center_distance) - maximum_depth_distance
+        if wall_proximity < -self.EPSILON:
+            return self.SetError(
+                self.constants.ERROR_WALL_TUNNELING,
+                error_kind="particle-wall",
+                source_id=SourceID,
+                wall_flag=wall_flag,
+            )
+        return True
+
+    def CheckPenetrationStepResolution(
+        self,
+        SourceID,
+        normal,
+        source_radius,
+        target_velocity,
+        error_kind,
+        target_id=None,
+        wall_flag=None,
+    ):
+        """Require one step to consume no more than the penetration reserve."""
+        source_velocity = self.GetStartFrameVelocity(SourceID)
+        relative_normal_velocity = (
+            (float(target_velocity.x) - float(source_velocity.x)) * normal[0]
+            + (float(target_velocity.y) - float(source_velocity.y)) * normal[1]
+            + (float(target_velocity.z) - float(source_velocity.z)) * normal[2]
+        )
+        inward_displacement = max(
+            0.0,
+            -relative_normal_velocity * float(self.ShaderFlags.dt),
+        )
+        penetration_reserve = (
+            (1.0 - self.MAXIMUM_PENETRATION_FRACTION)
+            * float(source_radius)
+        )
+        if inward_displacement > penetration_reserve + self.EPSILON:
+            return self.SetError(
+                self.constants.ERROR_PENETRATION_STEP_TOO_LARGE,
+                error_kind=error_kind,
+                source_id=SourceID,
+                target_id=target_id,
+                wall_flag=wall_flag,
+            )
+        return True
+
     def BoundaryParticleWallFlag(self, SourceID, BoundaryID):
-        """Infer the configured wall represented by a boundary marker."""
+        """Return the fixed lower/upper identity of a horizontal marker."""
         boundary_position = self.GetParticlePosition(BoundaryID)
+        configured_planes = []
+        for bounds_name in ("reservoir_bounds", "pipe_bounds"):
+            bounds = self.run_configuration.get(bounds_name)
+            if bounds is not None and len(bounds) == 6:
+                configured_planes.extend(
+                    (
+                        (abs(float(boundary_position.y) - float(bounds[2])), 3),
+                        (abs(float(boundary_position.y) - float(bounds[3])), 4),
+                    )
+                )
+        if configured_planes:
+            return min(configured_planes, key=lambda candidate: candidate[0])[1]
+
         boundary_particles = [
             particle_id
             for particle_id in range(len(self.particles))
@@ -100,8 +174,26 @@ class ForceContactDynamics:
         return 4
 
     def BoundaryParticleVerticalWallFlag(self, SourceID, BoundaryID):
-        """Infer the left/right wall represented by a boundary marker."""
+        """Return the fixed left/right identity of a vertical marker."""
         boundary_position = self.GetParticlePosition(BoundaryID)
+        configured_planes = []
+        reservoir_bounds = self.run_configuration.get("reservoir_bounds")
+        if reservoir_bounds is not None and len(reservoir_bounds) == 6:
+            configured_planes.extend(
+                (
+                    (
+                        abs(float(boundary_position.x) - float(reservoir_bounds[0])),
+                        1,
+                    ),
+                    (
+                        abs(float(boundary_position.x) - float(reservoir_bounds[1])),
+                        2,
+                    ),
+                )
+            )
+        if configured_planes:
+            return min(configured_planes, key=lambda candidate: candidate[0])[1]
+
         boundary_particles = [
             particle_id
             for particle_id in range(len(self.particles))
@@ -394,6 +486,8 @@ class ForceContactDynamics:
             BoundaryID,
         )
         if contact_state is None:
+            if self.collIn.ErrorReturn != self.constants.ERROR_NONE:
+                return False
             return True
         return self.AccumulateContactForce(SourceID, contact_state, totalForce)
 
@@ -404,6 +498,22 @@ class ForceContactDynamics:
             return None
         normal_x, normal_y, normal_z, overlap_area, center_distance, wall_flag = segment
         radius = float(self.particles[SourceID].Data.x)
+        if not self.CheckPenetrationStepResolution(
+            SourceID,
+            (normal_x, normal_y, normal_z),
+            radius,
+            self.create_vec4(),
+            "particle-wall",
+            wall_flag=wall_flag,
+        ):
+            return None
+        if not self.CheckWallMaximumDepth(
+            SourceID,
+            center_distance,
+            radius,
+            wall_flag,
+        ):
+            return None
         geometry = (
             normal_x,
             normal_y,
@@ -421,13 +531,38 @@ class ForceContactDynamics:
         """Return True when a boundary marker is local to the source."""
         source_position = self.GetParticlePosition(SourceID)
         boundary_position = self.GetParticlePosition(BoundaryID)
-        return (
-            abs(source_position.x - boundary_position.x) <= 1.0
-            and abs(source_position.z - boundary_position.z) <= 1.0
-        )
+        evaluator_id = int(round(float(self.particles[BoundaryID].Data.z)))
+        if evaluator_id == 1:
+            in_segment = abs(source_position.x - boundary_position.x) <= 1.0
+        elif evaluator_id == 2:
+            in_segment = abs(source_position.y - boundary_position.y) <= 1.0
+        elif evaluator_id == 3:
+            in_segment = abs(source_position.x - boundary_position.x) <= 1.0
+        else:
+            return False
+        return in_segment and abs(source_position.z - boundary_position.z) <= 1.0
 
     def InitializeWallContactState(self, SourceID, wall):
         """Initialize one current-frame source-wall contact."""
+        physical_geometry = self.GetPhysicalWallGhostGeometry(SourceID, wall)
+        if physical_geometry is not None:
+            radius = float(self.particles[SourceID].Data.x)
+            if not self.CheckPenetrationStepResolution(
+                SourceID,
+                physical_geometry[:3],
+                radius,
+                self.create_vec4(),
+                "particle-wall",
+                wall_flag=wall,
+            ):
+                return None
+            if not self.CheckWallMaximumDepth(
+                SourceID,
+                physical_geometry[4],
+                radius,
+                wall,
+            ):
+                return None
         geometry = self.GetWallGhostGeometry(SourceID, wall)
         if geometry is None:
             return None
@@ -572,6 +707,176 @@ class ForceContactDynamics:
         )
         return orientation_magnitude - proximity_magnitude
 
+    @staticmethod
+    def SolveSmallLinearSystem(matrix, values, epsilon=1.0e-12):
+        """Solve a dense system of at most three equations."""
+        size = len(values)
+        augmented = [
+            [float(matrix[row][column]) for column in range(size)]
+            + [float(values[row])]
+            for row in range(size)
+        ]
+        for pivot in range(size):
+            pivot_row = max(
+                range(pivot, size),
+                key=lambda row: abs(augmented[row][pivot]),
+            )
+            if abs(augmented[pivot_row][pivot]) <= epsilon:
+                return None
+            augmented[pivot], augmented[pivot_row] = (
+                augmented[pivot_row],
+                augmented[pivot],
+            )
+            divisor = augmented[pivot][pivot]
+            for column in range(pivot, size + 1):
+                augmented[pivot][column] /= divisor
+            for row in range(size):
+                if row == pivot:
+                    continue
+                factor = augmented[row][pivot]
+                for column in range(pivot, size + 1):
+                    augmented[row][column] -= factor * augmented[pivot][column]
+        return [augmented[row][size] for row in range(size)]
+
+    def ProjectSourceVelocityToContactSet(self, candidate_velocity, constraints):
+        """Return the closest velocity satisfying all source half-spaces."""
+        candidate = tuple(float(value) for value in candidate_velocity)
+
+        def dot(left, right):
+            return sum(left[axis] * right[axis] for axis in range(3))
+
+        def satisfies(velocity):
+            return all(
+                dot(normal, velocity) <= limit + self.EPSILON
+                for normal, limit, _contact_state in constraints
+            )
+
+        if satisfies(candidate):
+            return candidate
+
+        best_velocity = None
+        best_distance_sq = None
+        maximum_active = min(3, len(constraints))
+        for active_count in range(1, maximum_active + 1):
+            for active_indices in itertools.combinations(
+                range(len(constraints)),
+                active_count,
+            ):
+                active = [constraints[index] for index in active_indices]
+                gram = [
+                    [dot(left[0], right[0]) for right in active]
+                    for left in active
+                ]
+                residual = [
+                    dot(normal, candidate) - limit
+                    for normal, limit, _contact_state in active
+                ]
+                multipliers = self.SolveSmallLinearSystem(
+                    gram,
+                    residual,
+                    self.EPSILON,
+                )
+                if multipliers is None or any(
+                    multiplier < -self.EPSILON
+                    for multiplier in multipliers
+                ):
+                    continue
+                velocity = tuple(
+                    candidate[axis]
+                    - sum(
+                        multipliers[index] * active[index][0][axis]
+                        for index in range(active_count)
+                    )
+                    for axis in range(3)
+                )
+                if not satisfies(velocity):
+                    continue
+                distance_sq = sum(
+                    (candidate[axis] - velocity[axis]) ** 2
+                    for axis in range(3)
+                )
+                if best_distance_sq is None or distance_sq < best_distance_sq:
+                    best_velocity = velocity
+                    best_distance_sq = distance_sq
+        return best_velocity
+
+    def ApplySourceMaximumDepth(self, SourceID):
+        """Stop current inward source motion at observed maximum compression."""
+        source = self.particles[SourceID]
+        candidate = (
+            float(source.VelRad.x),
+            float(source.VelRad.y),
+            float(source.VelRad.z),
+        )
+        constraints = []
+        for contact_index in range(int(source.contactCount)):
+            contact_state = self.GetContactSlots(SourceID)[contact_index]
+            contact_type = int(contact_state.ids.y)
+            if contact_type not in (self.CONTACT_PARTICLE, self.CONTACT_WALL):
+                continue
+
+            source_radius = float(contact_state.effective_source_radius)
+            maximum_depth = self.MAXIMUM_PENETRATION_FRACTION * source_radius
+            penetration_depth = max(0.0, float(contact_state.aux.y))
+            contact_state.maximum_depth = maximum_depth
+            contact_state.remaining_depth = max(
+                0.0,
+                maximum_depth - penetration_depth,
+            )
+            contact_state.maximum_depth_reached = (
+                1.0
+                if penetration_depth >= maximum_depth - self.EPSILON
+                else 0.0
+            )
+            if penetration_depth < maximum_depth - self.EPSILON:
+                continue
+
+            normal = (
+                float(contact_state.geom.x),
+                float(contact_state.geom.y),
+                float(contact_state.geom.z),
+            )
+            source_normal_limit = 0.0
+            constraints.append((normal, source_normal_limit, contact_state))
+
+        if not constraints:
+            return True
+
+        contained = self.ProjectSourceVelocityToContactSet(candidate, constraints)
+        if contained is None:
+            first_contact = constraints[0][2]
+            first_contact_type = int(first_contact.ids.y)
+            target_id = (
+                int(first_contact.ids.x)
+                if first_contact_type == self.CONTACT_PARTICLE
+                else None
+            )
+            wall_flag = (
+                int(first_contact.ids.x)
+                if first_contact_type == self.CONTACT_WALL
+                else None
+            )
+            return self.SetError(
+                self.constants.ERROR_MAX_DEPTH_CONSTRAINT,
+                error_kind="source-contact-set",
+                source_id=SourceID,
+                target_id=target_id,
+                wall_flag=wall_flag,
+            )
+
+        source_mass = self.GetParticleMass(SourceID)
+        blocked_momentum = tuple(
+            source_mass * (candidate[axis] - contained[axis])
+            for axis in range(3)
+        )
+        source.parms.y += blocked_momentum[0]
+        source.parms.z += blocked_momentum[1]
+        source.parms.w += blocked_momentum[2]
+        self.SyncInternalMomentumMagnitude(source)
+        source.VelRad.x, source.VelRad.y, source.VelRad.z = contained
+        source.VelRad.w = self.VelocityAngle(contained[0], contained[1])
+        return True
+
     def GetParticlePosition(self, ParticleID):
         """Return a particle's frame-start position.
 
@@ -590,9 +895,21 @@ class ForceContactDynamics:
         """Return True when a particle is an occupancy-only boundary marker."""
         return float(getattr(self.particles[ParticleID], "ptype", 0.0)) > 0.5
 
+    def IsNullParticle(self, ParticleID):
+        """Return True only for the reserved ABI particle at index zero."""
+        particle = self.particles[ParticleID]
+        return (
+            int(ParticleID) == 0
+            and int(getattr(particle, "pnum", -1)) == 0
+            and float(getattr(particle, "ptype", 0.0)) < -0.5
+        )
+
     def IsMobileParticleActiveForDynamics(self, ParticleID):
         """Return True when a particle is a mobile dynamics source."""
-        return not self.IsBoundaryParticle(ParticleID)
+        return (
+            not self.IsNullParticle(ParticleID)
+            and not self.IsBoundaryParticle(ParticleID)
+        )
 
     def BoundaryParticleWallsEnabled(self):
         """Return True when boundary markers provide wall broad phase."""
@@ -1048,6 +1365,23 @@ class ForceContactDynamics:
         contact = center_distance <= source_radius + target_radius
         if not contact:
             return False
+        if center_distance <= self.EPSILON:
+            normal = (1.0, 0.0, 0.0)
+        else:
+            normal = (
+                dx / center_distance,
+                dy / center_distance,
+                dz / center_distance,
+            )
+        if not self.CheckPenetrationStepResolution(
+            SourceID,
+            normal,
+            source_radius,
+            self.GetStartFrameVelocity(TargetID),
+            "particle-particle",
+            target_id=TargetID,
+        ):
+            return True
         (
             effective_source_radius,
             _effective_target_radius,
@@ -1076,8 +1410,14 @@ class ForceContactDynamics:
             source.max_penetration_depth,
             penetration_depth,
         )
-        if not suppress_contact and center_distance <= effective_source_radius:
-            self.collIn.ErrorReturn = self.constants.ERROR_TUNNELING
+        directed_proximity = center_distance - _effective_target_radius
+        if not suppress_contact and directed_proximity < -self.EPSILON:
+            self.SetError(
+                self.constants.ERROR_PARTICLE_TUNNELING,
+                error_kind="particle-particle",
+                source_id=SourceID,
+                target_id=TargetID,
+            )
         return True
 
     def DetectContacts(self, total_forces):
@@ -1173,7 +1513,24 @@ class ForceContactDynamics:
                 return False
         return True
 
-    def SetError(self, error_code):
+    def SetError(
+        self,
+        error_code,
+        error_kind=None,
+        source_id=None,
+        target_id=None,
+        wall_flag=None,
+    ):
         """Set the shared collision error state and return failure."""
         self.collIn.ErrorReturn = error_code
+        if error_kind is not None:
+            self.collIn.ErrorKind = str(error_kind)
+        if source_id is not None:
+            self.collIn.ErrorSourceID = int(source_id)
+            self.collIn.particleNumber = int(source_id)
+        if target_id is not None:
+            self.collIn.ErrorTargetID = int(target_id)
+            self.collIn.ReadWriteConflict = int(target_id)
+        if wall_flag is not None:
+            self.collIn.ErrorWallFlag = int(wall_flag)
         return False

@@ -187,11 +187,17 @@ def _particle_kinetic_energy(particle):
 
 
 def _active_particles(particles, dynamics=None):
-    return particles
+    return [
+        particle
+        for particle_index, particle in enumerate(particles)
+        if _is_active_particle(particle_index, dynamics)
+    ]
 
 
 def _is_active_particle(particle_index, dynamics=None):
-    return True
+    if dynamics is not None and hasattr(dynamics, "IsNullParticle"):
+        return not dynamics.IsNullParticle(particle_index)
+    return particle_index != 0
 
 
 def _total_momentum(particles, dynamics=None):
@@ -257,7 +263,17 @@ def _sequential_contact_diagnostics(particles):
     if len(particles) < 2:
         return 0.0, 0.0
 
-    source = particles[0]
+    source_index = next(
+        (
+            particle_index
+            for particle_index in range(len(particles))
+            if _is_active_particle(particle_index)
+        ),
+        None,
+    )
+    if source_index is None:
+        return 0.0, 0.0
+    source = particles[source_index]
     contacts = getattr(source, "contacts", getattr(source, "gcs", []))
     for contact in contacts:
         is_particle_contact = getattr(contact.ids, "y", 0) == 1
@@ -720,11 +736,19 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
             )
             if live.collIn.ErrorReturn != live.constants.ERROR_NONE:
                 if exit_on_error:
-                    print(f"SimulationRunner exiting: ErrorReturn={live.collIn.ErrorReturn}")
+                    print(
+                        "SimulationRunner exiting: "
+                        f"ErrorReturn={live.collIn.ErrorReturn} "
+                        f"{live.ErrorDescription()}"
+                    )
                     running = False
                 else:
                     if not paused:
-                        print(f"SimulationRunner paused: ErrorReturn={live.collIn.ErrorReturn}")
+                        print(
+                            "SimulationRunner paused: "
+                            f"ErrorReturn={live.collIn.ErrorReturn} "
+                            f"{live.ErrorDescription()}"
+                        )
                     paused = True
 
             if not paused:

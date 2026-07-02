@@ -7,10 +7,25 @@
   \label{force:#1}%
 }
 
-\texttt{ForceDynamics} treats contact geometry as an instantaneous central
-repulsive force field.  Python still calculates and records overlap area for
-diagnostics and for the optional area-force mode.  The current default
-configuration uses penetration depth as the force measure:
+\subsection{High-Level Model}
+
+\texttt{ForceDynamics} is a source-owned, current-state contact model.  Each
+mobile source reads immutable frame-start state, evaluates every contact that
+applies to that source, sums the contact forces, and writes only its own
+velocity and position.  A source never writes a target particle.  No global
+pair solver reaches backward to revise a completed collision.
+
+The frame has four conceptual stages:
+\begin{enumerate}
+    \item snapshot immutable frame-start particle state;
+    \item detect particle and wall contacts and build one source-local force sum;
+    \item calculate a candidate source velocity, then apply the current-state
+          maximum-compression constraint to the source's complete contact set;
+    \item integrate the source position and record diagnostics.
+\end{enumerate}
+
+Python calculates penetration depth and overlap area.  The default force
+measure is penetration depth:
 \begin{verbatim}
 contact_force_measure = "depth";
 \end{verbatim}
@@ -18,15 +33,16 @@ The alternate supported mode is:
 \begin{verbatim}
 contact_force_measure = "area";
 \end{verbatim}
-One source-particle invocation detects all current particle and wall contacts,
-immediately vector-sums their forces into a source-local \texttt{totalForce},
-and writes only the source velocity and position.  The implementation is
-shaped to transfer directly to one GLSL compute invocation per source
-particle.
+The source-owned schedule is exported to one GLSL compute invocation per
+source particle.  The horizontal boundary-particle reservoir now runs the
+generated force, maximum-depth, internal-momentum, and position paths in
+Vulkan.  Position and velocity are both double buffered so every invocation
+reads immutable frame-start state and writes only the alternate source state.
 
-\texttt{ForceDynamics} currently supports two active wall interpretations:
+\texttt{ForceDynamics} supports three wall interpretations:
 \begin{itemize}
     \item \emph{simple walls}: all four configured wall planes are solid;
+    \item \emph{pipe walls}: the two configured cross-flow planes are solid;
     \item \emph{boundary-particle walls}: particles with positive
     evaluator-valued \texttt{ptype} are occupancy markers that represent
     local wall segments.
@@ -38,11 +54,9 @@ and broad-phase placement, but when a mobile source sees a boundary marker as
 a target, it evaluates the represented wall segment and accumulates a wall
 force instead of a particle-particle force.
 
-The current generated GLSL path validates the ordinary particle and wall force
-model in Vulkan.  Starting-contact effective geometry remains Python-side
-model behavior until the \texttt{StartingContactState.glsl} buffer/export path
-is implemented, so \texttt{ResolveStartingCollision} is intentionally excluded
-from the current Vulkan export validation.
+Boundary markers are self-describing: positive \texttt{ptype}/\texttt{Data.z}
+values select horizontal, vertical, or CD-nozzle wall evaluation.  Marker
+targets that describe the same physical wall are deduplicated by wall flag.
 
 \begin{figure}[ht]
 \centering
@@ -53,7 +67,7 @@ from the current Vulkan export validation.
 \begin{figure}[ht]
 \centering
 \resizebox{\textwidth}{!}{\input{ForceDynamicsFlowPTikz}}
-\caption{Historical pipe-wall flow retained for comparison}
+\caption{ForceDynamics pipe-wall flow: particle targets plus wall flags 3--4}
 \end{figure}
 
 \begin{figure}[ht]
@@ -71,8 +85,8 @@ schedule:
 
 \begin{verbatim}
 snapshot frame-start positions and velocities
-initialize starting-contact effective geometry
-initialize totalForce for every source
+initialize starting-contact effective geometry and diagnostics
+initialize totalForce and source contact sets
 for each SourceID:
     scan possible targets
         if TargetID is a mobile particle:
@@ -85,7 +99,8 @@ for each SourceID:
         ProcessWallCollision(SourceID, wall, totalForce)
 capture frame-start pair diagnostics
 for each SourceID:
-    CalcVelocity(SourceID, totalForce)
+    calculate force-driven candidate velocity
+    ApplySourceMaximumDepth(SourceID)
 for each SourceID:
     CalcPosition(SourceID)
 snapshot end positions for diagnostics
@@ -93,6 +108,8 @@ snapshot end positions for diagnostics
 
 The Python harness uses a direct particle scan where GLSL uses cell occupancy
 lists.  Both schedules complete one source-local force sum before integration.
+Maximum compression is evaluated from observed frame state, not from a
+predicted future position.
 Starting-contact state is initialized after the frame-start snapshot so
 particle-particle and particle-wall overlaps present in the initial
 configuration can be treated as zero-force contact limits.  The end-position
@@ -265,29 +282,51 @@ physical-radius overlap.
 \texttt{GetParticlePosition(ParticleID)} returns a particle position from the
 selected immutable position snapshot.
 
-\ForceFunctionSection{TunnelingDetection}
+\ForceFunctionSection{MaximumCompression}
 
-The current GLSL contact query in \texttt{isParticleContactMotion.glsl}
-detects overlap or near-overlap at the sampled frame position:
+Maximum compression applies to both particle and wall contacts.  With source
+radius \(r_s\), the first-version rule is:
+\begin{equation}
+\delta_{\max}=0.5r_s.
+\end{equation}
+At or beyond this observed depth, further inward source-normal motion is
+removed.  Tangential velocity is preserved.  The removed source translational
+momentum is stored in the source-owned internal-momentum vector
+\texttt{parms.yzw}.
 
-\begin{verbatim}
-float rddiff = dsq - rsq;
-if (rddiff < 0.00001)
-    return 1;
-\end{verbatim}
+All maximum-depth contacts for one source are collected before the source is
+updated.  \texttt{ProjectSourceVelocityToContactSet} deterministically projects
+the candidate source velocity against that complete local constraint set.  It
+does not mutate targets and does not iterate over global particle pairs.
 
-This is an instantaneous overlap test.  It does not prove that the segment
-traced from the previous position to the current position avoided the contact
-radius.  A fast particle can therefore tunnel if it is outside the overlap
-band at both sampled endpoints but crosses the band between them.
+The model also enforces a timestep-resolution condition:
+\begin{equation}
+\text{relative inward displacement per step}
+\leq (1-0.5)r_s.
+\end{equation}
+A violation raises \texttt{ERROR\_PENETRATION\_STEP\_TOO\_LARGE}; the simulation
+does not silently alter \(\Delta t\).
 
-The planned tunneling error path should add a swept closest-approach test to
-the hand-maintained contact-query shader infrastructure.  If the swept path
-crosses the particle-particle contact radius, the shader should set the
-compute error field and return a tunneling error rather than silently
-continuing.  Boundary-particle wall tunneling requires the analogous test in
-the wall-segment evaluator because the crossing is against a wall plane or
-segment, not a particle center.
+Error reporting distinguishes \texttt{ERROR\_PARTICLE\_TUNNELING},
+\texttt{ERROR\_WALL\_TUNNELING}, \texttt{ERROR\_MAX\_DEPTH\_CONSTRAINT}, and
+\texttt{ERROR\_PENETRATION\_STEP\_TOO\_LARGE}.  Reported source and target IDs
+are particle numbers because Python preserves the null particle at index zero.
+
+\ForceFunctionSection{VulkanBufferedState}
+
+Vulkan uses the same selector for position and velocity buffers.  When
+\texttt{positionBuffer=0}, contact processing reads \texttt{PosLocA} and
+\texttt{VelRadA}, while integration writes \texttt{PosLocB} and
+\texttt{VelRadB}.  The roles reverse when the selector is one.
+\texttt{GetParticleVelocity} reads the immutable current velocity,
+\texttt{GetNextParticleVelocity} reads the candidate/output velocity, and
+\texttt{SetNextParticleVelocity} writes only that alternate buffer.
+
+After \texttt{CalcPosition}, \texttt{ApplyParticleDeathBounds} tests the newly
+written position against the six configured death planes.  A mobile particle
+outside any plane receives \texttt{Data.w=-1}.  Dead particles are excluded as
+compute sources, contact targets, cell-occupancy entries, and rendered
+particles.  Boundary markers are exempt from death-bound processing.
 
 \ForceFunctionSection{GetStartFrameVelocity}
 
@@ -326,9 +365,9 @@ area-mode comparison.
 
 The force is applied during both compression and rebound.  Starting contacts
 use effective geometry measured from their starting separation.  There is no
-contact weighting, available-momentum cap, or collision phase.  Source-owned
-recoverable internal momentum is recorded as a diagnostic only and does not
-feed back into velocity.
+contact weighting, available-momentum cap, or collision phase.  Maximum-depth
+containment is a separate source-velocity constraint applied after the
+force-driven candidate velocity is calculated.
 
 \ForceFunctionSection{RecoverableInternalMomentum}
 
@@ -340,11 +379,12 @@ stored component along the same normal, limited by the current contact
 impulse.  The scalar magnitude is mirrored to \texttt{Data.z} and to the
 Python \texttt{internal\_momentum} report field.
 
-This is diagnostic bookkeeping only.  It is intended to show recoverable
-collision compression rising during approach, draining during rebound, and
-remaining nonzero when crowding or confinement blocks release.  Heat,
-thermalization, and heat-transfer coefficients are later model layers and are
-not part of the current ForceDynamics update.
+Force-contact bookkeeping records compression and rebound.  In addition,
+maximum-depth containment stores inward source momentum that cannot be
+expressed as translational motion during the current frame.  The storage is
+therefore no longer purely diagnostic, although a complete release and thermal
+transfer model is still deferred.  Heat, thermalization, and heat-transfer
+coefficients remain later model layers.
 
 \ForceFunctionSection{GetContactStiffness}
 
@@ -366,15 +406,18 @@ is area stiffness.
 
 \ForceFunctionSection{CalcVelocity}
 
-\texttt{CalcVelocity(SourceID, totalForce)} performs the source velocity
-write.  It converts the completed source-local force sum to acceleration
-inside the function:
+\texttt{CalcVelocity(SourceID, totalForce)} first calculates the force-driven
+candidate source velocity:
 
 \begin{equation}
 \mathbf v_{n+1}
 =
 \mathbf v_n+\frac{\mathbf F_n}{m}\Delta t.
 \end{equation}
+It then calls \texttt{ApplySourceMaximumDepth(SourceID)} before the velocity is
+accepted.  This second step may remove inward normal velocity and store the
+corresponding source-owned internal momentum.  Position integration sees only
+the accepted velocity.
 
 \ForceFunctionSection{GetParticleMass}
 
@@ -403,11 +446,12 @@ dynamics simulations.
 
 \subsection{Potential Energy and Diagnostics}
 
-The force is conservative with pair potential:
-
+In depth mode the pair potential is:
 \begin{equation}
-U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}A_{ij}(s)\,ds.
+U_{ij}(d)=\frac{1}{2}q_{ij}\delta_{ij}^{2}.
 \end{equation}
+In area mode the earlier overlap-area potential remains
+\(U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}A_{ij}(s)\,ds\).
 
 For a starting contact, \(r_i+r_j\) is replaced by the effective starting
 separation limit while the contact is active.  After the contact rebounds to

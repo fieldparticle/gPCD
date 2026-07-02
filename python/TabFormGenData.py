@@ -124,7 +124,7 @@ class TabGenData(QTabWidget):
         include_items = self.itemcfgFile.open_log(self.itemcfg.include_file)
         for key, value in include_items.items():
             self.itemcfg[key] = value
-            print(f'{key}')
+           #print(f'{key}')
 
         pass
     #******************************************************************
@@ -185,7 +185,15 @@ class TabGenData(QTabWidget):
     # reload the configuration file
     #
     def refresh(self):
-        return self.load_item_cfg(self.CfgFile)
+        try:
+            with open(self.CfgFile, "r", encoding="utf-8") as cfg_file:
+                self.itemcfg = libconf.load(cfg_file)
+        except BaseException as e:
+            self.log.log(self,f"Could not read particle data:{e}")
+            return
+        if 'include_file' in self.itemcfg:
+            self.load_include()
+        
     #******************************************************************
     # Browse to an existing cfg file
     #
@@ -200,6 +208,7 @@ class TabGenData(QTabWidget):
             self.load_item_cfg(folder[0])
  
     def run_analysis(self):
+        self.refresh()
         if self.batch_mode==True:
             self.do_batch()
         elif self.study_mode==True:
@@ -223,7 +232,7 @@ class TabGenData(QTabWidget):
          # Pass the function to execute
         if self.refresh() == False:
             print("Config file error")
-            retur
+            return
         index = 0
         os.system('cls' if os.name == 'nt' else 'clear')
         self.current_test_file = 0
@@ -376,7 +385,9 @@ class TabGenData(QTabWidget):
     # Thread is complete start a new thread for the next file if there is any
     #
     def plot_particles(self):
-        
+        if self.refresh() == False:
+            print("Config file error")
+            return
         selected_item = self.DataList.selectedItems()
         if selected_item ==self.selected_item:
             self.plot_obj.close_plot()

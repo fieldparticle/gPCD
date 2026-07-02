@@ -2,6 +2,8 @@ These are the session rules for Field Particle System.
 
 Always assume code changes are for Pythin only.
 Never modify c++ code without asking.
+Do not try to compile c++ code
+Do not run tests, just tell me what tests need to be run.
 
 to refresh all of the convention read 
 DocumentConventions.tex

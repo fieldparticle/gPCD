@@ -56,6 +56,7 @@ public:
 	void WriteShaderDbgHeader();
 	void WriteWalls();
 	void Reservoir();
+	void WriteCDNoz();
 
 
 	std::vector<char> ReadSPVFile(const std::string& filename);

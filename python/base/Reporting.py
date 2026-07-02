@@ -368,6 +368,8 @@ class Reporting:
             }
 
             for source_index, particle in enumerate(particles):
+                if int(getattr(particle, "pnum", -1)) == 0:
+                    continue
                 contacts = active_by_source.get(source_index, [])
                 source_targets = "|".join(
                     self.contact_target_label(particles, contact)
@@ -510,6 +512,8 @@ class Reporting:
     def active_contacts_by_source(particles):
         active_by_source = {}
         for source_index, particle in enumerate(particles):
+            if int(getattr(particle, "pnum", -1)) == 0:
+                continue
             contacts = getattr(particle, "contacts", getattr(particle, "gcs", []))
             active_contacts = []
             for slot, contact in enumerate(contacts):

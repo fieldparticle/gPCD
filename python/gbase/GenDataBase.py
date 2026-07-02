@@ -241,6 +241,7 @@ class GenDataBase:
     def add_null_particle(self,w_list):
         particle_struct = pdata()
         particle_struct.pnum = 0
+        particle_struct.ptype = PTYPE_NULL
         w_list.append(particle_struct)
     
     #******************************************************************

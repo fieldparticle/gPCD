@@ -14,7 +14,8 @@ lstr_dtype = np.dtype([
 particle_dtype = np.dtype([
     ("PosLocA", np.float32, 4),
     ("PosLocB", np.float32, 4),
-    ("VelRad", np.float32, 4),
+    ("VelRadA", np.float32, 4),
+    ("VelRadB", np.float32, 4),
     ("Data", np.float32, 4),
     ("parms", np.float32, 4),
     ("CornerList", lstr_dtype, 8),
@@ -168,7 +169,12 @@ class ReadCaptureFile:
         dead = mobile & (life < -1.0e-6)
         boundary = captured["ptype"] > 0.5
 
-        capture_velocity = captured["VelRad"][:, :3]
+        use_a = np.isclose(captured["PosLocA"][:, 3], 0.0)
+        capture_velocity = np.where(
+            use_a[:, None],
+            captured["VelRadA"][:, :3],
+            captured["VelRadB"][:, :3],
+        )
         capture_mass = captured["parms"][:, 0]
         momentum, kinetic_energy, max_speed = self._totals(
             capture_mass[active], capture_velocity[active]

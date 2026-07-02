@@ -1,122 +1,40 @@
 \begin{tikzpicture}[
-    node distance=0.28in and 0.62in,
-    function/.style={
-        draw=black!60,
-        fill=black!3,
-        rounded corners=2pt,
-        minimum width=1.90in,
-        minimum height=0.30in,
-        text width=1.76in,
-        align=center,
-        font=\ttfamily\scriptsize
-    },
-    entry/.style={
-        function,
-        fill=green!8,
-        draw=green!40!black,
-        line width=0.65pt
-    },
-    lifecycle/.style={
-        function,
-        fill=purple!7,
-        draw=purple!50!black
-    },
-    boundary/.style={
-        function,
-        fill=violet!7,
-        draw=violet!55!black
-    },
-    reused/.style={
-        draw=orange!55!black,
-        fill=orange!10,
-        rounded corners=2pt,
-        minimum width=1.16in,
-        minimum height=0.22in,
-        text width=1.04in,
-        inner xsep=2pt,
-        align=center,
-        font=\ttfamily\tiny
-    },
-    flow/.style={-{Stealth[length=5pt]}, draw=black!65, line width=0.45pt},
-    reusecall/.style={-{Stealth[length=4pt]}, draw=orange!60!black, dashed, line width=0.4pt},
-    loop/.style={flow, rounded corners=0pt}
+    node distance=0.34in and 0.72in,
+    box/.style={draw=black!60, fill=black!3, rounded corners=2pt,
+        minimum width=2.25in, minimum height=0.38in, text width=2.08in,
+        align=center, font=\sffamily\scriptsize},
+    stage/.style={box, fill=green!8, draw=green!40!black, line width=0.65pt},
+    marker/.style={box, fill=violet!7, draw=violet!55!black},
+    constraint/.style={box, fill=orange!10, draw=orange!60!black},
+    flow/.style={-{Stealth[length=5pt]}, draw=black!65, line width=0.5pt}
 ]
+\node[stage] (snapshot) {Immutable frame-start snapshot};
+\node[box, below=of snapshot] (targets) {Occupancy/direct target scan};
+\node[box, below left=of targets] (particles)
+    {Mobile target\\particle contact};
+\node[marker, below right=of targets] (markers)
+    {Boundary marker\\dispatch evaluator from \texttt{Data.z}};
+\node[marker, below=of markers] (wall)
+    {Evaluate local wall segment\\deduplicate by physical wall flag};
+\node[stage, below=2.45in of snapshot] (sum)
+    {Complete source-local \texttt{totalForce}\\no target writes};
+\node[stage, below=of sum] (candidate)
+    {Force-driven candidate velocity};
+\node[constraint, below=of candidate] (maximum)
+    {Current-state maximum compression\\particle and wall contact set};
+\node[stage, below=of maximum] (position)
+    {Accept source velocity and integrate position};
+\node[box, below=of position] (diagnostics)
+    {Diagnostics and distinct error reporting};
 
-\providecommand{\ForceFlowNode}[2]{\hyperref[force:#1]{\strut #2}}
-
-\node[entry] (main) {main(SourceID)\\{\scriptsize WALL\_MODEL\_BOUNDARY\_PARTICLE}};
-\node[lifecycle, below=of main] (start-reservoir)
-    {StartReservoir(SourceID)};
-\node[function, below=of start-reservoir] (start-state)
-    {\ForceFlowNode{InitializeStartingContactState}{InitStartingContactState}};
-\node[function, below=of start-state] (target-scan)
-    {target scan};
-
-\node[function, below left=0.34in and 0.74in of target-scan] (particle-process)
-    {ProcessParticleCollision\\{\scriptsize mobile target}};
-\node[function, below=of particle-process] (geometry)
-    {\ForceFlowNode{GetParticleGeometry}{GetParticleGeometry}};
-\node[function, below=of geometry] (particle-force)
-    {AccumulateContactForce};
-
-\node[boundary, below right=0.34in and 0.74in of target-scan] (bp-process)
-    {\ForceFlowNode{ProcessBoundaryParticleWallCollision}{ProcessBoundaryWallCollision}};
-\node[boundary, below=of bp-process] (bp-eval)
-    {\ForceFlowNode{EvaluateWallSegment}{EvaluateWallSegment}};
-\node[boundary, below=of bp-eval] (bp-force)
-    {AccumulateContactForce};
-
-\node[entry, below=0.55in of main |- particle-force.south] (velocity)
-    {CalcVelocity(SourceID, totalForce)};
-\node[entry, below=of velocity] (position)
-    {CalcPosition(SourceID)};
-\node[lifecycle, below=of position] (retire)
-    {RetirePastXMax(SourceID)};
-
-\node[reused, left=0.16in of geometry] (particle-position)
-    {\ForceFlowNode{GetParticlePosition}{GetParticlePosition}};
-\node[reused, left=0.16in of particle-force] (particle-stiffness)
-    {GetContactStiffness};
-\node[reused, right=0.16in of bp-eval] (bp-position)
-    {\ForceFlowNode{GetParticlePosition}{GetParticlePosition}};
-\node[reused, right=0.16in of bp-force] (bp-stiffness)
-    {GetContactStiffness};
-\node[reused, left=of velocity] (velocity-mass)
-    {\ForceFlowNode{GetParticleMass}{GetParticleMass}};
-\node[reused, right=of velocity] (velocity-start)
-    {\ForceFlowNode{GetStartFrameVelocity}{GetStartFrameVelocity}};
-
-\draw[flow] (main) -- (start-reservoir);
-\draw[flow] (start-reservoir) -- node[right,font=\scriptsize]{active source} (start-state);
-\draw[flow] (start-state) -- (target-scan);
-
-\draw[flow] (target-scan) -- node[left,font=\scriptsize]{mobile target} (particle-process);
-\draw[flow] (particle-process) -- (geometry);
-\draw[flow] (geometry) -- (particle-force);
-\draw[loop] (particle-force.west) -- ++(-0.18in,0)
-    |- node[pos=0.12,left,font=\scriptsize]{next target} (target-scan.west);
-
-\draw[flow] (target-scan) -- node[right,font=\scriptsize]{boundary marker} (bp-process);
-\draw[flow] (bp-process) -- (bp-eval);
-\draw[flow] (bp-eval) -- (bp-force);
-\draw[loop] (bp-force.east) -- ++(0.18in,0)
-    |- node[pos=0.12,right,font=\scriptsize]{next target} (target-scan.east);
-
-\draw[flow] (particle-force.south) -- ++(0,-0.18in) -| (velocity.north);
-\draw[flow] (bp-force.south) -- ++(0,-0.18in) -| (velocity.north);
-\draw[flow] (velocity) -- (position);
-\draw[flow] (position) -- (retire);
-
-\draw[reusecall] (geometry) -- (particle-position);
-\draw[reusecall] (particle-force) -- (particle-stiffness);
-\draw[reusecall] (bp-eval) -- (bp-position);
-\draw[reusecall] (bp-force) -- (bp-stiffness);
-\draw[reusecall] (velocity) -- (velocity-mass);
-\draw[reusecall] (velocity) -- (velocity-start);
-
-\node[font=\sffamily\scriptsize, text=black!65, above left=0.08in and 0.08in of particle-process]
-    {particle contacts};
-\node[font=\sffamily\scriptsize, text=violet!65!black, above right=0.08in and 0.08in of bp-process]
-    {boundary-particle walls};
-
+\draw[flow] (snapshot) -- (targets);
+\draw[flow] (targets) -- (particles);
+\draw[flow] (targets) -- (markers);
+\draw[flow] (markers) -- (wall);
+\draw[flow] (particles) |- (sum);
+\draw[flow] (wall) |- (sum);
+\draw[flow] (sum) -- (candidate);
+\draw[flow] (candidate) -- (maximum);
+\draw[flow] (maximum) -- (position);
+\draw[flow] (position) -- (diagnostics);
 \end{tikzpicture}

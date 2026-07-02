@@ -20,7 +20,8 @@ struct ContactState {
 struct Particle {
 	glm::vec4 PosLocA; // xyz=position, w=active flag: 0 active, 1 inactive
 	glm::vec4 PosLocB; // xyz=alternate position buffer, w=active flag
-	glm::vec4 VelRad;  // xyz=velocity, w=velocity angle
+	glm::vec4 VelRadA;  // xyz=velocity, w=velocity angle
+	glm::vec4 VelRadB;  // xyz=velocity, w=velocity angle
 
 	glm::vec4 Data;    // x=radius, y=collision_stiffness_q, z=reserved, w=state/flags
 	glm::vec4 parms;   // x=mass, y=delta_vx, z=delta_vy, w=delta_speed

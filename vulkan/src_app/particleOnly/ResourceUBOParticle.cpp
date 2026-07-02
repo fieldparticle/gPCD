@@ -44,7 +44,6 @@ void ResourceParticleUBO::Create(uint32_t BindPoint, SwapChainObj* SCO, Resource
 {
 	m_Particle = particle;
 	m_NumElements = 0;// m_Particle->m_NumParticles;
-
 	Create(BindPoint, SCO);
 }
 void ResourceParticleUBO::createLayout()
@@ -110,8 +109,7 @@ void ResourceParticleUBO::createBuffers()
 
 void ResourceParticleUBO::PushMem(uint32_t currentBuffer)
 {
-	float s = m_Particle->m_SideLength;
-	GeneralViewing(m_Particle->m_SideLength, currentBuffer);
+	GeneralViewing(currentBuffer);
 }
 
 

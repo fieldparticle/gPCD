@@ -1056,7 +1056,7 @@ class ForceDynamics(ForceContactDynamics):
             penetration_depth,
         )
         if center_distance <= source_radius:
-            self.collIn.ErrorReturn = self.constants.ERROR_TUNNELING
+            self.collIn.ErrorReturn = self.constants.ERROR_PARTICLE_TUNNELING
         return True
 
     @staticmethod

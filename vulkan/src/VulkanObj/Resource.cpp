@@ -46,22 +46,51 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
 		m_BindPoint=BindPoint;
    
     
-}void Resource::GeneralViewing(uint32_t SideLength, uint32_t CurrentBuffer)
-{
-    float s = static_cast<float>(SideLength);
-    float cellCenter = 0.5f * s;
+}
 
+void Resource::GeneralViewing(uint32_t CurrentBuffer)
+{
     glm::vec3 center(
-        cellCenter,
-        cellCenter,
-        cellCenter
+        0.5f * static_cast<float>(m_CellW),
+        0.5f * static_cast<float>(m_CellH),
+        0.5f * static_cast<float>(m_CellL)
     );
+
+    config_setting_t* viewCenter = CfgTst->CheckKey("view_center");
+    if (viewCenter != nullptr)
+    {
+        if (config_setting_length(viewCenter) != 3)
+            throw std::runtime_error("view_center must contain exactly three values");
+
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            config_setting_t* value = config_setting_get_elem(viewCenter, axis);
+            if (value == nullptr)
+                throw std::runtime_error("view_center contains an invalid value");
+
+            int valueType = config_setting_type(value);
+            if (valueType == CONFIG_TYPE_FLOAT)
+                center[axis] = static_cast<float>(config_setting_get_float(value));
+            else if (valueType == CONFIG_TYPE_INT)
+                center[axis] = static_cast<float>(config_setting_get_int(value));
+            else if (valueType == CONFIG_TYPE_INT64)
+                center[axis] = static_cast<float>(config_setting_get_int64(value));
+            else
+                throw std::runtime_error("view_center values must be numeric");
+        }
+    }
+
+    float cellWidth = static_cast<float>(m_CellW);
+    float cellHeight = static_cast<float>(m_CellH);
+    float cellDepth = static_cast<float>(m_CellL);
+    float maxExtent = glm::max(cellWidth, glm::max(cellHeight, cellDepth));
 
     m_UBO = {};
 
     // ============================================================
     // Model
-    // The rendered cell-array extent spans 0..SideLength.
+    // Rotate around the configured view center, or the cell-array center when
+    // no explicit view center is supplied.
     // Rotate about the extent center so the cell array remains
     // centered in the view.
     // ============================================================
@@ -107,7 +136,9 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
     glm::vec3 up;
     glm::vec3 screenRight;
 
-    float dist = s * 4.0f;
+    float dist = maxExtent * 4.0f;
+    float worldWidth = cellWidth;
+    float worldHeight = cellHeight;
 
     if (rCoordView == VIEW_XY)
     {
@@ -117,6 +148,8 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
         eye = center + glm::vec3(0.0f, 0.0f, dist);
         up = glm::vec3(0.0f, 1.0f, 0.0f);
         screenRight = glm::vec3(1.0f, 0.0f, 0.0f);
+        worldWidth = cellWidth;
+        worldHeight = cellHeight;
     }
     else if (rCoordView == VIEW_ZY)
     {
@@ -126,6 +159,8 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
         eye = center + glm::vec3(dist, 0.0f, 0.0f);
         up = glm::vec3(0.0f, 1.0f, 0.0f);
         screenRight = glm::vec3(0.0f, 0.0f, 1.0f);
+        worldWidth = cellDepth;
+        worldHeight = cellHeight;
     }
     else if (rCoordView == VIEW_XZ)
     {
@@ -135,12 +170,16 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
         eye = center + glm::vec3(0.0f, dist, 0.0f);
         up = glm::vec3(0.0f, 0.0f, 1.0f);
         screenRight = glm::vec3(1.0f, 0.0f, 0.0f);
+        worldWidth = cellWidth;
+        worldHeight = cellDepth;
     }
     else
     {
         eye = center + glm::vec3(0.0f, 0.0f, dist);
         up = glm::vec3(0.0f, 1.0f, 0.0f);
         screenRight = glm::vec3(1.0f, 0.0f, 0.0f);
+        worldWidth = cellWidth;
+        worldHeight = cellHeight;
     }
 
     glm::vec3 pan = (PanX * screenRight) + (PanY * up);
@@ -160,8 +199,6 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
 
     float viewWidth = static_cast<float>(m_SCO->m_SwapChainExtent.width);
     float viewHeight = static_cast<float>(m_SCO->m_SwapChainExtent.height);
-    float aspect = viewWidth / viewHeight;
-
     if (ZoomX == 0.0f)
     {
         mout << "GeneralViewing ZoomX is zero" << ende;
@@ -178,18 +215,20 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
         usableHeight = viewHeight;
     }
 
-    float fitPixels = (usableWidth < usableHeight) ? usableWidth : usableHeight;
-    float pixelsPerWorldUnit = fitPixels / s;
-    float half = (0.5f * viewHeight / pixelsPerWorldUnit) / ZoomX;
-    //float half = 100.0f;
+    float pixelsPerWorldUnit = glm::min(
+        usableWidth / worldWidth,
+        usableHeight / worldHeight
+    );
+    float halfWidth = (0.5f * viewWidth / pixelsPerWorldUnit) / ZoomX;
+    float halfHeight = (0.5f * viewHeight / pixelsPerWorldUnit) / ZoomX;
 
     m_UBO.proj = glm::ortho(
-        -half * aspect,
-        half * aspect,
-        -half,
-        half,
+        -halfWidth,
+        halfWidth,
+        -halfHeight,
+        halfHeight,
         0.1f,
-        s * 10.0f
+        maxExtent * 10.0f
     );
 
     //mout << "rRotZ:" << rRotZ << "," << "rRotY:" << rRotY << "," << "rRotX:" << rRotX << "," "zoom:" << ZoomX << ende;

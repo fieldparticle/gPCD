@@ -43,10 +43,9 @@ void ResourceCollMatrix::Create(uint32_t BindPoint, ResourceVertexParticle* part
 
     uint32_t Size = static_cast<uint32_t>(m_particle->m_SideLength);
     m_BindPoint = BindPoint;
-    // Sizes are in bytes
-    m_MaxLoc = static_cast<uint32_t>((CfgTst->GetUInt("CellAryW", true)) 
-                                        * (CfgTst->GetUInt("CellAryH", true)) 
-                                        * (CfgTst->GetUInt("CellAryL", true)));
+    
+    m_MaxLoc = static_cast<uint32_t>(m_CellW * m_CellH * m_CellL);
+
 
     // This is in bytes. sizeof(uint32_t) returns 4
     uint64_t cell_occ_size = (CfgTst->GetInt("cell_occupancy_list_size", true));
