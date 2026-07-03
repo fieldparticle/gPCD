@@ -339,6 +339,32 @@ def _motion_summary(start_diagnostics, particles, dynamics=None):
         dynamics,
     )
     v_rel, raw_impulse = _sequential_contact_diagnostics(particles)
+    piston_position = 0.0
+    piston_velocity = (0.0, 0.0, 0.0)
+    piston_contacts = 0
+    piston_frame_impulse = 0.0
+    piston_total_impulse = 0.0
+    piston_total_momentum = (0.0, 0.0, 0.0)
+    if dynamics is not None and dynamics.PistonEnabled():
+        frame_number = int(dynamics.ShaderFlags.frameNum)
+        piston_position = dynamics.GetPistonPosition(frame_number)
+        velocity = dynamics.GetPistonVelocity(frame_number)
+        piston_velocity = (velocity.x, velocity.y, velocity.z)
+        piston_contacts = int(getattr(dynamics, "piston_contact_count", 0))
+        piston_frame_impulse = float(
+            getattr(dynamics, "piston_frame_impulse", 0.0)
+        )
+        piston_total_impulse = float(
+            getattr(dynamics, "piston_total_impulse", 0.0)
+        )
+        total_transfer = getattr(dynamics, "piston_total_momentum", None)
+        if total_transfer is not None:
+            piston_total_momentum = (
+                float(total_transfer.x),
+                float(total_transfer.y),
+                float(total_transfer.z),
+            )
+
     return {
         "start_total_px": start_x,
         "start_total_py": start_y,
@@ -367,6 +393,16 @@ def _motion_summary(start_diagnostics, particles, dynamics=None):
         "energy_drift": total_energy - start_diagnostics["total_energy"],
         "v_rel": v_rel,
         "raw_impulse": raw_impulse,
+        "piston_position": piston_position,
+        "piston_velocity_x": piston_velocity[0],
+        "piston_velocity_y": piston_velocity[1],
+        "piston_velocity_z": piston_velocity[2],
+        "piston_contacts": piston_contacts,
+        "piston_frame_impulse": piston_frame_impulse,
+        "piston_total_impulse": piston_total_impulse,
+        "piston_total_px": piston_total_momentum[0],
+        "piston_total_py": piston_total_momentum[1],
+        "piston_total_pz": piston_total_momentum[2],
     }
 
 
@@ -468,6 +504,31 @@ def _draw_particles(
             abs(side_bottom - side_top),
         )
         pygame.draw.rect(screen, (70, 85, 105), side_rect, 1)
+
+    if dynamics is not None and dynamics.PistonEnabled():
+        reservoir_bounds = run_configuration["reservoir_bounds"]
+        piston_x = dynamics.GetPistonPosition(frame_number)
+        piston_bottom = _to_screen(
+            piston_x,
+            float(reservoir_bounds[2]),
+            view_box,
+            screen_width,
+            screen_height,
+        )
+        piston_top = _to_screen(
+            piston_x,
+            float(reservoir_bounds[3]),
+            view_box,
+            screen_width,
+            screen_height,
+        )
+        pygame.draw.line(
+            screen,
+            (255, 210, 70),
+            piston_bottom,
+            piston_top,
+            4,
+        )
 
     font = pygame.font.Font(None, 24)
     hsv_color = bool(run_configuration.get("hsv_color", False))
@@ -577,6 +638,21 @@ def _draw_particles(
         row = row_font.render(row_text, True, (220, 230, 240))
         screen.blit(row, (10, row_y))
         row_y += 20
+    piston_row = (
+        f"piston x={motion_summary['piston_position']:.8f} "
+        f"v=({motion_summary['piston_velocity_x']:.8f},"
+        f"{motion_summary['piston_velocity_y']:.8f},"
+        f"{motion_summary['piston_velocity_z']:.8f}) "
+        f"contacts={motion_summary['piston_contacts']} "
+        f"frame_J={motion_summary['piston_frame_impulse']:.8f} "
+        f"total_J={motion_summary['piston_total_impulse']:.8f} "
+        f"total_P=({motion_summary['piston_total_px']:.8f},"
+        f"{motion_summary['piston_total_py']:.8f},"
+        f"{motion_summary['piston_total_pz']:.8f})"
+    )
+    row = row_font.render(piston_row, True, (220, 230, 240))
+    screen.blit(row, (10, row_y))
+    row_y += 20
     row_y += 6
     displayed_particle_rows = 0
     active_particle_count = len(_active_particles(particles, dynamics))

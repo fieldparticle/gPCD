@@ -69,6 +69,11 @@ class ForceDynamics(ForceContactDynamics):
         self.wall_contact_offset = 0.0
         self.starting_contacts_initialized = False
         self.starting_contact_states = {}
+        self.piston_contact_count = 0
+        self.piston_frame_impulse = 0.0
+        self.piston_frame_momentum = self.create_vec4()
+        self.piston_total_impulse = 0.0
+        self.piston_total_momentum = self.create_vec4()
 
     def ClearContactDiagnostics(self, contact_state):
         """Reset reporting-only diagnostics on one reusable contact slot."""
@@ -120,8 +125,10 @@ class ForceDynamics(ForceContactDynamics):
             "maximum_depth",
             "remaining_depth",
             "maximum_depth_reached",
+            "is_piston_contact",
         ):
             setattr(contact_state, field_name, 0.0)
+        contact_state.wall_target_velocity = self.create_vec4()
 
     def ClearContactSlot(self, contact_state):
         """Reset one reusable current-frame contact slot."""
@@ -172,7 +179,7 @@ class ForceDynamics(ForceContactDynamics):
         normal_z = float(contact_state.geom.z)
         source_velocity = self.GetStartFrameVelocity(SourceID)
         target_velocity = (
-            self.create_vec4()
+            getattr(contact_state, "wall_target_velocity", self.create_vec4())
             if int(contact_state.ids.y) == self.constants.CONTACT_WALL
             else self.GetStartFrameVelocity(TargetID)
         )
@@ -212,6 +219,20 @@ class ForceDynamics(ForceContactDynamics):
             )
         )
         contact_state.raw_impulse = contact_state.force_magnitude * dt
+        if float(getattr(contact_state, "is_piston_contact", 0.0)) != 0.0:
+            impulse = contact_state.raw_impulse
+            transfer_x = -impulse * float(contact_state.geom.x)
+            transfer_y = -impulse * float(contact_state.geom.y)
+            transfer_z = -impulse * float(contact_state.geom.z)
+            self.piston_contact_count += 1
+            self.piston_frame_impulse += impulse
+            self.piston_frame_momentum.x += transfer_x
+            self.piston_frame_momentum.y += transfer_y
+            self.piston_frame_momentum.z += transfer_z
+            self.piston_total_impulse += impulse
+            self.piston_total_momentum.x += transfer_x
+            self.piston_total_momentum.y += transfer_y
+            self.piston_total_momentum.z += transfer_z
         self.RecordRecoverableInternalMomentum(SourceID, contact_state)
         contact_state.contact_potential_energy = self.GetOverlapPotentialEnergy(
             source_radius,
@@ -731,6 +752,9 @@ class ForceDynamics(ForceContactDynamics):
         resolution, or motion.  This does not reset particle state or contact
         ledgers; it only gates whether the frame is allowed to run.
         """
+        self.piston_contact_count = 0
+        self.piston_frame_impulse = 0.0
+        self.piston_frame_momentum = self.create_vec4()
         self.collIn.ErrorReturn = self.constants.ERROR_NONE
         self.collIn.ErrorKind = "none"
         self.collIn.ErrorSourceID = -1

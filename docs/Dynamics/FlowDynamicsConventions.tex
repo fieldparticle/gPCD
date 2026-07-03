@@ -6,9 +6,9 @@
 Scheduled particle birth, lifecycle gating through \texttt{Data.w}, and
 outlet retirement have been retired from the live Python
 \texttt{ForceDynamics} path.  Mobile particles are generated active from
-frame zero.  The selected replacement is a finite, prefilled reservoir whose
-rear wall will later move as a piston.  The piston model is not yet
-implemented.
+frame zero.  The selected replacement is a finite, prefilled reservoir with
+an analytic moving piston.  The Python piston model is implemented; GLSL and
+Vulkan piston integration remain the next porting stage.
 
 The former deferred-birth design remains documented as a historical
 investigation in \texttt{DynamicsConventions.tex} and
@@ -62,10 +62,10 @@ z_{\mathrm{particle}}=1.
 \]
 The cell-array depth must therefore be greater than three.
 
-\subsection{Reservoir Packing Report}
+\subsection{Reservoir Packing}
 
-The current generator calculates reservoir capacity but does not yet create
-mobile particle records.  With particle radius (r) and configured
+The current generator calculates reservoir capacity and emits the complete
+centered mobile-particle grid.  With particle radius (r) and configured
 surface-to-surface separation (s), center spacing is:
 \[
 \ell=2r+s.
@@ -84,16 +84,14 @@ N=\left\lfloor\frac{L}{\ell}\right\rfloor+1.
 The occupied grid is centered in any remaining space so opposing wall margins
 are equal.
 
-For the current reduced Python case, the report is a \(30\times13\) grid,
-or 390 possible mobile particles.  This is capacity only; no mobile particles
-are written yet.
+Generated mobile particles are active from frame zero and receive the common
+configured \texttt{reservoir\_velocity}.
 
 \subsection{Boundary Marker Geometry}
 
-The current horizontal generator writes boundary markers only.  It creates:
+The current horizontal generator creates:
 
 \begin{itemize}
-    \item a closed vertical reservoir inlet;
     \item upper and lower reservoir walls;
     \item upper and lower pipe walls;
     \item vertical shoulder segments where a narrower pipe joins the
@@ -107,20 +105,17 @@ markers use evaluator ID 2 through \texttt{pdata.ptype}; the Vulkan loader
 later transports that value to \texttt{Data.z}.  Boundary markers remain
 occupancy placeholders rather than mobile dynamics sources.
 
-The current binary-only milestone writes one null record followed by 43
-boundary-marker records for the reduced horizontal geometry.  It deliberately
-does not write a \texttt{.tst} file.
+The fixed vertical inlet marker row has been removed.  The analytic piston
+occupies that physical role without becoming a boundary particle.  The
+generator writes both binary particle data and test metadata.
 
-\subsection{Future Piston Work}
+\subsection{Current Piston Work}
 
-After wall geometry and prefilled particle packing are verified in Python, the
-next model stages are:
-
-\begin{enumerate}
-    \item materialize the reported nonoverlapping mobile grid;
-    \item assign the common initial axial velocity;
-    \item define the rear-wall piston start frame;
-    \item move the piston at the selected axial speed;
-    \item include piston impulse in momentum diagnostics;
-    \item only then update generated GLSL and Vulkan wrappers.
-\end{enumerate}
+\texttt{piston\_start\_frame} controls when the rear plane begins moving.
+The piston starts at the reservoir axial minimum, advances with
+\texttt{reservoir\_velocity}, and stops at the reservoir axial maximum.  Each
+active source evaluates it once before target scanning.  Python diagnostics
+report piston position, velocity, contact count, impulse, and momentum
+transfer.  The next geometry step is a short linear converging section
+attached to the pipe outlet, with a distinct boundary equation and
+self-describing marker evaluator.

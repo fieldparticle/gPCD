@@ -417,6 +417,114 @@ class ForceContactDynamics:
         overlap_area = self.particle_overlap_area(radius, radius, center_distance)
         return (*normal, overlap_area, center_distance, wall_flag)
 
+    def GetPistonPosition(self, frame):
+        """Return the piston x position for the specified simulation frame."""
+        bounds = self.run_configuration["reservoir_bounds"]
+        start_x = float(bounds[0])
+        stop_x = float(bounds[1])
+        start_frame = int(self.run_configuration["piston_start_frame"])
+        velocity_x = float(self.run_configuration["reservoir_velocity"][0])
+
+        elapsed_frames = max(0, int(frame) - start_frame)
+        position = start_x + elapsed_frames * float(self.ShaderFlags.dt) * velocity_x
+        return min(position, stop_x)
+
+    def PistonEnabled(self):
+        """Return whether this scenario defines the analytic piston model."""
+        return all(
+            key in self.run_configuration
+            for key in (
+                "reservoir_bounds",
+                "reservoir_velocity",
+                "piston_start_frame",
+            )
+        )
+
+    def GetPistonVelocity(self, frame):
+        """Return zero while parked and the configured velocity while moving."""
+        start_frame = int(self.run_configuration["piston_start_frame"])
+        stop_x = float(self.run_configuration["reservoir_bounds"][1])
+        if int(frame) < start_frame or self.GetPistonPosition(frame) >= stop_x:
+            return self.create_vec4()
+
+        velocity = self.run_configuration["reservoir_velocity"]
+        vx, vy, vz = (float(value) for value in velocity)
+        return self.create_vec4(vx, vy, vz, self.VelocityAngle(vx, vy))
+
+    def EvaluatePistonWall(self, SourceID):
+        """Evaluate the analytic vertical piston plane for one mobile source."""
+        source_position = self.GetParticlePosition(SourceID)
+        radius = float(self.particles[SourceID].Data.x)
+        bounds = self.run_configuration["reservoir_bounds"]
+        if not (
+            float(bounds[2]) <= float(source_position.y) <= float(bounds[3])
+            and float(bounds[4]) <= float(source_position.z) <= float(bounds[5])
+        ):
+            return None
+
+        offset = self.WallContactOffsetDistance(radius)
+        piston_x = self.GetPistonPosition(self.ShaderFlags.frameNum)
+        ghost = (
+            piston_x - radius + offset,
+            source_position.y,
+            source_position.z,
+        )
+        normal = (-1.0, 0.0, 0.0)
+        center_distance = abs(ghost[0] - source_position.x)
+        if center_distance >= 2.0 * radius:
+            return None
+        overlap_area = self.particle_overlap_area(radius, radius, center_distance)
+        return (*normal, overlap_area, center_distance, 1)
+
+    def ProcessPistonCollision(self, SourceID, totalForce):
+        """Evaluate and accumulate the single analytic piston contact."""
+        if not self.PistonEnabled():
+            return True
+        segment = self.EvaluatePistonWall(SourceID)
+        if segment is None:
+            return True
+
+        normal_x, normal_y, normal_z, overlap_area, center_distance, wall_flag = segment
+        radius = float(self.particles[SourceID].Data.x)
+        if not self.CheckPenetrationStepResolution(
+            SourceID,
+            (normal_x, normal_y, normal_z),
+            radius,
+            self.GetPistonVelocity(self.ShaderFlags.frameNum),
+            "particle-wall",
+            wall_flag=wall_flag,
+        ):
+            return False
+        if not self.CheckWallMaximumDepth(
+            SourceID,
+            center_distance,
+            radius,
+            wall_flag,
+        ):
+            return False
+
+        geometry = (
+            normal_x,
+            normal_y,
+            normal_z,
+            overlap_area,
+            center_distance,
+            radius,
+            2.0 * radius,
+            0.0,
+            0.0,
+        )
+        contact_state = self.AppendWallContactSlot(SourceID, wall_flag, geometry)
+        if contact_state is None:
+            return False
+        contact_state.wall_target_velocity = self.GetPistonVelocity(
+            self.ShaderFlags.frameNum
+        )
+        contact_state.is_piston_contact = 1.0
+        if hasattr(self, "RecordContactParameters"):
+            self.RecordContactParameters(SourceID, wall_flag, contact_state)
+        return self.AccumulateContactForce(SourceID, contact_state, totalForce)
+
     def EvaluateCDNozzleWallSegment(self, SourceID, BoundaryID):
         """Evaluate an analytic CD nozzle wall represented by a marker cell.
 
@@ -836,7 +944,21 @@ class ForceContactDynamics:
                 float(contact_state.geom.y),
                 float(contact_state.geom.z),
             )
-            source_normal_limit = 0.0
+            if contact_type == self.CONTACT_WALL:
+                target_velocity = getattr(
+                    contact_state,
+                    "wall_target_velocity",
+                    self.create_vec4(),
+                )
+            else:
+                target_velocity = self.GetStartFrameVelocity(
+                    int(contact_state.ids.x)
+                )
+            source_normal_limit = (
+                float(target_velocity.x) * normal[0]
+                + float(target_velocity.y) * normal[1]
+                + float(target_velocity.z) * normal[2]
+            )
             constraints.append((normal, source_normal_limit, contact_state))
 
         if not constraints:
@@ -1290,6 +1412,8 @@ class ForceContactDynamics:
         contact_state.starting_contact = starting_contact
         contact_state.starting_resolved = starting_resolved
         contact_state.wall_ghost_mass = self.GetParticleMass(SourceID)
+        contact_state.wall_target_velocity = self.create_vec4()
+        contact_state.is_piston_contact = 0.0
         source.contactCount += 1
         source.colFlg = 1
         source.report_contacts = source.contactCount
@@ -1430,6 +1554,11 @@ class ForceContactDynamics:
         for source_id in range(len(self.particles)):
             if not self.IsMobileParticleActiveForDynamics(source_id):
                 continue
+            if not self.ProcessPistonCollision(
+                source_id,
+                total_forces[source_id],
+            ):
+                return False
             processed_boundary_walls = set()
             for target_id in range(len(self.particles)):
                 if source_id == target_id:

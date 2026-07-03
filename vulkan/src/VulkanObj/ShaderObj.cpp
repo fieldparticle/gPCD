@@ -233,7 +233,16 @@ void ShaderObj::WriteWalls()
 		<< "const float BOUNDARY_ZMAX = " << std::fixed << std::setprecision(9)
 		<< CfgTst->GetFloat("boundary_z_max", true) << ";\n";
 
-
+	std::ostringstream piston_str;
+	piston_str
+		<< "const uint PISTON_START_FRAME = " 
+			<< CfgTst->GetInt("boundary_z_max", true) << ";\n"
+		<< "const uint PISTON_INITIAL_X = " << std::fixed << std::setprecision(9)
+			<< CfgTst->GetFloat("boundary_z_max", true) << ";\n"
+		<< "const uint PISTON_STOP_X = " 
+			<< CfgTst->GetInt("boundary_z_max", true) << ";\n"
+		<< "const uint PISTON_VELOCITY = " << "1" << std::fixed << std::setprecision(9) 
+			<<	CfgTst->GetFloat("boundary_z_max", true) << ";\n";
 	
 
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);

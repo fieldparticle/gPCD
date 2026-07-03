@@ -1,11 +1,16 @@
-Correct. Vulkan is behind Python in two places:
-Nozzle equation
-Python uses the new quadratic radius and analytic slope.
-Generated GLSL still uses linear interpolation.
+Use piston velocity as the wall target velocity for:Relative normal velocity
+Penetration-step guard
+Internal momentum compression/release
+Maximum-depth containment
 
-Wall-contact deduplication
-Python deduplicates valid boundary contacts by physical wallFlag.
-Vulkan deduplicates by boundary marker TargetID.
-Two adjacent markers representing the same wall can therefore apply the wall force twice in Vulkan.
+Add piston diagnostics:Current position
+Current velocity
+Number of contacts
+Total piston impulse/momentum transfer
 
-Both must be updated before Python and Vulkan are behaviorally aligned.
+Verify in Python:Stationary before start frame
+First movement occurs on the configured frame
+Correct displacement per frame
+No remaining fixed inlet-wall force
+Correct stop position
+No tunneling under crowding

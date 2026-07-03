@@ -733,9 +733,10 @@ The current helper activates a particle immediately when its birth frame
 arrives.  Capture analysis confirmed that this can admit a new wave into a
 slowed live particle near the inlet, creating artificial overlap compression
 and kinetic energy.  Deferred admission was specified but not implemented.
-The selected next porting work instead replaces scheduled birth with a
-prefilled moving-piston reservoir.  That work requires rectangular cell-array
-dimensions, moving-wall relative velocity, and piston-impulse diagnostics.
+Python now replaces scheduled birth with a prefilled moving-piston reservoir.
+The remaining porting work is to export its analytic position and velocity,
+one-per-source piston contact, moving-wall maximum-depth constraint, and
+piston-impulse diagnostics to GLSL and the Vulkan wrapper.
 
 \subsection{Step 16: Vulkan Runtime Validation}
 

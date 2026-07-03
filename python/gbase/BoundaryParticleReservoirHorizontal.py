@@ -187,6 +187,12 @@ class BoundaryParticleReservoirHorizontal():
         f.write(f"death_y_max = {death_y_max:0.6f};\n")
         f.write(f"death_z_min = {death_z_min:0.6f};\n")
         f.write(f"death_z_max = {death_z_max:0.6f};\n")
+        f.write(f"piston_start_frame = {self.piston_start_frame};\n")
+        f.write(f"piston_initial_x = {self.reservoir_bounds[0]:0.6f};\n")
+        f.write(f"piston_stop_x = {self.reservoir_bounds[1]:0.6f};\n")
+        f.write(f"piston_velocity_x = {self.reservoir_velocity[0]:0.6f};\n")
+        f.write(f"piston_velocity_y = {self.reservoir_velocity[1]:0.6f};\n")
+        f.write(f"piston_velocity_z = {self.reservoir_velocity[2]:0.6f};\n")
         fstr = f"wall_contact_offset = {float(run_cfg.wall_contact_offset):0.6f};\n"
         f.write(fstr)
         f.write('wall_type = "WALL_MODEL_BOUNDARY_PARTICLE";\n')
@@ -298,6 +304,7 @@ class BoundaryParticleReservoirHorizontal():
         separation = read_number("particle_separation_distance")
         wall_contact_offset = read_number("wall_contact_offset")
         collision_stiffness_q = read_number("collision_stiffness_q")
+        piston_start_frame_value = read_number("piston_start_frame")
         if radius is not None and radius <= 0.0:
             errors.append("radius must be positive")
         if separation is not None and separation < 0.0:
@@ -306,6 +313,14 @@ class BoundaryParticleReservoirHorizontal():
             errors.append("wall_contact_offset must not be negative")
         if collision_stiffness_q is not None and collision_stiffness_q < 0.0:
             errors.append("collision_stiffness_q must not be negative")
+        piston_start_frame = None
+        if piston_start_frame_value is not None:
+            if piston_start_frame_value < 0.0:
+                errors.append("piston_start_frame must not be negative")
+            elif not piston_start_frame_value.is_integer():
+                errors.append("piston_start_frame must be an integer")
+            else:
+                piston_start_frame = int(piston_start_frame_value)
 
         raw_velocity = self.itemcfg.get("reservoir_velocity")
         reservoir_velocity = None
@@ -321,6 +336,11 @@ class BoundaryParticleReservoirHorizontal():
             else:
                 if not all(math.isfinite(value) for value in reservoir_velocity):
                     errors.append("reservoir_velocity values must be finite")
+                elif reservoir_velocity[0] <= 0.0:
+                    errors.append(
+                        "reservoir_velocity x must be positive so the piston can "
+                        "move from reservoir_bounds.x_start to x_end"
+                    )
 
         raw_view_center = self.itemcfg.get("view_center")
         view_center = None
@@ -478,6 +498,7 @@ class BoundaryParticleReservoirHorizontal():
         self.reservoir_velocity = reservoir_velocity
         self.view_center = view_center
         self.collision_stiffness_q = collision_stiffness_q
+        self.piston_start_frame = piston_start_frame
         print(
             "BoundaryParticleReservoirHorizontal configuration: PASS\n"
             f"  cell array: {width}x{height}x{depth}\n"
@@ -485,6 +506,7 @@ class BoundaryParticleReservoirHorizontal():
             f"  pipe bounds: {pipe}\n"
             f"  death bounds: {death}\n"
             f"  reservoir velocity: {reservoir_velocity}\n"
+            f"  piston start frame: {piston_start_frame}\n"
             f"  view center: {view_center}\n"
             "  particle plane: z=1"
         )
@@ -622,14 +644,8 @@ class BoundaryParticleReservoirHorizontal():
                 evaluator_id,
             )
 
-        # The reservoir inlet is closed. The pipe outlet intentionally has no
-        # corresponding vertical marker line.
-        for y in self.marker_axis_positions(reservoir_y_bottom, reservoir_y_top):
-            add_marker(
-                reservoir_x_start,
-                y,
-                BOUNDARY_EVALUATOR_VERTICAL,
-            )
+        # The analytic piston replaces the fixed reservoir inlet marker line.
+        # The pipe outlet intentionally has no vertical marker line either.
 
         # If the pipe is narrower than the reservoir, close the two shoulder
         # portions of the shared interface while leaving the pipe opening clear.
@@ -652,7 +668,7 @@ class BoundaryParticleReservoirHorizontal():
         print(
             "BoundaryParticleReservoirHorizontal boundary report:\n"
             f"  boundary particles: {self.number_boundary_particles}\n"
-            f"  closed inlet x: {reservoir_x_start:g}\n"
+            f"  piston initial x: {reservoir_x_start:g}\n"
             f"  reservoir/pipe interface x: {pipe_x_start:g}\n"
             f"  open pipe outlet x: {pipe_x_end:g}"
         )

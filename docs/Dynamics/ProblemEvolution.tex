@@ -1258,3 +1258,39 @@ source-owned execution without cross-workgroup barriers.  Permanent death is
 separate from the retired scheduled-birth lifecycle: particles begin alive,
 may die once after leaving the configured domain, and never re-enter the
 simulation.
+
+\subsection{Analytic Moving Piston In Python}
+
+\subsubsection{<previous form>}
+
+The new horizontal generator initially closed the reservoir inlet with a row
+of stationary vertical boundary markers.  Wall contacts therefore had zero
+target velocity, and a moving piston would have required marker motion,
+cell-occupancy updates, and duplicate-contact control.
+
+\subsubsection{<current form>}
+
+The fixed inlet marker row has been removed.  Python evaluates one analytic
+vertical piston plane per active mobile source.  The plane remains at the
+reservoir start until \texttt{piston\_start\_frame}, moves with
+\texttt{reservoir\_velocity}, and clamps at the reservoir end.
+
+Piston velocity is carried by its wall contact.  Relative-normal diagnostics,
+the penetration-step guard, internal-momentum compression and release, and
+maximum-depth containment all use that target velocity.  At maximum depth the
+source is constrained to the piston normal velocity, not zero.  Python reports
+current piston state, contact count, frame and cumulative impulse, and
+cumulative vector momentum transfer.  The game UI renders the analytic plane
+as a vertical line.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{<Analysis>}
+
+A flat moving piston is exactly described by one position and velocity and
+does not need particle occupancy to define its geometry.  Analytic evaluation
+preserves source ownership, avoids duplicate marker forces, and makes the
+external momentum source explicit.  GLSL/Vulkan piston integration and a
+heterogeneous linear converging outlet section remain future work.

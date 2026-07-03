@@ -327,18 +327,26 @@ to modify another particle.
 
 \subsection{Prefilled Moving-Piston Reservoir Convention}
 
-The selected next reservoir model removes runtime particle birth.  A finite
-reservoir is prefilled with nonoverlapping mobile particles.  At the release
-frame the mobile population and rear wall begin moving in the flow direction.
-The rear wall then moves with the configured inlet velocity and acts as a
-piston.  Particle and piston motion must begin together; otherwise an
-equal-speed piston cannot close a gap created before it starts.
+The active Python reservoir model removes runtime particle birth.  A finite
+reservoir is prefilled with nonoverlapping mobile particles having the
+configured reservoir velocity.  Its rear boundary is an analytic vertical
+piston plane.  Before \texttt{piston\_start\_frame} the plane remains at the
+reservoir start.  It then moves with the configured reservoir velocity until
+it reaches the reservoir end, where its position is clamped and its velocity
+becomes zero.
 
 The piston supplies external impulse, so particle momentum alone is not a
 closed-system conservation diagnostic.  Runtime diagnostics must record
-particle momentum together with piston impulse.  Contact response must use
-particle velocity relative to piston velocity rather than stationary-wall
-relative velocity.
+particle momentum together with piston impulse.  Relative normal velocity,
+penetration-step resolution, internal-momentum compression and release, and
+maximum-depth containment all use particle velocity relative to piston
+velocity rather than stationary-wall relative velocity.
+
+The piston is analytic rather than a row of moving boundary markers.  It is
+evaluated once per active mobile source, independently of marker locality.
+This avoids duplicate marker contacts and moving cell-occupancy bookkeeping.
+The Python game UI draws the analytic plane as a line; that line is a
+visualization and not a particle record.
 
 The useful run duration is finite and is set by reservoir length, piston
 speed, and distance to the nozzle entrance.  Downstream restriction may slow

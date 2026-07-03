@@ -82,6 +82,21 @@ The old population controls
 \texttt{particles\_per\_cell\_row} do not define the new physical packing.
 They should be removed from the reduced profile as that profile is completed.
 
+\subsection{Piston Inputs}
+
+\begin{description}
+    \item[\texttt{reservoir\_velocity}] Three values giving the common initial
+    mobile-particle velocity and piston velocity while it is moving.  The
+    horizontal piston requires a positive x component.
+    \item[\texttt{piston\_start\_frame}] Nonnegative integer frame at which
+    piston motion begins.
+\end{description}
+
+The piston begins at \texttt{reservoir\_bounds.x\_start}, remains stationary
+before its start frame, and is clamped at
+\texttt{reservoir\_bounds.x\_end}.  These derived positions are not separate
+cfg fields.
+
 \subsection{Generator-Owned Wall Behavior}
 
 The cfg does not select \texttt{wall\_type},
@@ -107,3 +122,5 @@ rectangular cell dimensions.
 \texttt{z\_axis\_lims} control Python plotting and game-camera bounds.
 \texttt{hsv\_color}, \texttt{hsv\_sat}, and \texttt{hsv\_val} control
 velocity-angle coloring only and do not affect dynamics.
+The game simulation draws the analytic piston as a vertical line and reports
+its position, velocity, contacts, impulse, and cumulative momentum transfer.

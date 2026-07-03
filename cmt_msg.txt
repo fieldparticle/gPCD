@@ -1,15 +1,10 @@
 Current status:
-	- Exported source-owned ForceDynamics to the horizontal Vulkan reservoir
-	- Added double-buffered velocity state matching position buffering
-	- Added maximum-compression containment and internal momentum storage
-	- Added permanent six-plane mobile-particle death handling
-	- Updated capture analysis for the expanded particle ABI
-
+	- Implemented the analytic moving piston in the Python reservoir
+	- Applied piston velocity to contact, compression, and containment calculations
+	- Added piston impulse diagnostics and game UI rendering
 Code Changes:
-	- Added VelRadA/VelRadB selection and alternate-buffer integration
-	- Added boundary-marker contact dispatch and deduplication
-	- Added wall type and death bounds to generated test metadata
-	- Added dead-source, dead-target, occupancy, and rendering exclusion
-	- Updated ForceDynamics, porting, configuration, and evolution documentation
-
-Next: Validate death-bound exits and begin the moving-piston reservoir boundary
+	- Added frame-based piston position and velocity
+	- Added one source-owned piston contact per mobile particle
+	- Removed the fixed inlet boundary-marker wall
+	- Updated ForceDynamics and reservoir documentation
+Next: Add a heterogeneous linear converging section to the pipe outlet

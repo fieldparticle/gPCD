@@ -88,6 +88,7 @@ snapshot frame-start positions and velocities
 initialize starting-contact effective geometry and diagnostics
 initialize totalForce and source contact sets
 for each SourceID:
+    ProcessPistonCollision(SourceID, totalForce)
     scan possible targets
         if TargetID is a mobile particle:
             ProcessParticleCollision(TargetID, SourceID, totalForce)
@@ -119,6 +120,39 @@ The Python harness uses a direct scan over particles where GLSL uses cell
 occupancy lists.  Boundary-particle wall mode changes the meaning of a target
 record during that scan; it does not change source ownership or introduce a
 target write.
+
+The horizontal prefilled-reservoir scenario also evaluates one analytic
+piston contact per mobile source before scanning particle and boundary-marker
+targets.  The piston does not depend on marker locality and does not duplicate
+the stationary boundary-marker wall path.
+
+\ForceFunctionSection{GetPistonPosition}
+
+\texttt{GetPistonPosition(frame)} returns the analytic piston plane position.
+Before \texttt{piston\_start\_frame} it remains at the reservoir start.  It
+then advances by \texttt{reservoir\_velocity.x} and the frame timestep until
+it reaches the reservoir end, where it is clamped.
+
+\ForceFunctionSection{GetPistonVelocity}
+
+\texttt{GetPistonVelocity(frame)} returns zero before motion and after the
+stop plane is reached.  During travel it returns the configured reservoir
+velocity.  This is the target-wall velocity used by relative-normal motion,
+the penetration-step guard, internal-momentum compression and release, and
+maximum-depth containment.
+
+\ForceFunctionSection{EvaluatePistonWall}
+
+\texttt{EvaluatePistonWall(SourceID)} constructs a vertical equal-radius
+ghost plane at the current analytic piston position.  It applies across the
+reservoir transverse bounds and returns ordinary wall-contact geometry.
+
+\ForceFunctionSection{ProcessPistonCollision}
+
+\texttt{ProcessPistonCollision(SourceID,totalForce)} evaluates the piston once
+for each active mobile source, records its moving target velocity, performs
+wall penetration and maximum-depth checks, appends a source-owned wall
+contact, and accumulates force.  No piston boundary-marker row is emitted.
 
 \ForceFunctionSection{InitializeStartingContactState}
 
@@ -307,6 +341,11 @@ The model also enforces a timestep-resolution condition:
 A violation raises \texttt{ERROR\_PENETRATION\_STEP\_TOO\_LARGE}; the simulation
 does not silently alter \(\Delta t\).
 
+For a moving piston, inward displacement and maximum-depth containment are
+relative to piston velocity.  At maximum depth the source normal velocity is
+limited to the piston normal velocity rather than to zero.  Removed relative
+inward source momentum remains source-owned internal momentum.
+
 Error reporting distinguishes \texttt{ERROR\_PARTICLE\_TUNNELING},
 \texttt{ERROR\_WALL\_TUNNELING}, \texttt{ERROR\_MAX\_DEPTH\_CONSTRAINT}, and
 \texttt{ERROR\_PENETRATION\_STEP\_TOO\_LARGE}.  Reported source and target IDs
@@ -385,6 +424,18 @@ expressed as translational motion during the current frame.  The storage is
 therefore no longer purely diagnostic, although a complete release and thermal
 transfer model is still deferred.  Heat, thermalization, and heat-transfer
 coefficients remain later model layers.
+
+Piston contacts use piston velocity when determining the sign of relative
+normal motion.  They therefore store momentum while the piston closes on a
+source and release it when source and piston separate, rather than treating
+the piston as a stationary wall.
+
+\ForceFunctionSection{PistonDiagnostics}
+
+Python records current piston position and velocity, current-frame contact
+count, frame and cumulative scalar impulse, and cumulative vector momentum
+transferred from the piston to particles.  The game UI displays this state and
+\texttt{momentum.csv} carries the same diagnostic columns.
 
 \ForceFunctionSection{GetContactStiffness}
 

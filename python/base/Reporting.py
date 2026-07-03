@@ -128,6 +128,16 @@ class Reporting:
                         "energy_drift",
                         "v_rel",
                         "raw_impulse",
+                        "piston_position",
+                        "piston_velocity_x",
+                        "piston_velocity_y",
+                        "piston_velocity_z",
+                        "piston_contacts",
+                        "piston_frame_impulse",
+                        "piston_total_impulse",
+                        "piston_total_px",
+                        "piston_total_py",
+                        "piston_total_pz",
                     ]
                 )
                 self.written_headers.add(csv_path)
@@ -159,6 +169,16 @@ class Reporting:
                     self.csv_number(momentum_summary["energy_drift"]),
                     self.csv_number(momentum_summary["v_rel"]),
                     self.csv_number(momentum_summary["raw_impulse"]),
+                    self.csv_number(momentum_summary["piston_position"]),
+                    self.csv_number(momentum_summary["piston_velocity_x"]),
+                    self.csv_number(momentum_summary["piston_velocity_y"]),
+                    self.csv_number(momentum_summary["piston_velocity_z"]),
+                    int(momentum_summary["piston_contacts"]),
+                    self.csv_number(momentum_summary["piston_frame_impulse"]),
+                    self.csv_number(momentum_summary["piston_total_impulse"]),
+                    self.csv_number(momentum_summary["piston_total_px"]),
+                    self.csv_number(momentum_summary["piston_total_py"]),
+                    self.csv_number(momentum_summary["piston_total_pz"]),
                 ]
             )
         self.written_momentum_frames.add(frame_number)
