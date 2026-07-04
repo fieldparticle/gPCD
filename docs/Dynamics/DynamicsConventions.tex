@@ -183,7 +183,7 @@ translation.  A complete release and thermal-transfer model remains deferred.
 (\texttt{ptype=0}), it is the internal-momentum magnitude described above.  A
 boundary marker is never processed as a mobile source.  Its positive
 \texttt{pdata.ptype} value is the wall-evaluator ID: horizontal is 1, vertical
-is 2, and CD nozzle is 3.  Python and the Vulkan loader copy that value into
+is 2, CD nozzle is 3, and general finite line is 4.  Python and the Vulkan loader copy that value into
 runtime \texttt{ptype} and \texttt{Data.z}.  The binary
 \texttt{pdata.temp\_vel} field remains reserved and is not part of boundary
 dispatch.  Per-frame contact reset and internal-momentum synchronization must
@@ -328,12 +328,16 @@ to modify another particle.
 \subsection{Prefilled Moving-Piston Reservoir Convention}
 
 The active Python reservoir model removes runtime particle birth.  A finite
-reservoir is prefilled with nonoverlapping mobile particles having the
-configured reservoir velocity.  Its rear boundary is an analytic vertical
+chamber is prefilled with nonoverlapping mobile particles.  Its rear boundary is an analytic vertical
 piston plane.  Before \texttt{piston\_start\_frame} the plane remains at the
-reservoir start.  It then moves with the configured reservoir velocity until
-it reaches the reservoir end, where its position is clamped and its velocity
+chamber start.  It then moves with \texttt{piston\_velocity} until
+it reaches the chamber end, where its position is clamped and its velocity
 becomes zero.
+
+All straight stationary walls use finite line segments.  A segment stores
+\(A,B,C\), two endpoints, and a physical wall flag.  The line equation is
+\(Ax+By+C=0\), with normalized \((A,B)\) defining the outward normal.  The
+response is calculated from this equation rather than marker orientation.
 
 The piston supplies external impulse, so particle momentum alone is not a
 closed-system conservation diagnostic.  Runtime diagnostics must record

@@ -23,8 +23,11 @@
 #include "../common/particle.glsl"
 #include "workgroups.glsl"
 #include "../common/isParticleContactMotion.glsl"
+#define FORCE_DYNAMICS_LINEAR_RESERVOIR_AVAILABLE
+#include "reservoir.glsl"
 #include "../common/ForceDynamics.glsl"
 #include "../common/ForceDynamicsBoundaryParticle.glsl"
+#include "../common/ForceDynamicsLinearReservoir.glsl"
 
 const uint DUPLICATE_TARGET_CAPACITY = 64u;
 

@@ -1,10 +1,15 @@
 Current status:
-	- Implemented the analytic moving piston in the Python reservoir
-	- Applied piston velocity to contact, compression, and containment calculations
-	- Added piston impulse diagnostics and game UI rendering
+	- Replaced reservoir and pipe bounds with a unified prefilled chamber model.
+	- Verified horizontal chamber generation and Python simulation.
+	- Added analytic piston and general finite-line wall support.
+	- Generated reusable GLSL support for piston and linear-wall dynamics.
+	- Updated dynamics, configuration, porting, and problem-evolution documentation.
+
 Code Changes:
-	- Added frame-based piston position and velocity
-	- Added one source-owned piston contact per mobile particle
-	- Removed the fixed inlet boundary-marker wall
-	- Updated ForceDynamics and reservoir documentation
-Next: Add a heterogeneous linear converging section to the pipe outlet
+	- Added chamber bounds and separate chamber and conduit wall-segment collections.
+	- Added finite-line evaluator ID 4 with deepest-contact selection by wall flag.
+	- Added piston position, velocity, collision, and moving-wall maximum-depth export.
+	- Added ForceDynamicsLinearReservoir.glsl and updated generated dynamics includes.
+	- Exported chamber and piston metadata for Vulkan integration.
+
+Next: Implement and validate the CD nozzle model.

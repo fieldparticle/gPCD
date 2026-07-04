@@ -20,11 +20,13 @@ BOUNDARY_EVALUATOR_NONE = PTYPE_MOBILE
 BOUNDARY_EVALUATOR_HORIZONTAL = 1.0
 BOUNDARY_EVALUATOR_VERTICAL = 2.0
 BOUNDARY_EVALUATOR_CD_NOZZLE = 3.0
+BOUNDARY_EVALUATOR_LINEAR = 4.0
 
 BOUNDARY_EVALUATOR_IDS = {
     "horizontal_wall": BOUNDARY_EVALUATOR_HORIZONTAL,
     "vertical_wall": BOUNDARY_EVALUATOR_VERTICAL,
     "cd_nozzle_wall": BOUNDARY_EVALUATOR_CD_NOZZLE,
+    "linear_wall": BOUNDARY_EVALUATOR_LINEAR,
 }
 
 
@@ -42,7 +44,8 @@ class pdata(ctypes.Structure):
     - ``ptype == -1`` identifies the reserved null particle at index zero.
     - ``ptype == 0`` identifies a mobile particle. Positive ``ptype`` values
       identify boundary markers and also select their wall evaluator:
-      horizontal is 1, vertical is 2, and CD nozzle is 3. Vulkan copies a
+      horizontal is 1, vertical is 2, CD nozzle is 3, and linear converging
+      nozzle is 4. Vulkan copies a
       boundary marker's ``ptype`` into runtime ``Data.z``.
     - ``temp_vel`` is independent reserved particle data. It is not used for
       boundary classification or wall-evaluator dispatch.

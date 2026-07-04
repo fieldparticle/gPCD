@@ -14,6 +14,7 @@ class ForceContactDynamics:
         1: "EvaluateHorizontalWallSegment",
         2: "EvaluateVerticalWallSegment",
         3: "EvaluateCDNozzleWallSegment",
+        4: "EvaluateLinearWallSegment",
     }
 
     @staticmethod
@@ -417,13 +418,81 @@ class ForceContactDynamics:
         overlap_area = self.particle_overlap_area(radius, radius, center_distance)
         return (*normal, overlap_area, center_distance, wall_flag)
 
+    def EvaluateLinearWallSegment(self, SourceID, BoundaryID):
+        """Evaluate one configured finite line selected by a boundary marker."""
+        source_position = self.GetParticlePosition(SourceID)
+        boundary_position = self.GetParticlePosition(BoundaryID)
+        marker_x = float(boundary_position.x)
+        marker_y = float(boundary_position.y)
+
+        def point_segment_distance_sq(segment):
+            _a, _b, _c, x_start, y_start, x_end, y_end, _wall_flag = segment
+            dx = float(x_end) - float(x_start)
+            dy = float(y_end) - float(y_start)
+            length_sq = dx * dx + dy * dy
+            if length_sq <= self.EPSILON:
+                return float("inf")
+            fraction = (
+                (marker_x - float(x_start)) * dx
+                + (marker_y - float(y_start)) * dy
+            ) / length_sq
+            fraction = max(0.0, min(1.0, fraction))
+            closest_x = float(x_start) + fraction * dx
+            closest_y = float(y_start) + fraction * dy
+            return (marker_x - closest_x) ** 2 + (marker_y - closest_y) ** 2
+
+        segments = tuple(
+            self.run_configuration.get("linear_chamber_segments", ())
+        ) + tuple(self.run_configuration.get("linear_wall_segments", ()))
+        if not segments:
+            return None
+        segment = min(segments, key=point_segment_distance_sq)
+        a, b, c, x_start, y_start, x_end, y_end, wall_flag = (
+            float(value) for value in segment
+        )
+        normal_magnitude = math.hypot(a, b)
+        if normal_magnitude <= self.EPSILON:
+            return None
+        normal = (a / normal_magnitude, b / normal_magnitude, 0.0)
+
+        source_x = float(source_position.x)
+        source_y = float(source_position.y)
+        signed_distance = (a * source_x + b * source_y + c) / normal_magnitude
+        wall_x = source_x - signed_distance * normal[0]
+        wall_y = source_y - signed_distance * normal[1]
+        segment_dx = x_end - x_start
+        segment_dy = y_end - y_start
+        segment_length_sq = segment_dx * segment_dx + segment_dy * segment_dy
+        projection = (
+            (wall_x - x_start) * segment_dx
+            + (wall_y - y_start) * segment_dy
+        ) / segment_length_sq
+        if projection < -self.EPSILON or projection > 1.0 + self.EPSILON:
+            return None
+
+        radius = float(self.particles[SourceID].Data.x)
+        offset = self.WallContactOffsetDistance(radius)
+        ghost = (
+            wall_x + normal[0] * (radius - offset),
+            wall_y + normal[1] * (radius - offset),
+            float(source_position.z),
+        )
+        dx = ghost[0] - float(source_position.x)
+        dy = ghost[1] - float(source_position.y)
+        dz = ghost[2] - float(source_position.z)
+        center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if center_distance >= 2.0 * radius:
+            return None
+        overlap_area = self.particle_overlap_area(radius, radius, center_distance)
+        return (*normal, overlap_area, center_distance, int(wall_flag))
+
     def GetPistonPosition(self, frame):
         """Return the piston x position for the specified simulation frame."""
-        bounds = self.run_configuration["reservoir_bounds"]
+        bounds = self.run_configuration["chamber_bounds"]
         start_x = float(bounds[0])
         stop_x = float(bounds[1])
         start_frame = int(self.run_configuration["piston_start_frame"])
-        velocity_x = float(self.run_configuration["reservoir_velocity"][0])
+        velocity_x = float(self.run_configuration["piston_velocity"][0])
 
         elapsed_frames = max(0, int(frame) - start_frame)
         position = start_x + elapsed_frames * float(self.ShaderFlags.dt) * velocity_x
@@ -434,8 +503,8 @@ class ForceContactDynamics:
         return all(
             key in self.run_configuration
             for key in (
-                "reservoir_bounds",
-                "reservoir_velocity",
+                "chamber_bounds",
+                "piston_velocity",
                 "piston_start_frame",
             )
         )
@@ -443,11 +512,11 @@ class ForceContactDynamics:
     def GetPistonVelocity(self, frame):
         """Return zero while parked and the configured velocity while moving."""
         start_frame = int(self.run_configuration["piston_start_frame"])
-        stop_x = float(self.run_configuration["reservoir_bounds"][1])
+        stop_x = float(self.run_configuration["chamber_bounds"][1])
         if int(frame) < start_frame or self.GetPistonPosition(frame) >= stop_x:
             return self.create_vec4()
 
-        velocity = self.run_configuration["reservoir_velocity"]
+        velocity = self.run_configuration["piston_velocity"]
         vx, vy, vz = (float(value) for value in velocity)
         return self.create_vec4(vx, vy, vz, self.VelocityAngle(vx, vy))
 
@@ -455,7 +524,7 @@ class ForceContactDynamics:
         """Evaluate the analytic vertical piston plane for one mobile source."""
         source_position = self.GetParticlePosition(SourceID)
         radius = float(self.particles[SourceID].Data.x)
-        bounds = self.run_configuration["reservoir_bounds"]
+        bounds = self.run_configuration["chamber_bounds"]
         if not (
             float(bounds[2]) <= float(source_position.y) <= float(bounds[3])
             and float(bounds[4]) <= float(source_position.z) <= float(bounds[5])
@@ -646,6 +715,11 @@ class ForceContactDynamics:
             in_segment = abs(source_position.y - boundary_position.y) <= 1.0
         elif evaluator_id == 3:
             in_segment = abs(source_position.x - boundary_position.x) <= 1.0
+        elif evaluator_id == 4:
+            in_segment = (
+                abs(source_position.x - boundary_position.x) <= 1.0
+                and abs(source_position.y - boundary_position.y) <= 1.0
+            )
         else:
             return False
         return in_segment and abs(source_position.z - boundary_position.z) <= 1.0
@@ -1559,7 +1633,7 @@ class ForceContactDynamics:
                 total_forces[source_id],
             ):
                 return False
-            processed_boundary_walls = set()
+            boundary_candidates = {}
             for target_id in range(len(self.particles)):
                 if source_id == target_id:
                     continue
@@ -1570,15 +1644,18 @@ class ForceContactDynamics:
                     if segment is None:
                         continue
                     wall_flag = int(segment[-1])
-                    if wall_flag in processed_boundary_walls:
-                        continue
-                    if not self.ProcessBoundaryParticleWallCollision(
-                        source_id,
-                        target_id,
-                        total_forces[source_id],
-                    ):
-                        return False
-                    processed_boundary_walls.add(wall_flag)
+                    radius = float(self.particles[source_id].Data.x)
+                    penetration_depth = self.ParticlePenetrationDepth(
+                        radius,
+                        radius,
+                        float(segment[-2]),
+                    )
+                    previous = boundary_candidates.get(wall_flag)
+                    if previous is None or penetration_depth > previous[0]:
+                        boundary_candidates[wall_flag] = (
+                            penetration_depth,
+                            target_id,
+                        )
                     continue
                 if not self.IsMobileParticleActiveForDynamics(target_id):
                     continue
@@ -1597,6 +1674,14 @@ class ForceContactDynamics:
                     ):
                         return False
                 if self.collIn.ErrorReturn != self.constants.ERROR_NONE:
+                    return False
+            for wall_flag in sorted(boundary_candidates):
+                _penetration_depth, target_id = boundary_candidates[wall_flag]
+                if not self.ProcessBoundaryParticleWallCollision(
+                    source_id,
+                    target_id,
+                    total_forces[source_id],
+                ):
                     return False
         return True
 

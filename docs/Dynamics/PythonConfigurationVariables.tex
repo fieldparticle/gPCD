@@ -40,16 +40,14 @@ through the corresponding dimension minus one.
 \subsection{Horizontal Physical Bounds}
 
 \begin{description}
-    \item[\texttt{reservoir\_bounds}] Six values in the order
+    \item[\texttt{chamber\_bounds}] Six values in the order
     $x_{start},x_{end},y_{bottom},y_{top},z_{front},z_{back}$.
-    \item[\texttt{pipe\_bounds}] Six values in the same order.
     \item[\texttt{death\_bounds}] Six permanent mobile-particle death planes
     in the order \(x_{min},x_{max},y_{min},y_{max},z_{min},z_{max}\).
 \end{description}
 
 The generator requires positive $x$ and $y$ spans, finite numeric values,
-a shared reservoir/pipe interface, and pipe transverse bounds contained by
-the reservoir outlet face.  For the current 2D model, both arrays must use
+a chamber contained by the cell domain.  For the current 2D model, the array must use
 \texttt{z\_front=0} and \texttt{z\_back=3}; all records lie at
 \texttt{z=1}.
 
@@ -85,17 +83,29 @@ They should be removed from the reduced profile as that profile is completed.
 \subsection{Piston Inputs}
 
 \begin{description}
-    \item[\texttt{reservoir\_velocity}] Three values giving the common initial
-    mobile-particle velocity and piston velocity while it is moving.  The
+    \item[\texttt{piston\_velocity}] Three values giving piston velocity while
+    it is moving.  The
     horizontal piston requires a positive x component.
     \item[\texttt{piston\_start\_frame}] Nonnegative integer frame at which
     piston motion begins.
 \end{description}
 
-The piston begins at \texttt{reservoir\_bounds.x\_start}, remains stationary
+The piston begins at \texttt{chamber\_bounds.x\_start}, remains stationary
 before its start frame, and is clamped at
-\texttt{reservoir\_bounds.x\_end}.  These derived positions are not separate
+\texttt{chamber\_bounds.x\_end}.  These derived positions are not separate
 cfg fields.
+
+\subsection{Finite Linear Wall Inputs}
+
+\texttt{linear\_chamber\_segments} and \texttt{linear\_wall\_segments}
+contain rows with this schema:
+\begin{verbatim}
+[A, B, C, x_start, y_start, x_end, y_end, wall_flag]
+\end{verbatim}
+The line equation is \(Ax+By+C=0\), and \((A,B)\) points outward.  Endpoints
+limit the line to a finite segment.  The chamber collection describes the
+piston chamber; the wall collection describes attached conduit geometry.
+Both use the same evaluator and marker ID 4.
 
 \subsection{Generator-Owned Wall Behavior}
 

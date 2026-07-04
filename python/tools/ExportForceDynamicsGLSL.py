@@ -23,6 +23,9 @@ DEFAULT_OUTPUT = (
 )
 DEFAULT_BOUNDARY_OUTPUT = DEFAULT_OUTPUT.with_name("ForceDynamicsBoundaryParticle.glsl")
 DEFAULT_CD_NOZZLE_OUTPUT = DEFAULT_OUTPUT.with_name("ForceDynamicsCDNozzle.glsl")
+DEFAULT_RESERVOIR_OUTPUT = DEFAULT_OUTPUT.with_name(
+    "ForceDynamicsLinearReservoir.glsl"
+)
 
 KNOWN_TRANSLATION_PRIMITIVES = {
     "create_vec4": "Python vector factory; maps to vec4(...) in GLSL.",
@@ -46,6 +49,11 @@ GENERATED_GLSL_METHODS = [
     "EvaluateHorizontalWallSegment",
     "EvaluateVerticalWallSegment",
     "EvaluateCDNozzleWallSegment",
+    "EvaluateLinearWallSegment",
+    "GetPistonPosition",
+    "GetPistonVelocity",
+    "EvaluatePistonWall",
+    "ProcessPistonCollision",
     "ProcessBoundaryParticleWallCollision",
     "InitializeBoundaryParticleWallContactState",
     "InitializeWallContactState",
@@ -95,11 +103,20 @@ CD_NOZZLE_GLSL_METHODS = [
     "EvaluateCDNozzleWallSegment",
 ]
 
+LINEAR_RESERVOIR_GLSL_METHODS = [
+    "EvaluateLinearWallSegment",
+    "GetPistonPosition",
+    "GetPistonVelocity",
+    "EvaluatePistonWall",
+    "ProcessPistonCollision",
+]
+
 CORE_GLSL_METHODS = [
     method_name
     for method_name in GENERATED_GLSL_METHODS
     if method_name not in set(BOUNDARY_PARTICLE_GLSL_METHODS)
     and method_name not in set(CD_NOZZLE_GLSL_METHODS)
+    and method_name not in set(LINEAR_RESERVOIR_GLSL_METHODS)
     and method_name != "EvaluateWallSegment"
 ]
 
@@ -174,6 +191,16 @@ GLSL_SIGNATURES = {
     "EvaluateCDNozzleWallSegment": (
         "BoundaryWallSegment EvaluateCDNozzleWallSegment("
         "uint SourceID, uint BoundaryID)"
+    ),
+    "EvaluateLinearWallSegment": (
+        "BoundaryWallSegment EvaluateLinearWallSegment("
+        "uint SourceID, uint BoundaryID)"
+    ),
+    "GetPistonPosition": "float GetPistonPosition(uint frame)",
+    "GetPistonVelocity": "vec3 GetPistonVelocity(uint frame)",
+    "EvaluatePistonWall": "BoundaryWallSegment EvaluatePistonWall(uint SourceID)",
+    "ProcessPistonCollision": (
+        "bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)"
     ),
     "ProcessBoundaryParticleWallCollision": (
         "bool ProcessBoundaryParticleWallCollision("
@@ -257,7 +284,8 @@ GLSL_SIGNATURES = {
     ),
     "RegisterMaximumDepthConstraint": (
         "bool RegisterMaximumDepthConstraint("
-        "uint SourceID, vec3 normal, float penetration_depth, float source_radius)"
+        "uint SourceID, vec3 normal, float penetration_depth, "
+        "float source_radius, vec3 target_velocity)"
     ),
     "SolveMaximumDepthSystem": (
         "bool SolveMaximumDepthSystem("
@@ -352,6 +380,7 @@ GLSL_RESULT_STRUCTS = [
             "vec3 normal;",
             "float overlapArea;",
             "float penetrationDepth;",
+            "vec3 targetVelocity;",
             "bool valid;",
         ],
     ),
@@ -386,6 +415,9 @@ TRANSLATION_STATUS = {
         "ParticleProximityMagnitude",
         "ParticlePenetrationDepth",
         "ProcessBoundaryParticleWallCollision",
+        "GetPistonPosition",
+        "GetPistonVelocity",
+        "ProcessPistonCollision",
         "SetError",
     ],
     "needs_struct": [
@@ -398,6 +430,8 @@ TRANSLATION_STATUS = {
         "EvaluateHorizontalWallSegment",
         "EvaluateVerticalWallSegment",
         "EvaluateCDNozzleWallSegment",
+        "EvaluateLinearWallSegment",
+        "EvaluatePistonWall",
     ],
     "needs_buffer": [
         "StartingParticleKey",
@@ -455,6 +489,11 @@ TEMPLATE_GENERATED_METHODS = {
     "EvaluateHorizontalWallSegment",
     "EvaluateVerticalWallSegment",
     "EvaluateCDNozzleWallSegment",
+    "EvaluateLinearWallSegment",
+    "GetPistonPosition",
+    "GetPistonVelocity",
+    "EvaluatePistonWall",
+    "ProcessPistonCollision",
     "ProcessBoundaryParticleWallCollision",
     "SetError",
 }
@@ -538,7 +577,8 @@ GLSL_BODY_TEMPLATES = {
         "}",
         "if (!RegisterMaximumDepthConstraint(",
         "        SourceID, geometry.normal, penetration_depth,",
-        "        geometry.effectiveSourceRadius)) {",
+        "        geometry.effectiveSourceRadius,",
+        "        GetStartFrameVelocity(TargetID).xyz)) {",
         "    return false;",
         "}",
         "ContactForceInput contact = ContactForceInput(",
@@ -547,6 +587,7 @@ GLSL_BODY_TEMPLATES = {
         "    geometry.normal,",
         "    geometry.overlapArea,",
         "    penetration_depth,",
+        "    GetStartFrameVelocity(TargetID).xyz,",
         "    geometry.valid",
         ");",
         "return AccumulateContactForce(SourceID, contact, totalForce);",
@@ -572,7 +613,7 @@ GLSL_BODY_TEMPLATES = {
         "}",
         "if (!RegisterMaximumDepthConstraint(",
         "        SourceID, geometry.normal, penetration_depth,",
-        "        geometry.effectiveRadius)) {",
+        "        geometry.effectiveRadius, vec3(0.0))) {",
         "    return false;",
         "}",
         "ContactForceInput contact = ContactForceInput(",
@@ -581,6 +622,7 @@ GLSL_BODY_TEMPLATES = {
         "    geometry.normal,",
         "    geometry.overlapArea,",
         "    penetration_depth,",
+        "    vec3(0.0),",
         "    geometry.valid",
         ");",
         "return AccumulateContactForce(SourceID, contact, totalForce);",
@@ -683,6 +725,13 @@ GLSL_BODY_TEMPLATES = {
         "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
         "#endif",
         "}",
+        "if (evaluator_id == 4u) {",
+        "#if defined(FORCE_DYNAMICS_LINEAR_RESERVOIR_AVAILABLE)",
+        "    return EvaluateLinearWallSegment(SourceID, BoundaryID);",
+        "#else",
+        "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
+        "#endif",
+        "}",
         "return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
     ],
     "EvaluateHorizontalWallSegment": [
@@ -749,6 +798,121 @@ GLSL_BODY_TEMPLATES = {
         "float overlap_area = particle_overlap_area(radius, radius, center_distance);",
         "return BoundaryWallSegment(normal, overlap_area, center_distance, wall_flag, true);",
     ],
+    "EvaluateLinearWallSegment": [
+        "vec3 source_position = GetParticlePosition(SourceID).xyz;",
+        "vec2 marker = GetParticlePosition(BoundaryID).xy;",
+        "LinearWallSegment selected = LINEAR_CHAMBER_SEGMENTS[0];",
+        "float best_distance_sq = 3.402823466e+38;",
+        "bool found = false;",
+        "for (uint group = 0u; group < 2u; ++group) {",
+        "    uint count = (group == 0u)",
+        "        ? LINEAR_CHAMBER_SEGMENT_COUNT : LINEAR_WALL_SEGMENT_COUNT;",
+        "    for (uint index = 0u; index < count; ++index) {",
+        "        LinearWallSegment candidate = (group == 0u)",
+        "            ? LINEAR_CHAMBER_SEGMENTS[index] : LINEAR_WALL_SEGMENTS[index];",
+        "        vec2 start_point = candidate.endpoints.xy;",
+        "        vec2 end_point = candidate.endpoints.zw;",
+        "        vec2 extent = end_point - start_point;",
+        "        float extent_sq = dot(extent, extent);",
+        "        if (extent_sq <= EPSILON) { continue; }",
+        "        float t = clamp(dot(marker - start_point, extent) / extent_sq, 0.0, 1.0);",
+        "        vec2 closest = start_point + t * extent;",
+        "        float distance_sq = dot(marker - closest, marker - closest);",
+        "        if (!found || distance_sq < best_distance_sq) {",
+        "            found = true;",
+        "            best_distance_sq = distance_sq;",
+        "            selected = candidate;",
+        "        }",
+        "    }",
+        "}",
+        "if (!found) {",
+        "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
+        "}",
+        "float normal_magnitude = length(selected.abc.xy);",
+        "if (normal_magnitude <= EPSILON) {",
+        "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, selected.wallFlag, false);",
+        "}",
+        "vec3 normal = vec3(selected.abc.xy / normal_magnitude, 0.0);",
+        "float signed_distance = (dot(selected.abc.xy, source_position.xy)",
+        "    + selected.abc.z) / normal_magnitude;",
+        "vec2 wall_point = source_position.xy - signed_distance * normal.xy;",
+        "vec2 segment_start = selected.endpoints.xy;",
+        "vec2 segment_extent = selected.endpoints.zw - segment_start;",
+        "float segment_extent_sq = dot(segment_extent, segment_extent);",
+        "float projection = dot(wall_point - segment_start, segment_extent)",
+        "    / segment_extent_sq;",
+        "if (projection < -EPSILON || projection > 1.0 + EPSILON) {",
+        "    return BoundaryWallSegment(normal, 0.0, 0.0, selected.wallFlag, false);",
+        "}",
+        "float radius = P[SourceID].Data.x;",
+        "float offset = WallContactOffsetDistance(radius);",
+        "vec3 ghost = vec3(wall_point, source_position.z)",
+        "    + normal * (radius - offset);",
+        "float center_distance = length(ghost - source_position);",
+        "if (center_distance >= 2.0 * radius) {",
+        "    return BoundaryWallSegment(normal, 0.0, center_distance, selected.wallFlag, false);",
+        "}",
+        "float overlap_area = particle_overlap_area(radius, radius, center_distance);",
+        "return BoundaryWallSegment(normal, overlap_area, center_distance, selected.wallFlag, true);",
+    ],
+    "GetPistonPosition": [
+        "if (frame <= PISTON_START_FRAME) { return CHAMBER_MIN.x; }",
+        "float elapsed_frames = float(frame - PISTON_START_FRAME);",
+        "float position = CHAMBER_MIN.x",
+        "    + elapsed_frames * ShaderFlags.dt * PISTON_VELOCITY.x;",
+        "return min(position, CHAMBER_MAX.x);",
+    ],
+    "GetPistonVelocity": [
+        "if (frame < PISTON_START_FRAME",
+        "        || GetPistonPosition(frame) >= CHAMBER_MAX.x) {",
+        "    return vec3(0.0);",
+        "}",
+        "return PISTON_VELOCITY;",
+    ],
+    "EvaluatePistonWall": [
+        "vec3 source_position = GetParticlePosition(SourceID).xyz;",
+        "if (source_position.y < CHAMBER_MIN.y || source_position.y > CHAMBER_MAX.y",
+        "        || source_position.z < CHAMBER_MIN.z || source_position.z > CHAMBER_MAX.z) {",
+        "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 1u, false);",
+        "}",
+        "float radius = P[SourceID].Data.x;",
+        "float offset = WallContactOffsetDistance(radius);",
+        "float piston_x = GetPistonPosition(uint(ShaderFlags.frameNum));",
+        "vec3 normal = vec3(-1.0, 0.0, 0.0);",
+        "vec3 ghost = vec3(piston_x - radius + offset, source_position.yz);",
+        "float center_distance = length(ghost - source_position);",
+        "if (center_distance >= 2.0 * radius) {",
+        "    return BoundaryWallSegment(normal, 0.0, center_distance, 1u, false);",
+        "}",
+        "float overlap_area = particle_overlap_area(radius, radius, center_distance);",
+        "return BoundaryWallSegment(normal, overlap_area, center_distance, 1u, true);",
+    ],
+    "ProcessPistonCollision": [
+        "BoundaryWallSegment segment = EvaluatePistonWall(SourceID);",
+        "if (!segment.valid) { return true; }",
+        "float source_radius = P[SourceID].Data.x;",
+        "float penetration_depth = ParticlePenetrationDepth(",
+        "    source_radius, source_radius, segment.centerDistance);",
+        "float maximum_depth_distance = source_radius",
+        "    - WallContactOffsetDistance(source_radius);",
+        "if (segment.centerDistance - maximum_depth_distance < -EPSILON) {",
+        "    return SetError(ERROR_WALL_TUNNELING);",
+        "}",
+        "vec3 piston_velocity = GetPistonVelocity(uint(ShaderFlags.frameNum));",
+        "if (!CheckPenetrationStepResolution(",
+        "        SourceID, segment.normal, source_radius, piston_velocity)) {",
+        "    return false;",
+        "}",
+        "if (!RegisterMaximumDepthConstraint(",
+        "        SourceID, segment.normal, penetration_depth, source_radius,",
+        "        piston_velocity)) {",
+        "    return false;",
+        "}",
+        "ContactForceInput contact = ContactForceInput(",
+        "    segment.wallFlag, CONTACT_WALL, segment.normal,",
+        "    segment.overlapArea, penetration_depth, piston_velocity, true);",
+        "return AccumulateContactForce(SourceID, contact, totalForce);",
+    ],
     "EvaluateCDNozzleWallSegment": [
         "uint wall_flag = BoundaryParticleCDNozzleWallFlag(SourceID, BoundaryID);",
         "if (wall_flag == 0u) {",
@@ -812,7 +976,8 @@ GLSL_BODY_TEMPLATES = {
         "    return false;",
         "}",
         "if (!RegisterMaximumDepthConstraint(",
-        "        SourceID, segment.normal, penetration_depth, source_radius)) {",
+        "        SourceID, segment.normal, penetration_depth, source_radius,",
+        "        vec3(0.0))) {",
         "    return false;",
         "}",
         "ContactForceInput contact = ContactForceInput(",
@@ -821,6 +986,7 @@ GLSL_BODY_TEMPLATES = {
         "    segment.normal,",
         "    segment.overlapArea,",
         "    penetration_depth,",
+        "    vec3(0.0),",
         "    segment.valid",
         ");",
         "return AccumulateContactForce(SourceID, contact, totalForce);",
@@ -966,9 +1132,7 @@ GLSL_BODY_TEMPLATES = {
         "float force_magnitude = stiffness * max(0.0, contact_measure);",
         "float impulse = force_magnitude * ShaderFlags.dt;",
         "vec3 source_velocity = GetParticleVelocity(SourceID).xyz;",
-        "vec3 target_velocity = (contact.contactType == CONTACT_WALL)",
-        "    ? vec3(0.0)",
-        "    : GetParticleVelocity(contact.targetID).xyz;",
+        "vec3 target_velocity = contact.targetVelocity;",
         "float rel_vn = dot(target_velocity - source_velocity, contact.normal);",
         "vec3 internal_momentum = P[SourceID].parms.yzw;",
         "if (rel_vn < -EPSILON) {",
@@ -1259,7 +1423,8 @@ GLSL_BODY_TEMPLATES = {
         "    return SetError(ERROR_MAX_DEPTH_CONSTRAINT);",
         "}",
         "maximumDepthConstraintNormals[maximumDepthConstraintCount] = normal;",
-        "maximumDepthConstraintLimits[maximumDepthConstraintCount] = 0.0;",
+        "maximumDepthConstraintLimits[maximumDepthConstraintCount] =",
+        "    dot(normal, target_velocity);",
         "maximumDepthConstraintCount += 1u;",
         "return true;",
     ],
@@ -1713,6 +1878,9 @@ def render_boundary_particle_glsl_file(
     for method_name in BOUNDARY_PARTICLE_GLSL_METHODS:
         lines.append(f"{GLSL_SIGNATURES[method_name]};")
     lines.append(GLSL_SIGNATURES["EvaluateCDNozzleWallSegment"] + ";")
+    lines.append("#if defined(FORCE_DYNAMICS_LINEAR_RESERVOIR_AVAILABLE)")
+    lines.append(GLSL_SIGNATURES["EvaluateLinearWallSegment"] + ";")
+    lines.append("#endif")
     lines.append(GLSL_SIGNATURES["EvaluateWallSegment"] + ";")
     lines.append("")
     lines.extend(
@@ -1747,6 +1915,34 @@ def render_cd_nozzle_glsl_file(source_path: Path, visitor: ForceDynamicsVisitor)
     return "\n".join(lines)
 
 
+def render_linear_reservoir_glsl_file(
+    source_path: Path, visitor: ForceDynamicsVisitor
+) -> str:
+    lines = [
+        "#ifndef FORCE_DYNAMICS_LINEAR_RESERVOIR_GLSL",
+        "#define FORCE_DYNAMICS_LINEAR_RESERVOIR_GLSL",
+        "",
+        "// Generated from base/ForceDynamics.py by tools/ExportForceDynamicsGLSL.py.",
+        "// Analytic piston and finite linear-wall helpers. Requires reservoir.glsl,",
+        "// ForceDynamics.glsl, and ForceDynamicsBoundaryParticle.glsl.",
+        "// Do not hand edit generated dynamics content.",
+        "",
+        "// Forward declarations for linear-reservoir methods.",
+    ]
+    for method_name in LINEAR_RESERVOIR_GLSL_METHODS:
+        lines.append(f"{GLSL_SIGNATURES[method_name]};")
+    lines.append("")
+    lines.extend(
+        render_method_bodies(
+            source_path,
+            visitor,
+            LINEAR_RESERVOIR_GLSL_METHODS,
+        )
+    )
+    lines.extend(["", "#endif", ""])
+    return "\n".join(lines)
+
+
 def write_stub_file(output_path: Path, source_path: Path, visitor: ForceDynamicsVisitor) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(render_core_glsl_file(source_path, visitor), encoding="utf-8")
@@ -1756,6 +1952,10 @@ def write_stub_file(output_path: Path, source_path: Path, visitor: ForceDynamics
     )
     DEFAULT_CD_NOZZLE_OUTPUT.write_text(
         render_cd_nozzle_glsl_file(source_path, visitor),
+        encoding="utf-8",
+    )
+    DEFAULT_RESERVOIR_OUTPUT.write_text(
+        render_linear_reservoir_glsl_file(source_path, visitor),
         encoding="utf-8",
     )
 
@@ -1922,6 +2122,7 @@ def main() -> int:
         print(f"Wrote stub GLSL: {output_path}")
         print(f"Wrote boundary-particle GLSL: {DEFAULT_BOUNDARY_OUTPUT}")
         print(f"Wrote CD nozzle GLSL: {DEFAULT_CD_NOZZLE_OUTPUT}")
+        print(f"Wrote linear-reservoir GLSL: {DEFAULT_RESERVOIR_OUTPUT}")
     return 0
 
 

@@ -506,18 +506,18 @@ def _draw_particles(
         pygame.draw.rect(screen, (70, 85, 105), side_rect, 1)
 
     if dynamics is not None and dynamics.PistonEnabled():
-        reservoir_bounds = run_configuration["reservoir_bounds"]
+        chamber_bounds = run_configuration["chamber_bounds"]
         piston_x = dynamics.GetPistonPosition(frame_number)
         piston_bottom = _to_screen(
             piston_x,
-            float(reservoir_bounds[2]),
+            float(chamber_bounds[2]),
             view_box,
             screen_width,
             screen_height,
         )
         piston_top = _to_screen(
             piston_x,
-            float(reservoir_bounds[3]),
+            float(chamber_bounds[3]),
             view_box,
             screen_width,
             screen_height,

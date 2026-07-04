@@ -57,7 +57,9 @@ Generated dynamics are divided by dependency:
     \item \texttt{ForceDynamicsBoundaryParticle.glsl} contains straight
     boundary-marker wall helpers and the generic wall-segment declaration;
     \item \texttt{ForceDynamicsCDNozzle.glsl} contains CD nozzle profile and
-    curved wall helpers that require generated nozzle constants.
+    curved wall helpers that require generated nozzle constants;
+    \item \texttt{ForceDynamicsLinearReservoir.glsl} contains the analytic
+    piston and general finite-line wall helpers for the prefilled chamber.
 \end{itemize}
 
 Ordinary wall and straight boundary-particle scenarios must not require CD
@@ -117,10 +119,17 @@ wall-segment shape is target-owned.  The generated dispatcher reads:
 uint evaluator_id = uint(round(P[BoundaryID].Data.z));
 \end{verbatim}
 Evaluator ID 1 selects the horizontal wall, 2 selects the vertical wall, and 3
-selects the CD nozzle wall.  Unknown IDs return an invalid segment.  CD nozzle
+selects the CD nozzle wall.  Evaluator ID 4 selects the optional general
+finite-line implementation.  Unknown IDs return an invalid segment.  CD nozzle
 wrappers define \texttt{FORCE\_DYNAMICS\_CD\_NOZZLE\_AVAILABLE} to make the
 optional CD implementation available; this is a module-availability guard,
 not a global wall-shape selection.
+
+Linear-chamber wrappers include
+\texttt{ForceDynamicsLinearReservoir.glsl} and define
+\texttt{FORCE\_DYNAMICS\_LINEAR\_RESERVOIR\_AVAILABLE}.  Moving-wall contact
+input carries \texttt{targetVelocity}; piston relative motion and
+maximum-depth containment must use that velocity rather than zero.
 
 Reservoir periodic direction is selected separately by:
 \begin{verbatim}

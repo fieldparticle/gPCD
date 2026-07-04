@@ -39,151 +39,145 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 
 		WriteShaderHeader();
 		WriteShaderDbgHeader();
-		WriteCDNoz();
+	//	WriteCDNoz();
 		WriteWalls();
 		Reservoir();
 		GenWorkGroups();
 }
+
 void ShaderObj::Reservoir()
 {
+	std::string fileDir =
+		CfgApp->GetString("application.gen_glsl_dir", true);
+	std::string fileName = fileDir + "/reservoir.glsl";
 
-	std::string pipe_reservoir_entry = CfgTst->GetString("flow_type", false);
-
-	if (pipe_reservoir_entry.compare("pipe_reservoir_entry")==0)
+	std::ofstream ostrm(fileName);
+	if (!ostrm.is_open())
 	{
-		std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
-		std::string filename = fildir + "/flow.glsl";
+		throw std::runtime_error(
+			"Failed to open file: " + fileName
+		);
+	}
+
+	ostrm << std::fixed << std::setprecision(9);
+
+	// ------------------------------------------------------------
+	// Piston and chamber
+	// ------------------------------------------------------------
+	ostrm
+		<< "#ifndef RESERVOIR_GLSL\n"
+		<< "#define RESERVOIR_GLSL\n\n"
+
+		<< "const uint BOUNDARY_EVALUATOR_LINEAR = 4u;\n"
+
+		<< "const uint PISTON_START_FRAME = "
+		<< CfgTst->GetUInt("piston_start_frame", true)
+		<< "u;\n"
+
+		<< "const vec3 CHAMBER_MIN = vec3("
+		<< CfgTst->GetFloat("chamber_x_start", true) << ", "
+		<< CfgTst->GetFloat("chamber_y_bottom", true) << ", "
+		<< CfgTst->GetFloat("chamber_z_front", true)
+		<< ");\n"
+
+		<< "const vec3 CHAMBER_MAX = vec3("
+		<< CfgTst->GetFloat("chamber_x_end", true) << ", "
+		<< CfgTst->GetFloat("chamber_y_top", true) << ", "
+		<< CfgTst->GetFloat("chamber_z_back", true)
+		<< ");\n"
+
+		<< "const vec3 PISTON_VELOCITY = vec3("
+		<< CfgTst->GetFloat("piston_velocity_x", true) << ", "
+		<< CfgTst->GetFloat("piston_velocity_y", true) << ", "
+		<< CfgTst->GetFloat("piston_velocity_z", true)
+		<< ");\n\n"
+
+		<< "struct LinearWallSegment\n"
+		<< "{\n"
+		<< "    vec3 abc;\n"
+		<< "    vec4 endpoints;\n"
+		<< "    uint wallFlag;\n"
+		<< "};\n\n";
+
+	auto writeSegmentArray =
+		[&](const std::string& cfgName,
+			const std::string& glslName,
+			const std::string& countName)
 		{
-			std::ofstream ostrm(filename);
-			if (!ostrm.is_open())
+			int segmentCount = 0;
+			config_setting_t* segmentList =
+				CfgTst->StartStructure(cfgName, segmentCount);
+
+			if (segmentCount <= 0)
 			{
-				std::string rpt = "Failed to open file:" + filename;
-				throw std::runtime_error(rpt.c_str());
+				throw std::runtime_error(
+					cfgName + " must contain at least one segment"
+				);
 			}
 
-			if (CfgTst->CheckKey("periodic_direction") != nullptr)
+			ostrm
+				<< "const uint " << countName << " = "
+				<< segmentCount << "u;\n"
+				<< "const LinearWallSegment " << glslName
+				<< "[" << segmentCount << "] = "
+				<< "LinearWallSegment[" << segmentCount << "](\n";
+
+			for (int index = 0; index < segmentCount; ++index)
 			{
-				std::string pdir = CfgTst->GetString("periodic_direction", true);
-				ostrm << "#define PERIODIC_DIRECTION " << CfgTst->GetString("periodic_direction", true) << "\n";
-				if (pdir.compare("horizontal") == 0)
+				config_setting_t* segment =
+					CfgTst->GetSubStructAddress(segmentList, index);
+
+				if (segment == nullptr ||
+					config_setting_length(segment) != 8)
 				{
-					ostrm << "const float OUTLET_X =" << std::fixed << std::setprecision(9) << CfgTst->GetFloat("reservoir_outlet_x", true) << ";\n";
-					ostrm << "const float INLET_X =" << std::fixed << std::setprecision(9) << CfgTst->GetFloat("reservoir_inlet_x", true) << ";\n";
-					
+					throw std::runtime_error(
+						cfgName + "[" + std::to_string(index) +
+						"] must contain eight values"
+					);
 				}
-				else
-				{
-					ostrm << "const float OUTLET_Y =" << std::fixed << std::setprecision(9) << CfgTst->GetFloat("reservoir_outlet_y", true) << ";\n";
-					ostrm << "const float INLET_Y =" << std::fixed << std::setprecision(9) << CfgTst->GetFloat("reservoir_inlet_y", true) << ";\n";
-				}
+
+				double a = config_setting_get_float_elem(segment, 0);
+				double b = config_setting_get_float_elem(segment, 1);
+				double c = config_setting_get_float_elem(segment, 2);
+				double xStart = config_setting_get_float_elem(segment, 3);
+				double yStart = config_setting_get_float_elem(segment, 4);
+				double xEnd = config_setting_get_float_elem(segment, 5);
+				double yEnd = config_setting_get_float_elem(segment, 6);
+				uint32_t wallFlag = static_cast<uint32_t>(
+					config_setting_get_float_elem(segment, 7)
+					);
+
+				ostrm
+					<< "    LinearWallSegment("
+					<< "vec3(" << a << ", " << b << ", " << c << "), "
+					<< "vec4(" << xStart << ", " << yStart << ", "
+					<< xEnd << ", " << yEnd << "), "
+					<< wallFlag << "u)";
+
+				if (index + 1 < segmentCount)
+					ostrm << ",";
+
+				ostrm << "\n";
 			}
-		}
-	}
 
+			ostrm << ");\n\n";
+		};
 
+	writeSegmentArray(
+		"linear_chamber_segments",
+		"LINEAR_CHAMBER_SEGMENTS",
+		"LINEAR_CHAMBER_SEGMENT_COUNT"
+	);
+
+	writeSegmentArray(
+		"linear_wall_segments",
+		"LINEAR_WALL_SEGMENTS",
+		"LINEAR_WALL_SEGMENT_COUNT"
+	);
+
+	ostrm << "#endif\n";
 }
-// This function is only for walls that are passed to glsl.
-// It is up to the glsl version to use it or not. It has nothing to
-// do with drawing the boundaries. That is in ResourceVertexCube.cpp
-void ShaderObj::WriteCDNoz()
-{
-	std::string wlflg = "0u";
-	wlflg = "1u;";
-	bool cdnoz = false;
-	std::string boundary_particle_function;
-	//std::string model_type = CfgTst->GetString("boundary_particle_function", true);
 
-
-	std::ostringstream cdnoz_str;
-
-	//if (model_type.compare("cd_nozzle_wall") == 0)
-	if (cdnoz == true)
-	{
-		cdnoz = true;
-
-		cdnoz_str
-			<< "const float CD_NOZZLE_START_X =" << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("nozzle_start_x", true) << ";\n"
-			<< "const float CD_NOZZLE_CENTER_Y = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("nozzle_center_y", true) << ";\n"
-			<< "const float CD_NOZZLE_INLET_LENGTH = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("nozzle_inlet_length", true) << ";\n"
-			<< "const float CD_NOZZLE_CONVERGE_LENGTH = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("nozzle_converge_length", true) << ";\n"
-			<< "const float CD_NOZZLE_THROAT_LENGTH = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("nozzle_throat_length", true) << ";\n"
-			<< "const float CD_NOZZLE_DIVERGE_LENGTH = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("nozzle_diverge_length", true) << ";\n"
-			<< "const float CD_NOZZLE_EXIT_LENGTH = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("nozzle_exit_length", true) << ";\n"
-			<< "const float CD_NOZZLE_INLET_RADIUS = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("nozzle_inlet_radius", true) << ";\n"
-			<< "const float CD_NOZZLE_THROAT_RADIUS = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("nozzle_throat_radius", true) << ";\n"
-			<< "const float CD_NOZZLE_EXIT_RADIUS = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("nozzle_exit_radius", true) << ";\n";
-
-	}
-
-	uint32_t wall_type = 0;
-	std::string wall_type_txt = CfgTst->GetString("wall_type", true);
-	if (wall_type_txt.compare("WALL_MODEL_SIMPLE") == 0)
-		wall_type = 1;
-	else if (wall_type_txt.compare("WALL_MODEL_PIPE") == 0)
-		wall_type = 2;
-	else if (wall_type_txt.compare("WALL_MODEL_BOUNDARY_PARTICLE") == 0)
-		wall_type = 3;
-
-
-	std::ostringstream wall_str;
-	wall_str
-
-		<< "const float BOUNDARY_XMIN = " << std::fixed << std::setprecision(9)
-		<< CfgTst->GetFloat("boundary_x_min", true) << ";\n"
-
-		<< "const float BOUNDARY_XMAX = " << std::fixed << std::setprecision(9)
-		<< CfgTst->GetFloat("boundary_x_max", true) << ";\n"
-
-		<< "const float BOUNDARY_YMIN = " << std::fixed << std::setprecision(9)
-		<< CfgTst->GetFloat("boundary_y_min", true) << ";\n"
-
-		<< "const float BOUNDARY_YMAX = " << std::fixed << std::setprecision(9)
-		<< CfgTst->GetFloat("boundary_y_max", true) << ";\n"
-
-		<< "const float BOUNDARY_ZMIN = " << std::fixed << std::setprecision(9)
-		<< CfgTst->GetFloat("boundary_z_min", true) << ";\n"
-
-		<< "const float BOUNDARY_ZMAX = " << std::fixed << std::setprecision(9)
-		<< CfgTst->GetFloat("boundary_z_max", true) << ";\n";
-
-
-
-
-	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
-	std::string filename = fildir + "/boundary.glsl";
-	{
-		std::ofstream ostrm(filename);
-		if (!ostrm.is_open())
-		{
-			std::string rpt = "Failed to open file:" + filename;
-			throw std::runtime_error(rpt.c_str());
-		}
-		ostrm << "#ifndef BOUNDARY_GLSL\n#define BOUNDARY_GLSL\n" <<
-
-			"const uint BOUNDARY_ENABLED = " << wlflg << "\n" <<
-			"const float wall_contact_offset = " << std::fixed << std::setprecision(9) <<
-			CfgTst->GetFloat("wall_contact_offset", true) << ";\n"
-			"#define CONTACT_FORCE_MEASURE  " << CfgTst->GetString("contact_force_measure", true) << "\n"
-			"#define " << CfgTst->GetString("wall_type", true) << "\n";
-
-		ostrm << wall_str.str();
-		if (cdnoz == true)
-			ostrm << cdnoz_str.str();
-		ostrm << "#endif\n";
-	}
-
-
-}
 // This function is only for walls that are passed to glsl.
 // It is up to the glsl version to use it or not. It has nothing to
 // do with drawing the boundaries. That is in ResourceVertexCube.cpp
@@ -191,11 +185,7 @@ void ShaderObj::WriteWalls()
 {
 	std::string wlflg = "0u";
 	wlflg = "1u;";
-	bool cdnoz = false;
-	std::string boundary_particle_function;
-	//std::string model_type = CfgTst->GetString("boundary_particle_function", true);
-
-
+	
 	std::ostringstream death_str;
 	death_str
 		<< "const float death_x_min = " << std::fixed << std::setprecision(9)
@@ -211,7 +201,7 @@ void ShaderObj::WriteWalls()
 		<< "const float death_z_max = " << std::fixed << std::setprecision(9)
 			<< CfgTst->GetFloat("death_z_max", true) << ";\n";
 
-		
+#if 1	
 	std::ostringstream wall_str;
 	wall_str 
 			
@@ -232,19 +222,8 @@ void ShaderObj::WriteWalls()
 
 		<< "const float BOUNDARY_ZMAX = " << std::fixed << std::setprecision(9)
 		<< CfgTst->GetFloat("boundary_z_max", true) << ";\n";
-
-	std::ostringstream piston_str;
-	piston_str
-		<< "const uint PISTON_START_FRAME = " 
-			<< CfgTst->GetInt("boundary_z_max", true) << ";\n"
-		<< "const uint PISTON_INITIAL_X = " << std::fixed << std::setprecision(9)
-			<< CfgTst->GetFloat("boundary_z_max", true) << ";\n"
-		<< "const uint PISTON_STOP_X = " 
-			<< CfgTst->GetInt("boundary_z_max", true) << ";\n"
-		<< "const uint PISTON_VELOCITY = " << "1" << std::fixed << std::setprecision(9) 
-			<<	CfgTst->GetFloat("boundary_z_max", true) << ";\n";
+#endif
 	
-
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
 	std::string filename = fildir + "/boundary.glsl";
 	{
@@ -315,9 +294,6 @@ void  ShaderObj::WriteShaderHeader()
 //if(CfgApp->GetBool("application.nsight", true) == true)
 //		return;
 	
-	float dt = 0.0;
-	
-
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
     std::string filename = fildir + "/params.glsl";
     {
@@ -326,9 +302,6 @@ void  ShaderObj::WriteShaderHeader()
 		std::string version = {};
 		version = "VERPONLY ";
 		
-		uint32_t MaxLoc = static_cast<uint32_t>(CfgTst->GetUInt("CellAryW", true)
-											  * CfgTst->GetUInt("CellAryH", true) 
-											  * CfgTst->GetUInt("CellAryL", true));
 
 		float col_red = CfgApp->GetFloat("application.col_color.red", true);
 		float col_green = CfgApp->GetFloat("application.col_color.green", true);
@@ -343,13 +316,12 @@ void  ShaderObj::WriteShaderHeader()
 		std::ostringstream hsv_color_on;
 		std::ostringstream hsv_sat;
 		std::ostringstream hsv_val;
-		bool has_hsv = false;
+		
 		
 		if (CfgApp->CheckKey("application.hsv_color"))
 		{
 			if (CfgApp->GetBool("application.hsv_color", true) == 1)
 			{
-				has_hsv = true;
 				hsv_color_on << "const uint HSV_ON = 1u;\n";
 				hsv_sat << "const float HSV_SAT = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_sat", true) << ";\n";
 				hsv_val << "const float HSV_VAL = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_val", true) << ";\n";

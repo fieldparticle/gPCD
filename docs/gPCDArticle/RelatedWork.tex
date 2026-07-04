@@ -10,13 +10,11 @@ This section reviews representative collision-detection methodologies,
 execution architectures, and rendering strategies, and identifies the
 architectural gap addressed by the gPCD framework.
 
-\subsection{Collision-Detection Frameworks}
-
-Most collision-detection frameworks separate candidate generation from
-collision evaluation through broad-phase and narrow-phase stages. The
-primary contribution of gPCD occurs during broad-phase occupancy
-generation, while narrow-phase evaluation completes the collision-
-detection framework. Consequently, broad-phase methodologies play a
+Most collision--detection frameworks separate candidate generation from
+collision evaluation through broad-phase and narrow--phase stages. The
+primary contribution of gPCD occurs during broad--phase occupancy
+generation, while narrow-phase evaluation completes the collision--detection framework. 
+Consequently, broad--phase methodologies play a
 central role in determining the scalability of large-scale collision-
 detection systems.
 
@@ -32,7 +30,6 @@ and GPU capabilities have increased, research has expanded beyond
 broad-phase methodologies to consider the execution architectures used
 to implement them.
 
-\subsection{Collision-Detection Architectures}
 
 Collision-detection methodologies have been implemented using a wide
 range of execution architectures. Early systems performed both
@@ -49,14 +46,9 @@ selected collision-detection operations to the GPU while maintaining
 CPU-managed coordination and data structures. GPU-resident
 architectures further reduce data movement by performing both
 broad-phase and narrow-phase operations on the GPU, improving parallel
-utilization and minimizing host-device communication.
-
-Although these architectures differ in execution location and data
-movement, they do not fundamentally alter the relationship between
-collision detection and rendering.
-
-
-\subsection{Rendering and Collision Detection}
+utilization and minimizing host-device communication. Although these architectures differ 
+in execution location and data movement, they do not fundamentally
+alter the rendering scheme.
 
 Collision detection and rendering have historically served distinct
 roles within simulation systems. Collision detection identifies particle
@@ -81,16 +73,7 @@ construction generally remain dedicated collision-detection operations
 performed independently of rasterization. As a result, rendering
 remains largely downstream of simulation and collision-detection
 processes rather than serving as an active participant in broad-phase
-collision detection.
-
-Despite advances in GPU-resident collision detection, broad-phase
-occupancy generation remains largely independent of the rendering
-pipeline. The remaining architectural gap is therefore the absence of a
-collision-detection framework in which broad-phase occupancy generation
-is integrated directly into the graphics pipeline.
-
-
-
+collision detection. gPCD is intended to close this remaining architectural gap.
 
 
 \input{OverviewArchitecture}

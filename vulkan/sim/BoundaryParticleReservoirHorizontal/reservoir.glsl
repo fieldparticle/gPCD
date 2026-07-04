@@ -1,0 +1,29 @@
+#ifndef RESERVOIR_GLSL
+#define RESERVOIR_GLSL
+
+const uint BOUNDARY_EVALUATOR_LINEAR = 4u;
+const uint PISTON_START_FRAME = 20u;
+const vec3 CHAMBER_MIN = vec3(2.000000000, 2.000000000, 0.000000000);
+const vec3 CHAMBER_MAX = vec3(20.000000000, 8.000000000, 3.000000000);
+const vec3 PISTON_VELOCITY = vec3(0.050000001, 0.000000000, 0.000000000);
+
+struct LinearWallSegment
+{
+    vec3 abc;
+    vec4 endpoints;
+    uint wallFlag;
+};
+
+const uint LINEAR_CHAMBER_SEGMENT_COUNT = 2u;
+const LinearWallSegment LINEAR_CHAMBER_SEGMENTS[2] = LinearWallSegment[2](
+    LinearWallSegment(vec3(0.000000000, -1.000000000, 2.000000000), vec4(2.000000000, 2.000000000, 20.000000000, 2.000000000), 3u),
+    LinearWallSegment(vec3(0.000000000, 1.000000000, -8.000000000), vec4(2.000000000, 8.000000000, 20.000000000, 8.000000000), 4u)
+);
+
+const uint LINEAR_WALL_SEGMENT_COUNT = 2u;
+const LinearWallSegment LINEAR_WALL_SEGMENTS[2] = LinearWallSegment[2](
+    LinearWallSegment(vec3(0.250000000, -1.000000000, -3.000000000), vec4(20.000000000, 2.000000000, 25.000000000, 3.250000000), 3u),
+    LinearWallSegment(vec3(0.250000000, 1.000000000, -13.000000000), vec4(20.000000000, 8.000000000, 25.000000000, 6.750000000), 4u)
+);
+
+#endif

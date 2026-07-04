@@ -55,8 +55,9 @@ a target, it evaluates the represented wall segment and accumulates a wall
 force instead of a particle-particle force.
 
 Boundary markers are self-describing: positive \texttt{ptype}/\texttt{Data.z}
-values select horizontal, vertical, or CD-nozzle wall evaluation.  Marker
-targets that describe the same physical wall are deduplicated by wall flag.
+values select horizontal, vertical, CD-nozzle, or general finite-line wall
+evaluation.  For each physical wall flag, all valid candidates are evaluated
+and the deepest contact is retained.
 
 \begin{figure}[ht]
 \centering
@@ -200,6 +201,7 @@ are:
 EvaluateHorizontalWallSegment(SourceID, BoundaryID)
 EvaluateVerticalWallSegment(SourceID, BoundaryID)
 EvaluateCDNozzleWallSegment(SourceID, BoundaryID)
+EvaluateLinearWallSegment(SourceID, BoundaryID)
 \end{verbatim}
 
 Horizontal marker segments classify targets as lower or upper wall markers.
@@ -224,9 +226,18 @@ slope.
 
 Python and the Vulkan wrappers may encounter several marker targets
 representing the same physical wall side.  They evaluate marker geometry and
-record the returned wall flag in source-local processed-wall state; only the
-first valid segment for each wall flag contributes force to a source during a
-frame.  Ordinary mobile-particle duplicates remain keyed by target ID.
+retain the deepest valid candidate for each wall flag before force is applied.
+This removes marker scan-order dependence at segment transitions.  Ordinary
+mobile-particle duplicates remain keyed by target ID.
+
+\ForceFunctionSection{EvaluateLinearWallSegment}
+
+\texttt{EvaluateLinearWallSegment(SourceID, BoundaryID)} selects the finite
+configured segment nearest the boundary marker.  For
+\(Ax+By+C=0\), it normalizes \((A,B)\), projects the source onto the analytic
+line, rejects projections outside the segment extent, and returns the wall
+ghost geometry and configured physical wall flag.  Marker orientation is not
+used to calculate the response.
 
 \ForceFunctionSection{BoundaryParticleAppliesToSource}
 

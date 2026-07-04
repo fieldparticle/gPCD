@@ -5,7 +5,7 @@ const float wall_contact_offset = 0.062500000;
 #define CONTACT_FORCE_MEASURE  depth
 #define WALL_MODEL_BOUNDARY_PARTICLE
 const float BOUNDARY_XMIN = 2.000000000;
-const float BOUNDARY_XMAX = 20.000000000;
+const float BOUNDARY_XMAX = 25.000000000;
 const float BOUNDARY_YMIN = 2.000000000;
 const float BOUNDARY_YMAX = 8.000000000;
 const float BOUNDARY_ZMIN = 1.000000000;

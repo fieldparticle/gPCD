@@ -1294,3 +1294,39 @@ does not need particle occupancy to define its geometry.  Analytic evaluation
 preserves source ownership, avoids duplicate marker forces, and makes the
 external momentum source explicit.  GLSL/Vulkan piston integration and a
 heterogeneous linear converging outlet section remain future work.
+
+\subsection{General Finite-Line Chamber And GLSL Export}
+
+\subsubsection{<previous form>}
+
+The replacement reservoir still separated \texttt{reservoir\_bounds} from
+\texttt{pipe\_bounds}, used horizontal and vertical evaluator IDs, and stopped
+at the first valid marker for a wall flag.  The piston existed only in Python.
+
+\subsubsection{<current form>}
+
+The horizontal generator now packs one \texttt{chamber\_bounds} domain and
+describes stationary straight geometry with
+\texttt{linear\_chamber\_segments} and \texttt{linear\_wall\_segments}.  Each
+finite segment stores \(A,B,C\), endpoints, and a wall flag and uses evaluator
+ID 4.  Python generation and simulation have been verified.  Contact selection
+retains the deepest valid candidate for each physical wall flag.
+
+The exporter now generates
+\texttt{ForceDynamicsLinearReservoir.glsl}, including general finite-line
+evaluation, piston position and velocity, piston collision processing, and
+moving-target maximum-depth constraints.  Scenario include wiring and shader
+compilation remain to be validated.  CD nozzle work is the next model step.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{<Analysis>}
+
+One finite-line equation handles horizontal, vertical, and sloped straight
+walls without deriving response geometry from marker placement.  Separate
+segment collections retain configuration clarity while sharing one collision
+implementation.  Deepest-contact selection removes scan-order dependence at
+segment transitions, and explicit target velocity preserves the moving-piston
+maximum-depth rule in generated GLSL.

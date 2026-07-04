@@ -112,8 +112,16 @@ class BoundaryParticleReservoirHorizontal():
             raise OSError(f"Can't open test file {self.test_file_name}: {e}") from e
 
         run_cfg = self.itemcfg
-        reservoir_x_start, _reservoir_x_end, reservoir_y_bottom, reservoir_y_top, _, _ = self.reservoir_bounds
-        _pipe_x_start, pipe_x_end, pipe_y_bottom, pipe_y_top, _, _ = self.pipe_bounds
+        boundary_x_values = [
+            value
+            for segment in self.all_linear_segments
+            for value in (segment[3], segment[5])
+        ]
+        boundary_y_values = [
+            value
+            for segment in self.all_linear_segments
+            for value in (segment[4], segment[6])
+        ]
         fstr = f"index = {self.index};\n"     
         f.write(fstr)
         # Cell counts are explicit for each axis. Valid cell coordinates run
@@ -161,13 +169,13 @@ class BoundaryParticleReservoirHorizontal():
         f.write(fstr)
         fstr = f"cell_occupancy_list_size = {run_cfg.cell_occupancy_list_size};\n"
         f.write(fstr)
-        fstr = f"boundary_x_min = {reservoir_x_start:0.6f};\n"
+        fstr = f"boundary_x_min = {min(boundary_x_values):0.6f};\n"
         f.write(fstr)
-        fstr = f"boundary_x_max = {pipe_x_end:0.6f};\n"
+        fstr = f"boundary_x_max = {max(boundary_x_values):0.6f};\n"
         f.write(fstr)
-        fstr = f"boundary_y_min = {min(reservoir_y_bottom, pipe_y_bottom):0.6f};\n"
+        fstr = f"boundary_y_min = {min(boundary_y_values):0.6f};\n"
         f.write(fstr)
-        fstr = f"boundary_y_max = {max(reservoir_y_top, pipe_y_top):0.6f};\n"
+        fstr = f"boundary_y_max = {max(boundary_y_values):0.6f};\n"
         f.write(fstr)
         fstr = f"boundary_z_min = {self.particle_plane_z:0.6f};\n"
         f.write(fstr)
@@ -187,12 +195,36 @@ class BoundaryParticleReservoirHorizontal():
         f.write(f"death_y_max = {death_y_max:0.6f};\n")
         f.write(f"death_z_min = {death_z_min:0.6f};\n")
         f.write(f"death_z_max = {death_z_max:0.6f};\n")
+        (
+            chamber_x_start,
+            chamber_x_end,
+            chamber_y_bottom,
+            chamber_y_top,
+            chamber_z_front,
+            chamber_z_back,
+        ) = self.chamber_bounds
+        f.write(f"chamber_x_start = {chamber_x_start:0.6f};\n")
+        f.write(f"chamber_x_end = {chamber_x_end:0.6f};\n")
+        f.write(f"chamber_y_bottom = {chamber_y_bottom:0.6f};\n")
+        f.write(f"chamber_y_top = {chamber_y_top:0.6f};\n")
+        f.write(f"chamber_z_front = {chamber_z_front:0.6f};\n")
+        f.write(f"chamber_z_back = {chamber_z_back:0.6f};\n")
         f.write(f"piston_start_frame = {self.piston_start_frame};\n")
-        f.write(f"piston_initial_x = {self.reservoir_bounds[0]:0.6f};\n")
-        f.write(f"piston_stop_x = {self.reservoir_bounds[1]:0.6f};\n")
-        f.write(f"piston_velocity_x = {self.reservoir_velocity[0]:0.6f};\n")
-        f.write(f"piston_velocity_y = {self.reservoir_velocity[1]:0.6f};\n")
-        f.write(f"piston_velocity_z = {self.reservoir_velocity[2]:0.6f};\n")
+        f.write(f"piston_initial_x = {self.chamber_bounds[0]:0.6f};\n")
+        f.write(f"piston_stop_x = {self.chamber_bounds[1]:0.6f};\n")
+        f.write(f"piston_velocity_x = {self.piston_velocity[0]:0.6f};\n")
+        f.write(f"piston_velocity_y = {self.piston_velocity[1]:0.6f};\n")
+        f.write(f"piston_velocity_z = {self.piston_velocity[2]:0.6f};\n")
+        for segment_key, segments in (
+            ("linear_chamber_segments", self.linear_chamber_segments),
+            ("linear_wall_segments", self.linear_wall_segments),
+        ):
+            f.write(f"{segment_key} = (\n")
+            for segment_index, segment in enumerate(segments):
+                separator = "," if segment_index + 1 < len(segments) else ""
+                values = ", ".join(f"{value:0.6f}" for value in segment)
+                f.write(f"    [{values}]{separator}\n")
+            f.write(");\n")
         fstr = f"wall_contact_offset = {float(run_cfg.wall_contact_offset):0.6f};\n"
         f.write(fstr)
         f.write('wall_type = "WALL_MODEL_BOUNDARY_PARTICLE";\n')
@@ -238,7 +270,7 @@ class BoundaryParticleReservoirHorizontal():
 
         try:
             self.add_null_particle(self.p_list)
-            self.calculate_reservoir_packing()
+            self.calculate_chamber_packing()
             self.add_mobile_particles()
             self.add_boundary_particles()
             self.write_particle_bin()
@@ -255,7 +287,7 @@ class BoundaryParticleReservoirHorizontal():
     # Simulation configuration checks
     # ------------------------------------------------------------------
     def validate_simulation_configuration(self):
-        """Validate horizontal 2D reservoir and pipe bounds."""
+        """Validate the horizontal 2D piston chamber and linear walls."""
         errors = []
         try:
             width, height, depth = get_cell_dimensions(self.itemcfg)
@@ -281,9 +313,58 @@ class BoundaryParticleReservoirHorizontal():
                 return None
             return bounds
 
-        reservoir = read_bounds("reservoir_bounds")
-        pipe = read_bounds("pipe_bounds")
+        chamber = read_bounds("chamber_bounds")
         death = read_bounds("death_bounds")
+
+        def read_linear_segments(key):
+            raw_segments = self.itemcfg.get(key)
+            segments = []
+            if raw_segments is None:
+                errors.append(f"{key} is required")
+                return segments
+            for segment_index, raw_segment in enumerate(raw_segments):
+                if len(raw_segment) != 8:
+                    errors.append(
+                        f"{key}[{segment_index}] must contain "
+                        "exactly eight values"
+                    )
+                    continue
+                try:
+                    segment = tuple(float(value) for value in raw_segment)
+                except (TypeError, ValueError):
+                    errors.append(f"{key}[{segment_index}] must be numeric")
+                    continue
+                if not all(math.isfinite(value) for value in segment):
+                    errors.append(f"{key}[{segment_index}] must be finite")
+                    continue
+                a, b, c, x_start, y_start, x_end, y_end, wall_flag = segment
+                if math.hypot(a, b) <= 1.0e-12:
+                    errors.append(
+                        f"{key}[{segment_index}] requires nonzero A or B"
+                    )
+                if math.hypot(x_end - x_start, y_end - y_start) <= 1.0e-12:
+                    errors.append(
+                        f"{key}[{segment_index}] endpoints must differ"
+                    )
+                for endpoint_name, x_value, y_value in (
+                    ("start", x_start, y_start),
+                    ("end", x_end, y_end),
+                ):
+                    if abs(a * x_value + b * y_value + c) > 1.0e-8:
+                        errors.append(
+                            f"{key}[{segment_index}] {endpoint_name} "
+                            "point is not on its line"
+                        )
+                if not wall_flag.is_integer() or int(wall_flag) not in (1, 2, 3, 4):
+                    errors.append(
+                        f"{key}[{segment_index}] wall_flag must be 1..4"
+                    )
+                segments.append(segment)
+            return segments
+
+        linear_chamber_segments = read_linear_segments("linear_chamber_segments")
+        linear_wall_segments = read_linear_segments("linear_wall_segments")
+        all_linear_segments = linear_chamber_segments + linear_wall_segments
 
         def read_number(key):
             raw_value = self.itemcfg.get(key)
@@ -322,24 +403,24 @@ class BoundaryParticleReservoirHorizontal():
             else:
                 piston_start_frame = int(piston_start_frame_value)
 
-        raw_velocity = self.itemcfg.get("reservoir_velocity")
-        reservoir_velocity = None
+        raw_velocity = self.itemcfg.get("piston_velocity")
+        piston_velocity = None
         if raw_velocity is None:
-            errors.append("reservoir_velocity is required")
+            errors.append("piston_velocity is required")
         elif len(raw_velocity) != 3:
-            errors.append("reservoir_velocity must contain exactly three values")
+            errors.append("piston_velocity must contain exactly three values")
         else:
             try:
-                reservoir_velocity = tuple(float(value) for value in raw_velocity)
+                piston_velocity = tuple(float(value) for value in raw_velocity)
             except (TypeError, ValueError):
-                errors.append("reservoir_velocity values must be numeric")
+                errors.append("piston_velocity values must be numeric")
             else:
-                if not all(math.isfinite(value) for value in reservoir_velocity):
-                    errors.append("reservoir_velocity values must be finite")
-                elif reservoir_velocity[0] <= 0.0:
+                if not all(math.isfinite(value) for value in piston_velocity):
+                    errors.append("piston_velocity values must be finite")
+                elif piston_velocity[0] <= 0.0:
                     errors.append(
-                        "reservoir_velocity x must be positive so the piston can "
-                        "move from reservoir_bounds.x_start to x_end"
+                        "piston_velocity x must be positive so the piston can "
+                        "move across chamber_bounds"
                     )
 
         raw_view_center = self.itemcfg.get("view_center")
@@ -379,8 +460,7 @@ class BoundaryParticleReservoirHorizontal():
                     f"{key}: 2D bounds require z_front=0 and z_back=3"
                 )
 
-        validate_order("reservoir_bounds", reservoir)
-        validate_order("pipe_bounds", pipe)
+        validate_order("chamber_bounds", chamber)
 
         if death is not None:
             if death[0] >= death[1]:
@@ -411,8 +491,7 @@ class BoundaryParticleReservoirHorizontal():
                         f"[{lower:g}, {upper:g}]"
                     )
 
-        validate_domain("reservoir_bounds", reservoir)
-        validate_domain("pipe_bounds", pipe)
+        validate_domain("chamber_bounds", chamber)
 
         if death is not None and width and height and depth:
             death_limits = (
@@ -430,36 +509,42 @@ class BoundaryParticleReservoirHorizontal():
                         f"[{lower:g}, {upper:g}]"
                     )
 
-        if reservoir is not None and pipe is not None:
-            if not math.isclose(reservoir[1], pipe[0], abs_tol=1.0e-9):
-                errors.append(
-                    "reservoir x_end must equal pipe x_start for a connected "
-                    "horizontal conduit"
-                )
-            if pipe[2] < reservoir[2] or pipe[3] > reservoir[3]:
-                errors.append(
-                    "pipe y bounds must fit within the reservoir outlet face"
-                )
-            if pipe[4] < reservoir[4] or pipe[5] > reservoir[5]:
-                errors.append(
-                    "pipe z bounds must fit within the reservoir outlet face"
-                )
-
         if death is not None:
-            for key, bounds in (
-                ("reservoir_bounds", reservoir),
-                ("pipe_bounds", pipe),
-            ):
-                if bounds is None:
-                    continue
+            if chamber is not None:
                 if (
-                    bounds[0] < death[0] or bounds[1] > death[1]
-                    or bounds[2] < death[2] or bounds[3] > death[3]
-                    or bounds[4] < death[4] or bounds[5] > death[5]
+                    chamber[0] < death[0] or chamber[1] > death[1]
+                    or chamber[2] < death[2] or chamber[3] > death[3]
+                    or chamber[4] < death[4] or chamber[5] > death[5]
                 ):
-                    errors.append(f"{key} must fit inside death_bounds")
+                    errors.append("chamber_bounds must fit inside death_bounds")
 
         particle_plane_z = 1.0
+        for segment_index, segment in enumerate(all_linear_segments):
+            _a, _b, _c, x_start, y_start, x_end, y_end, _wall_flag = segment
+            for endpoint_name, x_value, y_value in (
+                ("start", x_start, y_start),
+                ("end", x_end, y_end),
+            ):
+                if width and (x_value < 0.0 or x_value > width - 1.0):
+                    errors.append(
+                        f"linear segment {segment_index} {endpoint_name} "
+                        "x is outside the cell array"
+                    )
+                if height and (y_value < 0.0 or y_value > height - 1.0):
+                    errors.append(
+                        f"linear segment {segment_index} {endpoint_name} "
+                        "y is outside the cell array"
+                    )
+                if death is not None and (
+                    x_value < death[0] or x_value > death[1]
+                    or y_value < death[2] or y_value > death[3]
+                    or particle_plane_z < death[4] or particle_plane_z > death[5]
+                ):
+                    errors.append(
+                        f"linear segment {segment_index} {endpoint_name} "
+                        "is outside death_bounds"
+                    )
+
         if death is not None and radius is not None and radius > 0.0:
             if (
                 particle_plane_z - radius < death[4]
@@ -470,17 +555,17 @@ class BoundaryParticleReservoirHorizontal():
                 )
 
         if (
-            reservoir is not None
+            chamber is not None
             and radius is not None
             and radius > 0.0
             and wall_contact_offset is not None
             and wall_contact_offset >= 0.0
         ):
             clearance = radius * (1.0 + wall_contact_offset) + 1.0e-9
-            if reservoir[1] - reservoir[0] < 2.0 * clearance:
-                errors.append("reservoir x span is too small for wall clearance")
-            if reservoir[3] - reservoir[2] < 2.0 * clearance:
-                errors.append("reservoir y span is too small for wall clearance")
+            if chamber[1] - chamber[0] < 2.0 * clearance:
+                errors.append("chamber x span is too small for wall clearance")
+            if chamber[3] - chamber[2] < 2.0 * clearance:
+                errors.append("chamber y span is too small for wall clearance")
 
         if errors:
             raise ValueError(
@@ -491,28 +576,31 @@ class BoundaryParticleReservoirHorizontal():
         self.cell_array_width = width
         self.cell_array_height = height
         self.cell_array_depth = depth
-        self.reservoir_bounds = reservoir
-        self.pipe_bounds = pipe
+        self.chamber_bounds = chamber
         self.death_bounds = death
+        self.linear_chamber_segments = linear_chamber_segments
+        self.linear_wall_segments = linear_wall_segments
+        self.all_linear_segments = all_linear_segments
         self.particle_plane_z = particle_plane_z
-        self.reservoir_velocity = reservoir_velocity
+        self.piston_velocity = piston_velocity
         self.view_center = view_center
         self.collision_stiffness_q = collision_stiffness_q
         self.piston_start_frame = piston_start_frame
         print(
             "BoundaryParticleReservoirHorizontal configuration: PASS\n"
             f"  cell array: {width}x{height}x{depth}\n"
-            f"  reservoir bounds: {reservoir}\n"
-            f"  pipe bounds: {pipe}\n"
+            f"  chamber bounds: {chamber}\n"
+            f"  chamber segments: {len(linear_chamber_segments)}\n"
+            f"  outlet wall segments: {len(linear_wall_segments)}\n"
             f"  death bounds: {death}\n"
-            f"  reservoir velocity: {reservoir_velocity}\n"
+            f"  piston velocity: {piston_velocity}\n"
             f"  piston start frame: {piston_start_frame}\n"
             f"  view center: {view_center}\n"
             "  particle plane: z=1"
         )
         return True
 
-    def calculate_reservoir_packing(self):
+    def calculate_chamber_packing(self):
         """Calculate and report a centered 2D particle grid without creating it."""
         radius = float(self.itemcfg.radius)
         separation = float(self.itemcfg.particle_separation_distance)
@@ -528,7 +616,7 @@ class BoundaryParticleReservoirHorizontal():
         center_spacing = diameter + separation
         boundary_clearance = radius * (1.0 + wall_contact_offset) + 1.0e-9
         x_start, x_end, y_bottom, y_top, _z_front, _z_back = (
-            self.reservoir_bounds
+            self.chamber_bounds
         )
         x_center_min = x_start + boundary_clearance
         x_center_max = x_end - boundary_clearance
@@ -537,7 +625,7 @@ class BoundaryParticleReservoirHorizontal():
         usable_x = x_center_max - x_center_min
         usable_y = y_center_max - y_center_min
         if usable_x < 0.0 or usable_y < 0.0:
-            raise ValueError("reservoir bounds are too small for the particle diameter")
+            raise ValueError("chamber bounds are too small for the particle diameter")
 
         x_count = int(math.floor((usable_x / center_spacing) + 1.0e-12)) + 1
         y_count = int(math.floor((usable_y / center_spacing) + 1.0e-12)) + 1
@@ -574,9 +662,9 @@ class BoundaryParticleReservoirHorizontal():
         return self.packing_particle_count
 
     def add_mobile_particles(self):
-        """Materialize the calculated centered reservoir packing grid."""
+        """Materialize the calculated centered piston-chamber packing grid."""
         first_x, first_y, particle_z = self.packing_first_center
-        velocity_x, velocity_y, velocity_z = self.reservoir_velocity
+        velocity_x, velocity_y, velocity_z = self.piston_velocity
 
         for column in range(self.packing_x_count):
             particle_x = first_x + column * self.particle_center_spacing
@@ -602,7 +690,7 @@ class BoundaryParticleReservoirHorizontal():
         print(
             "BoundaryParticleReservoirHorizontal mobile-particle report:\n"
             f"  mobile particles: {self.number_active_particles}\n"
-            f"  velocity: {self.reservoir_velocity}\n"
+            f"  velocity: {self.piston_velocity}\n"
             f"  first particle number: 1\n"
             f"  last particle number: {self.number_active_particles}"
         )
@@ -625,11 +713,7 @@ class BoundaryParticleReservoirHorizontal():
         return positions
 
     def add_boundary_particles(self):
-        """Create closed-reservoir and open-ended pipe marker walls."""
-        reservoir_x_start, reservoir_x_end, reservoir_y_bottom, reservoir_y_top, _, _ = (
-            self.reservoir_bounds
-        )
-        pipe_x_start, pipe_x_end, pipe_y_bottom, pipe_y_top, _, _ = self.pipe_bounds
+        """Create markers along every configured finite linear wall."""
         marker_locations = set()
 
         def add_marker(x, y, evaluator_id):
@@ -644,33 +728,25 @@ class BoundaryParticleReservoirHorizontal():
                 evaluator_id,
             )
 
-        # The analytic piston replaces the fixed reservoir inlet marker line.
-        # The pipe outlet intentionally has no vertical marker line either.
-
-        # If the pipe is narrower than the reservoir, close the two shoulder
-        # portions of the shared interface while leaving the pipe opening clear.
-        if pipe_y_bottom > reservoir_y_bottom:
-            for y in self.marker_axis_positions(reservoir_y_bottom, pipe_y_bottom):
-                add_marker(pipe_x_start, y, BOUNDARY_EVALUATOR_VERTICAL)
-        if pipe_y_top < reservoir_y_top:
-            for y in self.marker_axis_positions(pipe_y_top, reservoir_y_top):
-                add_marker(pipe_x_start, y, BOUNDARY_EVALUATOR_VERTICAL)
-
-        for x_min, x_max, y in (
-            (reservoir_x_start, reservoir_x_end, reservoir_y_bottom),
-            (reservoir_x_start, reservoir_x_end, reservoir_y_top),
-            (pipe_x_start, pipe_x_end, pipe_y_bottom),
-            (pipe_x_start, pipe_x_end, pipe_y_top),
-        ):
-            for x in self.marker_axis_positions(x_min, x_max):
-                add_marker(x, y, BOUNDARY_EVALUATOR_HORIZONTAL)
+        for segment in self.all_linear_segments:
+            _a, _b, _c, x_start, y_start, x_end, y_end, _wall_flag = segment
+            marker_intervals = max(
+                1,
+                int(math.ceil(max(abs(x_end - x_start), abs(y_end - y_start)))),
+            )
+            for marker_index in range(marker_intervals + 1):
+                fraction = marker_index / marker_intervals
+                marker_x = x_start + fraction * (x_end - x_start)
+                marker_y = y_start + fraction * (y_end - y_start)
+                add_marker(marker_x, marker_y, BOUNDARY_EVALUATOR_LINEAR)
 
         print(
             "BoundaryParticleReservoirHorizontal boundary report:\n"
             f"  boundary particles: {self.number_boundary_particles}\n"
-            f"  piston initial x: {reservoir_x_start:g}\n"
-            f"  reservoir/pipe interface x: {pipe_x_start:g}\n"
-            f"  open pipe outlet x: {pipe_x_end:g}"
+            f"  chamber segments: {len(self.linear_chamber_segments)}\n"
+            f"  outlet wall segments: {len(self.linear_wall_segments)}\n"
+            f"  piston initial x: {self.chamber_bounds[0]:g}\n"
+            f"  piston stop/nozzle start x: {self.chamber_bounds[1]:g}"
         )
         return self.number_boundary_particles
 
@@ -728,4 +804,4 @@ class BoundaryParticleReservoirHorizontal():
         self.write_bin_file(self.p_list)
         self.close_bin_file()
         self.report_generated_bounds()
-        print(f"PipeReservoirEntry: Wrote {self.number_particles} reservoir particles to {self.test_bin_name}")
+        print(f"Piston chamber: wrote {self.number_particles} particles to {self.test_bin_name}")

@@ -6,9 +6,10 @@
 Scheduled particle birth, lifecycle gating through \texttt{Data.w}, and
 outlet retirement have been retired from the live Python
 \texttt{ForceDynamics} path.  Mobile particles are generated active from
-frame zero.  The selected replacement is a finite, prefilled reservoir with
-an analytic moving piston.  The Python piston model is implemented; GLSL and
-Vulkan piston integration remain the next porting stage.
+frame zero.  The selected replacement is a finite, prefilled chamber with an
+analytic moving piston.  Python generation and simulation are verified.  The
+GLSL exporter now emits piston and general finite-line wall support; scenario
+integration and shader compilation remain separate validation steps.
 
 The former deferred-birth design remains documented as a historical
 investigation in \texttt{DynamicsConventions.tex} and
@@ -29,28 +30,17 @@ The reduced Python profile remains selected through
 \texttt{sub\_BPRPPy.cfg}; the Vulkan profile is deferred until Python
 geometry and dynamics are verified.
 
-The physical domains are configured as:
+The packed physical domain is configured as:
 \begin{verbatim}
-reservoir_bounds = [
-    x_start, x_end,
-    y_bottom, y_top,
-    z_front, z_back
-];
-
-pipe_bounds = [
+chamber_bounds = [
     x_start, x_end,
     y_bottom, y_top,
     z_front, z_back
 ];
 \end{verbatim}
 
-For the horizontal model, positive (x) is axial.  The reservoir outlet and
-pipe inlet must share a plane:
-\[
-x_{r,\max}=x_{p,\min}.
-\]
-The pipe (y) and (z) bounds must fit inside the reservoir outlet face.
-Every bound must lie inside the explicit rectangular cell domain defined by
+For the horizontal model, positive (x) is axial.  Every chamber bound must
+lie inside the explicit rectangular cell domain defined by
 \texttt{cell\_array\_width}, \texttt{cell\_array\_height}, and
 \texttt{cell\_array\_depth}.
 
@@ -84,25 +74,25 @@ N=\left\lfloor\frac{L}{\ell}\right\rfloor+1.
 The occupied grid is centered in any remaining space so opposing wall margins
 are equal.
 
-Generated mobile particles are active from frame zero and receive the common
-configured \texttt{reservoir\_velocity}.
+Generated mobile particles are active from frame zero.  Piston motion uses
+the separately configured \texttt{piston\_velocity}.
 
 \subsection{Boundary Marker Geometry}
 
-The current horizontal generator creates:
-
-\begin{itemize}
-    \item upper and lower reservoir walls;
-    \item upper and lower pipe walls;
-    \item vertical shoulder segments where a narrower pipe joins the
-    reservoir;
-    \item no vertical wall across the pipe outlet.
-\end{itemize}
+Straight wall geometry is configured in two named collections:
+\begin{verbatim}
+linear_chamber_segments = (...);
+linear_wall_segments = (...);
+\end{verbatim}
+Each row is \texttt{[A,B,C,xStart,yStart,xEnd,yEnd,wallFlag]} and represents
+the finite line \(Ax+By+C=0\).  The normalized vector \((A,B)\) is the outward
+wall normal.  The collections distinguish chamber walls from attached
+conduit or nozzle walls without introducing different collision equations.
 
 Markers are no farther than one cell apart and shared coordinates are emitted
-once.  Horizontal segment markers use evaluator ID 1 and vertical segment
-markers use evaluator ID 2 through \texttt{pdata.ptype}; the Vulkan loader
-later transports that value to \texttt{Data.z}.  Boundary markers remain
+once.  General linear markers use evaluator ID 4 through
+\texttt{pdata.ptype}; the Vulkan loader transports that value to
+\texttt{Data.z}.  Boundary markers remain
 occupancy placeholders rather than mobile dynamics sources.
 
 The fixed vertical inlet marker row has been removed.  The analytic piston
@@ -112,10 +102,12 @@ generator writes both binary particle data and test metadata.
 \subsection{Current Piston Work}
 
 \texttt{piston\_start\_frame} controls when the rear plane begins moving.
-The piston starts at the reservoir axial minimum, advances with
-\texttt{reservoir\_velocity}, and stops at the reservoir axial maximum.  Each
+The piston starts at \texttt{chamber\_bounds.x\_start}, advances with
+\texttt{piston\_velocity}, and stops at
+\texttt{chamber\_bounds.x\_end}.  Each
 active source evaluates it once before target scanning.  Python diagnostics
 report piston position, velocity, contact count, impulse, and momentum
-transfer.  The next geometry step is a short linear converging section
-attached to the pipe outlet, with a distinct boundary equation and
-self-describing marker evaluator.
+transfer.  At transitions, all valid marker candidates are evaluated and the
+deepest candidate for each physical wall flag is retained.  The next model is
+the CD nozzle, using its profile-specific evaluator while preserving the same
+source-owned contact and piston rules.
