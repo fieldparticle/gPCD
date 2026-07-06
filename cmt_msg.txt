@@ -1,15 +1,15 @@
 Current status:
-	- Replaced reservoir and pipe bounds with a unified prefilled chamber model.
-	- Verified horizontal chamber generation and Python simulation.
-	- Added analytic piston and general finite-line wall support.
-	- Generated reusable GLSL support for piston and linear-wall dynamics.
-	- Updated dynamics, configuration, porting, and problem-evolution documentation.
+	- Migrated TwoParticleHorizontal generation to generic parametric wall segments
+	- Added Python presentation rendering and configuration-boundary overlays
+	- Reproduced the starting-contact effective-radius tunneling defect in TwoParticleHorizontalBug001
+	- Confirmed the defect was introduced by commit 20b4881 on June 18, 2026
 
 Code Changes:
-	- Added chamber bounds and separate chamber and conduit wall-segment collections.
-	- Added finite-line evaluator ID 4 with deepest-contact selection by wall flag.
-	- Added piston position, velocity, collision, and moving-wall maximum-depth export.
-	- Added ForceDynamicsLinearReservoir.glsl and updated generated dynamics includes.
-	- Exported chamber and piston metadata for Vulkan integration.
+	- Added GenericGenData explicit-particle binary and test metadata generation
+	- Made parametric wall normals direction-owned and wall IDs geometry-independent
+	- Corrected Python death, cell-boundary, and physical tunneling diagnostics
+	- Reworked contact reporting to distinguish active and suppressed geometry
+	- Added frame error metadata and per-run report-directory cleanup
+	- Documented the transparent-overlap bug caused by effective-radius starting contacts
 
-Next: Implement and validate the CD nozzle model.
+Next: Remove starting-contact effective-radius scaling and suppression, initialize physical starting compression, and verify TwoParticleHorizontalBug001 no longer tunnels

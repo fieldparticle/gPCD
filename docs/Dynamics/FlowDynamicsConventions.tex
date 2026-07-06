@@ -8,8 +8,9 @@ outlet retirement have been retired from the live Python
 \texttt{ForceDynamics} path.  Mobile particles are generated active from
 frame zero.  The selected replacement is a finite, prefilled chamber with an
 analytic moving piston.  Python generation and simulation are verified.  The
-GLSL exporter now emits piston and general finite-line wall support; scenario
-integration and shader compilation remain separate validation steps.
+GLSL exporter now emits independent piston, general finite-line, and
+piecewise parametric-curve wall support.  The horizontal and CD-nozzle
+scenario wrappers compile and run through the Vulkan path.
 
 The former deferred-birth design remains documented as a historical
 investigation in \texttt{DynamicsConventions.tex} and
@@ -108,6 +109,8 @@ The piston starts at \texttt{chamber\_bounds.x\_start}, advances with
 active source evaluates it once before target scanning.  Python diagnostics
 report piston position, velocity, contact count, impulse, and momentum
 transfer.  At transitions, all valid marker candidates are evaluated and the
-deepest candidate for each physical wall flag is retained.  The next model is
-the CD nozzle, using its profile-specific evaluator while preserving the same
-source-owned contact and piston rules.
+deepest candidate for each physical wall flag is retained.  The CD nozzle now
+uses piecewise cubic parametric segments while preserving the
+same source-owned contact and piston rules.  Parametric markers use evaluator
+ID 5.  Vulkan uses the same segment coefficients for wall response, and the
+generator derives its visual OBJ from the same segment samples.

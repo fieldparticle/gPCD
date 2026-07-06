@@ -1330,3 +1330,167 @@ segment collections retain configuration clarity while sharing one collision
 implementation.  Deepest-contact selection removes scan-order dependence at
 segment transitions, and explicit target velocity preserves the moving-piston
 maximum-depth rule in generated GLSL.
+
+\subsection{Piecewise Parametric CD Nozzle And Vulkan Integration}
+
+\subsubsection{<previous form>}
+
+The CD nozzle used section-specific inlet, converging, throat, diverging, and
+exit parameters together with a dedicated radius-and-slope evaluator.  Its
+visual OBJ had been generated from older coordinates, so the displayed profile
+could differ in position and aspect ratio from the collision profile.  Piston,
+linear-wall, and CD helpers were also coupled in generated includes.
+
+\subsubsection{<current form>}
+
+The CD generator now validates an ordered collection of finite cubic
+\texttt{curve\_wall\_segments}.  Shared parametric math evaluates points,
+tangents, extrema, bounds, minimum wall gap, and closest points.  Boundary
+markers use evaluator ID 5 and provide one locality marker per cell per
+physical wall.  The wall response derives the closest curve point and normal
+from segment coefficients rather than marker orientation.
+
+The GLSL exporter emits independent
+\texttt{ForceDynamicsPiston.glsl} and
+\texttt{ForceDynamicsParametricCurve.glsl} modules.  The Vulkan CD wrapper
+uses double-buffered velocity, skips dead sources and targets, applies the
+analytic piston, and checks six-plane death bounds after position integration.
+The vertex pass excludes dead particles from occupancy and rendering.
+
+The generator now rebuilds \texttt{CDNozzleGenerated.obj} from the same
+segment sample parameters used for boundary-marker generation.  The OBJ is a
+triangle ribbon with the texture-coordinate and normal records required by the
+current loader; it is visualization only.
+
+\subsubsection{difference outcome}
+
+full solution
+
+\subsubsection{<Analysis>}
+
+Piecewise parametric geometry removes nozzle-section decision trees and makes
+straight, quadratic, and cubic walls instances of one representation.  Sharing
+segment coefficients across validation, Python contact response, GLSL contact
+response, marker placement, and visualization removes duplicated profile
+state.  Keeping piston and curve support in separate generated modules lets a
+scenario select only the geometry and moving-boundary behavior it requires.
+
+\subsection{Starting-Contact Effective-Radius Tunneling Defect}
+
+\subsubsection{<previous form>}
+
+Ordinary particle contact originally used the physical source and target
+radii directly.  Contact existed whenever the physical center distance
+satisfied
+\begin{equation}
+d_{ij}<r_i+r_j,
+\end{equation}
+and the physical penetration depth was
+\begin{equation}
+\delta_{ij}=r_i+r_j-d_{ij}.
+\end{equation}
+There was no interval in which physically overlapping particles were hidden
+from contact force or tunneling detection.
+
+Commit \texttt{20b4881}, dated June 18, 2026 at 11:23 AM, introduced special
+starting-contact geometry.  Its commit title was \emph{update git ignore}, but
+the commit also added approximately 300 lines to
+\texttt{ForceDynamicsBase.py}.  The added model scaled both radii by
+\begin{equation}
+s=\frac{d_{ij}(0)}{r_i+r_j}
+\end{equation}
+and used
+\begin{equation}
+r_i^{\mathrm{eff}}=s r_i,
+\qquad
+r_j^{\mathrm{eff}}=s r_j
+\end{equation}
+so an initially overlapping pair appeared to have zero effective
+penetration.  Commit \texttt{c41ded4}, later on June 18, moved this logic into
+\texttt{ForceDynamics.py}; it did not originate the model.
+
+The intent was to avoid an immediate force discontinuity when a configured
+initial state already contained overlap.  The contact could compress relative
+to its initial separation and rebound to that separation.  Once it returned,
+the state became \texttt{resolved}.  Force geometry was then suppressed until
+the physical center distance reached the full physical separation
+(r_i+r_j).
+
+\subsubsection{<current form>}
+
+\texttt{TwoParticleHorizontalBug001.cfg} provides a narrow Python
+reproduction.  Two radius-(0.25) particles begin near the right wall with a
+small vertical offset.  The second particle is compressed between the first
+particle and the wall.  After the initial pair response and later wall
+rebounds, the pair remains physically overlapped while its starting-contact
+state is resolved and suppressed.
+
+The frame reports capture every particle and momentum frame from 0 through
+400.  The first reported pair phase ends at frame 25 when the effective
+overlap returns to zero.  The physical particles do not separate to their
+diameter of (0.5); their center distance remains near (0.42) for much of
+the subsequent motion.  Because the state remains suppressed, the later
+approach toward the left wall produces no valid force geometry.
+
+The center ordering reverses between frames 381 and 382:
+\begin{align}
+x_2-x_1 &= 0.01206345 && \text{at frame 381},\\
+x_2-x_1 &=-0.00229142 && \text{at frame 382}.
+\end{align}
+The particles therefore pass through one another while still listed as a
+physically overlapping pair.  Before the reporting correction,
+\texttt{contacts.csv} represented these suppressed detections as active
+contact rows whose normal, distance, depth, and force were all zero.  It also
+wrote empty rows for every boundary marker, obscuring the two mobile-particle
+history.
+
+Python tunneling diagnostics now test the physical proximity
+\begin{equation}
+p_{ij}^{\mathrm{phys}}=d_{ij}-r_j
+\end{equation}
+before effective-radius or starting-contact logic.  A negative physical
+proximity reports \texttt{ERROR\_PARTICLE\_TUNNELING} with source and target
+IDs.  This diagnostic change does not alter force, velocity, position, or
+internal momentum.
+
+Reporting now distinguishes valid force contacts from physical detections
+whose geometry is suppressed.  Valid rows use
+\texttt{contact\_status=active} and \texttt{geometry\_valid=1}; suppressed
+rows use \texttt{contact\_status=suppressed} and
+\texttt{geometry\_valid=0}.  Null, dead, and boundary-marker particles are
+excluded from mobile contact reports.  Momentum reports include the runtime
+error code, description, source, target, and wall.  Every new simulation run
+clears all files directly inside its configured report directory before
+writing new output.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{<Analysis>}
+
+The defect is not primarily a tolerance, force-stiffness, or timestep problem.
+It is a violation of the contact-geometry invariant.  The effective-radius
+model creates the interval
+\begin{equation}
+d_{ij}(0)<d_{ij}<r_i+r_j
+\end{equation}
+in which the real particles overlap but the force model treats the contact as
+open.  If relative motion reverses before complete physical separation, the
+particles can recompress and exchange ordering without force, maximum-depth
+containment, or the former effective-radius tunneling check.  This is a
+history-dependent transparent-overlap region.
+
+The model replacement must preserve physical radii for all geometry.  Physical
+overlap must always create physical contact, and contact may end only at
+(d_{ij}\ge r_i+r_j).  Starting overlap must instead initialize local
+compression state and its corresponding potential-energy baseline.  Contact
+history may control stored momentum, phase, and constitutive response, but it
+must never resize particles or suppress physically valid geometry.  The same
+rule applies to starting wall penetration.
+
+The reporting and physical tunneling checks provide a verified diagnostic
+surface, but the dynamics correction remains intentionally pending.  The next
+implementation step is to remove effective-radius scaling and resolved-contact
+suppression, initialize starting compression from physical penetration, and
+rerun \texttt{TwoParticleHorizontalBug001} as the regression case.

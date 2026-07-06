@@ -2,22 +2,18 @@
 #define BOUNDARY_GLSL
 const uint BOUNDARY_ENABLED = 1u;
 const float wall_contact_offset = 0.062500000;
-#define BOUNDARY_GUARD cell_guard
+#define CONTACT_FORCE_MEASURE  depth
 #define WALL_MODEL_BOUNDARY_PARTICLE
-const float BOUNDARY_XMIN = 1.000000000;
-const float BOUNDARY_XMAX = 65.000000000;
-const float BOUNDARY_YMIN = 40.000000000;
-const float BOUNDARY_YMAX = 60.000000000;
-const float BOUNDARY_ZMIN = 2.000000000;
-const float BOUNDARY_ZMAX = 2.000000000;
-const float CD_NOZZLE_START_X =1.000000000;
-const float CD_NOZZLE_CENTER_Y = 50.000000000;
-const float CD_NOZZLE_INLET_LENGTH = 10.000000000;
-const float CD_NOZZLE_CONVERGE_LENGTH = 20.000000000;
-const float CD_NOZZLE_THROAT_LENGTH = 5.000000000;
-const float CD_NOZZLE_DIVERGE_LENGTH = 20.000000000;
-const float CD_NOZZLE_EXIT_LENGTH = 10.000000000;
-const float CD_NOZZLE_INLET_RADIUS = 10.000000000;
-const float CD_NOZZLE_THROAT_RADIUS = 7.500000000;
-const float CD_NOZZLE_EXIT_RADIUS = 10.000000000;
+const float BOUNDARY_XMIN = 2.000000000;
+const float BOUNDARY_XMAX = 167.000000000;
+const float BOUNDARY_YMIN = 15.000000000;
+const float BOUNDARY_YMAX = 35.000000000;
+const float BOUNDARY_ZMIN = 1.000000000;
+const float BOUNDARY_ZMAX = 1.000000000;
+const float death_x_min = 1.000000000;
+const float death_x_max = 198.000000000;
+const float death_y_min = 12.000000000;
+const float death_y_max = 38.000000000;
+const float death_z_min = 0.000000000;
+const float death_z_max = 4.000000000;
 #endif

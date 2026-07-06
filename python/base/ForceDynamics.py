@@ -1,6 +1,9 @@
 import math
 import itertools
 
+from gbase.ParametricCurve import closest_point
+from gbase.ParametricCurve import evaluate_tangent
+
 
 class ForceContactDynamics:
     """Apply overlap-area central forces through a source-owned linear chain."""
@@ -15,6 +18,7 @@ class ForceContactDynamics:
         2: "EvaluateVerticalWallSegment",
         3: "EvaluateCDNozzleWallSegment",
         4: "EvaluateLinearWallSegment",
+        5: "EvaluateParametricWallSegment",
     }
 
     @staticmethod
@@ -68,7 +72,7 @@ class ForceContactDynamics:
         """Calculate and accumulate one particle-contact force."""
         contact_state = self.InitializeContactState(SourceID, TargetID)
         if contact_state is None:
-            return False
+            return self.collIn.ErrorReturn == self.constants.ERROR_NONE
         return self.AccumulateContactForce(SourceID, contact_state, totalForce)
 
     def ProcessWallCollision(self, SourceID, wall, totalForce):
@@ -486,6 +490,65 @@ class ForceContactDynamics:
         overlap_area = self.particle_overlap_area(radius, radius, center_distance)
         return (*normal, overlap_area, center_distance, int(wall_flag))
 
+    def EvaluateParametricWallSegment(self, SourceID, BoundaryID):
+        """Evaluate a configured parametric wall selected by a marker cell."""
+        segments = tuple(self.run_configuration.get("curve_wall_segments", ()))
+        if not segments:
+            return None
+
+        source_position = self.GetParticlePosition(SourceID)
+        boundary_position = self.GetParticlePosition(BoundaryID)
+        marker_point = (
+            float(boundary_position.x),
+            float(boundary_position.y),
+        )
+
+        def marker_distance(segment):
+            return closest_point(segment, marker_point)[2]
+
+        segment = min(segments, key=marker_distance)
+        source_point = (
+            float(source_position.x),
+            float(source_position.y),
+        )
+        parameter, wall_point_2d, _distance_squared = closest_point(
+            segment,
+            source_point,
+        )
+        tangent_x, tangent_y = evaluate_tangent(segment, parameter)
+        tangent_magnitude = math.hypot(tangent_x, tangent_y)
+        if tangent_magnitude <= self.EPSILON:
+            return None
+
+        wall_flag = int(round(float(segment[8])))
+        if wall_flag <= 0:
+            return None
+        normal = (
+            tangent_y / tangent_magnitude,
+            -tangent_x / tangent_magnitude,
+            0.0,
+        )
+
+        radius = float(self.particles[SourceID].Data.x)
+        offset = self.WallContactOffsetDistance(radius)
+        ghost = (
+            wall_point_2d[0] + normal[0] * (radius - offset),
+            wall_point_2d[1] + normal[1] * (radius - offset),
+            float(source_position.z),
+        )
+        dx = ghost[0] - float(source_position.x)
+        dy = ghost[1] - float(source_position.y)
+        dz = ghost[2] - float(source_position.z)
+        center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if center_distance >= 2.0 * radius:
+            return None
+        overlap_area = self.particle_overlap_area(
+            radius,
+            radius,
+            center_distance,
+        )
+        return (*normal, overlap_area, center_distance, wall_flag)
+
     def GetPistonPosition(self, frame):
         """Return the piston x position for the specified simulation frame."""
         bounds = self.run_configuration["chamber_bounds"]
@@ -720,6 +783,11 @@ class ForceContactDynamics:
                 abs(source_position.x - boundary_position.x) <= 1.0
                 and abs(source_position.y - boundary_position.y) <= 1.0
             )
+        elif evaluator_id == 5:
+            in_segment = (
+                abs(source_position.x - boundary_position.x) <= 1.0
+                and abs(source_position.y - boundary_position.y) <= 1.0
+            )
         else:
             return False
         return in_segment and abs(source_position.z - boundary_position.z) <= 1.0
@@ -767,13 +835,19 @@ class ForceContactDynamics:
         a slot with no geometry is allowed when no current overlap is found;
         returning None means no contact slot was available.
         """
-        contact_state = self.AppendContactSlot(SourceID, TargetID)
-        if contact_state is None:
-            return None
-
         contact = self.GetParticleGeometry(SourceID, TargetID)
         if contact is None:
-            return contact_state
+            return None
+
+        contact_state = self.AppendContactSlot(SourceID, TargetID)
+        if contact_state is None:
+            self.SetError(
+                self.constants.ERROR_CONTACT_LIST_MISSING,
+                error_kind="contact-slot-capacity",
+                source_id=SourceID,
+                target_id=TargetID,
+            )
+            return None
 
         (
             normal_x,
@@ -1105,6 +1179,7 @@ class ForceContactDynamics:
         return (
             not self.IsNullParticle(ParticleID)
             and not self.IsBoundaryParticle(ParticleID)
+            and float(self.particles[ParticleID].Data.w) >= 0.0
         )
 
     def BoundaryParticleWallsEnabled(self):
@@ -1539,10 +1614,31 @@ class ForceContactDynamics:
             output_position = particle.PosLocA
 
         if (
-            not bool(self.ShaderFlags.Boundary)
-            and (output_position.x < 1.0 or output_position.y < 1.0)
+            output_position.x < 0.0
+            or output_position.x >= float(self.ShaderFlags.CellAryW)
+            or output_position.y < 0.0
+            or output_position.y >= float(self.ShaderFlags.CellAryH)
+            or output_position.z < 0.0
+            or output_position.z >= float(self.ShaderFlags.CellAryL)
         ):
-            return self.SetError(self.constants.ERROR_PARTICLE_OUT_OF_BOUNDS)
+            return self.SetError(
+                self.constants.ERROR_PARTICLE_OUT_OF_BOUNDS,
+                error_kind="cell-boundary",
+                source_id=SourceID,
+            )
+
+        death_bounds = self.run_configuration.get("death_bounds")
+        if death_bounds is not None and len(death_bounds) == 6:
+            if (
+                output_position.x < float(death_bounds[0])
+                or output_position.x > float(death_bounds[1])
+                or output_position.y < float(death_bounds[2])
+                or output_position.y > float(death_bounds[3])
+                or output_position.z < float(death_bounds[4])
+                or output_position.z > float(death_bounds[5])
+            ):
+                particle.Data.w = -1.0
+                particle.state_flg = -1.0
         return True
 
     def isParticleContact(self, Frame, SourceID, TargetID, positionBuffer):
@@ -1563,6 +1659,16 @@ class ForceContactDynamics:
         contact = center_distance <= source_radius + target_radius
         if not contact:
             return False
+
+        physical_proximity = center_distance - target_radius
+        if physical_proximity < -self.EPSILON:
+            return self.SetError(
+                self.constants.ERROR_PARTICLE_TUNNELING,
+                error_kind="particle-particle",
+                source_id=SourceID,
+                target_id=TargetID,
+            )
+
         if center_distance <= self.EPSILON:
             normal = (1.0, 0.0, 0.0)
         else:
@@ -1608,14 +1714,8 @@ class ForceContactDynamics:
             source.max_penetration_depth,
             penetration_depth,
         )
-        directed_proximity = center_distance - _effective_target_radius
-        if not suppress_contact and directed_proximity < -self.EPSILON:
-            self.SetError(
-                self.constants.ERROR_PARTICLE_TUNNELING,
-                error_kind="particle-particle",
-                source_id=SourceID,
-                target_id=TargetID,
-            )
+        if suppress_contact and TargetID not in source.suppressed_contacts:
+            source.suppressed_contacts.append(TargetID)
         return True
 
     def DetectContacts(self, total_forces):

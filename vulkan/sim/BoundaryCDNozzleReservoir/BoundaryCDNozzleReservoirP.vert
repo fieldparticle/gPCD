@@ -1,5 +1,6 @@
 #version 460
 #extension GL_ARB_separate_shader_objects : enable
+#extension GL_GOOGLE_include_directive : require
 //#extension GL_ARB_shading_language_420pack : enable
 #include "debug.glsl"
 #if defined(DEBUG)
@@ -79,7 +80,7 @@ bool addUniqueCell(uint index, uint CornerLocation, inout uint Count)
 ////
 void main(){
 	
-	int index 		= gl_VertexIndex;
+	uint index = uint(gl_VertexIndex);
 	
 #if 0 && defined(DEBUG)
 	if(uint(ShaderFlags.frameNum) == 0 && index == 0)
@@ -98,7 +99,7 @@ void main(){
 	}
 #endif
 
-	if(!ParticleLifeActive(index,uint(ShaderFlags.frameNum)))
+	if (index == 0u || P[index].Data.w < 0.0)
 	{
 		gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 		gl_PointSize = 0.0;
@@ -293,9 +294,14 @@ void main(){
 	if(HSV_ON == 1)
 	{
 		if (P[index].ptype == 0)
-			fragColor = colorizeVelocity(P[index].VelRad.w,HSV_SAT,HSV_VAL);
+		{
+			float velocityAngle = ShaderFlags.positionBuffer == 0u
+				? P[index].VelRadA.w
+				: P[index].VelRadB.w;
+			fragColor = colorizeVelocity(velocityAngle, HSV_SAT, HSV_VAL);
+		}
 		else
-			fragColor = vec3{1.0,1.0,1.0);
+			fragColor = vec3(1.0, 1.0, 1.0);
 	}
 	else
 	{

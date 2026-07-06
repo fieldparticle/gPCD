@@ -26,6 +26,10 @@ DEFAULT_CD_NOZZLE_OUTPUT = DEFAULT_OUTPUT.with_name("ForceDynamicsCDNozzle.glsl"
 DEFAULT_RESERVOIR_OUTPUT = DEFAULT_OUTPUT.with_name(
     "ForceDynamicsLinearReservoir.glsl"
 )
+DEFAULT_PISTON_OUTPUT = DEFAULT_OUTPUT.with_name("ForceDynamicsPiston.glsl")
+DEFAULT_PARAMETRIC_OUTPUT = DEFAULT_OUTPUT.with_name(
+    "ForceDynamicsParametricCurve.glsl"
+)
 
 KNOWN_TRANSLATION_PRIMITIVES = {
     "create_vec4": "Python vector factory; maps to vec4(...) in GLSL.",
@@ -50,6 +54,7 @@ GENERATED_GLSL_METHODS = [
     "EvaluateVerticalWallSegment",
     "EvaluateCDNozzleWallSegment",
     "EvaluateLinearWallSegment",
+    "EvaluateParametricWallSegment",
     "GetPistonPosition",
     "GetPistonVelocity",
     "EvaluatePistonWall",
@@ -105,10 +110,17 @@ CD_NOZZLE_GLSL_METHODS = [
 
 LINEAR_RESERVOIR_GLSL_METHODS = [
     "EvaluateLinearWallSegment",
+]
+
+PISTON_GLSL_METHODS = [
     "GetPistonPosition",
     "GetPistonVelocity",
     "EvaluatePistonWall",
     "ProcessPistonCollision",
+]
+
+PARAMETRIC_CURVE_GLSL_METHODS = [
+    "EvaluateParametricWallSegment",
 ]
 
 CORE_GLSL_METHODS = [
@@ -117,6 +129,8 @@ CORE_GLSL_METHODS = [
     if method_name not in set(BOUNDARY_PARTICLE_GLSL_METHODS)
     and method_name not in set(CD_NOZZLE_GLSL_METHODS)
     and method_name not in set(LINEAR_RESERVOIR_GLSL_METHODS)
+    and method_name not in set(PISTON_GLSL_METHODS)
+    and method_name not in set(PARAMETRIC_CURVE_GLSL_METHODS)
     and method_name != "EvaluateWallSegment"
 ]
 
@@ -194,6 +208,10 @@ GLSL_SIGNATURES = {
     ),
     "EvaluateLinearWallSegment": (
         "BoundaryWallSegment EvaluateLinearWallSegment("
+        "uint SourceID, uint BoundaryID)"
+    ),
+    "EvaluateParametricWallSegment": (
+        "BoundaryWallSegment EvaluateParametricWallSegment("
         "uint SourceID, uint BoundaryID)"
     ),
     "GetPistonPosition": "float GetPistonPosition(uint frame)",
@@ -431,6 +449,7 @@ TRANSLATION_STATUS = {
         "EvaluateVerticalWallSegment",
         "EvaluateCDNozzleWallSegment",
         "EvaluateLinearWallSegment",
+        "EvaluateParametricWallSegment",
         "EvaluatePistonWall",
     ],
     "needs_buffer": [
@@ -490,6 +509,7 @@ TEMPLATE_GENERATED_METHODS = {
     "EvaluateVerticalWallSegment",
     "EvaluateCDNozzleWallSegment",
     "EvaluateLinearWallSegment",
+    "EvaluateParametricWallSegment",
     "GetPistonPosition",
     "GetPistonVelocity",
     "EvaluatePistonWall",
@@ -732,6 +752,13 @@ GLSL_BODY_TEMPLATES = {
         "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
         "#endif",
         "}",
+        "if (evaluator_id == 5u) {",
+        "#if defined(FORCE_DYNAMICS_PARAMETRIC_CURVE_AVAILABLE)",
+        "    return EvaluateParametricWallSegment(SourceID, BoundaryID);",
+        "#else",
+        "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
+        "#endif",
+        "}",
         "return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);",
     ],
     "EvaluateHorizontalWallSegment": [
@@ -854,6 +881,48 @@ GLSL_BODY_TEMPLATES = {
         "}",
         "float overlap_area = particle_overlap_area(radius, radius, center_distance);",
         "return BoundaryWallSegment(normal, overlap_area, center_distance, selected.wallFlag, true);",
+    ],
+    "EvaluateParametricWallSegment": [
+        "vec2 marker = GetParticlePosition(BoundaryID).xy;",
+        "ParametricCurveSegment selected = CURVE_WALL_SEGMENTS[0];",
+        "float best_marker_distance_sq = 3.402823466e+38;",
+        "for (uint index = 0u; index < CURVE_WALL_SEGMENT_COUNT; ++index) {",
+        "    ParametricCurveSegment candidate = CURVE_WALL_SEGMENTS[index];",
+        "    vec3 closest = ParametricCurveClosestPoint(candidate, marker);",
+        "    float distance_sq = dot(closest.yz - marker, closest.yz - marker);",
+        "    if (distance_sq < best_marker_distance_sq) {",
+        "        best_marker_distance_sq = distance_sq;",
+        "        selected = candidate;",
+        "    }",
+        "}",
+        "vec3 source_position = GetParticlePosition(SourceID).xyz;",
+        "vec3 closest = ParametricCurveClosestPoint(selected, source_position.xy);",
+        "float parameter = closest.x;",
+        "vec2 wall_point = closest.yz;",
+        "vec2 tangent = ParametricCurveTangent(selected, parameter);",
+        "float tangent_magnitude = length(tangent);",
+        "if (tangent_magnitude <= EPSILON) {",
+        "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, selected.wallFlag, false);",
+        "}",
+        "vec3 normal = vec3(0.0);",
+        "if (selected.wallFlag == 3u) {",
+        "    normal = vec3(tangent.y, -tangent.x, 0.0) / tangent_magnitude;",
+        "} else if (selected.wallFlag == 4u) {",
+        "    normal = vec3(-tangent.y, tangent.x, 0.0) / tangent_magnitude;",
+        "} else {",
+        "    return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, selected.wallFlag, false);",
+        "}",
+        "float radius = P[SourceID].Data.x;",
+        "float offset = WallContactOffsetDistance(radius);",
+        "vec3 ghost = vec3(wall_point, source_position.z)",
+        "    + normal * (radius - offset);",
+        "float center_distance = length(ghost - source_position);",
+        "if (center_distance >= 2.0 * radius) {",
+        "    return BoundaryWallSegment(normal, 0.0, center_distance, selected.wallFlag, false);",
+        "}",
+        "float overlap_area = particle_overlap_area(radius, radius, center_distance);",
+        "return BoundaryWallSegment(",
+        "    normal, overlap_area, center_distance, selected.wallFlag, true);",
     ],
     "GetPistonPosition": [
         "if (frame <= PISTON_START_FRAME) { return CHAMBER_MIN.x; }",
@@ -1170,6 +1239,9 @@ GLSL_BODY_TEMPLATES = {
     ],
     "ProjectSourceVelocityToContactSet": [
         "contained_velocity = candidate_velocity;",
+        "if (any(isnan(candidate_velocity)) || any(isinf(candidate_velocity))) {",
+        "    return false;",
+        "}",
         "bool candidate_valid = true;",
         "for (uint index = 0u; index < maximumDepthConstraintCount; ++index) {",
         "    if (dot(maximumDepthConstraintNormals[index], candidate_velocity)",
@@ -1185,80 +1257,62 @@ GLSL_BODY_TEMPLATES = {
         "float best_distance_sq = 0.0;",
         "for (uint i = 0u; i < maximumDepthConstraintCount; ++i) {",
         "    for (uint j_code = 0u; j_code <= maximumDepthConstraintCount; ++j_code) {",
-        "        for (uint k_code = 0u; k_code <= maximumDepthConstraintCount; ++k_code) {",
-        "            uint active_count = 1u;",
-        "            uint j = 0u;",
-        "            uint k = 0u;",
-        "            if (j_code > 0u) {",
-        "                j = j_code - 1u;",
-        "                if (j <= i) { continue; }",
-        "                active_count = 2u;",
-        "            } else if (k_code > 0u) {",
-        "                continue;",
-        "            }",
-        "            if (k_code > 0u) {",
-        "                k = k_code - 1u;",
-        "                if (active_count != 2u || k <= j) { continue; }",
-        "                active_count = 3u;",
-        "            }",
+        "        uint active_count = 1u;",
+        "        uint j = 0u;",
+        "        if (j_code > 0u) {",
+        "            j = j_code - 1u;",
+        "            if (j <= i) { continue; }",
+        "            active_count = 2u;",
+        "        }",
         "",
-        "            vec3 n0 = maximumDepthConstraintNormals[i];",
-        "            vec3 n1 = active_count >= 2u",
-        "                ? maximumDepthConstraintNormals[j] : vec3(0.0);",
-        "            vec3 n2 = active_count >= 3u",
-        "                ? maximumDepthConstraintNormals[k] : vec3(0.0);",
-        "            vec3 limits = vec3(",
-        "                maximumDepthConstraintLimits[i],",
-        "                active_count >= 2u ? maximumDepthConstraintLimits[j] : 0.0,",
-        "                active_count >= 3u ? maximumDepthConstraintLimits[k] : 0.0);",
-        "            mat3 gram = mat3(0.0);",
-        "            gram[0][0] = dot(n0, n0);",
-        "            if (active_count >= 2u) {",
-        "                gram[0][1] = dot(n0, n1);",
-        "                gram[1][0] = gram[0][1];",
-        "                gram[1][1] = dot(n1, n1);",
+        "        vec3 n0 = maximumDepthConstraintNormals[i];",
+        "        vec3 n1 = active_count == 2u",
+        "            ? maximumDepthConstraintNormals[j] : vec3(0.0);",
+        "        vec3 limits = vec3(",
+        "            maximumDepthConstraintLimits[i],",
+        "            active_count == 2u ? maximumDepthConstraintLimits[j] : 0.0,",
+        "            0.0);",
+        "        mat3 gram = mat3(0.0);",
+        "        gram[0][0] = dot(n0, n0);",
+        "        if (active_count == 2u) {",
+        "            gram[0][1] = dot(n0, n1);",
+        "            gram[1][0] = gram[0][1];",
+        "            gram[1][1] = dot(n1, n1);",
+        "        }",
+        "        vec3 residual = vec3(",
+        "            dot(n0, candidate_velocity),",
+        "            active_count == 2u ? dot(n1, candidate_velocity) : 0.0,",
+        "            0.0) - limits;",
+        "        vec3 multipliers;",
+        "        if (!SolveMaximumDepthSystem(",
+        "                gram, residual, active_count, multipliers)) {",
+        "            continue;",
+        "        }",
+        "        if (multipliers.x < -MAXIMUM_DEPTH_SOLVER_EPSILON",
+        "                || (active_count == 2u",
+        "                    && multipliers.y < -MAXIMUM_DEPTH_SOLVER_EPSILON)) {",
+        "            continue;",
+        "        }",
+        "        vec3 velocity = candidate_velocity - multipliers.x * n0;",
+        "        if (active_count == 2u) { velocity -= multipliers.y * n1; }",
+        "        if (any(isnan(velocity)) || any(isinf(velocity))) { continue; }",
+        "        bool satisfies_all = true;",
+        "        for (uint constraint = 0u;",
+        "                constraint < maximumDepthConstraintCount; ++constraint) {",
+        "            if (dot(maximumDepthConstraintNormals[constraint], velocity)",
+        "                    > maximumDepthConstraintLimits[constraint]",
+        "                        + MAXIMUM_DEPTH_SOLVER_EPSILON) {",
+        "                satisfies_all = false;",
         "            }",
-        "            if (active_count >= 3u) {",
-        "                gram[0][2] = dot(n0, n2);",
-        "                gram[2][0] = gram[0][2];",
-        "                gram[1][2] = dot(n1, n2);",
-        "                gram[2][1] = gram[1][2];",
-        "                gram[2][2] = dot(n2, n2);",
-        "            }",
-        "            vec3 residual = vec3(",
-        "                dot(n0, candidate_velocity),",
-        "                active_count >= 2u ? dot(n1, candidate_velocity) : 0.0,",
-        "                active_count >= 3u ? dot(n2, candidate_velocity) : 0.0",
-        "            ) - limits;",
-        "            vec3 multipliers;",
-        "            if (!SolveMaximumDepthSystem(",
-        "                    gram, residual, active_count, multipliers)) {",
-        "                continue;",
-        "            }",
-        "            if (multipliers.x < -EPSILON",
-        "                    || (active_count >= 2u && multipliers.y < -EPSILON)",
-        "                    || (active_count >= 3u && multipliers.z < -EPSILON)) {",
-        "                continue;",
-        "            }",
-        "            vec3 velocity = candidate_velocity - multipliers.x * n0;",
-        "            if (active_count >= 2u) { velocity -= multipliers.y * n1; }",
-        "            if (active_count >= 3u) { velocity -= multipliers.z * n2; }",
-        "            bool satisfies_all = true;",
-        "            for (uint constraint = 0u;",
-        "                    constraint < maximumDepthConstraintCount; ++constraint) {",
-        "                if (dot(maximumDepthConstraintNormals[constraint], velocity)",
-        "                        > maximumDepthConstraintLimits[constraint] + EPSILON) {",
-        "                    satisfies_all = false;",
-        "                }",
-        "            }",
-        "            if (!satisfies_all) { continue; }",
-        "            float distance_sq = dot(",
-        "                candidate_velocity - velocity, candidate_velocity - velocity);",
-        "            if (!found || distance_sq < best_distance_sq) {",
-        "                found = true;",
-        "                best_distance_sq = distance_sq;",
-        "                contained_velocity = velocity;",
-        "            }",
+        "        }",
+        "        if (!satisfies_all) { continue; }",
+        "        float distance_sq = dot(",
+        "            candidate_velocity - velocity, candidate_velocity - velocity);",
+        "        if (isnan(distance_sq) || isinf(distance_sq)) { continue; }",
+        "        if (!found || distance_sq < best_distance_sq) {",
+        "            found = true;",
+        "            best_distance_sq = distance_sq;",
+        "            contained_velocity = velocity;",
         "        }",
         "    }",
         "}",
@@ -1419,44 +1473,47 @@ GLSL_BODY_TEMPLATES = {
         "if (penetration_depth < maximum_depth - EPSILON) {",
         "    return true;",
         "}",
+        "float normal_length = length(normal);",
+        "if (normal_length <= MAXIMUM_DEPTH_SOLVER_EPSILON",
+        "        || isnan(normal_length) || isinf(normal_length)",
+        "        || any(isnan(target_velocity)) || any(isinf(target_velocity))) {",
+        "    return SetError(ERROR_MAX_DEPTH_CONSTRAINT);",
+        "}",
+        "vec3 unit_normal = normal / normal_length;",
+        "float limit = dot(unit_normal, target_velocity);",
+        "for (uint index = 0u; index < maximumDepthConstraintCount; ++index) {",
+        "    float alignment = dot(",
+        "        maximumDepthConstraintNormals[index], unit_normal);",
+        "    if (alignment >= 1.0 - MAXIMUM_DEPTH_SOLVER_EPSILON) {",
+        "        maximumDepthConstraintLimits[index] = min(",
+        "            maximumDepthConstraintLimits[index], limit);",
+        "        return true;",
+        "    }",
+        "}",
         "if (maximumDepthConstraintCount >= MAX_SOURCE_DEPTH_CONSTRAINTS) {",
         "    return SetError(ERROR_MAX_DEPTH_CONSTRAINT);",
         "}",
-        "maximumDepthConstraintNormals[maximumDepthConstraintCount] = normal;",
-        "maximumDepthConstraintLimits[maximumDepthConstraintCount] =",
-        "    dot(normal, target_velocity);",
+        "maximumDepthConstraintNormals[maximumDepthConstraintCount] = unit_normal;",
+        "maximumDepthConstraintLimits[maximumDepthConstraintCount] = limit;",
         "maximumDepthConstraintCount += 1u;",
         "return true;",
     ],
     "SolveMaximumDepthSystem": [
         "solution = vec3(0.0);",
         "if (size == 1u) {",
-        "    if (abs(matrix[0][0]) <= EPSILON) { return false; }",
+        "    if (abs(matrix[0][0]) <= MAXIMUM_DEPTH_SOLVER_EPSILON) { return false; }",
         "    solution.x = values.x / matrix[0][0];",
-        "    return true;",
+        "    return !any(isnan(solution)) && !any(isinf(solution));",
         "}",
         "if (size == 2u) {",
         "    float det = matrix[0][0] * matrix[1][1]",
         "        - matrix[1][0] * matrix[0][1];",
-        "    if (abs(det) <= EPSILON) { return false; }",
+        "    if (abs(det) <= MAXIMUM_DEPTH_SOLVER_EPSILON) { return false; }",
         "    solution.x = (values.x * matrix[1][1]",
         "        - matrix[1][0] * values.y) / det;",
         "    solution.y = (matrix[0][0] * values.y",
         "        - values.x * matrix[0][1]) / det;",
-        "    return true;",
-        "}",
-        "if (size == 3u) {",
-        "    float det = determinant(matrix);",
-        "    if (abs(det) <= EPSILON) { return false; }",
-        "    mat3 mx = matrix;",
-        "    mat3 my = matrix;",
-        "    mat3 mz = matrix;",
-        "    mx[0] = values;",
-        "    my[1] = values;",
-        "    mz[2] = values;",
-        "    solution = vec3(",
-        "        determinant(mx), determinant(my), determinant(mz)) / det;",
-        "    return true;",
+        "    return !any(isnan(solution)) && !any(isinf(solution));",
         "}",
         "return false;",
     ],
@@ -1781,6 +1838,7 @@ def render_core_glsl_file(source_path: Path, visitor: ForceDynamicsVisitor) -> s
         "// Do not hand edit generated dynamics content.",
         "",
         "const float EPSILON = 1.0e-12;",
+        "const float MAXIMUM_DEPTH_SOLVER_EPSILON = 1.0e-6;",
         "const float FORCE_DYNAMICS_PI = 3.1415926535897932384626433832795;",
         "const uint ERROR_NONE = 0u;",
         "const uint ERROR_INVALID_SOURCE_ID = 1u;",
@@ -1881,6 +1939,9 @@ def render_boundary_particle_glsl_file(
     lines.append("#if defined(FORCE_DYNAMICS_LINEAR_RESERVOIR_AVAILABLE)")
     lines.append(GLSL_SIGNATURES["EvaluateLinearWallSegment"] + ";")
     lines.append("#endif")
+    lines.append("#if defined(FORCE_DYNAMICS_PARAMETRIC_CURVE_AVAILABLE)")
+    lines.append(GLSL_SIGNATURES["EvaluateParametricWallSegment"] + ";")
+    lines.append("#endif")
     lines.append(GLSL_SIGNATURES["EvaluateWallSegment"] + ";")
     lines.append("")
     lines.extend(
@@ -1923,11 +1984,11 @@ def render_linear_reservoir_glsl_file(
         "#define FORCE_DYNAMICS_LINEAR_RESERVOIR_GLSL",
         "",
         "// Generated from base/ForceDynamics.py by tools/ExportForceDynamicsGLSL.py.",
-        "// Analytic piston and finite linear-wall helpers. Requires reservoir.glsl,",
+        "// Finite linear-wall helpers. Requires reservoir.glsl,",
         "// ForceDynamics.glsl, and ForceDynamicsBoundaryParticle.glsl.",
         "// Do not hand edit generated dynamics content.",
         "",
-        "// Forward declarations for linear-reservoir methods.",
+        "// Forward declarations for finite linear-wall methods.",
     ]
     for method_name in LINEAR_RESERVOIR_GLSL_METHODS:
         lines.append(f"{GLSL_SIGNATURES[method_name]};")
@@ -1938,6 +1999,119 @@ def render_linear_reservoir_glsl_file(
             visitor,
             LINEAR_RESERVOIR_GLSL_METHODS,
         )
+    )
+    lines.extend(["", "#endif", ""])
+    return "\n".join(lines)
+
+
+def render_piston_glsl_file(
+    source_path: Path, visitor: ForceDynamicsVisitor
+) -> str:
+    lines = [
+        "#ifndef FORCE_DYNAMICS_PISTON_GLSL",
+        "#define FORCE_DYNAMICS_PISTON_GLSL",
+        "",
+        "// Generated from base/ForceDynamics.py by tools/ExportForceDynamicsGLSL.py.",
+        "// Analytic moving-piston helpers. Requires reservoir.glsl,",
+        "// ForceDynamics.glsl, and ForceDynamicsBoundaryParticle.glsl.",
+        "// Do not hand edit generated dynamics content.",
+        "",
+        "// Forward declarations for piston methods.",
+    ]
+    for method_name in PISTON_GLSL_METHODS:
+        lines.append(f"{GLSL_SIGNATURES[method_name]};")
+    lines.append("")
+    lines.extend(render_method_bodies(source_path, visitor, PISTON_GLSL_METHODS))
+    lines.extend(["", "#endif", ""])
+    return "\n".join(lines)
+
+
+def render_parametric_curve_glsl_file(
+    source_path: Path, visitor: ForceDynamicsVisitor
+) -> str:
+    lines = [
+        "#ifndef FORCE_DYNAMICS_PARAMETRIC_CURVE_GLSL",
+        "#define FORCE_DYNAMICS_PARAMETRIC_CURVE_GLSL",
+        "",
+        "// Generated from base/ForceDynamics.py by tools/ExportForceDynamicsGLSL.py.",
+        "// Parametric boundary-wall helpers. Requires reservoir.glsl,",
+        "// ForceDynamics.glsl, and ForceDynamicsBoundaryParticle.glsl.",
+        "// Do not hand edit generated dynamics content.",
+        "",
+        "vec2 ParametricCurvePoint(ParametricCurveSegment segment, float t)",
+        "{",
+        "    float t2 = t * t;",
+        "    vec4 powers = vec4(1.0, t, t2, t2 * t);",
+        "    return vec2(dot(segment.xCoefficients, powers),",
+        "        dot(segment.yCoefficients, powers));",
+        "}",
+        "",
+        "vec2 ParametricCurveTangent(ParametricCurveSegment segment, float t)",
+        "{",
+        "    float t2 = t * t;",
+        "    vec4 derivative = vec4(0.0, 1.0, 2.0 * t, 3.0 * t2);",
+        "    return vec2(dot(segment.xCoefficients, derivative),",
+        "        dot(segment.yCoefficients, derivative));",
+        "}",
+        "",
+        "vec2 ParametricCurveSecondDerivative(",
+        "    ParametricCurveSegment segment, float t)",
+        "{",
+        "    vec4 derivative = vec4(0.0, 0.0, 2.0, 6.0 * t);",
+        "    return vec2(dot(segment.xCoefficients, derivative),",
+        "        dot(segment.yCoefficients, derivative));",
+        "}",
+        "",
+        "vec3 ParametricCurveClosestPoint(",
+        "    ParametricCurveSegment segment, vec2 point)",
+        "{",
+        "    const uint sampleCount = 16u;",
+        "    const uint iterationCount = 12u;",
+        "    float bestT = 0.0;",
+        "    float bestDistanceSq = 3.402823466e+38;",
+        "    uint bestIndex = 0u;",
+        "    for (uint index = 0u; index <= sampleCount; ++index) {",
+        "        float t = float(index) / float(sampleCount);",
+        "        vec2 delta = ParametricCurvePoint(segment, t) - point;",
+        "        float distanceSq = dot(delta, delta);",
+        "        if (distanceSq < bestDistanceSq) {",
+        "            bestDistanceSq = distanceSq;",
+        "            bestT = t;",
+        "            bestIndex = index;",
+        "        }",
+        "    }",
+        "    float lower = float((bestIndex > 0u) ? bestIndex - 1u : 0u)",
+        "        / float(sampleCount);",
+        "    float upper = float(min(bestIndex + 1u, sampleCount))",
+        "        / float(sampleCount);",
+        "    for (uint iteration = 0u; iteration < iterationCount; ++iteration) {",
+        "        vec2 curvePoint = ParametricCurvePoint(segment, bestT);",
+        "        vec2 tangent = ParametricCurveTangent(segment, bestT);",
+        "        vec2 secondVector =",
+        "            ParametricCurveSecondDerivative(segment, bestT);",
+        "        vec2 delta = curvePoint - point;",
+        "        float firstDerivative = dot(delta, tangent);",
+        "        float secondDerivative = dot(tangent, tangent)",
+        "            + dot(delta, secondVector);",
+        "        if (abs(secondDerivative) <= 1.0e-14) { break; }",
+        "        float nextT = clamp(",
+        "            bestT - firstDerivative / secondDerivative, lower, upper);",
+        "        if (abs(nextT - bestT) <= 1.0e-7) {",
+        "            bestT = nextT;",
+        "            break;",
+        "        }",
+        "        bestT = nextT;",
+        "    }",
+        "    return vec3(bestT, ParametricCurvePoint(segment, bestT));",
+        "}",
+        "",
+        "// Forward declarations for parametric wall methods.",
+    ]
+    for method_name in PARAMETRIC_CURVE_GLSL_METHODS:
+        lines.append(f"{GLSL_SIGNATURES[method_name]};")
+    lines.append("")
+    lines.extend(
+        render_method_bodies(source_path, visitor, PARAMETRIC_CURVE_GLSL_METHODS)
     )
     lines.extend(["", "#endif", ""])
     return "\n".join(lines)
@@ -1956,6 +2130,14 @@ def write_stub_file(output_path: Path, source_path: Path, visitor: ForceDynamics
     )
     DEFAULT_RESERVOIR_OUTPUT.write_text(
         render_linear_reservoir_glsl_file(source_path, visitor),
+        encoding="utf-8",
+    )
+    DEFAULT_PISTON_OUTPUT.write_text(
+        render_piston_glsl_file(source_path, visitor),
+        encoding="utf-8",
+    )
+    DEFAULT_PARAMETRIC_OUTPUT.write_text(
+        render_parametric_curve_glsl_file(source_path, visitor),
         encoding="utf-8",
     )
 
@@ -2123,6 +2305,8 @@ def main() -> int:
         print(f"Wrote boundary-particle GLSL: {DEFAULT_BOUNDARY_OUTPUT}")
         print(f"Wrote CD nozzle GLSL: {DEFAULT_CD_NOZZLE_OUTPUT}")
         print(f"Wrote linear-reservoir GLSL: {DEFAULT_RESERVOIR_OUTPUT}")
+        print(f"Wrote piston GLSL: {DEFAULT_PISTON_OUTPUT}")
+        print(f"Wrote parametric-curve GLSL: {DEFAULT_PARAMETRIC_OUTPUT}")
     return 0
 
 

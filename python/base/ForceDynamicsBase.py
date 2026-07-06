@@ -141,6 +141,7 @@ class ForceDynamics(ForceContactDynamics):
         """Reset Python current-frame contact and reporting state."""
         source = self.particles[SourceID]
         source.collision_list = []
+        source.suppressed_contacts = []
         source.contactCount = 0
         source.colFlg = 0
         if (
@@ -508,7 +509,11 @@ class ForceDynamics(ForceContactDynamics):
         )
         particle.parms = self.create_vec4(mass, 0.0, 0.0, 0.0)
         particle.internal_momentum = 0.0
-        particle.contacts = [self.create_geo_contact_state() for _ in range(16)]
+        particle.contacts = (
+            [self.create_geo_contact_state() for _ in range(16)]
+            if float(ptype) == 0.0
+            else []
+        )
         particle.gcs = particle.contacts
         particle.contactCount = 0
         particle.colFlg = 0
@@ -525,6 +530,7 @@ class ForceDynamics(ForceContactDynamics):
         particle.temp_vel = temp_vel
         particle.state_flg = fields.get("state_flg", 1.0)
         particle.collision_list = fields.get("collision_list", [])
+        particle.suppressed_contacts = []
         particle.oa = fields.get("oa", 0.0)
         particle.max_penetration_depth = fields.get("max_penetration_depth", 0.0)
         particle.report_contacts = 0
@@ -715,6 +721,9 @@ class ForceDynamics(ForceContactDynamics):
 
     def CollisionRun(self):
         """Run one source-owned semi-implicit ForceDynamics frame."""
+        diagnostics_enabled = not bool(
+            self.run_configuration.get("as_points", False)
+        )
         if not self.BeginFrame():
             return self.particles
         self.ApplyBeforeContactScanHook()
@@ -722,8 +731,9 @@ class ForceDynamics(ForceContactDynamics):
         self.ApplyStartRunHook()
         self.BuildFrameSnapshot()
         self.InitializeStartingContactState()
-        self.RecordFrameStartDiagnostics()
-        self.InitializePairPhaseEnergyReference()
+        if diagnostics_enabled:
+            self.RecordFrameStartDiagnostics()
+            self.InitializePairPhaseEnergyReference()
 
         total_forces = [self.create_vec4() for _ in self.particles]
         if not self.DetectContacts(total_forces):
@@ -731,15 +741,20 @@ class ForceDynamics(ForceContactDynamics):
         if not self.BuildWallContactLists(total_forces):
             return self.particles
         self.ClearInactiveRecoverableInternalMomentum()
-        frame_start_pairs = self.CapturePairGeometryDiagnostics()
+        frame_start_pairs = (
+            self.CapturePairGeometryDiagnostics()
+            if diagnostics_enabled
+            else None
+        )
         if not self.CalculateVelocities(total_forces):
             return self.particles
         if not self.CalculatePositions():
             return self.particles
-        self.BuildEndPositionSnapshot()
-        frame_end_pairs = self.CapturePairGeometryDiagnostics()
-        self.RecordAfterResolveDiagnostics()
-        self.RecordPairPhaseDiagnostics(frame_start_pairs, frame_end_pairs)
+        if diagnostics_enabled:
+            self.BuildEndPositionSnapshot()
+            frame_end_pairs = self.CapturePairGeometryDiagnostics()
+            self.RecordAfterResolveDiagnostics()
+            self.RecordPairPhaseDiagnostics(frame_start_pairs, frame_end_pairs)
         self.EndFrame()
         return self.particles
 

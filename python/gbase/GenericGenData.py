@@ -4,12 +4,11 @@ import os
 from gbase.ParametricCurve import bounds as curve_bounds
 from gbase.ParametricCurve import evaluate_point
 from gbase.ParametricCurve import evaluate_tangent
-from gbase.ParametricParticleVerifiyer import ParametricParticleVerifiyer
 from gbase.pdata import PTYPE_MOBILE, PTYPE_NULL, pdata
 
 
-class BoundaryCDNozzleReservoir:
-    """Generate particles and parametric wall markers for this scenario."""
+class GenericGenData:
+    """Generate particle data from declarative particle and wall configuration."""
 
     BOUNDARY_EVALUATOR_PARAMETRIC = 5.0
 
@@ -46,9 +45,172 @@ class BoundaryCDNozzleReservoir:
         return self.runner()
 
     def validate_simulation_configuration(self):
-        verified = ParametricParticleVerifiyer().verify(self.itemcfg)
-        for name, value in verified.items():
-            setattr(self, name, value)
+        errors = []
+
+        def required_values(name, count):
+            values = self.itemcfg.get(name)
+            if values is None:
+                errors.append(f"{name} is required")
+                return ()
+            if len(values) != count:
+                errors.append(f"{name} must contain exactly {count} values")
+                return ()
+            try:
+                result = tuple(float(value) for value in values)
+            except (TypeError, ValueError):
+                errors.append(f"{name} values must be numeric")
+                return ()
+            if not all(math.isfinite(value) for value in result):
+                errors.append(f"{name} values must be finite")
+                return ()
+            return result
+
+        dimensions = []
+        for name in (
+            "cell_array_width",
+            "cell_array_height",
+            "cell_array_depth",
+        ):
+            value = self.itemcfg.get(name)
+            if not isinstance(value, int) or value <= 0:
+                errors.append(f"{name} must be a positive integer")
+            else:
+                dimensions.append(value)
+
+        death_bounds = required_values("death_bounds", 6)
+        if death_bounds:
+            for axis, minimum, maximum in (
+                ("x", death_bounds[0], death_bounds[1]),
+                ("y", death_bounds[2], death_bounds[3]),
+                ("z", death_bounds[4], death_bounds[5]),
+            ):
+                if minimum >= maximum:
+                    errors.append(
+                        f"death_bounds {axis}_min must be less than {axis}_max"
+                    )
+
+        raw_segments = self.itemcfg.get("curve_wall_segments")
+        curve_segments = []
+        if not raw_segments:
+            errors.append("curve_wall_segments is required and must not be empty")
+        else:
+            for index, raw_segment in enumerate(raw_segments):
+                if len(raw_segment) != 9:
+                    errors.append(
+                        f"curve_wall_segments[{index}] must contain 9 values"
+                    )
+                    continue
+                try:
+                    segment = tuple(float(value) for value in raw_segment)
+                except (TypeError, ValueError):
+                    errors.append(
+                        f"curve_wall_segments[{index}] values must be numeric"
+                    )
+                    continue
+                if not all(math.isfinite(value) for value in segment):
+                    errors.append(
+                        f"curve_wall_segments[{index}] values must be finite"
+                    )
+                    continue
+                wall_flag = segment[8]
+                if not wall_flag.is_integer() or int(wall_flag) <= 0:
+                    errors.append(
+                        f"curve_wall_segments[{index}] wall_flag must be a positive integer"
+                    )
+                if all(abs(value) <= 1.0e-12 for value in segment[1:4] + segment[5:8]):
+                    errors.append(f"curve_wall_segments[{index}] has zero length")
+                curve_segments.append(segment)
+
+        particle_data = self.itemcfg.get("PARTICLE_DATA")
+        particles = []
+        if not particle_data:
+            errors.append("PARTICLE_DATA is required and must not be empty")
+        else:
+            for index in range(len(particle_data)):
+                name = f"p{index + 1}"
+                particle = particle_data.get(name)
+                if particle is None:
+                    errors.append(f"PARTICLE_DATA.{name} is required")
+                    continue
+                try:
+                    values = {
+                        "x": float(particle.location.x1),
+                        "y": float(particle.location.y1),
+                        "z": float(particle.location.z1),
+                        "vx": float(particle.vx),
+                        "vy": float(particle.vy),
+                        "vz": float(particle.get("vz", 0.0)),
+                        "mass": float(particle.mass),
+                        "radius": float(particle.radius),
+                        "collision_stiffness_q": float(
+                            particle.get(
+                                "collision_stiffness_q",
+                                self.itemcfg.get("collision_stiffness_q", 0.0),
+                            )
+                        ),
+                    }
+                except (AttributeError, TypeError, ValueError) as error:
+                    errors.append(f"PARTICLE_DATA.{name} is invalid: {error}")
+                    continue
+                if not all(math.isfinite(value) for value in values.values()):
+                    errors.append(f"PARTICLE_DATA.{name} values must be finite")
+                if values["radius"] <= 0.0:
+                    errors.append(f"PARTICLE_DATA.{name}.radius must be positive")
+                if values["mass"] <= 0.0:
+                    errors.append(f"PARTICLE_DATA.{name}.mass must be positive")
+                if values["collision_stiffness_q"] < 0.0:
+                    errors.append(
+                        f"PARTICLE_DATA.{name}.collision_stiffness_q must not be negative"
+                    )
+                particles.append(values)
+
+        if len(dimensions) == 3:
+            width, height, depth = dimensions
+            if death_bounds and (
+                death_bounds[0] < 0.0
+                or death_bounds[1] > width
+                or death_bounds[2] < 0.0
+                or death_bounds[3] > height
+                or death_bounds[4] < 0.0
+                or death_bounds[5] > depth
+            ):
+                errors.append("death_bounds must fit inside the cell array")
+            for index, segment in enumerate(curve_segments):
+                x_min, x_max, y_min, y_max = curve_bounds(segment)
+                if x_min < 0.0 or x_max > width:
+                    errors.append(
+                        f"curve_wall_segments[{index}] x extent is outside the cell array"
+                    )
+                if y_min < 0.0 or y_max > height:
+                    errors.append(
+                        f"curve_wall_segments[{index}] y extent is outside the cell array"
+                    )
+            for index, particle in enumerate(particles, start=1):
+                if not (
+                    0.0 <= particle["x"] <= width
+                    and 0.0 <= particle["y"] <= height
+                    and 0.0 <= particle["z"] <= depth
+                ):
+                    errors.append(
+                        f"PARTICLE_DATA.p{index} position is outside the cell array"
+                    )
+
+        if errors:
+            raise ValueError(
+                "GenericGenData configuration error(s):\n  - "
+                + "\n  - ".join(errors)
+            )
+
+        self.cell_array_width, self.cell_array_height, self.cell_array_depth = dimensions
+        self.death_bounds = death_bounds
+        self.curve_wall_segments = curve_segments
+        self.explicit_particles = particles
+        self.number_configured_particles = len(particles)
+        self.particle_plane_z = particles[0]["z"]
+        self.radius = float(self.itemcfg.radius)
+        self.wall_contact_offset = float(self.itemcfg.wall_contact_offset)
+        self.dt = float(self.itemcfg.dt)
+        self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
         return True
 
     def initialize_generation(self):
@@ -59,19 +221,21 @@ class BoundaryCDNozzleReservoir:
         self.number_active_particles = 0
         self.number_boundary_particles = 0
 
-        output_prefix = str(self.itemcfg.output_file_prefix)
+        output_prefix = str(
+            self.itemcfg.get("output_file_prefix", self.itemcfg.STUDY_NAME)
+        )
         output_directory = str(self.itemcfg.data_dir)
         self.test_bin_name = os.path.join(output_directory, f"{output_prefix}.bin")
         self.test_file_name = os.path.join(output_directory, f"{output_prefix}.tst")
         self.report_file = os.path.join(output_directory, f"{output_prefix}.rpt")
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        self.obj_file_name = os.path.join(
-            project_root,
-            "vulkan",
-            "sim",
-            "BoundaryCDNozzleReservoir",
-            "CDNozzleGenerated.obj",
-        )
+        configured_obj_file = self.itemcfg.get("obj_file_name")
+        if configured_obj_file:
+            self.obj_file_name = os.path.normpath(str(configured_obj_file))
+        else:
+            self.obj_file_name = os.path.join(
+                output_directory,
+                f"{output_prefix}.obj",
+            )
 
     def add_null_particle(self):
         particle = pdata()
@@ -80,7 +244,14 @@ class BoundaryCDNozzleReservoir:
         self.p_list.append(particle)
         return particle
 
-    def add_mobile_particle(self, position, velocity):
+    def add_mobile_particle(
+        self,
+        position,
+        velocity,
+        radius=None,
+        mass=1.0,
+        collision_stiffness_q=None,
+    ):
         particle = pdata()
         self.number_particles += 1
         self.number_active_particles += 1
@@ -88,12 +259,33 @@ class BoundaryCDNozzleReservoir:
         particle.ptype = PTYPE_MOBILE
         particle.rx, particle.ry, particle.rz = position
         particle.vx, particle.vy, particle.vz = velocity
-        particle.radius = self.radius
-        particle.molar_mass = 1.0
+        particle.radius = self.radius if radius is None else radius
+        particle.molar_mass = mass
         particle.state_flg = 0.0
-        particle.collision_stiffness_q = self.collision_stiffness_q
+        particle.collision_stiffness_q = (
+            float(self.itemcfg.get("collision_stiffness_q", 0.0))
+            if collision_stiffness_q is None
+            else collision_stiffness_q
+        )
         self.p_list.append(particle)
         return particle
+
+    def add_explicit_mobile_particles(self):
+        """Create the mobile particles declared by PARTICLE_DATA."""
+        for configured in self.explicit_particles:
+            self.add_mobile_particle(
+                (configured["x"], configured["y"], configured["z"]),
+                (configured["vx"], configured["vy"], configured["vz"]),
+                radius=configured["radius"],
+                mass=configured["mass"],
+                collision_stiffness_q=configured["collision_stiffness_q"],
+            )
+
+        if self.number_active_particles != self.number_configured_particles:
+            raise RuntimeError(
+                "generated mobile-particle count does not match PARTICLE_DATA"
+            )
+        return self.number_active_particles
 
     def add_boundary_particle(self, position):
         particle = pdata()
@@ -105,97 +297,12 @@ class BoundaryCDNozzleReservoir:
         particle.vx = 0.0
         particle.vy = 0.0
         particle.vz = 0.0
-        particle.radius = 0.25
+        particle.radius = self.radius
         particle.molar_mass = 1.0
         particle.state_flg = 0.0
         particle.collision_stiffness_q = 0.0
         self.p_list.append(particle)
         return particle
-
-    def calculate_chamber_packing(self):
-        """Calculate a centered, nonoverlapping 2D chamber packing."""
-        diameter = 2.0 * self.radius
-        center_spacing = diameter + self.particle_separation_distance
-        boundary_clearance = (
-            self.radius * (1.0 + self.wall_contact_offset) + 1.0e-9
-        )
-
-        x_start, x_end, y_bottom, y_top, _z_front, _z_back = (
-            self.chamber_bounds
-        )
-        x_center_min = x_start + boundary_clearance
-        x_center_max = x_end - boundary_clearance
-        y_center_min = y_bottom + boundary_clearance
-        y_center_max = y_top - boundary_clearance
-        usable_x = x_center_max - x_center_min
-        usable_y = y_center_max - y_center_min
-        if usable_x < 0.0 or usable_y < 0.0:
-            raise ValueError(
-                "chamber_bounds are too small for the configured particle "
-                "radius and wall clearance"
-            )
-
-        x_count = int(math.floor((usable_x / center_spacing) + 1.0e-12)) + 1
-        y_count = int(math.floor((usable_y / center_spacing) + 1.0e-12)) + 1
-        occupied_x = (x_count - 1) * center_spacing
-        occupied_y = (y_count - 1) * center_spacing
-        first_x = x_center_min + 0.5 * (usable_x - occupied_x)
-        first_y = y_center_min + 0.5 * (usable_y - occupied_y)
-
-        self.particle_diameter = diameter
-        self.particle_center_spacing = center_spacing
-        self.boundary_particle_clearance = boundary_clearance
-        self.packing_x_count = x_count
-        self.packing_y_count = y_count
-        self.packing_particle_count = x_count * y_count
-        self.packing_first_center = (
-            first_x,
-            first_y,
-            self.particle_plane_z,
-        )
-        self.packing_last_center = (
-            first_x + occupied_x,
-            first_y + occupied_y,
-            self.particle_plane_z,
-        )
-
-        print(
-            "Parametric chamber packing report:\n"
-            f"  radius: {self.radius:g}\n"
-            f"  diameter: {diameter:g}\n"
-            f"  surface separation: {self.particle_separation_distance:g}\n"
-            f"  center spacing: {center_spacing:g}\n"
-            f"  boundary clearance: {boundary_clearance:g}\n"
-            f"  grid: {x_count} columns x {y_count} rows\n"
-            f"  mobile particles: {self.packing_particle_count}\n"
-            f"  first center: {self.packing_first_center}\n"
-            f"  last center: {self.packing_last_center}"
-        )
-        return self.packing_particle_count
-
-    def add_mobile_particles(self):
-        """Materialize the calculated chamber packing."""
-        first_x, first_y, particle_z = self.packing_first_center
-        for column in range(self.packing_x_count):
-            particle_x = first_x + column * self.particle_center_spacing
-            for row in range(self.packing_y_count):
-                particle_y = first_y + row * self.particle_center_spacing
-                self.add_mobile_particle(
-                    (particle_x, particle_y, particle_z),
-                    self.piston_velocity,
-                )
-
-        if self.number_active_particles != self.packing_particle_count:
-            raise RuntimeError(
-                "generated mobile-particle count does not match packing count"
-            )
-        print(
-            "Parametric chamber mobile-particle report:\n"
-            f"  generated particles: {self.number_active_particles}\n"
-            f"  particle numbers: 1 through {self.number_active_particles}\n"
-            f"  velocity: {self.piston_velocity}"
-        )
-        return self.number_active_particles
 
     @staticmethod
     def _distance_between_points(first, second):
@@ -313,7 +420,7 @@ class BoundaryCDNozzleReservoir:
         with open(self.obj_file_name, "w", encoding="ascii", newline="\n") as output:
             output.write("# Generated from curve_wall_segments.\n")
             output.write("# Dynamics use boundary particles; this mesh is visual only.\n")
-            output.write("o CDNozzleGenerated\n")
+            output.write("o GeneratedParametricWalls\n")
             for vertex_x, vertex_y, vertex_z in vertices:
                 output.write(
                     f"v {vertex_x:.9f} {vertex_y:.9f} {vertex_z:.9f}\n"
@@ -347,7 +454,7 @@ class BoundaryCDNozzleReservoir:
             and int(round(float(particle.pnum))) != 0
         ]
         if not mobile_particles:
-            print("Parametric chamber generated bounds: no mobile particles")
+            print("Generic particle generated bounds: no mobile particles")
             return None
 
         center_bounds = (
@@ -367,7 +474,7 @@ class BoundaryCDNozzleReservoir:
             max(particle.rz + particle.radius for particle in mobile_particles),
         )
         print(
-            "Parametric chamber generated bounds:\n"
+            "Generic particle generated bounds:\n"
             f"  center x: [{center_bounds[0]:g}, {center_bounds[1]:g}]\n"
             f"  center y: [{center_bounds[2]:g}, {center_bounds[3]:g}]\n"
             f"  center z: [{center_bounds[4]:g}, {center_bounds[5]:g}]\n"
@@ -409,6 +516,8 @@ class BoundaryCDNozzleReservoir:
 
     def write_test_file(self):
         """Write Vulkan metadata for the parametric particle simulation."""
+        particle_data_bin_file = self.test_bin_name.replace(os.sep, "/")
+        report_file = self.report_file.replace(os.sep, "/")
         curve_extents = [
             curve_bounds(segment) for segment in self.curve_wall_segments
         ]
@@ -424,14 +533,6 @@ class BoundaryCDNozzleReservoir:
                 0.5 * self.cell_array_depth,
             ),
         )
-        (
-            chamber_x_start,
-            chamber_x_end,
-            chamber_y_bottom,
-            chamber_y_top,
-            chamber_z_front,
-            chamber_z_back,
-        ) = self.chamber_bounds
         (
             death_x_min,
             death_x_max,
@@ -469,9 +570,9 @@ class BoundaryCDNozzleReservoir:
             output.write("collsion_density = 0.0;\n")
             output.write("pdensity = 0.0;\n")
             output.write(
-                f'particle_data_bin_file = "{self.test_bin_name}";\n'
+                f'particle_data_bin_file = "{particle_data_bin_file}";\n'
             )
-            output.write(f'report_file = "{self.report_file}";\n')
+            output.write(f'report_file = "{report_file}";\n')
             output.write(f"dispatchx = {self.number_active_particles + 1};\n")
             output.write(f"dispatchy = {int(self.itemcfg.dispatchy)};\n")
             output.write(f"dispatchz = {int(self.itemcfg.dispatchz)};\n")
@@ -496,19 +597,6 @@ class BoundaryCDNozzleReservoir:
             output.write(f"death_y_max = {death_y_max:.9f};\n")
             output.write(f"death_z_min = {death_z_min:.9f};\n")
             output.write(f"death_z_max = {death_z_max:.9f};\n")
-
-            output.write(f"chamber_x_start = {chamber_x_start:.9f};\n")
-            output.write(f"chamber_x_end = {chamber_x_end:.9f};\n")
-            output.write(f"chamber_y_bottom = {chamber_y_bottom:.9f};\n")
-            output.write(f"chamber_y_top = {chamber_y_top:.9f};\n")
-            output.write(f"chamber_z_front = {chamber_z_front:.9f};\n")
-            output.write(f"chamber_z_back = {chamber_z_back:.9f};\n")
-            output.write(f"piston_start_frame = {self.piston_start_frame};\n")
-            output.write(f"piston_initial_x = {chamber_x_start:.9f};\n")
-            output.write(f"piston_stop_x = {chamber_x_end:.9f};\n")
-            output.write(f"piston_velocity_x = {self.piston_velocity[0]:.9f};\n")
-            output.write(f"piston_velocity_y = {self.piston_velocity[1]:.9f};\n")
-            output.write(f"piston_velocity_z = {self.piston_velocity[2]:.9f};\n")
 
             output.write("curve_wall_segments = (\n")
             for segment_index, segment in enumerate(self.curve_wall_segments):
@@ -555,23 +643,21 @@ class BoundaryCDNozzleReservoir:
         self.initialize_generation()
         try:
             self.add_null_particle()
-            self.calculate_chamber_packing()
-            self.add_mobile_particles()
+            self.add_explicit_mobile_particles()
             self.add_parametric_wall_markers()
-            self.write_parametric_wall_obj()
             self.write_particle_bin()
             self.write_test_file()
             self.report_generated_bounds()
         except (OSError, RuntimeError, TypeError, ValueError) as error:
             self.close_bin_file()
             print(
-                "Parametric chamber particle generation stopped:\n"
+                "Generic particle generation stopped:\n"
                 f"{type(error).__name__}: {error}"
             )
             return False
 
         print(
-            "Parametric chamber packing complete:\n"
+            "Generic particle generation complete:\n"
             f"  binary file: {self.test_bin_name}\n"
             f"  records: {self.count}\n"
             f"  mobile particles: {self.number_active_particles}\n"

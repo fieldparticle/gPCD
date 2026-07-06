@@ -107,6 +107,24 @@ limit the line to a finite segment.  The chamber collection describes the
 piston chamber; the wall collection describes attached conduit geometry.
 Both use the same evaluator and marker ID 4.
 
+\subsection{Parametric Wall Inputs}
+
+\texttt{curve\_wall\_segments} is an ordered collection of finite cubic
+parametric wall segments.  Each record has the form:
+\begin{verbatim}
+[ax, bx, cx, dx, ay, by, cy, dy, wall_flag]
+\end{verbatim}
+and defines
+\(x(t)=a_x+b_xt+c_xt^2+d_xt^3\) and
+\(y(t)=a_y+b_yt+c_yt^2+d_yt^3\) for \(0\leq t\leq1\).
+Wall flag 3 denotes the lower wall and wall flag 4 denotes the upper wall.
+Segments must be ordered, continuous within each physical wall, remain inside
+the cell and death bounds, and preserve a positive lower-to-upper gap.
+
+The CD generator uses these segments for validation, boundary-marker locality,
+Python wall response, generated GLSL metadata, and the visual nozzle OBJ.
+Parametric boundary markers use evaluator ID 5.
+
 \subsection{Generator-Owned Wall Behavior}
 
 The cfg does not select \texttt{wall\_type},

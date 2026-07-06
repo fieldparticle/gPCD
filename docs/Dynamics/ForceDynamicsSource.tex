@@ -55,8 +55,9 @@ a target, it evaluates the represented wall segment and accumulates a wall
 force instead of a particle-particle force.
 
 Boundary markers are self-describing: positive \texttt{ptype}/\texttt{Data.z}
-values select horizontal, vertical, CD-nozzle, or general finite-line wall
-evaluation.  For each physical wall flag, all valid candidates are evaluated
+values select horizontal, vertical, legacy CD-nozzle, general finite-line, or
+piecewise parametric-curve wall evaluation.  For each physical wall flag, all
+valid candidates are evaluated
 and the deepest contact is retained.
 
 \begin{figure}[ht]
@@ -202,6 +203,7 @@ EvaluateHorizontalWallSegment(SourceID, BoundaryID)
 EvaluateVerticalWallSegment(SourceID, BoundaryID)
 EvaluateCDNozzleWallSegment(SourceID, BoundaryID)
 EvaluateLinearWallSegment(SourceID, BoundaryID)
+EvaluateParametricWallSegment(SourceID, BoundaryID)
 \end{verbatim}
 
 Horizontal marker segments classify targets as lower or upper wall markers.
@@ -223,6 +225,14 @@ diverging sections.  \texttt{CDNozzleRadius(...)} evaluates
 \texttt{CDNozzleRadiusSlope(...)} evaluates the signed analytic derivative
 \(2(r_e-r_t)\xi/L^2\).  Straight inlet, throat, and exit sections have zero
 slope.
+
+\texttt{EvaluateParametricWallSegment} is the active CD-nozzle wall evaluator.
+Each finite segment stores cubic coefficients for \(x(t)\) and \(y(t)\), with
+\(0\leq t\leq1\), plus its physical wall flag.  Boundary markers provide only
+broad-phase locality.  The evaluator selects the applicable segment, performs
+a bounded closest-point search, evaluates the local tangent, and derives the
+outward normal from the lower or upper wall flag.  Straight, quadratic, and
+cubic sections therefore share one wall-contact implementation.
 
 Python and the Vulkan wrappers may encounter several marker targets
 representing the same physical wall side.  They evaluate marker geometry and

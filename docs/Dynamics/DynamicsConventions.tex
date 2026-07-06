@@ -125,13 +125,17 @@ velocity and then updates position using the new velocity.  An end-position
 snapshot is created only for diagnostics; it is not a second force evaluation.
 Relative velocity is diagnostic only and does not affect force magnitude.
 
-Starting contacts are the exception to memoryless operation.  When particles
-or wall contacts are already overlapping at initialization, the starting
-separation is recorded as an effective zero-force contact limit.  The model
-applies force only if the contact compresses deeper than that starting
-separation.  After rebound to the starting separation, the physical overlap is
-suppressed until the actual radii separate, preventing a second rebound from
-the configured initial overlap.
+The current implementation contains a known starting-contact defect.  It
+records an initial overlap as an effective zero-force separation, scales the
+contact radii, and suppresses physical overlap after rebound to that starting
+separation.  \texttt{TwoParticleHorizontalBug001} demonstrates that this can
+make overlapping particles transparent and permit an unreported ordering
+reversal.  This behavior is historical implementation state, not an approved
+contact convention.  The required invariant is that physical radii always own
+contact geometry: physical overlap must remain a physical contact until the
+actual radii separate.  Starting overlap must be represented by local
+compression state rather than altered geometry.  The investigation and commit
+history are recorded in \texttt{ProblemEvolution.tex}.
 
 \subsection{Diagnostics}
 
@@ -183,7 +187,8 @@ translation.  A complete release and thermal-transfer model remains deferred.
 (\texttt{ptype=0}), it is the internal-momentum magnitude described above.  A
 boundary marker is never processed as a mobile source.  Its positive
 \texttt{pdata.ptype} value is the wall-evaluator ID: horizontal is 1, vertical
-is 2, CD nozzle is 3, and general finite line is 4.  Python and the Vulkan loader copy that value into
+is 2, legacy CD nozzle is 3, general finite line is 4, and piecewise
+parametric curve is 5.  Python and the Vulkan loader copy that value into
 runtime \texttt{ptype} and \texttt{Data.z}.  The binary
 \texttt{pdata.temp\_vel} field remains reserved and is not part of boundary
 dispatch.  Per-frame contact reset and internal-momentum synchronization must

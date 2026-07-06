@@ -69,6 +69,7 @@ void ShaderObj::Reservoir()
 		<< "#define RESERVOIR_GLSL\n\n"
 
 		<< "const uint BOUNDARY_EVALUATOR_LINEAR = 4u;\n"
+		<< "const uint BOUNDARY_EVALUATOR_PARAMETRIC = 5u;\n"
 
 		<< "const uint PISTON_START_FRAME = "
 		<< CfgTst->GetUInt("piston_start_frame", true)
@@ -90,90 +91,163 @@ void ShaderObj::Reservoir()
 		<< CfgTst->GetFloat("piston_velocity_x", true) << ", "
 		<< CfgTst->GetFloat("piston_velocity_y", true) << ", "
 		<< CfgTst->GetFloat("piston_velocity_z", true)
-		<< ");\n\n"
+		<< ");\n\n";
 
-		<< "struct LinearWallSegment\n"
-		<< "{\n"
-		<< "    vec3 abc;\n"
-		<< "    vec4 endpoints;\n"
-		<< "    uint wallFlag;\n"
-		<< "};\n\n";
+	if (CfgTst->CheckKey("curve_wall_segments") != nullptr)
+	{
+		ostrm
+			<< "struct ParametricCurveSegment\n"
+			<< "{\n"
+			<< "    vec4 xCoefficients;\n"
+			<< "    vec4 yCoefficients;\n"
+			<< "    uint wallFlag;\n"
+			<< "};\n\n";
 
-	auto writeSegmentArray =
-		[&](const std::string& cfgName,
-			const std::string& glslName,
-			const std::string& countName)
+		int segmentCount = 0;
+		config_setting_t* segmentList =
+			CfgTst->StartStructure("curve_wall_segments", segmentCount);
+
+		if (segmentCount <= 0)
 		{
-			int segmentCount = 0;
-			config_setting_t* segmentList =
-				CfgTst->StartStructure(cfgName, segmentCount);
+			throw std::runtime_error(
+				"curve_wall_segments must contain at least one segment"
+			);
+		}
 
-			if (segmentCount <= 0)
+		ostrm
+			<< "const uint CURVE_WALL_SEGMENT_COUNT = "
+			<< segmentCount << "u;\n"
+			<< "const ParametricCurveSegment CURVE_WALL_SEGMENTS["
+			<< segmentCount << "] = ParametricCurveSegment["
+			<< segmentCount << "](\n";
+
+		for (int index = 0; index < segmentCount; ++index)
+		{
+			config_setting_t* segment =
+				CfgTst->GetSubStructAddress(segmentList, index);
+
+			if (segment == nullptr || config_setting_length(segment) != 9)
 			{
 				throw std::runtime_error(
-					cfgName + " must contain at least one segment"
+					"curve_wall_segments[" + std::to_string(index) +
+					"] must contain nine values"
 				);
 			}
 
+			double ax = config_setting_get_float_elem(segment, 0);
+			double bx = config_setting_get_float_elem(segment, 1);
+			double cx = config_setting_get_float_elem(segment, 2);
+			double dx = config_setting_get_float_elem(segment, 3);
+			double ay = config_setting_get_float_elem(segment, 4);
+			double by = config_setting_get_float_elem(segment, 5);
+			double cy = config_setting_get_float_elem(segment, 6);
+			double dy = config_setting_get_float_elem(segment, 7);
+			uint32_t wallFlag = static_cast<uint32_t>(
+				config_setting_get_float_elem(segment, 8)
+				);
+
 			ostrm
-				<< "const uint " << countName << " = "
-				<< segmentCount << "u;\n"
-				<< "const LinearWallSegment " << glslName
-				<< "[" << segmentCount << "] = "
-				<< "LinearWallSegment[" << segmentCount << "](\n";
+				<< "    ParametricCurveSegment("
+				<< "vec4(" << ax << ", " << bx << ", "
+				<< cx << ", " << dx << "), "
+				<< "vec4(" << ay << ", " << by << ", "
+				<< cy << ", " << dy << "), "
+				<< wallFlag << "u)";
 
-			for (int index = 0; index < segmentCount; ++index)
+			if (index + 1 < segmentCount)
+				ostrm << ",";
+
+			ostrm << "\n";
+		}
+
+		ostrm << ");\n\n";
+	}
+	else
+	{
+		ostrm
+			<< "struct LinearWallSegment\n"
+			<< "{\n"
+			<< "    vec3 abc;\n"
+			<< "    vec4 endpoints;\n"
+			<< "    uint wallFlag;\n"
+			<< "};\n\n";
+
+		auto writeSegmentArray =
+			[&](const std::string& cfgName,
+				const std::string& glslName,
+				const std::string& countName)
 			{
-				config_setting_t* segment =
-					CfgTst->GetSubStructAddress(segmentList, index);
+				int segmentCount = 0;
+				config_setting_t* segmentList =
+					CfgTst->StartStructure(cfgName, segmentCount);
 
-				if (segment == nullptr ||
-					config_setting_length(segment) != 8)
+				if (segmentCount <= 0)
 				{
 					throw std::runtime_error(
-						cfgName + "[" + std::to_string(index) +
-						"] must contain eight values"
+						cfgName + " must contain at least one segment"
 					);
 				}
 
-				double a = config_setting_get_float_elem(segment, 0);
-				double b = config_setting_get_float_elem(segment, 1);
-				double c = config_setting_get_float_elem(segment, 2);
-				double xStart = config_setting_get_float_elem(segment, 3);
-				double yStart = config_setting_get_float_elem(segment, 4);
-				double xEnd = config_setting_get_float_elem(segment, 5);
-				double yEnd = config_setting_get_float_elem(segment, 6);
-				uint32_t wallFlag = static_cast<uint32_t>(
-					config_setting_get_float_elem(segment, 7)
-					);
-
 				ostrm
-					<< "    LinearWallSegment("
-					<< "vec3(" << a << ", " << b << ", " << c << "), "
-					<< "vec4(" << xStart << ", " << yStart << ", "
-					<< xEnd << ", " << yEnd << "), "
-					<< wallFlag << "u)";
+					<< "const uint " << countName << " = "
+					<< segmentCount << "u;\n"
+					<< "const LinearWallSegment " << glslName
+					<< "[" << segmentCount << "] = "
+					<< "LinearWallSegment[" << segmentCount << "](\n";
 
-				if (index + 1 < segmentCount)
-					ostrm << ",";
+				for (int index = 0; index < segmentCount; ++index)
+				{
+					config_setting_t* segment =
+						CfgTst->GetSubStructAddress(segmentList, index);
 
-				ostrm << "\n";
-			}
+					if (segment == nullptr ||
+						config_setting_length(segment) != 8)
+					{
+						throw std::runtime_error(
+							cfgName + "[" + std::to_string(index) +
+							"] must contain eight values"
+						);
+					}
 
-			ostrm << ");\n\n";
-		};
+					double a = config_setting_get_float_elem(segment, 0);
+					double b = config_setting_get_float_elem(segment, 1);
+					double c = config_setting_get_float_elem(segment, 2);
+					double xStart = config_setting_get_float_elem(segment, 3);
+					double yStart = config_setting_get_float_elem(segment, 4);
+					double xEnd = config_setting_get_float_elem(segment, 5);
+					double yEnd = config_setting_get_float_elem(segment, 6);
+					uint32_t wallFlag = static_cast<uint32_t>(
+						config_setting_get_float_elem(segment, 7)
+						);
 
-	writeSegmentArray(
-		"linear_chamber_segments",
-		"LINEAR_CHAMBER_SEGMENTS",
-		"LINEAR_CHAMBER_SEGMENT_COUNT"
-	);
+					ostrm
+						<< "    LinearWallSegment("
+						<< "vec3(" << a << ", " << b << ", " << c << "), "
+						<< "vec4(" << xStart << ", " << yStart << ", "
+						<< xEnd << ", " << yEnd << "), "
+						<< wallFlag << "u)";
 
-	writeSegmentArray(
-		"linear_wall_segments",
-		"LINEAR_WALL_SEGMENTS",
-		"LINEAR_WALL_SEGMENT_COUNT"
-	);
+					if (index + 1 < segmentCount)
+						ostrm << ",";
+
+					ostrm << "\n";
+				}
+
+				ostrm << ");\n\n";
+			};
+
+		writeSegmentArray(
+			"linear_chamber_segments",
+			"LINEAR_CHAMBER_SEGMENTS",
+			"LINEAR_CHAMBER_SEGMENT_COUNT"
+		);
+
+		writeSegmentArray(
+			"linear_wall_segments",
+			"LINEAR_WALL_SEGMENTS",
+			"LINEAR_WALL_SEGMENT_COUNT"
+		);
+	}
 
 	ostrm << "#endif\n";
 }

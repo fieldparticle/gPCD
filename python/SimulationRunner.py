@@ -9,6 +9,7 @@ from base.InLineTest import InLineTest
 #from gbase import libconf
 import io, libconf
 from gbase.utilities import get_cell_dimensions, hsv_angle
+from gbase.ParametricCurve import evaluate_point
 
 
 BASE_CLASS_REGISTRY = {
@@ -77,9 +78,29 @@ def _display_base_from_config(shadow):
         )
     return display_base
 
+
+def _clear_report_directory(report_dir):
+    report_dir.mkdir(parents=True, exist_ok=True)
+    deleted_count = 0
+    for report_file in report_dir.iterdir():
+        if report_file.is_file():
+            report_file.unlink()
+            deleted_count += 1
+    return deleted_count
+
 def _window_size(run_configuration):
     window_size = run_configuration.get("window_size", (1000, 1000))
     return int(window_size[0]), int(window_size[1])
+
+
+def _presentation_quality(run_configuration):
+    return bool(run_configuration.get("presentation_quality", False))
+
+
+def _as_points(run_configuration):
+    if _presentation_quality(run_configuration):
+        return False
+    return bool(run_configuration.get("as_points", False))
 
 
 def _view_box(run_configuration):
@@ -195,9 +216,85 @@ def _active_particles(particles, dynamics=None):
 
 
 def _is_active_particle(particle_index, dynamics=None):
-    if dynamics is not None and hasattr(dynamics, "IsNullParticle"):
-        return not dynamics.IsNullParticle(particle_index)
+    if dynamics is not None and hasattr(
+        dynamics, "IsMobileParticleActiveForDynamics"
+    ):
+        return dynamics.IsMobileParticleActiveForDynamics(particle_index)
     return particle_index != 0
+
+
+def _is_visible_particle(particle_index, particle, dynamics=None):
+    if dynamics is not None and hasattr(dynamics, "IsNullParticle"):
+        if dynamics.IsNullParticle(particle_index):
+            return False
+    elif particle_index == 0:
+        return False
+    return float(getattr(getattr(particle, "Data", None), "w", 0.0)) >= 0.0
+
+
+def _is_boundary_particle(particle_index, particle, dynamics=None):
+    if dynamics is not None and hasattr(dynamics, "IsBoundaryParticle"):
+        return dynamics.IsBoundaryParticle(particle_index)
+    return float(getattr(particle, "ptype", 0.0)) > 0.5
+
+
+def _particle_colors(
+    particle_index,
+    particle,
+    dynamics,
+    hsv_color,
+    hsv_sat,
+    hsv_val,
+):
+    if _is_boundary_particle(particle_index, particle, dynamics):
+        return (60, 220, 90), (150, 255, 175)
+    if hsv_color:
+        color = hsv_angle(particle.VelRad.w, hsv_val, hsv_sat)
+        return color, color
+    if _has_active_wall_contact(particle) or particle.collision_list:
+        return (255, 60, 60), (255, 210, 210)
+    return (65, 125, 255), (145, 190, 255)
+
+
+def _blend_color(first, second, amount):
+    amount = max(0.0, min(1.0, float(amount)))
+    return tuple(
+        int(round(first[index] * (1.0 - amount) + second[index] * amount))
+        for index in range(3)
+    )
+
+
+def _draw_presentation_sphere(screen, center, radius, fill, edge):
+    """Draw a shaded pseudo-3D sphere using inexpensive concentric layers."""
+    radius = max(2, int(radius))
+    shadow_center = (
+        center[0] + max(1, radius // 8),
+        center[1] + max(1, radius // 8),
+    )
+    shadow_color = _blend_color(fill, (0, 0, 0), 0.65)
+    pygame.draw.circle(screen, shadow_color, shadow_center, radius)
+
+    dark_fill = _blend_color(fill, (0, 0, 0), 0.35)
+    pygame.draw.circle(screen, dark_fill, center, radius)
+    layer_count = min(18, radius)
+    for layer_index in range(layer_count):
+        fraction = layer_index / max(1, layer_count - 1)
+        layer_radius = max(1, radius - int(fraction * radius * 0.72))
+        layer_center = (
+            center[0] - int(fraction * radius * 0.22),
+            center[1] - int(fraction * radius * 0.22),
+        )
+        layer_color = _blend_color(dark_fill, fill, 0.35 + 0.65 * fraction)
+        pygame.draw.circle(screen, layer_color, layer_center, layer_radius)
+
+    highlight_radius = max(1, radius // 5)
+    highlight_center = (
+        center[0] - max(1, radius // 3),
+        center[1] - max(1, radius // 3),
+    )
+    highlight_color = _blend_color(fill, (255, 255, 255), 0.72)
+    pygame.draw.circle(screen, highlight_color, highlight_center, highlight_radius)
+    pygame.draw.circle(screen, edge, center, radius, max(1, radius // 12))
 
 
 def _total_momentum(particles, dynamics=None):
@@ -345,6 +442,17 @@ def _motion_summary(start_diagnostics, particles, dynamics=None):
     piston_frame_impulse = 0.0
     piston_total_impulse = 0.0
     piston_total_momentum = (0.0, 0.0, 0.0)
+    error_code = 0
+    error_description = "ERROR_NONE"
+    error_source = -1
+    error_target = -1
+    error_wall = 0
+    if dynamics is not None:
+        error_code = int(getattr(dynamics.collIn, "ErrorReturn", 0))
+        error_description = dynamics.ErrorDescription()
+        error_source = int(getattr(dynamics.collIn, "ErrorSourceID", -1))
+        error_target = int(getattr(dynamics.collIn, "ErrorTargetID", -1))
+        error_wall = int(getattr(dynamics.collIn, "ErrorWallFlag", 0))
     if dynamics is not None and dynamics.PistonEnabled():
         frame_number = int(dynamics.ShaderFlags.frameNum)
         piston_position = dynamics.GetPistonPosition(frame_number)
@@ -403,6 +511,11 @@ def _motion_summary(start_diagnostics, particles, dynamics=None):
         "piston_total_px": piston_total_momentum[0],
         "piston_total_py": piston_total_momentum[1],
         "piston_total_pz": piston_total_momentum[2],
+        "error_code": error_code,
+        "error_description": error_description,
+        "error_source": error_source,
+        "error_target": error_target,
+        "error_wall": error_wall,
     }
 
 
@@ -452,6 +565,65 @@ def _particle_report_row(particle):
     )
 
 
+def _draw_world_rect(screen, bounds, view_box, color, width):
+    screen_width, screen_height = screen.get_size()
+    x_min, x_max, y_min, y_max = bounds
+    left_top = _to_screen(
+        x_min, y_max, view_box, screen_width, screen_height
+    )
+    right_bottom = _to_screen(
+        x_max, y_min, view_box, screen_width, screen_height
+    )
+    rectangle = pygame.Rect(
+        min(left_top[0], right_bottom[0]),
+        min(left_top[1], right_bottom[1]),
+        abs(right_bottom[0] - left_top[0]),
+        abs(right_bottom[1] - left_top[1]),
+    )
+    pygame.draw.rect(screen, color, rectangle, width)
+
+
+def _draw_configuration_boundaries(screen, run_configuration, view_box):
+    """Draw the cell domain, death planes, and physical wall curves."""
+    screen_width, screen_height = screen.get_size()
+    cell_width, cell_height, _ = get_cell_dimensions(run_configuration)
+    if cell_width > 0 and cell_height > 0:
+        _draw_world_rect(
+            screen,
+            (0.0, float(cell_width), 0.0, float(cell_height)),
+            view_box,
+            (50, 110, 255),
+            2,
+        )
+
+    death_bounds = run_configuration.get("death_bounds")
+    if death_bounds is not None and len(death_bounds) >= 4:
+        _draw_world_rect(
+            screen,
+            tuple(float(value) for value in death_bounds[:4]),
+            view_box,
+            (255, 60, 60),
+            2,
+        )
+
+    segments = run_configuration.get("curve_wall_segments", ())
+    for segment in segments:
+        points = []
+        for sample_index in range(65):
+            parameter = sample_index / 64.0
+            point_x, point_y = evaluate_point(segment, parameter)
+            points.append(
+                _to_screen(
+                    point_x,
+                    point_y,
+                    view_box,
+                    screen_width,
+                    screen_height,
+                )
+            )
+        pygame.draw.lines(screen, (60, 220, 90), False, points, 3)
+
+
 def _draw_particles(
     screen,
     particles,
@@ -466,44 +638,41 @@ def _draw_particles(
     screen_width, screen_height = screen.get_size()
     view_box = _view_box(run_configuration)
     screen.fill((14, 18, 24))
+    _draw_configuration_boundaries(screen, run_configuration, view_box)
+    presentation_quality = _presentation_quality(run_configuration)
+    as_points = _as_points(run_configuration)
+
+    if as_points:
+        hsv_color = bool(run_configuration.get("hsv_color", False))
+        hsv_sat = float(run_configuration.get("hsv_sat", 0.707))
+        hsv_val = float(run_configuration.get("hsv_val", 1.0))
+        for index, particle in enumerate(particles):
+            if not _is_visible_particle(index, particle, dynamics):
+                continue
+            center = _to_screen(
+                particle.rx,
+                particle.ry,
+                view_box,
+                screen_width,
+                screen_height,
+            )
+            fill, _edge = _particle_colors(
+                index,
+                particle,
+                dynamics,
+                hsv_color,
+                hsv_sat,
+                hsv_val,
+            )
+            pygame.draw.circle(screen, fill, center, 1)
+        pygame.display.flip()
+        return
+
     motion_summary = _motion_summary(
         start_diagnostics,
         particles,
         dynamics,
     )
-
-    wall_left, wall_top = _to_screen(
-        float(run_configuration.get("WallXMIN", view_box[0])),
-        float(run_configuration.get("WallYMAX", view_box[3])),
-        view_box,
-        screen_width,
-        screen_height,
-    )
-    wall_right, wall_bottom = _to_screen(
-        float(run_configuration.get("WallXMAX", view_box[1])),
-        float(run_configuration.get("WallYMIN", view_box[2])),
-        view_box,
-        screen_width,
-        screen_height,
-    )
-    wall_rect = pygame.Rect(
-        min(wall_left, wall_right),
-        min(wall_top, wall_bottom),
-        abs(wall_right - wall_left),
-        abs(wall_bottom - wall_top),
-    )
-    pygame.draw.rect(screen, (120, 135, 155), wall_rect, 2)
-    cell_width, cell_height, _ = get_cell_dimensions(run_configuration)
-    if cell_width > 0 and cell_height > 0:
-        side_left, side_top = _to_screen(0.0, cell_height, view_box, screen_width, screen_height)
-        side_right, side_bottom = _to_screen(cell_width, 0.0, view_box, screen_width, screen_height)
-        side_rect = pygame.Rect(
-            min(side_left, side_right),
-            min(side_top, side_bottom),
-            abs(side_right - side_left),
-            abs(side_bottom - side_top),
-        )
-        pygame.draw.rect(screen, (70, 85, 105), side_rect, 1)
 
     if dynamics is not None and dynamics.PistonEnabled():
         chamber_bounds = run_configuration["chamber_bounds"]
@@ -530,70 +699,79 @@ def _draw_particles(
             4,
         )
 
-    font = pygame.font.Font(None, 24)
     hsv_color = bool(run_configuration.get("hsv_color", False))
     hsv_sat = float(run_configuration.get("hsv_sat", 0.707))
     hsv_val = float(run_configuration.get("hsv_val", 1.0))
-    wall_xmax = float(run_configuration.get("WallXMAX", view_box[1]))
-    wall_ymax = float(run_configuration.get("WallYMAX", view_box[3]))
-    xmax_label = font.render(f"x={wall_xmax:g}", True, (190, 205, 225))
-    ymax_label = font.render(f"y={wall_ymax:g}", True, (190, 205, 225))
-    screen.blit(
-        xmax_label,
-        (
-            max(0, min(screen_width - xmax_label.get_width(), wall_rect.right - xmax_label.get_width())),
-            max(0, min(screen_height - xmax_label.get_height(), wall_rect.centery + 6)),
-        ),
-    )
-    screen.blit(
-        ymax_label,
-        (
-            max(0, min(screen_width - ymax_label.get_width(), wall_rect.centerx + 6)),
-            max(0, min(screen_height - ymax_label.get_height(), wall_rect.top)),
-        ),
-    )
-
     particle_screen_data = []
     for index, particle in enumerate(particles):
-        if not _is_active_particle(index, dynamics):
+        if not _is_visible_particle(index, particle, dynamics):
             continue
         center = _to_screen(particle.rx, particle.ry, view_box, screen_width, screen_height)
-        radius = _radius_to_pixels(particle.radius, view_box, screen_width, screen_height)
-        fill = (255, 255, 255)
-        edge = (80, 220, 255)
-        if hsv_color:
-            fill = hsv_angle(particle.VelRad.w, hsv_val, hsv_sat)
-            edge = fill
-        elif _has_active_wall_contact(particle):
-            fill = (255, 60, 60)
-            edge = (255, 220, 220)
-        elif particle.collision_list:
-            fill = (255, 140, 110)
-            edge = (255, 220, 200)
-        particle_screen_data.append((index, particle, center, radius, edge))
-        pygame.draw.circle(screen, fill, center, radius)
-
-    for index, particle, center, radius, _edge in particle_screen_data:
-        for target_id in particle.collision_list:
-            if target_id <= index:
-                continue
-            target_screen_data = next(
-                (
-                    screen_data
-                    for screen_data in particle_screen_data
-                    if screen_data[0] == target_id
-                ),
-                None,
+        radius = (
+            1
+            if as_points
+            else _radius_to_pixels(
+                particle.radius,
+                view_box,
+                screen_width,
+                screen_height,
             )
-            if target_screen_data is None:
-                continue
-            _target_index, _target_particle, target_center, target_radius, _target_edge = target_screen_data
-            _draw_overlap_lens(screen, center, radius, target_center, target_radius)
+        )
+        fill, edge = _particle_colors(
+            index,
+            particle,
+            dynamics,
+            hsv_color,
+            hsv_sat,
+            hsv_val,
+        )
+        particle_screen_data.append((index, particle, center, radius, edge))
+        if presentation_quality:
+            _draw_presentation_sphere(
+                screen,
+                center,
+                radius,
+                fill,
+                edge,
+            )
+        else:
+            pygame.draw.circle(screen, fill, center, radius)
+
+    if not as_points:
+        for index, particle, center, radius, _edge in particle_screen_data:
+            for target_id in particle.collision_list:
+                if target_id <= index:
+                    continue
+                target_screen_data = next(
+                    (
+                        screen_data
+                        for screen_data in particle_screen_data
+                        if screen_data[0] == target_id
+                    ),
+                    None,
+                )
+                if target_screen_data is None:
+                    continue
+                (
+                    _target_index,
+                    _target_particle,
+                    target_center,
+                    target_radius,
+                    _target_edge,
+                ) = target_screen_data
+                _draw_overlap_lens(
+                    screen,
+                    center,
+                    radius,
+                    target_center,
+                    target_radius,
+                )
 
     show_particle_numbers = bool(run_configuration.get("simulation_particle_numbers", True))
     particle_label_font = pygame.font.Font(None, 22) if show_particle_numbers else None
     for _index, particle, center, radius, edge in particle_screen_data:
-        pygame.draw.circle(screen, edge, center, max(1, radius), 2)
+        if not as_points and not presentation_quality:
+            pygame.draw.circle(screen, edge, center, max(1, radius), 2)
         if show_particle_numbers:
             label = particle_label_font.render(str(int(particle.pnum)), True, (255, 255, 255))
             screen.blit(label, (center[0] + 5, center[1] - 16))
@@ -697,6 +875,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
         shadow.load_cfg_file(cfg_file)
     test_file_name = Path(cfg_file).name
     run_configuration = live.run_configuration
+    thin_mode = _as_points(run_configuration)
     senario = None
     if study == True or "in_line_obj" in run_configuration:
         senario = InLineTest()
@@ -718,23 +897,40 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
             "capture output has no fallback directory."
         )
     report_dir = Path(run_configuration["run_debug_dir"])
-    live_reporting = Reporting(report_dir, run_configuration.get("rpt_frames"))
+    cleared_report_count = _clear_report_directory(report_dir)
+    live_reporting = (
+        None
+        if thin_mode
+        else Reporting(
+            report_dir,
+            run_configuration.get("rpt_frames"),
+            clear_existing=False,
+        )
+    )
     reporting_s = None
-    if shadow is not None:
+    if shadow is not None and not thin_mode:
         reporting_s = Reporting(
             report_dir,
             run_configuration.get("rpt_frames"),
             clear_existing=False,
             file_suffix="_s",
         )
-    print(
-        f"SimulationRunner cleared {live_reporting.cleared_report_count} "
-        f"capture file(s): {report_dir}"
+    if live_reporting is not None:
+        print(
+            f"SimulationRunner cleared {cleared_report_count} "
+            f"report file(s): {report_dir}"
+        )
+    elif cleared_report_count:
+        print(
+            f"SimulationRunner cleared {cleared_report_count} "
+            f"report file(s): {report_dir}"
+        )
+    live_start_diagnostics = (
+        None if thin_mode else _run_start_diagnostics(live)
     )
-    live_start_diagnostics = _run_start_diagnostics(live)
     shadow_start_diagnostics = (
         _run_start_diagnostics(shadow)
-        if shadow is not None
+        if shadow is not None and not thin_mode
         else None
     )
 
@@ -769,23 +965,25 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                 live.ShaderFlags.frameNum = frame_number
                 ##JMB Main Call to live.CollisionRun()
                 live_particles = live.CollisionRun()
-                _report_particles(
-                    live_reporting,
-                    frame_number,
-                    live_particles,
-                    live_start_diagnostics,
-                    live,
-                )
+                if not thin_mode:
+                    _report_particles(
+                        live_reporting,
+                        frame_number,
+                        live_particles,
+                        live_start_diagnostics,
+                        live,
+                    )
                 if shadow is not None:
                     shadow.ShaderFlags.frameNum = frame_number
                     shadow_particles = shadow.CollisionRun()
-                    _report_particles(
-                        reporting_s,
-                        frame_number,
-                        shadow_particles,
-                        shadow_start_diagnostics,
-                        shadow,
-                    )
+                    if not thin_mode:
+                        _report_particles(
+                            reporting_s,
+                            frame_number,
+                            shadow_particles,
+                            shadow_start_diagnostics,
+                            shadow,
+                        )
             else:
                 live_particles = live.particles
                 if shadow is not None:
@@ -831,8 +1029,11 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                 frame_number += 1
                 if stop_frame is not None and frame_number > stop_frame:
                     running = False
-            clock.tick(frame_rate)
+            clock.tick(0 if thin_mode else frame_rate)
     finally:
-        live_reporting.close()
+        if live_reporting is not None:
+            live_reporting.close()
+        if reporting_s is not None:
+            reporting_s.close()
         pygame.quit()
     return False

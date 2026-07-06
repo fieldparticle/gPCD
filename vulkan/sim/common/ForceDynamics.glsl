@@ -7,6 +7,7 @@
 // Do not hand edit generated dynamics content.
 
 const float EPSILON = 1.0e-12;
+const float MAXIMUM_DEPTH_SOLVER_EPSILON = 1.0e-6;
 const float FORCE_DYNAMICS_PI = 3.1415926535897932384626433832795;
 const uint ERROR_NONE = 0u;
 const uint ERROR_INVALID_SOURCE_ID = 1u;
@@ -166,13 +167,13 @@ void SetNextParticleVelocity(uint ParticleID, vec4 velocity);
 bool RegisterMaximumDepthConstraint(uint SourceID, vec3 normal, float penetration_depth, float source_radius, vec3 target_velocity);
 bool SolveMaximumDepthSystem(mat3 matrix, vec3 values, uint size, out vec3 solution);
 
-// Python source: ForceDynamics.py:21
+// Python source: ForceDynamics.py:25
 float VelocityAngle(float vx, float vy)
 {
     return (vx != 0.0 || vy != 0.0) ? atan(vy, vx) : 0.0;
 }
 
-// Python source: ForceDynamics.py:26
+// Python source: ForceDynamics.py:30
 vec4 particle_position(uint ParticleID, uint positionBuffer)
 {
     return (positionBuffer == 0u)
@@ -180,7 +181,7 @@ vec4 particle_position(uint ParticleID, uint positionBuffer)
         : P[ParticleID].PosLocB;
 }
 
-// Python source: ForceDynamics.py:33
+// Python source: ForceDynamics.py:37
 float particle_overlap_area(float source_radius, float target_radius, float center_distance)
 {
     if (center_distance <= 0.0) {
@@ -219,13 +220,13 @@ float particle_overlap_area(float source_radius, float target_radius, float cent
     return source_area + target_area - triangle_area;
 }
 
-// Python source: ForceDynamics.py:877
+// Python source: ForceDynamics.py:952
 float ParticleProximityMagnitude(float source_radius, float target_radius, float center_distance)
 {
     return max(0.0, center_distance - target_radius);
 }
 
-// Python source: ForceDynamics.py:882
+// Python source: ForceDynamics.py:957
 float ParticlePenetrationDepth(float source_radius, float target_radius, float center_distance)
 {
     float orientation_magnitude = source_radius;
@@ -237,7 +238,7 @@ float ParticlePenetrationDepth(float source_radius, float target_radius, float c
     return orientation_magnitude - proximity_magnitude;
 }
 
-// Python source: ForceDynamics.py:67
+// Python source: ForceDynamics.py:71
 bool ProcessParticleCollision(uint TargetID, uint SourceID, inout vec3 totalForce)
 {
     ParticleGeometry geometry = GetParticleGeometry(SourceID, TargetID);
@@ -277,7 +278,7 @@ bool ProcessParticleCollision(uint TargetID, uint SourceID, inout vec3 totalForc
     return AccumulateContactForce(SourceID, contact, totalForce);
 }
 
-// Python source: ForceDynamics.py:74
+// Python source: ForceDynamics.py:78
 bool ProcessWallCollision(uint SourceID, uint wall, inout vec3 totalForce)
 {
     WallGhostGeometry geometry = GetWallGhostGeometry(SourceID, wall);
@@ -315,28 +316,28 @@ bool ProcessWallCollision(uint SourceID, uint wall, inout vec3 totalForce)
     return AccumulateContactForce(SourceID, contact, totalForce);
 }
 
-// Python source: ForceDynamics.py:727
+// Python source: ForceDynamics.py:802
 bool InitializeWallContactState(uint SourceID, uint wall)
 {
     // TODO: generate body for InitializeWallContactState.
     return false;
 }
 
-// Python source: ForceDynamics.py:753
+// Python source: ForceDynamics.py:828
 bool InitializeContactState(uint SourceID, uint TargetID)
 {
     // TODO: generate body for InitializeContactState.
     return false;
 }
 
-// Python source: ForceDynamics.py:762
+// Python source: ForceDynamics.py:837
 bool GetContactState(uint SourceID, uint TargetID)
 {
     // TODO: generate body for GetContactState.
     return false;
 }
 
-// Python source: ForceDynamics.py:815
+// Python source: ForceDynamics.py:890
 ParticleGeometry GetParticleGeometry(uint SourceID, uint TargetID)
 {
     vec4 source_position = GetParticlePosition(SourceID);
@@ -374,33 +375,33 @@ ParticleGeometry GetParticleGeometry(uint SourceID, uint TargetID)
     );
 }
 
-// Python source: ForceDynamics.py:1076
+// Python source: ForceDynamics.py:1151
 vec4 GetParticlePosition(uint ParticleID)
 {
     return particle_position(ParticleID, uint(ShaderFlags.positionBuffer));
 }
 
-// Python source: ForceDynamics.py:1121
+// Python source: ForceDynamics.py:1196
 uint StartingParticleKey(uint SourceID, uint TargetID)
 {
     // TODO: generate body for StartingParticleKey.
     return 0u;
 }
 
-// Python source: ForceDynamics.py:1127
+// Python source: ForceDynamics.py:1202
 uint StartingWallKey(uint SourceID, uint wall_flag)
 {
     // TODO: generate body for StartingWallKey.
     return 0u;
 }
 
-// Python source: ForceDynamics.py:1131
+// Python source: ForceDynamics.py:1206
 void InitializeStartingContactState()
 {
     // TODO: generate body for InitializeStartingContactState.
 }
 
-// Python source: ForceDynamics.py:1194
+// Python source: ForceDynamics.py:1269
 float ParticleCenterDistance(uint SourceID, uint TargetID)
 {
     vec4 source_position = GetParticlePosition(SourceID);
@@ -409,7 +410,7 @@ float ParticleCenterDistance(uint SourceID, uint TargetID)
     return length(delta);
 }
 
-// Python source: ForceDynamics.py:1203
+// Python source: ForceDynamics.py:1278
 ParticleEffectiveContactGeometry GetParticleEffectiveContactGeometry(uint SourceID, uint TargetID, float center_distance)
 {
     float source_radius = P[SourceID].Data.x;
@@ -428,7 +429,7 @@ ParticleEffectiveContactGeometry GetParticleEffectiveContactGeometry(uint Source
     );
 }
 
-// Python source: ForceDynamics.py:1241
+// Python source: ForceDynamics.py:1316
 ParticlePotentialGeometry GetParticlePotentialGeometry(uint SourceID, uint TargetID, float center_distance)
 {
     ParticleEffectiveContactGeometry effective =
@@ -442,27 +443,27 @@ ParticlePotentialGeometry GetParticlePotentialGeometry(uint SourceID, uint Targe
     return ParticlePotentialGeometry(effective.sourceRadius, effective.targetRadius, true);
 }
 
-// Python source: ForceDynamics.py:1261
+// Python source: ForceDynamics.py:1336
 bool AppendContactSlot(uint SourceID, uint TargetID)
 {
     // TODO: generate body for AppendContactSlot.
     return false;
 }
 
-// Python source: ForceDynamics.py:1282
+// Python source: ForceDynamics.py:1357
 uint GetContactSlots(uint SourceID)
 {
     // TODO: generate body for GetContactSlots.
     return 0u;
 }
 
-// Python source: ForceDynamics.py:1286
+// Python source: ForceDynamics.py:1361
 vec4 GetStartFrameVelocity(uint ParticleID)
 {
     return GetParticleVelocity(ParticleID);
 }
 
-// Python source: ForceDynamics.py:1297
+// Python source: ForceDynamics.py:1372
 bool AccumulateContactForce(uint SourceID, ContactForceInput contact, inout vec3 totalForce)
 {
     if (!contact.valid) {
@@ -500,7 +501,7 @@ bool AccumulateContactForce(uint SourceID, ContactForceInput contact, inout vec3
     return true;
 }
 
-// Python source: ForceDynamics.py:1317
+// Python source: ForceDynamics.py:1392
 float GetPairStiffness(uint SourceID, uint TargetID)
 {
     float source_q = P[SourceID].Data.y;
@@ -508,7 +509,7 @@ float GetPairStiffness(uint SourceID, uint TargetID)
     return max(0.0, 0.5 * (source_q + target_q));
 }
 
-// Python source: ForceDynamics.py:1323
+// Python source: ForceDynamics.py:1398
 float GetContactStiffness(uint SourceID, uint TargetID, uint contact_type)
 {
     if (contact_type == CONTACT_WALL) {
@@ -517,13 +518,13 @@ float GetContactStiffness(uint SourceID, uint TargetID, uint contact_type)
     return GetPairStiffness(SourceID, TargetID);
 }
 
-// Python source: ForceDynamics.py:1329
+// Python source: ForceDynamics.py:1404
 float WallContactOffsetDistance(float radius)
 {
     return min(radius, radius * wall_contact_offset);
 }
 
-// Python source: ForceDynamics.py:1333
+// Python source: ForceDynamics.py:1408
 WallPhysicalGhostGeometry GetPhysicalWallGhostGeometry(uint SourceID, uint wall_flag)
 {
     vec4 position = GetParticlePosition(SourceID);
@@ -557,7 +558,7 @@ WallPhysicalGhostGeometry GetPhysicalWallGhostGeometry(uint SourceID, uint wall_
     return WallPhysicalGhostGeometry(normal, overlap_area, center_distance, true);
 }
 
-// Python source: ForceDynamics.py:1385
+// Python source: ForceDynamics.py:1460
 WallGhostGeometry GetWallGhostGeometry(uint SourceID, uint wall_flag)
 {
     WallPhysicalGhostGeometry physical =
@@ -610,14 +611,14 @@ WallGhostGeometry GetWallGhostGeometry(uint SourceID, uint wall_flag)
     );
 }
 
-// Python source: ForceDynamics.py:1447
+// Python source: ForceDynamics.py:1522
 bool AppendWallContactSlot(uint SourceID, uint wall_flag)
 {
     // TODO: generate body for AppendWallContactSlot.
     return false;
 }
 
-// Python source: ForceDynamics.py:105
+// Python source: ForceDynamics.py:109
 bool CheckPenetrationStepResolution(uint SourceID, vec3 normal, float source_radius, vec3 target_velocity)
 {
     vec3 source_velocity = GetStartFrameVelocity(SourceID).xyz;
@@ -633,10 +634,13 @@ bool CheckPenetrationStepResolution(uint SourceID, vec3 normal, float source_rad
     return true;
 }
 
-// Python source: ForceDynamics.py:923
+// Python source: ForceDynamics.py:998
 bool ProjectSourceVelocityToContactSet(vec3 candidate_velocity, out vec3 contained_velocity)
 {
     contained_velocity = candidate_velocity;
+    if (any(isnan(candidate_velocity)) || any(isinf(candidate_velocity))) {
+        return false;
+    }
     bool candidate_valid = true;
     for (uint index = 0u; index < maximumDepthConstraintCount; ++index) {
         if (dot(maximumDepthConstraintNormals[index], candidate_velocity)
@@ -652,87 +656,69 @@ bool ProjectSourceVelocityToContactSet(vec3 candidate_velocity, out vec3 contain
     float best_distance_sq = 0.0;
     for (uint i = 0u; i < maximumDepthConstraintCount; ++i) {
         for (uint j_code = 0u; j_code <= maximumDepthConstraintCount; ++j_code) {
-            for (uint k_code = 0u; k_code <= maximumDepthConstraintCount; ++k_code) {
-                uint active_count = 1u;
-                uint j = 0u;
-                uint k = 0u;
-                if (j_code > 0u) {
-                    j = j_code - 1u;
-                    if (j <= i) { continue; }
-                    active_count = 2u;
-                } else if (k_code > 0u) {
-                    continue;
-                }
-                if (k_code > 0u) {
-                    k = k_code - 1u;
-                    if (active_count != 2u || k <= j) { continue; }
-                    active_count = 3u;
-                }
+            uint active_count = 1u;
+            uint j = 0u;
+            if (j_code > 0u) {
+                j = j_code - 1u;
+                if (j <= i) { continue; }
+                active_count = 2u;
+            }
 
-                vec3 n0 = maximumDepthConstraintNormals[i];
-                vec3 n1 = active_count >= 2u
-                    ? maximumDepthConstraintNormals[j] : vec3(0.0);
-                vec3 n2 = active_count >= 3u
-                    ? maximumDepthConstraintNormals[k] : vec3(0.0);
-                vec3 limits = vec3(
-                    maximumDepthConstraintLimits[i],
-                    active_count >= 2u ? maximumDepthConstraintLimits[j] : 0.0,
-                    active_count >= 3u ? maximumDepthConstraintLimits[k] : 0.0);
-                mat3 gram = mat3(0.0);
-                gram[0][0] = dot(n0, n0);
-                if (active_count >= 2u) {
-                    gram[0][1] = dot(n0, n1);
-                    gram[1][0] = gram[0][1];
-                    gram[1][1] = dot(n1, n1);
+            vec3 n0 = maximumDepthConstraintNormals[i];
+            vec3 n1 = active_count == 2u
+                ? maximumDepthConstraintNormals[j] : vec3(0.0);
+            vec3 limits = vec3(
+                maximumDepthConstraintLimits[i],
+                active_count == 2u ? maximumDepthConstraintLimits[j] : 0.0,
+                0.0);
+            mat3 gram = mat3(0.0);
+            gram[0][0] = dot(n0, n0);
+            if (active_count == 2u) {
+                gram[0][1] = dot(n0, n1);
+                gram[1][0] = gram[0][1];
+                gram[1][1] = dot(n1, n1);
+            }
+            vec3 residual = vec3(
+                dot(n0, candidate_velocity),
+                active_count == 2u ? dot(n1, candidate_velocity) : 0.0,
+                0.0) - limits;
+            vec3 multipliers;
+            if (!SolveMaximumDepthSystem(
+                    gram, residual, active_count, multipliers)) {
+                continue;
+            }
+            if (multipliers.x < -MAXIMUM_DEPTH_SOLVER_EPSILON
+                    || (active_count == 2u
+                        && multipliers.y < -MAXIMUM_DEPTH_SOLVER_EPSILON)) {
+                continue;
+            }
+            vec3 velocity = candidate_velocity - multipliers.x * n0;
+            if (active_count == 2u) { velocity -= multipliers.y * n1; }
+            if (any(isnan(velocity)) || any(isinf(velocity))) { continue; }
+            bool satisfies_all = true;
+            for (uint constraint = 0u;
+                    constraint < maximumDepthConstraintCount; ++constraint) {
+                if (dot(maximumDepthConstraintNormals[constraint], velocity)
+                        > maximumDepthConstraintLimits[constraint]
+                            + MAXIMUM_DEPTH_SOLVER_EPSILON) {
+                    satisfies_all = false;
                 }
-                if (active_count >= 3u) {
-                    gram[0][2] = dot(n0, n2);
-                    gram[2][0] = gram[0][2];
-                    gram[1][2] = dot(n1, n2);
-                    gram[2][1] = gram[1][2];
-                    gram[2][2] = dot(n2, n2);
-                }
-                vec3 residual = vec3(
-                    dot(n0, candidate_velocity),
-                    active_count >= 2u ? dot(n1, candidate_velocity) : 0.0,
-                    active_count >= 3u ? dot(n2, candidate_velocity) : 0.0
-                ) - limits;
-                vec3 multipliers;
-                if (!SolveMaximumDepthSystem(
-                        gram, residual, active_count, multipliers)) {
-                    continue;
-                }
-                if (multipliers.x < -EPSILON
-                        || (active_count >= 2u && multipliers.y < -EPSILON)
-                        || (active_count >= 3u && multipliers.z < -EPSILON)) {
-                    continue;
-                }
-                vec3 velocity = candidate_velocity - multipliers.x * n0;
-                if (active_count >= 2u) { velocity -= multipliers.y * n1; }
-                if (active_count >= 3u) { velocity -= multipliers.z * n2; }
-                bool satisfies_all = true;
-                for (uint constraint = 0u;
-                        constraint < maximumDepthConstraintCount; ++constraint) {
-                    if (dot(maximumDepthConstraintNormals[constraint], velocity)
-                            > maximumDepthConstraintLimits[constraint] + EPSILON) {
-                        satisfies_all = false;
-                    }
-                }
-                if (!satisfies_all) { continue; }
-                float distance_sq = dot(
-                    candidate_velocity - velocity, candidate_velocity - velocity);
-                if (!found || distance_sq < best_distance_sq) {
-                    found = true;
-                    best_distance_sq = distance_sq;
-                    contained_velocity = velocity;
-                }
+            }
+            if (!satisfies_all) { continue; }
+            float distance_sq = dot(
+                candidate_velocity - velocity, candidate_velocity - velocity);
+            if (isnan(distance_sq) || isinf(distance_sq)) { continue; }
+            if (!found || distance_sq < best_distance_sq) {
+                found = true;
+                best_distance_sq = distance_sq;
+                contained_velocity = velocity;
             }
         }
     }
     return found;
 }
 
-// Python source: ForceDynamics.py:985
+// Python source: ForceDynamics.py:1060
 bool ApplySourceMaximumDepth(uint SourceID)
 {
     if (maximumDepthConstraintOwner != SourceID
@@ -754,7 +740,7 @@ bool ApplySourceMaximumDepth(uint SourceID)
     return true;
 }
 
-// Python source: ForceDynamics.py:1496
+// Python source: ForceDynamics.py:1571
 bool CalcVelocity(uint SourceID, vec3 totalForce)
 {
     float dt = ShaderFlags.dt;
@@ -772,13 +758,13 @@ bool CalcVelocity(uint SourceID, vec3 totalForce)
     return ApplySourceMaximumDepth(SourceID);
 }
 
-// Python source: ForceDynamics.py:1512
+// Python source: ForceDynamics.py:1587
 float GetParticleMass(uint ParticleID)
 {
     return max(P[ParticleID].parms.x, EPSILON);
 }
 
-// Python source: ForceDynamics.py:1516
+// Python source: ForceDynamics.py:1591
 bool CalcPosition(uint SourceID)
 {
     uint position_buffer = uint(ShaderFlags.positionBuffer);
@@ -812,7 +798,7 @@ bool CalcPosition(uint SourceID)
     return true;
 }
 
-// Python source: ForceDynamics.py:1730
+// Python source: ForceDynamics.py:1805
 bool SetError(uint error_code)
 {
     collOut.ErrorNumber = error_code;
@@ -883,12 +869,28 @@ bool RegisterMaximumDepthConstraint(uint SourceID, vec3 normal, float penetratio
     if (penetration_depth < maximum_depth - EPSILON) {
         return true;
     }
+    float normal_length = length(normal);
+    if (normal_length <= MAXIMUM_DEPTH_SOLVER_EPSILON
+            || isnan(normal_length) || isinf(normal_length)
+            || any(isnan(target_velocity)) || any(isinf(target_velocity))) {
+        return SetError(ERROR_MAX_DEPTH_CONSTRAINT);
+    }
+    vec3 unit_normal = normal / normal_length;
+    float limit = dot(unit_normal, target_velocity);
+    for (uint index = 0u; index < maximumDepthConstraintCount; ++index) {
+        float alignment = dot(
+            maximumDepthConstraintNormals[index], unit_normal);
+        if (alignment >= 1.0 - MAXIMUM_DEPTH_SOLVER_EPSILON) {
+            maximumDepthConstraintLimits[index] = min(
+                maximumDepthConstraintLimits[index], limit);
+            return true;
+        }
+    }
     if (maximumDepthConstraintCount >= MAX_SOURCE_DEPTH_CONSTRAINTS) {
         return SetError(ERROR_MAX_DEPTH_CONSTRAINT);
     }
-    maximumDepthConstraintNormals[maximumDepthConstraintCount] = normal;
-    maximumDepthConstraintLimits[maximumDepthConstraintCount] =
-        dot(normal, target_velocity);
+    maximumDepthConstraintNormals[maximumDepthConstraintCount] = unit_normal;
+    maximumDepthConstraintLimits[maximumDepthConstraintCount] = limit;
     maximumDepthConstraintCount += 1u;
     return true;
 }
@@ -898,32 +900,19 @@ bool SolveMaximumDepthSystem(mat3 matrix, vec3 values, uint size, out vec3 solut
 {
     solution = vec3(0.0);
     if (size == 1u) {
-        if (abs(matrix[0][0]) <= EPSILON) { return false; }
+        if (abs(matrix[0][0]) <= MAXIMUM_DEPTH_SOLVER_EPSILON) { return false; }
         solution.x = values.x / matrix[0][0];
-        return true;
+        return !any(isnan(solution)) && !any(isinf(solution));
     }
     if (size == 2u) {
         float det = matrix[0][0] * matrix[1][1]
             - matrix[1][0] * matrix[0][1];
-        if (abs(det) <= EPSILON) { return false; }
+        if (abs(det) <= MAXIMUM_DEPTH_SOLVER_EPSILON) { return false; }
         solution.x = (values.x * matrix[1][1]
             - matrix[1][0] * values.y) / det;
         solution.y = (matrix[0][0] * values.y
             - values.x * matrix[0][1]) / det;
-        return true;
-    }
-    if (size == 3u) {
-        float det = determinant(matrix);
-        if (abs(det) <= EPSILON) { return false; }
-        mat3 mx = matrix;
-        mat3 my = matrix;
-        mat3 mz = matrix;
-        mx[0] = values;
-        my[1] = values;
-        mz[2] = values;
-        solution = vec3(
-            determinant(mx), determinant(my), determinant(mz)) / det;
-        return true;
+        return !any(isnan(solution)) && !any(isinf(solution));
     }
     return false;
 }

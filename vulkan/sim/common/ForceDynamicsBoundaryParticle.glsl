@@ -17,15 +17,18 @@ BoundaryWallSegment EvaluateCDNozzleWallSegment(uint SourceID, uint BoundaryID);
 #if defined(FORCE_DYNAMICS_LINEAR_RESERVOIR_AVAILABLE)
 BoundaryWallSegment EvaluateLinearWallSegment(uint SourceID, uint BoundaryID);
 #endif
+#if defined(FORCE_DYNAMICS_PARAMETRIC_CURVE_AVAILABLE)
+BoundaryWallSegment EvaluateParametricWallSegment(uint SourceID, uint BoundaryID);
+#endif
 BoundaryWallSegment EvaluateWallSegment(uint SourceID, uint BoundaryID);
 
-// Python source: ForceDynamics.py:1090
+// Python source: ForceDynamics.py:1165
 bool IsBoundaryParticle(uint ParticleID)
 {
     return P[ParticleID].ptype > 0.5;
 }
 
-// Python source: ForceDynamics.py:140
+// Python source: ForceDynamics.py:144
 uint BoundaryParticleWallFlag(uint SourceID, uint BoundaryID)
 {
     if (!IsBoundaryParticle(BoundaryID)) {
@@ -37,7 +40,7 @@ uint BoundaryParticleWallFlag(uint SourceID, uint BoundaryID)
     return (boundary_position.y < mid_y) ? 3u : 4u;
 }
 
-// Python source: ForceDynamics.py:177
+// Python source: ForceDynamics.py:181
 uint BoundaryParticleVerticalWallFlag(uint SourceID, uint BoundaryID)
 {
     if (!IsBoundaryParticle(BoundaryID)) {
@@ -49,7 +52,7 @@ uint BoundaryParticleVerticalWallFlag(uint SourceID, uint BoundaryID)
     return (boundary_position.x < mid_x) ? 1u : 2u;
 }
 
-// Python source: ForceDynamics.py:333
+// Python source: ForceDynamics.py:337
 BoundaryWallSegment EvaluateHorizontalWallSegment(uint SourceID, uint BoundaryID)
 {
     uint wall_flag = BoundaryParticleWallFlag(SourceID, BoundaryID);
@@ -84,7 +87,7 @@ BoundaryWallSegment EvaluateHorizontalWallSegment(uint SourceID, uint BoundaryID
     return BoundaryWallSegment(normal, overlap_area, center_distance, wall_flag, true);
 }
 
-// Python source: ForceDynamics.py:377
+// Python source: ForceDynamics.py:381
 BoundaryWallSegment EvaluateVerticalWallSegment(uint SourceID, uint BoundaryID)
 {
     uint wall_flag = BoundaryParticleVerticalWallFlag(SourceID, BoundaryID);
@@ -119,7 +122,7 @@ BoundaryWallSegment EvaluateVerticalWallSegment(uint SourceID, uint BoundaryID)
     return BoundaryWallSegment(normal, overlap_area, center_distance, wall_flag, true);
 }
 
-// Python source: ForceDynamics.py:659
+// Python source: ForceDynamics.py:729
 bool ProcessBoundaryParticleWallCollision(uint SourceID, uint BoundaryID, inout vec3 totalForce)
 {
     BoundaryWallSegment segment = EvaluateWallSegment(SourceID, BoundaryID);
@@ -155,14 +158,14 @@ bool ProcessBoundaryParticleWallCollision(uint SourceID, uint BoundaryID, inout 
     return AccumulateContactForce(SourceID, contact, totalForce);
 }
 
-// Python source: ForceDynamics.py:671
+// Python source: ForceDynamics.py:741
 bool InitializeBoundaryParticleWallContactState(uint SourceID, uint BoundaryID)
 {
     // TODO: generate body for InitializeBoundaryParticleWallContactState.
     return false;
 }
 
-// Python source: ForceDynamics.py:324
+// Python source: ForceDynamics.py:328
 BoundaryWallSegment EvaluateWallSegment(uint SourceID, uint BoundaryID)
 {
     uint evaluator_id = uint(round(P[BoundaryID].Data.z));
@@ -182,6 +185,13 @@ BoundaryWallSegment EvaluateWallSegment(uint SourceID, uint BoundaryID)
     if (evaluator_id == 4u) {
     #if defined(FORCE_DYNAMICS_LINEAR_RESERVOIR_AVAILABLE)
         return EvaluateLinearWallSegment(SourceID, BoundaryID);
+    #else
+        return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);
+    #endif
+    }
+    if (evaluator_id == 5u) {
+    #if defined(FORCE_DYNAMICS_PARAMETRIC_CURVE_AVAILABLE)
+        return EvaluateParametricWallSegment(SourceID, BoundaryID);
     #else
         return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false);
     #endif

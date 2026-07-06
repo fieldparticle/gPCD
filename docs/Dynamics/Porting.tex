@@ -56,10 +56,14 @@ Generated dynamics are divided by dependency:
     \item \texttt{ForceDynamics.glsl} contains reusable core dynamics;
     \item \texttt{ForceDynamicsBoundaryParticle.glsl} contains straight
     boundary-marker wall helpers and the generic wall-segment declaration;
-    \item \texttt{ForceDynamicsCDNozzle.glsl} contains CD nozzle profile and
-    curved wall helpers that require generated nozzle constants;
-    \item \texttt{ForceDynamicsLinearReservoir.glsl} contains the analytic
-    piston and general finite-line wall helpers for the prefilled chamber.
+    \item \texttt{ForceDynamicsCDNozzle.glsl} retains the legacy analytic CD
+    nozzle evaluator;
+    \item \texttt{ForceDynamicsLinearReservoir.glsl} contains general
+    finite-line wall helpers;
+    \item \texttt{ForceDynamicsPiston.glsl} contains the analytic moving
+    piston helpers;
+    \item \texttt{ForceDynamicsParametricCurve.glsl} contains cubic
+    parametric evaluation, bounded closest-point search, and evaluator ID 5.
 \end{itemize}
 
 Ordinary wall and straight boundary-particle scenarios must not require CD
@@ -118,16 +122,17 @@ wall-segment shape is target-owned.  The generated dispatcher reads:
 \begin{verbatim}
 uint evaluator_id = uint(round(P[BoundaryID].Data.z));
 \end{verbatim}
-Evaluator ID 1 selects the horizontal wall, 2 selects the vertical wall, and 3
-selects the CD nozzle wall.  Evaluator ID 4 selects the optional general
-finite-line implementation.  Unknown IDs return an invalid segment.  CD nozzle
-wrappers define \texttt{FORCE\_DYNAMICS\_CD\_NOZZLE\_AVAILABLE} to make the
-optional CD implementation available; this is a module-availability guard,
-not a global wall-shape selection.
+Evaluator ID 1 selects the horizontal wall, 2 selects the vertical wall, 3
+selects the legacy CD nozzle wall, 4 selects the optional general finite-line
+implementation, and 5 selects the piecewise parametric-curve implementation.
+Unknown IDs return an invalid segment.  Active CD wrappers define
+\texttt{FORCE\_DYNAMICS\_PARAMETRIC\_CURVE\_AVAILABLE}; this is a module-
+availability guard, not a global wall-shape selection.
 
 Linear-chamber wrappers include
 \texttt{ForceDynamicsLinearReservoir.glsl} and define
-\texttt{FORCE\_DYNAMICS\_LINEAR\_RESERVOIR\_AVAILABLE}.  Moving-wall contact
+\texttt{FORCE\_DYNAMICS\_LINEAR\_RESERVOIR\_AVAILABLE}.  Wrappers requiring a
+piston include \texttt{ForceDynamicsPiston.glsl} independently.  Moving-wall contact
 input carries \texttt{targetVelocity}; piston relative motion and
 maximum-depth containment must use that velocity rather than zero.
 
@@ -468,6 +473,7 @@ The required generated methods are:
     \item \texttt{EvaluateHorizontalWallSegment(...)};
     \item \texttt{EvaluateVerticalWallSegment(...)};
     \item \texttt{EvaluateCDNozzleWallSegment(...)};
+    \item \texttt{EvaluateParametricWallSegment(...)};
     \item \texttt{ProcessBoundaryParticleWallCollision(...)}.
 \end{itemize}
 
@@ -488,7 +494,8 @@ wall-function define.  Each boundary marker stores its evaluator ID in
 \texttt{pdata.ptype}; Python and the Vulkan loader copy it into runtime
 \texttt{ptype} and \texttt{Data.z}.  Generated
 \texttt{EvaluateWallSegment(SourceID, BoundaryID)} dispatches from that target
-value and supports horizontal, vertical, and CD-nozzle IDs.  Zero or unknown
+value and supports horizontal, vertical, legacy CD-nozzle, finite-line, and
+piecewise parametric IDs.  Zero or unknown
 IDs return an invalid wall segment.  \texttt{pdata.temp\_vel} remains reserved.
 
 The CD-nozzle evaluator treats boundary particles as locality markers and
@@ -497,11 +504,12 @@ constants in \texttt{boundary.glsl}.  Required CD nozzle symbols include
 \texttt{CD\_NOZZLE\_START\_X}, \texttt{CD\_NOZZLE\_CENTER\_Y}, the five
 section lengths, and the inlet, throat, and exit radii.
 
-Python and generated GLSL use the same quadratic converging and diverging
-radius sections and analytic slopes.  The explicit exporter templates for
-\texttt{CDNozzleRadius(...)} and \texttt{CDNozzleRadiusSlope(...)} emit those
-equations into \texttt{ForceDynamicsCDNozzle.glsl}; the CD shader compile trial
-passes with the generated quadratic profile.
+The active CD path uses cubic parametric segments emitted through
+\texttt{reservoir.glsl}.  Explicit GLSL templates evaluate points, tangents,
+second derivatives, and a bounded closest point before constructing the wall
+ghost.  This algorithm is template generated rather than inferred from the
+Python AST.  The older radius-and-slope evaluator remains available only for
+legacy scenarios.
 
 Marker target IDs are broad-phase records, not physical wall identities.  A
 source may discover two adjacent markers for one wall when its extent spans
@@ -758,7 +766,7 @@ particle and wall scenarios exercised so far.  That validation covers:
     \item \texttt{WALL\_MODEL\_SIMPLE};
     \item \texttt{WALL\_MODEL\_PIPE};
     \item \texttt{WALL\_MODEL\_BOUNDARY\_PARTICLE}, including the replacement
-    \texttt{BoundaryParticleReservoirHorizontalP.comp};
+    horizontal reservoir and parametric CD-nozzle wrappers;
     \item source-local \texttt{totalForce};
     \item \texttt{CalcVelocity(...)};
     \item \texttt{CalcPosition(...)};
@@ -793,7 +801,10 @@ the selected \texttt{EvaluateWallSegment} path.  A generated OBJ such as:
 \begin{verbatim}
 sim/BoundaryCDNozzleReservoir/CDNozzleGenerated.obj
 \end{verbatim}
-is used only to draw the intended wall shape.
+is used only to draw the intended wall shape.  The CD generator now rewrites
+this OBJ from the same \texttt{curve\_wall\_segments} sampling used to place
+locality markers.  The visual mesh and collision profile therefore share one
+geometry source and coordinate system.
 
 The current Vulkan OBJ loader accepts only triangle faces in
 \texttt{v/vt/vn} form.  Generated OBJ files must therefore include dummy

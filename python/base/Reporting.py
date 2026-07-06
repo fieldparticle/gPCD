@@ -23,10 +23,7 @@ class Reporting:
     def clear_existing_reports(self):
         deleted_count = 0
         for report_file in self.output_dir.iterdir():
-            if (
-                report_file.is_file()
-                and report_file.suffix.lower() == self.CAPTURE_FILE_SUFFIX
-            ):
+            if report_file.is_file():
                 report_file.unlink()
                 deleted_count += 1
         return deleted_count
@@ -138,6 +135,11 @@ class Reporting:
                         "piston_total_px",
                         "piston_total_py",
                         "piston_total_pz",
+                        "error_code",
+                        "error_description",
+                        "error_source",
+                        "error_target",
+                        "error_wall",
                     ]
                 )
                 self.written_headers.add(csv_path)
@@ -179,6 +181,11 @@ class Reporting:
                     self.csv_number(momentum_summary["piston_total_px"]),
                     self.csv_number(momentum_summary["piston_total_py"]),
                     self.csv_number(momentum_summary["piston_total_pz"]),
+                    int(momentum_summary["error_code"]),
+                    momentum_summary["error_description"],
+                    int(momentum_summary["error_source"]),
+                    int(momentum_summary["error_target"]),
+                    int(momentum_summary["error_wall"]),
                 ]
             )
         self.written_momentum_frames.add(frame_number)
@@ -361,6 +368,8 @@ class Reporting:
                         "target",
                         "slot",
                         "contact_type",
+                        "contact_status",
+                        "geometry_valid",
                         "source_contact_count",
                         "source_targets",
                         "source_total_overlap_area",
@@ -388,14 +397,28 @@ class Reporting:
             }
 
             for source_index, particle in enumerate(particles):
-                if int(getattr(particle, "pnum", -1)) == 0:
+                if (
+                    int(getattr(particle, "pnum", -1)) == 0
+                    or float(getattr(particle, "ptype", 0.0)) > 0.5
+                    or float(getattr(getattr(particle, "Data", None), "w", 0.0)) < 0.0
+                ):
                     continue
                 contacts = active_by_source.get(source_index, [])
+                active_target_ids = {
+                    int(contact.ids.x)
+                    for _slot, contact in contacts
+                    if int(contact.ids.y) == 1
+                }
+                suppressed_targets = [
+                    int(target_id)
+                    for target_id in getattr(particle, "suppressed_contacts", [])
+                    if int(target_id) not in active_target_ids
+                ]
                 source_targets = "|".join(
                     self.contact_target_label(particles, contact)
                     for _slot, contact in contacts
                 )
-                if not contacts:
+                if not contacts and not suppressed_targets:
                     writer.writerow(
                         [
                             frame_number,
@@ -405,6 +428,8 @@ class Reporting:
                             "",
                             "",
                             "",
+                            "inactive",
+                            0,
                             0,
                             "",
                             self.csv_number(0.0),
@@ -463,6 +488,8 @@ class Reporting:
                             self.contact_target_label(particles, contact),
                             slot,
                             contact_type,
+                            "active",
+                            1,
                             len(contacts),
                             source_targets,
                             self.csv_number(source_total_overlap_area),
@@ -526,13 +553,51 @@ class Reporting:
                         ]
                     )
 
+                for target_index in suppressed_targets:
+                    writer.writerow(
+                        [
+                            frame_number,
+                            source_index,
+                            particle.pnum,
+                            target_index,
+                            self.particle_number_for_index(
+                                particles,
+                                target_index,
+                            ),
+                            "",
+                            1,
+                            "suppressed",
+                            0,
+                            len(contacts),
+                            source_targets,
+                            self.csv_number(source_total_overlap_area),
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            *["" for _column in contact_diagnostic_columns],
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                        ]
+                    )
+
         self.written_contact_frames.add(frame_number)
 
     @staticmethod
     def active_contacts_by_source(particles):
         active_by_source = {}
         for source_index, particle in enumerate(particles):
-            if int(getattr(particle, "pnum", -1)) == 0:
+            if (
+                int(getattr(particle, "pnum", -1)) == 0
+                or float(getattr(particle, "ptype", 0.0)) > 0.5
+                or float(getattr(getattr(particle, "Data", None), "w", 0.0)) < 0.0
+            ):
                 continue
             contacts = getattr(particle, "contacts", getattr(particle, "gcs", []))
             active_contacts = []
