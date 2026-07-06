@@ -185,11 +185,12 @@ translation.  A complete release and thermal-transfer model remains deferred.
 
 \texttt{Data.z} has a type-dependent meaning.  For mobile particles
 (\texttt{ptype=0}), it is the internal-momentum magnitude described above.  A
-boundary marker is never processed as a mobile source.  Its positive
-\texttt{pdata.ptype} value is the wall-evaluator ID: horizontal is 1, vertical
-is 2, legacy CD nozzle is 3, general finite line is 4, and piecewise
-parametric curve is 5.  Python and the Vulkan loader copy that value into
-runtime \texttt{ptype} and \texttt{Data.z}.  The binary
+boundary marker is never processed as a mobile source.  The active Python
+wall model uses \texttt{pdata.ptype=5} for every parametric locality marker;
+straight and curved walls share that evaluator.  Python copies the value into
+runtime \texttt{ptype} and \texttt{Data.z}.  Evaluator IDs 1--4 remain only
+in unmigrated Vulkan and historical generator code and are not part of the
+active Python wall dispatch.  The binary
 \texttt{pdata.temp\_vel} field remains reserved and is not part of boundary
 dispatch.  Per-frame contact reset and internal-momentum synchronization must
 not overwrite \texttt{Data.z} for boundary particles.

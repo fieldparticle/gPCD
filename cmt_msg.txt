@@ -1,15 +1,13 @@
 Current status:
-	- Migrated TwoParticleHorizontal generation to generic parametric wall segments
-	- Added Python presentation rendering and configuration-boundary overlays
-	- Reproduced the starting-contact effective-radius tunneling defect in TwoParticleHorizontalBug001
-	- Confirmed the defect was introduced by commit 20b4881 on June 18, 2026
-
+	- Migrated the batch_test_001 Python scenarios to GenericGenData parametric walls
+	- Replaced active Python legacy/manual wall dispatch with evaluator-5 locality markers
+	- Preserved cfg-versus-binary particle loading while producing identical wall markers
+	- Retained the known starting-contact effective-radius tunneling defect for the next correction
 Code Changes:
-	- Added GenericGenData explicit-particle binary and test metadata generation
-	- Made parametric wall normals direction-owned and wall IDs geometry-independent
-	- Corrected Python death, cell-boundary, and physical tunneling diagnostics
-	- Reworked contact reporting to distinguish active and suppressed geometry
-	- Added frame error metadata and per-run report-directory cleanup
-	- Documented the transparent-overlap bug caused by effective-radius starting contacts
-
-Next: Remove starting-contact effective-radius scaling and suppression, initialize physical starting compression, and verify TwoParticleHorizontalBug001 no longer tunnels
+	- Converted rectangular test walls to directed curve_wall_segments and repaired the batch manifest
+	- Added shared parametric marker sampling for generated and runtime-created boundary particles
+	- Deduplicated wall contacts by physical wall flag and retained the deepest valid contact
+	- Removed walls_on, Wall* geometry, and evaluator IDs 1-4 from active Python ForceDynamics
+	- Updated the Python viewer to render boundary markers as unfilled green circles
+	- Updated ForceDynamics, configuration, porting, and problem-evolution documentation
+Next: Remove starting-contact effective-radius scaling and suppression, initialize physical starting compression, and rerun TwoParticleHorizontalBug001

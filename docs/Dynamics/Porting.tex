@@ -11,6 +11,15 @@ must preserve the same source-owned processing order.
 Python \texttt{base/ForceDynamics.py} is the export source for dynamics.
 \texttt{ForceDynamicsBase.py} is Python infrastructure and diagnostics.
 
+The active Python wall source now contains only evaluator-5 parametric walls.
+The horizontal, vertical, analytic CD, finite-line, and manual \texttt{Wall*}
+paths documented later in this file describe the current Vulkan compatibility
+surface, not the canonical Python design.  Before the next dynamics export,
+the exporter and wrappers must be reduced to evaluator-5 locality markers,
+direct \texttt{curve\_wall\_segments} evaluation, and deepest-contact
+deduplication by physical \texttt{wallFlag}.  Legacy Vulkan paths must not be
+reintroduced into Python to preserve wrapper compatibility.
+
 \subsection{Stable Shader Wrapper}
 
 The compute shader stays hand-maintained.  Generated GLSL is included by it

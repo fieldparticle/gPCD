@@ -39,44 +39,18 @@ generated force, maximum-depth, internal-momentum, and position paths in
 Vulkan.  Position and velocity are both double buffered so every invocation
 reads immutable frame-start state and writes only the alternate source state.
 
-\texttt{ForceDynamics} supports three wall interpretations:
-\begin{itemize}
-    \item \emph{simple walls}: all four configured wall planes are solid;
-    \item \emph{pipe walls}: the two configured cross-flow planes are solid;
-    \item \emph{boundary-particle walls}: particles with positive
-    evaluator-valued \texttt{ptype} are occupancy markers that represent
-    local wall segments.
-\end{itemize}
+\texttt{ForceDynamics} has one stationary-wall representation: finite cubic
+parametric segments in \texttt{curve\_wall\_segments}.  Straight lines are
+represented by zero quadratic and cubic coefficients.  Boundary particles
+with evaluator ID 5 are occupancy/locality markers; they are not mobile
+dynamics sources and do not own separate horizontal, vertical, linear, or CD
+wall equations.
 
-Simple walls use the configured wall-ghost geometry.  Boundary
-particles are not mobile dynamics sources.  They remain active for display
-and broad-phase placement, but when a mobile source sees a boundary marker as
-a target, it evaluates the represented wall segment and accumulates a wall
-force instead of a particle-particle force.
-
-Boundary markers are self-describing: positive \texttt{ptype}/\texttt{Data.z}
-values select horizontal, vertical, legacy CD-nozzle, general finite-line, or
-piecewise parametric-curve wall evaluation.  For each physical wall flag, all
-valid candidates are evaluated
-and the deepest contact is retained.
-
-\begin{figure}[ht]
-\centering
-\resizebox{\textwidth}{!}{\input{ForceDynamicsFlowTikz}}
-\caption{ForceDynamics simple-wall flow: particle targets plus wall flags 1--4}
-\end{figure}
-
-\begin{figure}[ht]
-\centering
-\resizebox{\textwidth}{!}{\input{ForceDynamicsFlowPTikz}}
-\caption{ForceDynamics pipe-wall flow: particle targets plus wall flags 3--4}
-\end{figure}
-
-\begin{figure}[ht]
-\centering
-\resizebox{\textwidth}{!}{\input{ForceDynamicsFlowBTikz}}
-\caption{ForceDynamics boundary-particle flow: marker targets become wall segments}
-\end{figure}
+When any evaluator-5 marker is local to a mobile source, Python evaluates the
+configured parametric segments directly.  It retains the deepest valid
+contact for each positive physical \texttt{wall\_flag}.  Marker target IDs do
+not identify physical walls, which removes marker-order and shared-corner
+ambiguity.
 
 \clearpage
 
@@ -94,12 +68,11 @@ for each SourceID:
     scan possible targets
         if TargetID is a mobile particle:
             ProcessParticleCollision(TargetID, SourceID, totalForce)
-        if TargetID is a boundary marker:
-            ProcessBoundaryParticleWallCollision(SourceID, TargetID, totalForce)
-for each SourceID:
-    if boundary-particle walls are not enabled:
-    for each configured manual wall flag:
-        ProcessWallCollision(SourceID, wall, totalForce)
+        if TargetID is a local evaluator-5 boundary marker:
+            remember that parametric wall evaluation is local
+    evaluate every curve_wall_segment once
+    retain deepest contact per wall_flag
+    ProcessParametricWallCollision(SourceID, contact, totalForce)
 capture frame-start pair diagnostics
 for each SourceID:
     calculate force-driven candidate velocity
@@ -119,9 +92,9 @@ configuration can be treated as zero-force contact limits.  The end-position
 snapshot is diagnostic only and is not a second force scan.
 
 The Python harness uses a direct scan over particles where GLSL uses cell
-occupancy lists.  Boundary-particle wall mode changes the meaning of a target
-record during that scan; it does not change source ownership or introduce a
-target write.
+occupancy lists.  Boundary markers gate locality only.  Actual wall points,
+tangents, normals, penetration, and force come from the configured parametric
+segments.
 
 The horizontal prefilled-reservoir scenario also evaluates one analytic
 piston contact per mobile source before scanning particle and boundary-marker
@@ -158,10 +131,10 @@ contact, and accumulates force.  No piston boundary-marker row is emitted.
 
 \ForceFunctionSection{InitializeStartingContactState}
 
-\texttt{InitializeStartingContactState()} records mobile particle and manual
-wall contacts that already overlap when the model starts.  Boundary marker
-particles are not recorded as mobile starting contacts.  For each starting
-contact, the current center distance becomes the effective separation limit.
+\texttt{InitializeStartingContactState()} records mobile particle contacts
+that already overlap when the model starts.  Boundary marker particles are
+not recorded as mobile starting contacts.  For each starting contact, the
+current center distance becomes the effective separation limit.
 The physical radii are still retained, but force and potential energy use the
 effective geometry until the contact rebounds to its starting separation and
 then clears the physical overlap.
@@ -174,64 +147,21 @@ immediately adds the contact force to the source-local \texttt{totalForce}.
 It does not write the target particle.  Boundary markers are not processed by
 this function; they are routed to the boundary-particle wall path.
 
-\ForceFunctionSection{ProcessWallCollision}
+\ForceFunctionSection{ProcessParametricWallCollision}
 
-\texttt{ProcessWallCollision(SourceID, wall, totalForce)} creates the
-configured wall ghost geometry and immediately adds its force to
-\texttt{totalForce}.  Manual-wall mode scans flags \(1,2,3,4\).  When
-boundary-particle walls are enabled, the manual wall scan is suppressed.
+\texttt{ProcessParametricWallCollision(SourceID,contact,totalForce)} accepts
+already evaluated transient wall geometry, appends the diagnostic wall slot,
+and immediately accumulates force into the source-local sum.
 
-\ForceFunctionSection{ProcessBoundaryParticleWallCollision}
+\ForceFunctionSection{EvaluateParametricWallSegment}
 
-\texttt{ProcessBoundaryParticleWallCollision(SourceID, BoundaryID,
-totalForce)} treats a boundary marker target as a source-owned wall contact.
-It evaluates the wall segment represented by the boundary marker, appends the
-ordinary wall diagnostic contact slot, and immediately accumulates that wall
-force into \texttt{totalForce}.
-
-\ForceFunctionSection{EvaluateWallSegment}
-
-\texttt{EvaluateWallSegment(SourceID, BoundaryID)} is the boundary-particle
-wall geometry dispatcher.  In Python, the target boundary marker owns its
-evaluator ID in \texttt{Data.z}; the dispatcher does not read a global wall-
-function selection.  Evaluator ID zero or an unknown ID produces no wall
-segment, so older binary files must be regenerated.  The supported evaluators
-are:
-
-\begin{verbatim}
-EvaluateHorizontalWallSegment(SourceID, BoundaryID)
-EvaluateVerticalWallSegment(SourceID, BoundaryID)
-EvaluateCDNozzleWallSegment(SourceID, BoundaryID)
-EvaluateLinearWallSegment(SourceID, BoundaryID)
-EvaluateParametricWallSegment(SourceID, BoundaryID)
-\end{verbatim}
-
-Horizontal marker segments classify targets as lower or upper wall markers.
-Vertical marker segments classify targets as left or right wall markers.  In
-both cases the evaluator constructs the stationary wall ghost for the mobile
-source and returns normal, overlap area, center distance, and wall flag.  The
-force accumulator then uses the configured contact-force measure.
-
-\texttt{EvaluateCDNozzleWallSegment} is the current curved two-dimensional
-nozzle evaluator.  Boundary markers still provide locality, but the wall point
-and wall normal are calculated from the analytic CD nozzle radius profile at
-the source particle's current axial coordinate.  This preserves the same
-source-owned accumulation rule used by straight boundary-particle walls while
-allowing the wall segment to be curved.
-
-The current Python profile uses endpoint-constrained quadratic converging and
-diverging sections.  \texttt{CDNozzleRadius(...)} evaluates
-\(r_t+(r_e-r_t)(\xi/L)^2\), and
-\texttt{CDNozzleRadiusSlope(...)} evaluates the signed analytic derivative
-\(2(r_e-r_t)\xi/L^2\).  Straight inlet, throat, and exit sections have zero
-slope.
-
-\texttt{EvaluateParametricWallSegment} is the active CD-nozzle wall evaluator.
+\texttt{EvaluateParametricWallSegment(SourceID,segment)} is the sole
+stationary-wall evaluator.
 Each finite segment stores cubic coefficients for \(x(t)\) and \(y(t)\), with
 \(0\leq t\leq1\), plus its physical wall flag.  Boundary markers provide only
 broad-phase locality.  The evaluator selects the applicable segment, performs
 a bounded closest-point search, evaluates the local tangent, and derives the
-outward normal from the lower or upper wall flag.  Straight, quadratic, and
+outward right-hand normal from segment direction.  Straight, quadratic, and
 cubic sections therefore share one wall-contact implementation.
 
 Python and the Vulkan wrappers may encounter several marker targets
@@ -240,22 +170,12 @@ retain the deepest valid candidate for each wall flag before force is applied.
 This removes marker scan-order dependence at segment transitions.  Ordinary
 mobile-particle duplicates remain keyed by target ID.
 
-\ForceFunctionSection{EvaluateLinearWallSegment}
+\ForceFunctionSection{ParametricBoundaryMarkerApplies}
 
-\texttt{EvaluateLinearWallSegment(SourceID, BoundaryID)} selects the finite
-configured segment nearest the boundary marker.  For
-\(Ax+By+C=0\), it normalizes \((A,B)\), projects the source onto the analytic
-line, rejects projections outside the segment extent, and returns the wall
-ghost geometry and configured physical wall flag.  Marker orientation is not
-used to calculate the response.
-
-\ForceFunctionSection{BoundaryParticleAppliesToSource}
-
-\texttt{BoundaryParticleAppliesToSource(SourceID, BoundaryID)} is the current
-Python locality guard for boundary markers.  It approximates the GLSL
-cell-list broad phase by accepting only markers near the source in \(x\) and
-\(z\).  The GLSL boundary-particle path should receive marker candidates from
-cell occupancy rather than from a full direct scan.
+\texttt{ParametricBoundaryMarkerApplies(SourceID,BoundaryID)} is the Python
+locality guard.  It accepts only evaluator-5 markers within one cell of the
+source in each axis.  The GLSL path obtains the equivalent locality from cell
+occupancy.
 
 \ForceFunctionSection{IsBoundaryParticle}
 
@@ -268,22 +188,6 @@ occupancy and wall-geometry markers, not mobile dynamics sources.
 \texttt{IsMobileParticleActiveForDynamics(ParticleID)} excludes boundary
 markers from source integration.  Scheduled reservoir lifecycle filtering has
 been removed; mobile particles are active from their generated initial state.
-
-\ForceFunctionSection{WallFlagsForDynamics}
-
-\texttt{WallFlagsForDynamics()} returns the four legacy manual-wall flags.
-Boundary-particle wall mode bypasses this manual scan because wall contacts are
-discovered as boundary-marker targets.
-
-\ForceFunctionSection{InitializeWallContactState}
-
-\texttt{InitializeWallContactState(SourceID, wall)} represents a wall contact
-with a stationary ghost.  Ordinary wall contacts use a ghost having the same
-radius and mass as the source particle.  Starting wall contacts use an
-effective ghost radius whose diameter equals the starting wall-ghost center
-distance.  The contact normal is perpendicular to the wall.  The configurable
-\texttt{wall\_contact\_offset} controls how far the physical ghost center lies
-beyond the wall boundary.
 
 \ForceFunctionSection{InitializeContactState}
 

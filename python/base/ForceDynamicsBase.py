@@ -9,7 +9,8 @@ import math
 import re
 from pathlib import Path
 from gbase.libconf import AttrDict
-from gbase.pdata import PTYPE_NULL
+from gbase.ParametricCurve import wall_marker_positions
+from gbase.pdata import BOUNDARY_EVALUATOR_PARAMETRIC, PTYPE_NULL
 
 class ParticleFields(AttrDictFields):
     def __setattr__(self, attr, value):
@@ -191,13 +192,6 @@ class ForceDynamics(ForceContactDynamics):
         )
         source.total_overlap_area += overlap_area
 
-    def InitializeWallContactState(self, SourceID, wall):
-        """Initialize a physical wall contact, then attach Python diagnostics."""
-        contact_state = super().InitializeWallContactState(SourceID, wall)
-        if contact_state is not None:
-            self.RecordContactParameters(SourceID, wall, contact_state)
-        return contact_state
-
     def AccumulateContactForce(self, SourceID, contact_state, totalForce):
         """Accumulate one physical force, then attach Python diagnostics."""
         if not super().AccumulateContactForce(SourceID, contact_state, totalForce):
@@ -374,6 +368,8 @@ class ForceDynamics(ForceContactDynamics):
             self.particle_data = self.config.get("PARTICLE_DATA", {})
 
         self.particles = self.create_particle_array_from_cfg(self.particle_data)
+        if self.config.pdata_from_file == False:
+            self.add_parametric_boundary_markers_from_cfg()
         self.ShaderFlags = self.create_shader_flags_from_cfg(self.run_configuration)
         self.wall_contact_offset = max(
             0.0,
@@ -395,6 +391,41 @@ class ForceDynamics(ForceContactDynamics):
             self.inline_test_flag = False
         # If there is a 
         return self.particles
+
+    def add_parametric_boundary_markers_from_cfg(self):
+        """Build runtime wall markers when mobile particles come from cfg data."""
+        segments = self.run_configuration.get("curve_wall_segments", ())
+        if not segments:
+            return 0
+
+        mobile_particles = [
+            particle
+            for particle in self.particles
+            if float(getattr(particle, "ptype", 0.0)) == 0.0
+            and int(getattr(particle, "pnum", 0)) != 0
+        ]
+        if not mobile_particles:
+            return 0
+
+        plane_z = float(mobile_particles[0].rz)
+        radius = float(self.run_configuration.get("radius", 0.0))
+        marker_count = 0
+        for position in wall_marker_positions(segments, plane_z):
+            self.particles.append(
+                self.create_particle(
+                    pnum=len(self.particles),
+                    rx=position[0],
+                    ry=position[1],
+                    rz=position[2],
+                    radius=radius,
+                    mass=1.0,
+                    ptype=BOUNDARY_EVALUATOR_PARAMETRIC,
+                    collision_stiffness_q=0.0,
+                    state_flg=0.0,
+                )
+            )
+            marker_count += 1
+        return marker_count
 
     def load_constants(self, constants_file_name=None):
         if constants_file_name is None:
@@ -699,7 +730,6 @@ class ForceDynamics(ForceContactDynamics):
         shader_flags.dt = fields.get("dt", 0.0)
         shader_flags.systemp = fields.get("systemp", 0.0)
         shader_flags.ColorMap = fields.get("ColorMap", 0.0)
-        shader_flags.Boundary = fields.get("Boundary", 0.0)
         shader_flags.StopFlg = fields.get("StopFlg", 0.0)
         shader_flags.frameNum = fields.get("frameNum", 0.0)
         shader_flags.actualFrame = fields.get("actualFrame", 0.0)
@@ -715,7 +745,6 @@ class ForceDynamics(ForceContactDynamics):
             CellAryL=depth,
             Ptot=len(self.particles),
             dt=run_configuration.get("dt", 0.0),
-            Boundary=1.0 if run_configuration.get("walls_on", False) else 0.0,
             positionBuffer=run_configuration.get("positionBuffer", 0.0),
         )
 
@@ -737,8 +766,6 @@ class ForceDynamics(ForceContactDynamics):
 
         total_forces = [self.create_vec4() for _ in self.particles]
         if not self.DetectContacts(total_forces):
-            return self.particles
-        if not self.BuildWallContactLists(total_forces):
             return self.particles
         self.ClearInactiveRecoverableInternalMomentum()
         frame_start_pairs = (
@@ -1153,25 +1180,20 @@ class ForceDynamics(ForceContactDynamics):
             )
 
     def TotalWallPotentialEnergy(self):
-        """Return current conservative potential energy stored against walls."""
-        if not bool(self.ShaderFlags.Boundary):
-            return 0.0
-        self.InitializeStartingContactState()
+        """Return potential energy stored against parametric walls."""
         total = 0.0
         for source_id, source in enumerate(self.particles):
             if not self.IsMobileParticleActiveForDynamics(source_id):
                 continue
             stiffness = max(0.0, float(source.Data.y or 0.0))
-            for wall_flag in self.WallFlagsForDynamics():
-                geometry = self.GetWallGhostGeometry(source_id, wall_flag)
-                if geometry is None:
-                    continue
-                radius = float(geometry[5])
+            contacts = self.EvaluateParametricWallContacts(source_id)
+            for _penetration_depth, geometry in contacts.values():
+                radius = float(source.Data.x)
                 total += self.GetOverlapPotentialEnergy(
                     radius,
                     radius,
                     stiffness,
-                    geometry[4],
+                    float(geometry[-2]),
                 )
         return total
 

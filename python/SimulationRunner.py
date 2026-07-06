@@ -111,24 +111,14 @@ def _view_box(run_configuration):
         x_min = float(x_axis_lims[0])
         x_max = float(x_axis_lims[1])
     else:
-        x_min = float(run_configuration.get("WallXMIN", 0.0))
-        x_max = float(
-            run_configuration.get(
-                "WallXMAX",
-                cell_width,
-            )
-        )
+        x_min = 0.0
+        x_max = float(cell_width)
     if y_axis_lims is not None and len(y_axis_lims) >= 2:
         y_min = float(y_axis_lims[0])
         y_max = float(y_axis_lims[1])
     else:
-        y_min = float(run_configuration.get("WallYMIN", 0.0))
-        y_max = float(
-            run_configuration.get(
-                "WallYMAX",
-                cell_height,
-            )
-        )
+        y_min = 0.0
+        y_max = float(cell_height)
     zoom = float(run_configuration.get("zoom", 1.0))
     if zoom <= 0.0:
         zoom = 1.0
@@ -706,6 +696,7 @@ def _draw_particles(
     for index, particle in enumerate(particles):
         if not _is_visible_particle(index, particle, dynamics):
             continue
+        is_boundary = _is_boundary_particle(index, particle, dynamics)
         center = _to_screen(particle.rx, particle.ry, view_box, screen_width, screen_height)
         radius = (
             1
@@ -725,8 +716,12 @@ def _draw_particles(
             hsv_sat,
             hsv_val,
         )
-        particle_screen_data.append((index, particle, center, radius, edge))
-        if presentation_quality:
+        particle_screen_data.append(
+            (index, particle, center, radius, edge, is_boundary)
+        )
+        if is_boundary:
+            pygame.draw.circle(screen, fill, center, radius, 2)
+        elif presentation_quality:
             _draw_presentation_sphere(
                 screen,
                 center,
@@ -738,7 +733,9 @@ def _draw_particles(
             pygame.draw.circle(screen, fill, center, radius)
 
     if not as_points:
-        for index, particle, center, radius, _edge in particle_screen_data:
+        for index, particle, center, radius, _edge, is_boundary in particle_screen_data:
+            if is_boundary:
+                continue
             for target_id in particle.collision_list:
                 if target_id <= index:
                     continue
@@ -758,6 +755,7 @@ def _draw_particles(
                     target_center,
                     target_radius,
                     _target_edge,
+                    _target_is_boundary,
                 ) = target_screen_data
                 _draw_overlap_lens(
                     screen,
@@ -769,10 +767,10 @@ def _draw_particles(
 
     show_particle_numbers = bool(run_configuration.get("simulation_particle_numbers", True))
     particle_label_font = pygame.font.Font(None, 22) if show_particle_numbers else None
-    for _index, particle, center, radius, edge in particle_screen_data:
-        if not as_points and not presentation_quality:
+    for _index, particle, center, radius, edge, is_boundary in particle_screen_data:
+        if not as_points and not presentation_quality and not is_boundary:
             pygame.draw.circle(screen, edge, center, max(1, radius), 2)
-        if show_particle_numbers:
+        if show_particle_numbers and not is_boundary:
             label = particle_label_font.render(str(int(particle.pnum)), True, (255, 255, 255))
             screen.blit(label, (center[0] + 5, center[1] - 16))
 

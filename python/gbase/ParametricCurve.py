@@ -142,6 +142,51 @@ def bounds(segment):
     )
 
 
+def marker_parameters(segment, maximum_spacing=1.0):
+    """Return parameters whose adjacent curve chords fit within one cell."""
+    x_min, x_max, y_min, y_max = bounds(segment)
+    intervals = max(1, int(math.ceil(max(x_max - x_min, y_max - y_min))))
+
+    while True:
+        parameters = [index / intervals for index in range(intervals + 1)]
+        points = [evaluate_point(segment, parameter) for parameter in parameters]
+        largest_spacing = max(
+            math.hypot(
+                points[index + 1][0] - points[index][0],
+                points[index + 1][1] - points[index][1],
+            )
+            for index in range(intervals)
+        )
+        if largest_spacing <= maximum_spacing + 1.0e-9:
+            return parameters
+        intervals *= 2
+        if intervals > 1048576:
+            raise RuntimeError(
+                "curve marker refinement exceeded the interval limit"
+            )
+
+
+def wall_marker_positions(segments, plane_z):
+    """Return one integer-cell marker per physical wall per occupied cell."""
+    marker_cells = set()
+    positions = []
+    for segment in segments:
+        wall_flag = int(round(float(segment[8])))
+        for parameter in marker_parameters(segment):
+            point_x, point_y = evaluate_point(segment, parameter)
+            marker_cell = (
+                round(point_x),
+                round(point_y),
+                round(float(plane_z)),
+                wall_flag,
+            )
+            if marker_cell in marker_cells:
+                continue
+            marker_cells.add(marker_cell)
+            positions.append(tuple(float(value) for value in marker_cell[:3]))
+    return positions
+
+
 def minimum_gap(lower_segment, upper_segment):
     """Return the minimum upper-y minus lower-y for paired segments."""
     a = upper_segment[4] - lower_segment[4]

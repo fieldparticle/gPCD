@@ -3,19 +3,21 @@
 
 \subsection{Scope}
 
-This section documents the current Python configuration contract for the new
-horizontal boundary-particle reservoir.  Manual-wall scenarios retain their
-existing \texttt{WallXMIN}, \texttt{WallXMAX}, \texttt{WallYMIN},
-\texttt{WallYMAX}, \texttt{WallZMIN}, and \texttt{WallZMAX} fields.
-Those fields are not used to define boundary-particle geometry.
+This section documents the current Python configuration contract for generic
+mobile-particle and reservoir scenarios.  Stationary walls are defined only
+by \texttt{curve\_wall\_segments}; the active Python dynamics no longer reads
+\texttt{WallXMIN}, \texttt{WallXMAX}, \texttt{WallYMIN},
+\texttt{WallYMAX}, \texttt{WallZMIN}, \texttt{WallZMAX}, or
+\texttt{walls\_on}.
 
 \subsection{Generator Selection}
 
 \begin{description}
     \item[\texttt{module\_dir}] Directory containing the dynamically loaded
     generator.
-    \item[\texttt{module\_class}] The horizontal reservoir selects
-    \texttt{BoundaryParticleReservoirHorizontal.py}.
+    \item[\texttt{module\_class}] Generic explicit-particle cases select
+    \texttt{GenericGenData.py}.  Reservoir generators inherit or reuse that
+    generic particle and parametric-wall contract.
     \item[\texttt{include\_file}] Scale profile merged over the parent cfg.
     \texttt{sub\_BPRPPy.cfg} provides the reduced Python profile and
     \texttt{sub\_BPRPVk.cfg} provides the larger Vulkan profile.
@@ -95,18 +97,6 @@ before its start frame, and is clamped at
 \texttt{chamber\_bounds.x\_end}.  These derived positions are not separate
 cfg fields.
 
-\subsection{Finite Linear Wall Inputs}
-
-\texttt{linear\_chamber\_segments} and \texttt{linear\_wall\_segments}
-contain rows with this schema:
-\begin{verbatim}
-[A, B, C, x_start, y_start, x_end, y_end, wall_flag]
-\end{verbatim}
-The line equation is \(Ax+By+C=0\), and \((A,B)\) points outward.  Endpoints
-limit the line to a finite segment.  The chamber collection describes the
-piston chamber; the wall collection describes attached conduit geometry.
-Both use the same evaluator and marker ID 4.
-
 \subsection{Parametric Wall Inputs}
 
 \texttt{curve\_wall\_segments} is an ordered collection of finite cubic
@@ -117,9 +107,10 @@ parametric wall segments.  Each record has the form:
 and defines
 \(x(t)=a_x+b_xt+c_xt^2+d_xt^3\) and
 \(y(t)=a_y+b_yt+c_yt^2+d_yt^3\) for \(0\leq t\leq1\).
-Wall flag 3 denotes the lower wall and wall flag 4 denotes the upper wall.
-Segments must be ordered, continuous within each physical wall, remain inside
-the cell and death bounds, and preserve a positive lower-to-upper gap.
+The positive wall flag identifies one physical wall for contact
+deduplication.  Segment direction determines the outward right-hand normal.
+Segments must remain inside the cell and death bounds; connected conduit
+profiles must remain continuous and preserve their intended gap.
 
 The CD generator uses these segments for validation, boundary-marker locality,
 Python wall response, generated GLSL metadata, and the visual nozzle OBJ.
@@ -127,10 +118,10 @@ Parametric boundary markers use evaluator ID 5.
 
 \subsection{Generator-Owned Wall Behavior}
 
-The cfg does not select \texttt{wall\_type},
+The cfg does not select \texttt{wall\_type}, \texttt{walls\_on},
 \texttt{boundary\_particle\_function}, or a conduit axis.  The generator
-owns horizontal pipe geometry and emits local evaluator IDs in each marker's
-\texttt{ptype}.  The current binary contains:
+owns the geometry and emits evaluator ID 5 in each marker's \texttt{ptype}.
+The current binary contains:
 
 \begin{itemize}
     \item one null particle with \texttt{pnum=0};
@@ -138,11 +129,16 @@ owns horizontal pipe geometry and emits local evaluator IDs in each marker's
     \item boundary markers with positive evaluator-valued \texttt{ptype}.
 \end{itemize}
 
-The generator writes both \texttt{.bin} and \texttt{.tst}.  It emits the
-generator-owned wall selection
-\texttt{wall\_type="WALL\_MODEL\_BOUNDARY\_PARTICLE"}, physical boundary
-extents, all six named death planes, contact-force measure, dispatch size, and
-rectangular cell dimensions.
+The generator writes both \texttt{.bin} and \texttt{.tst}, including physical
+boundary extents, all six named death planes, contact-force measure, dispatch
+size, and rectangular cell dimensions.
+
+\texttt{pdata\_from\_file} retains its data-source meaning.  When true,
+Python loads mobile and boundary records from the generated binary.  When
+false, Python loads mobile records from \texttt{PARTICLE\_DATA} and constructs
+the evaluator-5 locality markers in memory from
+\texttt{curve\_wall\_segments}.  Both modes use the shared marker sampling in
+\texttt{ParametricCurve.py} and therefore produce the same wall locality.
 
 \subsection{Display And Diagnostics}
 
@@ -152,3 +148,6 @@ rectangular cell dimensions.
 velocity-angle coloring only and do not affect dynamics.
 The game simulation draws the analytic piston as a vertical line and reports
 its position, velocity, contacts, impulse, and cumulative momentum transfer.
+In sphere mode, boundary markers retain their configured visual radius but
+are drawn as unfilled green circles without particle-number labels.  Point
+mode retains its minimal point rendering.

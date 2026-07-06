@@ -1494,3 +1494,57 @@ surface, but the dynamics correction remains intentionally pending.  The next
 implementation step is to remove effective-radius scaling and resolved-contact
 suppression, initialize starting compression from physical penetration, and
 rerun \texttt{TwoParticleHorizontalBug001} as the regression case.
+
+\subsection{Generic Parametric Boundary Migration}
+
+\subsubsection{previous form}
+
+Python wall processing retained several overlapping representations: manual
+\texttt{WallXMIN/WallXMAX/WallYMIN/WallYMAX} planes, horizontal and vertical
+marker evaluators, an analytic CD-nozzle evaluator, finite linear segments,
+and cubic parametric segments.  Runtime selection depended on
+\texttt{walls\_on}, marker evaluator IDs 1--5, and a fallback manual wall scan.
+At shared marker cells, evaluator ID 5 did not identify which physical segment
+the marker represented, so nearest-segment ties could select the wrong wall.
+
+The first generic cfg migration also exposed a data-source distinction.
+\texttt{pdata\_from\_file=false} intentionally loads mobile particles from
+\texttt{PARTICLE\_DATA}; it does not load generated binary boundary records.
+Requiring binary input would have repaired missing markers by changing the cfg
+contract rather than repairing wall construction.
+
+\subsubsection{current form}
+
+All cases in \texttt{batch\_test\_001.cfg} now define stationary walls with
+\texttt{curve\_wall\_segments}.  Straight walls are cubic records whose
+quadratic and cubic coefficients are zero.  Every boundary marker uses
+evaluator ID 5 and serves only as a locality record.  Once a local marker is
+found, Python evaluates every configured segment directly, retains the deepest
+valid contact for each positive physical \texttt{wall\_flag}, and accumulates
+that wall force once.
+
+The manual wall scan, \texttt{walls\_on}, \texttt{Wall*} geometry, evaluator
+IDs 1--4, and their Python dispatcher functions have been removed from the
+active Force model.  \texttt{pdata\_from\_file} keeps its original meaning:
+true loads the complete generated binary, while false loads mobile cfg records
+and constructs evaluator-5 markers in memory.  Generator and runtime marker
+construction share the same sampling functions in
+\texttt{ParametricCurve.py}.
+
+The Python viewer draws boundary markers at their configured radius as unfilled
+green circles.  They receive no sphere shading, collision lens, or particle
+number label, while point mode remains unchanged.
+
+\subsubsection{difference outcome}
+
+full solution
+
+\subsubsection{Analysis}
+
+Wall geometry now has one source of truth.  Boundary particles answer only the
+broad-phase question ``is wall evaluation local?''; the parametric segment
+answers the geometric questions of closest point, tangent, outward normal,
+penetration, and physical identity.  This separation avoids both marker-order
+dependence and duplicated wall equations.  Reservoir generators can extend
+\texttt{GenericGenData} for population and piston behavior without creating a
+second stationary-wall model.

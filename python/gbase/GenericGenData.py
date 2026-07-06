@@ -4,6 +4,7 @@ import os
 from gbase.ParametricCurve import bounds as curve_bounds
 from gbase.ParametricCurve import evaluate_point
 from gbase.ParametricCurve import evaluate_tangent
+from gbase.ParametricCurve import marker_parameters
 from gbase.pdata import PTYPE_MOBILE, PTYPE_NULL, pdata
 
 
@@ -304,32 +305,9 @@ class GenericGenData:
         self.p_list.append(particle)
         return particle
 
-    @staticmethod
-    def _distance_between_points(first, second):
-        return math.hypot(second[0] - first[0], second[1] - first[1])
-
     def curve_marker_parameters(self, segment, maximum_spacing=1.0):
-        """Return uniform parameters whose adjacent chords fit one cell."""
-        x_min, x_max, y_min, y_max = curve_bounds(segment)
-        intervals = max(
-            1,
-            int(math.ceil(max(x_max - x_min, y_max - y_min))),
-        )
-
-        while True:
-            parameters = [index / intervals for index in range(intervals + 1)]
-            points = [evaluate_point(segment, value) for value in parameters]
-            largest_spacing = max(
-                self._distance_between_points(points[index], points[index + 1])
-                for index in range(intervals)
-            )
-            if largest_spacing <= maximum_spacing + 1.0e-9:
-                return parameters
-            intervals *= 2
-            if intervals > 1048576:
-                raise RuntimeError(
-                    "curve marker refinement exceeded the interval limit"
-                )
+        """Return parameters using the shared runtime marker policy."""
+        return marker_parameters(segment, maximum_spacing)
 
     def add_parametric_wall_markers(self):
         """Create deduplicated locality markers along all wall segments."""
