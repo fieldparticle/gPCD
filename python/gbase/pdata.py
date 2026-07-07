@@ -45,10 +45,9 @@ class pdata(ctypes.Structure):
     - ``collision_stiffness_q`` becomes ``Data.y``.
     - ``ptype == -1`` identifies the reserved null particle at index zero.
     - ``ptype == 0`` identifies a mobile particle. Positive ``ptype`` values
-      identify boundary markers and also select their wall evaluator:
-      horizontal is 1, vertical is 2, CD nozzle is 3, and linear converging
-      nozzle is 4. Vulkan copies a
-      boundary marker's ``ptype`` into runtime ``Data.z``.
+      identify boundary markers. Generic parametric simulations use
+      ``ptype == 1`` for all boundary markers; the simulation wall model and
+      ``curve_wall_segments`` determine how those markers are evaluated.
     - ``temp_vel`` is independent reserved particle data. It is not used for
       boundary classification or wall-evaluator dispatch.
     - ``state_flg`` becomes ``Data.w``.
@@ -75,7 +74,7 @@ class pdata(ctypes.Structure):
         ("vx", ctypes.c_double),          # Initial x velocity.
         ("vy", ctypes.c_double),          # Initial y velocity.
         ("vz", ctypes.c_double),          # Initial z velocity.
-        ("ptype", ctypes.c_double),       # 0 mobile; positive values identify the boundary evaluator.
+        ("ptype", ctypes.c_double),       # 0 mobile; positive values identify boundary markers.
         ("state_flg", ctypes.c_double),   # Lifecycle: 0 reservoir, 1 active, 2 escaped, 3 retained.
         ("molar_mass", ctypes.c_double),  # Particle mass; copied to Vulkan parms.x.
         ("temp_vel", ctypes.c_double),    # Reserved particle data; independent of boundary dispatch.

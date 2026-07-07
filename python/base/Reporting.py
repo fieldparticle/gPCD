@@ -190,7 +190,14 @@ class Reporting:
             )
         self.written_momentum_frames.add(frame_number)
 
-    def report_particle(self, frame_number, particle, momentum_summary=None):
+    def report_particle(
+        self,
+        frame_number,
+        particle,
+        momentum_summary=None,
+        position=None,
+        velocity=None,
+    ):
         if not self.should_report_frame(frame_number):
             return
 
@@ -200,6 +207,10 @@ class Reporting:
             return
 
         write_header = csv_path not in self.written_headers
+        if position is None:
+            position = particle.PosLocA
+        if velocity is None:
+            velocity = particle.VelRad
         with csv_path.open("a", newline="", encoding="utf-8") as csv_file:
             writer = csv.writer(csv_file)
             if write_header:
@@ -224,10 +235,10 @@ class Reporting:
                 [
                     frame_number,
                     particle.pnum,
-                    self.csv_number(particle.rx),
-                    self.csv_number(particle.ry),
-                    self.csv_number(particle.vx),
-                    self.csv_number(particle.vy),
+                    self.csv_number(position.x),
+                    self.csv_number(position.y),
+                    self.csv_number(velocity.x),
+                    self.csv_number(velocity.y),
                     self.csv_number(
                         getattr(
                             particle,
@@ -313,12 +324,9 @@ class Reporting:
             "raw_impulse",
             "force_magnitude",
             "contact_potential_energy",
-            "starting_contact",
-            "starting_resolved",
-            "effective_source_radius",
-            "effective_target_radius",
-            "effective_separation_limit",
-            "physical_separation_limit",
+            "source_radius",
+            "target_radius",
+            "separation_limit",
             "compression_impulse",
             "release_impulse",
             "internal_momentum_px",
@@ -326,13 +334,6 @@ class Reporting:
             "internal_momentum_pz",
             "internal_momentum_mag",
             "planned_impulse_to_target",
-            "source_available_momentum",
-            "source_available_share",
-            "target_available_momentum",
-            "target_available_share",
-            "weighted_available_momentum",
-            "source_vn",
-            "target_vn",
             "rel_vn",
             "delta_px",
             "delta_py",
@@ -343,18 +344,10 @@ class Reporting:
             "source_vx_after",
             "source_vy_after",
             "source_vz_after",
-            "source_ke_before",
-            "source_ke_after",
-            "source_ke_delta",
-            "contact_ke_delta_estimate",
             "source_net_delta_px",
             "source_net_delta_py",
             "source_net_delta_pz",
             "source_net_impulse_mag",
-            "source_net_ke_delta_estimate",
-            "source_contact_ke_delta_sum",
-            "source_ke_cross_term",
-            "source_ke_residual",
         ]
         with csv_path.open("a", newline="", encoding="utf-8") as csv_file:
             writer = csv.writer(csv_file)
@@ -404,21 +397,11 @@ class Reporting:
                 ):
                     continue
                 contacts = active_by_source.get(source_index, [])
-                active_target_ids = {
-                    int(contact.ids.x)
-                    for _slot, contact in contacts
-                    if int(contact.ids.y) == 1
-                }
-                suppressed_targets = [
-                    int(target_id)
-                    for target_id in getattr(particle, "suppressed_contacts", [])
-                    if int(target_id) not in active_target_ids
-                ]
                 source_targets = "|".join(
                     self.contact_target_label(particles, contact)
                     for _slot, contact in contacts
                 )
-                if not contacts and not suppressed_targets:
+                if not contacts:
                     writer.writerow(
                         [
                             frame_number,
@@ -503,12 +486,9 @@ class Reporting:
                             self.csv_number(getattr(contact, "raw_impulse", 0.0)),
                             self.csv_number(getattr(contact, "force_magnitude", 0.0)),
                             self.csv_number(getattr(contact, "contact_potential_energy", 0.0)),
-                            self.csv_number(getattr(contact, "starting_contact", 0.0)),
-                            self.csv_number(getattr(contact, "starting_resolved", 0.0)),
-                            self.csv_number(getattr(contact, "effective_source_radius", 0.0)),
-                            self.csv_number(getattr(contact, "effective_target_radius", 0.0)),
-                            self.csv_number(getattr(contact, "effective_separation_limit", 0.0)),
-                            self.csv_number(getattr(contact, "physical_separation_limit", 0.0)),
+                            self.csv_number(getattr(contact, "source_radius", 0.0)),
+                            self.csv_number(getattr(contact, "target_radius", 0.0)),
+                            self.csv_number(getattr(contact, "separation_limit", 0.0)),
                             self.csv_number(getattr(contact, "compression_impulse", 0.0)),
                             self.csv_number(getattr(contact, "release_impulse", 0.0)),
                             self.csv_number(getattr(contact, "internal_momentum_px", 0.0)),
@@ -516,13 +496,6 @@ class Reporting:
                             self.csv_number(getattr(contact, "internal_momentum_pz", 0.0)),
                             self.csv_number(getattr(contact, "internal_momentum_mag", 0.0)),
                             self.csv_number(contact.aux.w),
-                            self.csv_number(getattr(contact, "source_available_momentum", 0.0)),
-                            self.csv_number(getattr(contact, "source_available_share", 0.0)),
-                            self.csv_number(getattr(contact, "target_available_momentum", 0.0)),
-                            self.csv_number(getattr(contact, "target_available_share", 0.0)),
-                            self.csv_number(getattr(contact, "weighted_available_momentum", 0.0)),
-                            self.csv_number(getattr(contact, "source_vn", 0.0)),
-                            self.csv_number(getattr(contact, "target_vn", 0.0)),
                             self.csv_number(getattr(contact, "rel_vn", 0.0)),
                             self.csv_number(getattr(contact, "delta_px", 0.0)),
                             self.csv_number(getattr(contact, "delta_py", 0.0)),
@@ -533,57 +506,15 @@ class Reporting:
                             self.csv_number(getattr(contact, "source_vx_after", 0.0)),
                             self.csv_number(getattr(contact, "source_vy_after", 0.0)),
                             self.csv_number(getattr(contact, "source_vz_after", 0.0)),
-                            self.csv_number(getattr(contact, "source_ke_before", 0.0)),
-                            self.csv_number(getattr(contact, "source_ke_after", 0.0)),
-                            self.csv_number(getattr(contact, "source_ke_delta", 0.0)),
-                            self.csv_number(getattr(contact, "contact_ke_delta_estimate", 0.0)),
                             self.csv_number(source_net_delta_px),
                             self.csv_number(source_net_delta_py),
                             self.csv_number(source_net_delta_pz),
                             self.csv_number(source_net_impulse_mag),
-                            self.csv_number(getattr(contact, "source_net_ke_delta_estimate", 0.0)),
-                            self.csv_number(getattr(contact, "source_contact_ke_delta_sum", 0.0)),
-                            self.csv_number(getattr(contact, "source_ke_cross_term", 0.0)),
-                            self.csv_number(getattr(contact, "source_ke_residual", 0.0)),
                             self.csv_number(contact.geom.x),
                             self.csv_number(contact.geom.y),
                             self.csv_number(contact.geom.z),
                             self.csv_number(contact.aux.x),
                             self.csv_number(contact.aux.y),
-                        ]
-                    )
-
-                for target_index in suppressed_targets:
-                    writer.writerow(
-                        [
-                            frame_number,
-                            source_index,
-                            particle.pnum,
-                            target_index,
-                            self.particle_number_for_index(
-                                particles,
-                                target_index,
-                            ),
-                            "",
-                            1,
-                            "suppressed",
-                            0,
-                            len(contacts),
-                            source_targets,
-                            self.csv_number(source_total_overlap_area),
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                            *["" for _column in contact_diagnostic_columns],
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
                         ]
                     )
 

@@ -290,10 +290,25 @@ void main(){
 		
 	}
 	
+	if(HSV_ON == 1)
+	{
+		if (P[index].ptype == 0)
+		{
+			float velocityAngle = ShaderFlags.positionBuffer == 0u
+				? P[index].VelRadA.w
+				: P[index].VelRadB.w;
+			fragColor = colorizeVelocity(velocityAngle, HSV_SAT, HSV_VAL);
+		}
+		else
+			fragColor = vec3(1.0, 1.0, 1.0);
+	}
+	else
+	{
 	if(uint(P[index].colFlg) == 1)
 		fragColor = vec3(1.0,0.0,0.0);	
 	else if(uint(P[index].colFlg) == 0)
 		fragColor = vec3(0.0,1.0,0.0);	
+	}
 	
 	
 }

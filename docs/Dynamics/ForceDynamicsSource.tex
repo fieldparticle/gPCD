@@ -6,458 +6,384 @@
   \subsection{ForceDynamics:#1}%
   \label{force:#1}%
 }
+\newcommand{\ForceFunctionEntry}[2]{%
+  \subsubsection{\texttt{\detokenize{#1}}}%
+  \label{force:#1}%
+  #2%
+}
 
 \subsection{High-Level Model}
 
 \texttt{ForceDynamics} is a source-owned, current-state contact model.  Each
-mobile source reads immutable frame-start state, evaluates every contact that
-applies to that source, sums the contact forces, and writes only its own
-velocity and position.  A source never writes a target particle.  No global
-pair solver reaches backward to revise a completed collision.
+mobile source reads an immutable frame-start snapshot, builds its complete
+particle, piston, and parametric-wall contact set, accumulates one local force,
+and writes only its own velocity and position.  Physical radii are used
+unconditionally.  Initial particle or wall overlap is a configuration error;
+contact history never changes geometry or makes overlapping objects
+transparent.
 
-The frame has four conceptual stages:
-\begin{enumerate}
-    \item snapshot immutable frame-start particle state;
-    \item detect particle and wall contacts and build one source-local force sum;
-    \item calculate a candidate source velocity, then apply the current-state
-          maximum-compression constraint to the source's complete contact set;
-    \item integrate the source position and record diagnostics.
-\end{enumerate}
+\begin{figure}[htbp]
+\centering
+\resizebox{0.98\textwidth}{!}{\input{ForceDynamicsFlowTikz}}
+\caption{Clickable shader-shaped flow exported from \texttt{ForceDynamics.py}.}
+\label{fig:force-dynamics-flow}
+\end{figure}
 
-Python calculates penetration depth and overlap area.  The default force
-measure is penetration depth:
-\begin{verbatim}
-contact_force_measure = "depth";
-\end{verbatim}
-The alternate supported mode is:
-\begin{verbatim}
-contact_force_measure = "area";
-\end{verbatim}
-The source-owned schedule is exported to one GLSL compute invocation per
-source particle.  The horizontal boundary-particle reservoir now runs the
-generated force, maximum-depth, internal-momentum, and position paths in
-Vulkan.  Position and velocity are both double buffered so every invocation
-reads immutable frame-start state and writes only the alternate source state.
+The diagram intentionally omits the Python harness, configuration loading,
+scenario hooks, and diagnostic passes.  It shows the per-source function flow
+that the exporter mirrors in GLSL.  Those Python-only support functions remain
+documented later in this section but are not shader stages.
 
-\texttt{ForceDynamics} has one stationary-wall representation: finite cubic
-parametric segments in \texttt{curve\_wall\_segments}.  Straight lines are
-represented by zero quadratic and cubic coefficients.  Boundary particles
-with evaluator ID 5 are occupancy/locality markers; they are not mobile
-dynamics sources and do not own separate horizontal, vertical, linear, or CD
-wall equations.
-
-When any evaluator-5 marker is local to a mobile source, Python evaluates the
-configured parametric segments directly.  It retains the deepest valid
-contact for each positive physical \texttt{wall\_flag}.  Marker target IDs do
-not identify physical walls, which removes marker-order and shared-corner
-ambiguity.
+The stationary-wall representation is a set of finite cubic parametric
+segments from \texttt{curve\_wall\_segments}.  Straight walls use zero
+quadratic and cubic coefficients.  Boundary particles have positive
+\texttt{ptype} and are locality markers only; no wall evaluator is carried in
+\texttt{Data.z}.  Once any marker is local, the analytic segments supply the
+wall point, tangent, normal, distance, penetration, and physical wall flag.
 
 \clearpage
+\subsection{Frame Orchestration}
 
-\ForceFunctionSection{CollisionRun}
-
-\texttt{CollisionRun} is the Python harness for the shader-shaped execution
-schedule:
-
-\begin{verbatim}
-snapshot frame-start positions and velocities
-initialize starting-contact effective geometry and diagnostics
-initialize totalForce and source contact sets
-for each SourceID:
-    ProcessPistonCollision(SourceID, totalForce)
-    scan possible targets
-        if TargetID is a mobile particle:
-            ProcessParticleCollision(TargetID, SourceID, totalForce)
-        if TargetID is a local evaluator-5 boundary marker:
-            remember that parametric wall evaluation is local
-    evaluate every curve_wall_segment once
-    retain deepest contact per wall_flag
-    ProcessParametricWallCollision(SourceID, contact, totalForce)
-capture frame-start pair diagnostics
-for each SourceID:
-    calculate force-driven candidate velocity
-    ApplySourceMaximumDepth(SourceID)
-for each SourceID:
-    CalcPosition(SourceID)
-snapshot end positions for diagnostics
-\end{verbatim}
-
-The Python harness uses a direct particle scan where GLSL uses cell occupancy
-lists.  Both schedules complete one source-local force sum before integration.
-Maximum compression is evaluated from observed frame state, not from a
-predicted future position.
-Starting-contact state is initialized after the frame-start snapshot so
-particle-particle and particle-wall overlaps present in the initial
-configuration can be treated as zero-force contact limits.  The end-position
-snapshot is diagnostic only and is not a second force scan.
-
-The Python harness uses a direct scan over particles where GLSL uses cell
-occupancy lists.  Boundary markers gate locality only.  Actual wall points,
-tangents, normals, penetration, and force come from the configured parametric
-segments.
-
-The horizontal prefilled-reservoir scenario also evaluates one analytic
-piston contact per mobile source before scanning particle and boundary-marker
-targets.  The piston does not depend on marker locality and does not duplicate
-the stationary boundary-marker wall path.
-
-\ForceFunctionSection{GetPistonPosition}
-
-\texttt{GetPistonPosition(frame)} returns the analytic piston plane position.
-Before \texttt{piston\_start\_frame} it remains at the reservoir start.  It
-then advances by \texttt{reservoir\_velocity.x} and the frame timestep until
-it reaches the reservoir end, where it is clamped.
-
-\ForceFunctionSection{GetPistonVelocity}
-
-\texttt{GetPistonVelocity(frame)} returns zero before motion and after the
-stop plane is reached.  During travel it returns the configured reservoir
-velocity.  This is the target-wall velocity used by relative-normal motion,
-the penetration-step guard, internal-momentum compression and release, and
-maximum-depth containment.
-
-\ForceFunctionSection{EvaluatePistonWall}
-
-\texttt{EvaluatePistonWall(SourceID)} constructs a vertical equal-radius
-ghost plane at the current analytic piston position.  It applies across the
-reservoir transverse bounds and returns ordinary wall-contact geometry.
-
-\ForceFunctionSection{ProcessPistonCollision}
-
-\texttt{ProcessPistonCollision(SourceID,totalForce)} evaluates the piston once
-for each active mobile source, records its moving target velocity, performs
-wall penetration and maximum-depth checks, appends a source-owned wall
-contact, and accumulates force.  No piston boundary-marker row is emitted.
-
-\ForceFunctionSection{InitializeStartingContactState}
-
-\texttt{InitializeStartingContactState()} records mobile particle contacts
-that already overlap when the model starts.  Boundary marker particles are
-not recorded as mobile starting contacts.  For each starting contact, the
-current center distance becomes the effective separation limit.
-The physical radii are still retained, but force and potential energy use the
-effective geometry until the contact rebounds to its starting separation and
-then clears the physical overlap.
-
-\ForceFunctionSection{ProcessParticleCollision}
-
-\texttt{ProcessParticleCollision(TargetID, SourceID, totalForce)} initializes
-the current contact geometry, records a diagnostic contact slot, and
-immediately adds the contact force to the source-local \texttt{totalForce}.
-It does not write the target particle.  Boundary markers are not processed by
-this function; they are routed to the boundary-particle wall path.
-
-\ForceFunctionSection{ProcessParametricWallCollision}
-
-\texttt{ProcessParametricWallCollision(SourceID,contact,totalForce)} accepts
-already evaluated transient wall geometry, appends the diagnostic wall slot,
-and immediately accumulates force into the source-local sum.
-
-\ForceFunctionSection{EvaluateParametricWallSegment}
-
-\texttt{EvaluateParametricWallSegment(SourceID,segment)} is the sole
-stationary-wall evaluator.
-Each finite segment stores cubic coefficients for \(x(t)\) and \(y(t)\), with
-\(0\leq t\leq1\), plus its physical wall flag.  Boundary markers provide only
-broad-phase locality.  The evaluator selects the applicable segment, performs
-a bounded closest-point search, evaluates the local tangent, and derives the
-outward right-hand normal from segment direction.  Straight, quadratic, and
-cubic sections therefore share one wall-contact implementation.
-
-Python and the Vulkan wrappers may encounter several marker targets
-representing the same physical wall side.  They evaluate marker geometry and
-retain the deepest valid candidate for each wall flag before force is applied.
-This removes marker scan-order dependence at segment transitions.  Ordinary
-mobile-particle duplicates remain keyed by target ID.
-
-\ForceFunctionSection{ParametricBoundaryMarkerApplies}
-
-\texttt{ParametricBoundaryMarkerApplies(SourceID,BoundaryID)} is the Python
-locality guard.  It accepts only evaluator-5 markers within one cell of the
-source in each axis.  The GLSL path obtains the equivalent locality from cell
-occupancy.
-
-\ForceFunctionSection{IsBoundaryParticle}
-
-\texttt{IsBoundaryParticle(ParticleID)} returns true when the particle record
-has positive evaluator-valued \texttt{ptype}.  Boundary particles are
-occupancy and wall-geometry markers, not mobile dynamics sources.
-
-\ForceFunctionSection{IsMobileParticleActiveForDynamics}
-
-\texttt{IsMobileParticleActiveForDynamics(ParticleID)} excludes boundary
-markers from source integration.  Scheduled reservoir lifecycle filtering has
-been removed; mobile particles are active from their generated initial state.
-
-\ForceFunctionSection{InitializeContactState}
-
-\texttt{InitializeContactState(SourceID, TargetID)} obtains the current
-particle-particle geometry and records one source-owned diagnostic contact
-slot.
-
-\ForceFunctionSection{GetContactState}
-
-\texttt{GetContactState(SourceID, TargetID)} obtains a reusable current-frame
-contact slot.  The slot contains geometry and diagnostic values only; it is
-not used later to calculate force.
-
-\ForceFunctionSection{AppendContactSlot}
-
-\texttt{AppendContactSlot(SourceID, TargetID)} records an active
-particle-contact slot owned by the source.
-
-\ForceFunctionSection{GetContactSlots}
-
-\texttt{GetContactSlots(SourceID)} returns the fixed diagnostic contact-slot
-array owned by the source particle.
-
-\ForceFunctionSection{GetParticleGeometry}
-
-\texttt{GetParticleGeometry(SourceID, TargetID)} calculates overlap area,
-center distance, penetration depth, and the source-to-target normal from the
-immutable frame-start position snapshot.  In depth mode, the source orientation
-vector points from the source center to the source boundary in the collision
-direction, the proximity vector points from the source center to the target
-leading edge, and penetration depth is the orientation magnitude minus the
-proximity magnitude.  Ordinary contacts use the physical particle radii.  If
-the pair belongs to a starting contact,
-\texttt{GetParticleGeometry} obtains effective radii from
-\texttt{GetParticleEffectiveContactGeometry}.  The effective radii make the
-starting separation a zero-force limit.  If a resolved starting contact is
-still physically overlapping, physical force is suppressed until the actual
-radii separate.
-
-\ForceFunctionSection{GetParticleEffectiveContactGeometry}
-
-\texttt{GetParticleEffectiveContactGeometry(SourceID, TargetID,
-center\_distance)} selects the radii used by both force and diagnostic
-potential energy for one particle contact.  It returns physical radii for
-ordinary contacts, effective radii for active starting contacts, and a
-suppression flag for resolved starting contacts that have not yet cleared the
-physical-radius overlap.
-
-\ForceFunctionSection{GetParticlePosition}
-
-\texttt{GetParticlePosition(ParticleID)} returns a particle position from the
-selected immutable position snapshot.
-
-\ForceFunctionSection{MaximumCompression}
-
-Maximum compression applies to both particle and wall contacts.  With source
-radius \(r_s\), the first-version rule is:
-\begin{equation}
-\delta_{\max}=0.5r_s.
-\end{equation}
-At or beyond this observed depth, further inward source-normal motion is
-removed.  Tangential velocity is preserved.  The removed source translational
-momentum is stored in the source-owned internal-momentum vector
-\texttt{parms.yzw}.
-
-All maximum-depth contacts for one source are collected before the source is
-updated.  \texttt{ProjectSourceVelocityToContactSet} deterministically projects
-the candidate source velocity against that complete local constraint set.  It
-does not mutate targets and does not iterate over global particle pairs.
-
-The model also enforces a timestep-resolution condition:
-\begin{equation}
-\text{relative inward displacement per step}
-\leq (1-0.5)r_s.
-\end{equation}
-A violation raises \texttt{ERROR\_PENETRATION\_STEP\_TOO\_LARGE}; the simulation
-does not silently alter \(\Delta t\).
-
-For a moving piston, inward displacement and maximum-depth containment are
-relative to piston velocity.  At maximum depth the source normal velocity is
-limited to the piston normal velocity rather than to zero.  Removed relative
-inward source momentum remains source-owned internal momentum.
-
-Error reporting distinguishes \texttt{ERROR\_PARTICLE\_TUNNELING},
-\texttt{ERROR\_WALL\_TUNNELING}, \texttt{ERROR\_MAX\_DEPTH\_CONSTRAINT}, and
-\texttt{ERROR\_PENETRATION\_STEP\_TOO\_LARGE}.  Reported source and target IDs
-are particle numbers because Python preserves the null particle at index zero.
-
-\ForceFunctionSection{VulkanBufferedState}
-
-Vulkan uses the same selector for position and velocity buffers.  When
-\texttt{positionBuffer=0}, contact processing reads \texttt{PosLocA} and
-\texttt{VelRadA}, while integration writes \texttt{PosLocB} and
-\texttt{VelRadB}.  The roles reverse when the selector is one.
-\texttt{GetParticleVelocity} reads the immutable current velocity,
-\texttt{GetNextParticleVelocity} reads the candidate/output velocity, and
-\texttt{SetNextParticleVelocity} writes only that alternate buffer.
-
-After \texttt{CalcPosition}, \texttt{ApplyParticleDeathBounds} tests the newly
-written position against the six configured death planes.  A mobile particle
-outside any plane receives \texttt{Data.w=-1}.  Dead particles are excluded as
-compute sources, contact targets, cell-occupancy entries, and rendered
-particles.  Boundary markers are exempt from death-bound processing.
-
-\ForceFunctionSection{GetStartFrameVelocity}
-
-\texttt{GetStartFrameVelocity(ParticleID)} returns the immutable frame-start
-velocity used by integration and relative-normal-velocity diagnostics.
-
-\ForceFunctionSection{AccumulateContactForce}
-
-For every current particle or wall contact,
-\texttt{AccumulateContactForce(SourceID, contact\_state, totalForce)} applies:
-
-\begin{equation}
-F_{ij}=q_{ij}M_{ij},
-\end{equation}
-
-\begin{equation}
-\mathbf F_i \mathrel{+}= -F_{ij}\mathbf n_{ij}.
-\end{equation}
-
-\(M_{ij}\) is selected by \texttt{contact\_force\_measure}.  In the default
-\texttt{depth} mode, \(M_{ij}\) is penetration depth.  With
-\(\mathbf O_i\) as the source orientation vector and \(\mathbf P_{ij}\) as the
-source-to-target-leading-edge proximity vector:
-\begin{equation}
-M_{ij}=\delta_{ij}=\lVert\mathbf O_i\rVert-\lVert\mathbf P_{ij}\rVert,
-\end{equation}
-which reduces to:
-\begin{equation}
-M_{ij}=r_i+r_j-\lVert \mathbf x_j-\mathbf x_i\rVert.
-\end{equation}
-For wall contacts the equal-radius wall ghost gives
-\(M_{ij}=2r_i-d_{\mathrm{wall}}\).  In \texttt{area} mode, \(M_{ij}\) is the
-circle-overlap area \(A_{ij}\), preserving the earlier force law.  Python
-continues to calculate overlap area in both modes for diagnostics and for
-area-mode comparison.
-
-The force is applied during both compression and rebound.  Starting contacts
-use effective geometry measured from their starting separation.  There is no
-contact weighting, available-momentum cap, or collision phase.  Maximum-depth
-containment is a separate source-velocity constraint applied after the
-force-driven candidate velocity is calculated.
-
-\ForceFunctionSection{RecoverableInternalMomentum}
-
-Each source particle owns a recoverable internal momentum vector in
-\texttt{parms.yzw}.  \texttt{parms.x} remains particle mass.  During
-compression, \texttt{AccumulateContactForce} adds the current contact impulse
-along the contact normal to this vector.  During rebound, it releases the
-stored component along the same normal, limited by the current contact
-impulse.  The scalar magnitude is mirrored to \texttt{Data.z} and to the
-Python \texttt{internal\_momentum} report field.
-
-Force-contact bookkeeping records compression and rebound.  In addition,
-maximum-depth containment stores inward source momentum that cannot be
-expressed as translational motion during the current frame.  The storage is
-therefore no longer purely diagnostic, although a complete release and thermal
-transfer model is still deferred.  Heat, thermalization, and heat-transfer
-coefficients remain later model layers.
-
-Piston contacts use piston velocity when determining the sign of relative
-normal motion.  They therefore store momentum while the piston closes on a
-source and release it when source and piston separate, rather than treating
-the piston as a stationary wall.
-
-\ForceFunctionSection{PistonDiagnostics}
-
-Python records current piston position and velocity, current-frame contact
-count, frame and cumulative scalar impulse, and cumulative vector momentum
-transferred from the piston to particles.  The game UI displays this state and
-\texttt{momentum.csv} carries the same diagnostic columns.
-
-\ForceFunctionSection{GetContactStiffness}
-
-\texttt{GetContactStiffness(SourceID, TargetID, contact\_type)} selects
-particle-pair or wall stiffness for the current contact.
-
-\ForceFunctionSection{GetPairStiffness}
-
-\texttt{GetPairStiffness(SourceID, TargetID)} returns the nonnegative mean of
-the two particle-owned stiffness values:
-
-\begin{equation}
-q_{ij}=\max\left(0,\frac{q_i+q_j}{2}\right).
-\end{equation}
-
-The units of \(q\) depend on \texttt{contact\_force\_measure}.  In
-\texttt{depth} mode, \(q\) is depth stiffness.  In \texttt{area} mode, \(q\)
-is area stiffness.
-
-\ForceFunctionSection{CalcVelocity}
-
-\texttt{CalcVelocity(SourceID, totalForce)} first calculates the force-driven
-candidate source velocity:
-
-\begin{equation}
-\mathbf v_{n+1}
-=
-\mathbf v_n+\frac{\mathbf F_n}{m}\Delta t.
-\end{equation}
-It then calls \texttt{ApplySourceMaximumDepth(SourceID)} before the velocity is
-accepted.  This second step may remove inward normal velocity and store the
-corresponding source-owned internal momentum.  Position integration sees only
-the accepted velocity.
-
-\ForceFunctionSection{GetParticleMass}
-
-\texttt{GetParticleMass(ParticleID)} returns particle mass from
-\texttt{parms.x} with an epsilon lower bound.
-
-\ForceFunctionSection{CalcPosition}
-
-\texttt{CalcPosition(SourceID)} performs the semi-implicit Euler position
-write using the newly calculated velocity:
-
-\begin{equation}
-\mathbf x_{n+1}
-=
-\mathbf x_n+\mathbf v_{n+1}\Delta t.
-\end{equation}
-
-This velocity-first update is the symplectic Euler method.  Symplectic Euler
-does not conserve the system's exact total energy at every timestep.  Instead,
-it typically produces a bounded energy excursion in which the calculated
-total energy oscillates above and below the exact value.  Unlike standard
-Euler integration, this error generally does not accumulate into continuous
-energy growth or decay.  Decreasing the timestep reduces the excursion's
-magnitude, making symplectic Euler well suited for long-running conservative
-dynamics simulations.
-
-\subsection{Potential Energy and Diagnostics}
-
-In depth mode the pair potential is:
-\begin{equation}
-U_{ij}(d)=\frac{1}{2}q_{ij}\delta_{ij}^{2}.
-\end{equation}
-In area mode the earlier overlap-area potential remains
-\(U_{ij}(d)=q_{ij}\int_d^{r_i+r_j}A_{ij}(s)\,ds\).
-
-For a starting contact, \(r_i+r_j\) is replaced by the effective starting
-separation limit while the contact is active.  After the contact rebounds to
-that limit, force and potential energy remain suppressed until the actual
-physical radii separate.  This avoids a second rebound caused only by the
-initial configured overlap.
-
-Potential energy, relative normal velocity, contact slots, end-position
-snapshots, and pair-phase measurements are diagnostic only.  They do not
-affect the source-local force sum or particle integration.  System energy is:
-
-\begin{equation}
-E_{\mathrm{total}}=KE+\sum_{i<j}U_{ij}+\sum_{i,w}U_{iw}.
-\end{equation}
-
-\subsection{Current Numerical Results}
-
-The central pair rule independently produces equal-and-opposite particle-pair
-forces and preserves vector momentum.  Semi-implicit Euler introduces a small
-bounded numerical energy excursion.  Current captures include:
-
-\begin{verbatim}
-ThreeParticle, 500 steps:
-energy range = approximately [-9.18e-5, +9.98e-5]
-final energy difference = approximately -1.69e-7
-
-ParticlesInBox, 10000 steps:
-energy range = approximately [-1.85e-5, +1.90e-5]
-final energy difference = approximately -7.34e-7
-\end{verbatim}
-
-The long-running box result currently rises and falls within a bounded band
-rather than showing monotonic energy drift.
+\ForceFunctionEntry{CollisionRun}{Runs one complete semi-implicit frame.  It
+gates the frame, executes scenario hooks, resets transient state, builds the
+snapshot, validates initial geometry once, detects contacts, resolves velocity
+and maximum depth, integrates position, records optional diagnostics, and
+swaps the active buffers.}
+
+\ForceFunctionEntry{BeginFrame}{Clears per-frame piston and error reporting.
+A persistent configuration error stops the frame before contact processing.}
+
+\ForceFunctionEntry{ApplyBeforeContactScanHook}{Calls the optional scenario
+\texttt{BeforeContactScan} callback before snapshot construction.}
+
+\ForceFunctionEntry{ResetFrameState}{Clears current-frame contact slots,
+overlap measurements, and report fields while preserving recoverable internal
+momentum and other cross-frame contact memory.}
+
+\ForceFunctionEntry{ApplyStartRunHook}{Calls the optional scenario start hook
+used by focused Python test cases.}
+
+\ForceFunctionEntry{BuildFrameSnapshot}{Copies current positions and
+velocities into immutable frame-start arrays used by all source calculations.}
+
+\ForceFunctionEntry{BuildEndPositionSnapshot}{Captures integrated positions
+only when diagnostics are enabled.  It does not trigger another force scan.}
+
+\ForceFunctionEntry{DetectContacts}{Selects the active contact-determination
+implementation.  The current Python model delegates to
+\texttt{NaiveContactDetermination}.}
+
+\ForceFunctionEntry{NaiveContactDetermination}{For every active mobile source,
+processes the piston, scans mobile and boundary-marker targets, processes
+physical particle contacts, then evaluates the deepest parametric contact for
+each local physical wall flag.}
+
+\ForceFunctionEntry{CalculateVelocities}{Calls \texttt{CalcVelocity} once for
+each active mobile source after that source's complete force sum is known.}
+
+\ForceFunctionEntry{CalculatePositions}{Calls \texttt{CalcPosition} once for
+each active mobile source using the newly calculated velocity.}
+
+\ForceFunctionEntry{EndFrame}{Toggles the active position/velocity buffer and
+invalidates the Python frame snapshots.}
+
+\subsection{Particle Contacts}
+
+\ForceFunctionEntry{GetPhysicalParticleContact}{Returns validated geometry
+only when two real-radius particles physically overlap.  It also detects a
+source perimeter that has passed the target center and reports particle
+tunneling.}
+
+\ForceFunctionEntry{GetParticleGeometry}{Calculates center distance, contact
+normal, overlap area, penetration inputs, and both physical radii.  No
+effective or reduced radius exists.}
+
+\ForceFunctionEntry{ProcessParticleCollision}{Creates or reuses the
+source-owned contact state from previously calculated geometry and accumulates
+its force without recalculating geometry.}
+
+\ForceFunctionEntry{InitializeContactState}{Initializes the current-frame
+particle contact, marks the source as colliding, and records contact
+parameters.  The derived implementation uses the base contact ledger.}
+
+\ForceFunctionEntry{GetContactState}{Finds an existing source-target contact
+slot or appends one, then updates it with current physical geometry.}
+
+\ForceFunctionEntry{AppendContactSlot}{Allocates a source-owned particle
+contact slot, enforcing the configured slot capacity.}
+
+\ForceFunctionEntry{ParticleContactTargetIDs}{Derives current particle target
+IDs directly from active contact slots; there is no separate collision list.}
+
+\ForceFunctionEntry{ParticlePenetrationDepth}{Returns
+\(\max(0,r_s+r_t-d)\) for physical radii and center distance.}
+
+\ForceFunctionEntry{particle_overlap_area}{Computes the exact circular lens
+area for two intersecting particles, including containment and separation
+limits.}
+
+\subsection{Parametric Walls}
+
+\ForceFunctionEntry{ParametricBoundaryMarkerApplies}{Checks boundary-marker
+\texttt{ptype} and cell-local proximity.  Markers gate wall evaluation but do
+not define wall geometry or select an evaluator.}
+
+\ForceFunctionEntry{EvaluateParametricWallSegment}{Finds the closest bounded
+point on one cubic segment, derives its tangent and outward normal, and returns
+wall-contact geometry when the source overlaps the equal-radius ghost wall.}
+
+\ForceFunctionEntry{EvaluateParametricWallContacts}{Evaluates all configured
+segments and retains only the deepest valid contact for each positive physical
+\texttt{wall\_flag}.}
+
+\ForceFunctionEntry{ProcessParametricWallCollision}{Initializes one selected
+wall contact and sends it through the common force path.}
+
+\ForceFunctionEntry{InitializeParametricWallContactState}{Checks timestep
+resolution and wall maximum depth, converts wall geometry into a source-owned
+contact slot, and supplies stationary target velocity.}
+
+\ForceFunctionEntry{AppendWallContactSlot}{Allocates or reuses a contact slot
+keyed by physical wall flag rather than boundary-marker particle ID.}
+
+\ForceFunctionEntry{ParametricWallPhysicalPenetration}{Calculates real-radius
+penetration against a segment for initial-geometry validation.}
+
+\ForceFunctionEntry{WallContactOffsetDistance}{Returns the configured radial
+offset used to place the analytic equal-radius wall ghost.}
+
+\ForceFunctionEntry{CheckWallMaximumDepth}{Reports wall tunneling when the wall
+ghost's leading edge has passed the source center.}
+
+\subsection{Piston}
+
+\ForceFunctionEntry{PistonEnabled}{Returns true only when chamber bounds,
+piston velocity, and piston start frame are all configured.}
+
+\ForceFunctionEntry{GetPistonPosition}{Returns the piston plane position.  It
+is stationary before its start frame, advances with timestep and configured
+velocity, and clamps at the chamber end.}
+
+\ForceFunctionEntry{GetPistonVelocity}{Returns zero while parked or clamped and
+the configured velocity while the piston is moving.}
+
+\ForceFunctionEntry{EvaluatePistonWall}{Evaluates the moving vertical ghost
+plane within the chamber cross-section and returns common wall geometry.}
+
+\ForceFunctionEntry{ProcessPistonCollision}{Checks the moving-wall timestep and
+depth limits, creates a wall slot with piston target velocity, and accumulates
+force and piston momentum diagnostics.}
+
+\subsection{Contact Force and Memory}
+
+\ForceFunctionEntry{AccumulateContactForce}{Applies stiffness along the contact
+normal, updates compression or release phase, and stores recoverable inward
+momentum on the source-owned contact.  The base implementation also records
+detailed diagnostics.}
+
+\ForceFunctionEntry{GetPairStiffness}{Returns the nonnegative mean of the two
+mobile particles' stiffness values.}
+
+\ForceFunctionEntry{GetContactStiffness}{Selects pair stiffness for particle
+contacts and source stiffness for wall contacts.}
+
+\ForceFunctionEntry{GetStartFrameVelocity}{Returns velocity from the immutable
+frame snapshot, preventing source-order dependence.}
+
+\ForceFunctionEntry{RecordRecoverableInternalMomentum}{Stores unresolved
+inward normal momentum on the owning contact slot.}
+
+\ForceFunctionEntry{SyncInternalMomentumMagnitude}{Recomputes the particle's
+reported internal-momentum magnitude from its persistent contact slots.}
+
+\ForceFunctionEntry{ClearRecoverableInternalMomentum}{Clears all recoverable
+momentum owned by one particle.}
+
+\ForceFunctionEntry{ClearInactiveRecoverableInternalMomentum}{Clears momentum
+whose owning contact did not remain active in the current frame.}
+
+\subsection{Maximum Depth and Timestep Safety}
+
+The maximum allowed penetration is
+\[
+ d_{\max}=f_{\max}r_s,
+\]
+where the current maximum fraction is \(f_{\max}=0.5\).  A frame must also
+satisfy
+\[
+ \Delta x_{\mathrm{inward}} \le (1-f_{\max})r_s.
+\]
+
+\ForceFunctionEntry{CheckPenetrationStepResolution}{Checks the relative inward
+normal displacement for one timestep against the unused penetration reserve.
+Failure reports \texttt{ERROR\_PENETRATION\_STEP\_TOO\_LARGE}.}
+
+\ForceFunctionEntry{ApplySourceMaximumDepth}{Builds all currently active
+particle and wall velocity constraints at maximum depth and applies them to
+the source's candidate velocity as one source-owned operation.}
+
+\ForceFunctionEntry{ProjectSourceVelocityToContactSet}{Projects the candidate
+velocity onto at most two independent 2D normal constraints.  It merges nearly
+parallel limits, rejects non-finite or ill-conditioned solutions, and returns
+failure when no stable projection exists.  Its local \texttt{dot} and
+\texttt{satisfies} helpers implement vector testing within this solver.}
+
+\ForceFunctionEntry{SolveSmallLinearSystem}{Solves the bounded one- or two-row
+constraint system with explicit singularity and finite-value checks.}
+
+\subsection{Velocity, Position, and Activity}
+
+\ForceFunctionEntry{CalcVelocity}{Performs semi-implicit Euler velocity update
+from the complete source force, applies maximum-depth containment, and records
+net source impulse diagnostics.}
+
+\ForceFunctionEntry{CalcPosition}{Writes the alternate position buffer using
+the newly calculated velocity, checks cell-array bounds, and marks mobile
+particles dead when they leave the six death planes.}
+
+\ForceFunctionEntry{GetParticleMass}{Returns \texttt{parms.x} with an epsilon
+lower bound.}
+
+\ForceFunctionEntry{GetParticlePosition}{Returns the immutable frame-start
+position when available, otherwise the currently selected position buffer.}
+
+\ForceFunctionEntry{GetCurrentParticlePosition}{Returns directly from the
+currently selected position buffer without consulting the diagnostic snapshot.}
+
+\ForceFunctionEntry{GetParticleVelocity}{Returns the velocity associated with
+the active position buffer.}
+
+\ForceFunctionEntry{particle_position}{Static buffered-position accessor used
+before a full dynamics object snapshot is available.}
+
+\ForceFunctionEntry{VelocityAngle}{Returns the planar velocity heading used by
+rendering and reports.}
+
+\ForceFunctionEntry{IsNullParticle}{Identifies reserved particle index zero.}
+
+\ForceFunctionEntry{IsBoundaryParticle}{Identifies evaluator-bearing boundary
+markers.}
+
+\ForceFunctionEntry{IsMobileParticleActiveForDynamics}{Accepts only non-null,
+non-boundary particles whose state is not dead.}
+
+\subsection{Initial Validation and Errors}
+
+\ForceFunctionEntry{ValidateInitialGeometry}{Runs once after configuration.
+It rejects initial mobile-mobile overlap, parametric-wall overlap, and piston
+overlap using physical geometry.}
+
+\ForceFunctionEntry{SetError}{Stores the error code, category, source ID,
+target ID, and wall flag in the shared collision result and returns false for
+direct propagation through the call chain.}
+
+\ForceFunctionEntry{ErrorDescription}{Formats the current error state for the
+Python UI and report output.}
+
+\subsection{Contact Ledger}
+
+\ForceFunctionEntry{BeginContactFrame}{Starts a new frame for one source's
+contact ledger and clears only transient slot activity.}
+
+\ForceFunctionEntry{GetContactSlots}{Returns the fixed source-owned slot array.
+The derived override exposes the same ledger to active dynamics code.}
+
+\ForceFunctionEntry{ClearContactSlot}{Resets one reusable slot to inactive
+defaults.}
+
+\ForceFunctionEntry{ClearContactDiagnostics}{Clears diagnostic fields without
+changing the physical identity of a persistent contact.}
+
+\ForceFunctionEntry{RecordContactParameters}{Copies current geometry, phase,
+velocity, force, and impulse values into report fields.}
+
+\subsection{Diagnostics and Energy}
+
+These functions run only when \texttt{dynamics\_diagnostics=true}; rendering
+mode does not implicitly enable them.
+
+\ForceFunctionEntry{ParticleKineticEnergy}{Returns one particle's kinetic
+energy using either a supplied velocity or current buffered velocity.}
+
+\ForceFunctionEntry{GetContactPotentialEnergy}{Returns elastic potential energy
+for one particle contact under the configured force measure.}
+
+\ForceFunctionEntry{GetOverlapPotentialEnergy}{Integrates the selected overlap
+force measure to obtain contact potential energy.}
+
+\ForceFunctionEntry{TotalPotentialEnergy}{Sums active particle-contact
+potential energy without double counting physical pairs.}
+
+\ForceFunctionEntry{TotalWallPotentialEnergy}{Sums active piston and parametric
+wall potential energy.}
+
+\ForceFunctionEntry{CurrentDiagnosticTotalEnergy}{Combines current kinetic,
+particle-contact, and wall-contact energy.}
+
+\ForceFunctionEntry{CapturePairGeometryDiagnostics}{Captures physical pair
+distance, penetration, and phase information before or after integration.}
+
+\ForceFunctionEntry{InitializePairPhaseEnergyReference}{Initializes the energy
+reference used to measure one compression/release phase.}
+
+\ForceFunctionEntry{RecordPairPhaseDiagnostics}{Compares start and end pair
+geometry and records phase-level energy changes.}
+
+\ForceFunctionEntry{RecordFrameStartDiagnostics}{Captures frame-start momentum,
+kinetic energy, potential energy, and piston state.}
+
+\ForceFunctionEntry{RecordAfterResolveDiagnostics}{Captures the corresponding
+post-resolution quantities.}
+
+\subsection{Configuration and Construction}
+
+\ForceFunctionEntry{load_cfg_file}{Loads constants, the selected cfg and its
+include, particle data, marker data, shader flags, dimensions, force mode,
+diagnostic switches, and persistent configuration errors.}
+
+\ForceFunctionEntry{load_include}{Merges the configured include file into the
+primary configuration object.}
+
+\ForceFunctionEntry{load_constants}{Loads named error codes and shared numeric
+constants.}
+
+\ForceFunctionEntry{add_parametric_boundary_markers_from_cfg}{Builds
+evaluator-5 locality markers when particles are supplied directly by cfg.}
+
+\ForceFunctionEntry{getParticleData}{Reads the selected binary particle file
+and preserves its null particle and buffered fields.}
+
+\ForceFunctionEntry{create_particle_from_cfg}{Converts one cfg particle
+record into the runtime particle structure.}
+
+\ForceFunctionEntry{create_particle_array_from_cfg}{Builds the indexed
+runtime particle array from binary or cfg records.}
+
+\ForceFunctionEntry{create_particle_array}{Allocates an empty particle array
+with the requested count.}
+
+\ForceFunctionEntry{create_particle}{Constructs one initialized particle
+record with buffered position and velocity fields.}
+
+\ForceFunctionEntry{create_shader_flags_from_cfg}{Builds frame, timestep,
+buffer-selector, and rectangular cell-array state from configuration.}
+
+\ForceFunctionEntry{create_shader_flags}{Constructs an initialized shader
+flags object.}
+
+\ForceFunctionEntry{create_collision_in}{Constructs the shared collision
+result and error-reporting object.}
+
+\ForceFunctionEntry{create_geo_contact_state}{Constructs one initialized
+source-owned contact slot.}
+
+\ForceFunctionEntry{create_vec4}{Constructs the Python four-component float
+vector used to mirror GLSL structures.}
+
+\ForceFunctionEntry{create_uvec4}{Constructs the corresponding unsigned
+integer vector.}
+
+The small structure classes at the beginning of \texttt{ForceDynamicsBase.py}
+use \texttt{\_\_setattr\_\_} only to provide GLSL-like aliasing and field
+normalization.  They are storage mechanics, not dynamics stages, and therefore
+do not appear as flowchart nodes.

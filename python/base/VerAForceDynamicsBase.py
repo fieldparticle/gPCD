@@ -43,14 +43,9 @@ class CollisionInFields(AttrDictFields):
 
 class ForceDynamics(ForceContactDynamics):
     
-    def __init__(self, senario=None):
-        ##JMB If senario is passed in then 
-        #       assign it to self.senario, otherwise set self.senario to None
-        if senario is not None:
-            self.senario = senario
-        else:
-            self.senario = None
-        self.study = senario is not None
+    def __init__(self, scenario=None):
+        self.scenario = scenario
+        self.study = scenario is not None
         self.config = None
         self.run_configuration = None
         self.particle_data = None
@@ -470,10 +465,9 @@ class ForceDynamics(ForceContactDynamics):
         
         self.item_cfg = shader_flags
         shader_flags.DrawInstance = fields.get("DrawInstance", 0.0)
-        shader_flags.SideLength = fields.get("SideLength", 0.0)
-        shader_flags.CellAryW = fields.get("CellAryW", shader_flags.SideLength)
-        shader_flags.CellAryH = fields.get("CellAryH", shader_flags.SideLength)
-        shader_flags.CellAryL = fields.get("CellAryL", shader_flags.SideLength)
+        shader_flags.CellAryW = fields.get("CellAryW", 0.0)
+        shader_flags.CellAryH = fields.get("CellAryH", 0.0)
+        shader_flags.CellAryL = fields.get("CellAryL", 0.0)
         shader_flags.Ptot = fields.get("Ptot", 0.0)
         shader_flags.dt = fields.get("dt", 0.0)
         shader_flags.systemp = fields.get("systemp", 0.0)
@@ -488,7 +482,6 @@ class ForceDynamics(ForceContactDynamics):
     def create_shader_flags_from_cfg(self, run_configuration):
         width, height, depth = get_cell_dimensions(run_configuration)
         return self.create_shader_flags(
-            SideLength=width,
             CellAryW=width,
             CellAryH=height,
             CellAryL=depth,
@@ -551,8 +544,8 @@ class ForceDynamics(ForceContactDynamics):
         are detected for the frame.  If no scenario is attached, this stage is
         a no-op.
         """
-        if self.senario:
-            self.senario.BeforeContactScan(self.particles)
+        if self.scenario:
+            self.scenario.BeforeContactScan(self.particles)
 
     def ResetFrameState(self):
         """Reset shadow per-frame contact and reporting state.
@@ -596,13 +589,13 @@ class ForceDynamics(ForceContactDynamics):
 
         This hook executes after frame-local state has been reset and before
         the frame snapshot is built.  When inline-test mode is active and a
-        scenario object is attached, senario.StartRun(particles) may adjust or
+        scenario object is attached, scenario.StartRun(particles) may adjust or
         replace the particle list used by the rest of the frame.  If inline
         testing is not active, or no scenario is attached, this stage is a
         no-op.
         """
-        if self.inline_test_flag == True and self.senario is not None:
-            self.particles = self.senario.StartRun(self.particles)
+        if self.inline_test_flag == True and self.scenario is not None:
+            self.particles = self.scenario.StartRun(self.particles)
     
     def BuildFrameSnapshot(self):
         """Capture frame-start positions and velocities for dynamics logic.
@@ -921,7 +914,7 @@ class ForceDynamics(ForceContactDynamics):
             normal = (-1.0, 0.0, 0.0)
         elif wall_flag == 2:
             ghost = (
-                float(cfg.get("WallXMAX", self.ShaderFlags.SideLength))
+                float(cfg.get("WallXMAX", self.ShaderFlags.CellAryW))
                 + radius
                 - offset,
                 position.y,
@@ -938,7 +931,7 @@ class ForceDynamics(ForceContactDynamics):
         elif wall_flag == 4:
             ghost = (
                 position.x,
-                float(cfg.get("WallYMAX", self.ShaderFlags.SideLength))
+                float(cfg.get("WallYMAX", self.ShaderFlags.CellAryH))
                 + radius
                 - offset,
                 position.z,

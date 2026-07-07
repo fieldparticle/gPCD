@@ -41,61 +41,93 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 		WriteShaderDbgHeader();
 	//	WriteCDNoz();
 		WriteWalls();
-		Reservoir();
+		
+		//Reservoir();
 		GenWorkGroups();
 }
-
-void ShaderObj::Reservoir()
+std::ostringstream  ShaderObj::ParametricCurves()
 {
-	std::string fileDir =
-		CfgApp->GetString("application.gen_glsl_dir", true);
-	std::string fileName = fileDir + "/reservoir.glsl";
+	std::ostringstream curve_str;
+	curve_str << std::fixed << std::setprecision(9);
+	curve_str
+		<< "struct ParametricCurveSegment\n"
+		<< "{\n"
+		<< "    vec4 xCoefficients;\n"
+		<< "    vec4 yCoefficients;\n"
+		<< "    uint wallFlag;\n"
+		<< "};\n\n";
 
-	std::ofstream ostrm(fileName);
-	if (!ostrm.is_open())
+	int segmentCount = 0;
+	config_setting_t* segmentList =
+		CfgTst->StartStructure("curve_wall_segments", segmentCount);
+
+	if (segmentCount <= 0)
 	{
 		throw std::runtime_error(
-			"Failed to open file: " + fileName
+			"curve_wall_segments must contain at least one segment"
 		);
 	}
 
-	ostrm << std::fixed << std::setprecision(9);
+	curve_str
+		<< "const uint CURVE_WALL_SEGMENT_COUNT = "
+		<< segmentCount << "u;\n"
+		<< "const ParametricCurveSegment CURVE_WALL_SEGMENTS["
+		<< segmentCount << "] = ParametricCurveSegment["
+		<< segmentCount << "](\n";
+
+	for (int index = 0; index < segmentCount; ++index)
+	{
+		config_setting_t* segment =
+			CfgTst->GetSubStructAddress(segmentList, index);
+
+		if (segment == nullptr || config_setting_length(segment) != 9)
+		{
+			throw std::runtime_error(
+				"curve_wall_segments[" + std::to_string(index) +
+				"] must contain nine values"
+			);
+		}
+
+		double ax = config_setting_get_float_elem(segment, 0);
+		double bx = config_setting_get_float_elem(segment, 1);
+		double cx = config_setting_get_float_elem(segment, 2);
+		double dx = config_setting_get_float_elem(segment, 3);
+		double ay = config_setting_get_float_elem(segment, 4);
+		double by = config_setting_get_float_elem(segment, 5);
+		double cy = config_setting_get_float_elem(segment, 6);
+		double dy = config_setting_get_float_elem(segment, 7);
+		uint32_t wallFlag = static_cast<uint32_t>(
+			config_setting_get_float_elem(segment, 8)
+			);
+
+		curve_str
+			<< "    ParametricCurveSegment("
+			<< "vec4(" << ax << ", " << bx << ", "
+			<< cx << ", " << dx << "), "
+			<< "vec4(" << ay << ", " << by << ", "
+			<< cy << ", " << dy << "), "
+			<< wallFlag << "u)";
+
+		if (index + 1 < segmentCount)
+			curve_str << ",";
+
+		curve_str << "\n";
+	}
+
+	curve_str << ");\n\n";
+
+	return curve_str;
+}
+#if 0
+void ShaderObj::Reservoir()
+{
+	
 
 	// ------------------------------------------------------------
 	// Piston and chamber
 	// ------------------------------------------------------------
-	ostrm
-		<< "#ifndef RESERVOIR_GLSL\n"
-		<< "#define RESERVOIR_GLSL\n\n"
 
-		<< "const uint BOUNDARY_EVALUATOR_LINEAR = 4u;\n"
-		<< "const uint BOUNDARY_EVALUATOR_PARAMETRIC = 5u;\n"
-
-		<< "const uint PISTON_START_FRAME = "
-		<< CfgTst->GetUInt("piston_start_frame", true)
-		<< "u;\n"
-
-		<< "const vec3 CHAMBER_MIN = vec3("
-		<< CfgTst->GetFloat("chamber_x_start", true) << ", "
-		<< CfgTst->GetFloat("chamber_y_bottom", true) << ", "
-		<< CfgTst->GetFloat("chamber_z_front", true)
-		<< ");\n"
-
-		<< "const vec3 CHAMBER_MAX = vec3("
-		<< CfgTst->GetFloat("chamber_x_end", true) << ", "
-		<< CfgTst->GetFloat("chamber_y_top", true) << ", "
-		<< CfgTst->GetFloat("chamber_z_back", true)
-		<< ");\n"
-
-		<< "const vec3 PISTON_VELOCITY = vec3("
-		<< CfgTst->GetFloat("piston_velocity_x", true) << ", "
-		<< CfgTst->GetFloat("piston_velocity_y", true) << ", "
-		<< CfgTst->GetFloat("piston_velocity_z", true)
-		<< ");\n\n";
-
-	if (CfgTst->CheckKey("curve_wall_segments") != nullptr)
-	{
-		ostrm
+	outStream
 			<< "struct ParametricCurveSegment\n"
 			<< "{\n"
 			<< "    vec4 xCoefficients;\n"
@@ -114,7 +146,7 @@ void ShaderObj::Reservoir()
 			);
 		}
 
-		ostrm
+		outStream
 			<< "const uint CURVE_WALL_SEGMENT_COUNT = "
 			<< segmentCount << "u;\n"
 			<< "const ParametricCurveSegment CURVE_WALL_SEGMENTS["
@@ -146,7 +178,7 @@ void ShaderObj::Reservoir()
 				config_setting_get_float_elem(segment, 8)
 				);
 
-			ostrm
+			outStream
 				<< "    ParametricCurveSegment("
 				<< "vec4(" << ax << ", " << bx << ", "
 				<< cx << ", " << dx << "), "
@@ -155,12 +187,12 @@ void ShaderObj::Reservoir()
 				<< wallFlag << "u)";
 
 			if (index + 1 < segmentCount)
-				ostrm << ",";
+				outStream << ",";
 
-			ostrm << "\n";
+			outStream << "\n";
 		}
 
-		ostrm << ");\n\n";
+		ostoutStreamrm << ");\n\n";
 	}
 	else
 	{
@@ -251,7 +283,7 @@ void ShaderObj::Reservoir()
 
 	ostrm << "#endif\n";
 }
-
+#endif
 // This function is only for walls that are passed to glsl.
 // It is up to the glsl version to use it or not. It has nothing to
 // do with drawing the boundaries. That is in ResourceVertexCube.cpp
@@ -275,7 +307,7 @@ void ShaderObj::WriteWalls()
 		<< "const float death_z_max = " << std::fixed << std::setprecision(9)
 			<< CfgTst->GetFloat("death_z_max", true) << ";\n";
 
-#if 1	
+#if 0	
 	std::ostringstream wall_str;
 	wall_str 
 			
@@ -315,8 +347,11 @@ void ShaderObj::WriteWalls()
 			"#define CONTACT_FORCE_MEASURE  " << CfgTst->GetString("contact_force_measure", true) << "\n"
 			"#define " << CfgTst->GetString("wall_type", true) << "\n";
 			
-		ostrm << wall_str.str();
+		//ostrm << wall_str.str();
 		ostrm << death_str.str();
+		std::ostringstream curve_ostr = ParametricCurves();
+		ostrm << curve_ostr.str();
+
 		ostrm << "#endif\n";
 	}
 

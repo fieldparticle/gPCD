@@ -1,7 +1,8 @@
 @echo off
 
-set newPrefix=BoundaryParticleReservoirHorizontal
-set oldPrefix=BoundaryParticleReservoirPeriodic
+set newPrefix=TestPythonBoundarySpheres
+
+set oldPrefix=BoundarySpheresAndCube
 
 set old_dir=%~dp0%oldPrefix%
 set new_dir=%~dp0%newPrefix%

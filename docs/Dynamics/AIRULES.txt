@@ -7,7 +7,7 @@ Do not run tests, just tell me what tests need to be run.
 
 to refresh all of the convention read 
 DocumentConventions.tex
-DynamicsConventions.tex
+DynamicsTheory.tex
 FlowDynamicsConventions.tex
 ProgrammingConventions.tex
 ProgrammingStyle.tex

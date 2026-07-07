@@ -57,6 +57,7 @@ public:
 	void WriteWalls();
 	void Reservoir();
 	void WriteCDNoz();
+	std::ostringstream ParametricCurves();
 
 
 	std::vector<char> ReadSPVFile(const std::string& filename);

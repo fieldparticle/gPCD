@@ -93,7 +93,7 @@ class ForceContactDynamics:
         else:
             cfg = self.run_configuration
             min_y = float(cfg.get("WallYMIN", 0.0))
-            max_y = float(cfg.get("WallYMAX", self.ShaderFlags.SideLength))
+            max_y = float(cfg.get("WallYMAX", self.ShaderFlags.CellAryH))
         mid_y = 0.5 * (min_y + max_y)
         if boundary_position.y < mid_y:
             return 3
@@ -117,7 +117,7 @@ class ForceContactDynamics:
         else:
             cfg = self.run_configuration
             min_x = float(cfg.get("WallXMIN", 0.0))
-            max_x = float(cfg.get("WallXMAX", self.ShaderFlags.SideLength))
+            max_x = float(cfg.get("WallXMAX", self.ShaderFlags.CellAryW))
         mid_x = 0.5 * (min_x + max_x)
         if boundary_position.x < mid_x:
             return 1
@@ -136,7 +136,7 @@ class ForceContactDynamics:
         cfg = self.run_configuration
         default_center_y = 0.5 * (
             float(cfg.get("WallYMIN", 0.0))
-            + float(cfg.get("WallYMAX", getattr(self.ShaderFlags, "SideLength", 1.0)))
+            + float(cfg.get("WallYMAX", self.ShaderFlags.CellAryH))
         )
         return float(cfg.get("nozzle_center_y", default_center_y))
 
@@ -855,7 +855,7 @@ class ForceContactDynamics:
             normal = (-1.0, 0.0, 0.0)
         elif wall_flag == 2:
             ghost = (
-                float(cfg.get("WallXMAX", self.ShaderFlags.SideLength))
+                float(cfg.get("WallXMAX", self.ShaderFlags.CellAryW))
                 + radius
                 - offset,
                 position.y,
@@ -872,7 +872,7 @@ class ForceContactDynamics:
         elif wall_flag == 4:
             ghost = (
                 position.x,
-                float(cfg.get("WallYMAX", self.ShaderFlags.SideLength))
+                float(cfg.get("WallYMAX", self.ShaderFlags.CellAryH))
                 + radius
                 - offset,
                 position.z,

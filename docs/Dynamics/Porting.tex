@@ -11,14 +11,19 @@ must preserve the same source-owned processing order.
 Python \texttt{base/ForceDynamics.py} is the export source for dynamics.
 \texttt{ForceDynamicsBase.py} is Python infrastructure and diagnostics.
 
-The active Python wall source now contains only evaluator-5 parametric walls.
-The horizontal, vertical, analytic CD, finite-line, and manual \texttt{Wall*}
-paths documented later in this file describe the current Vulkan compatibility
-surface, not the canonical Python design.  Before the next dynamics export,
-the exporter and wrappers must be reduced to evaluator-5 locality markers,
-direct \texttt{curve\_wall\_segments} evaluation, and deepest-contact
-deduplication by physical \texttt{wallFlag}.  Legacy Vulkan paths must not be
-reintroduced into Python to preserve wrapper compatibility.
+The active Python wall source now contains only generic parametric walls.
+Boundary particles identify locality with positive \texttt{ptype}; they do
+not carry evaluator IDs in \texttt{Data.z}.  The canonical wall geometry is
+\texttt{curve\_wall\_segments}.  Horizontal, vertical, analytic CD,
+finite-line, manual \texttt{Wall*}, reservoir, and piston paths are not part
+of the simple export target.
+
+The current Vulkan parity target is:
+\begin{verbatim}
+vulkan/sim/TestPythonBoundarySpheres
+\end{verbatim}
+It uses the new \texttt{ForceDynamicsSimple*} GLSL family and intentionally
+excludes reservoir and piston behavior.
 
 \subsection{Stable Shader Wrapper}
 
@@ -27,40 +32,30 @@ and may be regenerated.  Existing contact-query helpers such as
 \texttt{isParticleContact.glsl} remain hand-maintained shader infrastructure
 and are not rewritten by the ForceDynamics export.
 
-\texttt{ForceDynamics.glsl} exports reusable dynamics functions.  It does not
-own the scenario contact-discovery schedule and it does not choose the wall
-model.  The scenario \texttt{*P.comp} file owns wall-model selection with
-compile-time defines and calls the generated ForceDynamics functions in the
-appropriate order.
-
-Exactly one wall model must be selected by the scenario compute shader:
-\begin{verbatim}
-#define WALL_MODEL_SIMPLE
-#define WALL_MODEL_PIPE
-#define WALL_MODEL_BOUNDARY_PARTICLE
-\end{verbatim}
-
-The shader wrapper must guard against missing or conflicting wall-model
-selection:
-\begin{verbatim}
-#if defined(WALL_MODEL_SIMPLE) && defined(WALL_MODEL_PIPE)
-#error Select only one wall model.
-#endif
-#if defined(WALL_MODEL_SIMPLE) && defined(WALL_MODEL_BOUNDARY_PARTICLE)
-#error Select only one wall model.
-#endif
-#if defined(WALL_MODEL_PIPE) && defined(WALL_MODEL_BOUNDARY_PARTICLE)
-#error Select only one wall model.
-#endif
-#if !defined(WALL_MODEL_SIMPLE) && !defined(WALL_MODEL_PIPE) && \
-    !defined(WALL_MODEL_BOUNDARY_PARTICLE)
-#error Select one wall model.
-#endif
-\end{verbatim}
+\texttt{ForceDynamicsSimple.glsl} exports reusable simple dynamics
+functions.  The generated scenario compute shader owns contact discovery by
+scanning source corner cells, deduplicating target IDs discovered through
+multiple occupied cells, and calling the generated simple functions in the
+approved order.  There is no wrapper-level wall-model decision in the simple
+path: boundary-marker targets always mean parametric-wall locality.
 
 \subsection{Generated Files}
 
-Generated dynamics are divided by dependency:
+The new simple generated files are:
+\begin{itemize}
+    \item \texttt{ForceDynamicsSimple.glsl};
+    \item \texttt{ForceDynamicsSimpleBoundaryParticle.glsl};
+    \item \texttt{ForceDynamicsSimpleParametricWall.glsl};
+    \item \texttt{TestPythonBoundarySpheresP.comp}.
+\end{itemize}
+
+They are produced by:
+\begin{verbatim}
+tools/ExportForceDynamicsSimpleGLSL.py
+\end{verbatim}
+
+The older generated dynamics files remain compatibility artifacts for older
+scenario wrappers:
 \begin{itemize}
     \item \texttt{ForceDynamics.glsl} contains reusable core dynamics;
     \item \texttt{ForceDynamicsBoundaryParticle.glsl} contains straight
@@ -72,7 +67,8 @@ Generated dynamics are divided by dependency:
     \item \texttt{ForceDynamicsPiston.glsl} contains the analytic moving
     piston helpers;
     \item \texttt{ForceDynamicsParametricCurve.glsl} contains cubic
-    parametric evaluation, bounded closest-point search, and evaluator ID 5.
+    parametric evaluation and bounded closest-point search for the older
+    wrapper family.
 \end{itemize}
 
 Ordinary wall and straight boundary-particle scenarios must not require CD
@@ -120,23 +116,27 @@ layout (binding = 5) coherent buffer CollisionOut
 \subsection{Generated Boundary File}
 
 Boundary parameters are generated from the scenario cfg into
-\texttt{boundary.glsl}.  Wall geometry reads symbols such as
-\texttt{BOUNDARY\_XMIN}, \texttt{BOUNDARY\_XMAX},
-\texttt{BOUNDARY\_YMIN}, and \texttt{BOUNDARY\_YMAX} from that include.
-Generated ForceDynamics code assumes those symbols exist and must not hardcode
-the cfg values.
+\texttt{boundary.glsl}.  The simple path requires:
+\begin{itemize}
+    \item \texttt{wall\_contact\_offset};
+    \item \texttt{death\_x\_min/max},
+          \texttt{death\_y\_min/max}, and
+          \texttt{death\_z\_min/max};
+    \item \texttt{ParametricCurveSegment};
+    \item \texttt{CURVE\_WALL\_SEGMENT\_COUNT};
+    \item \texttt{CURVE\_WALL\_SEGMENTS}.
+\end{itemize}
 
-Boundary-particle wall model participation is selected by the wrapper, but
-wall-segment shape is target-owned.  The generated dispatcher reads:
-\begin{verbatim}
-uint evaluator_id = uint(round(P[BoundaryID].Data.z));
-\end{verbatim}
-Evaluator ID 1 selects the horizontal wall, 2 selects the vertical wall, 3
-selects the legacy CD nozzle wall, 4 selects the optional general finite-line
-implementation, and 5 selects the piecewise parametric-curve implementation.
-Unknown IDs return an invalid segment.  Active CD wrappers define
-\texttt{FORCE\_DYNAMICS\_PARAMETRIC\_CURVE\_AVAILABLE}; this is a module-
-availability guard, not a global wall-shape selection.
+The simple path does not use \texttt{BOUNDARY\_XMIN},
+\texttt{BOUNDARY\_XMAX}, \texttt{BOUNDARY\_YMIN},
+\texttt{BOUNDARY\_YMAX}, or any derived \texttt{boundary\_*} values from the
+\texttt{.tst} file.  Those fields are legacy simple-box metadata and must not
+be regenerated by \texttt{GenericGenData}.
+
+Boundary-particle wall participation is no longer selected by a dispatcher.
+If a target is a boundary particle, it is a locality marker for
+\texttt{curve\_wall\_segments}.  The evaluator is implied by the simple
+model, not stored in \texttt{P[BoundaryID].Data.z}.
 
 Linear-chamber wrappers include
 \texttt{ForceDynamicsLinearReservoir.glsl} and define
@@ -498,27 +498,17 @@ marker target.  The boundary-particle processor should build a local
 immediately, just as \texttt{ProcessWallCollision(...)} does for manual wall
 flags.
 
-Python and generated GLSL no longer select the evaluator through a global
-wall-function define.  Each boundary marker stores its evaluator ID in
-\texttt{pdata.ptype}; Python and the Vulkan loader copy it into runtime
-\texttt{ptype} and \texttt{Data.z}.  Generated
-\texttt{EvaluateWallSegment(SourceID, BoundaryID)} dispatches from that target
-value and supports horizontal, vertical, legacy CD-nozzle, finite-line, and
-piecewise parametric IDs.  Zero or unknown
-IDs return an invalid wall segment.  \texttt{pdata.temp\_vel} remains reserved.
+The simple path has no evaluator dispatcher.  Each boundary marker has
+\texttt{ptype=1} and exists only to make wall evaluation local.  When such a
+target is discovered, the generated simple shader evaluates
+\texttt{curve\_wall\_segments}, chooses the valid wall contact by physical
+\texttt{wallFlag}, and accumulates that force immediately.  \texttt{Data.z}
+is not a boundary evaluator channel, and \texttt{pdata.temp\_vel} remains
+reserved.
 
-The CD-nozzle evaluator treats boundary particles as locality markers and
-calculates the actual wall point and wall normal from the generated CD nozzle
-constants in \texttt{boundary.glsl}.  Required CD nozzle symbols include
-\texttt{CD\_NOZZLE\_START\_X}, \texttt{CD\_NOZZLE\_CENTER\_Y}, the five
-section lengths, and the inlet, throat, and exit radii.
-
-The active CD path uses cubic parametric segments emitted through
-\texttt{reservoir.glsl}.  Explicit GLSL templates evaluate points, tangents,
-second derivatives, and a bounded closest point before constructing the wall
-ghost.  This algorithm is template generated rather than inferred from the
-Python AST.  The older radius-and-slope evaluator remains available only for
-legacy scenarios.
+The older horizontal, vertical, analytic CD-nozzle, finite-line, and
+marker-owned evaluator-ID dispatch paths are historical compatibility work.
+They are not part of the \texttt{ForceDynamicsSimple*} export.
 
 Marker target IDs are broad-phase records, not physical wall identities.  A
 source may discover two adjacent markers for one wall when its extent spans

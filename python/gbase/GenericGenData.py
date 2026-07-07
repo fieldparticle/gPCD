@@ -11,7 +11,7 @@ from gbase.pdata import PTYPE_MOBILE, PTYPE_NULL, pdata
 class GenericGenData:
     """Generate particle data from declarative particle and wall configuration."""
 
-    BOUNDARY_EVALUATOR_PARAMETRIC = 5.0
+    BOUNDARY_PARTICLE_PTYPE = 1.0
 
     def __init__(self):
         self.parent = None
@@ -293,7 +293,7 @@ class GenericGenData:
         self.number_particles += 1
         self.number_boundary_particles += 1
         particle.pnum = self.number_particles
-        particle.ptype = self.BOUNDARY_EVALUATOR_PARAMETRIC
+        particle.ptype = self.BOUNDARY_PARTICLE_PTYPE
         particle.rx, particle.ry, particle.rz = position
         particle.vx = 0.0
         particle.vy = 0.0
@@ -342,7 +342,7 @@ class GenericGenData:
             "Parametric wall-marker report:\n"
             f"  curve segments: {len(self.curve_wall_segments)}\n"
             f"  unique boundary markers: {self.number_boundary_particles}\n"
-            f"  evaluator ID: {self.BOUNDARY_EVALUATOR_PARAMETRIC:g}\n"
+            f"  boundary ptype: {self.BOUNDARY_PARTICLE_PTYPE:g}\n"
             f"  markers added per segment: {segment_marker_counts}\n"
             "  occupancy rule: one marker per cell per physical wall\n"
             "  marker position: integer cell center\n"
@@ -496,13 +496,6 @@ class GenericGenData:
         """Write Vulkan metadata for the parametric particle simulation."""
         particle_data_bin_file = self.test_bin_name.replace(os.sep, "/")
         report_file = self.report_file.replace(os.sep, "/")
-        curve_extents = [
-            curve_bounds(segment) for segment in self.curve_wall_segments
-        ]
-        boundary_x_min = min(extent[0] for extent in curve_extents)
-        boundary_x_max = max(extent[1] for extent in curve_extents)
-        boundary_y_min = min(extent[2] for extent in curve_extents)
-        boundary_y_max = max(extent[3] for extent in curve_extents)
         view_center = self.itemcfg.get(
             "view_center",
             (
@@ -561,13 +554,6 @@ class GenericGenData:
                 "cell_occupancy_list_size = "
                 f"{self.cell_occupancy_list_size};\n"
             )
-
-            output.write(f"boundary_x_min = {boundary_x_min:.9f};\n")
-            output.write(f"boundary_x_max = {boundary_x_max:.9f};\n")
-            output.write(f"boundary_y_min = {boundary_y_min:.9f};\n")
-            output.write(f"boundary_y_max = {boundary_y_max:.9f};\n")
-            output.write(f"boundary_z_min = {self.particle_plane_z:.9f};\n")
-            output.write(f"boundary_z_max = {self.particle_plane_z:.9f};\n")
 
             output.write(f"death_x_min = {death_x_min:.9f};\n")
             output.write(f"death_x_max = {death_x_max:.9f};\n")

@@ -1,21 +1,35 @@
 % !TeX root = main.tex
 \section{Flow Dynamics Conventions}
 
-\subsection{Current Reservoir Direction}
+\subsection{Current Simple-Model Direction}
 
 Scheduled particle birth, lifecycle gating through \texttt{Data.w}, and
 outlet retirement have been retired from the live Python
 \texttt{ForceDynamics} path.  Mobile particles are generated active from
-frame zero.  The selected replacement is a finite, prefilled chamber with an
-analytic moving piston.  Python generation and simulation are verified.  The
-GLSL exporter now emits independent piston, general finite-line, and
-piecewise parametric-curve wall support.  The horizontal and CD-nozzle
-scenario wrappers compile and run through the Vulkan path.
+frame zero.  The current verification target is the simple particle model:
+mobile particles, boundary-particle locality markers, and stationary
+parametric walls generated from \texttt{curve\_wall\_segments}.  Reservoir,
+piston, and CD-nozzle flow remain separate later efforts until the simple
+Python and GLSL paths agree.
 
 The former deferred-birth design remains documented as a historical
-investigation in \texttt{DynamicsConventions.tex} and
-\texttt{ProblemEvolution.tex}.  It is not an active generation or dynamics
-rule.
+investigation in \texttt{ProblemEvolution.tex}.  It is not an active
+generation or dynamics rule.
+
+The active generic generator contract is:
+\begin{itemize}
+    \item mobile particles are active at frame zero;
+    \item boundary particles use \texttt{ptype=1};
+    \item \texttt{Data.z} is not used for wall evaluator selection;
+    \item all stationary wall geometry is in
+          \texttt{curve\_wall\_segments};
+    \item \texttt{death\_bounds} define permanent mobile-particle death;
+    \item \texttt{cell\_array\_width},
+          \texttt{cell\_array\_height}, and
+          \texttt{cell\_array\_depth} define the rectangular cell domain;
+    \item legacy derived \texttt{boundary\_*} test-file fields are not
+          emitted by \texttt{GenericGenData}.
+\end{itemize}
 
 \subsection{Horizontal Reservoir Generator}
 
@@ -80,7 +94,7 @@ the separately configured \texttt{piston\_velocity}.
 
 \subsection{Boundary Marker Geometry}
 
-Straight wall geometry is configured in two named collections:
+The earlier reservoir prototype used two named finite-line collections:
 \begin{verbatim}
 linear_chamber_segments = (...);
 linear_wall_segments = (...);
@@ -90,11 +104,13 @@ the finite line \(Ax+By+C=0\).  The normalized vector \((A,B)\) is the outward
 wall normal.  The collections distinguish chamber walls from attached
 conduit or nozzle walls without introducing different collision equations.
 
-Markers are no farther than one cell apart and shared coordinates are emitted
-once.  General linear markers use evaluator ID 4 through
-\texttt{pdata.ptype}; the Vulkan loader transports that value to
-\texttt{Data.z}.  Boundary markers remain
-occupancy placeholders rather than mobile dynamics sources.
+The simple generic path replaces those line-specific arrays with
+\texttt{curve\_wall\_segments}.  Straight walls are represented as cubic
+segments with zero higher-order coefficients, so horizontal, vertical,
+sloped, and curved walls share one evaluator.  Markers are no farther than one
+cell apart and shared coordinates are emitted once per physical wall flag.
+Boundary markers remain occupancy placeholders rather than mobile dynamics
+sources.
 
 The fixed vertical inlet marker row has been removed.  The analytic piston
 occupies that physical role without becoming a boundary particle.  The
@@ -108,9 +124,7 @@ The piston starts at \texttt{chamber\_bounds.x\_start}, advances with
 \texttt{chamber\_bounds.x\_end}.  Each
 active source evaluates it once before target scanning.  Python diagnostics
 report piston position, velocity, contact count, impulse, and momentum
-transfer.  At transitions, all valid marker candidates are evaluated and the
-deepest candidate for each physical wall flag is retained.  The CD nozzle now
-uses piecewise cubic parametric segments while preserving the
-same source-owned contact and piston rules.  Parametric markers use evaluator
-ID 5.  Vulkan uses the same segment coefficients for wall response, and the
-generator derives its visual OBJ from the same segment samples.
+transfer.  This work is deferred while \texttt{TestPythonBoundarySpheres}
+becomes the simple low-particle Vulkan parity target.  When piston and
+reservoir work resumes, it should inherit the same generic parametric wall
+contract instead of reintroducing finite-line or evaluator-ID branches.

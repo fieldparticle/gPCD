@@ -1,13 +1,13 @@
 Current status:
-	- Migrated the batch_test_001 Python scenarios to GenericGenData parametric walls
-	- Replaced active Python legacy/manual wall dispatch with evaluator-5 locality markers
-	- Preserved cfg-versus-binary particle loading while producing identical wall markers
-	- Retained the known starting-contact effective-radius tunneling defect for the next correction
+	- Reset the active Vulkan parity target to the simple generic particle model
+	- Clarified that boundary particles are ptype=1 locality markers, not Data.z evaluator carriers
+	- Removed legacy derived boundary_* fields from GenericGenData .tst output
+	- Added the ForceDynamicsSimple GLSL family and TestPythonBoundarySpheres compute target
+	- Documented that reservoir, piston, and CD-nozzle flow are deferred until simple Python/GLSL parity is stable
 Code Changes:
-	- Converted rectangular test walls to directed curve_wall_segments and repaired the batch manifest
-	- Added shared parametric marker sampling for generated and runtime-created boundary particles
-	- Deduplicated wall contacts by physical wall flag and retained the deepest valid contact
-	- Removed walls_on, Wall* geometry, and evaluator IDs 1-4 from active Python ForceDynamics
-	- Updated the Python viewer to render boundary markers as unfilled green circles
-	- Updated ForceDynamics, configuration, porting, and problem-evolution documentation
-Next: Remove starting-contact effective-radius scaling and suppression, initialize physical starting compression, and rerun TwoParticleHorizontalBug001
+	- Updated GenericGenData to emit generic boundary markers and omit boundary_x/y/z_min/max metadata
+	- Added tools/ExportForceDynamicsSimpleGLSL.py for the clean simple GLSL export path
+	- Generated ForceDynamicsSimple.glsl, ForceDynamicsSimpleBoundaryParticle.glsl, ForceDynamicsSimpleParametricWall.glsl, and TestPythonBoundarySpheresP.comp
+	- Updated DynamicsTheory, ForceDynamicsSource, FlowDynamicsConventions, Porting, PythonConfigurationVariables, and ProblemEvolution for the simple-model contract
+	- Recorded the Simple GLSL Restart in ProblemEvolution
+Next: Regenerate the simple test .tst/boundary.glsl path from curve_wall_segments, compile TestPythonBoundarySpheres shaders, and compare the simple Vulkan behavior against the Python batch cases

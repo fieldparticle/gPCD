@@ -1,6 +1,7 @@
 import pygame
 from pathlib import Path
 import math
+from types import SimpleNamespace
 
 from base.ForceDynamicsBase import ForceDynamics
 from base.VerAForceDynamicsBase import ForceDynamics as VerAForceDynamics
@@ -184,16 +185,42 @@ def _draw_overlap_lens(screen, left_center, left_radius, right_center, right_rad
     screen.blit(overlap_surface, (min_x, min_y))
 
 
-def _particle_momentum(particle):
-    mass = float(getattr(particle, "mass", 1.0))
-    return mass * float(particle.vx), mass * float(particle.vy)
+def _runtime_particle_position(particle_index, particle, dynamics=None):
+    if dynamics is not None and hasattr(dynamics, "GetCurrentParticlePosition"):
+        return dynamics.GetCurrentParticlePosition(particle_index)
+    return SimpleNamespace(
+        x=float(getattr(particle, "rx", 0.0)),
+        y=float(getattr(particle, "ry", 0.0)),
+        z=float(getattr(particle, "rz", 0.0)),
+    )
 
 
-def _particle_kinetic_energy(particle):
+def _runtime_particle_velocity(particle_index, particle, dynamics=None):
+    if dynamics is not None and hasattr(dynamics, "GetParticleVelocity"):
+        return dynamics.GetParticleVelocity(particle_index)
+    return getattr(
+        particle,
+        "VelRad",
+        SimpleNamespace(
+            x=float(getattr(particle, "vx", 0.0)),
+            y=float(getattr(particle, "vy", 0.0)),
+            z=float(getattr(particle, "vz", 0.0)),
+        ),
+    )
+
+
+def _particle_momentum(particle_index, particle, dynamics=None):
     mass = float(getattr(particle, "mass", 1.0))
-    vx = float(particle.vx)
-    vy = float(particle.vy)
-    vz = float(getattr(particle, "vz", 0.0))
+    velocity = _runtime_particle_velocity(particle_index, particle, dynamics)
+    return mass * float(velocity.x), mass * float(velocity.y)
+
+
+def _particle_kinetic_energy(particle_index, particle, dynamics=None):
+    mass = float(getattr(particle, "mass", 1.0))
+    velocity = _runtime_particle_velocity(particle_index, particle, dynamics)
+    vx = float(velocity.x)
+    vy = float(velocity.y)
+    vz = float(velocity.z)
     return 0.5 * mass * (vx * vx + vy * vy + vz * vz)
 
 
@@ -228,6 +255,13 @@ def _is_boundary_particle(particle_index, particle, dynamics=None):
     return float(getattr(particle, "ptype", 0.0)) > 0.5
 
 
+def _particle_contact_target_ids(particle_index, particle, dynamics=None):
+    """Return active particle contacts, preferring authoritative slots."""
+    if dynamics is not None and hasattr(dynamics, "ParticleContactTargetIDs"):
+        return dynamics.ParticleContactTargetIDs(particle_index)
+    return list(getattr(particle, "collision_list", ()))
+
+
 def _particle_colors(
     particle_index,
     particle,
@@ -241,7 +275,11 @@ def _particle_colors(
     if hsv_color:
         color = hsv_angle(particle.VelRad.w, hsv_val, hsv_sat)
         return color, color
-    if _has_active_wall_contact(particle) or particle.collision_list:
+    if _has_active_wall_contact(particle) or _particle_contact_target_ids(
+        particle_index,
+        particle,
+        dynamics,
+    ):
         return (255, 60, 60), (255, 210, 210)
     return (65, 125, 255), (145, 190, 255)
 
@@ -290,8 +328,14 @@ def _draw_presentation_sphere(screen, center, radius, fill, edge):
 def _total_momentum(particles, dynamics=None):
     total_x = 0.0
     total_y = 0.0
-    for particle in _active_particles(particles, dynamics):
-        momentum_x, momentum_y = _particle_momentum(particle)
+    for particle_index, particle in enumerate(particles):
+        if not _is_active_particle(particle_index, dynamics):
+            continue
+        momentum_x, momentum_y = _particle_momentum(
+            particle_index,
+            particle,
+            dynamics,
+        )
         total_x += momentum_x
         total_y += momentum_y
     return total_x, total_y
@@ -299,8 +343,9 @@ def _total_momentum(particles, dynamics=None):
 
 def _total_kinetic_energy(particles, dynamics=None):
     return sum(
-        _particle_kinetic_energy(particle)
-        for particle in _active_particles(particles, dynamics)
+        _particle_kinetic_energy(particle_index, particle, dynamics)
+        for particle_index, particle in enumerate(particles)
+        if _is_active_particle(particle_index, dynamics)
     )
 
 
@@ -537,7 +582,9 @@ def _summary_table_header():
     )
 
 
-def _particle_report_row(particle):
+def _particle_report_row(particle_index, particle, dynamics=None):
+    position = _runtime_particle_position(particle_index, particle, dynamics)
+    velocity = _runtime_particle_velocity(particle_index, particle, dynamics)
     internal_momentum = float(
         getattr(
             particle,
@@ -547,10 +594,10 @@ def _particle_report_row(particle):
     )
     return (
         f"p{int(particle.pnum):>3}"
-        f" x={particle.rx:>13.6f}"
-        f" y={particle.ry:>13.6f}"
-        f" vx={particle.vx:>13.6f}"
-        f" vy={particle.vy:>13.6f}"
+        f" x={position.x:>13.6f}"
+        f" y={position.y:>13.6f}"
+        f" vx={velocity.x:>13.6f}"
+        f" vy={velocity.y:>13.6f}"
         f" int_mom={internal_momentum:>14.8f}"
     )
 
@@ -639,9 +686,10 @@ def _draw_particles(
         for index, particle in enumerate(particles):
             if not _is_visible_particle(index, particle, dynamics):
                 continue
+            position = _runtime_particle_position(index, particle, dynamics)
             center = _to_screen(
-                particle.rx,
-                particle.ry,
+                position.x,
+                position.y,
                 view_box,
                 screen_width,
                 screen_height,
@@ -697,7 +745,14 @@ def _draw_particles(
         if not _is_visible_particle(index, particle, dynamics):
             continue
         is_boundary = _is_boundary_particle(index, particle, dynamics)
-        center = _to_screen(particle.rx, particle.ry, view_box, screen_width, screen_height)
+        position = _runtime_particle_position(index, particle, dynamics)
+        center = _to_screen(
+            position.x,
+            position.y,
+            view_box,
+            screen_width,
+            screen_height,
+        )
         radius = (
             1
             if as_points
@@ -736,7 +791,11 @@ def _draw_particles(
         for index, particle, center, radius, _edge, is_boundary in particle_screen_data:
             if is_boundary:
                 continue
-            for target_id in particle.collision_list:
+            for target_id in _particle_contact_target_ids(
+                index,
+                particle,
+                dynamics,
+            ):
                 if target_id <= index:
                     continue
                 target_screen_data = next(
@@ -837,7 +896,7 @@ def _draw_particles(
             continue
         if active_particle_count > 4 and displayed_particle_rows >= 4:
             break
-        row_text = _particle_report_row(particle)
+        row_text = _particle_report_row(index, particle, dynamics)
         row = row_font.render(row_text, True, (220, 230, 240))
         screen.blit(row, (10, row_y))
         row_y += 20
@@ -862,7 +921,21 @@ def _report_particles(reporting, frame_number, particles, start_diagnostics, dyn
     for particle_index, particle in enumerate(particles):
         if not _is_active_particle(particle_index, dynamics):
             continue
-        reporting.report_particle(frame_number, particle, motion_summary)
+        reporting.report_particle(
+            frame_number,
+            particle,
+            motion_summary,
+            position=_runtime_particle_position(
+                particle_index,
+                particle,
+                dynamics,
+            ),
+            velocity=_runtime_particle_velocity(
+                particle_index,
+                particle,
+                dynamics,
+            ),
+        )
 
 
 def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_number=None):
@@ -874,19 +947,19 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
     test_file_name = Path(cfg_file).name
     run_configuration = live.run_configuration
     thin_mode = _as_points(run_configuration)
-    senario = None
+    scenario = None
     if study == True or "in_line_obj" in run_configuration:
-        senario = InLineTest()
-        live.senario = senario
+        scenario = InLineTest()
+        live.scenario = scenario
         live.study = study
         live.inline_test_flag = True
-        senario.Create(live.config, study_number)
+        scenario.Create(live.config, study_number)
         if shadow is not None:
-            shadow_senario = InLineTest()
-            shadow.senario = shadow_senario
+            shadow_scenario = InLineTest()
+            shadow.scenario = shadow_scenario
             shadow.study = study
             shadow.inline_test_flag = True
-            shadow_senario.Create(shadow.config, study_number)
+            shadow_scenario.Create(shadow.config, study_number)
     if batch_mode:
         run_configuration["end_frame"] = end_frame
     if "run_debug_dir" not in run_configuration:

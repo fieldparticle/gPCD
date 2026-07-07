@@ -1,0 +1,7 @@
+But the generated shader is not yet ready as a clean Vulkan compile. I found likely compile blockers:
+CONTACT_PARTICLE and CONTACT_WALL are used but not defined in GLSL.
+wall_contact_offset is used but not defined/passed.
+ERROR_INVALID_DT and ERROR_PARTICLE_OUT_OF_BOUNDS are used but not defined.
+SetError() writes collIn.ErrorReturn, but BoundarySpheresMotionP.comp includes atomic.glsl, which defines collOut, not collIn.
+BoundarySpheresMotionP.comp calls isWallContact(...), but I did not find a GLSL definition for it.
+Some exported methods are still TODO stubs, but they are mostly diagnostic/contact-slot/start-contact pieces and not on the immediate force path.

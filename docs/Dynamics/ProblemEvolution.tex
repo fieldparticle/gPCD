@@ -1414,7 +1414,7 @@ initial state already contained overlap.  The contact could compress relative
 to its initial separation and rebound to that separation.  Once it returned,
 the state became \texttt{resolved}.  Force geometry was then suppressed until
 the physical center distance reached the full physical separation
-(r_i+r_j).
+$(r_i+r_j)$.
 
 \subsubsection{<current form>}
 
@@ -1483,7 +1483,7 @@ history-dependent transparent-overlap region.
 
 The model replacement must preserve physical radii for all geometry.  Physical
 overlap must always create physical contact, and contact may end only at
-(d_{ij}\ge r_i+r_j).  Starting overlap must instead initialize local
+$(d_{ij}\ge r_i+r_j)$.  Starting overlap must instead initialize local
 compression state and its corresponding potential-energy baseline.  Contact
 history may control stored momentum, phase, and constitutive response, but it
 must never resize particles or suppress physically valid geometry.  The same
@@ -1518,7 +1518,8 @@ contract rather than repairing wall construction.
 All cases in \texttt{batch\_test\_001.cfg} now define stationary walls with
 \texttt{curve\_wall\_segments}.  Straight walls are cubic records whose
 quadratic and cubic coefficients are zero.  Every boundary marker uses
-evaluator ID 5 and serves only as a locality record.  Once a local marker is
+\texttt{ptype=1} and serves only as a locality record.  Wall evaluator IDs are
+not stored in \texttt{Data.z} in the generic path.  Once a local marker is
 found, Python evaluates every configured segment directly, retains the deepest
 valid contact for each positive physical \texttt{wall\_flag}, and accumulates
 that wall force once.
@@ -1527,7 +1528,7 @@ The manual wall scan, \texttt{walls\_on}, \texttt{Wall*} geometry, evaluator
 IDs 1--4, and their Python dispatcher functions have been removed from the
 active Force model.  \texttt{pdata\_from\_file} keeps its original meaning:
 true loads the complete generated binary, while false loads mobile cfg records
-and constructs evaluator-5 markers in memory.  Generator and runtime marker
+and constructs generic boundary markers in memory.  Generator and runtime marker
 construction share the same sampling functions in
 \texttt{ParametricCurve.py}.
 
@@ -1548,3 +1549,50 @@ penetration, and physical identity.  This separation avoids both marker-order
 dependence and duplicated wall equations.  Reservoir generators can extend
 \texttt{GenericGenData} for population and piston behavior without creating a
 second stationary-wall model.
+
+\subsection{Simple GLSL Restart}
+
+\subsubsection{previous form}
+
+The GLSL port accumulated several generations of wall and reservoir behavior
+inside one family of includes and scenario wrappers.  The active files mixed
+manual simple walls, pipe walls, boundary-particle walls, analytic CD-nozzle
+walls, finite-line reservoir walls, piston helpers, death rules, and old
+scheduled-birth lifecycle helpers.  That made it difficult to verify the
+small particle cases from \texttt{batch\_test\_001.cfg} because every compile
+or runtime failure had to be separated from reservoir and CD-nozzle history.
+
+\subsubsection{current form}
+
+The simple Vulkan target is now
+\texttt{vulkan/sim/TestPythonBoundarySpheres}.  A new exporter,
+\texttt{tools/ExportForceDynamicsSimpleGLSL.py}, generates a separate simple
+GLSL family:
+\begin{itemize}
+    \item \texttt{ForceDynamicsSimple.glsl};
+    \item \texttt{ForceDynamicsSimpleBoundaryParticle.glsl};
+    \item \texttt{ForceDynamicsSimpleParametricWall.glsl};
+    \item \texttt{TestPythonBoundarySpheresP.comp}.
+\end{itemize}
+
+The generated compute schedule preserves the old cell/corner broad phase
+rather than scanning every particle.  Each source scans its eight occupied
+corner cells, deduplicates target IDs found through multiple cells, processes
+mobile particle contacts, and treats boundary-marker targets as locality for
+\texttt{curve\_wall\_segments}.  It skips null, boundary, and dead particles
+as sources and applies death bounds after position integration.  The simple
+\texttt{.tst} contract no longer emits derived
+\texttt{boundary\_x/y/z\_min/max} fields; wall geometry comes only from
+\texttt{curve\_wall\_segments}.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+The restart removes the decision tree from the low-particle validation path.
+The simple path can now be compared against Python without reservoir birth,
+piston motion, CD geometry, finite-line compatibility, or legacy manual-wall
+fallbacks.  Reservoir and piston work can resume later by building on the
+same generic wall contract after the simple Python and GLSL paths agree.
