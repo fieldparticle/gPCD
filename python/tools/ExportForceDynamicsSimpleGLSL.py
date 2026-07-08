@@ -7,7 +7,7 @@ targets the GenericGenData/TestPythonBoundarySpheres model:
 - boundary particles as locality markers
 - parametric curve-wall segments
 - no reservoir lifecycle
-- no piston
+- optional analytic piston for packed reservoir tests
 - no CD-nozzle/horizontal/vertical evaluator dispatch
 """
 
@@ -70,6 +70,14 @@ SIMPLE_PARAMETRIC_METHODS = [
     "EvaluateParametricWallSegment",
 ]
 
+SIMPLE_PISTON_METHODS = [
+    "PistonEnabled",
+    "GetPistonPosition",
+    "GetPistonVelocity",
+    "EvaluatePistonWall",
+    "ProcessPistonCollision",
+]
+
 RETIRED_METHODS = {
     "ProcessWallCollision",
     "InitializeWallContactState",
@@ -83,10 +91,6 @@ RETIRED_METHODS = {
     "EvaluateVerticalWallSegment",
     "EvaluateCDNozzleWallSegment",
     "EvaluateLinearWallSegment",
-    "GetPistonPosition",
-    "GetPistonVelocity",
-    "EvaluatePistonWall",
-    "ProcessPistonCollision",
     "StartingParticleKey",
     "StartingWallKey",
     "InitializeStartingContactState",
@@ -135,7 +139,12 @@ def parse_source(source_path: Path) -> ForceDynamicsVisitor:
 
 
 def validate_surface(visitor: ForceDynamicsVisitor) -> list[str]:
-    exported = set(SIMPLE_CORE_METHODS + SIMPLE_BOUNDARY_METHODS + SIMPLE_PARAMETRIC_METHODS)
+    exported = set(
+        SIMPLE_CORE_METHODS
+        + SIMPLE_BOUNDARY_METHODS
+        + SIMPLE_PARAMETRIC_METHODS
+        + SIMPLE_PISTON_METHODS
+    )
     errors: list[str] = []
     missing = exported - set(visitor.methods)
     if missing:
@@ -611,13 +620,11 @@ bool CalcPosition(uint SourceID)
         P[SourceID].PosLocB.w = 1.0;
     }}
 
-#if defined(DEATH_BOUNDS_AVAILABLE)
     if (nextPosition.x < death_x_min || nextPosition.x > death_x_max
             || nextPosition.y < death_y_min || nextPosition.y > death_y_max
             || nextPosition.z < death_z_min || nextPosition.z > death_z_max) {{
         P[SourceID].Data.w = -1.0;
     }}
-#endif
     return true;
 }}
 
@@ -769,6 +776,124 @@ BoundaryWallSegment EvaluateParametricWallSegment(uint SourceID, uint BoundaryID
 """
 
 
+def render_piston(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
+    line = lambda name: method_line(visitor, name)
+    return f"""#ifndef FORCE_DYNAMICS_SIMPLE_PISTON_GLSL
+#define FORCE_DYNAMICS_SIMPLE_PISTON_GLSL
+
+// Generated from {source_path.as_posix()} by tools/ExportForceDynamicsSimpleGLSL.py.
+// Optional analytic piston support for packed reservoir tests.
+// Do not hand edit generated dynamics content.
+
+#if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
+
+// Python source: ForceDynamics.py:{line("PistonEnabled")}
+bool PistonEnabled()
+{{
+    return true;
+}}
+
+// Python source: ForceDynamics.py:{line("GetPistonPosition")}
+float GetPistonPosition(uint frame)
+{{
+    if (frame < piston_start_frame) {{
+        return CHAMBER_MIN.x;
+    }}
+
+    float elapsedFrames = float(frame - piston_start_frame);
+    float position = CHAMBER_MIN.x
+        + elapsedFrames * ShaderFlags.dt * PISTON_VELOCITY.x;
+    return min(position, CHAMBER_MAX.x);
+}}
+
+// Python source: ForceDynamics.py:{line("GetPistonVelocity")}
+vec3 GetPistonVelocity(uint frame)
+{{
+    if (frame < piston_start_frame) {{
+        return vec3(0.0);
+    }}
+    if (GetPistonPosition(frame) >= CHAMBER_MAX.x) {{
+        return vec3(0.0);
+    }}
+    return PISTON_VELOCITY;
+}}
+
+// Python source: ForceDynamics.py:{line("EvaluatePistonWall")}
+BoundaryWallSegment EvaluatePistonWall(uint SourceID)
+{{
+    vec3 sourcePosition = GetParticlePosition(SourceID).xyz;
+    if (sourcePosition.y < CHAMBER_MIN.y || sourcePosition.y > CHAMBER_MAX.y
+            || sourcePosition.z < CHAMBER_MIN.z
+            || sourcePosition.z > CHAMBER_MAX.z) {{
+        return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 1u, false);
+    }}
+
+    float radius = P[SourceID].Data.x;
+    float offset = WallContactOffsetDistance(radius);
+    float pistonX = GetPistonPosition(uint(ShaderFlags.frameNum));
+    vec3 ghost = vec3(
+        pistonX - radius + offset,
+        sourcePosition.y,
+        sourcePosition.z);
+    vec3 normal = vec3(-1.0, 0.0, 0.0);
+    float centerDistance = abs(ghost.x - sourcePosition.x);
+    if (centerDistance >= 2.0 * radius) {{
+        return BoundaryWallSegment(normal, 0.0, centerDistance, 1u, false);
+    }}
+
+    float overlapArea = particle_overlap_area(radius, radius, centerDistance);
+    return BoundaryWallSegment(normal, overlapArea, centerDistance, 1u, true);
+}}
+
+// Python source: ForceDynamics.py:{line("ProcessPistonCollision")}
+bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
+{{
+    if (!PistonEnabled()) {{ return true; }}
+
+    BoundaryWallSegment segment = EvaluatePistonWall(SourceID);
+    if (!segment.valid) {{ return true; }}
+
+    float sourceRadius = P[SourceID].Data.x;
+    float penetrationDepth = ParticlePenetrationDepth(
+        sourceRadius, sourceRadius, segment.centerDistance);
+    float maximumDepthDistance =
+        sourceRadius - WallContactOffsetDistance(sourceRadius);
+    if (segment.centerDistance - maximumDepthDistance < -EPSILON) {{
+        return SetError(ERROR_WALL_TUNNELING);
+    }}
+
+    vec3 pistonVelocity = GetPistonVelocity(uint(ShaderFlags.frameNum));
+    if (!CheckPenetrationStepResolution(
+            SourceID, segment.normal, sourceRadius, pistonVelocity)) {{
+        return false;
+    }}
+    if (!RegisterMaximumDepthConstraint(
+            SourceID,
+            segment.normal,
+            penetrationDepth,
+            sourceRadius,
+            pistonVelocity)) {{
+        return false;
+    }}
+
+    P[SourceID].contactCount += 1u;
+    ContactForceInput contact = ContactForceInput(
+        segment.wallFlag,
+        CONTACT_WALL,
+        segment.normal,
+        segment.overlapArea,
+        penetrationDepth,
+        pistonVelocity,
+        true);
+    return AccumulateContactForce(SourceID, contact, totalForce);
+}}
+
+#endif
+
+#endif
+"""
+
+
 def render_compute(source_path: Path) -> str:
     return f"""#version 460
 #extension GL_GOOGLE_include_directive : enable
@@ -795,6 +920,9 @@ def render_compute(source_path: Path) -> str:
 #include "../common/ForceDynamicsSimple.glsl"
 #include "../common/ForceDynamicsSimpleBoundaryParticle.glsl"
 #include "../common/ForceDynamicsSimpleParametricWall.glsl"
+#if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
+#include "../common/ForceDynamicsSimplePiston.glsl"
+#endif
 
 // Generated from {source_path.as_posix()} by tools/ExportForceDynamicsSimpleGLSL.py.
 // Simple source-owned compute schedule.
@@ -827,6 +955,12 @@ void main()
     P[SourceID].contactCount = 0u;
     P[SourceID].colFlg = 0u;
     vec3 totalForce = vec3(0.0);
+
+#if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
+    if (!ProcessPistonCollision(SourceID, totalForce)) {{
+        return;
+    }}
+#endif
 
     const uint DUP_LIST_SIZE = 32u;
     uint duplicateTargets[DUP_LIST_SIZE];
@@ -945,6 +1079,11 @@ def write_outputs(
         encoding="utf-8",
         newline="\n",
     )
+    (output_dir / "ForceDynamicsSimplePiston.glsl").write_text(
+        render_piston(source_path, visitor),
+        encoding="utf-8",
+        newline="\n",
+    )
     compute_output.parent.mkdir(parents=True, exist_ok=True)
     compute_output.write_text(
         render_compute(source_path),
@@ -984,6 +1123,9 @@ def main() -> int:
         print(f"  - {method}")
     print("Parametric wall methods:")
     for method in SIMPLE_PARAMETRIC_METHODS:
+        print(f"  - {method}")
+    print("Piston methods:")
+    for method in SIMPLE_PISTON_METHODS:
         print(f"  - {method}")
 
     if args.write:

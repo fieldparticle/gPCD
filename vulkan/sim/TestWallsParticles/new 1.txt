@@ -1,8 +1,0 @@
-Python generation and simulation have not been tested.
-.tst does not yet emit named chamber Y/Z bounds needed by ShaderObj.
-GLSL exporter has no piston or general linear-wall support.
-ShaderObj::Reservoir() currently writes an empty file.
-WriteWalls() exports death bounds but no line arrays or piston constants.
-Generated boundary.glsl is stale and still contains old aggregate bounds.
-Documentation predates the chamber/general-line migration.
-Next

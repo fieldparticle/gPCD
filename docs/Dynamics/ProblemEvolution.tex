@@ -1596,3 +1596,61 @@ The simple path can now be compared against Python without reservoir birth,
 piston motion, CD geometry, finite-line compatibility, or legacy manual-wall
 fallbacks.  Reservoir and piston work can resume later by building on the
 same generic wall contract after the simple Python and GLSL paths agree.
+
+\subsection{Reservoir Restart On The Simple Contract}
+
+\subsubsection{previous form}
+
+The earlier reservoir path mixed several concerns: scheduled particle birth,
+outlet retirement, finite-line wall arrays, boundary-marker evaluator IDs,
+and piston behavior.  This made it difficult to tell whether a failure came
+from reservoir lifecycle, wall geometry, broad-phase locality, or the core
+particle dynamics.
+
+During the first simple-GLSL restart, reservoir and piston support were
+intentionally deferred.  Death bounds were also guarded in the generated
+simple GLSL by \texttt{DEATH\_BOUNDS\_AVAILABLE}.  That guard made death
+planes optional even though the new generic \texttt{.tst} contract always
+emits six death-plane constants.
+
+\subsubsection{current form}
+
+\texttt{GenReservoir.py} now inherits \texttt{GenericGenData.py}.  It keeps
+the generic wall contract and adds only reservoir-specific generation:
+packed mobile particles, piston/chamber metadata, and optional reuse of
+\texttt{piston\_velocity} as the initial reservoir particle velocity.  Mobile
+particles are active at frame zero.  Boundary particles remain
+\texttt{ptype=1} locality markers for \texttt{curve\_wall\_segments}.  The
+reservoir does not reintroduce scheduled birth, outlet retirement, manual
+walls, or evaluator IDs in \texttt{Data.z}.
+
+The simple GLSL exporter now emits
+\texttt{ForceDynamicsSimplePiston.glsl} as an optional reservoir include.
+The base simple particle/wall path remains unchanged, while reservoir wrappers
+can include piston contact processing without using legacy finite-line or
+birth-lifecycle helpers.
+
+Death bounds are now unconditional in
+\texttt{ForceDynamicsSimple.glsl}.  A Vulkan capture showed particle 72
+reaching the cell-array boundary at frame 544.  The frame matched the
+kinematic calculation from the generated state:
+\[
+(33.0-19.4)/(0.05\cdot0.5)=544.
+\]
+Because \texttt{death\_x\_max=30} should have killed the particle earlier,
+the captured \texttt{ERROR\_PARTICLE\_OUT\_OF\_BOUNDS} exposed the optional
+death-bound guard as an incorrect contract.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+The reservoir is now an extension of the simple model rather than a competing
+model.  The base dynamics remain source-owned particle and parametric-wall
+processing.  Piston contact is optional wrapper behavior with explicit
+metadata, and death planes are mandatory lifecycle rules for every simple
+generated scenario.  This keeps the next validation target narrow: verify the
+simple GLSL particle/wall path, then verify the reservoir wrapper by adding
+only piston contact and packed initial conditions.

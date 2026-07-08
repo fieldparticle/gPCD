@@ -8,9 +8,10 @@ outlet retirement have been retired from the live Python
 \texttt{ForceDynamics} path.  Mobile particles are generated active from
 frame zero.  The current verification target is the simple particle model:
 mobile particles, boundary-particle locality markers, and stationary
-parametric walls generated from \texttt{curve\_wall\_segments}.  Reservoir,
-piston, and CD-nozzle flow remain separate later efforts until the simple
-Python and GLSL paths agree.
+parametric walls generated from \texttt{curve\_wall\_segments}.  Reservoir
+work is now being reintroduced as a generator extension of the same simple
+model rather than as a separate wall or lifecycle system.  CD-nozzle flow
+remains separate until the generic simple and reservoir paths are stable.
 
 The former deferred-birth design remains documented as a historical
 investigation in \texttt{ProblemEvolution.tex}.  It is not an active
@@ -31,19 +32,25 @@ The active generic generator contract is:
           emitted by \texttt{GenericGenData}.
 \end{itemize}
 
-\subsection{Horizontal Reservoir Generator}
+Death bounds are always part of the simple model contract.  Generated simple
+GLSL must read \texttt{death\_x/y/z\_min/max} unconditionally and mark mobile
+particles dead before they can continue to the harder cell-array boundary.
+There is no \texttt{DEATH\_BOUNDS\_AVAILABLE} feature switch in the current
+simple path.
 
-The active replacement work begins in:
+\subsection{Reservoir Generator}
+
+The active replacement work has moved to:
 \begin{verbatim}
-gbase/BoundaryParticleReservoirHorizontal.py
-cfg_gendata/BoundaryParticleReservoirHorizontal.cfg
+gbase/GenReservoir.py
+cfg_gendata/TestReservoir.cfg
 \end{verbatim}
 
-The generator owns the horizontal orientation.  Its cfg does not select a
-wall model, wall function, conduit axis, birth schedule, or retirement plane.
-The reduced Python profile remains selected through
-\texttt{sub\_BPRPPy.cfg}; the Vulkan profile is deferred until Python
-geometry and dynamics are verified.
+\texttt{GenReservoir.py} inherits the generic particle/wall generator and
+adds packed mobile-particle population plus piston metadata.  Its cfg does not
+select a wall model, wall function, conduit axis, birth schedule, or
+retirement plane.  The reduced Python profile remains selected through
+\texttt{sub\_BPRPPy.cfg}; Vulkan uses the same generated data contract.
 
 The packed physical domain is configured as:
 \begin{verbatim}
@@ -90,7 +97,9 @@ The occupied grid is centered in any remaining space so opposing wall margins
 are equal.
 
 Generated mobile particles are active from frame zero.  Piston motion uses
-the separately configured \texttt{piston\_velocity}.
+the configured \texttt{piston\_velocity}.  During the current reservoir
+bring-up, that same value may also be used as the initial reservoir particle
+velocity.  This is a generator convention, not a scheduled-birth lifecycle.
 
 \subsection{Boundary Marker Geometry}
 
@@ -124,7 +133,11 @@ The piston starts at \texttt{chamber\_bounds.x\_start}, advances with
 \texttt{chamber\_bounds.x\_end}.  Each
 active source evaluates it once before target scanning.  Python diagnostics
 report piston position, velocity, contact count, impulse, and momentum
-transfer.  This work is deferred while \texttt{TestPythonBoundarySpheres}
-becomes the simple low-particle Vulkan parity target.  When piston and
-reservoir work resumes, it should inherit the same generic parametric wall
-contract instead of reintroducing finite-line or evaluator-ID branches.
+transfer.
+
+The simple GLSL exporter now emits an optional
+\texttt{ForceDynamicsSimplePiston.glsl} include for reservoir wrappers.  This
+keeps piston support separate from the base simple particle/wall path while
+preserving the same source-owned contact schedule.  Reservoir wrappers that
+enable the piston must include the piston file and provide
+\texttt{piston\_start\_frame}, chamber bounds, and piston velocity constants.

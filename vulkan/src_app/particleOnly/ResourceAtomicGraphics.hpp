@@ -39,6 +39,7 @@ struct GCollision
 	uint32_t particleNumber;
 	uint32_t ReadWriteConflict;
 	uint32_t ExcessSlots;
+	uint32_t FrameNumber;
 };
 class ResourceAtomicGraphics : public Resource
 {

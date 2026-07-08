@@ -420,6 +420,12 @@ class ForceDynamics(ForceContactDynamics):
             for name, value in constants.items()
             if name.startswith("ERROR_")
         }
+        self.error_names[self.constants.ERROR_INITIAL_PARTICLE_OVERLAP] = (
+            "ERROR_INITIAL_PARTICLE_OVERLAP"
+        )
+        self.error_names[self.constants.ERROR_INITIAL_WALL_OVERLAP] = (
+            "ERROR_INITIAL_WALL_OVERLAP"
+        )
         return self.constants
 
     def ErrorDescription(self):

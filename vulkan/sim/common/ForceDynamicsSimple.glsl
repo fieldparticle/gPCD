@@ -444,13 +444,11 @@ bool CalcPosition(uint SourceID)
         P[SourceID].PosLocB.w = 1.0;
     }
 
-#if defined(DEATH_BOUNDS_AVAILABLE)
     if (nextPosition.x < death_x_min || nextPosition.x > death_x_max
             || nextPosition.y < death_y_min || nextPosition.y > death_y_max
             || nextPosition.z < death_z_min || nextPosition.z > death_z_max) {
         P[SourceID].Data.w = -1.0;
     }
-#endif
     return true;
 }
 

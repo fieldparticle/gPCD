@@ -114,16 +114,129 @@ void ResourceAtomicCompute::PushMem(uint32_t currentBuffer)
 
 void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 {
+
+
 #ifndef NDEBUG
 	if (m_App->m_EnableValidationLayers == false)
 		return;
 	
-	#if 1
-		void* mappedData = {};
-		vmaMapMemory(m_App->m_vmaAllocator, m_Allocation[currentBuffer], &mappedData);
-		memcpy(&m_collisionStruct, mappedData, sizeof(Collision));
-		vmaUnmapMemory(m_App->m_vmaAllocator, m_Allocation[currentBuffer]);
-	#endif
+	
+	void* mappedData = {};
+	vmaMapMemory(m_App->m_vmaAllocator, m_Allocation[currentBuffer], &mappedData);
+	memcpy(&m_collisionStruct, mappedData, sizeof(Collision));
+	vmaUnmapMemory(m_App->m_vmaAllocator, m_Allocation[currentBuffer]);
+	
+	if (m_collisionStruct.ErrorNumber != 0)
+	{
+		std::ostringstream  objtxt;
+		objtxt << "====================================================================" << std::ends;
+		mout << objtxt.str().c_str() << ende;
+		objtxt.str("");
+		objtxt.clear();
+
+		if (m_collisionStruct.ErrorNumber == 3)
+		{
+			m_App->m_quit_event = 3;
+			objtxt << " ResourceAtomicCompute::ERROR_INVALID_DT "
+				<< m_collisionStruct.ErrorNumber 
+				<< " frame:"
+				<< m_collisionStruct.FrameNumber
+				<< std::ends;
+			mout << objtxt.str().c_str() << ende;
+		}
+
+		else
+		if(m_collisionStruct.ErrorNumber == 4)
+		{
+			m_App->m_quit_event = 4;
+			objtxt << " ResourceAtomicCompute::ERROR_CONTACT_LIST_MISSING "
+				<< m_collisionStruct.ErrorNumber 
+				<< " frame:" 
+				<< m_collisionStruct.FrameNumber
+				<< std::ends;
+			mout << objtxt.str().c_str() << ende;
+		}
+		else 
+		if(m_collisionStruct.ErrorNumber == 5)
+		{
+			m_App->m_quit_event = 5;
+			objtxt << " ResourceAtomicCompute:ERROR_PARTICLE_OUT_OF_BOUNDS:"
+				<< m_collisionStruct.ErrorNumber 
+				<< " frame:"
+				<< m_collisionStruct.FrameNumber
+				<< std::ends;
+			mout << objtxt.str().c_str() << ende;
+
+		}
+		else
+		if(m_collisionStruct.ErrorNumber == 6)
+		{
+			m_App->m_quit_event = 1;
+			objtxt << " ResourceAtomicCompute:ERROR_PARTICLE_TUNNELING "
+				<< m_collisionStruct.ErrorNumber 
+				<< " frame:"
+				<< m_collisionStruct.FrameNumber
+				<< std::ends;
+			mout << objtxt.str().c_str() << ende;
+
+		}
+		else
+		if(m_collisionStruct.ErrorNumber == 8)
+		{
+			m_App->m_quit_event = 1;
+			objtxt << " ResourceAtomicCompute:ERROR_WALL_TUNNELING "
+				<< m_collisionStruct.ErrorNumber 
+				<< " frame:"
+				<< m_collisionStruct.FrameNumber
+				<< std::ends;
+			mout << objtxt.str().c_str() << ende;
+
+		}
+		else
+		if (m_collisionStruct.ErrorNumber == 9)
+		{
+			m_App->m_quit_event = 1;
+			objtxt << " ResourceAtomicCompute:ERROR_MAX_DEPTH_CONSTRAINT "
+				<< m_collisionStruct.ErrorNumber 
+				<< " frame:"
+				<< m_collisionStruct.FrameNumber
+				<< std::ends;
+			mout << objtxt.str().c_str() << ende;
+
+		}
+		else
+		if (m_collisionStruct.ErrorNumber == 10)
+		{
+			m_App->m_quit_event = 1;
+			objtxt << " ResourceAtomicCompute:ERROR_PENETRATION_STEP_TOO_LARGE "
+				<< m_collisionStruct.ErrorNumber 
+				<< " frame:"
+				<< m_collisionStruct.FrameNumber
+				<< std::ends;
+			mout << objtxt.str().c_str() << ende;
+
+		}
+		else
+		{
+
+			m_App->m_quit_event = 1;
+			objtxt << " ResourceAtomicCompute:Undefined Error: "
+				<< m_collisionStruct.ErrorNumber 
+				<< " frame:"
+				<< m_collisionStruct.FrameNumber
+				<< std::ends;
+			mout << objtxt.str().c_str() << ende;
+
+		}
+		//throw std::runtime_error(objtxt.str().c_str());
+		objtxt.str("");
+		objtxt.clear();
+		objtxt << "====================================================================" << std::endl;
+		mout << objtxt.str().c_str() << ende;
+
+	}
+
+
 		//memcpy(&m_collisionStruct, m_BuffersMapped[0], sizeof(Collision));
 
 	if (m_App->m_FrameNumber < m_ReportCompFramesLessThan )

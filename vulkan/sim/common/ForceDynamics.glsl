@@ -802,6 +802,7 @@ bool CalcPosition(uint SourceID)
 bool SetError(uint error_code)
 {
     collOut.ErrorNumber = error_code;
+	collOut.FrameNumber = uint(ShaderFlags.frameNum);
     return false;
 }
 

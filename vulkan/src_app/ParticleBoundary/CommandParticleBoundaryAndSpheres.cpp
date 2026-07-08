@@ -173,11 +173,12 @@ void CommandParticleBoundaryAndSpheres::RecordSubPassCube(uint32_t imageindex, u
 		0,
 		nullptr);
 
-	ResourceParticlePush* pco = (ResourceParticlePush*)(m_RCO->GetResourceName("PushConstants"));
-	unsigned long pcosize = sizeof(pco->m_ShaderFlags);
-	void* sfl = &pco->m_ShaderFlags;
+	ResourceParticlePush* pco		= (ResourceParticlePush*)(m_RCO->GetResourceName("PushConstants"));
+	unsigned long pcosize			= sizeof(pco->m_ShaderFlags);
+	void* sfl						= &pco->m_ShaderFlags;
 	pco->m_ShaderFlags.DrawInstance = 1.0;
-	uint32_t upcosize = static_cast<uint32_t>(pcosize);
+	uint32_t upcosize				= static_cast<uint32_t>(pcosize);
+
 	// Bind push constants to command buffer.
 	vkCmdPushConstants(m_CommandBuffers[currentBuffer],
 		m_PLO[m_BoundarySubPass]->m_PipelineLayout,

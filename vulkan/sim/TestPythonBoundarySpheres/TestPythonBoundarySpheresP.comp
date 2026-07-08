@@ -23,6 +23,9 @@
 #include "../common/ForceDynamicsSimple.glsl"
 #include "../common/ForceDynamicsSimpleBoundaryParticle.glsl"
 #include "../common/ForceDynamicsSimpleParametricWall.glsl"
+#if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
+#include "../common/ForceDynamicsSimplePiston.glsl"
+#endif
 
 // Generated from C:/_DJ/gPCD/python/base/ForceDynamics.py by tools/ExportForceDynamicsSimpleGLSL.py.
 // Simple source-owned compute schedule.
@@ -55,6 +58,12 @@ void main()
     P[SourceID].contactCount = 0u;
     P[SourceID].colFlg = 0u;
     vec3 totalForce = vec3(0.0);
+
+#if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
+    if (!ProcessPistonCollision(SourceID, totalForce)) {
+        return;
+    }
+#endif
 
     const uint DUP_LIST_SIZE = 32u;
     uint duplicateTargets[DUP_LIST_SIZE];

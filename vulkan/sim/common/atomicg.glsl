@@ -41,5 +41,6 @@ layout (binding = 5) coherent buffer CollisionIn
 	uint particleNumber;
 	uint ReadWriteConflict;			// Reserved
 	uint ExcessSlots;
+	uint FrameNumber;			// Reserved
 	
 } collIn;

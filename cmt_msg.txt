@@ -1,13 +1,14 @@
 Current status:
 	- Reset the active Vulkan parity target to the simple generic particle model
 	- Clarified that boundary particles are ptype=1 locality markers, not Data.z evaluator carriers
-	- Removed legacy derived boundary_* fields from GenericGenData .tst output
-	- Added the ForceDynamicsSimple GLSL family and TestPythonBoundarySpheres compute target
-	- Documented that reservoir, piston, and CD-nozzle flow are deferred until simple Python/GLSL parity is stable
+	- Added GenReservoir as a reservoir generator that inherits the GenericGenData contract
+	- Added optional simple piston GLSL export support for reservoir wrappers
+	- Made simple GLSL death bounds mandatory instead of feature-gated
 Code Changes:
 	- Updated GenericGenData to emit generic boundary markers and omit boundary_x/y/z_min/max metadata
+	- Added GenReservoir for packed active reservoir particles plus chamber and piston metadata
 	- Added tools/ExportForceDynamicsSimpleGLSL.py for the clean simple GLSL export path
-	- Generated ForceDynamicsSimple.glsl, ForceDynamicsSimpleBoundaryParticle.glsl, ForceDynamicsSimpleParametricWall.glsl, and TestPythonBoundarySpheresP.comp
-	- Updated DynamicsTheory, ForceDynamicsSource, FlowDynamicsConventions, Porting, PythonConfigurationVariables, and ProblemEvolution for the simple-model contract
-	- Recorded the Simple GLSL Restart in ProblemEvolution
-Next: Regenerate the simple test .tst/boundary.glsl path from curve_wall_segments, compile TestPythonBoundarySpheres shaders, and compare the simple Vulkan behavior against the Python batch cases
+	- Generated ForceDynamicsSimple.glsl, ForceDynamicsSimpleBoundaryParticle.glsl, ForceDynamicsSimpleParametricWall.glsl, ForceDynamicsSimplePiston.glsl, and TestPythonBoundarySpheresP.comp
+	- Updated FlowDynamicsConventions, Porting, and ProblemEvolution for the simple/reservoir contract
+	- Recorded the reservoir restart and frame-544 death-bound capture in ProblemEvolution
+Next: Update the TestReservoir Vulkan wrapper to include the optional simple piston path, then rerun the reservoir capture and confirm particles die at death bounds instead of reaching the cell-array boundary

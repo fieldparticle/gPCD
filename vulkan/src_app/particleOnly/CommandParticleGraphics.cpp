@@ -145,10 +145,10 @@ void CommandParticleGraphics::RecordCommands( uint32_t imageIndex, uint32_t curr
 		0,
 		nullptr);
 
-	ResourceParticlePush* pco = (ResourceParticlePush*) (m_RCO->GetResourceName("PushConstants"));
-	unsigned long pcosize = sizeof(pco->m_ShaderFlags);
-	void* sfl = &pco->m_ShaderFlags;
-	uint32_t upcosize = static_cast<uint32_t>(pcosize);
+	ResourceParticlePush* pco	= (ResourceParticlePush*) (m_RCO->GetResourceName("PushConstants"));
+	unsigned long pcosize		= sizeof(pco->m_ShaderFlags);
+	void* sfl					= &pco->m_ShaderFlags;
+	uint32_t upcosize			= static_cast<uint32_t>(pcosize);
 	// Bind push constants to command buffer.
 	vkCmdPushConstants(m_CommandBuffers[currentBuffer],
 		m_PLO[0]->m_PipelineLayout,

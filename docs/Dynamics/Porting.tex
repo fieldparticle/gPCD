@@ -15,15 +15,18 @@ The active Python wall source now contains only generic parametric walls.
 Boundary particles identify locality with positive \texttt{ptype}; they do
 not carry evaluator IDs in \texttt{Data.z}.  The canonical wall geometry is
 \texttt{curve\_wall\_segments}.  Horizontal, vertical, analytic CD,
-finite-line, manual \texttt{Wall*}, reservoir, and piston paths are not part
-of the simple export target.
+finite-line, and manual \texttt{Wall*} paths are not part of the simple
+export target.  Reservoir behavior is layered on top of the simple target by
+an optional piston include and generator metadata; it must not reintroduce
+scheduled birth or separate wall evaluators.
 
 The current Vulkan parity target is:
 \begin{verbatim}
 vulkan/sim/TestPythonBoundarySpheres
 \end{verbatim}
 It uses the new \texttt{ForceDynamicsSimple*} GLSL family and intentionally
-excludes reservoir and piston behavior.
+excludes reservoir behavior.  Reservoir wrappers may include the optional
+\texttt{ForceDynamicsSimplePiston.glsl} file after the base simple includes.
 
 \subsection{Stable Shader Wrapper}
 
@@ -46,6 +49,7 @@ The new simple generated files are:
     \item \texttt{ForceDynamicsSimple.glsl};
     \item \texttt{ForceDynamicsSimpleBoundaryParticle.glsl};
     \item \texttt{ForceDynamicsSimpleParametricWall.glsl};
+    \item \texttt{ForceDynamicsSimplePiston.glsl};
     \item \texttt{TestPythonBoundarySpheresP.comp}.
 \end{itemize}
 
@@ -127,6 +131,12 @@ Boundary parameters are generated from the scenario cfg into
     \item \texttt{CURVE\_WALL\_SEGMENTS}.
 \end{itemize}
 
+Death bounds are required by the simple generated dynamics and are evaluated
+unconditionally.  Generated simple GLSL must not wrap the death-plane check in
+\texttt{DEATH\_BOUNDS\_AVAILABLE}.  A particle that crosses a death plane is
+marked dead through \texttt{Data.w=-1} before it can drift onward to the
+cell-array out-of-bounds error.
+
 The simple path does not use \texttt{BOUNDARY\_XMIN},
 \texttt{BOUNDARY\_XMAX}, \texttt{BOUNDARY\_YMIN},
 \texttt{BOUNDARY\_YMAX}, or any derived \texttt{boundary\_*} values from the
@@ -137,6 +147,16 @@ Boundary-particle wall participation is no longer selected by a dispatcher.
 If a target is a boundary particle, it is a locality marker for
 \texttt{curve\_wall\_segments}.  The evaluator is implied by the simple
 model, not stored in \texttt{P[BoundaryID].Data.z}.
+
+Reservoir piston wrappers additionally require:
+\begin{itemize}
+    \item \texttt{piston\_start\_frame};
+    \item \texttt{chamber\_x\_start/end},
+          \texttt{chamber\_y\_bottom/top}, and
+          \texttt{chamber\_z\_front/back};
+    \item \texttt{piston\_velocity\_x/y/z}.
+\end{itemize}
+Those constants are not required by ordinary simple boundary-sphere wrappers.
 
 Linear-chamber wrappers include
 \texttt{ForceDynamicsLinearReservoir.glsl} and define
