@@ -52,19 +52,27 @@ select a wall model, wall function, conduit axis, birth schedule, or
 retirement plane.  The reduced Python profile remains selected through
 \texttt{sub\_BPRPPy.cfg}; Vulkan uses the same generated data contract.
 
-The packed physical domain is configured as:
-\begin{verbatim}
-chamber_bounds = [
-    x_start, x_end,
-    y_bottom, y_top,
-    z_front, z_back
-];
-\end{verbatim}
+The packed physical domain is derived from the configured curves rather than
+from a second rectangular chamber record.  The reservoir configuration uses
+\texttt{curve\_wall\_segments} with generator-only role metadata:
+\begin{itemize}
+    \item \texttt{curve\_role=1}: packing curve;
+    \item \texttt{curve\_role=2}: boundary curve.
+\end{itemize}
+Packing curves define the upstream chamber used for mobile-particle
+population and piston travel.  Boundary curves define stationary collision
+walls.  Runtime GLSL does not branch on curve role; role is generation
+metadata.
 
-For the horizontal model, positive (x) is axial.  Every chamber bound must
-lie inside the explicit rectangular cell domain defined by
+For the horizontal model, positive (x) is axial.  The generator derives the
+reservoir packing \(x\) and \(y\) spans from \texttt{curve\_role=1} curves and
+validates them against the explicit rectangular cell domain defined by
 \texttt{cell\_array\_width}, \texttt{cell\_array\_height}, and
-\texttt{cell\_array\_depth}.
+\texttt{cell\_array\_depth}.  The configuration item
+\texttt{packing\_z\_bounds} supplies the Z span:
+\begin{verbatim}
+packing_z_bounds = [z_front, z_back];
+\end{verbatim}
 
 The current two-dimensional convention is:
 \[
@@ -96,10 +104,11 @@ N=\left\lfloor\frac{L}{\ell}\right\rfloor+1.
 The occupied grid is centered in any remaining space so opposing wall margins
 are equal.
 
-Generated mobile particles are active from frame zero.  Piston motion uses
-the configured \texttt{piston\_velocity}.  During the current reservoir
-bring-up, that same value may also be used as the initial reservoir particle
-velocity.  This is a generator convention, not a scheduled-birth lifecycle.
+Generated mobile particles are active from frame zero.  Their initial velocity
+comes from \texttt{initial\_particle\_velocity}.  Piston motion uses
+\texttt{piston\_velocity}.  During bring-up these may be configured to the
+same vector, but they are separate concepts: one initializes mobile
+particles, the other moves the analytic piston.
 
 \subsection{Boundary Marker Geometry}
 
@@ -128,16 +137,18 @@ generator writes both binary particle data and test metadata.
 \subsection{Current Piston Work}
 
 \texttt{piston\_start\_frame} controls when the rear plane begins moving.
-The piston starts at \texttt{chamber\_bounds.x\_start}, advances with
-\texttt{piston\_velocity}, and stops at
-\texttt{chamber\_bounds.x\_end}.  Each
-active source evaluates it once before target scanning.  Python diagnostics
-report piston position, velocity, contact count, impulse, and momentum
-transfer.
+The piston starts at the minimum \(x\) extent of the packing curves, advances
+with \texttt{piston\_velocity}, and stops at the maximum \(x\) extent of the
+packing curves.  The generator emits those derived values as
+\texttt{piston\_x\_start} and \texttt{piston\_x\_stop}.  Each active source
+evaluates the piston once before target scanning.  Python diagnostics report
+piston position, velocity, contact count, impulse, and momentum transfer.
 
 The simple GLSL exporter now emits an optional
 \texttt{ForceDynamicsSimplePiston.glsl} include for reservoir wrappers.  This
 keeps piston support separate from the base simple particle/wall path while
 preserving the same source-owned contact schedule.  Reservoir wrappers that
 enable the piston must include the piston file and provide
-\texttt{piston\_start\_frame}, chamber bounds, and piston velocity constants.
+\texttt{piston\_start\_frame}, \texttt{piston\_x\_start},
+\texttt{piston\_x\_stop}, and \texttt{piston\_velocity\_x/y/z}.  The simple
+piston include does not require or read \texttt{CHAMBER\_MIN/MAX} constants.

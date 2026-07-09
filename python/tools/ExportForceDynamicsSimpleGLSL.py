@@ -352,6 +352,15 @@ void SetNextParticleVelocity(uint ParticleID, vec4 velocity)
 bool SetError(uint errorCode)
 {{
     collOut.ErrorNumber = errorCode;
+    collOut.FrameNumber = uint(ShaderFlags.frameNum);
+    return false;
+}}
+
+bool SetError(uint errorCode, uint SourceID)
+{{
+    collOut.ErrorNumber = errorCode;
+    collOut.FrameNumber = uint(ShaderFlags.frameNum);
+    collOut.ParticleNumber = SourceID;
     return false;
 }}
 
@@ -410,7 +419,7 @@ bool CheckPenetrationStepResolution(
     float penetrationReserve =
         (1.0 - MAXIMUM_PENETRATION_FRACTION) * sourceRadius;
     if (inwardDisplacement > penetrationReserve + EPSILON) {{
-        return SetError(ERROR_PENETRATION_STEP_TOO_LARGE);
+        return SetError(ERROR_PENETRATION_STEP_TOO_LARGE, SourceID);
     }}
     return true;
 }}
@@ -423,7 +432,7 @@ ParticleGeometry GetPhysicalParticleContact(uint SourceID, uint TargetID)
     float physicalProximity =
         geometry.centerDistance - geometry.targetRadius;
     if (physicalProximity < -EPSILON) {{
-        SetError(ERROR_PARTICLE_TUNNELING);
+        SetError(ERROR_PARTICLE_TUNNELING, SourceID);
         return ParticleGeometry(vec3(0.0), 0.0, geometry.centerDistance,
             geometry.sourceRadius, geometry.targetRadius, false);
     }}
@@ -456,7 +465,7 @@ bool RegisterMaximumDepthConstraint(
     }}
 
     if (maximumDepthConstraintCount >= MAX_SOURCE_DEPTH_CONSTRAINTS) {{
-        return SetError(ERROR_MAX_DEPTH_CONSTRAINT);
+        return SetError(ERROR_MAX_DEPTH_CONSTRAINT, SourceID);
     }}
     maximumDepthConstraintNormals[maximumDepthConstraintCount] = normal;
     maximumDepthConstraintLimits[maximumDepthConstraintCount] =
@@ -518,7 +527,7 @@ bool ProcessParametricWallCollision(
     float maximumDepthDistance =
         sourceRadius - WallContactOffsetDistance(sourceRadius);
     if (segment.centerDistance - maximumDepthDistance < -EPSILON) {{
-        return SetError(ERROR_WALL_TUNNELING);
+        return SetError(ERROR_WALL_TUNNELING, SourceID);
     }}
     if (!CheckPenetrationStepResolution(
             SourceID, segment.normal, sourceRadius, vec3(0.0))) {{
@@ -576,7 +585,7 @@ bool ApplySourceMaximumDepth(uint SourceID)
     vec3 containedVelocity = vec3(0.0);
     if (!ProjectSourceVelocityToContactSet(
             candidate.xyz, containedVelocity)) {{
-        return SetError(ERROR_MAX_DEPTH_CONSTRAINT);
+        return SetError(ERROR_MAX_DEPTH_CONSTRAINT, SourceID);
     }}
     candidate.xyz = containedVelocity;
     candidate.w = VelocityAngle(candidate.x, candidate.y);
@@ -587,7 +596,7 @@ bool ApplySourceMaximumDepth(uint SourceID)
 bool CalcVelocity(uint SourceID, vec3 totalForce)
 {{
     float dt = ShaderFlags.dt;
-    if (dt <= 0.0) {{ return SetError(ERROR_INVALID_DT); }}
+    if (dt <= 0.0) {{ return SetError(ERROR_INVALID_DT, SourceID); }}
     float mass = GetParticleMass(SourceID);
     vec4 startVelocity = GetStartFrameVelocity(SourceID);
     vec4 nextVelocity = startVelocity;
@@ -600,7 +609,7 @@ bool CalcVelocity(uint SourceID, vec3 totalForce)
 bool CalcPosition(uint SourceID)
 {{
     float dt = ShaderFlags.dt;
-    if (dt <= 0.0) {{ return SetError(ERROR_INVALID_DT); }}
+    if (dt <= 0.0) {{ return SetError(ERROR_INVALID_DT, SourceID); }}
 
     vec4 position = GetParticlePosition(SourceID);
     vec4 velocity = GetNextParticleVelocity(SourceID);
@@ -609,7 +618,7 @@ bool CalcPosition(uint SourceID)
     if (nextPosition.x < 0.0 || nextPosition.x >= float(WIDTH)
             || nextPosition.y < 0.0 || nextPosition.y >= float(HEIGHT)
             || nextPosition.z < 0.0 || nextPosition.z >= float(DEPTH)) {{
-        return SetError(ERROR_PARTICLE_OUT_OF_BOUNDS);
+        return SetError(ERROR_PARTICLE_OUT_OF_BOUNDS, SourceID);
     }}
 
     if (uint(ShaderFlags.positionBuffer) == 0u) {{
@@ -796,38 +805,41 @@ bool PistonEnabled()
 // Python source: ForceDynamics.py:{line("GetPistonPosition")}
 float GetPistonPosition(uint frame)
 {{
-    if (frame < piston_start_frame) {{
-        return CHAMBER_MIN.x;
+    uint pistonStartFrame = uint(piston_start_frame);
+    if (frame < pistonStartFrame) {{
+        return piston_x_start;
     }}
 
-    float elapsedFrames = float(frame - piston_start_frame);
-    float position = CHAMBER_MIN.x
-        + elapsedFrames * ShaderFlags.dt * PISTON_VELOCITY.x;
-    return min(position, CHAMBER_MAX.x);
+    float elapsedFrames = float(frame - pistonStartFrame);
+    vec3 pistonVelocity = vec3(
+        piston_velocity_x,
+        piston_velocity_y,
+        piston_velocity_z);
+    float position = piston_x_start
+        + elapsedFrames * ShaderFlags.dt * pistonVelocity.x;
+    return min(position, piston_x_stop);
 }}
 
 // Python source: ForceDynamics.py:{line("GetPistonVelocity")}
 vec3 GetPistonVelocity(uint frame)
 {{
-    if (frame < piston_start_frame) {{
+    uint pistonStartFrame = uint(piston_start_frame);
+    if (frame < pistonStartFrame) {{
         return vec3(0.0);
     }}
-    if (GetPistonPosition(frame) >= CHAMBER_MAX.x) {{
+    if (GetPistonPosition(frame) >= piston_x_stop) {{
         return vec3(0.0);
     }}
-    return PISTON_VELOCITY;
+    return vec3(
+        piston_velocity_x,
+        piston_velocity_y,
+        piston_velocity_z);
 }}
 
 // Python source: ForceDynamics.py:{line("EvaluatePistonWall")}
 BoundaryWallSegment EvaluatePistonWall(uint SourceID)
 {{
     vec3 sourcePosition = GetParticlePosition(SourceID).xyz;
-    if (sourcePosition.y < CHAMBER_MIN.y || sourcePosition.y > CHAMBER_MAX.y
-            || sourcePosition.z < CHAMBER_MIN.z
-            || sourcePosition.z > CHAMBER_MAX.z) {{
-        return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 1u, false);
-    }}
-
     float radius = P[SourceID].Data.x;
     float offset = WallContactOffsetDistance(radius);
     float pistonX = GetPistonPosition(uint(ShaderFlags.frameNum));
@@ -859,7 +871,7 @@ bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
     float maximumDepthDistance =
         sourceRadius - WallContactOffsetDistance(sourceRadius);
     if (segment.centerDistance - maximumDepthDistance < -EPSILON) {{
-        return SetError(ERROR_WALL_TUNNELING);
+        return SetError(ERROR_WALL_TUNNELING, SourceID);
     }}
 
     vec3 pistonVelocity = GetPistonVelocity(uint(ShaderFlags.frameNum));
@@ -962,7 +974,7 @@ void main()
     }}
 #endif
 
-    const uint DUP_LIST_SIZE = 32u;
+    const uint DUP_LIST_SIZE = MAX_CELL_OCCUPANY * 8u;
     uint duplicateTargets[DUP_LIST_SIZE];
     uint duplicateCount = 0u;
     for (uint index = 0u; index < DUP_LIST_SIZE; ++index) {{
@@ -987,29 +999,29 @@ void main()
                 continue;
             }}
 
-            bool duplicate = false;
-            for (uint duplicateIndex = 0u;
-                    duplicateIndex < duplicateCount;
-                    ++duplicateIndex) {{
-                if (duplicateTargets[duplicateIndex] == TargetID) {{
-                    duplicate = true;
-                    break;
-                }}
-            }}
-            if (duplicate) {{
-                continue;
-            }}
-            if (duplicateCount >= DUP_LIST_SIZE) {{
-                SetError(ERROR_CONTACT_LIST_MISSING);
-                return;
-            }}
-            duplicateTargets[duplicateCount] = TargetID;
-            duplicateCount += 1u;
-
             if (IsBoundaryParticle(TargetID)) {{
                 if (!ParametricBoundaryMarkerApplies(SourceID, TargetID)) {{
                     continue;
                 }}
+
+                bool duplicate = false;
+                for (uint duplicateIndex = 0u;
+                        duplicateIndex < duplicateCount;
+                        ++duplicateIndex) {{
+                    if (duplicateTargets[duplicateIndex] == TargetID) {{
+                        duplicate = true;
+                        break;
+                    }}
+                }}
+                if (duplicate) {{
+                    continue;
+                }}
+                if (duplicateCount >= DUP_LIST_SIZE) {{
+                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                    return;
+                }}
+                duplicateTargets[duplicateCount] = TargetID;
+                duplicateCount += 1u;
 
                 BoundaryWallSegment segment =
                     EvaluateParametricWallSegment(SourceID, TargetID);
@@ -1028,6 +1040,25 @@ void main()
             if (!IsMobileParticleActiveForDynamics(TargetID)) {{
                 continue;
             }}
+
+            bool duplicate = false;
+            for (uint duplicateIndex = 0u;
+                    duplicateIndex < duplicateCount;
+                    ++duplicateIndex) {{
+                if (duplicateTargets[duplicateIndex] == TargetID) {{
+                    duplicate = true;
+                    break;
+                }}
+            }}
+            if (duplicate) {{
+                continue;
+            }}
+            if (duplicateCount >= DUP_LIST_SIZE) {{
+                SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                return;
+            }}
+            duplicateTargets[duplicateCount] = TargetID;
+            duplicateCount += 1u;
 
             ParticleGeometry geometry =
                 GetPhysicalParticleContact(SourceID, TargetID);

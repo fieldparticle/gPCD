@@ -775,14 +775,8 @@ class ForceDynamics(ForceContactDynamics):
 
         if self.PistonEnabled():
             piston_x = self.GetPistonPosition(self.ShaderFlags.frameNum)
-            bounds = self.run_configuration["chamber_bounds"]
             for source_id in mobile_ids:
                 source_position = self.GetParticlePosition(source_id)
-                if not (
-                    float(bounds[2]) <= float(source_position.y) <= float(bounds[3])
-                    and float(bounds[4]) <= float(source_position.z) <= float(bounds[5])
-                ):
-                    continue
                 radius = float(self.particles[source_id].Data.x)
                 penetration = radius - (float(source_position.x) - piston_x)
                 if penetration > self.EPSILON:

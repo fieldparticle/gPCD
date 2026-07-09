@@ -1654,3 +1654,167 @@ metadata, and death planes are mandatory lifecycle rules for every simple
 generated scenario.  This keeps the next validation target narrow: verify the
 simple GLSL particle/wall path, then verify the reservoir wrapper by adding
 only piston contact and packed initial conditions.
+
+\subsection{Dead Particles In Vertex Broad Phase}
+
+\subsubsection{previous form}
+
+The simple reservoir compute path marked mobile particles dead by writing
+\texttt{Data.w < 0} after they crossed a configured death plane.  Compute
+source processing and contact-target processing skipped dead particles, but
+the \texttt{TestReservoir} vertex shader still advanced far enough to color
+and insert those records into the cell-occupancy corner lists.
+
+This created visual noise after particles crossed the death zone and could
+also leave dead records visible to the next broad-phase build.  The problem
+was not a new particle type: \texttt{ptype} still distinguished null,
+mobile, and boundary records.  The missing rule was lifecycle filtering in
+the vertex path.
+
+\subsubsection{current form}
+
+\texttt{TestReservoirP.vert} now clears the particle's corner-list entries and
+then returns before rendering or occupancy insertion when
+\texttt{Data.w < 0}.  Dead particles receive zero point size and neutral
+output color, and they do not contribute cell locations for later compute
+passes.
+
+The active particle categories remain:
+\begin{itemize}
+    \item \texttt{ptype=-1}: null particle;
+    \item \texttt{ptype=0}: mobile particle;
+    \item \texttt{ptype=1}: boundary marker.
+\end{itemize}
+Dead state is orthogonal to \texttt{ptype}; it is carried by negative
+\texttt{Data.w}.
+
+\subsubsection{difference outcome}
+
+full solution
+
+\subsubsection{Analysis}
+
+The fix keeps lifecycle ownership consistent across compute and graphics.
+Compute death bounds decide when a mobile particle becomes dead, while the
+vertex stage must honor that state before doing either visual work or
+broad-phase occupancy work.  This prevents dead records from being mistaken
+for active contact participants and removes stale color artifacts from the
+reservoir visualization.
+
+Error diagnostics were also separated from particle-count accounting by using
+a dedicated \texttt{ParticleNumber} field for the failing source ID.  That
+keeps \texttt{numParticles} available for its count/debug role and makes
+source-owned runtime errors readable in Vulkan logs.
+
+\subsection{Function-Wall Boundary Model Direction}
+
+\subsubsection{previous form}
+
+The generic wall path moved toward fully parametric curve segments using
+\texttt{x(t)} and \texttt{y(t)}.  Runtime contact used a bounded closest-point
+search: sample candidate \texttt{t} values, choose the nearest sample, refine
+with Newton iteration, clamp \texttt{t} to \([0,1]\), and then calculate the
+wall tangent and normal at that closest point.
+
+That representation is powerful, but it is broader than the current model
+needs.  The active two-dimensional conduit walls are intended to be smooth,
+single-valued functions of position, not looping or self-overlapping curves.
+The boundary particle is also not meant to be the wall geometry itself.  Its
+job is to mark that a cell contains a wall so the mobile particle can be sent
+to the wall evaluator.  The evaluator should then use the mobile particle's
+\(x,y\) position and the wall definition to calculate the physical response.
+
+The leakage seen near the start of the converging section exposed this
+confusion.  Small particles could enter cells near the wall transition without
+getting a reliable wall response.  Treating marker centers as geometry, or
+making marker rasterization increasingly dense, does not solve the underlying
+model issue.  It only changes which cells happen to trigger the evaluator.
+
+\subsubsection{current form}
+
+The next boundary model should use function walls for the active Python and
+simple GLSL work.  A wall segment is evaluated directly from the mobile
+particle position:
+\[
+    y_{wall} = f(x_{particle}).
+\]
+For cubic function segments this can be represented as
+\[
+    y = y_0 + a_1 dx + a_2 dx^2 + a_3 dx^3,
+    \qquad dx = x - x_0.
+\]
+The local slope is
+\[
+    \frac{dy}{dx} = a_1 + 2a_2 dx + 3a_3 dx^2.
+\]
+The wall definition, or the generator, must provide the outward normal
+orientation for the segment.  Runtime code should not need separate lower-wall
+and upper-wall branches.  Once the outward normal is known, every wall uses the
+same signed-distance calculation:
+\[
+    d_{out} = (p - p_{wall}) \cdot n_{out},
+\]
+where \(p\) is the particle center, \(p_{wall}\) is the point on the wall at
+that particle position, and \(n_{out}\) is the outward wall normal.  The
+penetration depth is then
+\[
+    \delta = r + d_{out}.
+\]
+A contact exists when \(\delta > 0\).  The response force acts inward, opposite
+the outward normal.
+
+Vertical walls are the only required special case.  They can be represented as
+\(x = c\) with a configured outward normal.  They still use the same signed
+normal penetration formula after selecting the wall point
+\((c, y_{particle})\).
+
+Boundary markers remain broad-phase sentinels.  A marker says that the cell is
+near a wall; it does not define the wall's position, tangent, normal, or
+penetration depth.  The physical geometry comes from the function-wall segment
+and its normal orientation.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+The cleanup should happen in this order.
+
+First, clean up the active model before adding more behavior:
+\begin{itemize}
+    \item keep the leakage-response experiments backed out of the active path;
+    \item retire the general closest-point/Newton parametric evaluator from the
+          simple and reservoir direction once the function-wall evaluator is in
+          place;
+    \item settle on one wall configuration shape for the active path instead of
+          maintaining both generic parametric curves and function walls;
+    \item keep Vulkan unchanged until the Python behavior is validated.
+\end{itemize}
+
+Next, make the Python changes:
+\begin{itemize}
+    \item update the configuration contract to describe function-wall segments
+          and vertical wall segments explicitly;
+    \item update the generator so boundary particles mark wall-containing cells
+          as locality sentinels, not as sampled wall geometry;
+    \item implement the Python wall evaluator from particle \(x,y\), wall
+          function, slope, and outward normal;
+    \item validate starting geometry, small-particle wall contact, and the
+          converging-section transition in Python before exporting anything to
+          Vulkan.
+\end{itemize}
+
+Only after Python passes should the Vulkan path be changed:
+\begin{itemize}
+    \item update the simple GLSL exporter/templates for function-wall metadata
+          and evaluation;
+    \item regenerate the simple common GLSL and the active test wrapper;
+    \item run Vulkan captures around the converging transition and compare the
+          wall-contact behavior with Python;
+    \item then resume reservoir and piston work on top of the verified simple
+          boundary model.
+\end{itemize}
+
+This keeps tomorrow's work focused: clean the model representation first,
+prove the Python wall response, then port the verified behavior to GLSL.

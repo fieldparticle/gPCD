@@ -202,9 +202,8 @@ class ForceContactDynamics:
 
     def GetPistonPosition(self, frame):
         """Return the piston x position for the specified simulation frame."""
-        bounds = self.run_configuration["chamber_bounds"]
-        start_x = float(bounds[0])
-        stop_x = float(bounds[1])
+        start_x = float(self.run_configuration["piston_x_start"])
+        stop_x = float(self.run_configuration["piston_x_stop"])
         start_frame = int(self.run_configuration["piston_start_frame"])
         velocity_x = float(self.run_configuration["piston_velocity"][0])
 
@@ -214,10 +213,13 @@ class ForceContactDynamics:
 
     def PistonEnabled(self):
         """Return whether this scenario defines the analytic piston model."""
+        if not bool(self.run_configuration.get("piston_enabled", False)):
+            return False
         return all(
             key in self.run_configuration
             for key in (
-                "chamber_bounds",
+                "piston_x_start",
+                "piston_x_stop",
                 "piston_velocity",
                 "piston_start_frame",
             )
@@ -226,7 +228,7 @@ class ForceContactDynamics:
     def GetPistonVelocity(self, frame):
         """Return zero while parked and the configured velocity while moving."""
         start_frame = int(self.run_configuration["piston_start_frame"])
-        stop_x = float(self.run_configuration["chamber_bounds"][1])
+        stop_x = float(self.run_configuration["piston_x_stop"])
         if int(frame) < start_frame or self.GetPistonPosition(frame) >= stop_x:
             return self.create_vec4()
 
@@ -238,12 +240,6 @@ class ForceContactDynamics:
         """Evaluate the analytic vertical piston plane for one mobile source."""
         source_position = self.GetParticlePosition(SourceID)
         radius = float(self.particles[SourceID].Data.x)
-        bounds = self.run_configuration["chamber_bounds"]
-        if not (
-            float(bounds[2]) <= float(source_position.y) <= float(bounds[3])
-            and float(bounds[4]) <= float(source_position.z) <= float(bounds[5])
-        ):
-            return None
 
         offset = self.WallContactOffsetDistance(radius)
         piston_x = self.GetPistonPosition(self.ShaderFlags.frameNum)

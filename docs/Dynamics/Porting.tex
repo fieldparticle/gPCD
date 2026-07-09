@@ -113,9 +113,16 @@ layout (binding = 5) coherent buffer CollisionOut
 	uint vnumParticles; 	// Number of particles emitted from compute to verterx.
 	uint ErrorNumber;
 	uint holdPidx;			// Reserved
+	uint FrameNumber;
+	uint ParticleNumber;
 
 } collOut;
 \end{verbatim}
+
+\texttt{ParticleNumber} is the failing source-particle identifier for
+source-owned generated errors.  It must not be overloaded onto
+\texttt{numParticles}, because \texttt{numParticles} is also used for particle
+count/debug accounting.
 
 \subsection{Generated Boundary File}
 
@@ -151,12 +158,13 @@ model, not stored in \texttt{P[BoundaryID].Data.z}.
 Reservoir piston wrappers additionally require:
 \begin{itemize}
     \item \texttt{piston\_start\_frame};
-    \item \texttt{chamber\_x\_start/end},
-          \texttt{chamber\_y\_bottom/top}, and
-          \texttt{chamber\_z\_front/back};
+    \item \texttt{piston\_x\_start};
+    \item \texttt{piston\_x\_stop};
     \item \texttt{piston\_velocity\_x/y/z}.
 \end{itemize}
 Those constants are not required by ordinary simple boundary-sphere wrappers.
+The simple piston include does not require \texttt{CHAMBER\_MIN/MAX} or
+derived chamber-bound constants.
 
 Linear-chamber wrappers include
 \texttt{ForceDynamicsLinearReservoir.glsl} and define

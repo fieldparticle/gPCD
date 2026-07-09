@@ -107,6 +107,8 @@ void ResourceAtomicCompute::PushMem(uint32_t currentBuffer)
 	m_collisionStruct.holdPidx = 0;
 	m_collisionStruct.numParticles = 0;
 	m_collisionStruct.vnumParticles = 0;
+	m_collisionStruct.ErrorNumber = 0;
+	m_collisionStruct.FrameNumber = 0;
 	vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, &m_collisionStruct, m_Allocation[currentBuffer],
 		0, sizeof(Collision));
 
@@ -141,6 +143,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
+				<< " pnum:" << m_collisionStruct.ParticleNumber
 				<< std::ends;
 			mout << objtxt.str().c_str() << ende;
 		}
@@ -153,6 +156,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:" 
 				<< m_collisionStruct.FrameNumber
+				<< " pnum:" << m_collisionStruct.ParticleNumber
 				<< std::ends;
 			mout << objtxt.str().c_str() << ende;
 		}
@@ -164,6 +168,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
+				<< " pnum:" << m_collisionStruct.ParticleNumber
 				<< std::ends;
 			mout << objtxt.str().c_str() << ende;
 
@@ -176,6 +181,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
+				<< " pnum:" << m_collisionStruct.ParticleNumber
 				<< std::ends;
 			mout << objtxt.str().c_str() << ende;
 
@@ -188,6 +194,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
+				<< " pnum:" << m_collisionStruct.ParticleNumber
 				<< std::ends;
 			mout << objtxt.str().c_str() << ende;
 
@@ -200,6 +207,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
+				<< " pnum:" << m_collisionStruct.ParticleNumber
 				<< std::ends;
 			mout << objtxt.str().c_str() << ende;
 
@@ -212,6 +220,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
+				<< " pnum:" << m_collisionStruct.ParticleNumber
 				<< std::ends;
 			mout << objtxt.str().c_str() << ende;
 
@@ -224,6 +233,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
+				<< " pnum:" << m_collisionStruct.ParticleNumber
 				<< std::ends;
 			mout << objtxt.str().c_str() << ende;
 

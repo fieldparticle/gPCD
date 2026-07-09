@@ -520,7 +520,6 @@ class BoundaryCDNozzleReservoir:
             output.write(");\n")
 
             output.write(f"wall_contact_offset = {self.wall_contact_offset:.9f};\n")
-            output.write('wall_type = "WALL_MODEL_BOUNDARY_PARTICLE";\n')
             output.write(f"DT = {self.dt:.9f};\n")
             output.write(
                 "contact_force_measure = "

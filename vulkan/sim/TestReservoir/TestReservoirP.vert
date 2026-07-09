@@ -102,9 +102,18 @@ void main(){
 		return;
 	}
 	
-	// Clear this paricles corner array
+	// Clear this particle's corner array. Dead particles must not leave stale
+	// cell-locality state behind.
 	for (uint kk = 0;kk<8;kk++)
 		P[index].CornerList[kk].ploc = npos;
+
+	if(P[index].Data.w < 0.0)
+	{
+		gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+		gl_PointSize = 0.0;
+		fragColor = vec3(0.0, 0.0, 0.0);
+		return;
+	}
 
 	float cx=0.0;
 	float cy=0.0;

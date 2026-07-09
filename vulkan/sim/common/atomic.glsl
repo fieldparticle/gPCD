@@ -41,5 +41,6 @@ layout (binding = 5) coherent buffer CollisionOut
 	uint ErrorNumber;
 	uint holdPidx;			// Reserved
 	uint FrameNumber;			// Reserved
+	uint ParticleNumber;
 	
 } collOut;

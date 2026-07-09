@@ -159,6 +159,9 @@ markers.  The generic simple model no longer stores a wall evaluator in
 applicable configured curve segments are evaluated.  At most one contact is
 retained for each positive physical \texttt{wall\_flag}: the deepest valid
 contact.  Marker particle IDs are not physical wall identities.
+Generator-only curve roles may identify packing curves and boundary curves,
+but those roles are not runtime evaluator selectors.  Runtime wall response is
+defined by the configured curve geometry and physical wall flag.
 
 A stationary wall is an external momentum sink or source.  Particle-only
 momentum is therefore not a closed-system invariant when stationary walls are
@@ -345,6 +348,11 @@ deferred admission are retired.  Permanent life state is:
 After integration, a mobile particle outside the rectangular cell array is an
 error.  A mobile particle outside any configured death plane becomes dead.
 Death bounds never apply to boundary markers.
+
+Dead state is not a particle type.  A dead mobile particle remains a mobile
+record with negative \texttt{Data.w}.  Compute and vertex paths must both test
+that lifecycle state before treating the record as a source, target,
+cell-occupancy participant, or rendered particle.
 
 The rectangular cell index is
 

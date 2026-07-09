@@ -55,7 +55,7 @@ public:
 	void WriteShaderHeaderCDNOZ();
 	void WriteShaderDbgHeader();
 	void WriteWalls();
-	void Reservoir();
+	void Piston();
 	void WriteCDNoz();
 	std::ostringstream ParametricCurves();
 

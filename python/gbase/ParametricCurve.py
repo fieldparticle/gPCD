@@ -1,9 +1,16 @@
 import math
 
 
+def geometry_values(segment):
+    """Return the nine geometry values, ignoring generator metadata."""
+    if len(segment) < 9:
+        raise ValueError("parametric curve segment must contain at least 9 values")
+    return segment[:9]
+
+
 def evaluate_point(segment, parameter):
     """Return the point on a cubic parametric segment at parameter t."""
-    ax, bx, cx, dx, ay, by, cy, dy, _wall_flag = segment
+    ax, bx, cx, dx, ay, by, cy, dy, _wall_flag = geometry_values(segment)
     t = float(parameter)
     t_squared = t * t
     t_cubed = t_squared * t
@@ -15,7 +22,7 @@ def evaluate_point(segment, parameter):
 
 def evaluate_tangent(segment, parameter):
     """Return the unnormalized curve tangent at parameter t."""
-    _ax, bx, cx, dx, _ay, by, cy, dy, _wall_flag = segment
+    _ax, bx, cx, dx, _ay, by, cy, dy, _wall_flag = geometry_values(segment)
     t = float(parameter)
     t_squared = t * t
     return (
@@ -25,7 +32,7 @@ def evaluate_tangent(segment, parameter):
 
 
 def _evaluate_second_derivative(segment, parameter):
-    _ax, _bx, cx, dx, _ay, _by, cy, dy, _wall_flag = segment
+    _ax, _bx, cx, dx, _ay, _by, cy, dy, _wall_flag = geometry_values(segment)
     t = float(parameter)
     return (
         2.0 * cx + 6.0 * dx * t,
@@ -113,7 +120,7 @@ def _quadratic_roots(a, b, c, epsilon=1.0e-12):
 
 def extrema_parameters(segment):
     """Return endpoints and interior x/y extrema parameters in [0, 1]."""
-    _ax, bx, cx, dx, _ay, by, cy, dy, _wall_flag = segment
+    _ax, bx, cx, dx, _ay, by, cy, dy, _wall_flag = geometry_values(segment)
     parameters = {0.0, 1.0}
     for linear, quadratic, cubic in ((bx, cx, dx), (by, cy, dy)):
         for root in _quadratic_roots(

@@ -236,7 +236,7 @@ void CommandParticleBoundaryAndSpheres::RecordSubPassCube(uint32_t imageindex, u
 		upcosize2,
 		sfl2);
 	ResourceVertexParticle* rvp = (ResourceVertexParticle*)(m_RCO->GetResourceName("VertexParticle"));
-	uint16_t vnum2 = dvo2->m_NumElements;
+	uint32_t vnum2 = dvo2->m_NumElements;
 	uint32_t numpts = rvp->m_NumParticles-1;
 	vkCmdDraw(m_CommandBuffers[currentBuffer], vnum2, numpts, 0, 0);
 
@@ -314,7 +314,7 @@ void CommandParticleBoundaryAndSpheres::RecordSubPassParticle(uint32_t imageinde
 		sfl);
 
 
-	uint16_t vnum = dvo->m_NumElements;
+	uint32_t vnum = dvo->m_NumElements;
 	vkCmdDraw(m_CommandBuffers[currentBuffer], vnum, 1, 0, 0);
 	
 }

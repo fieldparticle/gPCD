@@ -39,6 +39,7 @@ struct Collision
 	uint32_t ErrorNumber;
 	uint32_t holdPidx;
 	uint32_t FrameNumber;
+	uint32_t ParticleNumber;
 };
 class ResourceAtomicCompute : public Resource
 {

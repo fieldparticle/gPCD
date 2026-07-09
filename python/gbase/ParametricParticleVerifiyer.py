@@ -9,7 +9,7 @@ from gbase.utilities import get_cell_dimensions
 class ParametricParticleVerifiyer:
     """Verify configuration for 2D parametric particle geometry."""
 
-    CURVE_VALUE_COUNT = 9
+    CURVE_GEOMETRY_VALUE_COUNT = 9
     LOWER_WALL_FLAG = 3
     UPPER_WALL_FLAG = 4
     PARTICLE_PLANE_Z = 1.0
@@ -216,10 +216,10 @@ class ParametricParticleVerifiyer:
             errors.append("curve_wall_segments must not be empty")
         else:
             for segment_index, raw_segment in enumerate(raw_segments):
-                if len(raw_segment) != self.CURVE_VALUE_COUNT:
+                if len(raw_segment) not in (self.CURVE_GEOMETRY_VALUE_COUNT, 10):
                     errors.append(
                         f"curve_wall_segments[{segment_index}] must contain "
-                        f"exactly {self.CURVE_VALUE_COUNT} values"
+                        f"{self.CURVE_GEOMETRY_VALUE_COUNT} or 10 values"
                     )
                     continue
                 try:
@@ -236,6 +236,7 @@ class ParametricParticleVerifiyer:
                         "be finite"
                     )
                     continue
+                segment = segment[:self.CURVE_GEOMETRY_VALUE_COUNT]
                 wall_flag = segment[8]
                 if (
                     not wall_flag.is_integer()

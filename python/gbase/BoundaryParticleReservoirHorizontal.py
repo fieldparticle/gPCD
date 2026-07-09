@@ -227,7 +227,6 @@ class BoundaryParticleReservoirHorizontal():
             f.write(");\n")
         fstr = f"wall_contact_offset = {float(run_cfg.wall_contact_offset):0.6f};\n"
         f.write(fstr)
-        f.write('wall_type = "WALL_MODEL_BOUNDARY_PARTICLE";\n')
         fstr = f"DT = {run_cfg.dt};\n"
         f.write(fstr)
         contact_force_measure = getattr(run_cfg, "contact_force_measure", "area")

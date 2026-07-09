@@ -7,8 +7,26 @@ from gbase.ParametricCurve import bounds as curve_bounds
 class GenReservoir(GenericGenData):
     """Generate a packed reservoir using the GenericGenData output contract."""
 
+    CURVE_ROLE_PACKING = 1
+    CURVE_ROLE_BOUNDARY = 2
+
     def validate_simulation_configuration(self):
         errors = []
+
+        def optional_bool(name, default=False):
+            value = self.itemcfg.get(name, default)
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, (int, float)):
+                return bool(value)
+            if isinstance(value, str):
+                lowered = value.strip().lower()
+                if lowered in ("true", "yes", "on", "1"):
+                    return True
+                if lowered in ("false", "no", "off", "0"):
+                    return False
+            errors.append(f"{name} must be true or false")
+            return bool(default)
 
         def required_values(name, count):
             values = self.itemcfg.get(name)
@@ -41,20 +59,27 @@ class GenReservoir(GenericGenData):
                 dimensions.append(value)
 
         death_bounds = required_values("death_bounds", 6)
-        chamber_bounds = required_values("chamber_bounds", 6)
-        velocity_key = "reservoir_velocity"
-        if self.itemcfg.get(velocity_key) is None:
-            velocity_key = "piston_velocity"
-        reservoir_velocity = required_values(velocity_key, 3)
+        packing_z_bounds = required_values("packing_z_bounds", 2)
+        initial_particle_velocity = required_values("initial_particle_velocity", 3)
+
+        piston_enabled = optional_bool(
+            "piston_enabled",
+            self.itemcfg.get("piston_velocity") is not None,
+        )
+        piston_velocity = (0.0, 0.0, 0.0)
+        if piston_enabled:
+            piston_velocity = required_values("piston_velocity", 3)
+
         raw_segments = self.itemcfg.get("curve_wall_segments")
         curve_segments = []
+        packing_curve_segments = []
         if not raw_segments:
             errors.append("curve_wall_segments is required and must not be empty")
         else:
             for index, raw_segment in enumerate(raw_segments):
-                if len(raw_segment) != 9:
+                if len(raw_segment) not in (9, 10):
                     errors.append(
-                        f"curve_wall_segments[{index}] must contain 9 values"
+                        f"curve_wall_segments[{index}] must contain 9 or 10 values"
                     )
                     continue
                 try:
@@ -74,9 +99,36 @@ class GenReservoir(GenericGenData):
                     errors.append(
                         f"curve_wall_segments[{index}] wall_flag must be a positive integer"
                     )
+                curve_role = self.CURVE_ROLE_BOUNDARY
+                if len(segment) == 10:
+                    raw_curve_role = segment[9]
+                    if not raw_curve_role.is_integer():
+                        errors.append(
+                            f"curve_wall_segments[{index}] curve_role must be an integer"
+                        )
+                    else:
+                        curve_role = int(raw_curve_role)
+                    if curve_role not in (
+                        self.CURVE_ROLE_PACKING,
+                        self.CURVE_ROLE_BOUNDARY,
+                    ):
+                        errors.append(
+                            f"curve_wall_segments[{index}] curve_role must be 1 or 2"
+                        )
                 if all(abs(value) <= 1.0e-12 for value in segment[1:4] + segment[5:8]):
                     errors.append(f"curve_wall_segments[{index}] has zero length")
-                curve_segments.append(segment)
+                curve_segments.append(segment[:9])
+                if curve_role == self.CURVE_ROLE_PACKING:
+                    packing_curve_segments.append(segment[:9])
+
+        packing_bounds = ()
+        if not packing_curve_segments:
+            errors.append(
+                "curve_wall_segments must include at least one packing_curve "
+                "(curve_role=1)"
+            )
+        else:
+            packing_bounds = self.derive_packing_bounds(packing_curve_segments)
 
         separation = self.itemcfg.get("particle_separation_distance")
         try:
@@ -106,14 +158,15 @@ class GenReservoir(GenericGenData):
             elif not piston_start_frame_value.is_integer():
                 errors.append("piston_start_frame must be an integer")
 
-        if chamber_bounds and len(dimensions) == 3:
-            x_start, x_end, y_bottom, y_top, z_front, z_back = chamber_bounds
+        if packing_bounds and packing_z_bounds and len(dimensions) == 3:
+            x_start, x_end, y_bottom, y_top = packing_bounds
+            z_front, z_back = packing_z_bounds
             if x_start >= x_end:
-                errors.append("chamber_bounds: x_start must be less than x_end")
+                errors.append("packing curves: x_start must be less than x_end")
             if y_bottom >= y_top:
-                errors.append("chamber_bounds: y_bottom must be less than y_top")
+                errors.append("packing curves: y_bottom must be less than y_top")
             if z_front >= z_back:
-                errors.append("chamber_bounds: z_front must be less than z_back")
+                errors.append("packing_z_bounds: z_front must be less than z_back")
             if (
                 x_start < 0.0
                 or x_end > dimensions[0]
@@ -122,7 +175,7 @@ class GenReservoir(GenericGenData):
                 or z_front < 0.0
                 or z_back > dimensions[2]
             ):
-                errors.append("chamber_bounds must fit inside the cell array")
+                errors.append("packing bounds must fit inside the cell array")
             if (
                 death_bounds
                 and (
@@ -134,7 +187,15 @@ class GenReservoir(GenericGenData):
                     or z_back > death_bounds[5]
                 )
             ):
-                errors.append("chamber_bounds must fit inside death_bounds")
+                errors.append("packing bounds must fit inside death_bounds")
+
+        if initial_particle_velocity:
+            if not all(math.isfinite(value) for value in initial_particle_velocity):
+                errors.append("initial_particle_velocity values must be finite")
+
+        if piston_enabled and piston_velocity:
+            if not all(math.isfinite(value) for value in piston_velocity):
+                errors.append("piston_velocity values must be finite")
 
         if death_bounds and len(dimensions) == 3:
             width, height, depth = dimensions
@@ -172,9 +233,14 @@ class GenReservoir(GenericGenData):
         self.cell_array_width, self.cell_array_height, self.cell_array_depth = dimensions
         self.death_bounds = death_bounds
         self.curve_wall_segments = curve_segments
-        self.chamber_bounds = chamber_bounds
-        self.reservoir_velocity = reservoir_velocity
-        self.reservoir_velocity_key = velocity_key
+        self.packing_curve_segments = packing_curve_segments
+        self.packing_bounds = packing_bounds
+        self.packing_z_bounds = packing_z_bounds
+        self.piston_x_start = packing_bounds[0]
+        self.piston_x_stop = packing_bounds[1]
+        self.initial_particle_velocity = initial_particle_velocity
+        self.piston_enabled = piston_enabled
+        self.piston_velocity = piston_velocity
         self.particle_separation_distance = particle_separation_distance
         self.piston_start_frame = int(piston_start_frame_value)
         self.number_configured_particles = 0
@@ -186,11 +252,30 @@ class GenReservoir(GenericGenData):
         self.calculate_chamber_packing()
         return True
 
+    def derive_packing_bounds(self, packing_curve_segments):
+        x_min_values = []
+        x_max_values = []
+        y_min_values = []
+        y_max_values = []
+        for segment in packing_curve_segments:
+            x_min, x_max, y_min, y_max = curve_bounds(segment)
+            x_min_values.append(x_min)
+            x_max_values.append(x_max)
+            y_min_values.append(y_min)
+            y_max_values.append(y_max)
+        return (
+            min(x_min_values),
+            max(x_max_values),
+            min(y_min_values),
+            max(y_max_values),
+        )
+
     def calculate_chamber_packing(self):
         radius = self.radius
         center_spacing = 2.0 * radius + self.particle_separation_distance
         boundary_clearance = radius * (1.0 + self.wall_contact_offset) + 1.0e-9
-        x_start, x_end, y_bottom, y_top, z_front, z_back = self.chamber_bounds
+        x_start, x_end, y_bottom, y_top = self.packing_bounds
+        z_front, z_back = self.packing_z_bounds
         z_center = 0.5 * (z_front + z_back)
 
         x_center_min = x_start + boundary_clearance
@@ -201,7 +286,7 @@ class GenReservoir(GenericGenData):
         usable_x = x_center_max - x_center_min
         usable_y = y_center_max - y_center_min
         if usable_x < 0.0 or usable_y < 0.0:
-            raise ValueError("chamber_bounds are too small for particle clearance")
+            raise ValueError("packing bounds are too small for particle clearance")
 
         x_count = int(math.floor((usable_x / center_spacing) + 1.0e-12)) + 1
         y_count = int(math.floor((usable_y / center_spacing) + 1.0e-12)) + 1
@@ -225,7 +310,9 @@ class GenReservoir(GenericGenData):
 
         print(
             "Reservoir packing report:\n"
-            f"  chamber bounds: {self.chamber_bounds}\n"
+            f"  packing bounds: {self.packing_bounds}\n"
+            f"  packing z bounds: {self.packing_z_bounds}\n"
+            f"  piston x range: {self.piston_x_start:g} to {self.piston_x_stop:g}\n"
             f"  radius: {radius:g}\n"
             f"  surface separation: {self.particle_separation_distance:g}\n"
             f"  center spacing: {center_spacing:g}\n"
@@ -234,13 +321,15 @@ class GenReservoir(GenericGenData):
             f"  particle count: {self.packing_particle_count}\n"
             f"  first center: {self.packing_first_center}\n"
             f"  last center: {self.packing_last_center}\n"
-            f"  reservoir velocity: {self.reservoir_velocity}"
+            f"  initial particle velocity: {self.initial_particle_velocity}\n"
+            f"  piston enabled: {self.piston_enabled}\n"
+            f"  piston velocity: {self.piston_velocity}"
         )
         return self.packing_particle_count
 
     def add_reservoir_mobile_particles(self):
         first_x, first_y, particle_z = self.packing_first_center
-        velocity = self.reservoir_velocity
+        velocity = self.initial_particle_velocity
 
         for column in range(self.packing_x_count):
             particle_x = first_x + column * self.particle_center_spacing
@@ -259,7 +348,7 @@ class GenReservoir(GenericGenData):
         print(
             "Reservoir mobile-particle report:\n"
             f"  mobile particles: {self.number_active_particles}\n"
-            f"  velocity: {self.reservoir_velocity}\n"
+            f"  velocity: {self.initial_particle_velocity}\n"
             f"  first particle number: 1\n"
             f"  last particle number: {self.number_active_particles}"
         )
@@ -269,18 +358,12 @@ class GenReservoir(GenericGenData):
         test_file_name = super().write_test_file()
         with open(test_file_name, "a", encoding="ascii") as output:
             output.write(f"piston_start_frame = {self.piston_start_frame};\n")
-            output.write(f"chamber_x_start = {self.chamber_bounds[0]:.9f};\n")
-            output.write(f"chamber_x_end = {self.chamber_bounds[1]:.9f};\n")
-            output.write(f"chamber_y_bottom = {self.chamber_bounds[2]:.9f};\n")
-            output.write(f"chamber_y_top = {self.chamber_bounds[3]:.9f};\n")
-            output.write(f"chamber_z_front = {self.chamber_bounds[4]:.9f};\n")
-            output.write(f"chamber_z_back = {self.chamber_bounds[5]:.9f};\n")
-            output.write(f"reservoir_velocity_x = {self.reservoir_velocity[0]:.9f};\n")
-            output.write(f"reservoir_velocity_y = {self.reservoir_velocity[1]:.9f};\n")
-            output.write(f"reservoir_velocity_z = {self.reservoir_velocity[2]:.9f};\n")
-            output.write(f"piston_velocity_x = {self.reservoir_velocity[0]:.9f};\n")
-            output.write(f"piston_velocity_y = {self.reservoir_velocity[1]:.9f};\n")
-            output.write(f"piston_velocity_z = {self.reservoir_velocity[2]:.9f};\n")
+            output.write(f"piston_x_start = {self.piston_x_start:.9f};\n")
+            output.write(f"piston_x_stop = {self.piston_x_stop:.9f};\n")
+            output.write(f"piston_enabled = {1 if self.piston_enabled else 0};\n")
+            output.write(f"piston_velocity_x = {self.piston_velocity[0]:.9f};\n")
+            output.write(f"piston_velocity_y = {self.piston_velocity[1]:.9f};\n")
+            output.write(f"piston_velocity_z = {self.piston_velocity[2]:.9f};\n")
         return test_file_name
 
     def runner(self):

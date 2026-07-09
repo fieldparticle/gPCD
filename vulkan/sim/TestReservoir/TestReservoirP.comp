@@ -13,6 +13,7 @@
 #include "params.glsl"
 #include "../common/constants.glsl"
 #include "boundary.glsl"
+#include "piston.glsl"
 #include "../common/util.glsl"
 #include "../common/push.glsl"
 #include "../common/atomic.glsl"
@@ -23,6 +24,8 @@
 #include "../common/ForceDynamicsSimple.glsl"
 #include "../common/ForceDynamicsSimpleBoundaryParticle.glsl"
 #include "../common/ForceDynamicsSimpleParametricWall.glsl"
+#define FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE
+#include "../common/ForceDynamicsSimplePiston.glsl"
 
 // Generated from C:/_DJ/gPCD/python/base/ForceDynamics.py by tools/ExportForceDynamicsSimpleGLSL.py.
 // Simple source-owned compute schedule.
@@ -48,15 +51,18 @@ void main()
         return;
     }
 
-#if defined(DEBUG)
-    atomicAdd(collOut.numParticles, 1u);
-#endif
 
     P[SourceID].contactCount = 0u;
     P[SourceID].colFlg = 0u;
     vec3 totalForce = vec3(0.0);
 
-    const uint DUP_LIST_SIZE = 32u;
+#if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
+    if (!ProcessPistonCollision(SourceID, totalForce)) {
+        return;
+    }
+#endif
+
+    const uint DUP_LIST_SIZE = MAX_CELL_OCCUPANY * 8u;
     uint duplicateTargets[DUP_LIST_SIZE];
     uint duplicateCount = 0u;
     for (uint index = 0u; index < DUP_LIST_SIZE; ++index) {
@@ -81,29 +87,29 @@ void main()
                 continue;
             }
 
-            bool duplicate = false;
-            for (uint duplicateIndex = 0u;
-                    duplicateIndex < duplicateCount;
-                    ++duplicateIndex) {
-                if (duplicateTargets[duplicateIndex] == TargetID) {
-                    duplicate = true;
-                    break;
-                }
-            }
-            if (duplicate) {
-                continue;
-            }
-            if (duplicateCount >= DUP_LIST_SIZE) {
-                SetError(ERROR_CONTACT_LIST_MISSING);
-                return;
-            }
-            duplicateTargets[duplicateCount] = TargetID;
-            duplicateCount += 1u;
-
             if (IsBoundaryParticle(TargetID)) {
                 if (!ParametricBoundaryMarkerApplies(SourceID, TargetID)) {
                     continue;
                 }
+
+                bool duplicate = false;
+                for (uint duplicateIndex = 0u;
+                        duplicateIndex < duplicateCount;
+                        ++duplicateIndex) {
+                    if (duplicateTargets[duplicateIndex] == TargetID) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (duplicate) {
+                    continue;
+                }
+                if (duplicateCount >= DUP_LIST_SIZE) {
+                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                    return;
+                }
+                duplicateTargets[duplicateCount] = TargetID;
+                duplicateCount += 1u;
 
                 BoundaryWallSegment segment =
                     EvaluateParametricWallSegment(SourceID, TargetID);
@@ -122,6 +128,25 @@ void main()
             if (!IsMobileParticleActiveForDynamics(TargetID)) {
                 continue;
             }
+
+            bool duplicate = false;
+            for (uint duplicateIndex = 0u;
+                    duplicateIndex < duplicateCount;
+                    ++duplicateIndex) {
+                if (duplicateTargets[duplicateIndex] == TargetID) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate) {
+                continue;
+            }
+            if (duplicateCount >= DUP_LIST_SIZE) {
+                SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                return;
+            }
+            duplicateTargets[duplicateCount] = TargetID;
+            duplicateCount += 1u;
 
             ParticleGeometry geometry =
                 GetPhysicalParticleContact(SourceID, TargetID);

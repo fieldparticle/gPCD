@@ -1655,6 +1655,7 @@ GLSL_BODY_TEMPLATES = {
     ],
     "SetError": [
         "collOut.ErrorNumber = error_code;",
+        "collOut.FrameNumber = uint(ShaderFlags.frameNum);",
         "return false;",
     ],
 }

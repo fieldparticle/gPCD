@@ -7,7 +7,7 @@
 
 #if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
 
-// Python source: ForceDynamics.py:215
+// Python source: ForceDynamics.py:214
 bool PistonEnabled()
 {
     return true;
@@ -16,38 +16,41 @@ bool PistonEnabled()
 // Python source: ForceDynamics.py:203
 float GetPistonPosition(uint frame)
 {
-    if (frame < piston_start_frame) {
-        return CHAMBER_MIN.x;
+    uint pistonStartFrame = uint(piston_start_frame);
+    if (frame < pistonStartFrame) {
+        return piston_x_start;
     }
 
-    float elapsedFrames = float(frame - piston_start_frame);
-    float position = CHAMBER_MIN.x
-        + elapsedFrames * ShaderFlags.dt * PISTON_VELOCITY.x;
-    return min(position, CHAMBER_MAX.x);
+    float elapsedFrames = float(frame - pistonStartFrame);
+    vec3 pistonVelocity = vec3(
+        piston_velocity_x,
+        piston_velocity_y,
+        piston_velocity_z);
+    float position = piston_x_start
+        + elapsedFrames * ShaderFlags.dt * pistonVelocity.x;
+    return min(position, piston_x_stop);
 }
 
-// Python source: ForceDynamics.py:226
+// Python source: ForceDynamics.py:228
 vec3 GetPistonVelocity(uint frame)
 {
-    if (frame < piston_start_frame) {
+    uint pistonStartFrame = uint(piston_start_frame);
+    if (frame < pistonStartFrame) {
         return vec3(0.0);
     }
-    if (GetPistonPosition(frame) >= CHAMBER_MAX.x) {
+    if (GetPistonPosition(frame) >= piston_x_stop) {
         return vec3(0.0);
     }
-    return PISTON_VELOCITY;
+    return vec3(
+        piston_velocity_x,
+        piston_velocity_y,
+        piston_velocity_z);
 }
 
-// Python source: ForceDynamics.py:237
+// Python source: ForceDynamics.py:239
 BoundaryWallSegment EvaluatePistonWall(uint SourceID)
 {
     vec3 sourcePosition = GetParticlePosition(SourceID).xyz;
-    if (sourcePosition.y < CHAMBER_MIN.y || sourcePosition.y > CHAMBER_MAX.y
-            || sourcePosition.z < CHAMBER_MIN.z
-            || sourcePosition.z > CHAMBER_MAX.z) {
-        return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 1u, false);
-    }
-
     float radius = P[SourceID].Data.x;
     float offset = WallContactOffsetDistance(radius);
     float pistonX = GetPistonPosition(uint(ShaderFlags.frameNum));
@@ -65,7 +68,7 @@ BoundaryWallSegment EvaluatePistonWall(uint SourceID)
     return BoundaryWallSegment(normal, overlapArea, centerDistance, 1u, true);
 }
 
-// Python source: ForceDynamics.py:262
+// Python source: ForceDynamics.py:258
 bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
 {
     if (!PistonEnabled()) { return true; }
@@ -79,7 +82,7 @@ bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
     float maximumDepthDistance =
         sourceRadius - WallContactOffsetDistance(sourceRadius);
     if (segment.centerDistance - maximumDepthDistance < -EPSILON) {
-        return SetError(ERROR_WALL_TUNNELING);
+        return SetError(ERROR_WALL_TUNNELING, SourceID);
     }
 
     vec3 pistonVelocity = GetPistonVelocity(uint(ShaderFlags.frameNum));

@@ -1,14 +1,13 @@
 Current status:
-	- Reset the active Vulkan parity target to the simple generic particle model
-	- Clarified that boundary particles are ptype=1 locality markers, not Data.z evaluator carriers
-	- Added GenReservoir as a reservoir generator that inherits the GenericGenData contract
-	- Added optional simple piston GLSL export support for reservoir wrappers
-	- Made simple GLSL death bounds mandatory instead of feature-gated
+	- The leakage-response experiments are backed out of the active path: the signed parametric wall penetration change and rasterized marker generation should not be treated as the next model.
+	- Boundary markers are being re-centered conceptually as broad-phase sentinels: they identify cells near a wall, while the wall evaluator owns physical position, normal, penetration, and force response.
+	- The next wall model should be function-wall based for the active 2D work: y=f(x) segments with configured outward normals, plus a vertical-wall special case.
+	- Vulkan should stay unchanged until the Python function-wall behavior is validated.
 Code Changes:
-	- Updated GenericGenData to emit generic boundary markers and omit boundary_x/y/z_min/max metadata
-	- Added GenReservoir for packed active reservoir particles plus chamber and piston metadata
-	- Added tools/ExportForceDynamicsSimpleGLSL.py for the clean simple GLSL export path
-	- Generated ForceDynamicsSimple.glsl, ForceDynamicsSimpleBoundaryParticle.glsl, ForceDynamicsSimpleParametricWall.glsl, ForceDynamicsSimplePiston.glsl, and TestPythonBoundarySpheresP.comp
-	- Updated FlowDynamicsConventions, Porting, and ProblemEvolution for the simple/reservoir contract
-	- Recorded the reservoir restart and frame-544 death-bound capture in ProblemEvolution
-Next: Update the TestReservoir Vulkan wrapper to include the optional simple piston path, then rerun the reservoir capture and confirm particles die at death bounds instead of reaching the cell-array boundary
+	- Documented the function-wall boundary direction in docs/Dynamics/ProblemEvolution.tex.
+	- Captured the required implementation order: cleanup first, Python function-wall changes second, Python validation third, Vulkan/export changes last.
+	- Preserved the current simple/reservoir checkpoint notes, including dead-particle vertex filtering and ParticleNumber error diagnostics.
+Next:
+	- Clean up the active wall configuration/evaluator shape.
+	- Implement and validate function-wall response in Python, especially small particles at the converging transition.
+	- After Python passes, update the simple GLSL exporter/templates and rerun Vulkan captures.

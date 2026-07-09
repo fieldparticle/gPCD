@@ -96,9 +96,9 @@ class GenericGenData:
             errors.append("curve_wall_segments is required and must not be empty")
         else:
             for index, raw_segment in enumerate(raw_segments):
-                if len(raw_segment) != 9:
+                if len(raw_segment) not in (9, 10):
                     errors.append(
-                        f"curve_wall_segments[{index}] must contain 9 values"
+                        f"curve_wall_segments[{index}] must contain 9 or 10 values"
                     )
                     continue
                 try:
@@ -113,14 +113,18 @@ class GenericGenData:
                         f"curve_wall_segments[{index}] values must be finite"
                     )
                     continue
-                wall_flag = segment[8]
+                geometry_segment = segment[:9]
+                wall_flag = geometry_segment[8]
                 if not wall_flag.is_integer() or int(wall_flag) <= 0:
                     errors.append(
                         f"curve_wall_segments[{index}] wall_flag must be a positive integer"
                     )
-                if all(abs(value) <= 1.0e-12 for value in segment[1:4] + segment[5:8]):
+                if all(
+                    abs(value) <= 1.0e-12
+                    for value in geometry_segment[1:4] + geometry_segment[5:8]
+                ):
                     errors.append(f"curve_wall_segments[{index}] has zero length")
-                curve_segments.append(segment)
+                curve_segments.append(geometry_segment)
 
         particle_data = self.itemcfg.get("PARTICLE_DATA")
         particles = []
@@ -572,7 +576,6 @@ class GenericGenData:
             output.write(");\n")
 
             output.write(f"wall_contact_offset = {self.wall_contact_offset:.9f};\n")
-            output.write('wall_type = "WALL_MODEL_BOUNDARY_PARTICLE";\n')
             output.write(f"DT = {self.dt:.9f};\n")
             output.write(
                 "contact_force_measure = "

@@ -65,7 +65,7 @@ void main()
     }
 #endif
 
-    const uint DUP_LIST_SIZE = 32u;
+    const uint DUP_LIST_SIZE = MAX_CELL_OCCUPANY * 8u;
     uint duplicateTargets[DUP_LIST_SIZE];
     uint duplicateCount = 0u;
     for (uint index = 0u; index < DUP_LIST_SIZE; ++index) {
@@ -90,29 +90,29 @@ void main()
                 continue;
             }
 
-            bool duplicate = false;
-            for (uint duplicateIndex = 0u;
-                    duplicateIndex < duplicateCount;
-                    ++duplicateIndex) {
-                if (duplicateTargets[duplicateIndex] == TargetID) {
-                    duplicate = true;
-                    break;
-                }
-            }
-            if (duplicate) {
-                continue;
-            }
-            if (duplicateCount >= DUP_LIST_SIZE) {
-                SetError(ERROR_CONTACT_LIST_MISSING);
-                return;
-            }
-            duplicateTargets[duplicateCount] = TargetID;
-            duplicateCount += 1u;
-
             if (IsBoundaryParticle(TargetID)) {
                 if (!ParametricBoundaryMarkerApplies(SourceID, TargetID)) {
                     continue;
                 }
+
+                bool duplicate = false;
+                for (uint duplicateIndex = 0u;
+                        duplicateIndex < duplicateCount;
+                        ++duplicateIndex) {
+                    if (duplicateTargets[duplicateIndex] == TargetID) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (duplicate) {
+                    continue;
+                }
+                if (duplicateCount >= DUP_LIST_SIZE) {
+                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                    return;
+                }
+                duplicateTargets[duplicateCount] = TargetID;
+                duplicateCount += 1u;
 
                 BoundaryWallSegment segment =
                     EvaluateParametricWallSegment(SourceID, TargetID);
@@ -131,6 +131,25 @@ void main()
             if (!IsMobileParticleActiveForDynamics(TargetID)) {
                 continue;
             }
+
+            bool duplicate = false;
+            for (uint duplicateIndex = 0u;
+                    duplicateIndex < duplicateCount;
+                    ++duplicateIndex) {
+                if (duplicateTargets[duplicateIndex] == TargetID) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate) {
+                continue;
+            }
+            if (duplicateCount >= DUP_LIST_SIZE) {
+                SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                return;
+            }
+            duplicateTargets[duplicateCount] = TargetID;
+            duplicateCount += 1u;
 
             ParticleGeometry geometry =
                 GetPhysicalParticleContact(SourceID, TargetID);
