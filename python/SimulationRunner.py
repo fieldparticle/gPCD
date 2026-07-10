@@ -2,7 +2,7 @@ import pygame
 from pathlib import Path
 import math
 from types import SimpleNamespace
-
+from gbase.HSVWheelPyGame import *
 from base.ForceDynamicsBase import ForceDynamics
 from base.VerAForceDynamicsBase import ForceDynamics as VerAForceDynamics
 from base.Reporting import Reporting
@@ -10,7 +10,7 @@ from base.InLineTest import InLineTest
 #from gbase import libconf
 import io, libconf
 from gbase.utilities import get_cell_dimensions, hsv_angle
-from gbase.ParametricCurve import evaluate_point
+from gbase.FunctionWall import sample_points
 
 
 BASE_CLASS_REGISTRY = {
@@ -102,6 +102,10 @@ def _as_points(run_configuration):
     if _presentation_quality(run_configuration):
         return False
     return bool(run_configuration.get("as_points", False))
+
+
+def _dynamics_diagnostics_enabled(run_configuration):
+    return bool(run_configuration.get("dynamics_diagnostics", False))
 
 
 def _view_box(run_configuration):
@@ -645,19 +649,18 @@ def _draw_configuration_boundaries(screen, run_configuration, view_box):
 
     segments = run_configuration.get("curve_wall_segments", ())
     for segment in segments:
-        points = []
-        for sample_index in range(65):
-            parameter = sample_index / 64.0
-            point_x, point_y = evaluate_point(segment, parameter)
-            points.append(
-                _to_screen(
-                    point_x,
-                    point_y,
-                    view_box,
-                    screen_width,
-                    screen_height,
-                )
+        points = [
+            _to_screen(
+                point_x,
+                point_y,
+                view_box,
+                screen_width,
+                screen_height,
             )
+            for point_x, point_y in sample_points(segment, maximum_spacing=0.05)
+        ]
+        if len(points) < 2:
+            continue
         pygame.draw.lines(screen, (60, 220, 90), False, points, 3)
 
 
@@ -946,7 +949,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
         shadow.load_cfg_file(cfg_file)
     test_file_name = Path(cfg_file).name
     run_configuration = live.run_configuration
-    thin_mode = _as_points(run_configuration)
+    dynamics_diagnostics = _dynamics_diagnostics_enabled(run_configuration)
     scenario = None
     if study == True or "in_line_obj" in run_configuration:
         scenario = InLineTest()
@@ -971,7 +974,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
     cleared_report_count = _clear_report_directory(report_dir)
     live_reporting = (
         None
-        if thin_mode
+        if not dynamics_diagnostics
         else Reporting(
             report_dir,
             run_configuration.get("rpt_frames"),
@@ -979,7 +982,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
         )
     )
     reporting_s = None
-    if shadow is not None and not thin_mode:
+    if shadow is not None and dynamics_diagnostics:
         reporting_s = Reporting(
             report_dir,
             run_configuration.get("rpt_frames"),
@@ -997,11 +1000,11 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
             f"report file(s): {report_dir}"
         )
     live_start_diagnostics = (
-        None if thin_mode else _run_start_diagnostics(live)
+        _run_start_diagnostics(live) if dynamics_diagnostics else None
     )
     shadow_start_diagnostics = (
         _run_start_diagnostics(shadow)
-        if shadow is not None and not thin_mode
+        if shadow is not None and dynamics_diagnostics
         else None
     )
 
@@ -1023,6 +1026,8 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
     try:
         running = True
         paused = False
+        wheel = HSVWheel(400)
+        font = pygame.font.SysFont("consolas", 18)
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -1031,12 +1036,13 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                     running = False
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                     paused = not paused
+                
 
             if not paused:
                 live.ShaderFlags.frameNum = frame_number
                 ##JMB Main Call to live.CollisionRun()
                 live_particles = live.CollisionRun()
-                if not thin_mode:
+                if dynamics_diagnostics:
                     _report_particles(
                         live_reporting,
                         frame_number,
@@ -1047,7 +1053,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                 if shadow is not None:
                     shadow.ShaderFlags.frameNum = frame_number
                     shadow_particles = shadow.CollisionRun()
-                    if not thin_mode:
+                    if dynamics_diagnostics:
                         _report_particles(
                             reporting_s,
                             frame_number,
@@ -1079,6 +1085,8 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                 display_runner.collIn.ErrorReturn,
                 display_runner.ErrorDescription(),
             )
+            wheel.draw(screen, (screen.get_width() - 420, 20), font)
+            pygame.display.flip()
             if live.collIn.ErrorReturn != live.constants.ERROR_NONE:
                 if exit_on_error:
                     print(
@@ -1100,7 +1108,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                 frame_number += 1
                 if stop_frame is not None and frame_number > stop_frame:
                     running = False
-            clock.tick(0 if thin_mode else frame_rate)
+            clock.tick(0 if not dynamics_diagnostics else frame_rate)
     finally:
         if live_reporting is not None:
             live_reporting.close()

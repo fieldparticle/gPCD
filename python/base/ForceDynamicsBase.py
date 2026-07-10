@@ -9,7 +9,7 @@ import math
 import re
 from pathlib import Path
 from gbase.libconf import AttrDict
-from gbase.ParametricCurve import wall_marker_positions
+from gbase.FunctionWall import wall_marker_positions
 from gbase.pdata import PTYPE_NULL
 
 PTYPE_BOUNDARY = 1.0
@@ -294,6 +294,8 @@ class ForceDynamics(ForceContactDynamics):
             return False
         if not self.ApplySourceMaximumDepth(SourceID):
             return False
+        if not self.CheckResolvedContactStep(SourceID):
+            return False
         source = self.particles[SourceID]
         mass = self.GetParticleMass(SourceID)
         delta_momentum_x = mass * (source.VelRad.x - start_velocity.x)
@@ -344,7 +346,7 @@ class ForceDynamics(ForceContactDynamics):
 
         self.particles = self.create_particle_array_from_cfg(self.particle_data)
         if self.config.pdata_from_file == False:
-            self.add_parametric_boundary_markers_from_cfg()
+            self.add_function_boundary_markers_from_cfg()
         self.ShaderFlags = self.create_shader_flags_from_cfg(self.run_configuration)
         self.wall_contact_offset = max(
             0.0,
@@ -365,7 +367,7 @@ class ForceDynamics(ForceContactDynamics):
         # If there is a 
         return self.particles
 
-    def add_parametric_boundary_markers_from_cfg(self):
+    def add_function_boundary_markers_from_cfg(self):
         """Build runtime wall markers when mobile particles come from cfg data."""
         segments = self.run_configuration.get("curve_wall_segments", ())
         if not segments:
@@ -760,7 +762,7 @@ class ForceDynamics(ForceContactDynamics):
         segments = self.run_configuration.get("curve_wall_segments", ())
         for source_id in mobile_ids:
             for segment in segments:
-                penetration = self.ParametricWallPhysicalPenetration(
+                penetration = self.FunctionWallPhysicalPenetration(
                     source_id,
                     segment,
                 )
@@ -770,7 +772,7 @@ class ForceDynamics(ForceContactDynamics):
                     self.constants.ERROR_INITIAL_WALL_OVERLAP,
                     error_kind="initial-wall-overlap",
                     source_id=source_id,
-                    wall_flag=int(round(float(segment[8]))),
+                    wall_flag=int(round(float(segment[9]))),
                 )
 
         if self.PistonEnabled():
@@ -811,7 +813,7 @@ class ForceDynamics(ForceContactDynamics):
                 if self.IsBoundaryParticle(target_id):
                     has_local_boundary_marker = (
                         has_local_boundary_marker
-                        or self.ParametricBoundaryMarkerApplies(
+                        or self.BoundaryMarkerApplies(
                             source_id,
                             target_id,
                         )
@@ -832,10 +834,10 @@ class ForceDynamics(ForceContactDynamics):
                     return False
             if not has_local_boundary_marker:
                 continue
-            boundary_contacts = self.EvaluateParametricWallContacts(source_id)
+            boundary_contacts = self.EvaluateFunctionWallContacts(source_id)
             for wall_flag in sorted(boundary_contacts):
                 _penetration_depth, contact = boundary_contacts[wall_flag]
-                if not self.ProcessParametricWallCollision(
+                if not self.ProcessFunctionWallCollision(
                     source_id,
                     contact,
                     total_forces[source_id],
@@ -1284,13 +1286,13 @@ class ForceDynamics(ForceContactDynamics):
             )
 
     def TotalWallPotentialEnergy(self):
-        """Return potential energy stored against parametric walls."""
+        """Return potential energy stored against function walls."""
         total = 0.0
         for source_id, source in enumerate(self.particles):
             if not self.IsMobileParticleActiveForDynamics(source_id):
                 continue
             stiffness = max(0.0, float(source.Data.y or 0.0))
-            contacts = self.EvaluateParametricWallContacts(source_id)
+            contacts = self.EvaluateFunctionWallContacts(source_id)
             for _penetration_depth, geometry in contacts.values():
                 radius = float(source.Data.x)
                 total += self.GetOverlapPotentialEnergy(

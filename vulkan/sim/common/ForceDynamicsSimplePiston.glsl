@@ -7,13 +7,13 @@
 
 #if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
 
-// Python source: ForceDynamics.py:214
+// Python source: ForceDynamics.py:307
 bool PistonEnabled()
 {
     return true;
 }
 
-// Python source: ForceDynamics.py:203
+// Python source: ForceDynamics.py:296
 float GetPistonPosition(uint frame)
 {
     uint pistonStartFrame = uint(piston_start_frame);
@@ -31,7 +31,7 @@ float GetPistonPosition(uint frame)
     return min(position, piston_x_stop);
 }
 
-// Python source: ForceDynamics.py:228
+// Python source: ForceDynamics.py:321
 vec3 GetPistonVelocity(uint frame)
 {
     uint pistonStartFrame = uint(piston_start_frame);
@@ -47,7 +47,7 @@ vec3 GetPistonVelocity(uint frame)
         piston_velocity_z);
 }
 
-// Python source: ForceDynamics.py:239
+// Python source: ForceDynamics.py:332
 BoundaryWallSegment EvaluatePistonWall(uint SourceID)
 {
     vec3 sourcePosition = GetParticlePosition(SourceID).xyz;
@@ -68,7 +68,7 @@ BoundaryWallSegment EvaluatePistonWall(uint SourceID)
     return BoundaryWallSegment(normal, overlapArea, centerDistance, 1u, true);
 }
 
-// Python source: ForceDynamics.py:258
+// Python source: ForceDynamics.py:351
 bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
 {
     if (!PistonEnabled()) { return true; }
@@ -109,6 +109,26 @@ bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
         pistonVelocity,
         true);
     return AccumulateContactForce(SourceID, contact, totalForce);
+}
+
+bool CheckResolvedPistonContactStep(uint SourceID)
+{
+    if (!PistonEnabled()) { return true; }
+
+    BoundaryWallSegment segment = EvaluatePistonWall(SourceID);
+    if (!segment.valid) { return true; }
+
+    float sourceRadius = P[SourceID].Data.x;
+    float penetrationDepth = ParticlePenetrationDepth(
+        sourceRadius,
+        sourceRadius,
+        segment.centerDistance);
+    return CheckResolvedContactStep(
+        SourceID,
+        segment.normal,
+        penetrationDepth,
+        sourceRadius,
+        GetPistonVelocity(uint(ShaderFlags.frameNum)));
 }
 
 #endif

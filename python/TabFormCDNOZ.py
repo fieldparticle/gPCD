@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import QFileDialog, QLabel, QGroupBox,QMessageBox
 from PyQt6.QtWidgets import QGridLayout, QTabWidget, QLineEdit,QListWidget
 from PyQt6.QtWidgets import QPushButton, QGroupBox,QTextEdit
 from PyQt6 import QtCore
-from HSVWheel import *
 from _thread import *
 from gbase.ConfigUtility import *
 import glob        

@@ -1,11 +1,9 @@
-import math
 import os
 
-from gbase.ParametricCurve import bounds as curve_bounds
-from gbase.ParametricCurve import evaluate_point
-from gbase.ParametricCurve import evaluate_tangent
-from gbase.ParametricCurve import marker_parameters
+from gbase.FunctionWall import bounds as wall_bounds
+from gbase.FunctionWall import sample_points
 from gbase.pdata import PTYPE_MOBILE, PTYPE_NULL, pdata
+import math
 
 
 class GenericGenData:
@@ -78,6 +76,49 @@ class GenericGenData:
             else:
                 dimensions.append(value)
 
+        try:
+            target_penetration_fraction = float(
+                self.itemcfg.get(
+                    "target_penetration_fraction",
+                    self.itemcfg.get("max_penetration_fraction", 0.5),
+                )
+            )
+        except (TypeError, ValueError):
+            errors.append("target_penetration_fraction must be numeric")
+            target_penetration_fraction = None
+
+        try:
+            hard_penetration_fraction = float(
+                self.itemcfg.get("hard_penetration_fraction", 0.75)
+            )
+        except (TypeError, ValueError):
+            errors.append("hard_penetration_fraction must be numeric")
+            hard_penetration_fraction = None
+
+        if target_penetration_fraction is not None:
+            if not math.isfinite(target_penetration_fraction):
+                errors.append("target_penetration_fraction must be finite")
+            elif not 0.0 < target_penetration_fraction < 1.0:
+                errors.append("target_penetration_fraction must be between 0 and 1")
+
+        if hard_penetration_fraction is not None:
+            if not math.isfinite(hard_penetration_fraction):
+                errors.append("hard_penetration_fraction must be finite")
+            elif not 0.0 < hard_penetration_fraction < 1.0:
+                errors.append("hard_penetration_fraction must be between 0 and 1")
+
+        if (
+            target_penetration_fraction is not None
+            and hard_penetration_fraction is not None
+            and math.isfinite(target_penetration_fraction)
+            and math.isfinite(hard_penetration_fraction)
+            and hard_penetration_fraction <= target_penetration_fraction
+        ):
+            errors.append(
+                "hard_penetration_fraction must be greater than "
+                "target_penetration_fraction"
+            )
+
         death_bounds = required_values("death_bounds", 6)
         if death_bounds:
             for axis, minimum, maximum in (
@@ -96,9 +137,9 @@ class GenericGenData:
             errors.append("curve_wall_segments is required and must not be empty")
         else:
             for index, raw_segment in enumerate(raw_segments):
-                if len(raw_segment) not in (9, 10):
+                if len(raw_segment) != 10:
                     errors.append(
-                        f"curve_wall_segments[{index}] must contain 9 or 10 values"
+                        f"curve_wall_segments[{index}] must contain 10 values"
                     )
                     continue
                 try:
@@ -113,18 +154,43 @@ class GenericGenData:
                         f"curve_wall_segments[{index}] values must be finite"
                     )
                     continue
-                geometry_segment = segment[:9]
-                wall_flag = geometry_segment[8]
+                (
+                    boundary_kind,
+                    independent_axis,
+                    u_start,
+                    u_end,
+                    _f_start,
+                    _a1,
+                    _a2,
+                    _a3,
+                    normal_sign,
+                    wall_flag,
+                ) = segment
+                if (
+                    not boundary_kind.is_integer()
+                    or int(boundary_kind) not in (0, 1)
+                ):
+                    errors.append(
+                        f"curve_wall_segments[{index}] boundary_kind must be 0 or 1"
+                    )
+                if (
+                    not independent_axis.is_integer()
+                    or int(independent_axis) not in (0, 1)
+                ):
+                    errors.append(
+                        f"curve_wall_segments[{index}] independent_axis must be 0 or 1"
+                    )
                 if not wall_flag.is_integer() or int(wall_flag) <= 0:
                     errors.append(
                         f"curve_wall_segments[{index}] wall_flag must be a positive integer"
                     )
-                if all(
-                    abs(value) <= 1.0e-12
-                    for value in geometry_segment[1:4] + geometry_segment[5:8]
-                ):
+                if abs(u_end - u_start) <= 1.0e-12:
                     errors.append(f"curve_wall_segments[{index}] has zero length")
-                curve_segments.append(geometry_segment)
+                if normal_sign == 0.0:
+                    errors.append(
+                        f"curve_wall_segments[{index}] normal_sign must not be zero"
+                    )
+                curve_segments.append(segment)
 
         particle_data = self.itemcfg.get("PARTICLE_DATA")
         particles = []
@@ -139,6 +205,7 @@ class GenericGenData:
                     continue
                 try:
                     values = {
+                        "name": name,
                         "x": float(particle.location.x1),
                         "y": float(particle.location.y1),
                         "z": float(particle.location.z1),
@@ -157,7 +224,10 @@ class GenericGenData:
                 except (AttributeError, TypeError, ValueError) as error:
                     errors.append(f"PARTICLE_DATA.{name} is invalid: {error}")
                     continue
-                if not all(math.isfinite(value) for value in values.values()):
+                numeric_values = (
+                    value for key, value in values.items() if key != "name"
+                )
+                if not all(math.isfinite(value) for value in numeric_values):
                     errors.append(f"PARTICLE_DATA.{name} values must be finite")
                 if values["radius"] <= 0.0:
                     errors.append(f"PARTICLE_DATA.{name}.radius must be positive")
@@ -181,7 +251,7 @@ class GenericGenData:
             ):
                 errors.append("death_bounds must fit inside the cell array")
             for index, segment in enumerate(curve_segments):
-                x_min, x_max, y_min, y_max = curve_bounds(segment)
+                x_min, x_max, y_min, y_max = wall_bounds(segment)
                 if x_min < 0.0 or x_max > width:
                     errors.append(
                         f"curve_wall_segments[{index}] x extent is outside the cell array"
@@ -218,6 +288,220 @@ class GenericGenData:
         self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
         return True
 
+    def report_collision_feasibility(self):
+        """Print a kinematic collision timing estimate for configured particles."""
+        if len(self.explicit_particles) < 2:
+            report_text = "Collision Feasibility: fewer than two mobile particles"
+            print(report_text)
+            self.write_validation_log(report_text)
+            return []
+
+        dt = float(self.dt)
+        target_penetration_fraction = float(
+            self.itemcfg.get(
+                "target_penetration_fraction",
+                self.itemcfg.get("max_penetration_fraction", 0.5),
+            )
+        )
+        hard_penetration_fraction = float(
+            self.itemcfg.get("hard_penetration_fraction", 0.75)
+        )
+        min_compression_frames = float(
+            self.itemcfg.get("min_compression_frames", 3.0)
+        )
+        reports = []
+
+        lines = [
+            "Collision Feasibility:",
+            f"  minimum compression frames: {min_compression_frames:.3f}",
+        ]
+        for source_index, source in enumerate(self.explicit_particles):
+            for target in self.explicit_particles[source_index + 1 :]:
+                dx = target["x"] - source["x"]
+                dy = target["y"] - source["y"]
+                dz = target["z"] - source["z"]
+                center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+                if center_distance <= 1.0e-12:
+                    normal_x, normal_y, normal_z = 1.0, 0.0, 0.0
+                else:
+                    normal_x = dx / center_distance
+                    normal_y = dy / center_distance
+                    normal_z = dz / center_distance
+
+                relative_velocity_x = source["vx"] - target["vx"]
+                relative_velocity_y = source["vy"] - target["vy"]
+                relative_velocity_z = source["vz"] - target["vz"]
+                relative_normal_speed = (
+                    relative_velocity_x * normal_x
+                    + relative_velocity_y * normal_y
+                    + relative_velocity_z * normal_z
+                )
+
+                contact_distance = source["radius"] + target["radius"]
+                initial_gap = center_distance - contact_distance
+                per_frame_closing_distance = max(0.0, relative_normal_speed) * dt
+                target_penetration_depth = (
+                    target_penetration_fraction * source["radius"]
+                )
+                hard_penetration_depth = (
+                    hard_penetration_fraction * source["radius"]
+                )
+
+                if initial_gap <= 0.0:
+                    frames_to_first_contact = 0.0
+                elif per_frame_closing_distance > 0.0:
+                    frames_to_first_contact = initial_gap / per_frame_closing_distance
+                else:
+                    frames_to_first_contact = math.inf
+
+                if per_frame_closing_distance > 0.0:
+                    frames_to_target_depth = (
+                        target_penetration_depth / per_frame_closing_distance
+                    )
+                    frames_to_hard_depth = (
+                        hard_penetration_depth / per_frame_closing_distance
+                    )
+                else:
+                    frames_to_target_depth = math.inf
+                    frames_to_hard_depth = math.inf
+                time_to_first_contact = frames_to_first_contact * dt
+                time_to_target_depth = frames_to_target_depth * dt
+                time_to_hard_depth = frames_to_hard_depth * dt
+
+                stiffness_at_contact = min(
+                    source["collision_stiffness_q"],
+                    target["collision_stiffness_q"],
+                )
+                force_at_target_depth = (
+                    stiffness_at_contact * target_penetration_depth
+                )
+                source_dv_per_frame_at_max = (
+                    force_at_target_depth / source["mass"]
+                ) * dt
+                target_dv_per_frame_at_max = (
+                    force_at_target_depth / target["mass"]
+                ) * dt
+                relative_dv_per_frame_at_max = (
+                    source_dv_per_frame_at_max + target_dv_per_frame_at_max
+                )
+                response_mass_factor = (1.0 / source["mass"]) + (
+                    1.0 / target["mass"]
+                )
+                if (
+                    relative_normal_speed > 0.0
+                    and frames_to_target_depth > 0.0
+                    and math.isfinite(frames_to_target_depth)
+                    and target_penetration_depth > 0.0
+                    and dt > 0.0
+                    and response_mass_factor > 0.0
+                ):
+                    required_stiffness_for_max_depth = relative_normal_speed / (
+                        frames_to_target_depth
+                        * target_penetration_depth
+                        * dt
+                        * response_mass_factor
+                    )
+                else:
+                    required_stiffness_for_max_depth = 0.0
+                if relative_normal_speed <= 0.0:
+                    frames_to_cancel_relative_speed = 0.0
+                elif relative_dv_per_frame_at_max > 0.0:
+                    frames_to_cancel_relative_speed = (
+                        relative_normal_speed / relative_dv_per_frame_at_max
+                    )
+                else:
+                    frames_to_cancel_relative_speed = math.inf
+                time_to_cancel_relative_speed = (
+                    frames_to_cancel_relative_speed * dt
+                )
+
+                if relative_normal_speed <= 0.0:
+                    status = "OPENING"
+                elif frames_to_hard_depth < 1.0:
+                    status = "ERROR"
+                elif frames_to_target_depth < min_compression_frames:
+                    status = "WARNING"
+                elif frames_to_cancel_relative_speed > frames_to_target_depth:
+                    status = "WARNING_STIFFNESS"
+                else:
+                    status = "OK"
+
+                lines.extend(
+                    [
+                        f"  source pair: {source['name']} -> {target['name']}",
+                        f"  initial gap: {initial_gap:.6f}",
+                        "  relative normal speed: "
+                        f"{max(0.0, relative_normal_speed):.6f}",
+                        "  per-frame closing distance: "
+                        f"{per_frame_closing_distance:.6f}",
+                        "  frames to first contact: "
+                        f"{frames_to_first_contact:.3f}",
+                        "  time to first contact: "
+                        f"{time_to_first_contact:.6f}",
+                        "  target penetration depth: "
+                        f"{target_penetration_depth:.6f}",
+                        "  hard penetration depth: "
+                        f"{hard_penetration_depth:.6f}",
+                        "  frames from contact to target depth: "
+                        f"{frames_to_target_depth:.3f}",
+                        "  time from contact to target depth: "
+                        f"{time_to_target_depth:.6f}",
+                        "  frames from contact to hard depth: "
+                        f"{frames_to_hard_depth:.3f}",
+                        "  time from contact to hard depth: "
+                        f"{time_to_hard_depth:.6f}",
+                        "  stiffness at contact: "
+                        f"{stiffness_at_contact:.6f}",
+                        "  force at target depth: "
+                        f"{force_at_target_depth:.6f}",
+                        "  source dv/frame at max: "
+                        f"{source_dv_per_frame_at_max:.6f}",
+                        "  target dv/frame at max: "
+                        f"{target_dv_per_frame_at_max:.6f}",
+                        "  relative dv/frame at max: "
+                        f"{relative_dv_per_frame_at_max:.6f}",
+                        "  frames to cancel relative speed: "
+                        f"{frames_to_cancel_relative_speed:.3f}",
+                        "  time to cancel relative speed: "
+                        f"{time_to_cancel_relative_speed:.6f}",
+                        "  required stiffness for max-depth response: "
+                        f"{required_stiffness_for_max_depth:.6f}",
+                        f"  status: {status}",
+                    ]
+                )
+
+                reports.append(
+                    {
+                        "source": source["name"],
+                        "target": target["name"],
+                        "initial_gap": initial_gap,
+                        "relative_normal_speed": relative_normal_speed,
+                        "per_frame_closing_distance": per_frame_closing_distance,
+                        "frames_to_first_contact": frames_to_first_contact,
+                        "time_to_first_contact": time_to_first_contact,
+                        "target_penetration_depth": target_penetration_depth,
+                        "hard_penetration_depth": hard_penetration_depth,
+                        "frames_to_target_depth": frames_to_target_depth,
+                        "time_to_target_depth": time_to_target_depth,
+                        "frames_to_hard_depth": frames_to_hard_depth,
+                        "time_to_hard_depth": time_to_hard_depth,
+                        "stiffness_at_contact": stiffness_at_contact,
+                        "force_at_target_depth": force_at_target_depth,
+                        "source_dv_per_frame_at_max": source_dv_per_frame_at_max,
+                        "target_dv_per_frame_at_max": target_dv_per_frame_at_max,
+                        "relative_dv_per_frame_at_max": relative_dv_per_frame_at_max,
+                        "frames_to_cancel_relative_speed": frames_to_cancel_relative_speed,
+                        "time_to_cancel_relative_speed": time_to_cancel_relative_speed,
+                        "required_stiffness_for_max_depth": required_stiffness_for_max_depth,
+                        "status": status,
+                    }
+                )
+
+        report_text = "\n".join(lines)
+        print(report_text)
+        self.write_validation_log(report_text)
+        return reports
+
     def initialize_generation(self):
         self.p_list = []
         self.bin_file = None
@@ -230,9 +514,16 @@ class GenericGenData:
             self.itemcfg.get("output_file_prefix", self.itemcfg.STUDY_NAME)
         )
         output_directory = str(self.itemcfg.data_dir)
+        os.makedirs(output_directory, exist_ok=True)
         self.test_bin_name = os.path.join(output_directory, f"{output_prefix}.bin")
         self.test_file_name = os.path.join(output_directory, f"{output_prefix}.tst")
         self.report_file = os.path.join(output_directory, f"{output_prefix}.rpt")
+        self.validation_log_name = os.path.join(output_directory, f"{output_prefix}.log")
+        with open(self.validation_log_name, "w", encoding="ascii", newline="\n") as output:
+            output.write(
+                "Function-wall particle validation log\n"
+                f"  output prefix: {output_prefix}\n"
+            )
         configured_obj_file = self.itemcfg.get("obj_file_name")
         if configured_obj_file:
             self.obj_file_name = os.path.normpath(str(configured_obj_file))
@@ -241,6 +532,11 @@ class GenericGenData:
                 output_directory,
                 f"{output_prefix}.obj",
             )
+
+    def write_validation_log(self, text):
+        with open(self.validation_log_name, "a", encoding="ascii", newline="\n") as output:
+            output.write(text.rstrip())
+            output.write("\n")
 
     def add_null_particle(self):
         particle = pdata()
@@ -309,21 +605,20 @@ class GenericGenData:
         self.p_list.append(particle)
         return particle
 
-    def curve_marker_parameters(self, segment, maximum_spacing=1.0):
-        """Return parameters using the shared runtime marker policy."""
-        return marker_parameters(segment, maximum_spacing)
+    def curve_marker_points(self, segment, maximum_spacing=1.0):
+        """Return sampled points used only for boundary-sentinel placement."""
+        return sample_points(segment, maximum_spacing)
 
-    def add_parametric_wall_markers(self):
-        """Create deduplicated locality markers along all wall segments."""
+    def add_function_wall_markers(self):
+        """Create deduplicated boundary-sentinel markers along wall segments."""
         marker_cells = set()
         segment_marker_counts = []
 
         for segment in self.curve_wall_segments:
-            wall_flag = int(round(segment[8]))
-            parameters = self.curve_marker_parameters(segment)
+            wall_flag = int(round(segment[9]))
+            points = self.curve_marker_points(segment)
             added_for_segment = 0
-            for parameter in parameters:
-                marker_x, marker_y = evaluate_point(segment, parameter)
+            for marker_x, marker_y in points:
                 cell_x = round(marker_x)
                 cell_y = round(marker_y)
                 cell_z = round(self.particle_plane_z)
@@ -342,35 +637,45 @@ class GenericGenData:
                 added_for_segment += 1
             segment_marker_counts.append(added_for_segment)
 
-        print(
-            "Parametric wall-marker report:\n"
+        report_text = (
+            "Function wall-marker report:\n"
             f"  curve segments: {len(self.curve_wall_segments)}\n"
             f"  unique boundary markers: {self.number_boundary_particles}\n"
             f"  boundary ptype: {self.BOUNDARY_PARTICLE_PTYPE:g}\n"
             f"  markers added per segment: {segment_marker_counts}\n"
-            "  occupancy rule: one marker per cell per physical wall\n"
+            "  occupancy rule: boundary markers are cell-locality sentinels\n"
             "  marker position: integer cell center\n"
-            "  maximum sampled curve chord: 1 cell"
+            "  maximum sampled function interval: 1 cell"
         )
+        print(report_text)
+        self.write_validation_log(report_text)
         return self.number_boundary_particles
 
-    def write_parametric_wall_obj(self):
-        """Write triangle ribbons sampled from the wall-marker curve paths."""
+    def write_function_wall_obj(self):
+        """Write triangle ribbons sampled from function-wall paths."""
         half_thickness = 0.25
         vertices = []
         faces = []
 
         for segment in self.curve_wall_segments:
-            parameters = self.curve_marker_parameters(segment)
+            points = self.curve_marker_points(segment)
             segment_vertices = []
 
-            for parameter in parameters:
-                point_x, point_y = evaluate_point(segment, parameter)
-                tangent_x, tangent_y = evaluate_tangent(segment, parameter)
+            for point_index, (point_x, point_y) in enumerate(points):
+                if len(points) == 1:
+                    tangent_x, tangent_y = 1.0, 0.0
+                elif point_index == 0:
+                    next_x, next_y = points[point_index + 1]
+                    tangent_x = next_x - point_x
+                    tangent_y = next_y - point_y
+                else:
+                    previous_x, previous_y = points[point_index - 1]
+                    tangent_x = point_x - previous_x
+                    tangent_y = point_y - previous_y
                 tangent_length = math.hypot(tangent_x, tangent_y)
                 if tangent_length <= 1.0e-12:
                     raise RuntimeError(
-                        "cannot generate OBJ ribbon from a zero-length tangent"
+                        "cannot generate OBJ ribbon from a zero-length wall sample"
                     )
 
                 normal_x = -tangent_y / tangent_length
@@ -400,9 +705,9 @@ class GenericGenData:
 
         os.makedirs(os.path.dirname(self.obj_file_name), exist_ok=True)
         with open(self.obj_file_name, "w", encoding="ascii", newline="\n") as output:
-            output.write("# Generated from curve_wall_segments.\n")
+            output.write("# Generated from function-wall curve_wall_segments.\n")
             output.write("# Dynamics use boundary particles; this mesh is visual only.\n")
-            output.write("o GeneratedParametricWalls\n")
+            output.write("o GeneratedFunctionWalls\n")
             for vertex_x, vertex_y, vertex_z in vertices:
                 output.write(
                     f"v {vertex_x:.9f} {vertex_y:.9f} {vertex_z:.9f}\n"
@@ -419,12 +724,14 @@ class GenericGenData:
                     f"f {third}/{third}/2 {second}/{second}/2 {first}/{first}/2\n"
                 )
 
-        print(
-            "Parametric wall OBJ report:\n"
+        report_text = (
+            "Function wall OBJ report:\n"
             f"  file: {self.obj_file_name}\n"
             f"  vertices: {len(vertices)}\n"
             f"  triangles: {2 * len(faces)}"
         )
+        print(report_text)
+        self.write_validation_log(report_text)
         return self.obj_file_name
 
     def report_generated_bounds(self):
@@ -436,7 +743,9 @@ class GenericGenData:
             and int(round(float(particle.pnum))) != 0
         ]
         if not mobile_particles:
-            print("Generic particle generated bounds: no mobile particles")
+            report_text = "Generic particle generated bounds: no mobile particles"
+            print(report_text)
+            self.write_validation_log(report_text)
             return None
 
         center_bounds = (
@@ -455,7 +764,7 @@ class GenericGenData:
             min(particle.rz - particle.radius for particle in mobile_particles),
             max(particle.rz + particle.radius for particle in mobile_particles),
         )
-        print(
+        report_text = (
             "Generic particle generated bounds:\n"
             f"  center x: [{center_bounds[0]:g}, {center_bounds[1]:g}]\n"
             f"  center y: [{center_bounds[2]:g}, {center_bounds[3]:g}]\n"
@@ -467,7 +776,149 @@ class GenericGenData:
             f"  perimeter z: [{perimeter_bounds[4]:g}, "
             f"{perimeter_bounds[5]:g}]"
         )
+        print(report_text)
+        self.write_validation_log(report_text)
         return center_bounds, perimeter_bounds
+
+    @staticmethod
+    def next_power_of_two(value):
+        value = int(math.ceil(float(value)))
+        if value <= 1:
+            return 1
+        return 1 << (value - 1).bit_length()
+
+    def cell_location_from_indices(self, cell_x, cell_y, cell_z):
+        return (
+            cell_x
+            + self.cell_array_width
+            * (cell_y + self.cell_array_height * cell_z)
+        )
+
+    def particle_cell_indices(self, particle):
+        return (
+            int(math.floor(float(particle.rx))),
+            int(math.floor(float(particle.ry))),
+            int(math.floor(float(particle.rz))),
+        )
+
+    def particle_corner_cell_indices(self, particle):
+        radius = float(particle.radius)
+        x_values = {
+            int(math.floor(float(particle.rx) - radius)),
+            int(math.floor(float(particle.rx) + radius)),
+        }
+        y_values = {
+            int(math.floor(float(particle.ry) - radius)),
+            int(math.floor(float(particle.ry) + radius)),
+        }
+        z_values = {
+            int(math.floor(float(particle.rz) - radius)),
+            int(math.floor(float(particle.rz) + radius)),
+        }
+        cells = set()
+        for cell_x in x_values:
+            for cell_y in y_values:
+                for cell_z in z_values:
+                    cells.add((cell_x, cell_y, cell_z))
+        return cells
+
+    def is_valid_cell_index(self, cell_x, cell_y, cell_z):
+        return (
+            0 <= cell_x < self.cell_array_width
+            and 0 <= cell_y < self.cell_array_height
+            and 0 <= cell_z < self.cell_array_depth
+        )
+
+    def report_cell_occupancy_capacity(self):
+        """Report initial occupancy against configured Vulkan cell-list capacity."""
+        center_occupancy = {}
+        corner_occupancy = {}
+        out_of_bounds = []
+
+        for particle in self.p_list:
+            if int(round(float(particle.pnum))) == 0:
+                continue
+
+            center_cell = self.particle_cell_indices(particle)
+            if self.is_valid_cell_index(*center_cell):
+                center_loc = self.cell_location_from_indices(*center_cell)
+                center_occupancy.setdefault(center_loc, []).append(particle.pnum)
+            else:
+                out_of_bounds.append((particle.pnum, center_cell))
+
+            for corner_cell in self.particle_corner_cell_indices(particle):
+                if not self.is_valid_cell_index(*corner_cell):
+                    out_of_bounds.append((particle.pnum, corner_cell))
+                    continue
+                corner_loc = self.cell_location_from_indices(*corner_cell)
+                corner_occupancy.setdefault(corner_loc, set()).add(particle.pnum)
+
+        def max_entry(occupancy):
+            if not occupancy:
+                return 0, None
+            location, particles = max(
+                occupancy.items(),
+                key=lambda item: len(item[1]),
+            )
+            return len(particles), location
+
+        max_center_count, max_center_location = max_entry(center_occupancy)
+        max_corner_count, max_corner_location = max_entry(corner_occupancy)
+        headroom_factor = float(
+            self.itemcfg.get("cell_occupancy_runtime_headroom_factor", 1.25)
+        )
+        recommended_size = self.next_power_of_two(
+            max_corner_count * max(1.0, headroom_factor)
+        )
+        configured_size = int(self.cell_occupancy_list_size)
+        runtime_headroom = configured_size - max_corner_count
+
+        if configured_size < max_corner_count:
+            status = "ERROR"
+        elif configured_size < recommended_size:
+            status = "WARNING_HEADROOM"
+        else:
+            status = "OK"
+
+        report_text = (
+            "Cell occupancy capacity report:\n"
+            f"  configured cell_occupancy_list_size: {configured_size}\n"
+            f"  initial max center occupancy: {max_center_count}"
+            f" at loc {max_center_location}\n"
+            f"  initial max corner occupancy: {max_corner_count}"
+            f" at loc {max_corner_location}\n"
+            f"  runtime headroom factor: {headroom_factor:g}\n"
+            f"  runtime headroom slots: {runtime_headroom}\n"
+            f"  recommended cell_occupancy_list_size: {recommended_size}\n"
+            f"  out-of-bounds cell references: {len(out_of_bounds)}\n"
+            f"  status: {status}"
+        )
+        print(report_text)
+        self.write_validation_log(report_text)
+
+        if out_of_bounds:
+            sample = ", ".join(
+                f"p{int(pnum)}->{cell}" for pnum, cell in out_of_bounds[:8]
+            )
+            raise RuntimeError(
+                "generated particle occupancy references cells outside the "
+                f"cell array: {sample}"
+            )
+        if configured_size < max_corner_count:
+            raise RuntimeError(
+                "cell_occupancy_list_size is too small for the generated "
+                f"initial state: configured {configured_size}, initial "
+                f"corner occupancy {max_corner_count}"
+            )
+        return {
+            "configured_size": configured_size,
+            "max_center_count": max_center_count,
+            "max_center_location": max_center_location,
+            "max_corner_count": max_corner_count,
+            "max_corner_location": max_corner_location,
+            "recommended_size": recommended_size,
+            "status": status,
+        }
 
     def create_bin_file(self):
         os.makedirs(str(self.itemcfg.data_dir), exist_ok=True)
@@ -497,7 +948,7 @@ class GenericGenData:
         return self.test_bin_name
 
     def write_test_file(self):
-        """Write Vulkan metadata for the parametric particle simulation."""
+        """Write Vulkan metadata for the function-wall particle simulation."""
         particle_data_bin_file = self.test_bin_name.replace(os.sep, "/")
         report_file = self.report_file.replace(os.sep, "/")
         view_center = self.itemcfg.get(
@@ -587,14 +1038,16 @@ class GenericGenData:
             output.write(f"hsv_sat = {float(self.itemcfg.hsv_sat):.9f};\n")
             output.write(f"hsv_val = {float(self.itemcfg.hsv_val):.9f};\n")
 
-        print(
-            "Parametric particle test-file report:\n"
+        report_text = (
+            "Function-wall particle test-file report:\n"
             f"  file: {self.test_file_name}\n"
             f"  particle records excluding null: {self.number_particles}\n"
             f"  mobile compute records including null: "
             f"{self.number_active_particles + 1}\n"
             f"  curve segments: {len(self.curve_wall_segments)}"
         )
+        print(report_text)
+        self.write_validation_log(report_text)
         return self.test_file_name
 
     def runner(self):
@@ -602,16 +1055,18 @@ class GenericGenData:
             self.validate_simulation_configuration()
         except (AttributeError, TypeError, ValueError) as error:
             print(
-                "Parametric particle configuration validation stopped:\n"
+                "Function-wall particle configuration validation stopped:\n"
                 f"{error}"
             )
             return False
 
         self.initialize_generation()
         try:
+            self.report_collision_feasibility()
             self.add_null_particle()
             self.add_explicit_mobile_particles()
-            self.add_parametric_wall_markers()
+            self.add_function_wall_markers()
+            self.report_cell_occupancy_capacity()
             self.write_particle_bin()
             self.write_test_file()
             self.report_generated_bounds()
@@ -623,11 +1078,13 @@ class GenericGenData:
             )
             return False
 
-        print(
+        report_text = (
             "Generic particle generation complete:\n"
             f"  binary file: {self.test_bin_name}\n"
             f"  records: {self.count}\n"
             f"  mobile particles: {self.number_active_particles}\n"
             f"  boundary markers: {self.number_boundary_particles}"
         )
+        print(report_text)
+        self.write_validation_log(report_text)
         return True

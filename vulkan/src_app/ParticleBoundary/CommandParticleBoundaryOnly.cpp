@@ -78,20 +78,20 @@ void CommandParticleBoundaryOnly::RecordCommands(uint32_t imageindex, uint32_t c
 		}
 	// Associate a render pass with command buffer
 	VkRenderPassBeginInfo renderPassInfo{};
-	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassInfo.sType				= VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	// Associate renderpass with command buffer
-	renderPassInfo.renderPass = m_RPO->m_RenderPass;
+	renderPassInfo.renderPass			= m_RPO->m_RenderPass;
 	// Associate frame buffer with current swap chain image number.
-	renderPassInfo.framebuffer = m_FBO->m_SwapChainFramebuffers[imageindex];
-	renderPassInfo.renderArea.offset = { 0, 0 };
-	renderPassInfo.renderArea.extent = m_SCO->GetSwapExtent();
+	renderPassInfo.framebuffer			= m_FBO->m_SwapChainFramebuffers[imageindex];
+	renderPassInfo.renderArea.offset	= { 0, 0 };
+	renderPassInfo.renderArea.extent	= m_SCO->GetSwapExtent();
 
 	std::array<VkClearValue, 2> clearValues{};
-	clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
-	clearValues[1].depthStencil = { 1.0f, 0 };
-	VkClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
-	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-	renderPassInfo.pClearValues = clearValues.data();
+	clearValues[0].color				= { {0.0f, 0.0f, 0.0f, 1.0f} };
+	clearValues[1].depthStencil			= { 1.0f, 0 };
+	VkClearValue clearColor				= { {{0.0f, 0.0f, 0.0f, 1.0f}} };
+	renderPassInfo.clearValueCount		= static_cast<uint32_t>(clearValues.size());
+	renderPassInfo.pClearValues			= clearValues.data();
 
 	vkCmdFillBuffer(m_CommandBuffers[currentBuffer],
 		collMem->m_Buffers[0],
@@ -260,13 +260,13 @@ void CommandParticleBoundaryOnly::RecordSubPassParticle(uint32_t imageindex, uin
 
 	// Record the viewpoer to be used
 	VkViewport viewport{};
-	viewport.x = 0.0f;
-	viewport.y = static_cast<float>(m_SCO->GetSwapHeight());
-	viewport.width = static_cast<float>(m_SCO->GetSwapWidth());
-	viewport.height = -static_cast<float>(m_SCO->GetSwapHeight());
+	viewport.x			= 0.0f;
+	viewport.y			= static_cast<float>(m_SCO->GetSwapHeight());
+	viewport.width		= static_cast<float>(m_SCO->GetSwapWidth());
+	viewport.height		= -static_cast<float>(m_SCO->GetSwapHeight());
 
-	viewport.minDepth = static_cast<float>(m_SCO->GetSizzorMin());
-	viewport.maxDepth = static_cast<float>(m_SCO->GetSizzorMax());
+	viewport.minDepth	= static_cast<float>(m_SCO->GetSizzorMin());
+	viewport.maxDepth	= static_cast<float>(m_SCO->GetSizzorMax());
 
 	vkCmdSetViewport(m_CommandBuffers[currentBuffer], 0, 1, &viewport);
 

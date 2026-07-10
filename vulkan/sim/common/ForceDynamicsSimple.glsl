@@ -8,7 +8,8 @@
 const float EPSILON = 1.0e-12;
 const float MAXIMUM_DEPTH_SOLVER_EPSILON = 1.0e-6;
 const float FORCE_DYNAMICS_PI = 3.1415926535897932384626433832795;
-const float MAXIMUM_PENETRATION_FRACTION = 0.5;
+const float TARGET_PENETRATION_FRACTION = 0.5;
+const float HARD_PENETRATION_FRACTION = 0.75;
 const uint CONTACT_PARTICLE = 1u;
 const uint CONTACT_WALL = 2u;
 const uint CONTACT_ACTIVE_THIS_FRAME = 1u;
@@ -103,7 +104,7 @@ float particle_overlap_area(float sourceRadius, float targetRadius, float center
     return sourceArea + targetArea - triangleArea;
 }
 
-// Python source: ForceDynamics.py:470
+// Python source: ForceDynamics.py:541
 float ParticlePenetrationDepth(float sourceRadius, float targetRadius, float centerDistance)
 {
     return sourceRadius + targetRadius - centerDistance;
@@ -233,6 +234,10 @@ ParticleGeometry GetParticleGeometry(uint SourceID, uint TargetID)
         sourceRadius, targetRadius, true);
 }
 
+float GetContactTargetDepth(float sourceRadius);
+float GetContactHardDepth(float sourceRadius);
+float GetContactRemainingDepth(float sourceRadius, float penetrationDepth);
+
 bool CheckPenetrationStepResolution(
     uint SourceID, vec3 normal, float sourceRadius, vec3 targetVelocity)
 {
@@ -240,12 +245,93 @@ bool CheckPenetrationStepResolution(
     float relativeNormalVelocity = dot(targetVelocity - sourceVelocity, normal);
     float inwardDisplacement = max(
         0.0, -relativeNormalVelocity * ShaderFlags.dt);
-    float penetrationReserve =
-        (1.0 - MAXIMUM_PENETRATION_FRACTION) * sourceRadius;
+    float penetrationReserve = GetContactHardDepth(sourceRadius);
     if (inwardDisplacement > penetrationReserve + EPSILON) {
         return SetError(ERROR_PENETRATION_STEP_TOO_LARGE, SourceID);
     }
     return true;
+}
+
+float GetContactTargetDepth(float sourceRadius)
+{
+    return TARGET_PENETRATION_FRACTION * sourceRadius;
+}
+
+float GetContactHardDepth(float sourceRadius)
+{
+    return HARD_PENETRATION_FRACTION * sourceRadius;
+}
+
+float GetContactRemainingDepth(float sourceRadius, float penetrationDepth)
+{
+    return GetContactHardDepth(sourceRadius) - penetrationDepth;
+}
+
+float GetContactInwardDisplacement(
+    uint SourceID, vec3 normal, vec3 targetVelocity, vec3 sourceVelocity)
+{
+    float relativeNormalVelocity = dot(targetVelocity - sourceVelocity, normal);
+    return max(0.0, -relativeNormalVelocity * ShaderFlags.dt);
+}
+
+bool CheckResolvedContactStep(
+    uint SourceID,
+    vec3 normal,
+    float penetrationDepth,
+    float sourceRadius,
+    vec3 targetVelocity)
+{
+    float remainingDepth = GetContactRemainingDepth(sourceRadius, penetrationDepth);
+    if (penetrationDepth > GetContactHardDepth(sourceRadius) + EPSILON) {
+        return SetError(ERROR_MAX_DEPTH_CONSTRAINT, SourceID);
+    }
+
+    vec3 resolvedVelocity = GetNextParticleVelocity(SourceID).xyz;
+    float inwardDisplacement = GetContactInwardDisplacement(
+        SourceID,
+        normal,
+        targetVelocity,
+        resolvedVelocity);
+    if (inwardDisplacement > remainingDepth + EPSILON) {
+        return SetError(ERROR_PENETRATION_STEP_TOO_LARGE, SourceID);
+    }
+    return true;
+}
+
+bool CheckResolvedParticleContactStep(
+    uint SourceID,
+    uint TargetID,
+    ParticleGeometry geometry)
+{
+    if (!geometry.valid) { return true; }
+    float penetrationDepth = ParticlePenetrationDepth(
+        geometry.sourceRadius,
+        geometry.targetRadius,
+        geometry.centerDistance);
+    return CheckResolvedContactStep(
+        SourceID,
+        geometry.normal,
+        penetrationDepth,
+        geometry.sourceRadius,
+        GetStartFrameVelocity(TargetID).xyz);
+}
+
+bool CheckResolvedFunctionWallContactStep(
+    uint SourceID,
+    BoundaryWallSegment segment)
+{
+    if (!segment.valid) { return true; }
+    float sourceRadius = P[SourceID].Data.x;
+    float penetrationDepth = ParticlePenetrationDepth(
+        sourceRadius,
+        sourceRadius,
+        segment.centerDistance);
+    return CheckResolvedContactStep(
+        SourceID,
+        segment.normal,
+        penetrationDepth,
+        sourceRadius,
+        vec3(0.0));
 }
 
 ParticleGeometry GetPhysicalParticleContact(uint SourceID, uint TargetID)
@@ -283,8 +369,8 @@ bool RegisterMaximumDepthConstraint(
         maximumDepthConstraintCount = 0u;
     }
 
-    float maximumDepth = MAXIMUM_PENETRATION_FRACTION * sourceRadius;
-    if (penetrationDepth < maximumDepth - EPSILON) {
+    float targetDepth = GetContactTargetDepth(sourceRadius);
+    if (penetrationDepth < targetDepth - EPSILON) {
         return true;
     }
 
@@ -341,7 +427,7 @@ bool ProcessParticleCollision(
     return AccumulateContactForce(SourceID, contact, totalForce);
 }
 
-bool ProcessParametricWallCollision(
+bool ProcessFunctionWallCollision(
     uint SourceID, BoundaryWallSegment segment, inout vec3 totalForce)
 {
     if (!segment.valid) { return true; }

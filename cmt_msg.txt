@@ -1,13 +1,22 @@
 Current status:
-	- The leakage-response experiments are backed out of the active path: the signed parametric wall penetration change and rasterized marker generation should not be treated as the next model.
-	- Boundary markers are being re-centered conceptually as broad-phase sentinels: they identify cells near a wall, while the wall evaluator owns physical position, normal, penetration, and force response.
-	- The next wall model should be function-wall based for the active 2D work: y=f(x) segments with configured outward normals, plus a vertical-wall special case.
-	- Vulkan should stay unchanged until the Python function-wall behavior is validated.
+    - Simple Python and GLSL dynamics have been reorganized around the generic function-wall model.
+    - Boundary particles now act as locality sentinels; wall geometry comes from configured function-wall segments.
+    - TestReservoir uses the generic reservoir generator path with piston metadata exported for Vulkan.
+    - Cell occupancy sizing is again controlled by cell_occupancy_list_size as the single authoritative cfg value.
+    - High-performance Python UI mode is separated from visual presentation options through dynamics_diagnostics.
+    - The remaining dynamics issue is contact compression at high crowding/small particle scale, where max-depth and timestep limits still need a better depth-range model.
+
 Code Changes:
-	- Documented the function-wall boundary direction in docs/Dynamics/ProblemEvolution.tex.
-	- Captured the required implementation order: cleanup first, Python function-wall changes second, Python validation third, Vulkan/export changes last.
-	- Preserved the current simple/reservoir checkpoint notes, including dead-particle vertex filtering and ParticleNumber error diagnostics.
+    - Added/updated GenericGenData and GenReservoir generation paths for function-wall segments, reservoir packing, boundary sentinels, and validation reporting.
+    - Updated active cfg files to use the new function-wall curve definitions and explicit axis limits.
+    - Added generator feasibility reporting for collision timing, stiffness response, compression frame estimates, and occupancy capacity.
+    - Updated Python UI behavior so diagnostics can be disabled for faster simulation while preserving runtime error reporting.
+    - Updated simple GLSL export flow for function-wall evaluation, piston support, dead-particle handling, and post-resolution contact-step checking.
+    - Regenerated simple GLSL artifacts for TestReservoir after exporter updates.
+    - Removed override_cell_occupancy_size handling and kept cell_occupancy_list_size as the configured occupancy authority.
+    - Documented the function-wall boundary model direction and the Python-first, then Vulkan porting sequence in ProblemEvolution.
+
 Next:
-	- Clean up the active wall configuration/evaluator shape.
-	- Implement and validate function-wall response in Python, especially small particles at the converging transition.
-	- After Python passes, update the simple GLSL exporter/templates and rerun Vulkan captures.
+    - Implement and test the depth range model: target compression depth for containment, hard compression depth for fatal error.
+    - Validate the model first in Python using TwoParticleHorizontal, a wall case, and TestReservoirPy.
+    - After Python behavior is stable, port the same depth range rules to the simple GLSL exporter and rerun TestReservoir Vulkan captures.

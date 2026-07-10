@@ -1,14 +1,12 @@
 import math
 
 from gbase.GenericGenData import GenericGenData
-from gbase.ParametricCurve import bounds as curve_bounds
+from gbase.FunctionWall import BOUNDARY_KIND_RESERVOIR
+from gbase.FunctionWall import bounds as wall_bounds
 
 
 class GenReservoir(GenericGenData):
     """Generate a packed reservoir using the GenericGenData output contract."""
-
-    CURVE_ROLE_PACKING = 1
-    CURVE_ROLE_BOUNDARY = 2
 
     def validate_simulation_configuration(self):
         errors = []
@@ -58,6 +56,49 @@ class GenReservoir(GenericGenData):
             else:
                 dimensions.append(value)
 
+        try:
+            target_penetration_fraction = float(
+                self.itemcfg.get(
+                    "target_penetration_fraction",
+                    self.itemcfg.get("max_penetration_fraction", 0.5),
+                )
+            )
+        except (TypeError, ValueError):
+            errors.append("target_penetration_fraction must be numeric")
+            target_penetration_fraction = None
+
+        try:
+            hard_penetration_fraction = float(
+                self.itemcfg.get("hard_penetration_fraction", 0.75)
+            )
+        except (TypeError, ValueError):
+            errors.append("hard_penetration_fraction must be numeric")
+            hard_penetration_fraction = None
+
+        if target_penetration_fraction is not None:
+            if not math.isfinite(target_penetration_fraction):
+                errors.append("target_penetration_fraction must be finite")
+            elif not 0.0 < target_penetration_fraction < 1.0:
+                errors.append("target_penetration_fraction must be between 0 and 1")
+
+        if hard_penetration_fraction is not None:
+            if not math.isfinite(hard_penetration_fraction):
+                errors.append("hard_penetration_fraction must be finite")
+            elif not 0.0 < hard_penetration_fraction < 1.0:
+                errors.append("hard_penetration_fraction must be between 0 and 1")
+
+        if (
+            target_penetration_fraction is not None
+            and hard_penetration_fraction is not None
+            and math.isfinite(target_penetration_fraction)
+            and math.isfinite(hard_penetration_fraction)
+            and hard_penetration_fraction <= target_penetration_fraction
+        ):
+            errors.append(
+                "hard_penetration_fraction must be greater than "
+                "target_penetration_fraction"
+            )
+
         death_bounds = required_values("death_bounds", 6)
         packing_z_bounds = required_values("packing_z_bounds", 2)
         initial_particle_velocity = required_values("initial_particle_velocity", 3)
@@ -77,9 +118,9 @@ class GenReservoir(GenericGenData):
             errors.append("curve_wall_segments is required and must not be empty")
         else:
             for index, raw_segment in enumerate(raw_segments):
-                if len(raw_segment) not in (9, 10):
+                if len(raw_segment) != 10:
                     errors.append(
-                        f"curve_wall_segments[{index}] must contain 9 or 10 values"
+                        f"curve_wall_segments[{index}] must contain 10 values"
                     )
                     continue
                 try:
@@ -94,38 +135,51 @@ class GenReservoir(GenericGenData):
                         f"curve_wall_segments[{index}] values must be finite"
                     )
                     continue
-                wall_flag = segment[8]
+                (
+                    boundary_kind,
+                    independent_axis,
+                    u_start,
+                    u_end,
+                    _f_start,
+                    _a1,
+                    _a2,
+                    _a3,
+                    normal_sign,
+                    wall_flag,
+                ) = segment
+                if (
+                    not boundary_kind.is_integer()
+                    or int(boundary_kind) not in (0, 1)
+                ):
+                    errors.append(
+                        f"curve_wall_segments[{index}] boundary_kind must be 0 or 1"
+                    )
+                if (
+                    not independent_axis.is_integer()
+                    or int(independent_axis) not in (0, 1)
+                ):
+                    errors.append(
+                        f"curve_wall_segments[{index}] independent_axis must be 0 or 1"
+                    )
                 if not wall_flag.is_integer() or int(wall_flag) <= 0:
                     errors.append(
                         f"curve_wall_segments[{index}] wall_flag must be a positive integer"
                     )
-                curve_role = self.CURVE_ROLE_BOUNDARY
-                if len(segment) == 10:
-                    raw_curve_role = segment[9]
-                    if not raw_curve_role.is_integer():
-                        errors.append(
-                            f"curve_wall_segments[{index}] curve_role must be an integer"
-                        )
-                    else:
-                        curve_role = int(raw_curve_role)
-                    if curve_role not in (
-                        self.CURVE_ROLE_PACKING,
-                        self.CURVE_ROLE_BOUNDARY,
-                    ):
-                        errors.append(
-                            f"curve_wall_segments[{index}] curve_role must be 1 or 2"
-                        )
-                if all(abs(value) <= 1.0e-12 for value in segment[1:4] + segment[5:8]):
+                if abs(u_end - u_start) <= 1.0e-12:
                     errors.append(f"curve_wall_segments[{index}] has zero length")
-                curve_segments.append(segment[:9])
-                if curve_role == self.CURVE_ROLE_PACKING:
-                    packing_curve_segments.append(segment[:9])
+                if normal_sign == 0.0:
+                    errors.append(
+                        f"curve_wall_segments[{index}] normal_sign must not be zero"
+                    )
+                curve_segments.append(segment)
+                if int(round(boundary_kind)) == BOUNDARY_KIND_RESERVOIR:
+                    packing_curve_segments.append(segment)
 
         packing_bounds = ()
         if not packing_curve_segments:
             errors.append(
-                "curve_wall_segments must include at least one packing_curve "
-                "(curve_role=1)"
+                "curve_wall_segments must include at least one reservoir "
+                "boundary segment (boundary_kind=1)"
             )
         else:
             packing_bounds = self.derive_packing_bounds(packing_curve_segments)
@@ -214,7 +268,7 @@ class GenReservoir(GenericGenData):
                     )
 
             for index, segment in enumerate(curve_segments):
-                x_min, x_max, y_min, y_max = curve_bounds(segment)
+                x_min, x_max, y_min, y_max = wall_bounds(segment)
                 if x_min < 0.0 or x_max > width:
                     errors.append(
                         f"curve_wall_segments[{index}] x extent is outside the cell array"
@@ -258,7 +312,7 @@ class GenReservoir(GenericGenData):
         y_min_values = []
         y_max_values = []
         for segment in packing_curve_segments:
-            x_min, x_max, y_min, y_max = curve_bounds(segment)
+            x_min, x_max, y_min, y_max = wall_bounds(segment)
             x_min_values.append(x_min)
             x_max_values.append(x_max)
             y_min_values.append(y_min)
@@ -308,7 +362,7 @@ class GenReservoir(GenericGenData):
             z_center,
         )
 
-        print(
+        self.packing_report_text = (
             "Reservoir packing report:\n"
             f"  packing bounds: {self.packing_bounds}\n"
             f"  packing z bounds: {self.packing_z_bounds}\n"
@@ -345,14 +399,154 @@ class GenReservoir(GenericGenData):
                     ),
                 )
 
-        print(
+        report_text = (
             "Reservoir mobile-particle report:\n"
             f"  mobile particles: {self.number_active_particles}\n"
             f"  velocity: {self.initial_particle_velocity}\n"
             f"  first particle number: 1\n"
             f"  last particle number: {self.number_active_particles}"
         )
+        print(report_text)
+        self.write_validation_log(report_text)
         return self.number_active_particles
+
+    def report_collision_feasibility(self):
+        """Print piston-driven collision timing estimates for reservoir packing."""
+        min_compression_frames = float(
+            self.itemcfg.get("min_compression_frames", 3.0)
+        )
+        target_penetration_fraction = float(
+            self.itemcfg.get(
+                "target_penetration_fraction",
+                self.itemcfg.get("max_penetration_fraction", 0.5),
+            )
+        )
+        hard_penetration_fraction = float(
+            self.itemcfg.get("hard_penetration_fraction", 0.75)
+        )
+        piston_normal_speed = abs(float(self.piston_velocity[0]))
+        per_frame_closing_distance = piston_normal_speed * self.dt
+        target_penetration_depth = target_penetration_fraction * self.radius
+        hard_penetration_depth = hard_penetration_fraction * self.radius
+
+        first_x, _first_y, _particle_z = self.packing_first_center
+        piston_to_first_gap = first_x - self.radius - self.piston_x_start
+        particle_gap = self.particle_separation_distance
+
+        def frames_for_distance(distance):
+            if distance <= 0.0:
+                return 0.0
+            if per_frame_closing_distance <= 0.0:
+                return math.inf
+            return distance / per_frame_closing_distance
+
+        frames_to_first_piston_contact = frames_for_distance(piston_to_first_gap)
+        frames_to_neighbor_contact = frames_for_distance(particle_gap)
+        frames_to_target_depth = frames_for_distance(target_penetration_depth)
+        frames_to_hard_depth = frames_for_distance(hard_penetration_depth)
+        time_to_first_piston_contact = frames_to_first_piston_contact * self.dt
+        time_to_neighbor_contact = frames_to_neighbor_contact * self.dt
+        time_to_target_depth = frames_to_target_depth * self.dt
+        time_to_hard_depth = frames_to_hard_depth * self.dt
+        stiffness_at_contact = float(self.itemcfg.get("collision_stiffness_q", 0.0))
+        force_at_target_depth = stiffness_at_contact * target_penetration_depth
+        source_dv_per_frame_at_max = force_at_target_depth * self.dt
+        relative_dv_per_frame_at_max = source_dv_per_frame_at_max
+        if (
+            piston_normal_speed > 0.0
+            and frames_to_target_depth > 0.0
+            and math.isfinite(frames_to_target_depth)
+            and target_penetration_depth > 0.0
+            and self.dt > 0.0
+        ):
+            required_stiffness_for_max_depth = piston_normal_speed / (
+                frames_to_target_depth * target_penetration_depth * self.dt
+            )
+        else:
+            required_stiffness_for_max_depth = 0.0
+        if piston_normal_speed <= 0.0:
+            frames_to_cancel_relative_speed = 0.0
+        elif relative_dv_per_frame_at_max > 0.0:
+            frames_to_cancel_relative_speed = (
+                piston_normal_speed / relative_dv_per_frame_at_max
+            )
+        else:
+            frames_to_cancel_relative_speed = math.inf
+        time_to_cancel_relative_speed = frames_to_cancel_relative_speed * self.dt
+
+        if not self.piston_enabled:
+            status = "PISTON_DISABLED"
+        elif piston_normal_speed <= 0.0:
+            status = "NO_PISTON_COMPRESSION"
+        elif frames_to_hard_depth < 1.0:
+            status = "ERROR"
+        elif frames_to_target_depth < min_compression_frames:
+            status = "WARNING"
+        elif frames_to_cancel_relative_speed > frames_to_target_depth:
+            status = "WARNING_STIFFNESS"
+        else:
+            status = "OK"
+
+        report_text = (
+            "Collision Feasibility:\n"
+            f"  model: reservoir piston compression\n"
+            f"  piston normal speed: {piston_normal_speed:.6f}\n"
+            f"  dt: {self.dt:.6f}\n"
+            f"  per-frame closing distance: {per_frame_closing_distance:.6f}\n"
+            f"  particle surface gap: {particle_gap:.6f}\n"
+            f"  piston-to-first-particle gap: {piston_to_first_gap:.6f}\n"
+            f"  frames to first piston contact: "
+            f"{frames_to_first_piston_contact:.3f}\n"
+            f"  time to first piston contact: "
+            f"{time_to_first_piston_contact:.6f}\n"
+            f"  frames to neighbor contact: {frames_to_neighbor_contact:.3f}\n"
+            f"  time to neighbor contact: {time_to_neighbor_contact:.6f}\n"
+            f"  target penetration depth: {target_penetration_depth:.6f}\n"
+            f"  hard penetration depth: {hard_penetration_depth:.6f}\n"
+            f"  frames from contact to target depth: {frames_to_target_depth:.3f}\n"
+            f"  time from contact to target depth: {time_to_target_depth:.6f}\n"
+            f"  frames from contact to hard depth: {frames_to_hard_depth:.3f}\n"
+            f"  time from contact to hard depth: {time_to_hard_depth:.6f}\n"
+            f"  minimum compression frames: {min_compression_frames:.3f}\n"
+            f"  stiffness at contact: {stiffness_at_contact:.6f}\n"
+            f"  force at target depth: {force_at_target_depth:.6f}\n"
+            f"  source dv/frame at max: {source_dv_per_frame_at_max:.6f}\n"
+            f"  relative dv/frame at max: {relative_dv_per_frame_at_max:.6f}\n"
+            f"  frames to cancel relative speed: "
+            f"{frames_to_cancel_relative_speed:.3f}\n"
+            f"  time to cancel relative speed: "
+            f"{time_to_cancel_relative_speed:.6f}\n"
+            f"  required stiffness for max-depth response: "
+            f"{required_stiffness_for_max_depth:.6f}\n"
+            f"  status: {status}"
+        )
+        print(report_text)
+        self.write_validation_log(report_text)
+        return {
+            "model": "reservoir piston compression",
+            "piston_normal_speed": piston_normal_speed,
+            "per_frame_closing_distance": per_frame_closing_distance,
+            "particle_gap": particle_gap,
+            "piston_to_first_gap": piston_to_first_gap,
+            "frames_to_first_piston_contact": frames_to_first_piston_contact,
+            "time_to_first_piston_contact": time_to_first_piston_contact,
+            "frames_to_neighbor_contact": frames_to_neighbor_contact,
+            "time_to_neighbor_contact": time_to_neighbor_contact,
+            "target_penetration_depth": target_penetration_depth,
+            "hard_penetration_depth": hard_penetration_depth,
+            "frames_to_target_depth": frames_to_target_depth,
+            "time_to_target_depth": time_to_target_depth,
+            "frames_to_hard_depth": frames_to_hard_depth,
+            "time_to_hard_depth": time_to_hard_depth,
+            "stiffness_at_contact": stiffness_at_contact,
+            "force_at_target_depth": force_at_target_depth,
+            "source_dv_per_frame_at_max": source_dv_per_frame_at_max,
+            "relative_dv_per_frame_at_max": relative_dv_per_frame_at_max,
+            "frames_to_cancel_relative_speed": frames_to_cancel_relative_speed,
+            "time_to_cancel_relative_speed": time_to_cancel_relative_speed,
+            "required_stiffness_for_max_depth": required_stiffness_for_max_depth,
+            "status": status,
+        }
 
     def write_test_file(self):
         test_file_name = super().write_test_file()
@@ -378,9 +572,13 @@ class GenReservoir(GenericGenData):
 
         self.initialize_generation()
         try:
+            print(self.packing_report_text)
+            self.write_validation_log(self.packing_report_text)
+            self.report_collision_feasibility()
             self.add_null_particle()
             self.add_reservoir_mobile_particles()
-            self.add_parametric_wall_markers()
+            self.add_function_wall_markers()
+            self.report_cell_occupancy_capacity()
             self.write_particle_bin()
             self.write_test_file()
             self.report_generated_bounds()
@@ -392,11 +590,13 @@ class GenReservoir(GenericGenData):
             )
             return False
 
-        print(
+        report_text = (
             "Reservoir generation complete:\n"
             f"  binary file: {self.test_bin_name}\n"
             f"  records: {self.count}\n"
             f"  mobile particles: {self.number_active_particles}\n"
             f"  boundary markers: {self.number_boundary_particles}"
         )
+        print(report_text)
+        self.write_validation_log(report_text)
         return True

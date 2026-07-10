@@ -24,7 +24,7 @@ from gbase.BinaryFileUtilities import *
 from gbase.import_module import load_class_from_file
 from gbase.pdata import *
 from gbase.GenPQBData import *
-from SimulationRunner import run_analysis as simulation_run_analysis
+from SimulationRunner_HSVPanel import run_analysis as simulation_run_analysis
 from base.ForcePlots import run_force_plots
 from gbase.ReadCaptureFile import *
 #from GenMotionData import *
@@ -186,13 +186,26 @@ class TabGenData(QTabWidget):
     #
     def refresh(self):
         try:
-            with open(self.CfgFile, "r", encoding="utf-8") as cfg_file:
-                self.itemcfg = libconf.load(cfg_file)
+            self.itemcfgFile = ConfigUtility(self.CfgFile)
+            self.itemcfgFile.Create(self.bobj.log, self.CfgFile)
+            self.itemcfg = self.itemcfgFile.config
         except BaseException as e:
             self.log.log(self,f"Could not read particle data:{e}")
-            return
+            return False
         if 'include_file' in self.itemcfg:
             self.load_include()
+        try:
+            if self.itemcfg.get("type") not in ("batch", "verfperf"):
+                mod_path = self.itemcfg.module_dir
+                mod_name = self.itemcfg.module_class
+                full_path = os.path.join(mod_path, mod_name)
+                self.gen_class = load_class_from_file(full_path)()
+                self.gen_class.create(self, self.itemcfg)
+                self.plot_obj.create(self.itemcfg, self)
+        except BaseException as e:
+            self.log.log(self,f"Unable to refresh data generation file: error:{e}")
+            return False
+        return True
         
     #******************************************************************
     # Browse to an existing cfg file

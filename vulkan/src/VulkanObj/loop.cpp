@@ -44,7 +44,7 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 	TimerObj* timerstep;
 	uint32_t			endFrame		= CfgApp->GetUInt("application.end_frame", true);
 	bool				stopondata		= CfgApp->GetBool("application.stopondata", true);
-	float			frameDelay		= CfgApp->GetFloat("application.frame_delay", true);
+	float				frameDelay		= CfgApp->GetFloat("application.frame_delay", true);
 	float				deltaTime		= 0.0f;
 	float				lastFrame		= 0.0f;
 	uint32_t			quit_event		= 0;
@@ -59,6 +59,7 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 	double				capFrameDelay	= MpsApp->GetFloat("cap_frame_delay", true);	
 	bool				doCap			= MpsApp->GetBool("do_cap", true);
 	bool				stopOnError		= CfgApp->GetBool("application.stopOnError", true);
+	bool				doAutoSingleFile= CfgApp->GetBool("application.doAutoSingleFile", true); 
 	uint32_t			imgNum			= 0;
 	std::string			oringcap_dir = CfgApp->GetString("application.testfile", true);
 	std::string			out_dir = CfgApp->GetString("application.capture_dir", true);
@@ -170,7 +171,7 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 			}
 			
 			// Draw the frame.
-			DrawInstance->DrawFrame();
+			//DrawInstance->DrawFrame();
 
 			 
 			// If the global exit flag has been set exit.
@@ -187,15 +188,6 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 			// Increment frame counter
 			nbFrames++;
 			double ddt = currentTime - lastCapTime;
-
-			// Check to see if caputre delay has been met then capture this frame
-			if (ddt >= capFrameDelay && doCap == true && tcpsapp != nullptr)
-			{
-				mout << "ddt:" << ddt << " capFrameDelay:" << capFrameDelay << ende;;
-				tcpsapp->WritePort("next");
-				lastCapTime = currentTime;
-			}
-
 			double diff_time = currentTime - lastTime;
 			if (currentTime - lastTime >= 1.0 && doAuto != true)
 			{ 
@@ -267,18 +259,6 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 					<< 	partErrG << ","														// 15-error graphics particle
 					<< 	collErr << ","														// 16-error compute collsions
 					<< std::endl;
-
-					if(tcp != nullptr)
-					{
-						tcp->WritePort(objtxt.str().c_str());
-						tcp->ReadPort();
-						if(tcp->m_SRecvBuf.compare("stop") == 0)
-						{
-							vkDeviceWaitIdle(VulkanWin->GetLogicalDevice());
-							return 2;
-						}
-							
-					}
 
 					aprCount++;
 				}

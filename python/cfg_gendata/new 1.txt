@@ -1,29 +1,3 @@
-Beyond starting-overlap logic, <ForceDynamics>* cleanup falls into three groups.
-Remove After Migration
-Boundary evaluator IDs 1–4.
-EvaluateHorizontalWallSegment()
-EvaluateVerticalWallSegment()
-EvaluateLinearWallSegment()
-EvaluateCDNozzleWallSegment() and its radius/slope helpers.
-Global/manual wall processing using WallXMIN...WallZMAX.
-SideLength fallbacks after all configurations use explicit width, height, and depth.
-Old config switches such as neo_prediction_mode, use_geo_runner, and unused substeps.
-These cannot all disappear immediately: BoundaryParticleReservoirHorizontal still uses evaluator 4, and several older configurations still use manual walls.
-Refactor, Then Remove
-Duplicate particle state aliases: rx/ry/rz and vx/vy/vz duplicate buffered position and velocity data.
-collision_list, fixed contact slots, and reporting records currently overlap responsibilities. Physics should consume transient contact geometry; diagnostics should receive copied records.
-Rendering-controlled diagnostics:diagnostics_enabled = not as_points
-Replace this with an explicit diagnostics setting. Drawing mode must not change physics diagnostics.
-Automatic ClearInactiveRecoverableInternalMomentum(). Internal momentum should be released or retained according to the physical model, not erased merely because contactCount == 0.
-Keep
-Source-owned frame snapshots and double-buffered state.
-Parametric evaluator ID 5.
-Physical tunneling detection.
-Maximum-depth constraints.
-Rectangular cell dimensions and death bounds.
-Piston processing.
-Diagnostic/reporting capability, explicitly enabled.
-Performance-study hooks until those configurations are deliberately retired.
-The safest order is: replace starting-overlap behavior, migrate remaining normal generators to parametric walls, remove evaluator IDs 1–4 and manual walls, separate diagnostics from contact state, then eliminate duplicated particle aliases and legacy dimensions. No code changed in this analysis.
-
-8:16 PM
+x_axis_lims 
+y_axis_lims 
+z_axis_lims 

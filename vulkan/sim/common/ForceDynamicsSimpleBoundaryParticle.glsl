@@ -5,8 +5,8 @@
 // Boundary-particle locality helpers for the simple generic model.
 // Do not hand edit generated dynamics content.
 
-// Python source: ForceDynamics.py:351
-bool ParametricBoundaryMarkerApplies(uint SourceID, uint BoundaryID)
+// Python source: ForceDynamics.py:422
+bool BoundaryMarkerApplies(uint SourceID, uint BoundaryID)
 {
     if (!IsBoundaryParticle(BoundaryID)) { return false; }
     vec4 sourcePosition = GetParticlePosition(SourceID);
@@ -16,7 +16,7 @@ bool ParametricBoundaryMarkerApplies(uint SourceID, uint BoundaryID)
         && abs(sourcePosition.z - boundaryPosition.z) <= 1.0;
 }
 
-bool ProcessParametricWallCollision(
+bool ProcessFunctionWallCollision(
     uint SourceID, BoundaryWallSegment segment, inout vec3 totalForce);
 
 #endif

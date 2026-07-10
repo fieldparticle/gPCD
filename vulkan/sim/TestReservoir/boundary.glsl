@@ -8,19 +8,26 @@ const float death_y_min = 1.000000000;
 const float death_y_max = 9.000000000;
 const float death_z_min = 0.000000000;
 const float death_z_max = 4.000000000;
-struct ParametricCurveSegment
+struct FunctionWallSegment
 {
-    vec4 xCoefficients;
-    vec4 yCoefficients;
+    uint boundaryKind;
+    uint independentAxis;
+    float uStart;
+    float uEnd;
+    float fStart;
+    float a1;
+    float a2;
+    float a3;
+    float normalSign;
     uint wallFlag;
 };
 
 const uint CURVE_WALL_SEGMENT_COUNT = 4u;
-const ParametricCurveSegment CURVE_WALL_SEGMENTS[4] = ParametricCurveSegment[4](
-    ParametricCurveSegment(vec4(2.000000000, 18.000000000, 0.000000000, 0.000000000), vec4(2.000000000, 0.000000000, 0.000000000, 0.000000000), 3u),
-    ParametricCurveSegment(vec4(20.000000000, -18.000000000, 0.000000000, 0.000000000), vec4(8.000000000, 0.000000000, 0.000000000, 0.000000000), 4u),
-    ParametricCurveSegment(vec4(20.000000000, 5.000000000, 0.000000000, 0.000000000), vec4(2.000000000, 1.250000000, 0.000000000, 0.000000000), 3u),
-    ParametricCurveSegment(vec4(25.000000000, -5.000000000, 0.000000000, 0.000000000), vec4(6.750000000, 1.250000000, 0.000000000, 0.000000000), 4u)
+const FunctionWallSegment CURVE_WALL_SEGMENTS[4] = FunctionWallSegment[4](
+    FunctionWallSegment(1u, 0u, 2.000000000, 20.000000000, 2.000000000, 0.000000000, 0.000000000, 0.000000000, -1.000000000, 3u),
+    FunctionWallSegment(1u, 0u, 20.000000000, 2.000000000, 8.000000000, 0.000000000, 0.000000000, 0.000000000, 1.000000000, 4u),
+    FunctionWallSegment(0u, 0u, 20.000000000, 25.000000000, 2.000000000, 0.250000000, 0.000000000, 0.000000000, -1.000000000, 3u),
+    FunctionWallSegment(0u, 0u, 25.000000000, 20.000000000, 6.750000000, -0.250000000, 0.000000000, 0.000000000, 1.000000000, 4u)
 );
 
 #endif

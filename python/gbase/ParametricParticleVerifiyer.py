@@ -400,6 +400,8 @@ class ParametricParticleVerifiyer:
             f"  minimum cell occupancy: {minimum_cell_occupancy}\n"
             f"  generated cell occupancy list size: "
             f"{cell_occupancy_list_size}\n"
+            f"  configured cell occupancy list size: "
+            f"{occupancy_value}\n"
             f"  particle plane: z={self.PARTICLE_PLANE_Z:g}"
         )
         return {
@@ -420,4 +422,5 @@ class ParametricParticleVerifiyer:
             "piston_velocity": piston_velocity,
             "particle_plane_z": self.PARTICLE_PLANE_Z,
             "cell_occupancy_list_size": cell_occupancy_list_size,
+            "configured_cell_occupancy_list_size": occupancy_value,
         }

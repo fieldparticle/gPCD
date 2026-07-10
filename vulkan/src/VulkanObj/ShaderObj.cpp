@@ -45,15 +45,23 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 		Piston();
 		GenWorkGroups();
 }
-std::ostringstream  ShaderObj::ParametricCurves()
+std::ostringstream ShaderObj::FunctionWalls()
 {
-	std::ostringstream curve_str;
-	curve_str << std::fixed << std::setprecision(9);
-	curve_str
-		<< "struct ParametricCurveSegment\n"
+	std::ostringstream wall_str;
+	wall_str << std::fixed << std::setprecision(9);
+
+	wall_str
+		<< "struct FunctionWallSegment\n"
 		<< "{\n"
-		<< "    vec4 xCoefficients;\n"
-		<< "    vec4 yCoefficients;\n"
+		<< "    uint boundaryKind;\n"
+		<< "    uint independentAxis;\n"
+		<< "    float uStart;\n"
+		<< "    float uEnd;\n"
+		<< "    float fStart;\n"
+		<< "    float a1;\n"
+		<< "    float a2;\n"
+		<< "    float a3;\n"
+		<< "    float normalSign;\n"
 		<< "    uint wallFlag;\n"
 		<< "};\n\n";
 
@@ -68,11 +76,11 @@ std::ostringstream  ShaderObj::ParametricCurves()
 		);
 	}
 
-	curve_str
+	wall_str
 		<< "const uint CURVE_WALL_SEGMENT_COUNT = "
 		<< segmentCount << "u;\n"
-		<< "const ParametricCurveSegment CURVE_WALL_SEGMENTS["
-		<< segmentCount << "] = ParametricCurveSegment["
+		<< "const FunctionWallSegment CURVE_WALL_SEGMENTS["
+		<< segmentCount << "] = FunctionWallSegment["
 		<< segmentCount << "](\n";
 
 	for (int index = 0; index < segmentCount; ++index)
@@ -80,45 +88,54 @@ std::ostringstream  ShaderObj::ParametricCurves()
 		config_setting_t* segment =
 			CfgTst->GetSubStructAddress(segmentList, index);
 
-		if (segment == nullptr || config_setting_length(segment) != 9)
+		if (segment == nullptr || config_setting_length(segment) != 10)
 		{
 			throw std::runtime_error(
 				"curve_wall_segments[" + std::to_string(index) +
-				"] must contain nine values"
+				"] must contain ten values"
 			);
 		}
 
-		double ax = config_setting_get_float_elem(segment, 0);
-		double bx = config_setting_get_float_elem(segment, 1);
-		double cx = config_setting_get_float_elem(segment, 2);
-		double dx = config_setting_get_float_elem(segment, 3);
-		double ay = config_setting_get_float_elem(segment, 4);
-		double by = config_setting_get_float_elem(segment, 5);
-		double cy = config_setting_get_float_elem(segment, 6);
-		double dy = config_setting_get_float_elem(segment, 7);
+		uint32_t boundaryKind = static_cast<uint32_t>(
+			config_setting_get_float_elem(segment, 0)
+			);
+		uint32_t independentAxis = static_cast<uint32_t>(
+			config_setting_get_float_elem(segment, 1)
+			);
+		double uStart = config_setting_get_float_elem(segment, 2);
+		double uEnd = config_setting_get_float_elem(segment, 3);
+		double fStart = config_setting_get_float_elem(segment, 4);
+		double a1 = config_setting_get_float_elem(segment, 5);
+		double a2 = config_setting_get_float_elem(segment, 6);
+		double a3 = config_setting_get_float_elem(segment, 7);
+		double normalSign = config_setting_get_float_elem(segment, 8);
 		uint32_t wallFlag = static_cast<uint32_t>(
-			config_setting_get_float_elem(segment, 8)
+			config_setting_get_float_elem(segment, 9)
 			);
 
-		curve_str
-			<< "    ParametricCurveSegment("
-			<< "vec4(" << ax << ", " << bx << ", "
-			<< cx << ", " << dx << "), "
-			<< "vec4(" << ay << ", " << by << ", "
-			<< cy << ", " << dy << "), "
+		wall_str
+			<< "    FunctionWallSegment("
+			<< boundaryKind << "u, "
+			<< independentAxis << "u, "
+			<< uStart << ", "
+			<< uEnd << ", "
+			<< fStart << ", "
+			<< a1 << ", "
+			<< a2 << ", "
+			<< a3 << ", "
+			<< normalSign << ", "
 			<< wallFlag << "u)";
 
 		if (index + 1 < segmentCount)
-			curve_str << ",";
+			wall_str << ",";
 
-		curve_str << "\n";
+		wall_str << "\n";
 	}
 
-	curve_str << ");\n\n";
+	wall_str << ");\n\n";
 
-	return curve_str;
+	return wall_str;
 }
-
 void ShaderObj::Piston()
 {
 
@@ -180,28 +197,7 @@ void ShaderObj::WriteWalls()
 		<< "const float death_z_max = " << std::fixed << std::setprecision(9)
 			<< CfgTst->GetFloat("death_z_max", true) << ";\n";
 
-#if 0	
-	std::ostringstream wall_str;
-	wall_str 
-			
-		<< "const float BOUNDARY_XMIN = " << std::fixed << std::setprecision(9)
-		<< CfgTst->GetFloat("boundary_x_min", true) << ";\n"
 
-		<< "const float BOUNDARY_XMAX = " << std::fixed << std::setprecision(9)
-		<< CfgTst->GetFloat("boundary_x_max", true) << ";\n"
-
-		<< "const float BOUNDARY_YMIN = " << std::fixed << std::setprecision(9)
-		<< CfgTst->GetFloat("boundary_y_min", true) << ";\n"
-
-		<< "const float BOUNDARY_YMAX = " << std::fixed << std::setprecision(9)
-		<< CfgTst->GetFloat("boundary_y_max", true) << ";\n"
-
-		<< "const float BOUNDARY_ZMIN = " << std::fixed << std::setprecision(9)
-		<< CfgTst->GetFloat("boundary_z_min", true) << ";\n"
-
-		<< "const float BOUNDARY_ZMAX = " << std::fixed << std::setprecision(9)
-		<< CfgTst->GetFloat("boundary_z_max", true) << ";\n";
-#endif
 	
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
 	std::string filename = fildir + "/boundary.glsl";
@@ -214,15 +210,14 @@ void ShaderObj::WriteWalls()
 		}
 		ostrm << "#ifndef BOUNDARY_GLSL\n#define BOUNDARY_GLSL\n" <<
 
-			"const uint BOUNDARY_ENABLED = " << wlflg << "\n" <<
-			"const float wall_contact_offset = " << std::fixed << std::setprecision(9) <<
-			CfgTst->GetFloat("wall_contact_offset", true) << ";\n";
+			"const uint BOUNDARY_ENABLED = " 
+				<< wlflg << "\n" <<
+			"const float wall_contact_offset = " << std::fixed << std::setprecision(9) 
+				<< CfgTst->GetFloat("wall_contact_offset", true) << ";\n";
 			
-			
-			
-		//ostrm << wall_str.str();
+		
 		ostrm << death_str.str();
-		std::ostringstream curve_ostr = ParametricCurves();
+		std::ostringstream curve_ostr = FunctionWalls();
 		ostrm << curve_ostr.str();
 
 		ostrm << "#endif\n";

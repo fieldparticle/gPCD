@@ -1,9 +1,8 @@
 import math
 import itertools
 
-from gbase.ParametricCurve import closest_point
-from gbase.ParametricCurve import evaluate_point
-from gbase.ParametricCurve import evaluate_tangent
+from gbase.FunctionWall import evaluate_wall_at_point
+from gbase.FunctionWall import physical_penetration
 
 
 class ForceContactDynamics:
@@ -13,7 +12,8 @@ class ForceContactDynamics:
     CONTACT_PARTICLE = 1
     CONTACT_WALL = 2
     CONTACT_ACTIVE_THIS_FRAME = 1
-    MAXIMUM_PENETRATION_FRACTION = 0.5
+    TARGET_PENETRATION_FRACTION = 0.5
+    HARD_PENETRATION_FRACTION = 0.75
 
     @staticmethod
     def VelocityAngle(vx, vy):
@@ -79,28 +79,6 @@ class ForceContactDynamics:
             return self.collIn.ErrorReturn == self.constants.ERROR_NONE
         return self.AccumulateContactForce(SourceID, contact_state, totalForce)
 
-    def CheckWallMaximumDepth(
-        self,
-        SourceID,
-        center_distance,
-        particle_radius,
-        wall_flag,
-    ):
-        """Reject a wall ghost whose leading edge passed the source center."""
-        maximum_depth_distance = (
-            float(particle_radius)
-            - self.WallContactOffsetDistance(particle_radius)
-        )
-        wall_proximity = float(center_distance) - maximum_depth_distance
-        if wall_proximity < -self.EPSILON:
-            return self.SetError(
-                self.constants.ERROR_WALL_TUNNELING,
-                error_kind="particle-wall",
-                source_id=SourceID,
-                wall_flag=wall_flag,
-            )
-        return True
-
     def CheckPenetrationStepResolution(
         self,
         SourceID,
@@ -122,10 +100,7 @@ class ForceContactDynamics:
             0.0,
             -relative_normal_velocity * float(self.ShaderFlags.dt),
         )
-        penetration_reserve = (
-            (1.0 - self.MAXIMUM_PENETRATION_FRACTION)
-            * float(source_radius)
-        )
+        penetration_reserve = self.GetHardPenetrationDepth(source_radius)
         if inward_displacement > penetration_reserve + self.EPSILON:
             return self.SetError(
                 self.constants.ERROR_PENETRATION_STEP_TOO_LARGE,
@@ -133,47 +108,165 @@ class ForceContactDynamics:
                 source_id=SourceID,
                 target_id=target_id,
                 wall_flag=wall_flag,
-            )
+        )
         return True
 
-    def EvaluateParametricWallSegment(self, SourceID, segment):
-        """Evaluate one configured parametric wall against a mobile source."""
+    def GetTargetPenetrationFraction(self):
+        return float(
+            self.run_configuration.get(
+                "target_penetration_fraction",
+                self.run_configuration.get(
+                    "max_penetration_fraction",
+                    self.TARGET_PENETRATION_FRACTION,
+                ),
+            )
+        )
+
+    def GetHardPenetrationFraction(self):
+        return float(
+            self.run_configuration.get(
+                "hard_penetration_fraction",
+                self.HARD_PENETRATION_FRACTION,
+            )
+        )
+
+    def GetTargetPenetrationDepth(self, source_radius):
+        return self.GetTargetPenetrationFraction() * float(source_radius)
+
+    def GetHardPenetrationDepth(self, source_radius):
+        return self.GetHardPenetrationFraction() * float(source_radius)
+
+    def GetContactTargetVelocity(self, contact_state):
+        """Return the frame-start velocity of a contact target or wall ghost."""
+        contact_type = int(contact_state.ids.y)
+        if contact_type == self.CONTACT_WALL:
+            return getattr(
+                contact_state,
+                "wall_target_velocity",
+                self.create_vec4(),
+            )
+        return self.GetStartFrameVelocity(int(contact_state.ids.x))
+
+    def GetContactTargetDepth(self, contact_state):
+        """Return the preferred source-owned compression depth."""
+        return self.GetTargetPenetrationDepth(contact_state.source_radius)
+
+    def GetContactHardDepth(self, contact_state):
+        """Return the source-owned fatal compression depth."""
+        return self.GetHardPenetrationDepth(contact_state.source_radius)
+
+    def GetContactRemainingDepth(self, contact_state):
+        """Return how much additional penetration is available before hard depth."""
+        hard_depth = self.GetContactHardDepth(contact_state)
+        penetration_depth = max(0.0, float(contact_state.aux.y))
+        return max(0.0, hard_depth - penetration_depth)
+
+    def GetContactInwardSpeed(self, SourceID, contact_state, velocity=None):
+        """Return positive speed that would increase contact penetration."""
+        source_velocity = velocity if velocity is not None else self.particles[SourceID].VelRad
+        target_velocity = self.GetContactTargetVelocity(contact_state)
+        normal = (
+            float(contact_state.geom.x),
+            float(contact_state.geom.y),
+            float(contact_state.geom.z),
+        )
+        relative_normal_velocity = (
+            (float(target_velocity.x) - float(source_velocity.x)) * normal[0]
+            + (float(target_velocity.y) - float(source_velocity.y)) * normal[1]
+            + (float(target_velocity.z) - float(source_velocity.z)) * normal[2]
+        )
+        return max(0.0, -relative_normal_velocity)
+
+    def CheckContactMaximumDepth(self, SourceID, contact_state):
+        """Reject a contact whose current penetration exceeds hard depth."""
+        penetration_depth = max(0.0, float(contact_state.aux.y))
+        target_depth = self.GetContactTargetDepth(contact_state)
+        hard_depth = self.GetContactHardDepth(contact_state)
+        contact_state.maximum_depth = target_depth
+        contact_state.hard_depth = hard_depth
+        contact_state.remaining_depth = max(0.0, hard_depth - penetration_depth)
+        contact_state.maximum_depth_reached = (
+            1.0 if penetration_depth >= target_depth - self.EPSILON else 0.0
+        )
+        if penetration_depth <= hard_depth + self.EPSILON:
+            return True
+
+        contact_type = int(contact_state.ids.y)
+        return self.SetError(
+            self.constants.ERROR_MAX_DEPTH_CONSTRAINT,
+            error_kind="particle-wall" if contact_type == self.CONTACT_WALL else "particle-particle",
+            source_id=SourceID,
+            target_id=int(contact_state.ids.x) if contact_type == self.CONTACT_PARTICLE else None,
+            wall_flag=int(contact_state.ids.x) if contact_type == self.CONTACT_WALL else None,
+        )
+
+    def CheckContactPenetrationStepResolution(self, SourceID, contact_state, velocity=None):
+        """Require the next source step to fit inside remaining contact depth."""
+        penetration_depth = max(0.0, float(contact_state.aux.y))
+        hard_depth = self.GetContactHardDepth(contact_state)
+        if penetration_depth > hard_depth + self.EPSILON:
+            contact_type = int(contact_state.ids.y)
+            return self.SetError(
+                self.constants.ERROR_MAX_DEPTH_CONSTRAINT,
+                error_kind="particle-wall" if contact_type == self.CONTACT_WALL else "particle-particle",
+                source_id=SourceID,
+                target_id=int(contact_state.ids.x) if contact_type == self.CONTACT_PARTICLE else None,
+                wall_flag=int(contact_state.ids.x) if contact_type == self.CONTACT_WALL else None,
+            )
+
+        inward_speed = self.GetContactInwardSpeed(SourceID, contact_state, velocity)
+        inward_displacement = inward_speed * float(self.ShaderFlags.dt)
+        remaining_depth = self.GetContactRemainingDepth(contact_state)
+        if inward_displacement <= remaining_depth + self.EPSILON:
+            return True
+
+        contact_type = int(contact_state.ids.y)
+        return self.SetError(
+            self.constants.ERROR_PENETRATION_STEP_TOO_LARGE,
+            error_kind="particle-wall" if contact_type == self.CONTACT_WALL else "particle-particle",
+            source_id=SourceID,
+            target_id=int(contact_state.ids.x) if contact_type == self.CONTACT_PARTICLE else None,
+            wall_flag=int(contact_state.ids.x) if contact_type == self.CONTACT_WALL else None,
+        )
+
+    def CheckResolvedContactStep(self, SourceID):
+        """Validate resolved velocity against all active contact reserves."""
+        source = self.particles[SourceID]
+        for contact_index in range(int(source.contactCount)):
+            contact_state = self.GetContactSlots(SourceID)[contact_index]
+            contact_type = int(contact_state.ids.y)
+            if contact_type not in (self.CONTACT_PARTICLE, self.CONTACT_WALL):
+                continue
+            if not self.CheckContactPenetrationStepResolution(
+                SourceID,
+                contact_state,
+                source.VelRad,
+            ):
+                return False
+        return True
+
+    def EvaluateFunctionWallSegment(self, SourceID, segment):
+        """Evaluate one configured function wall against a mobile source."""
         source_position = self.GetParticlePosition(SourceID)
         source_point = (
             float(source_position.x),
             float(source_position.y),
         )
-        parameter, wall_point_2d, _distance_squared = closest_point(
-            segment,
-            source_point,
-        )
-        tangent_x, tangent_y = evaluate_tangent(segment, parameter)
-        tangent_magnitude = math.hypot(tangent_x, tangent_y)
-        if tangent_magnitude <= self.EPSILON:
+        evaluation = evaluate_wall_at_point(segment, source_point)
+        if evaluation is None:
             return None
 
-        wall_flag = int(round(float(segment[8])))
+        wall_flag = int(evaluation["wall_flag"])
         if wall_flag <= 0:
             return None
-        normal = (
-            tangent_y / tangent_magnitude,
-            -tangent_x / tangent_magnitude,
-            0.0,
-        )
 
         radius = float(self.particles[SourceID].Data.x)
-        offset = self.WallContactOffsetDistance(radius)
-        ghost = (
-            wall_point_2d[0] + normal[0] * (radius - offset),
-            wall_point_2d[1] + normal[1] * (radius - offset),
-            float(source_position.z),
-        )
-        dx = ghost[0] - float(source_position.x)
-        dy = ghost[1] - float(source_position.y)
-        dz = ghost[2] - float(source_position.z)
-        center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
-        if center_distance >= 2.0 * radius:
+        penetration_depth = physical_penetration(segment, source_point, radius)
+        if penetration_depth is None or penetration_depth <= self.EPSILON:
             return None
+        normal_x, normal_y = evaluation["normal"]
+        normal = (normal_x, normal_y, 0.0)
+        center_distance = max(0.0, 2.0 * radius - penetration_depth)
         overlap_area = self.particle_overlap_area(
             radius,
             radius,
@@ -181,12 +274,12 @@ class ForceContactDynamics:
         )
         return (*normal, overlap_area, center_distance, wall_flag)
 
-    def EvaluateParametricWallContacts(self, SourceID):
+    def EvaluateFunctionWallContacts(self, SourceID):
         """Return the deepest current contact for each physical wall."""
         radius = float(self.particles[SourceID].Data.x)
         contacts = {}
         for segment in self.run_configuration.get("curve_wall_segments", ()):
-            contact = self.EvaluateParametricWallSegment(SourceID, segment)
+            contact = self.EvaluateFunctionWallSegment(SourceID, segment)
             if contact is None:
                 continue
             wall_flag = int(contact[-1])
@@ -265,23 +358,6 @@ class ForceContactDynamics:
 
         normal_x, normal_y, normal_z, overlap_area, center_distance, wall_flag = segment
         radius = float(self.particles[SourceID].Data.x)
-        if not self.CheckPenetrationStepResolution(
-            SourceID,
-            (normal_x, normal_y, normal_z),
-            radius,
-            self.GetPistonVelocity(self.ShaderFlags.frameNum),
-            "particle-wall",
-            wall_flag=wall_flag,
-        ):
-            return False
-        if not self.CheckWallMaximumDepth(
-            SourceID,
-            center_distance,
-            radius,
-            wall_flag,
-        ):
-            return False
-
         geometry = (
             normal_x,
             normal_y,
@@ -298,13 +374,17 @@ class ForceContactDynamics:
             self.ShaderFlags.frameNum
         )
         contact_state.is_piston_contact = 1.0
+        if not self.CheckContactMaximumDepth(SourceID, contact_state):
+            return False
+        if not self.CheckContactPenetrationStepResolution(SourceID, contact_state):
+            return False
         if hasattr(self, "RecordContactParameters"):
             self.RecordContactParameters(SourceID, wall_flag, contact_state)
         return self.AccumulateContactForce(SourceID, contact_state, totalForce)
 
-    def ProcessParametricWallCollision(self, SourceID, contact, totalForce):
-        """Apply one source-owned parametric wall contact."""
-        contact_state = self.InitializeParametricWallContactState(SourceID, contact)
+    def ProcessFunctionWallCollision(self, SourceID, contact, totalForce):
+        """Apply one source-owned function-wall contact."""
+        contact_state = self.InitializeFunctionWallContactState(SourceID, contact)
         if contact_state is None:
             if self.collIn.ErrorReturn != self.constants.ERROR_NONE:
                 return False
@@ -317,26 +397,10 @@ class ForceContactDynamics:
             )
         return self.AccumulateContactForce(SourceID, contact_state, totalForce)
 
-    def InitializeParametricWallContactState(self, SourceID, contact):
-        """Initialize one current-frame source-parametric-wall contact."""
+    def InitializeFunctionWallContactState(self, SourceID, contact):
+        """Initialize one current-frame source-function-wall contact."""
         normal_x, normal_y, normal_z, overlap_area, center_distance, wall_flag = contact
         radius = float(self.particles[SourceID].Data.x)
-        if not self.CheckPenetrationStepResolution(
-            SourceID,
-            (normal_x, normal_y, normal_z),
-            radius,
-            self.create_vec4(),
-            "particle-wall",
-            wall_flag=wall_flag,
-        ):
-            return None
-        if not self.CheckWallMaximumDepth(
-            SourceID,
-            center_distance,
-            radius,
-            wall_flag,
-        ):
-            return None
         geometry = (
             normal_x,
             normal_y,
@@ -346,10 +410,17 @@ class ForceContactDynamics:
             radius,
             radius,
         )
-        return self.AppendWallContactSlot(SourceID, wall_flag, geometry)
+        contact_state = self.AppendWallContactSlot(SourceID, wall_flag, geometry)
+        if contact_state is None:
+            return None
+        if not self.CheckContactMaximumDepth(SourceID, contact_state):
+            return None
+        if not self.CheckContactPenetrationStepResolution(SourceID, contact_state):
+            return None
+        return contact_state
 
-    def ParametricBoundaryMarkerApplies(self, SourceID, BoundaryID):
-        """Return True when a parametric boundary marker is local to a source."""
+    def BoundaryMarkerApplies(self, SourceID, BoundaryID):
+        """Return True when a boundary sentinel is local to a source."""
         source_position = self.GetParticlePosition(SourceID)
         boundary_position = self.GetParticlePosition(BoundaryID)
         return (
@@ -580,19 +651,21 @@ class ForceContactDynamics:
                 continue
 
             source_radius = float(contact_state.source_radius)
-            maximum_depth = self.MAXIMUM_PENETRATION_FRACTION * source_radius
+            target_depth = self.GetTargetPenetrationDepth(source_radius)
+            hard_depth = self.GetHardPenetrationDepth(source_radius)
             penetration_depth = max(0.0, float(contact_state.aux.y))
-            contact_state.maximum_depth = maximum_depth
+            contact_state.maximum_depth = target_depth
+            contact_state.hard_depth = hard_depth
             contact_state.remaining_depth = max(
                 0.0,
-                maximum_depth - penetration_depth,
+                hard_depth - penetration_depth,
             )
             contact_state.maximum_depth_reached = (
                 1.0
-                if penetration_depth >= maximum_depth - self.EPSILON
+                if penetration_depth >= target_depth - self.EPSILON
                 else 0.0
             )
-            if penetration_depth < maximum_depth - self.EPSILON:
+            if penetration_depth < target_depth - self.EPSILON:
                 continue
 
             normal = (
@@ -680,33 +753,12 @@ class ForceContactDynamics:
         """Return the current runtime particle velocity."""
         return self.particles[ParticleID].VelRad
 
-    def ParametricWallPhysicalPenetration(self, SourceID, segment):
+    def FunctionWallPhysicalPenetration(self, SourceID, segment):
         """Return signed physical penetration into one outward-facing wall."""
         source_position = self.GetParticlePosition(SourceID)
         source_point = (float(source_position.x), float(source_position.y))
-        parameter, wall_point, _distance_squared = closest_point(
-            segment,
-            source_point,
-        )
-        tangent_x, tangent_y = evaluate_tangent(segment, parameter)
-        tangent_magnitude = math.hypot(tangent_x, tangent_y)
-        if tangent_magnitude <= self.EPSILON:
-            start_point = evaluate_point(segment, 0.0)
-            end_point = evaluate_point(segment, 1.0)
-            tangent_x = end_point[0] - start_point[0]
-            tangent_y = end_point[1] - start_point[1]
-            tangent_magnitude = math.hypot(tangent_x, tangent_y)
-        if tangent_magnitude <= self.EPSILON:
-            return None
-
-        normal_x = tangent_y / tangent_magnitude
-        normal_y = -tangent_x / tangent_magnitude
-        signed_outward_distance = (
-            (source_point[0] - wall_point[0]) * normal_x
-            + (source_point[1] - wall_point[1]) * normal_y
-        )
         radius = float(self.particles[SourceID].Data.x)
-        return radius + signed_outward_distance
+        return physical_penetration(segment, source_point, radius)
 
     def IsBoundaryParticle(self, ParticleID):
         """Return True when a particle is an occupancy-only boundary marker."""

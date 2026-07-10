@@ -5,7 +5,7 @@ targets the GenericGenData/TestPythonBoundarySpheres model:
 
 - active mobile particles
 - boundary particles as locality markers
-- parametric curve-wall segments
+- function-wall segments
 - no reservoir lifecycle
 - optional analytic piston for packed reservoir tests
 - no CD-nozzle/horizontal/vertical evaluator dispatch
@@ -61,13 +61,13 @@ SIMPLE_CORE_METHODS = [
 ]
 
 SIMPLE_BOUNDARY_METHODS = [
-    "ParametricBoundaryMarkerApplies",
-    "ProcessParametricWallCollision",
-    "InitializeParametricWallContactState",
+    "BoundaryMarkerApplies",
+    "ProcessFunctionWallCollision",
+    "InitializeFunctionWallContactState",
 ]
 
-SIMPLE_PARAMETRIC_METHODS = [
-    "EvaluateParametricWallSegment",
+SIMPLE_FUNCTION_WALL_METHODS = [
+    "EvaluateFunctionWallSegment",
 ]
 
 SIMPLE_PISTON_METHODS = [
@@ -142,7 +142,7 @@ def validate_surface(visitor: ForceDynamicsVisitor) -> list[str]:
     exported = set(
         SIMPLE_CORE_METHODS
         + SIMPLE_BOUNDARY_METHODS
-        + SIMPLE_PARAMETRIC_METHODS
+        + SIMPLE_FUNCTION_WALL_METHODS
         + SIMPLE_PISTON_METHODS
     )
     errors: list[str] = []
@@ -184,7 +184,8 @@ def render_core(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
 const float EPSILON = 1.0e-12;
 const float MAXIMUM_DEPTH_SOLVER_EPSILON = 1.0e-6;
 const float FORCE_DYNAMICS_PI = 3.1415926535897932384626433832795;
-const float MAXIMUM_PENETRATION_FRACTION = 0.5;
+const float TARGET_PENETRATION_FRACTION = 0.5;
+const float HARD_PENETRATION_FRACTION = 0.75;
 const uint CONTACT_PARTICLE = 1u;
 const uint CONTACT_WALL = 2u;
 const uint CONTACT_ACTIVE_THIS_FRAME = 1u;
@@ -409,6 +410,10 @@ ParticleGeometry GetParticleGeometry(uint SourceID, uint TargetID)
         sourceRadius, targetRadius, true);
 }}
 
+float GetContactTargetDepth(float sourceRadius);
+float GetContactHardDepth(float sourceRadius);
+float GetContactRemainingDepth(float sourceRadius, float penetrationDepth);
+
 bool CheckPenetrationStepResolution(
     uint SourceID, vec3 normal, float sourceRadius, vec3 targetVelocity)
 {{
@@ -416,12 +421,93 @@ bool CheckPenetrationStepResolution(
     float relativeNormalVelocity = dot(targetVelocity - sourceVelocity, normal);
     float inwardDisplacement = max(
         0.0, -relativeNormalVelocity * ShaderFlags.dt);
-    float penetrationReserve =
-        (1.0 - MAXIMUM_PENETRATION_FRACTION) * sourceRadius;
+    float penetrationReserve = GetContactHardDepth(sourceRadius);
     if (inwardDisplacement > penetrationReserve + EPSILON) {{
         return SetError(ERROR_PENETRATION_STEP_TOO_LARGE, SourceID);
     }}
     return true;
+}}
+
+float GetContactTargetDepth(float sourceRadius)
+{{
+    return TARGET_PENETRATION_FRACTION * sourceRadius;
+}}
+
+float GetContactHardDepth(float sourceRadius)
+{{
+    return HARD_PENETRATION_FRACTION * sourceRadius;
+}}
+
+float GetContactRemainingDepth(float sourceRadius, float penetrationDepth)
+{{
+    return GetContactHardDepth(sourceRadius) - penetrationDepth;
+}}
+
+float GetContactInwardDisplacement(
+    uint SourceID, vec3 normal, vec3 targetVelocity, vec3 sourceVelocity)
+{{
+    float relativeNormalVelocity = dot(targetVelocity - sourceVelocity, normal);
+    return max(0.0, -relativeNormalVelocity * ShaderFlags.dt);
+}}
+
+bool CheckResolvedContactStep(
+    uint SourceID,
+    vec3 normal,
+    float penetrationDepth,
+    float sourceRadius,
+    vec3 targetVelocity)
+{{
+    float remainingDepth = GetContactRemainingDepth(sourceRadius, penetrationDepth);
+    if (penetrationDepth > GetContactHardDepth(sourceRadius) + EPSILON) {{
+        return SetError(ERROR_MAX_DEPTH_CONSTRAINT, SourceID);
+    }}
+
+    vec3 resolvedVelocity = GetNextParticleVelocity(SourceID).xyz;
+    float inwardDisplacement = GetContactInwardDisplacement(
+        SourceID,
+        normal,
+        targetVelocity,
+        resolvedVelocity);
+    if (inwardDisplacement > remainingDepth + EPSILON) {{
+        return SetError(ERROR_PENETRATION_STEP_TOO_LARGE, SourceID);
+    }}
+    return true;
+}}
+
+bool CheckResolvedParticleContactStep(
+    uint SourceID,
+    uint TargetID,
+    ParticleGeometry geometry)
+{{
+    if (!geometry.valid) {{ return true; }}
+    float penetrationDepth = ParticlePenetrationDepth(
+        geometry.sourceRadius,
+        geometry.targetRadius,
+        geometry.centerDistance);
+    return CheckResolvedContactStep(
+        SourceID,
+        geometry.normal,
+        penetrationDepth,
+        geometry.sourceRadius,
+        GetStartFrameVelocity(TargetID).xyz);
+}}
+
+bool CheckResolvedFunctionWallContactStep(
+    uint SourceID,
+    BoundaryWallSegment segment)
+{{
+    if (!segment.valid) {{ return true; }}
+    float sourceRadius = P[SourceID].Data.x;
+    float penetrationDepth = ParticlePenetrationDepth(
+        sourceRadius,
+        sourceRadius,
+        segment.centerDistance);
+    return CheckResolvedContactStep(
+        SourceID,
+        segment.normal,
+        penetrationDepth,
+        sourceRadius,
+        vec3(0.0));
 }}
 
 ParticleGeometry GetPhysicalParticleContact(uint SourceID, uint TargetID)
@@ -459,8 +545,8 @@ bool RegisterMaximumDepthConstraint(
         maximumDepthConstraintCount = 0u;
     }}
 
-    float maximumDepth = MAXIMUM_PENETRATION_FRACTION * sourceRadius;
-    if (penetrationDepth < maximumDepth - EPSILON) {{
+    float targetDepth = GetContactTargetDepth(sourceRadius);
+    if (penetrationDepth < targetDepth - EPSILON) {{
         return true;
     }}
 
@@ -517,7 +603,7 @@ bool ProcessParticleCollision(
     return AccumulateContactForce(SourceID, contact, totalForce);
 }}
 
-bool ProcessParametricWallCollision(
+bool ProcessFunctionWallCollision(
     uint SourceID, BoundaryWallSegment segment, inout vec3 totalForce)
 {{
     if (!segment.valid) {{ return true; }}
@@ -650,8 +736,8 @@ def render_boundary(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
 // Boundary-particle locality helpers for the simple generic model.
 // Do not hand edit generated dynamics content.
 
-// Python source: ForceDynamics.py:{line("ParametricBoundaryMarkerApplies")}
-bool ParametricBoundaryMarkerApplies(uint SourceID, uint BoundaryID)
+// Python source: ForceDynamics.py:{line("BoundaryMarkerApplies")}
+bool BoundaryMarkerApplies(uint SourceID, uint BoundaryID)
 {{
     if (!IsBoundaryParticle(BoundaryID)) {{ return false; }}
     vec4 sourcePosition = GetParticlePosition(SourceID);
@@ -661,124 +747,144 @@ bool ParametricBoundaryMarkerApplies(uint SourceID, uint BoundaryID)
         && abs(sourcePosition.z - boundaryPosition.z) <= 1.0;
 }}
 
-bool ProcessParametricWallCollision(
+bool ProcessFunctionWallCollision(
     uint SourceID, BoundaryWallSegment segment, inout vec3 totalForce);
 
 #endif
 """
 
 
-def render_parametric(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
+def render_function_wall(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
     line = lambda name: method_line(visitor, name)
-    return f"""#ifndef FORCE_DYNAMICS_SIMPLE_PARAMETRIC_WALL_GLSL
-#define FORCE_DYNAMICS_SIMPLE_PARAMETRIC_WALL_GLSL
+    return f"""#ifndef FORCE_DYNAMICS_SIMPLE_FUNCTION_WALL_GLSL
+#define FORCE_DYNAMICS_SIMPLE_FUNCTION_WALL_GLSL
 
 // Generated from {source_path.as_posix()} by tools/ExportForceDynamicsSimpleGLSL.py.
-// Parametric curve-wall evaluator for the simple generic model.
+// Function-wall evaluator for the simple generic model.
 // Do not hand edit generated dynamics content.
 
-vec2 ParametricCurvePoint(ParametricCurveSegment segment, float t)
+vec2 FunctionWallValueSlope(FunctionWallSegment segment, float u)
 {{
-    float t2 = t * t;
-    vec4 powers = vec4(1.0, t, t2, t2 * t);
-    return vec2(
-        dot(segment.xCoefficients, powers),
-        dot(segment.yCoefficients, powers));
+    float du = u - segment.uStart;
+    float du2 = du * du;
+    float value = segment.fStart
+        + segment.a1 * du
+        + segment.a2 * du2
+        + segment.a3 * du2 * du;
+    float slope = segment.a1
+        + 2.0 * segment.a2 * du
+        + 3.0 * segment.a3 * du2;
+    return vec2(value, slope);
 }}
 
-vec2 ParametricCurveTangent(ParametricCurveSegment segment, float t)
+bool FunctionWallEvaluateAtPoint(
+    FunctionWallSegment segment,
+    vec2 point,
+    out vec2 wallPoint,
+    out vec2 normal)
 {{
-    float t2 = t * t;
-    vec4 derivative = vec4(0.0, 1.0, 2.0 * t, 3.0 * t2);
-    return vec2(
-        dot(segment.xCoefficients, derivative),
-        dot(segment.yCoefficients, derivative));
-}}
-
-vec2 ParametricCurveSecondDerivative(ParametricCurveSegment segment, float t)
-{{
-    vec4 derivative = vec4(0.0, 0.0, 2.0, 6.0 * t);
-    return vec2(
-        dot(segment.xCoefficients, derivative),
-        dot(segment.yCoefficients, derivative));
-}}
-
-vec3 ParametricCurveClosestPoint(ParametricCurveSegment segment, vec2 point)
-{{
-    const uint sampleCount = 16u;
-    const uint iterationCount = 12u;
-    const float solverTolerance = 1.0e-6;
-    float bestT = 0.0;
-    float bestDistanceSq = 3.402823466e+38;
-    uint bestIndex = 0u;
-
-    for (uint index = 0u; index <= sampleCount; ++index) {{
-        float t = float(index) / float(sampleCount);
-        vec2 delta = ParametricCurvePoint(segment, t) - point;
-        float distanceSq = dot(delta, delta);
-        if (distanceSq < bestDistanceSq) {{
-            bestDistanceSq = distanceSq;
-            bestT = t;
-            bestIndex = index;
-        }}
+    float u = point.x;
+    if (segment.independentAxis == 1u) {{
+        u = point.y;
     }}
 
-    float lower = float((bestIndex > 0u) ? bestIndex - 1u : 0u) / float(sampleCount);
-    float upper = float(min(bestIndex + 1u, sampleCount)) / float(sampleCount);
-    for (uint iteration = 0u; iteration < iterationCount; ++iteration) {{
-        vec2 curvePoint = ParametricCurvePoint(segment, bestT);
-        vec2 tangent = ParametricCurveTangent(segment, bestT);
-        vec2 secondVector = ParametricCurveSecondDerivative(segment, bestT);
-        vec2 delta = curvePoint - point;
-        float firstDerivative = dot(delta, tangent);
-        float secondDerivative = dot(tangent, tangent) + dot(delta, secondVector);
-        if (abs(secondDerivative) <= solverTolerance) {{ break; }}
-        float nextT = clamp(bestT - firstDerivative / secondDerivative, lower, upper);
-        if (abs(nextT - bestT) <= solverTolerance) {{
-            bestT = nextT;
-            break;
-        }}
-        bestT = nextT;
+    float lower = min(segment.uStart, segment.uEnd);
+    float upper = max(segment.uStart, segment.uEnd);
+    if (u < lower - EPSILON || u > upper + EPSILON) {{
+        return false;
     }}
-    return vec3(bestT, ParametricCurvePoint(segment, bestT));
+
+    vec2 valueSlope = FunctionWallValueSlope(segment, u);
+    if (segment.independentAxis == 0u) {{
+        wallPoint = vec2(u, valueSlope.x);
+        if (segment.normalSign >= 0.0) {{
+            normal = normalize(vec2(-valueSlope.y, 1.0));
+        }} else {{
+            normal = normalize(vec2(valueSlope.y, -1.0));
+        }}
+    }} else {{
+        wallPoint = vec2(valueSlope.x, u);
+        if (segment.normalSign >= 0.0) {{
+            normal = normalize(vec2(1.0, -valueSlope.y));
+        }} else {{
+            normal = normalize(vec2(-1.0, valueSlope.y));
+        }}
+    }}
+    return !(any(isnan(wallPoint))
+        || any(isinf(wallPoint))
+        || any(isnan(normal))
+        || any(isinf(normal)));
 }}
 
-// Python source: ForceDynamics.py:{line("EvaluateParametricWallSegment")}
-BoundaryWallSegment EvaluateParametricWallSegment(uint SourceID, uint BoundaryID)
+float FunctionWallPhysicalPenetration(
+    FunctionWallSegment segment,
+    vec2 point,
+    float radius)
+{{
+    vec2 wallPoint;
+    vec2 normal;
+    if (!FunctionWallEvaluateAtPoint(segment, point, wallPoint, normal)) {{
+        return -1.0;
+    }}
+    float signedOutwardDistance = dot(point - wallPoint, normal);
+    return radius + signedOutwardDistance;
+}}
+
+FunctionWallSegment SelectFunctionWallSegment(uint SourceID, uint BoundaryID)
 {{
     vec2 marker = GetParticlePosition(BoundaryID).xy;
-    ParametricCurveSegment selected = CURVE_WALL_SEGMENTS[0];
-    float bestMarkerDistanceSq = 3.402823466e+38;
+    FunctionWallSegment selected = CURVE_WALL_SEGMENTS[0];
+    float bestDistanceSq = 3.402823466e+38;
     for (uint index = 0u; index < CURVE_WALL_SEGMENT_COUNT; ++index) {{
-        ParametricCurveSegment candidate = CURVE_WALL_SEGMENTS[index];
-        vec3 closest = ParametricCurveClosestPoint(candidate, marker);
-        float distanceSq = dot(closest.yz - marker, closest.yz - marker);
-        if (distanceSq < bestMarkerDistanceSq) {{
-            bestMarkerDistanceSq = distanceSq;
+        FunctionWallSegment candidate = CURVE_WALL_SEGMENTS[index];
+        vec2 wallPoint;
+        vec2 normal;
+        if (!FunctionWallEvaluateAtPoint(candidate, marker, wallPoint, normal)) {{
+            continue;
+        }}
+        float distanceSq = dot(wallPoint - marker, wallPoint - marker);
+        if (distanceSq < bestDistanceSq) {{
+            bestDistanceSq = distanceSq;
             selected = candidate;
         }}
     }}
+    return selected;
+}}
 
+// Python source: ForceDynamics.py:{line("EvaluateFunctionWallSegment")}
+BoundaryWallSegment EvaluateFunctionWallSegment(uint SourceID, uint BoundaryID)
+{{
+    FunctionWallSegment selected = SelectFunctionWallSegment(SourceID, BoundaryID);
     vec3 sourcePosition = GetParticlePosition(SourceID).xyz;
-    vec3 closest = ParametricCurveClosestPoint(selected, sourcePosition.xy);
-    vec2 wallPoint = closest.yz;
-    vec2 tangent = ParametricCurveTangent(selected, closest.x);
-    float tangentMagnitude = length(tangent);
-    if (tangentMagnitude <= EPSILON) {{
+    vec2 wallPoint;
+    vec2 normal2d;
+    if (!FunctionWallEvaluateAtPoint(selected, sourcePosition.xy, wallPoint, normal2d)) {{
         return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, selected.wallFlag, false);
     }}
 
-    vec3 normal = vec3(tangent.y, -tangent.x, 0.0) / tangentMagnitude;
     float radius = P[SourceID].Data.x;
-    float offset = WallContactOffsetDistance(radius);
-    vec3 ghost = vec3(wallPoint, sourcePosition.z) + normal * (radius - offset);
-    float centerDistance = length(ghost - sourcePosition);
-    if (centerDistance >= 2.0 * radius) {{
-        return BoundaryWallSegment(normal, 0.0, centerDistance, selected.wallFlag, false);
+    float penetrationDepth = FunctionWallPhysicalPenetration(
+        selected,
+        sourcePosition.xy,
+        radius);
+    if (penetrationDepth <= EPSILON) {{
+        float centerDistance = max(0.0, 2.0 * radius - penetrationDepth);
+        return BoundaryWallSegment(
+            vec3(normal2d, 0.0),
+            0.0,
+            centerDistance,
+            selected.wallFlag,
+            false);
     }}
 
+    float centerDistance = max(0.0, 2.0 * radius - penetrationDepth);
     float overlapArea = particle_overlap_area(radius, radius, centerDistance);
-    return BoundaryWallSegment(normal, overlapArea, centerDistance, selected.wallFlag, true);
+    return BoundaryWallSegment(
+        vec3(normal2d, 0.0),
+        overlapArea,
+        centerDistance,
+        selected.wallFlag,
+        true);
 }}
 
 #endif
@@ -900,13 +1006,38 @@ bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
     return AccumulateContactForce(SourceID, contact, totalForce);
 }}
 
+bool CheckResolvedPistonContactStep(uint SourceID)
+{{
+    if (!PistonEnabled()) {{ return true; }}
+
+    BoundaryWallSegment segment = EvaluatePistonWall(SourceID);
+    if (!segment.valid) {{ return true; }}
+
+    float sourceRadius = P[SourceID].Data.x;
+    float penetrationDepth = ParticlePenetrationDepth(
+        sourceRadius,
+        sourceRadius,
+        segment.centerDistance);
+    return CheckResolvedContactStep(
+        SourceID,
+        segment.normal,
+        penetrationDepth,
+        sourceRadius,
+        GetPistonVelocity(uint(ShaderFlags.frameNum)));
+}}
+
 #endif
 
 #endif
 """
 
 
-def render_compute(source_path: Path) -> str:
+def render_compute(source_path: Path, enable_piston: bool = False) -> str:
+    piston_include = ""
+    if enable_piston:
+        piston_include = """#include "piston.glsl"
+#define FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE
+"""
     return f"""#version 460
 #extension GL_GOOGLE_include_directive : enable
 #extension GL_ARB_separate_shader_objects : enable
@@ -929,9 +1060,10 @@ def render_compute(source_path: Path) -> str:
 #include "../common/particle.glsl"
 #include "workgroups.glsl"
 
+{piston_include}\
 #include "../common/ForceDynamicsSimple.glsl"
 #include "../common/ForceDynamicsSimpleBoundaryParticle.glsl"
-#include "../common/ForceDynamicsSimpleParametricWall.glsl"
+#include "../common/ForceDynamicsSimpleFunctionWall.glsl"
 #if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
 #include "../common/ForceDynamicsSimplePiston.glsl"
 #endif
@@ -1000,7 +1132,7 @@ void main()
             }}
 
             if (IsBoundaryParticle(TargetID)) {{
-                if (!ParametricBoundaryMarkerApplies(SourceID, TargetID)) {{
+                if (!BoundaryMarkerApplies(SourceID, TargetID)) {{
                     continue;
                 }}
 
@@ -1024,11 +1156,11 @@ void main()
                 duplicateCount += 1u;
 
                 BoundaryWallSegment segment =
-                    EvaluateParametricWallSegment(SourceID, TargetID);
+                    EvaluateFunctionWallSegment(SourceID, TargetID);
                 if (!segment.valid) {{
                     continue;
                 }}
-                if (!ProcessParametricWallCollision(
+                if (!ProcessFunctionWallCollision(
                         SourceID,
                         segment,
                         totalForce)) {{
@@ -1081,6 +1213,110 @@ void main()
     if (!ApplySourceMaximumDepth(SourceID)) {{
         return;
     }}
+
+#if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
+    if (!CheckResolvedPistonContactStep(SourceID)) {{
+        return;
+    }}
+#endif
+
+    duplicateCount = 0u;
+    for (uint index = 0u; index < DUP_LIST_SIZE; ++index) {{
+        duplicateTargets[index] = 0u;
+    }}
+
+    for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {{
+        uint loc = P[SourceID].CornerList[CornerIndex].ploc;
+        if (loc == npos) {{
+            continue;
+        }}
+
+        for (uint CellSlot = 0u; CellSlot < MAX_CELL_OCCUPANY; ++CellSlot) {{
+            uint TargetID = clink[loc].idx[CellSlot];
+            if (TargetID == 0u) {{
+                break;
+            }}
+            if (TargetID == SourceID) {{
+                continue;
+            }}
+            if (TargetID >= uint(ShaderFlags.Ptot)) {{
+                continue;
+            }}
+
+            if (IsBoundaryParticle(TargetID)) {{
+                if (!BoundaryMarkerApplies(SourceID, TargetID)) {{
+                    continue;
+                }}
+
+                bool duplicate = false;
+                for (uint duplicateIndex = 0u;
+                        duplicateIndex < duplicateCount;
+                        ++duplicateIndex) {{
+                    if (duplicateTargets[duplicateIndex] == TargetID) {{
+                        duplicate = true;
+                        break;
+                    }}
+                }}
+                if (duplicate) {{
+                    continue;
+                }}
+                if (duplicateCount >= DUP_LIST_SIZE) {{
+                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                    return;
+                }}
+                duplicateTargets[duplicateCount] = TargetID;
+                duplicateCount += 1u;
+
+                BoundaryWallSegment segment =
+                    EvaluateFunctionWallSegment(SourceID, TargetID);
+                if (!segment.valid) {{
+                    continue;
+                }}
+                if (!CheckResolvedFunctionWallContactStep(
+                        SourceID,
+                        segment)) {{
+                    return;
+                }}
+                continue;
+            }}
+
+            if (!IsMobileParticleActiveForDynamics(TargetID)) {{
+                continue;
+            }}
+
+            bool duplicate = false;
+            for (uint duplicateIndex = 0u;
+                    duplicateIndex < duplicateCount;
+                    ++duplicateIndex) {{
+                if (duplicateTargets[duplicateIndex] == TargetID) {{
+                    duplicate = true;
+                    break;
+                }}
+            }}
+            if (duplicate) {{
+                continue;
+            }}
+            if (duplicateCount >= DUP_LIST_SIZE) {{
+                SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                return;
+            }}
+            duplicateTargets[duplicateCount] = TargetID;
+            duplicateCount += 1u;
+
+            ParticleGeometry geometry =
+                GetParticleGeometry(SourceID, TargetID);
+            if (!geometry.valid) {{
+                continue;
+            }}
+            if (!CheckResolvedParticleContactStep(
+                    SourceID,
+                    TargetID,
+                    geometry)) {{
+                return;
+            }}
+        }}
+    }}
+
     if (!CalcPosition(SourceID)) {{
         return;
     }}
@@ -1093,6 +1329,7 @@ def write_outputs(
     output_dir: Path,
     compute_output: Path,
     visitor: ForceDynamicsVisitor,
+    enable_piston: bool = False,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "ForceDynamicsSimple.glsl").write_text(
@@ -1105,8 +1342,8 @@ def write_outputs(
         encoding="utf-8",
         newline="\n",
     )
-    (output_dir / "ForceDynamicsSimpleParametricWall.glsl").write_text(
-        render_parametric(source_path, visitor),
+    (output_dir / "ForceDynamicsSimpleFunctionWall.glsl").write_text(
+        render_function_wall(source_path, visitor),
         encoding="utf-8",
         newline="\n",
     )
@@ -1117,7 +1354,7 @@ def write_outputs(
     )
     compute_output.parent.mkdir(parents=True, exist_ok=True)
     compute_output.write_text(
-        render_compute(source_path),
+        render_compute(source_path, enable_piston=enable_piston),
         encoding="utf-8",
         newline="\n",
     )
@@ -1130,6 +1367,11 @@ def main() -> int:
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--compute-output", type=Path, default=DEFAULT_COMPUTE_OUTPUT)
+    parser.add_argument(
+        "--enable-piston",
+        action="store_true",
+        help="Generate a compute wrapper that includes piston.glsl and enables piston support.",
+    )
     parser.add_argument(
         "--write",
         action="store_true",
@@ -1152,15 +1394,21 @@ def main() -> int:
     print("Boundary methods:")
     for method in SIMPLE_BOUNDARY_METHODS:
         print(f"  - {method}")
-    print("Parametric wall methods:")
-    for method in SIMPLE_PARAMETRIC_METHODS:
+    print("Function-wall methods:")
+    for method in SIMPLE_FUNCTION_WALL_METHODS:
         print(f"  - {method}")
     print("Piston methods:")
     for method in SIMPLE_PISTON_METHODS:
         print(f"  - {method}")
 
     if args.write:
-        write_outputs(args.source, args.output_dir, args.compute_output, visitor)
+        write_outputs(
+            args.source,
+            args.output_dir,
+            args.compute_output,
+            visitor,
+            enable_piston=args.enable_piston,
+        )
         print(f"Wrote simple GLSL family to {args.output_dir}")
         print(f"Wrote simple compute shader to {args.compute_output}")
     else:

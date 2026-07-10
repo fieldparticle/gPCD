@@ -119,13 +119,11 @@ void DrawParticleBoundary::DrawFrame()
 		m_ComputeCommandObj->RecordCommands(0, currentBuffer);
 
 		VkSubmitInfo csubmitInfo{};
-		csubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		csubmitInfo.commandBufferCount = 1;
-		csubmitInfo.pCommandBuffers =
-			&m_ComputeCommandObj->m_CommandBuffers[currentBuffer];
-		csubmitInfo.signalSemaphoreCount = 1;
-		csubmitInfo.pSignalSemaphores =
-			&m_SO->m_WaitSemaphores[SyncObjPO::W_COMPUTEFIN].semvec[currentBuffer];
+		csubmitInfo.sType					= VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		csubmitInfo.commandBufferCount		= 1;
+		csubmitInfo.pCommandBuffers			= &m_ComputeCommandObj->m_CommandBuffers[currentBuffer];
+		csubmitInfo.signalSemaphoreCount	= 1;
+		csubmitInfo.pSignalSemaphores		= &m_SO->m_WaitSemaphores[SyncObjPO::W_COMPUTEFIN].semvec[currentBuffer];
 
 
 		//=========================================================

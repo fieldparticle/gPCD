@@ -139,6 +139,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 		if (m_collisionStruct.ErrorNumber == 3)
 		{
 			m_App->m_quit_event = 3;
+			Extflg = true;
 			objtxt << " ResourceAtomicCompute::ERROR_INVALID_DT "
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"
@@ -152,6 +153,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 		if(m_collisionStruct.ErrorNumber == 4)
 		{
 			m_App->m_quit_event = 4;
+			Extflg = true;
 			objtxt << " ResourceAtomicCompute::ERROR_CONTACT_LIST_MISSING "
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:" 
@@ -164,6 +166,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 		if(m_collisionStruct.ErrorNumber == 5)
 		{
 			m_App->m_quit_event = 5;
+			Extflg = true;
 			objtxt << " ResourceAtomicCompute:ERROR_PARTICLE_OUT_OF_BOUNDS:"
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"
@@ -176,7 +179,8 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 		else
 		if(m_collisionStruct.ErrorNumber == 6)
 		{
-			m_App->m_quit_event = 1;
+			m_App->m_quit_event = 6;
+			Extflg = true;
 			objtxt << " ResourceAtomicCompute:ERROR_PARTICLE_TUNNELING "
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"
@@ -189,7 +193,8 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 		else
 		if(m_collisionStruct.ErrorNumber == 8)
 		{
-			m_App->m_quit_event = 1;
+			m_App->m_quit_event = 7;
+			Extflg = true;
 			objtxt << " ResourceAtomicCompute:ERROR_WALL_TUNNELING "
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"
@@ -202,7 +207,8 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 		else
 		if (m_collisionStruct.ErrorNumber == 9)
 		{
-			m_App->m_quit_event = 1;
+			m_App->m_quit_event = 8;
+			Extflg = true;
 			objtxt << " ResourceAtomicCompute:ERROR_MAX_DEPTH_CONSTRAINT "
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"
@@ -215,7 +221,8 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 		else
 		if (m_collisionStruct.ErrorNumber == 10)
 		{
-			m_App->m_quit_event = 1;
+			m_App->m_quit_event = 9;
+			Extflg = true;
 			objtxt << " ResourceAtomicCompute:ERROR_PENETRATION_STEP_TOO_LARGE "
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"
@@ -228,7 +235,8 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 		else
 		{
 
-			m_App->m_quit_event = 1;
+			m_App->m_quit_event = 10;
+			Extflg = true;
 			objtxt << " ResourceAtomicCompute:Undefined Error: "
 				<< m_collisionStruct.ErrorNumber 
 				<< " frame:"

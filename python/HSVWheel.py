@@ -4,7 +4,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPainter, QImage
 from PyQt6.QtWidgets import QApplication, QWidget, QTabWidget, QVBoxLayout, QMainWindow
 from PyQt6.QtCore import QPointF, Qt
-from PyQt6.QtGui import QColor, QPen, QPainterPath, QPolygonF
+from PyQt6.QtGui import QColor, QPen, QPainterPath, QPolygonF, QFont
 import math
 
 class HSVWheel(QWidget):
@@ -41,7 +41,7 @@ class HSVWheel(QWidget):
         theta = math.radians(angle_deg)
 
         x2 = cx + length * math.cos(theta)
-        y2 = cy + length * math.sin(theta)
+        y2 = cy - length * math.sin(theta)
 
         start = QPointF(cx, cy)
         end = QPointF(x2, y2)
@@ -59,12 +59,12 @@ class HSVWheel(QWidget):
 
         p1 = QPointF(
             x2 + head_size * math.cos(angle1),
-            y2 + head_size * math.sin(angle1)
+            y2 - head_size * math.sin(angle1)
         )
 
         p2 = QPointF(
             x2 + head_size * math.cos(angle2),
-            y2 + head_size * math.sin(angle2)
+            y2 - head_size * math.sin(angle2)
         )
 
         arrow_head = QPolygonF([end, p1, p2])
@@ -106,8 +106,17 @@ class HSVWheel(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        if self.arrows == None:
-            return
+        if self.arrows is not None:
+            deg = self.arrows[0][0]           # first arrow angle
+            rad = math.radians(deg)
+
+            painter.setPen(Qt.GlobalColor.black)
+            painter.setFont(QFont("Consolas", 11))
+
+            painter.drawText(
+                10, 20,
+                f"DEG: {deg:6.1f}   RAD: {rad:7.4f}"
+            )
 
         x = (self.width() - self.image.width()) // 2
         y = (self.height() - self.image.height()) // 2
@@ -129,9 +138,28 @@ class MainWindow(QMainWindow):
         self.hsv_wheel = HSVWheel(400)
         self.tabs.addTab(self.hsv_wheel, "HSV Color Wheel")
 
+        # Initial arrow
+        self.angle = 0
+        self.hsv_wheel.set_arrows([
+            (self.angle, self.angle, 1.0, Qt.GlobalColor.black)
+        ])
 
-#app = QApplication(sys.argv)
-#window = MainWindow()
-#window.resize(600, 500)
-#window.show()
-#sys.exit(app.exec())
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_D:
+            self.angle = (self.angle + 1) % 360
+
+            self.hsv_wheel.set_arrows([
+                (self.angle, self.angle, 1.0, Qt.GlobalColor.black)
+            ])
+
+        elif event.key() == Qt.Key.Key_A:
+            self.angle = (self.angle - 1) % 360
+
+            self.hsv_wheel.set_arrows([
+                (self.angle, self.angle, 1.0, Qt.GlobalColor.black)
+            ])
+app = QApplication(sys.argv)
+window = MainWindow()
+window.resize(600, 500)
+window.show()
+sys.exit(app.exec())

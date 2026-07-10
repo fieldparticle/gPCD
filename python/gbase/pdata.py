@@ -21,14 +21,14 @@ BOUNDARY_EVALUATOR_HORIZONTAL = 1.0
 BOUNDARY_EVALUATOR_VERTICAL = 2.0
 BOUNDARY_EVALUATOR_CD_NOZZLE = 3.0
 BOUNDARY_EVALUATOR_LINEAR = 4.0
-BOUNDARY_EVALUATOR_PARAMETRIC = 5.0
+BOUNDARY_EVALUATOR_FUNCTION_WALL = 5.0
 
 BOUNDARY_EVALUATOR_IDS = {
     "horizontal_wall": BOUNDARY_EVALUATOR_HORIZONTAL,
     "vertical_wall": BOUNDARY_EVALUATOR_VERTICAL,
     "cd_nozzle_wall": BOUNDARY_EVALUATOR_CD_NOZZLE,
     "linear_wall": BOUNDARY_EVALUATOR_LINEAR,
-    "parametric_wall": BOUNDARY_EVALUATOR_PARAMETRIC,
+    "function_wall": BOUNDARY_EVALUATOR_FUNCTION_WALL,
 }
 
 
@@ -45,7 +45,7 @@ class pdata(ctypes.Structure):
     - ``collision_stiffness_q`` becomes ``Data.y``.
     - ``ptype == -1`` identifies the reserved null particle at index zero.
     - ``ptype == 0`` identifies a mobile particle. Positive ``ptype`` values
-      identify boundary markers. Generic parametric simulations use
+      identify boundary markers. Generic function-wall simulations use
       ``ptype == 1`` for all boundary markers; the simulation wall model and
       ``curve_wall_segments`` determine how those markers are evaluated.
     - ``temp_vel`` is independent reserved particle data. It is not used for
