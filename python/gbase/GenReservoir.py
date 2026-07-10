@@ -198,6 +198,13 @@ class GenReservoir(GenericGenData):
             errors.append("piston_start_frame must be numeric")
             piston_start_frame_value = None
 
+        piston_start_offset = self.itemcfg.get("piston_start_offset", 0.0)
+        try:
+            piston_start_offset_value = float(piston_start_offset)
+        except (TypeError, ValueError):
+            errors.append("piston_start_offset must be numeric")
+            piston_start_offset_value = None
+
         if particle_separation_distance is not None:
             if not math.isfinite(particle_separation_distance):
                 errors.append("particle_separation_distance must be finite")
@@ -212,9 +219,16 @@ class GenReservoir(GenericGenData):
             elif not piston_start_frame_value.is_integer():
                 errors.append("piston_start_frame must be an integer")
 
+        if piston_start_offset_value is not None:
+            if not math.isfinite(piston_start_offset_value):
+                errors.append("piston_start_offset must be finite")
+            elif piston_start_offset_value < 0.0:
+                errors.append("piston_start_offset must not be negative")
+
         if packing_bounds and packing_z_bounds and len(dimensions) == 3:
             x_start, x_end, y_bottom, y_top = packing_bounds
             z_front, z_back = packing_z_bounds
+            piston_x_start = x_start - (piston_start_offset_value or 0.0)
             if x_start >= x_end:
                 errors.append("packing curves: x_start must be less than x_end")
             if y_bottom >= y_top:
@@ -242,6 +256,10 @@ class GenReservoir(GenericGenData):
                 )
             ):
                 errors.append("packing bounds must fit inside death_bounds")
+            if piston_x_start < 0.0:
+                errors.append("piston_x_start must fit inside the cell array")
+            if death_bounds and piston_x_start < death_bounds[0]:
+                errors.append("piston_x_start must fit inside death_bounds")
 
         if initial_particle_velocity:
             if not all(math.isfinite(value) for value in initial_particle_velocity):
@@ -290,7 +308,8 @@ class GenReservoir(GenericGenData):
         self.packing_curve_segments = packing_curve_segments
         self.packing_bounds = packing_bounds
         self.packing_z_bounds = packing_z_bounds
-        self.piston_x_start = packing_bounds[0]
+        self.piston_start_offset = piston_start_offset_value or 0.0
+        self.piston_x_start = packing_bounds[0] - self.piston_start_offset
         self.piston_x_stop = packing_bounds[1]
         self.initial_particle_velocity = initial_particle_velocity
         self.piston_enabled = piston_enabled

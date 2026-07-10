@@ -95,6 +95,107 @@ def _window_size(run_configuration):
     return int(window_size[0]), int(window_size[1])
 
 
+def _ui_layout(screen, run_configuration):
+    """Return the left particle viewport and the right HSV-wheel panel."""
+    screen_width, screen_height = screen.get_size()
+
+    panel_width = int(run_configuration.get("hsv_panel_width", 450))
+    panel_width = max(260, min(panel_width, screen_width - 200))
+
+    particle_rect = pygame.Rect(
+        0,
+        0,
+        screen_width - panel_width,
+        screen_height,
+    )
+
+    hsv_panel_rect = pygame.Rect(
+        particle_rect.right,
+        0,
+        panel_width,
+        screen_height,
+    )
+
+    return particle_rect, hsv_panel_rect
+
+
+def _draw_hsv_panel(screen, panel_rect, wheel, font):
+    """Draw the HSV wheel UI on the right side of the Pygame window."""
+    pygame.draw.rect(screen, (28, 32, 40), panel_rect)
+    pygame.draw.line(
+        screen,
+        (80, 90, 110),
+        (panel_rect.left, panel_rect.top),
+        (panel_rect.left, panel_rect.bottom),
+        2,
+    )
+
+    title = font.render("HSV Direction", True, (230, 235, 245))
+    screen.blit(title, (panel_rect.left + 20, panel_rect.top + 16))
+
+    wheel_x = panel_rect.left + (panel_rect.width - wheel.size) // 2
+    wheel_y = panel_rect.top + 50
+    wheel.draw(screen, (wheel_x, wheel_y), font)
+
+    help_y = wheel_y + wheel.size + 20
+    help_rows = (
+        "D: +1 degree",
+        "A: -1 degree",
+        "SPACE: pause",
+        "ESC: quit",
+    )
+    for row_text in help_rows:
+        row = font.render(row_text, True, (210, 220, 235))
+        screen.blit(row, (panel_rect.left + 20, help_y))
+        help_y += 22
+
+
+
+
+def _particle_velocity_angle_degrees(particle_index, particle, dynamics=None):
+    """Return the particle velocity direction in degrees.
+
+    The angle follows the standard Cartesian convention used by the
+    HSV wheel: 0 degrees points right, 90 degrees points up.
+    """
+    velocity = _runtime_particle_velocity(particle_index, particle, dynamics)
+    vx = float(getattr(velocity, "x", 0.0))
+    vy = float(getattr(velocity, "y", 0.0))
+
+    if abs(vx) < 1.0e-12 and abs(vy) < 1.0e-12:
+        velrad = getattr(particle, "VelRad", None)
+        if velrad is not None and hasattr(velrad, "w"):
+            return float(velrad.w) % 360.0
+        return 0.0
+
+    return math.degrees(math.atan2(vy, vx)) % 360.0
+
+
+def _hsv_velocity_arrow_data(particles, dynamics=None):
+    """Build HSV-wheel arrow data from the displayed particles.
+
+    Particle 0 is skipped because it is the null/sentinel particle in the
+    simulation data. Each returned entry is (particle_number, angle_degrees).
+    """
+    arrow_data = []
+    
+    for particle_index, particle in enumerate(particles):
+        if particle_index == 0 :
+            continue
+        if particle.ptype > 0:
+            continue
+        if not _is_visible_particle(particle_index, particle, dynamics):
+            continue
+
+        particle_number = int(getattr(particle, "pnum", particle_index))
+        angle_degrees = _particle_velocity_angle_degrees(
+            particle_index,
+            particle,
+            dynamics,
+        )
+        arrow_data.append((particle_number, angle_degrees))
+    return arrow_data
+
 def _presentation_quality(run_configuration):
     return bool(run_configuration.get("presentation_quality", False))
 
@@ -107,6 +208,10 @@ def _as_points(run_configuration):
 
 def _dynamics_diagnostics_enabled(run_configuration):
     return bool(run_configuration.get("dynamics_diagnostics", False))
+
+
+def _fast_ui_mode(run_configuration):
+    return not _dynamics_diagnostics_enabled(run_configuration)
 
 
 def _view_box(run_configuration):
@@ -141,32 +246,6 @@ def _view_box(run_configuration):
     )
 
 
-def _fit_view_box_to_screen(view_box, screen_width, screen_height):
-    """Expand the view box so world units have equal x/y pixel scale."""
-    x_min, x_max, y_min, y_max = view_box
-    width = x_max - x_min
-    height = y_max - y_min
-    if width <= 0.0 or height <= 0.0 or screen_width <= 0 or screen_height <= 0:
-        return view_box
-
-    view_aspect = width / height
-    screen_aspect = screen_width / screen_height
-    center_x = 0.5 * (x_min + x_max)
-    center_y = 0.5 * (y_min + y_max)
-
-    if view_aspect < screen_aspect:
-        width = height * screen_aspect
-    elif view_aspect > screen_aspect:
-        height = width / screen_aspect
-
-    return (
-        center_x - 0.5 * width,
-        center_x + 0.5 * width,
-        center_y - 0.5 * height,
-        center_y + 0.5 * height,
-    )
-
-
 def _to_screen(x, y, view_box, screen_width, screen_height):
     x_min, x_max, y_min, y_max = view_box
     sx = int((x - x_min) / (x_max - x_min) * screen_width)
@@ -179,53 +258,6 @@ def _radius_to_pixels(radius, view_box, screen_width, screen_height):
     scale_x = screen_width / (x_max - x_min)
     scale_y = screen_height / (y_max - y_min)
     return max(3, int(radius * min(scale_x, scale_y)))
-
-
-def _particle_radius(particle):
-    data = getattr(particle, "Data", None)
-    if data is not None and hasattr(data, "x"):
-        return float(data.x)
-    return float(getattr(particle, "radius", 0.0))
-
-
-def _grid_radius(particles, run_configuration, dynamics=None):
-    for index, particle in enumerate(particles):
-        if _is_boundary_particle(index, particle, dynamics):
-            continue
-        radius = _particle_radius(particle)
-        if radius > 0.0:
-            return radius
-    return max(0.0, float(run_configuration.get("radius", 0.0)))
-
-
-def _draw_particle_diameter_grid(screen, particles, run_configuration, dynamics, view_box):
-    if not bool(run_configuration.get("grid_on", False)):
-        return
-
-    radius = _grid_radius(particles, run_configuration, dynamics)
-    spacing = 2.0 * radius
-    if spacing <= 0.0:
-        return
-
-    screen_width, screen_height = screen.get_size()
-    x_min, x_max, y_min, y_max = view_box
-    color = (35, 45, 65)
-
-    first_x = math.floor(x_min / spacing) * spacing
-    x_value = first_x
-    while x_value <= x_max + 1.0e-9:
-        top = _to_screen(x_value, y_max, view_box, screen_width, screen_height)
-        bottom = _to_screen(x_value, y_min, view_box, screen_width, screen_height)
-        pygame.draw.line(screen, color, top, bottom, 1)
-        x_value += spacing
-
-    first_y = math.floor(y_min / spacing) * spacing
-    y_value = first_y
-    while y_value <= y_max + 1.0e-9:
-        left = _to_screen(x_min, y_value, view_box, screen_width, screen_height)
-        right = _to_screen(x_max, y_value, view_box, screen_width, screen_height)
-        pygame.draw.line(screen, color, left, right, 1)
-        y_value += spacing
 
 
 def _draw_overlap_lens(screen, left_center, left_radius, right_center, right_radius):
@@ -285,58 +317,6 @@ def _runtime_particle_velocity(particle_index, particle, dynamics=None):
             z=float(getattr(particle, "vz", 0.0)),
         ),
     )
-
-
-def _draw_piston_status_near_first_particle(
-    screen,
-    particles,
-    run_configuration,
-    dynamics,
-    frame_number,
-    view_box,
-):
-    if dynamics is None:
-        return
-    if not bool(run_configuration.get("dynamics_diagnostics", False)):
-        return
-
-    screen_width, screen_height = screen.get_size()
-    anchor = None
-    for index, particle in enumerate(particles):
-        if _is_boundary_particle(index, particle, dynamics):
-            continue
-        if not _is_visible_particle(index, particle, dynamics):
-            continue
-        position = _runtime_particle_position(index, particle, dynamics)
-        anchor = _to_screen(
-            position.x,
-            position.y,
-            view_box,
-            screen_width,
-            screen_height,
-        )
-        break
-
-    if anchor is None:
-        return
-
-    enabled = bool(dynamics.PistonEnabled()) if hasattr(dynamics, "PistonEnabled") else False
-    if enabled:
-        piston_x = dynamics.GetPistonPosition(frame_number)
-        piston_velocity = dynamics.GetPistonVelocity(frame_number)
-        label = (
-            f"piston x={piston_x:.6f} "
-            f"v=({piston_velocity.x:.6f},{piston_velocity.y:.6f},{piston_velocity.z:.6f})"
-        )
-    else:
-        label = "piston disabled"
-
-    font = pygame.font.SysFont("consolas", 18)
-    text = font.render(label, True, (255, 255, 255))
-    shadow = font.render(label, True, (0, 0, 0))
-    label_pos = (anchor[0] + 8, anchor[1] - 34)
-    screen.blit(shadow, (label_pos[0] + 1, label_pos[1] + 1))
-    screen.blit(text, label_pos)
 
 
 def _particle_momentum(particle_index, particle, dynamics=None):
@@ -747,6 +727,7 @@ def _draw_world_rect(screen, bounds, view_box, color, width):
         abs(right_bottom[0] - left_top[0]),
         abs(right_bottom[1] - left_top[1]),
     )
+    #rectangle['top'] = 149
     pygame.draw.rect(screen, color, rectangle, width)
 
 
@@ -841,13 +822,6 @@ def _draw_piston(screen, run_configuration, dynamics, frame_number, view_box):
     )
     pygame.draw.line(
         screen,
-        (0, 0, 0),
-        piston_bottom,
-        piston_top,
-        8,
-    )
-    pygame.draw.line(
-        screen,
         (245, 245, 245),
         piston_bottom,
         piston_top,
@@ -867,15 +841,31 @@ def _draw_particles(
     error_description="",
 ):
     screen_width, screen_height = screen.get_size()
-    view_box = _fit_view_box_to_screen(
-        _view_box(run_configuration),
-        screen_width,
-        screen_height,
-    )
+    view_box = _view_box(run_configuration)
+    fast_ui = _fast_ui_mode(run_configuration)
     screen.fill((14, 18, 24))
-    _draw_particle_diameter_grid(screen, particles, run_configuration, dynamics, view_box)
     _draw_configuration_boundaries(screen, run_configuration, view_box)
     _draw_piston(screen, run_configuration, dynamics, frame_number, view_box)
+    if fast_ui:
+        for index, particle in enumerate(particles):
+            if not _is_visible_particle(index, particle, dynamics):
+                continue
+            position = _runtime_particle_position(index, particle, dynamics)
+            center = _to_screen(
+                position.x,
+                position.y,
+                view_box,
+                screen_width,
+                screen_height,
+            )
+            if _is_boundary_particle(index, particle, dynamics):
+                pygame.draw.circle(screen, (60, 220, 90), center, 1)
+            elif _particle_contact_target_ids(index, particle, dynamics):
+                pygame.draw.circle(screen, (255, 80, 80), center, 2)
+            else:
+                pygame.draw.circle(screen, (90, 160, 255), center, 2)
+        return
+
     presentation_quality = _presentation_quality(run_configuration)
     as_points = _as_points(run_configuration)
 
@@ -903,7 +893,6 @@ def _draw_particles(
                 hsv_val,
             )
             pygame.draw.circle(screen, fill, center, 1)
-        pygame.display.flip()
         return
 
     motion_summary = _motion_summary(
@@ -932,7 +921,7 @@ def _draw_particles(
             1
             if as_points
             else _radius_to_pixels(
-                _particle_radius(particle),
+                particle.radius,
                 view_box,
                 screen_width,
                 screen_height,
@@ -998,16 +987,6 @@ def _draw_particles(
                     target_center,
                     target_radius,
                 )
-
-    _draw_piston(screen, run_configuration, dynamics, frame_number, view_box)
-    _draw_piston_status_near_first_particle(
-        screen,
-        particles,
-        run_configuration,
-        dynamics,
-        frame_number,
-        view_box,
-    )
 
     show_particle_numbers = bool(run_configuration.get("simulation_particle_numbers", True))
     particle_label_font = pygame.font.Font(None, 22) if show_particle_numbers else None
@@ -1095,7 +1074,6 @@ def _draw_particles(
         )
         screen.blit(error_text, (10, row_y + 4))
 
-    pygame.display.flip()
 
 
 def _report_particles(reporting, frame_number, particles, start_diagnostics, dynamics):
@@ -1132,6 +1110,10 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
     test_file_name = Path(cfg_file).name
     run_configuration = live.run_configuration
     dynamics_diagnostics = _dynamics_diagnostics_enabled(run_configuration)
+    fast_ui = not dynamics_diagnostics
+    if fast_ui:
+        shadow = None
+        display_base = "live"
     scenario = None
     if study == True or "in_line_obj" in run_configuration:
         scenario = InLineTest()
@@ -1153,15 +1135,17 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
             "capture output has no fallback directory."
         )
     report_dir = Path(run_configuration["run_debug_dir"])
-    cleared_report_count = _clear_report_directory(report_dir)
+    cleared_report_count = (
+        0 if fast_ui else _clear_report_directory(report_dir)
+    )
     live_reporting = (
-        None
-        if not dynamics_diagnostics
-        else Reporting(
+        Reporting(
             report_dir,
             run_configuration.get("rpt_frames"),
             clear_existing=False,
         )
+        if dynamics_diagnostics
+        else None
     )
     reporting_s = None
     if shadow is not None and dynamics_diagnostics:
@@ -1195,6 +1179,21 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
     pygame.display.set_caption(
         f"SimulationRunner [{display_base}] - {live.config.get('STUDY_NAME', cfg_file)}"
     )
+    if fast_ui:
+        hsv_panel_rect = None
+        particle_surface = screen
+        hsv_wheel_size = 0
+    else:
+        particle_rect, hsv_panel_rect = _ui_layout(screen, run_configuration)
+        particle_surface = screen.subsurface(particle_rect)
+        hsv_wheel_size = int(
+            run_configuration.get(
+                "hsv_wheel_size",
+                min(400, hsv_panel_rect.width - 40, hsv_panel_rect.height - 120),
+            )
+        )
+        hsv_wheel_size = max(120, hsv_wheel_size)
+
     clock = pygame.time.Clock()
 
     frame_number = 0
@@ -1208,8 +1207,11 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
     try:
         running = True
         paused = False
-        wheel = HSVWheel(400)
-        font = pygame.font.SysFont("consolas", 18)
+        if run_configuration.get('plot_hsv_wheel') == False:
+            wheel = None
+        else:    
+            wheel = None if fast_ui else HSVWheel(hsv_wheel_size)
+        font = None if fast_ui else pygame.font.SysFont("consolas", 18)
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -1218,6 +1220,18 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                     running = False
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                     paused = not paused
+                elif (
+                    not fast_ui
+                    and event.type == pygame.KEYDOWN
+                    and event.key == pygame.K_d
+                ):
+                    wheel.angle_deg = (wheel.angle_deg + 1.0) % 360.0
+                elif (
+                    not fast_ui
+                    and event.type == pygame.KEYDOWN
+                    and event.key == pygame.K_a
+                ):
+                    wheel.angle_deg = (wheel.angle_deg - 1.0) % 360.0
                 
 
             if not paused:
@@ -1232,17 +1246,16 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                         live_start_diagnostics,
                         live,
                     )
-                if shadow is not None:
+                if shadow is not None and dynamics_diagnostics:
                     shadow.ShaderFlags.frameNum = frame_number
                     shadow_particles = shadow.CollisionRun()
-                    if dynamics_diagnostics:
-                        _report_particles(
-                            reporting_s,
-                            frame_number,
-                            shadow_particles,
-                            shadow_start_diagnostics,
-                            shadow,
-                        )
+                    _report_particles(
+                        reporting_s,
+                        frame_number,
+                        shadow_particles,
+                        shadow_start_diagnostics,
+                        shadow,
+                    )
             else:
                 live_particles = live.particles
                 if shadow is not None:
@@ -1257,7 +1270,7 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                 else live_start_diagnostics
             )
             _draw_particles(
-                screen,
+                particle_surface,
                 display_particles,
                 run_configuration,
                 display_runner,
@@ -1267,10 +1280,21 @@ def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False,study_n
                 display_runner.collIn.ErrorReturn,
                 display_runner.ErrorDescription(),
             )
-            wheel.draw(screen, (screen.get_width() - 420, 20), font)
+            if not fast_ui and wheel != None:
+                wheel.set_particle_angles(
+                    _hsv_velocity_arrow_data(display_particles, display_runner)
+                )
+                _draw_hsv_panel(screen, hsv_panel_rect, wheel, font)
             pygame.display.flip()
             if live.collIn.ErrorReturn != live.constants.ERROR_NONE:
-                if exit_on_error:
+                if fast_ui:
+                    print(
+                        "SimulationRunner stopped: "
+                        f"ErrorReturn={live.collIn.ErrorReturn} "
+                        f"{live.ErrorDescription()}"
+                    )
+                    running = False
+                elif exit_on_error:
                     print(
                         "SimulationRunner exiting: "
                         f"ErrorReturn={live.collIn.ErrorReturn} "

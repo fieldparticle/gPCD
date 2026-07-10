@@ -63,7 +63,8 @@ class HSVWheel:
         self.particle_angles = normalized
 
     def create_hsv_wheel(self, size):
-        surface = pygame.Surface((size, size))
+        #surface = pygame.Surface((size, size))
+        surface = pygame.Surface((size, size), pygame.SRCALPHA)
         cx = size / 2.0
         cy = size / 2.0
         radius = size / 2.0
@@ -86,7 +87,7 @@ class HSVWheel:
                         (int(red * 255), int(green * 255), int(blue * 255)),
                     )
                 else:
-                    surface.set_at((x, y), (255, 255, 255))
+                    surface.set_at((x, y), (0, 0, 0))
 
         return surface.convert()
 

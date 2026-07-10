@@ -334,17 +334,12 @@ class ForceContactDynamics:
         source_position = self.GetParticlePosition(SourceID)
         radius = float(self.particles[SourceID].Data.x)
 
-        offset = self.WallContactOffsetDistance(radius)
         piston_x = self.GetPistonPosition(self.ShaderFlags.frameNum)
-        ghost = (
-            piston_x - radius + offset,
-            source_position.y,
-            source_position.z,
-        )
         normal = (-1.0, 0.0, 0.0)
-        center_distance = abs(ghost[0] - source_position.x)
-        if center_distance >= 2.0 * radius:
+        penetration_depth = radius - (float(source_position.x) - piston_x)
+        if penetration_depth <= self.EPSILON:
             return None
+        center_distance = max(0.0, 2.0 * radius - penetration_depth)
         overlap_area = self.particle_overlap_area(radius, radius, center_distance)
         return (*normal, overlap_area, center_distance, 1)
 

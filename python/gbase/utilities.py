@@ -5,13 +5,104 @@ import math
 import sys
 
 
+def _function_wall_bounds(segment):
+    (
+        _boundary_kind,
+        independent_axis,
+        u_start,
+        u_end,
+        f_start,
+        a1,
+        a2,
+        a3,
+        _normal_sign,
+        _wall_flag,
+    ) = (float(value) for value in segment)
+    independent_axis = int(round(independent_axis))
+
+    def value_at(u_value):
+        du = u_value - u_start
+        return f_start + a1 * du + a2 * du * du + a3 * du * du * du
+
+    if independent_axis == 0:
+        points = ((u_start, value_at(u_start)), (u_end, value_at(u_end)))
+    elif independent_axis == 1:
+        points = ((value_at(u_start), u_start), (value_at(u_end), u_end))
+    else:
+        return None
+
+    x_values = [point[0] for point in points]
+    y_values = [point[1] for point in points]
+    return min(x_values), max(x_values), min(y_values), max(y_values)
+
+
+def _derive_reservoir_xy_bounds(curve_wall_segments):
+    bounds_list = []
+    for segment in curve_wall_segments or ():
+        try:
+            if len(segment) != 10:
+                continue
+            boundary_kind = int(round(float(segment[0])))
+            if boundary_kind != 1:
+                continue
+            segment_bounds = _function_wall_bounds(segment)
+        except (TypeError, ValueError):
+            continue
+        if segment_bounds is not None:
+            bounds_list.append(segment_bounds)
+
+    if not bounds_list:
+        return None
+
+    return (
+        min(bounds[0] for bounds in bounds_list),
+        max(bounds[1] for bounds in bounds_list),
+        min(bounds[2] for bounds in bounds_list),
+        max(bounds[3] for bounds in bounds_list),
+    )
+
+
 def get_run_configuration(config):
     """Return the active run configuration from flat or legacy cfg layouts."""
     if config is None:
         return {}
     if "RUN_CONFIGURATION" in config:
-        return config.get("RUN_CONFIGURATION", {})
-    return config
+        run_cfg = config.get("RUN_CONFIGURATION", {})
+    else:
+        run_cfg = config
+
+    if "piston_velocity" not in run_cfg and all(
+        key in run_cfg
+        for key in (
+            "piston_velocity_x",
+            "piston_velocity_y",
+            "piston_velocity_z",
+        )
+    ):
+        run_cfg["piston_velocity"] = (
+            float(run_cfg["piston_velocity_x"]),
+            float(run_cfg["piston_velocity_y"]),
+            float(run_cfg["piston_velocity_z"]),
+        )
+
+    if "piston_enabled" not in run_cfg and "piston_velocity" in run_cfg:
+        run_cfg["piston_enabled"] = True
+
+    if (
+        "piston_x_start" not in run_cfg
+        and "piston_x_stop" not in run_cfg
+        and "curve_wall_segments" in run_cfg
+    ):
+        reservoir_bounds = _derive_reservoir_xy_bounds(
+            run_cfg.get("curve_wall_segments", ())
+        )
+        if reservoir_bounds is not None:
+            x_start, x_stop, _y_min, _y_max = reservoir_bounds
+            piston_start_offset = float(run_cfg.get("piston_start_offset", 0.0))
+            run_cfg["piston_x_start"] = x_start - piston_start_offset
+            run_cfg["piston_x_stop"] = x_stop
+
+    return run_cfg
 
 
 def get_cell_dimensions(config):

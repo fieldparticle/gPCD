@@ -1037,6 +1037,20 @@ class GenericGenData:
             )
             output.write(f"hsv_sat = {float(self.itemcfg.hsv_sat):.9f};\n")
             output.write(f"hsv_val = {float(self.itemcfg.hsv_val):.9f};\n")
+            output.write(
+                f"as_points = {1 if self.itemcfg.get('as_points', False) else 0};\n"
+            )
+            output.write(
+                "presentation_quality = "
+                f"{1 if self.itemcfg.get('presentation_quality', False) else 0};\n"
+            )
+            output.write(
+                "dynamics_diagnostics = "
+                f"{1 if self.itemcfg.get('dynamics_diagnostics', True) else 0};\n"
+            )
+            output.write(
+                f"grid_on = {1 if self.itemcfg.get('grid_on', False) else 0};\n"
+            )
 
         report_text = (
             "Function-wall particle test-file report:\n"

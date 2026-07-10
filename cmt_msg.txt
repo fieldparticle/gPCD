@@ -1,22 +1,20 @@
 Current status:
-    - Simple Python and GLSL dynamics have been reorganized around the generic function-wall model.
-    - Boundary particles now act as locality sentinels; wall geometry comes from configured function-wall segments.
-    - TestReservoir uses the generic reservoir generator path with piston metadata exported for Vulkan.
-    - Cell occupancy sizing is again controlled by cell_occupancy_list_size as the single authoritative cfg value.
-    - High-performance Python UI mode is separated from visual presentation options through dynamics_diagnostics.
-    - The remaining dynamics issue is contact compression at high crowding/small particle scale, where max-depth and timestep limits still need a better depth-range model.
+    - Python simple and reservoir dynamics now use the generic function-wall model with boundary particles as locality sentinels.
+    - TestCompressor is the active closed-end piston compression test for reproducing crowding and max-depth failures.
+    - The Python UI now has particle-diameter grid diagnostics and piston status/readout diagnostics for verifying physical scale and piston motion.
+    - Runtime cfg normalization now supports both source cfg and generated .tst piston forms.
+    - The current compressor failure is a real crowded-contact case: source 58 reaches a max-depth constraint against first target 1 after piston compression.
 
 Code Changes:
-    - Added/updated GenericGenData and GenReservoir generation paths for function-wall segments, reservoir packing, boundary sentinels, and validation reporting.
-    - Updated active cfg files to use the new function-wall curve definitions and explicit axis limits.
-    - Added generator feasibility reporting for collision timing, stiffness response, compression frame estimates, and occupancy capacity.
-    - Updated Python UI behavior so diagnostics can be disabled for faster simulation while preserving runtime error reporting.
-    - Updated simple GLSL export flow for function-wall evaluation, piston support, dead-particle handling, and post-resolution contact-step checking.
-    - Regenerated simple GLSL artifacts for TestReservoir after exporter updates.
-    - Removed override_cell_occupancy_size handling and kept cell_occupancy_list_size as the configured occupancy authority.
-    - Documented the function-wall boundary model direction and the Python-first, then Vulkan porting sequence in ProblemEvolution.
+    - Updated Python viewers to draw particle radius from the authoritative runtime Data.x field and to preserve world-unit aspect ratio.
+    - Added grid_on display support with grid spacing equal to one particle diameter.
+    - Added piston line/status diagnostics in the Python UI, including position and velocity near the first mobile particle.
+    - Normalized generated piston_velocity_x/y/z fields into piston_velocity for runtime dynamics.
+    - Derived missing piston_x_start and piston_x_stop from reservoir boundary curves when running source cfg files directly.
+    - Inferred piston_enabled from piston_velocity when the source cfg omits the explicit flag.
+    - Corrected Python piston contact so the analytic piston acts at the displayed plane instead of at an offset ghost-particle position.
 
 Next:
-    - Implement and test the depth range model: target compression depth for containment, hard compression depth for fatal error.
-    - Validate the model first in Python using TwoParticleHorizontal, a wall case, and TestReservoirPy.
-    - After Python behavior is stable, port the same depth range rules to the simple GLSL exporter and rerun TestReservoir Vulkan captures.
+    - Document the piston runtime normalization, display diagnostics, and compressor max-depth finding in ProblemEvolution after review approval.
+    - Add focused max-depth diagnostics for the failing source contact set: target ids, penetration depth, target depth, hard depth, candidate velocity, and contained velocity.
+    - Use TestCompressorPy to decide whether the depth-range model or timestep/stiffness configuration needs to change before porting piston changes to GLSL.
