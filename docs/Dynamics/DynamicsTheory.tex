@@ -208,14 +208,23 @@ containment may replace it with the accepted velocity
 The model limits observed penetration to a fraction of the source radius:
 
 \begin{equation}
-\delta_{\max}=f_{\max}r_i,
-\qquad 0<f_{\max}<1.
+\delta_{\mathrm{target}}=f_{\mathrm{target}}r_i,
+\qquad
+\delta_{\mathrm{hard}}=f_{\mathrm{hard}}r_i,
+\qquad
+0<f_{\mathrm{target}}<f_{\mathrm{hard}}<1.
 \end{equation}
 
-The present convention uses \(f_{\max}=0.5\).  A contact at or beyond this
-depth contributes a unilateral velocity constraint.  For contact normal
-\(\mathbf n_k\) and target normal velocity \(u_k\), the accepted source
-velocity must satisfy
+The target depth is the preferred containment depth.  Below this depth the
+ordinary contact force may continue to compress the contact.  At or beyond
+this depth, additional inward normal motion is blocked and the blocked
+momentum is stored as convertible internal momentum.  The hard depth is the
+fatal observed compression limit.  Penetration beyond the hard depth is an
+error.
+
+For contact normal \(\mathbf n_k\) and target normal velocity \(u_k\), a
+contact at or beyond target depth contributes the unilateral velocity
+constraint
 
 \begin{equation}
 \mathbf v_i^{n+1}\cdot\mathbf n_k\leq u_k.
@@ -245,7 +254,7 @@ penetration reserve.  With inward relative normal speed
 
 \begin{equation}
 v_{\mathrm{inward}}\Delta t
-\leq(1-f_{\max})r_i.
+\leq\delta_{\mathrm{hard}}-\delta.
 \end{equation}
 
 Violation is a timestep-resolution error and requires a smaller

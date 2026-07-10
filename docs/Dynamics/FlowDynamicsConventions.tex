@@ -137,12 +137,27 @@ generator writes both binary particle data and test metadata.
 \subsection{Current Piston Work}
 
 \texttt{piston\_start\_frame} controls when the rear plane begins moving.
-The piston starts at the minimum \(x\) extent of the packing curves, advances
-with \texttt{piston\_velocity}, and stops at the maximum \(x\) extent of the
+The piston starts at the minimum \(x\) extent of the packing curves minus
+\texttt{piston\_start\_offset}, advances with
+\texttt{piston\_velocity}, and stops at the maximum \(x\) extent of the
 packing curves.  The generator emits those derived values as
-\texttt{piston\_x\_start} and \texttt{piston\_x\_stop}.  Each active source
+\texttt{piston\_x\_start} and \texttt{piston\_x\_stop}.  When Python runs
+directly from a source cfg, runtime configuration normalization derives the
+same bounds from the reservoir curves and infers \texttt{piston\_enabled}
+from \texttt{piston\_velocity} when the explicit flag is omitted.  Generated
+test files may provide \texttt{piston\_velocity\_x/y/z}; Python normalizes
+those scalar values back into \texttt{piston\_velocity}.  Each active source
 evaluates the piston once before target scanning.  Python diagnostics report
 piston position, velocity, contact count, impulse, and momentum transfer.
+
+The active Python piston is an analytic plane at \texttt{piston\_x}.  It is
+not a ghost particle offset behind the displayed line.  Particle-piston
+penetration is evaluated from the particle edge and the plane position:
+\[
+    \delta = r - (x_{particle}-x_{piston}).
+\]
+This keeps the visual piston line, the moving-wall target velocity, and the
+physical contact plane aligned.
 
 The simple GLSL exporter now emits an optional
 \texttt{ForceDynamicsSimplePiston.glsl} include for reservoir wrappers.  This

@@ -1818,3 +1818,76 @@ Only after Python passes should the Vulkan path be changed:
 
 This keeps tomorrow's work focused: clean the model representation first,
 prove the Python wall response, then port the verified behavior to GLSL.
+
+\subsection{Compressor Piston Bring-Up}
+
+\subsubsection{previous form}
+
+The reservoir piston was present in generated metadata, but Python runtime
+configuration did not consistently see the same piston model.  Source cfg
+files provided \texttt{piston\_velocity} and
+\texttt{piston\_start\_frame}; generated test files provided
+\texttt{piston\_velocity\_x/y/z}, \texttt{piston\_x\_start}, and
+\texttt{piston\_x\_stop}.  The runtime dynamics required
+\texttt{piston\_enabled}, \texttt{piston\_velocity},
+\texttt{piston\_x\_start}, \texttt{piston\_x\_stop}, and
+\texttt{piston\_start\_frame}.  Running directly from the source cfg could
+therefore report the piston as disabled or place it at zero with zero
+velocity.
+
+The first piston contact geometry also used an offset ghost-particle
+construction.  That made the visual piston line and the physical contact
+plane disagree.  A particle could visually reach the piston before the
+dynamics treated the piston plane as physically present.
+
+\subsubsection{current form}
+
+Runtime configuration now normalizes both source cfg and generated test-file
+forms.  When scalar generated fields are present,
+\texttt{piston\_velocity\_x/y/z} are converted into the vector
+\texttt{piston\_velocity}.  When a source cfg provides
+\texttt{piston\_velocity} but omits \texttt{piston\_enabled}, the piston is
+enabled.  When source cfg files omit derived piston bounds, the runtime derives
+\texttt{piston\_x\_start} and \texttt{piston\_x\_stop} from the reservoir
+boundary curves and \texttt{piston\_start\_offset}, matching the generator.
+
+The Python piston contact is now an analytic plane contact at the displayed
+piston position.  Penetration is calculated from the particle left edge and
+the piston plane:
+\[
+    \delta = r - (x_{particle}-x_{piston}).
+\]
+A contact exists when \(\delta>0\).  This makes the white piston line,
+contact geometry, and moving-wall velocity refer to the same physical plane.
+
+The Python viewer now includes piston diagnostics.  With dynamics diagnostics
+enabled, the UI prints piston position and velocity near the first mobile
+particle.  The viewer also supports a particle-diameter grid so rendered
+radius, world scale, and dynamics radius can be checked visually.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+The closed-end \texttt{TestCompressor} case is now a useful compression test.
+With particle initial velocity set to zero, the moving piston drives a packed
+particle block into the closed downstream cap.  The first observed
+\texttt{ERROR\_MAX\_DEPTH\_CONSTRAINT} with
+\texttt{source=1, first\_wall=1} identifies the piston wall, not a stationary
+pipe wall.  The particle-particle packing did not fail first; the rigid
+piston-particle contact reached the hard compression limit first.
+
+That result is physically meaningful for the current model.  The piston is an
+infinitely rigid prescribed-motion boundary.  If it continues to advance after
+the packed particle block cannot accept more compression, the piston contact
+exceeds the configured hard penetration depth.  In this sense the wall has
+``hydraulically fractured'' before the mobile-particle chain exceeded its own
+compression limit.
+
+The next diagnostics for this path should report the full source contact set
+at failure: target IDs, wall flags, penetration depths, target depth, hard
+depth, candidate velocity, contained velocity, and blocked momentum.  That
+will separate expected compressor overpressure from mistakes in the
+source-owned constraint projection.

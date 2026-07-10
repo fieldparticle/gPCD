@@ -3,7 +3,7 @@ Current status:
     - TestCompressor is the active closed-end piston compression test for reproducing crowding and max-depth failures.
     - The Python UI now has particle-diameter grid diagnostics and piston status/readout diagnostics for verifying physical scale and piston motion.
     - Runtime cfg normalization now supports both source cfg and generated .tst piston forms.
-    - The current compressor failure is a real crowded-contact case: source 58 reaches a max-depth constraint against first target 1 after piston compression.
+    - The current compressor failure is understood as rigid piston overcompression: source 1 reaches max-depth constraint against piston wall 1 before particle-particle compression fails.
 
 Code Changes:
     - Updated Python viewers to draw particle radius from the authoritative runtime Data.x field and to preserve world-unit aspect ratio.
@@ -13,8 +13,8 @@ Code Changes:
     - Derived missing piston_x_start and piston_x_stop from reservoir boundary curves when running source cfg files directly.
     - Inferred piston_enabled from piston_velocity when the source cfg omits the explicit flag.
     - Corrected Python piston contact so the analytic piston acts at the displayed plane instead of at an offset ghost-particle position.
+    - Documented piston runtime normalization, plane-contact behavior, UI scale diagnostics, and the compressor max-depth finding.
+    - Updated dynamics theory to distinguish target containment depth from hard fatal compression depth.
 
 Next:
-    - Document the piston runtime normalization, display diagnostics, and compressor max-depth finding in ProblemEvolution after review approval.
-    - Add focused max-depth diagnostics for the failing source contact set: target ids, penetration depth, target depth, hard depth, candidate velocity, and contained velocity.
-    - Use TestCompressorPy to decide whether the depth-range model or timestep/stiffness configuration needs to change before porting piston changes to GLSL.
+    - CD nozzle.
