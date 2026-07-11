@@ -309,6 +309,14 @@ class GenericGenData:
         min_compression_frames = float(
             self.itemcfg.get("min_compression_frames", 3.0)
         )
+        compression_stiffness_gain = max(
+            0.0,
+            float(self.itemcfg.get("compression_stiffness_gain", 0.0)),
+        )
+        compression_stiffness_power = max(
+            0.0,
+            float(self.itemcfg.get("compression_stiffness_power", 2.0)),
+        )
         reports = []
 
         lines = [
@@ -384,8 +392,30 @@ class GenericGenData:
                     source["collision_stiffness_q"],
                     target["collision_stiffness_q"],
                 )
+                if (
+                    compression_stiffness_gain > 0.0
+                    and hard_penetration_depth > 0.0
+                ):
+                    target_compression_fraction = max(
+                        0.0,
+                        min(1.0, target_penetration_depth / hard_penetration_depth),
+                    )
+                    hard_compression_fraction = 1.0
+                    effective_stiffness_at_target = stiffness_at_contact * (
+                        1.0
+                        + compression_stiffness_gain
+                        * (target_compression_fraction ** compression_stiffness_power)
+                    )
+                    effective_stiffness_at_hard = stiffness_at_contact * (
+                        1.0
+                        + compression_stiffness_gain
+                        * (hard_compression_fraction ** compression_stiffness_power)
+                    )
+                else:
+                    effective_stiffness_at_target = stiffness_at_contact
+                    effective_stiffness_at_hard = stiffness_at_contact
                 force_at_target_depth = (
-                    stiffness_at_contact * target_penetration_depth
+                    effective_stiffness_at_target * target_penetration_depth
                 )
                 source_dv_per_frame_at_max = (
                     force_at_target_depth / source["mass"]
@@ -468,6 +498,14 @@ class GenericGenData:
                         f"{time_to_hard_depth:.6f}",
                         "  stiffness at contact: "
                         f"{stiffness_at_contact:.6f}",
+                        "  compression stiffness gain: "
+                        f"{compression_stiffness_gain:.6f}",
+                        "  compression stiffness power: "
+                        f"{compression_stiffness_power:.6f}",
+                        "  effective stiffness at target depth: "
+                        f"{effective_stiffness_at_target:.6f}",
+                        "  effective stiffness at hard depth: "
+                        f"{effective_stiffness_at_hard:.6f}",
                         "  force at target depth: "
                         f"{force_at_target_depth:.6f}",
                         "  source dv/frame at max: "
@@ -504,6 +542,10 @@ class GenericGenData:
                         "frames_to_hard_depth": frames_to_hard_depth,
                         "time_to_hard_depth": time_to_hard_depth,
                         "stiffness_at_contact": stiffness_at_contact,
+                        "compression_stiffness_gain": compression_stiffness_gain,
+                        "compression_stiffness_power": compression_stiffness_power,
+                        "effective_stiffness_at_target": effective_stiffness_at_target,
+                        "effective_stiffness_at_hard": effective_stiffness_at_hard,
                         "force_at_target_depth": force_at_target_depth,
                         "source_dv_per_frame_at_max": source_dv_per_frame_at_max,
                         "target_dv_per_frame_at_max": target_dv_per_frame_at_max,
@@ -1045,6 +1087,14 @@ class GenericGenData:
             output.write(");\n")
 
             output.write(f"wall_contact_offset = {self.wall_contact_offset:.9f};\n")
+            output.write(
+                "compression_stiffness_gain = "
+                f"{float(self.itemcfg.get('compression_stiffness_gain', 0.0)):.9f};\n"
+            )
+            output.write(
+                "compression_stiffness_power = "
+                f"{float(self.itemcfg.get('compression_stiffness_power', 2.0)):.9f};\n"
+            )
             output.write(f"DT = {self.dt:.9f};\n")
             output.write(
                 "contact_force_measure = "

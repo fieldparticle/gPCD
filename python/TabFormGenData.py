@@ -644,7 +644,8 @@ class TabGenData(QTabWidget):
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleAngled.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TestCompressor.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/CDNozzle.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TestReservoir.cfg")
+        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/CDNozzle.cfg")
         self.update_list_widget()
         self.update_data_list_widget()
         

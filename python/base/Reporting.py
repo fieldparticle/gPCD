@@ -323,6 +323,8 @@ class Reporting:
         contact_diagnostic_columns = [
             "raw_impulse",
             "force_magnitude",
+            "base_stiffness_q",
+            "effective_stiffness_q",
             "contact_potential_energy",
             "source_radius",
             "target_radius",
@@ -485,6 +487,8 @@ class Reporting:
                             self.csv_number(contact.aux.w),
                             self.csv_number(getattr(contact, "raw_impulse", 0.0)),
                             self.csv_number(getattr(contact, "force_magnitude", 0.0)),
+                            self.csv_number(getattr(contact, "base_stiffness_q", 0.0)),
+                            self.csv_number(getattr(contact, "effective_stiffness_q", 0.0)),
                             self.csv_number(getattr(contact, "contact_potential_energy", 0.0)),
                             self.csv_number(getattr(contact, "source_radius", 0.0)),
                             self.csv_number(getattr(contact, "target_radius", 0.0)),

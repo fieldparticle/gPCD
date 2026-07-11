@@ -179,7 +179,11 @@ class ForceDynamics(ForceContactDynamics):
         dt = max(0.0, float(self.ShaderFlags.dt))
         target_id = int(contact_state.ids.x)
         contact_type = int(contact_state.ids.y)
-        stiffness = self.GetContactStiffness(SourceID, target_id, contact_type)
+        stiffness = getattr(
+            contact_state,
+            "effective_stiffness_q",
+            self.GetContactStiffness(SourceID, target_id, contact_type),
+        )
         source_radius = float(getattr(contact_state, "source_radius", source.Data.x))
         target_radius = float(
             getattr(

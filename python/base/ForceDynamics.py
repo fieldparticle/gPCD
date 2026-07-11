@@ -828,21 +828,66 @@ class ForceContactDynamics:
         """Calculate one contact force and add it to source-local totalForce."""
         TargetID = int(contact_state.ids.x)
         contact_type = int(contact_state.ids.y)
-        pair_stiffness = self.GetContactStiffness(
+        base_stiffness = self.GetContactStiffness(
             SourceID,
             TargetID,
             contact_type,
         )
+        penetration_depth = max(0.0, float(contact_state.aux.y))
+        pair_stiffness = self.GetEffectiveContactStiffness(
+            base_stiffness,
+            penetration_depth,
+            float(getattr(contact_state, "source_radius", 0.0)),
+        )
         if self.contact_force_measure == "depth":
-            contact_measure = float(contact_state.aux.y)
+            contact_measure = penetration_depth
         else:
             contact_measure = float(contact_state.geom.w)
         force_magnitude = pair_stiffness * max(0.0, contact_measure)
+        contact_state.base_stiffness_q = base_stiffness
+        contact_state.effective_stiffness_q = pair_stiffness
         contact_state.force_magnitude = force_magnitude
         totalForce.x -= force_magnitude * float(contact_state.geom.x)
         totalForce.y -= force_magnitude * float(contact_state.geom.y)
         totalForce.z -= force_magnitude * float(contact_state.geom.z)
         return True
+
+    def GetCompressionStiffnessGain(self):
+        """Return the dimensionless near-hard-depth stiffness gain."""
+        return max(
+            0.0,
+            float(self.run_configuration.get("compression_stiffness_gain", 0.0)),
+        )
+
+    def GetCompressionStiffnessPower(self):
+        """Return the exponent used by the depth-dependent stiffness curve."""
+        return max(
+            0.0,
+            float(self.run_configuration.get("compression_stiffness_power", 2.0)),
+        )
+
+    def GetEffectiveContactStiffness(
+        self,
+        base_stiffness,
+        penetration_depth,
+        source_radius,
+    ):
+        """Return reversible depth-dependent stiffness for one contact."""
+        base_stiffness = max(0.0, float(base_stiffness))
+        gain = self.GetCompressionStiffnessGain()
+        if gain <= 0.0:
+            return base_stiffness
+
+        hard_depth = self.GetHardPenetrationDepth(source_radius)
+        if hard_depth <= self.EPSILON:
+            return base_stiffness
+
+        compression_fraction = max(
+            0.0,
+            min(1.0, float(penetration_depth) / hard_depth),
+        )
+        power = self.GetCompressionStiffnessPower()
+        return base_stiffness * (1.0 + gain * (compression_fraction ** power))
 
     def GetPairStiffness(self, SourceID, TargetID):
         """Return the nonnegative mean particle-owned stiffness for a contact."""

@@ -83,4 +83,4 @@ curve_wall_segments = (
 study 		= false;
 num_studies = 0;
 
-output_file_prefix = "sub_BPRPVk_MediumPacking";
+output_file_prefix = "TestReservoir_MediumPacking";

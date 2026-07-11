@@ -2124,3 +2124,30 @@ from blocked maximum-depth motion.  Ordinary contact force changes velocity
 through \(F\Delta t\).  Maximum-depth containment should only remove illegal
 inward motion that would exceed the configured hard limit; it should not
 become the main material stiffness.
+
+\subsubsection{implementation result}
+
+The depth-dependent stiffness law was added first to the Python dynamics and
+then exported into the shared simple GLSL family.  Testing
+\texttt{TestReservoir} showed a large stability improvement, which supports
+the diagnosis that constant \texttt{collision\_stiffness\_q} was too weak for
+dense reservoir compression.
+
+This is an important result because the improvement was made in the common
+contact-force path rather than in a reservoir-specific special case.  The same
+law applies to particle-particle contacts, function-wall contacts, and piston
+contacts when they pass through the simple dynamics contact-force path.
+
+\subsubsection{remaining synchronization}
+
+The GLSL implementation currently uses fallback preprocessor defaults for the
+new material shape:
+\begin{verbatim}
+FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN  = 8.0
+FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER = 2.0
+\end{verbatim}
+These values match the successful test direction, but they should not remain
+hardcoded.  The next cleanup is to export
+\texttt{compression\_stiffness\_gain} and
+\texttt{compression\_stiffness\_power} from the configuration into generated
+local GLSL so Python and Vulkan cannot drift.

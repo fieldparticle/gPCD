@@ -186,6 +186,12 @@ const float MAXIMUM_DEPTH_SOLVER_EPSILON = 1.0e-6;
 const float FORCE_DYNAMICS_PI = 3.1415926535897932384626433832795;
 const float TARGET_PENETRATION_FRACTION = 0.5;
 const float HARD_PENETRATION_FRACTION = 0.75;
+#ifndef FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN
+#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN 8.0
+#endif
+#ifndef FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER
+#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER 2.0
+#endif
 const uint CONTACT_PARTICLE = 1u;
 const uint CONTACT_WALL = 2u;
 const uint CONTACT_ACTIVE_THIS_FRAME = 1u;
@@ -388,6 +394,10 @@ float GetParticleMass(uint ParticleID)
     return max(P[ParticleID].parms.x, EPSILON);
 }}
 
+float GetContactTargetDepth(float sourceRadius);
+float GetContactHardDepth(float sourceRadius);
+float GetContactRemainingDepth(float sourceRadius, float penetrationDepth);
+
 float GetPairStiffness(uint SourceID, uint TargetID)
 {{
     return max(0.0, 0.5 * (P[SourceID].Data.y + P[TargetID].Data.y));
@@ -399,6 +409,36 @@ float GetContactStiffness(uint SourceID, uint TargetID, uint contactType)
         return max(0.0, P[SourceID].Data.y);
     }}
     return GetPairStiffness(SourceID, TargetID);
+}}
+
+float GetCompressionStiffnessGain()
+{{
+    return max(0.0, FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN);
+}}
+
+float GetCompressionStiffnessPower()
+{{
+    return max(0.0, FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER);
+}}
+
+float GetEffectiveContactStiffness(
+    float baseStiffness, float penetrationDepth, float sourceRadius)
+{{
+    float stiffness = max(0.0, baseStiffness);
+    float gain = GetCompressionStiffnessGain();
+    if (stiffness <= 0.0 || gain <= 0.0) {{
+        return stiffness;
+    }}
+
+    float hardDepth = GetContactHardDepth(sourceRadius);
+    if (hardDepth <= EPSILON) {{
+        return stiffness;
+    }}
+
+    float compressionFraction = clamp(
+        penetrationDepth / hardDepth, 0.0, 1.0);
+    return stiffness * (
+        1.0 + gain * pow(compressionFraction, GetCompressionStiffnessPower()));
 }}
 
 float WallContactOffsetDistance(float radius)
@@ -427,10 +467,6 @@ ParticleGeometry GetParticleGeometry(uint SourceID, uint TargetID)
     return ParticleGeometry(normal, overlapArea, centerDistance,
         sourceRadius, targetRadius, true);
 }}
-
-float GetContactTargetDepth(float sourceRadius);
-float GetContactHardDepth(float sourceRadius);
-float GetContactRemainingDepth(float sourceRadius, float penetrationDepth);
 
 bool CheckPenetrationStepResolution(
     uint SourceID, vec3 normal, float sourceRadius, vec3 targetVelocity)
@@ -677,8 +713,12 @@ bool AccumulateContactForce(
     uint SourceID, ContactForceInput contact, inout vec3 totalForce)
 {{
     if (!contact.valid) {{ return true; }}
-    float stiffness = GetContactStiffness(
+    float baseStiffness = GetContactStiffness(
         SourceID, contact.targetID, contact.contactType);
+    float stiffness = GetEffectiveContactStiffness(
+        baseStiffness,
+        max(0.0, contact.penetrationDepth),
+        P[SourceID].Data.x);
     float forceMagnitude = stiffness * max(0.0, contact.penetrationDepth);
     totalForce -= forceMagnitude * contact.normal;
     P[SourceID].colFlg = 1u;

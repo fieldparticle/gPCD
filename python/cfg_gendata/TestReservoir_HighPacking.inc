@@ -83,4 +83,4 @@ curve_wall_segments = (
 study 		= false;
 num_studies = 0;
 
-output_file_prefix = "TestReservoirVk";
+output_file_prefix = "TestReservoir_HighPacking";

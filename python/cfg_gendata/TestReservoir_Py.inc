@@ -78,4 +78,4 @@ hard_penetration_fraction = 0.75;
 study 					= false;
 num_studies 			= 0;
 
-output_file_prefix 		= "TestReservoirPy";
+output_file_prefix 		= "TestReservoir_Py";
