@@ -129,7 +129,7 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 			if (QuitEvent)
 			{
 				VulkanWin->m_quit_event = 1;
-				return 0;
+				return VulkanWin->m_quit_event;
 			};
 
 			if (VulkanWin->m_quit_event > 1)
@@ -151,6 +151,15 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 
 			// Draw the frame.
 			DrawInstance->DrawFrame();
+
+			if(VulkanWin->m_quit_event > 0)
+			{
+				std::ostringstream out_file;
+				out_file << cap_prfx.str() << "_" << VulkanWin->m_FrameNumber-1.0 << ".cap";
+				DrawInstance->CaptureFrame(out_file.str());
+				return VulkanWin->m_quit_event;
+			}
+
 
 			// is true capture this frame
 			if (G_ExportFrame == true && auto_cap_frames == false)
@@ -289,11 +298,11 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 			// Sleep if frame_delay is set
 			if(doAuto != true)
 				Sleep(frameDelay);
-			vkDeviceWaitIdle(VulkanWin->GetLogicalDevice());
+			//vkDeviceWaitIdle(VulkanWin->GetLogicalDevice());
 			
 		}
 
-		vkDeviceWaitIdle(VulkanWin->GetLogicalDevice());
+		//vkDeviceWaitIdle(VulkanWin->GetLogicalDevice());
 		
 	}
 	catch (const std::exception& e)

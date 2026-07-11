@@ -146,7 +146,8 @@ void DrawParticleBoundary::DrawFrame()
 			m_Computelst[ii]->PullMem(currentBuffer);
 		}
 		
-
+		if (Extflg == true)
+			return;
 		//########################################### Graphics ##########################################################
 		//=========================================================
 		// Wait for graphics fences
@@ -275,7 +276,8 @@ void DrawParticleBoundary::DrawFrame()
 		{
 			m_Graphicslst[ii]->PullMem(currentBuffer);
 		}
-
+		if (Extflg == true)
+			return;
 		// Wait for complettion of rendering then pick up the completed frame buffer 
 		// and send to presentation device.
 		VkSwapchainKHR swapChains[] = { m_SCO->m_SwapChain };

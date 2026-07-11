@@ -346,6 +346,18 @@ class GenericGenData:
                 hard_penetration_depth = (
                     hard_penetration_fraction * source["radius"]
                 )
+                if target_penetration_depth > 0.0:
+                    target_depth_step_fraction = (
+                        per_frame_closing_distance / target_penetration_depth
+                    )
+                else:
+                    target_depth_step_fraction = math.inf
+                if hard_penetration_depth > 0.0:
+                    hard_depth_step_fraction = (
+                        per_frame_closing_distance / hard_penetration_depth
+                    )
+                else:
+                    hard_depth_step_fraction = math.inf
 
                 if initial_gap <= 0.0:
                     frames_to_first_contact = 0.0
@@ -442,6 +454,10 @@ class GenericGenData:
                         f"{target_penetration_depth:.6f}",
                         "  hard penetration depth: "
                         f"{hard_penetration_depth:.6f}",
+                        "  target-depth step fraction: "
+                        f"{target_depth_step_fraction:.6f}",
+                        "  hard-depth step fraction: "
+                        f"{hard_depth_step_fraction:.6f}",
                         "  frames from contact to target depth: "
                         f"{frames_to_target_depth:.3f}",
                         "  time from contact to target depth: "
@@ -481,6 +497,8 @@ class GenericGenData:
                         "time_to_first_contact": time_to_first_contact,
                         "target_penetration_depth": target_penetration_depth,
                         "hard_penetration_depth": hard_penetration_depth,
+                        "target_depth_step_fraction": target_depth_step_fraction,
+                        "hard_depth_step_fraction": hard_depth_step_fraction,
                         "frames_to_target_depth": frames_to_target_depth,
                         "time_to_target_depth": time_to_target_depth,
                         "frames_to_hard_depth": frames_to_hard_depth,

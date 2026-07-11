@@ -68,7 +68,7 @@ BoundaryWallSegment EvaluatePistonWall(uint SourceID)
     return BoundaryWallSegment(normal, overlapArea, centerDistance, 1u, true);
 }
 
-// Python source: ForceDynamics.py:351
+// Python source: ForceDynamics.py:346
 bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
 {
     if (!PistonEnabled()) { return true; }
@@ -124,6 +124,26 @@ bool CheckResolvedPistonContactStep(uint SourceID)
         sourceRadius,
         segment.centerDistance);
     return CheckResolvedContactStep(
+        SourceID,
+        segment.normal,
+        penetrationDepth,
+        sourceRadius,
+        GetPistonVelocity(uint(ShaderFlags.frameNum)));
+}
+
+bool RegisterResolvedPistonContactStep(uint SourceID)
+{
+    if (!PistonEnabled()) { return true; }
+
+    BoundaryWallSegment segment = EvaluatePistonWall(SourceID);
+    if (!segment.valid) { return true; }
+
+    float sourceRadius = P[SourceID].Data.x;
+    float penetrationDepth = ParticlePenetrationDepth(
+        sourceRadius,
+        sourceRadius,
+        segment.centerDistance);
+    return RegisterContactStepConstraint(
         SourceID,
         segment.normal,
         penetrationDepth,

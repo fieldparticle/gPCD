@@ -1571,7 +1571,7 @@ GLSL family:
 \begin{itemize}
     \item \texttt{ForceDynamicsSimple.glsl};
     \item \texttt{ForceDynamicsSimpleBoundaryParticle.glsl};
-    \item \texttt{ForceDynamicsSimpleParametricWall.glsl};
+    \item \texttt{ForceDynamicsSimpleFunctionWall.glsl};
     \item \texttt{TestPythonBoundarySpheresP.comp}.
 \end{itemize}
 
@@ -1891,3 +1891,236 @@ at failure: target IDs, wall flags, penetration depths, target depth, hard
 depth, candidate velocity, contained velocity, and blocked momentum.  That
 will separate expected compressor overpressure from mistakes in the
 source-owned constraint projection.
+
+\subsection{Compressor Overcompression Feasibility}
+
+\subsubsection{previous form}
+
+The compressor test could report
+\texttt{ERROR\_MAX\_DEPTH\_CONSTRAINT} or
+\texttt{ERROR\_PENETRATION\_STEP\_TOO\_LARGE} after many particles had
+entered simultaneous contact from the piston to the closed pipe exit.  The
+first failing particle was not necessarily at the piston, which made the
+failure look like a random downstream shader or projection error.  The
+generator reported kinematic contact timing, but it did not directly state
+how much of the available compression depth a single timestep could consume.
+
+The GLSL error detail also used the same subcode for every failed
+maximum-depth projection.  A capture could identify the source particle, but
+not whether the failed projection happened immediately after the force-driven
+velocity or after the later post-resolution remaining-depth constraints were
+registered.
+
+\subsubsection{current form}
+
+The compressor test is now interpreted as a dense-contact feasibility test.
+When nearly every particle is in contact, the piston is the load source but
+the first impossible local constraint may appear anywhere in the packed
+column.  Successful runs obtained by increasing particle radius and reducing
+surface separation show that the failure is sensitive to configuration scale:
+particle radius controls allowed penetration depth, while piston speed and
+\(\Delta t\) control the per-frame closing distance.
+
+The generator reports explicit overcompression ratios:
+\[
+    \frac{v_c\Delta t}{\delta_{\mathrm{target}}}
+    \qquad\mathrm{and}\qquad
+    \frac{v_c\Delta t}{\delta_{\mathrm{hard}}}.
+\]
+For simple particle cases \(v_c\) is the relative normal particle speed.  For
+reservoir and compressor cases it is the piston normal speed.  These ratios
+make it visible when a configuration is asking one frame to consume too much
+of the available compression depth.
+
+The simple GLSL exporter now labels the two max-depth projection phases:
+\begin{itemize}
+    \item \texttt{Sub:9401}: first projection after force velocity;
+    \item \texttt{Sub:9402}: second projection after post-resolution
+          remaining-depth constraints.
+\end{itemize}
+Existing detail codes remain for hard-depth violation, invalid normals,
+constraint overflow, and unstable projection.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+The model is behaving differently in sparse gas-like collision and dense
+liquid-like compression.  Sparse contacts can be judged by pair timing and
+stiffness response.  Dense compressor loading must also be judged by the
+ratio between per-frame displacement and available compression depth.  A run
+that fails after the whole chamber is collision-saturated is not necessarily
+showing a broken piston or a bad wall; it may be showing that the selected
+radius, spacing, piston speed, and timestep have formed an overcompressed
+packed column.
+
+The next implementation work is not to hide this condition.  The correct
+next step is to use the new ratios and GLSL subcodes to separate three cases:
+configuration overcompression, timestep-resolution failure, and true
+projection bugs in the source-owned multi-contact solver.
+
+\subsection{Vulkan Frame Pacing and Contact Workload}
+
+\subsubsection{previous form}
+
+The CD-nozzle and reservoir Vulkan runs were interpreted mainly through
+dynamics errors such as \texttt{ERROR\_MAX\_DEPTH\_CONSTRAINT},
+\texttt{ERROR\_PENETRATION\_STEP\_TOO\_LARGE}, and
+\texttt{ERROR\_WALL\_TUNNELING}.  When the visual frame rate hesitated or
+jerked, the first suspicion was the Python viewer, the HSV display, or the
+particle renderer.  That explanation did not apply to the Vulkan run.
+
+The Vulkan particle-cell occupancy path uses a graphics pass to rebuild the
+cell lists.  \texttt{CommandParticleGraphics.cpp} clears both the collision
+index buffer and the lock/count buffer with \texttt{vkCmdFillBuffer}, then
+the vertex shader repopulates them:
+\begin{verbatim}
+slot = atomicAdd(L[sltidx], 1);
+clink[sltidx].idx[slot] = index;
+\end{verbatim}
+The compute shader then scans \texttt{clink[loc].idx[slot]} until it reaches
+particle ID zero.  Particle ID zero is the null particle, so zero is the
+correct empty sentinel for occupancy slots.
+
+\subsubsection{current form}
+
+The zero convention has two separate domains:
+\begin{itemize}
+    \item particle ID zero means an empty occupancy slot;
+    \item cell location zero is a valid cell unless the indexer is changed to
+          reserve it.
+\end{itemize}
+Therefore \texttt{CornerList.ploc} must continue to use \texttt{npos} as its
+empty-cell sentinel.  Clearing corner locations to zero would make unused
+corners look like valid cell zero and would cause compute to scan cell zero
+for non-existent corners.
+
+The major Vulkan frame-pacing contributors are now understood as workload
+and synchronization issues:
+\begin{itemize}
+    \item the main loop calls \texttt{vkDeviceWaitIdle()} every frame, so
+          variable GPU work becomes visible as CPU-side frame pacing jitter;
+    \item capture/readback paths call \texttt{vkQueueWaitIdle()}, map a
+          staging buffer, and write a capture file, so capture frames are
+          expected to stall;
+    \item dense compression increases the number of occupied cell slots
+          visited by each source;
+    \item the generated compute wrapper currently performs two occupancy
+          scans per source, one for force accumulation and one for
+          post-resolution remaining-depth constraints;
+    \item the duplicate-target array is sized from
+          \texttt{MAX\_CELL\_OCCUPANY * 8} and initialized twice per source,
+          so oversized cell occupancy increases fixed per-source work even
+          when zero termination is correct.
+\end{itemize}
+
+Lowering \texttt{MAX\_CELL\_OCCUPANY} improved frame pacing because it reduced
+both the maximum scan depth and the duplicate-list initialization size.  This
+does not change the physical model, but it makes clear that the generator
+should choose the smallest safe occupancy capacity and report why that value
+is required.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+The current Vulkan hitches are not evidence by themselves that wall geometry
+or collision response is wrong.  They are partly a scheduling and capacity
+problem.  The first cleanup is to preserve the existing sentinel convention:
+zero for empty particle slots, \texttt{npos} for empty cell references.  The
+next Vulkan cleanup is to remove unnecessary whole-device waits from ordinary
+frame pacing and to replace the second contact scan with source-local contact
+records captured during the first scan.
+
+The intended compute schedule is:
+\begin{verbatim}
+scan local occupancy once
+build compact source-owned contact records
+accumulate force from those records
+calculate candidate velocity
+apply maximum-depth projection from those records
+check post-resolution remaining depth from those records
+move the source
+\end{verbatim}
+If the source-owned contact record list overflows, that is a real dynamics
+error, not a reason to rediscover the same contacts through a second broad
+scan.
+
+\subsection{Depth-Dependent Contact Stiffness}
+
+\subsubsection{previous form}
+
+The active contact law used a constant \texttt{collision\_stiffness\_q}.
+Contact force in depth mode was proportional to current penetration depth:
+\[
+    F = q\,\delta .
+\]
+This works for sparse two-particle collisions because there is usually one
+dominant contact and enough open space for ordinary force integration to slow,
+stop, and reverse the particles.
+
+In dense compressor and CD-nozzle runs, the same constant stiffness must
+resist a collective pressure field.  Many particles can be in simultaneous
+contact from the piston to the pipe exit.  The force law remains modest even
+as individual contacts approach the configured hard penetration depth.
+Maximum-depth containment then becomes the first strong resistance instead of
+the last safety limit.
+
+\subsubsection{current form}
+
+The approved direction is to keep the same momentum-governed dynamics and
+replace constant stiffness with a reversible depth-dependent stiffness.  No
+energy variable is added to the dynamic state.  Energy may remain a diagnostic
+or a design guide, but the runtime state remains position, velocity, force,
+and existing contact/momentum diagnostics.
+
+The proposed form is:
+\[
+    x = \mathrm{clamp}
+        \left(\frac{\delta}{\delta_{\mathrm{hard}}},0,1\right),
+\]
+\[
+    q_{\mathrm{eff}} =
+        q_{\mathrm{base}}
+        \left(1 + g x^p\right),
+\]
+\[
+    F = q_{\mathrm{eff}}\delta .
+\]
+Here \(q_{\mathrm{base}}\) is the existing contact stiffness, \(g\) is the
+compression gain, and \(p\) controls how sharply resistance rises near hard
+compression.
+
+The same force curve is used while compressing and while releasing.  The
+force depends on current physical penetration, not on whether the contact is
+moving inward or outward.  The impulse generated by this force over time
+naturally slows, stops, and reverses the particles.  There is no separate
+stored energy or manual force payback.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+Depth-dependent stiffness fits the intended particle interpretation: contact
+is soft at first, but resistance rises as the remaining compressible depth is
+consumed.  This should reduce dependence on the hard maximum-depth projection
+as the first meaningful pressure response in dense flow.
+
+Momentum consistency still comes from symmetric force evaluation.  For
+particle-particle contacts, both source invocations must evaluate the same
+frame-start geometry and the same scalar force law with opposite normals.  For
+stationary walls and prescribed pistons, the equal-and-opposite momentum
+belongs to the external boundary system.  Piston and wall impulse reporting
+remains the correct diagnostic for those external reactions.
+
+The important cleanup is to distinguish ordinary reversible contact force
+from blocked maximum-depth motion.  Ordinary contact force changes velocity
+through \(F\Delta t\).  Maximum-depth containment should only remove illegal
+inward motion that would exceed the configured hard limit; it should not
+become the main material stiffness.

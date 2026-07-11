@@ -40,9 +40,9 @@ void CommandParticleCompute::Create(SwapChainObj* SCO,
 {
 	CommandObj::Create(SCO,FBO,RPO,RCO,PLO);
 
-	m_dkx = CfgTst->GetInt("dispatchx", true);
-	m_dky = CfgTst->GetInt("dispatchy", true);
-	m_dkz = CfgTst->GetInt("dispatchz", true);
+	m_dkx = CfgTst->GetInt("workGroupsx", true);
+	m_dky = CfgTst->GetInt("workGroupsy", true);
+	m_dkz = CfgTst->GetInt("workGroupsz", true);
 
 }
 //
@@ -58,13 +58,15 @@ void CommandParticleCompute::RecordCommands(uint32_t imageIndex, uint32_t curren
 	if (vkBeginCommandBuffer(m_CommandBuffers[currentBuffer], &beginInfo) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to vkBeginCommandBuffer Compute Command Buffer.");
 	}
+	
+#if 0 // Both are cleared in graphics
 	Resource* lockMem = (m_RCO->GetResourceName("CollisionLockImage"));
 	vkCmdFillBuffer(m_CommandBuffers[currentBuffer],
 		lockMem->m_Buffers[0],
 		0,
 		lockMem->m_BufSize,
 		0);
-
+#endif
 	//vkResetQueryPool(m_App->GetLogicalDevice(), m_PerfQueryPool, 0, 4);
 	vkCmdBindPipeline(m_CommandBuffers[currentBuffer],
 		VK_PIPELINE_BIND_POINT_COMPUTE, m_PLO[0]->m_Pipeline);
@@ -101,10 +103,12 @@ void CommandParticleCompute::RecordCommands(uint32_t imageIndex, uint32_t curren
 
 		vkCmdWriteTimestamp(m_CommandBuffers[currentBuffer],
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_PerfQueryPool, 0);
-		uint64_t vnum = dvo->m_NumElements;
+		
 	}
-
-	vkCmdDispatch(m_CommandBuffers[currentBuffer], m_dkx, m_dky, m_dkz);
+	uint64_t vnum = dvo->m_NumElements;
+	uint32_t workgroupCount =
+    (vnum + m_dkx - 1) / m_dkx;
+	vkCmdDispatch(m_CommandBuffers[currentBuffer], workgroupCount, m_dky, m_dkz);
 	
 	if (trace_on_flag == true)
 	{

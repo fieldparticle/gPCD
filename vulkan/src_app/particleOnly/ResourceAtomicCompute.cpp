@@ -142,6 +142,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 			Extflg = true;
 			objtxt << " ResourceAtomicCompute::ERROR_INVALID_DT "
 				<< m_collisionStruct.ErrorNumber 
+				<< " Sub:" << m_collisionStruct.holdPidx
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
 				<< " pnum:" << m_collisionStruct.ParticleNumber
@@ -156,6 +157,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 			Extflg = true;
 			objtxt << " ResourceAtomicCompute::ERROR_CONTACT_LIST_MISSING "
 				<< m_collisionStruct.ErrorNumber 
+				<< " Sub:" << m_collisionStruct.holdPidx
 				<< " frame:" 
 				<< m_collisionStruct.FrameNumber
 				<< " pnum:" << m_collisionStruct.ParticleNumber
@@ -169,6 +171,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 			Extflg = true;
 			objtxt << " ResourceAtomicCompute:ERROR_PARTICLE_OUT_OF_BOUNDS:"
 				<< m_collisionStruct.ErrorNumber 
+				<< " Sub:" << m_collisionStruct.holdPidx
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
 				<< " pnum:" << m_collisionStruct.ParticleNumber
@@ -183,6 +186,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 			Extflg = true;
 			objtxt << " ResourceAtomicCompute:ERROR_PARTICLE_TUNNELING "
 				<< m_collisionStruct.ErrorNumber 
+				<< " Sub:" << m_collisionStruct.holdPidx
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
 				<< " pnum:" << m_collisionStruct.ParticleNumber
@@ -197,6 +201,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 			Extflg = true;
 			objtxt << " ResourceAtomicCompute:ERROR_WALL_TUNNELING "
 				<< m_collisionStruct.ErrorNumber 
+				<< " Sub:" << m_collisionStruct.holdPidx
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
 				<< " pnum:" << m_collisionStruct.ParticleNumber
@@ -211,6 +216,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 			Extflg = true;
 			objtxt << " ResourceAtomicCompute:ERROR_MAX_DEPTH_CONSTRAINT "
 				<< m_collisionStruct.ErrorNumber 
+				<< " Sub:" << m_collisionStruct.holdPidx
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
 				<< " pnum:" << m_collisionStruct.ParticleNumber
@@ -225,6 +231,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 			Extflg = true;
 			objtxt << " ResourceAtomicCompute:ERROR_PENETRATION_STEP_TOO_LARGE "
 				<< m_collisionStruct.ErrorNumber 
+				<< " Sub:" << m_collisionStruct.holdPidx
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
 				<< " pnum:" << m_collisionStruct.ParticleNumber
@@ -239,6 +246,7 @@ void ResourceAtomicCompute::PullMem(uint32_t currentBuffer)
 			Extflg = true;
 			objtxt << " ResourceAtomicCompute:Undefined Error: "
 				<< m_collisionStruct.ErrorNumber 
+				<< " Sub:" << m_collisionStruct.holdPidx
 				<< " frame:"
 				<< m_collisionStruct.FrameNumber
 				<< " pnum:" << m_collisionStruct.ParticleNumber

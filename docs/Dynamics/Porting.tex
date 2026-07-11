@@ -40,7 +40,7 @@ functions.  The generated scenario compute shader owns contact discovery by
 scanning source corner cells, deduplicating target IDs discovered through
 multiple occupied cells, and calling the generated simple functions in the
 approved order.  There is no wrapper-level wall-model decision in the simple
-path: boundary-marker targets always mean parametric-wall locality.
+path: boundary-marker targets always mean function-wall locality.
 
 \subsection{Generated Files}
 
@@ -48,7 +48,7 @@ The new simple generated files are:
 \begin{itemize}
     \item \texttt{ForceDynamicsSimple.glsl};
     \item \texttt{ForceDynamicsSimpleBoundaryParticle.glsl};
-    \item \texttt{ForceDynamicsSimpleParametricWall.glsl};
+    \item \texttt{ForceDynamicsSimpleFunctionWall.glsl};
     \item \texttt{ForceDynamicsSimplePiston.glsl};
     \item \texttt{TestPythonBoundarySpheresP.comp}.
 \end{itemize}

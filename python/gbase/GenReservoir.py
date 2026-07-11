@@ -447,6 +447,18 @@ class GenReservoir(GenericGenData):
         per_frame_closing_distance = piston_normal_speed * self.dt
         target_penetration_depth = target_penetration_fraction * self.radius
         hard_penetration_depth = hard_penetration_fraction * self.radius
+        if target_penetration_depth > 0.0:
+            target_depth_step_fraction = (
+                per_frame_closing_distance / target_penetration_depth
+            )
+        else:
+            target_depth_step_fraction = math.inf
+        if hard_penetration_depth > 0.0:
+            hard_depth_step_fraction = (
+                per_frame_closing_distance / hard_penetration_depth
+            )
+        else:
+            hard_depth_step_fraction = math.inf
 
         first_x, _first_y, _particle_z = self.packing_first_center
         piston_to_first_gap = first_x - self.radius - self.piston_x_start
@@ -522,6 +534,8 @@ class GenReservoir(GenericGenData):
             f"  time to neighbor contact: {time_to_neighbor_contact:.6f}\n"
             f"  target penetration depth: {target_penetration_depth:.6f}\n"
             f"  hard penetration depth: {hard_penetration_depth:.6f}\n"
+            f"  target-depth step fraction: {target_depth_step_fraction:.6f}\n"
+            f"  hard-depth step fraction: {hard_depth_step_fraction:.6f}\n"
             f"  frames from contact to target depth: {frames_to_target_depth:.3f}\n"
             f"  time from contact to target depth: {time_to_target_depth:.6f}\n"
             f"  frames from contact to hard depth: {frames_to_hard_depth:.3f}\n"
@@ -553,6 +567,8 @@ class GenReservoir(GenericGenData):
             "time_to_neighbor_contact": time_to_neighbor_contact,
             "target_penetration_depth": target_penetration_depth,
             "hard_penetration_depth": hard_penetration_depth,
+            "target_depth_step_fraction": target_depth_step_fraction,
+            "hard_depth_step_fraction": hard_depth_step_fraction,
             "frames_to_target_depth": frames_to_target_depth,
             "time_to_target_depth": time_to_target_depth,
             "frames_to_hard_depth": frames_to_hard_depth,

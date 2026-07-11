@@ -1,20 +1,18 @@
 Current status:
-    - Python simple and reservoir dynamics now use the generic function-wall model with boundary particles as locality sentinels.
-    - TestCompressor is the active closed-end piston compression test for reproducing crowding and max-depth failures.
-    - The Python UI now has particle-diameter grid diagnostics and piston status/readout diagnostics for verifying physical scale and piston motion.
-    - Runtime cfg normalization now supports both source cfg and generated .tst piston forms.
-    - The current compressor failure is understood as rigid piston overcompression: source 1 reaches max-depth constraint against piston wall 1 before particle-particle compression fails.
+    - Vulkan CD-nozzle/reservoir frame hesitation was traced to workload and pacing rather than Python UI behavior.
+    - The particle-cell occupancy convention is clarified: particle ID 0 is the empty occupancy sentinel, while CornerList.ploc must continue to use npos because cell index 0 is a valid cell.
+    - CommandParticleGraphics clears both the collision-index buffer and lock buffer before vertex occupancy rebuild, so stale clink data is not the primary zero-termination concern.
+    - Lowering MAX_CELL_OCCUPANY improved frame pacing because it reduced both dense-cell scan work and the duplicate-target array initialized per source.
+    - Constant collision_stiffness_q is now identified as a material weakness in dense compressor/nozzle states: sparse contacts can rebound, but dense pressure fields need resistance to rise with penetration depth.
+    - The approved model direction is reversible depth-dependent stiffness without adding energy as dynamic state.
 
 Code Changes:
-    - Updated Python viewers to draw particle radius from the authoritative runtime Data.x field and to preserve world-unit aspect ratio.
-    - Added grid_on display support with grid spacing equal to one particle diameter.
-    - Added piston line/status diagnostics in the Python UI, including position and velocity near the first mobile particle.
-    - Normalized generated piston_velocity_x/y/z fields into piston_velocity for runtime dynamics.
-    - Derived missing piston_x_start and piston_x_stop from reservoir boundary curves when running source cfg files directly.
-    - Inferred piston_enabled from piston_velocity when the source cfg omits the explicit flag.
-    - Corrected Python piston contact so the analytic piston acts at the displayed plane instead of at an offset ghost-particle position.
-    - Documented piston runtime normalization, plane-contact behavior, UI scale diagnostics, and the compressor max-depth finding.
-    - Updated dynamics theory to distinguish target containment depth from hard fatal compression depth.
+    - Updated ProblemEvolution.tex with the Vulkan frame-pacing and contact-workload investigation.
+    - Documented the zero/npos sentinel split for particle occupancy slots and source corner-cell references.
+    - Documented the intended Vulkan compute cleanup: scan local occupancy once, store compact source-owned contact records, and reuse those records for force and remaining-depth checks.
+    - Updated DynamicsTheory.tex to describe depth-dependent effective stiffness as the approved material direction while keeping the model momentum-governed.
+    - Recorded that ordinary contact force should remain reversible and based on current physical penetration; max-depth containment should remain a safety limit, not the primary material response.
 
 Next:
-    - CD nozzle.
+    - Implement depth-dependent contact stiffness in Python first, then export the same force law to ForceDynamicsSimple GLSL.
+    - After that, reduce Vulkan pacing/workload cost by removing ordinary per-frame device waits and replacing the second occupancy scan with cached source-owned contact records.

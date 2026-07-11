@@ -22,7 +22,7 @@
 
 #include "../common/ForceDynamicsSimple.glsl"
 #include "../common/ForceDynamicsSimpleBoundaryParticle.glsl"
-#include "../common/ForceDynamicsSimpleParametricWall.glsl"
+#include "../common/ForceDynamicsSimpleFunctionWall.glsl"
 #if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
 #include "../common/ForceDynamicsSimplePiston.glsl"
 #endif
@@ -91,7 +91,7 @@ void main()
             }
 
             if (IsBoundaryParticle(TargetID)) {
-                if (!ParametricBoundaryMarkerApplies(SourceID, TargetID)) {
+                if (!BoundaryMarkerApplies(SourceID, TargetID)) {
                     continue;
                 }
 
@@ -115,11 +115,11 @@ void main()
                 duplicateCount += 1u;
 
                 BoundaryWallSegment segment =
-                    EvaluateParametricWallSegment(SourceID, TargetID);
+                    EvaluateFunctionWallSegment(SourceID, TargetID);
                 if (!segment.valid) {
                     continue;
                 }
-                if (!ProcessParametricWallCollision(
+                if (!ProcessFunctionWallCollision(
                         SourceID,
                         segment,
                         totalForce)) {
@@ -169,9 +169,117 @@ void main()
     if (!CalcVelocity(SourceID, totalForce)) {
         return;
     }
-    if (!ApplySourceMaximumDepth(SourceID)) {
+    if (!ApplySourceMaximumDepth(SourceID, 9401u)) {
         return;
     }
+
+#if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
+    if (!RegisterResolvedPistonContactStep(SourceID)) {
+        return;
+    }
+#endif
+
+    duplicateCount = 0u;
+    for (uint index = 0u; index < DUP_LIST_SIZE; ++index) {
+        duplicateTargets[index] = 0u;
+    }
+
+    for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
+        uint loc = P[SourceID].CornerList[CornerIndex].ploc;
+        if (loc == npos) {
+            continue;
+        }
+
+        for (uint CellSlot = 0u; CellSlot < MAX_CELL_OCCUPANY; ++CellSlot) {
+            uint TargetID = clink[loc].idx[CellSlot];
+            if (TargetID == 0u) {
+                break;
+            }
+            if (TargetID == SourceID) {
+                continue;
+            }
+            if (TargetID >= uint(ShaderFlags.Ptot)) {
+                continue;
+            }
+
+            if (IsBoundaryParticle(TargetID)) {
+                if (!BoundaryMarkerApplies(SourceID, TargetID)) {
+                    continue;
+                }
+
+                bool duplicate = false;
+                for (uint duplicateIndex = 0u;
+                        duplicateIndex < duplicateCount;
+                        ++duplicateIndex) {
+                    if (duplicateTargets[duplicateIndex] == TargetID) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (duplicate) {
+                    continue;
+                }
+                if (duplicateCount >= DUP_LIST_SIZE) {
+                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                    return;
+                }
+                duplicateTargets[duplicateCount] = TargetID;
+                duplicateCount += 1u;
+
+                BoundaryWallSegment segment =
+                    EvaluateFunctionWallSegment(SourceID, TargetID);
+                if (!segment.valid) {
+                    continue;
+                }
+                if (!RegisterResolvedFunctionWallContactStep(
+                        SourceID,
+                        segment)) {
+                    return;
+                }
+                continue;
+            }
+
+            if (!IsMobileParticleActiveForDynamics(TargetID)) {
+                continue;
+            }
+
+            bool duplicate = false;
+            for (uint duplicateIndex = 0u;
+                    duplicateIndex < duplicateCount;
+                    ++duplicateIndex) {
+                if (duplicateTargets[duplicateIndex] == TargetID) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate) {
+                continue;
+            }
+            if (duplicateCount >= DUP_LIST_SIZE) {
+                SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                return;
+            }
+            duplicateTargets[duplicateCount] = TargetID;
+            duplicateCount += 1u;
+
+            ParticleGeometry geometry =
+                GetParticleGeometry(SourceID, TargetID);
+            if (!geometry.valid) {
+                continue;
+            }
+            if (!RegisterResolvedParticleContactStep(
+                    SourceID,
+                    TargetID,
+                    geometry)) {
+                return;
+            }
+        }
+    }
+
+    if (!ApplySourceMaximumDepth(SourceID, 9402u)) {
+        return;
+    }
+
     if (!CalcPosition(SourceID)) {
         return;
     }

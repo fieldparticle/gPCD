@@ -104,7 +104,7 @@ float particle_overlap_area(float sourceRadius, float targetRadius, float center
     return sourceArea + targetArea - triangleArea;
 }
 
-// Python source: ForceDynamics.py:541
+// Python source: ForceDynamics.py:536
 float ParticlePenetrationDepth(float sourceRadius, float targetRadius, float centerDistance)
 {
     return sourceRadius + targetRadius - centerDistance;
@@ -176,16 +176,34 @@ void SetNextParticleVelocity(uint ParticleID, vec4 velocity)
 
 bool SetError(uint errorCode)
 {
-    collOut.ErrorNumber = errorCode;
-    collOut.FrameNumber = uint(ShaderFlags.frameNum);
+    uint previous = atomicCompSwap(collOut.ErrorNumber, ERROR_NONE, errorCode);
+    if (previous == ERROR_NONE) {
+        collOut.FrameNumber = uint(ShaderFlags.frameNum);
+        collOut.ParticleNumber = 0u;
+        collOut.holdPidx = 0u;
+    }
     return false;
 }
 
 bool SetError(uint errorCode, uint SourceID)
 {
-    collOut.ErrorNumber = errorCode;
-    collOut.FrameNumber = uint(ShaderFlags.frameNum);
-    collOut.ParticleNumber = SourceID;
+    uint previous = atomicCompSwap(collOut.ErrorNumber, ERROR_NONE, errorCode);
+    if (previous == ERROR_NONE) {
+        collOut.FrameNumber = uint(ShaderFlags.frameNum);
+        collOut.ParticleNumber = SourceID;
+        collOut.holdPidx = 0u;
+    }
+    return false;
+}
+
+bool SetErrorDetail(uint errorCode, uint SourceID, uint detail)
+{
+    uint previous = atomicCompSwap(collOut.ErrorNumber, ERROR_NONE, errorCode);
+    if (previous == ERROR_NONE) {
+        collOut.FrameNumber = uint(ShaderFlags.frameNum);
+        collOut.ParticleNumber = SourceID;
+        collOut.holdPidx = detail;
+    }
     return false;
 }
 
@@ -247,7 +265,7 @@ bool CheckPenetrationStepResolution(
         0.0, -relativeNormalVelocity * ShaderFlags.dt);
     float penetrationReserve = GetContactHardDepth(sourceRadius);
     if (inwardDisplacement > penetrationReserve + EPSILON) {
-        return SetError(ERROR_PENETRATION_STEP_TOO_LARGE, SourceID);
+        return SetErrorDetail(ERROR_PENETRATION_STEP_TOO_LARGE, SourceID, 1001u);
     }
     return true;
 }
@@ -283,7 +301,7 @@ bool CheckResolvedContactStep(
 {
     float remainingDepth = GetContactRemainingDepth(sourceRadius, penetrationDepth);
     if (penetrationDepth > GetContactHardDepth(sourceRadius) + EPSILON) {
-        return SetError(ERROR_MAX_DEPTH_CONSTRAINT, SourceID);
+        return SetErrorDetail(ERROR_MAX_DEPTH_CONSTRAINT, SourceID, 9001u);
     }
 
     vec3 resolvedVelocity = GetNextParticleVelocity(SourceID).xyz;
@@ -293,7 +311,7 @@ bool CheckResolvedContactStep(
         targetVelocity,
         resolvedVelocity);
     if (inwardDisplacement > remainingDepth + EPSILON) {
-        return SetError(ERROR_PENETRATION_STEP_TOO_LARGE, SourceID);
+        return SetErrorDetail(ERROR_PENETRATION_STEP_TOO_LARGE, SourceID, 1002u);
     }
     return true;
 }
@@ -374,14 +392,109 @@ bool RegisterMaximumDepthConstraint(
         return true;
     }
 
-    if (maximumDepthConstraintCount >= MAX_SOURCE_DEPTH_CONSTRAINTS) {
-        return SetError(ERROR_MAX_DEPTH_CONSTRAINT, SourceID);
+    float normalLength = length(normal);
+    if (normalLength <= MAXIMUM_DEPTH_SOLVER_EPSILON
+            || isnan(normalLength) || isinf(normalLength)
+            || any(isnan(targetVelocity)) || any(isinf(targetVelocity))) {
+        return SetErrorDetail(ERROR_MAX_DEPTH_CONSTRAINT, SourceID, 9002u);
     }
-    maximumDepthConstraintNormals[maximumDepthConstraintCount] = normal;
-    maximumDepthConstraintLimits[maximumDepthConstraintCount] =
-        dot(targetVelocity, normal);
+    vec3 unitNormal = normal / normalLength;
+    float limit = dot(targetVelocity, unitNormal);
+    for (uint index = 0u; index < maximumDepthConstraintCount; ++index) {
+        float alignment = dot(
+            maximumDepthConstraintNormals[index], unitNormal);
+        if (alignment >= 1.0 - MAXIMUM_DEPTH_SOLVER_EPSILON) {
+            maximumDepthConstraintLimits[index] = min(
+                maximumDepthConstraintLimits[index], limit);
+            return true;
+        }
+    }
+
+    if (maximumDepthConstraintCount >= MAX_SOURCE_DEPTH_CONSTRAINTS) {
+        return SetErrorDetail(ERROR_MAX_DEPTH_CONSTRAINT, SourceID, 9003u);
+    }
+    maximumDepthConstraintNormals[maximumDepthConstraintCount] = unitNormal;
+    maximumDepthConstraintLimits[maximumDepthConstraintCount] = limit;
     maximumDepthConstraintCount += 1u;
     return true;
+}
+
+bool RegisterContactStepConstraint(
+    uint SourceID,
+    vec3 normal,
+    float penetrationDepth,
+    float sourceRadius,
+    vec3 targetVelocity)
+{
+    if (maximumDepthConstraintOwner != SourceID) {
+        maximumDepthConstraintOwner = SourceID;
+        maximumDepthConstraintCount = 0u;
+    }
+
+    float hardDepth = GetContactHardDepth(sourceRadius);
+    if (penetrationDepth > hardDepth + EPSILON) {
+        return SetErrorDetail(ERROR_MAX_DEPTH_CONSTRAINT, SourceID, 9001u);
+    }
+
+    float dt = ShaderFlags.dt;
+    if (dt <= 0.0) { return SetError(ERROR_INVALID_DT, SourceID); }
+
+    float normalLength = length(normal);
+    if (normalLength <= MAXIMUM_DEPTH_SOLVER_EPSILON
+            || isnan(normalLength) || isinf(normalLength)
+            || any(isnan(targetVelocity)) || any(isinf(targetVelocity))) {
+        return SetErrorDetail(ERROR_MAX_DEPTH_CONSTRAINT, SourceID, 9002u);
+    }
+
+    vec3 unitNormal = normal / normalLength;
+    float remainingDepth = max(0.0, hardDepth - penetrationDepth);
+    float limit = dot(targetVelocity, unitNormal) + remainingDepth / dt;
+    for (uint index = 0u; index < maximumDepthConstraintCount; ++index) {
+        float alignment = dot(
+            maximumDepthConstraintNormals[index], unitNormal);
+        if (alignment >= 1.0 - MAXIMUM_DEPTH_SOLVER_EPSILON) {
+            maximumDepthConstraintLimits[index] = min(
+                maximumDepthConstraintLimits[index], limit);
+            return true;
+        }
+    }
+
+    if (maximumDepthConstraintCount >= MAX_SOURCE_DEPTH_CONSTRAINTS) {
+        return SetErrorDetail(ERROR_MAX_DEPTH_CONSTRAINT, SourceID, 9003u);
+    }
+    maximumDepthConstraintNormals[maximumDepthConstraintCount] = unitNormal;
+    maximumDepthConstraintLimits[maximumDepthConstraintCount] = limit;
+    maximumDepthConstraintCount += 1u;
+    return true;
+}
+
+bool SolveMaximumDepthSystem(
+    mat3 matrix,
+    vec3 values,
+    uint size,
+    out vec3 solution)
+{
+    solution = vec3(0.0);
+    if (size == 1u) {
+        if (abs(matrix[0][0]) <= MAXIMUM_DEPTH_SOLVER_EPSILON) {
+            return false;
+        }
+        solution.x = values.x / matrix[0][0];
+        return !any(isnan(solution)) && !any(isinf(solution));
+    }
+    if (size == 2u) {
+        float det = matrix[0][0] * matrix[1][1]
+            - matrix[1][0] * matrix[0][1];
+        if (abs(det) <= MAXIMUM_DEPTH_SOLVER_EPSILON) {
+            return false;
+        }
+        solution.x = (values.x * matrix[1][1]
+            - matrix[1][0] * values.y) / det;
+        solution.y = (matrix[0][0] * values.y
+            - values.x * matrix[0][1]) / det;
+        return !any(isnan(solution)) && !any(isinf(solution));
+    }
+    return false;
 }
 
 bool AccumulateContactForce(
@@ -463,28 +576,131 @@ bool ProcessFunctionWallCollision(
     return AccumulateContactForce(SourceID, contact, totalForce);
 }
 
+bool RegisterResolvedParticleContactStep(
+    uint SourceID,
+    uint TargetID,
+    ParticleGeometry geometry)
+{
+    if (!geometry.valid) { return true; }
+    float penetrationDepth = ParticlePenetrationDepth(
+        geometry.sourceRadius,
+        geometry.targetRadius,
+        geometry.centerDistance);
+    return RegisterContactStepConstraint(
+        SourceID,
+        geometry.normal,
+        penetrationDepth,
+        geometry.sourceRadius,
+        GetStartFrameVelocity(TargetID).xyz);
+}
+
+bool RegisterResolvedFunctionWallContactStep(
+    uint SourceID,
+    BoundaryWallSegment segment)
+{
+    if (!segment.valid) { return true; }
+    float sourceRadius = P[SourceID].Data.x;
+    float penetrationDepth = ParticlePenetrationDepth(
+        sourceRadius,
+        sourceRadius,
+        segment.centerDistance);
+    return RegisterContactStepConstraint(
+        SourceID,
+        segment.normal,
+        penetrationDepth,
+        sourceRadius,
+        vec3(0.0));
+}
+
 bool ProjectSourceVelocityToContactSet(
     vec3 candidateVelocity, out vec3 containedVelocity)
 {
     containedVelocity = candidateVelocity;
+    if (any(isnan(candidateVelocity)) || any(isinf(candidateVelocity))) {
+        return false;
+    }
+
+    bool candidateValid = true;
     for (uint index = 0u; index < maximumDepthConstraintCount; ++index) {
-        vec3 normal = maximumDepthConstraintNormals[index];
-        float limit = maximumDepthConstraintLimits[index];
-        float current = dot(containedVelocity, normal);
-        if (current > limit + EPSILON) {
-            containedVelocity -= (current - limit) * normal;
+        if (dot(maximumDepthConstraintNormals[index], candidateVelocity)
+                > maximumDepthConstraintLimits[index]
+                    + MAXIMUM_DEPTH_SOLVER_EPSILON) {
+            candidateValid = false;
         }
     }
-    for (uint index = 0u; index < maximumDepthConstraintCount; ++index) {
-        if (dot(containedVelocity, maximumDepthConstraintNormals[index])
-                > maximumDepthConstraintLimits[index] + EPSILON) {
-            return false;
+    if (candidateValid) {
+        return true;
+    }
+
+    bool found = false;
+    float bestDistanceSq = 0.0;
+    for (uint i = 0u; i < maximumDepthConstraintCount; ++i) {
+        for (uint jCode = 0u; jCode <= maximumDepthConstraintCount; ++jCode) {
+            uint activeCount = 1u;
+            uint j = 0u;
+            if (jCode > 0u) {
+                j = jCode - 1u;
+                if (j <= i) { continue; }
+                activeCount = 2u;
+            }
+
+            vec3 n0 = maximumDepthConstraintNormals[i];
+            vec3 n1 = activeCount == 2u
+                ? maximumDepthConstraintNormals[j] : vec3(0.0);
+            vec3 limits = vec3(
+                maximumDepthConstraintLimits[i],
+                activeCount == 2u ? maximumDepthConstraintLimits[j] : 0.0,
+                0.0);
+            mat3 gram = mat3(0.0);
+            gram[0][0] = dot(n0, n0);
+            if (activeCount == 2u) {
+                gram[0][1] = dot(n0, n1);
+                gram[1][0] = gram[0][1];
+                gram[1][1] = dot(n1, n1);
+            }
+            vec3 residual = vec3(
+                dot(n0, candidateVelocity),
+                activeCount == 2u ? dot(n1, candidateVelocity) : 0.0,
+                0.0) - limits;
+            vec3 multipliers;
+            if (!SolveMaximumDepthSystem(
+                    gram, residual, activeCount, multipliers)) {
+                continue;
+            }
+            if (multipliers.x < -MAXIMUM_DEPTH_SOLVER_EPSILON
+                    || (activeCount == 2u
+                        && multipliers.y < -MAXIMUM_DEPTH_SOLVER_EPSILON)) {
+                continue;
+            }
+            vec3 velocity = candidateVelocity - multipliers.x * n0;
+            if (activeCount == 2u) { velocity -= multipliers.y * n1; }
+            if (any(isnan(velocity)) || any(isinf(velocity))) { continue; }
+            bool satisfiesAll = true;
+            for (uint constraint = 0u;
+                    constraint < maximumDepthConstraintCount;
+                    ++constraint) {
+                if (dot(maximumDepthConstraintNormals[constraint], velocity)
+                        > maximumDepthConstraintLimits[constraint]
+                            + MAXIMUM_DEPTH_SOLVER_EPSILON) {
+                    satisfiesAll = false;
+                }
+            }
+            if (!satisfiesAll) { continue; }
+            float distanceSq = dot(
+                candidateVelocity - velocity,
+                candidateVelocity - velocity);
+            if (isnan(distanceSq) || isinf(distanceSq)) { continue; }
+            if (!found || distanceSq < bestDistanceSq) {
+                found = true;
+                bestDistanceSq = distanceSq;
+                containedVelocity = velocity;
+            }
         }
     }
-    return true;
+    return found;
 }
 
-bool ApplySourceMaximumDepth(uint SourceID)
+bool ApplySourceMaximumDepth(uint SourceID, uint failureDetail)
 {
     if (maximumDepthConstraintOwner != SourceID
             || maximumDepthConstraintCount == 0u) {
@@ -495,7 +711,7 @@ bool ApplySourceMaximumDepth(uint SourceID)
     vec3 containedVelocity = vec3(0.0);
     if (!ProjectSourceVelocityToContactSet(
             candidate.xyz, containedVelocity)) {
-        return SetError(ERROR_MAX_DEPTH_CONSTRAINT, SourceID);
+        return SetErrorDetail(ERROR_MAX_DEPTH_CONSTRAINT, SourceID, failureDetail);
     }
     candidate.xyz = containedVelocity;
     candidate.w = VelocityAngle(candidate.x, candidate.y);
