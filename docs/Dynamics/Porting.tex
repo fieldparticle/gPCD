@@ -179,6 +179,14 @@ Those constants are not required by ordinary simple boundary-sphere wrappers.
 The simple piston include does not require \texttt{CHAMBER\_MIN/MAX} or
 derived chamber-bound constants.
 
+FreeStream wrappers are ordinary simple streaming wrappers, not reservoir
+piston wrappers.  They must include the base simple dynamics, boundary
+particle helper, and function-wall helper, but must not include
+\texttt{ForceDynamicsSimplePiston.glsl} or define
+\texttt{FORCE\_DYNAMICS\_SIMPLE\_PISTON\_AVAILABLE}.  If a freestream run
+needs inlet timing, that timing belongs to the generated particle
+\texttt{Data.w} release records rather than to a moving piston.
+
 Linear-chamber wrappers include
 \texttt{ForceDynamicsLinearReservoir.glsl} and define
 \texttt{FORCE\_DYNAMICS\_LINEAR\_RESERVOIR\_AVAILABLE}.  Wrappers requiring a
@@ -217,6 +225,14 @@ plotting stay in Python.
 Rendering diagnostics are not part of the force law.  Scenario vertex shaders
 may color particles from \texttt{colFlg} or from velocity angle, but those
 colors must not affect generated dynamics.
+
+Shader \texttt{debugPrintfEXT} output is also diagnostic state.  In the
+Vulkan application it arrives through the debug-utils callback with message
+ID \texttt{VVL-DEBUG-PRINTF}.  The callback should intercept that ID, strip
+the wrapper text down to the message payload after \texttt{DebugPrintf:}, and
+print the payload without setting \texttt{Extflg}.  Otherwise an intentional
+shader print can behave like a stop condition because the generic
+informational-message branch marks \texttt{Extflg}.
 
 When GLSL uses \texttt{colFlg} as a collision-color diagnostic, the active
 compute shader must clear \texttt{P[SourceID].colFlg} once per source

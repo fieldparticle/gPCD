@@ -53,12 +53,16 @@ class pdata(ctypes.Structure):
     - ``state_flg`` becomes ``Data.w``.
     - ``molar_mass`` becomes ``parms.x``.
 
-    ``state_flg`` lifecycle values match ``base.SimCalc``:
+    ``state_flg`` lifecycle values are copied to runtime ``Data.w``:
 
-    - ``0`` = reservoir/inactive, waiting to be released.
-    - ``1`` = active, moved and considered for collisions.
-    - ``2`` = escaped, removed from active simulation and not reused.
-    - ``3`` = retained, removed from active motion but kept/stored.
+    - ``Data.w < 0`` = dead or retired; ignored by dynamics and rendering.
+    - ``Data.w == 0`` = active from frame zero.
+    - ``Data.w > 0`` = pending release frame; active when
+      ``frameNum >= Data.w``.
+
+    Boundary markers use ``ptype`` for classification. Their ``state_flg`` is
+    normally ``0`` and must not be used for wall identity or evaluator
+    dispatch.
 
     Do not reorder or rename fields without changing the matching Vulkan
     ``pdata.hpp`` struct and regenerating any binary files that use the old
@@ -75,7 +79,7 @@ class pdata(ctypes.Structure):
         ("vy", ctypes.c_double),          # Initial y velocity.
         ("vz", ctypes.c_double),          # Initial z velocity.
         ("ptype", ctypes.c_double),       # 0 mobile; positive values identify boundary markers.
-        ("state_flg", ctypes.c_double),   # Lifecycle: 0 reservoir, 1 active, 2 escaped, 3 retained.
+        ("state_flg", ctypes.c_double),   # Runtime lifecycle copied to Data.w.
         ("molar_mass", ctypes.c_double),  # Particle mass; copied to Vulkan parms.x.
         ("temp_vel", ctypes.c_double),    # Reserved particle data; independent of boundary dispatch.
         ("collision_stiffness_q", ctypes.c_double),  # Particle-owned collision stiffness; copied to Data.y.

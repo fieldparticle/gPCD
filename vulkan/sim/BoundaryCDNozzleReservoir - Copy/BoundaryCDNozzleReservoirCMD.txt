@@ -1,1 +1,0 @@
-studyFile "C:\_DJ\gPCD\vulkan\sim\BoundaryCDNozzleReservoir\BoundaryCDNozzleReservoir.cfg"  

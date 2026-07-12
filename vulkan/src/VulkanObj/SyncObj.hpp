@@ -61,6 +61,7 @@ public:
 
 	
 	void AddSignalSemaphore(std::string Name);
+	void AddSignalImageSemaphore(std::string Name, uint32_t Count);
 	void AddWaitSemaphore(std::string Name, VkPipelineStageFlags PipeStage);
 	void AddFence(std::string Name);
 

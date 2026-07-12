@@ -476,6 +476,8 @@ def _is_active_particle(particle_index, dynamics=None):
 
 
 def _is_visible_particle(particle_index, particle, dynamics=None):
+    if dynamics is not None and hasattr(dynamics, "IsParticleActiveForLifecycle"):
+        return dynamics.IsParticleActiveForLifecycle(particle_index)
     if dynamics is not None and hasattr(dynamics, "IsNullParticle"):
         if dynamics.IsNullParticle(particle_index):
             return False

@@ -153,7 +153,7 @@ int ParticleOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	syncObjects->AddFence("computeInflightFence");
 	syncObjects->AddWaitSemaphore("imageAvailableSemaphore", VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 	syncObjects->AddWaitSemaphore("computeFinishedSemaphore", VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
-	syncObjects->AddSignalSemaphore("renderFinishedSemaphore");
+	syncObjects->AddSignalImageSemaphore("renderFinishedSemaphore", swapChain->m_NumSwapImages);
 
 	MemStats(vulkanObj);
 

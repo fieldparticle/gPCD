@@ -62,12 +62,25 @@ void main()
 		vec3 sphereOffset = inPosition.xyz * P[ModelInstance].Data.x;
 		vec4 newPos = vec4(sphereOffset + P[ModelInstance].PosLocA.xyz, 1.0);
 		gl_Position = subo.proj * subo.view * subo.model * newPos;
-		if(uint(P[ModelInstance].colFlg) == 1)
-			fragColor = vec4(1.0,0.0,0.0,1.0);	
-		else if(uint(P[ModelInstance].colFlg) == 0)
-			fragColor = vec4(0.0,1.0,0.0,1.0);	
-		//fragColor = inColor;
+		if(HSV_ON == 1)
+		{
+			if (P[ModelInstance].ptype == 0)
+			{
+				float velocityAngle = ShaderFlags.positionBuffer == 0u
+					? P[ModelInstance].VelRadA.w
+					: P[ModelInstance].VelRadB.w;
+				fragColor = vec4(colorizeVelocity(velocityAngle, HSV_SAT, HSV_VAL),1.0);
+			}
+			else
+				fragColor = vec4(1.0, 1.0, 1.0,1.0);
+		}
+		else
+		{
+			if(uint(P[ModelInstance].colFlg) == 1)
+				fragColor = vec4(1.0,0.0,0.0,1.0);	
+			else if(uint(P[ModelInstance].colFlg) == 0)
+				fragColor = vec4(0.0,1.0,0.0,1.0);	
+		}
+	
 	}
-	
-	
 }

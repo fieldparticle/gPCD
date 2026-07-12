@@ -43,6 +43,22 @@ layout(location = 3) in vec2 inParms;
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 outParms;
 layout(location = 2) out vec3 matpos;
+
+bool IsParticlePendingBirth(uint ParticleID)
+{
+	float stateFlag = P[ParticleID].Data.w;
+	if (stateFlag <= 0.0)
+		return false;
+	return float(ShaderFlags.frameNum) < stateFlag;
+}
+
+bool IsParticleActiveForLifecycle(uint ParticleID)
+{
+	return ParticleID != 0u
+		&& P[ParticleID].Data.w >= 0.0
+		&& !IsParticlePendingBirth(ParticleID);
+}
+
 uint addUniqueCell(uint index, uint CornerLocation, uint Count)
 {
     if (CornerLocation == npos) {
@@ -102,12 +118,12 @@ void main(){
 		return;
 	}
 	
-	// Clear this particle's corner array. Dead particles must not leave stale
-	// cell-locality state behind.
+	// Clear this particle's corner array. Inactive particles must not leave
+	// stale cell-locality state behind.
 	for (uint kk = 0;kk<8;kk++)
 		P[index].CornerList[kk].ploc = npos;
 
-	if(P[index].Data.w < 0.0)
+	if(!IsParticleActiveForLifecycle(uint(index)))
 	{
 		gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
 		gl_PointSize = 0.0;

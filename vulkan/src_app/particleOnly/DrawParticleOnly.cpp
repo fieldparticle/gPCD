@@ -251,7 +251,7 @@ void DrawParticleOnly::DrawFrame()
 		submitInfo.commandBufferCount = 1;
 		submitInfo.pCommandBuffers = &m_GraphicsCommandObj->m_CommandBuffers[currentBuffer];
 		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = &m_SO->m_SigSemaphores[SyncObjPO::S_RENDERFIN].semvec[currentBuffer];
+		submitInfo.pSignalSemaphores = &m_SO->m_SigSemaphores[SyncObjPO::S_RENDERFIN].semvec[imageIndex];
 		if(Extflg == true)
 			return ;
 
@@ -294,7 +294,7 @@ void DrawParticleOnly::DrawFrame()
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &m_SO->m_SigSemaphores[SyncObjPO::S_RENDERFIN].semvec[currentBuffer];
+		presentInfo.pWaitSemaphores = &m_SO->m_SigSemaphores[SyncObjPO::S_RENDERFIN].semvec[imageIndex];
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = swapChains;
 		presentInfo.pImageIndices = &imageIndex;
@@ -311,7 +311,7 @@ void DrawParticleOnly::DrawFrame()
 		{
 			throw std::runtime_error("vkQueuePresentKHR in DrawFrame Failed.");
 		}
-		currentBuffer = (currentBuffer + 1) % m_App->m_FramesBuffered;
+		currentBuffer = 0;
 		m_App->SetCurrentBuffer(currentBuffer);
 		
 	}

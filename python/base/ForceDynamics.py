@@ -768,12 +768,33 @@ class ForceContactDynamics:
             and float(getattr(particle, "ptype", 0.0)) < -0.5
         )
 
+    def IsParticleDead(self, ParticleID):
+        """Return True when Data.w marks a particle as retired/dead."""
+        return float(self.particles[ParticleID].Data.w) < 0.0
+
+    def IsParticlePendingBirth(self, ParticleID):
+        """Return True while a positive Data.w release frame is in the future."""
+        state_flag = float(self.particles[ParticleID].Data.w)
+        if state_flag <= 0.0:
+            return False
+        return float(self.ShaderFlags.frameNum) < state_flag
+
+    def IsParticleBorn(self, ParticleID):
+        """Return True when a particle is not dead and has reached its release frame."""
+        return (
+            not self.IsParticleDead(ParticleID)
+            and not self.IsParticlePendingBirth(ParticleID)
+        )
+
+    def IsParticleActiveForLifecycle(self, ParticleID):
+        """Return True when lifecycle state allows a particle to be visible/usable."""
+        return not self.IsNullParticle(ParticleID) and self.IsParticleBorn(ParticleID)
+
     def IsMobileParticleActiveForDynamics(self, ParticleID):
         """Return True when a particle is a mobile dynamics source."""
         return (
-            not self.IsNullParticle(ParticleID)
+            self.IsParticleActiveForLifecycle(ParticleID)
             and not self.IsBoundaryParticle(ParticleID)
-            and float(self.particles[ParticleID].Data.w) >= 0.0
         )
 
     def AppendContactSlot(self, SourceID, TargetID):

@@ -43,6 +43,10 @@ SIMPLE_CORE_METHODS = [
     "GetStartFrameVelocity",
     "IsNullParticle",
     "IsBoundaryParticle",
+    "IsParticleDead",
+    "IsParticlePendingBirth",
+    "IsParticleBorn",
+    "IsParticleActiveForLifecycle",
     "IsMobileParticleActiveForDynamics",
     "AppendContactSlot",
     "GetContactSlots",
@@ -307,11 +311,32 @@ bool IsParticleDead(uint ParticleID)
     return P[ParticleID].Data.w < 0.0;
 }}
 
-bool IsMobileParticleActiveForDynamics(uint ParticleID)
+bool IsParticlePendingBirth(uint ParticleID)
+{{
+    float stateFlag = P[ParticleID].Data.w;
+    if (stateFlag <= 0.0)
+    {{
+        return false;
+    }}
+    return float(ShaderFlags.frameNum) < stateFlag;
+}}
+
+bool IsParticleBorn(uint ParticleID)
+{{
+    return !IsParticleDead(ParticleID)
+        && !IsParticlePendingBirth(ParticleID);
+}}
+
+bool IsParticleActiveForLifecycle(uint ParticleID)
 {{
     return !IsNullParticle(ParticleID)
-        && !IsBoundaryParticle(ParticleID)
-        && !IsParticleDead(ParticleID);
+        && IsParticleBorn(ParticleID);
+}}
+
+bool IsMobileParticleActiveForDynamics(uint ParticleID)
+{{
+    return IsParticleActiveForLifecycle(ParticleID)
+        && !IsBoundaryParticle(ParticleID);
 }}
 
 vec4 GetParticlePosition(uint ParticleID)

@@ -1,7 +1,7 @@
 @echo off
 
-set oldPrefix=BoundaryCDNozzleReservoir
-set newPrefix=CDNozzle
+set oldPrefix=FreeConvection
+set newPrefix=FreeStream
 
 
 
@@ -113,4 +113,7 @@ echo studyFile "%new_dir%\%newPrefix%.cfg" > "%new_dir%\%newPrefix%CMD.txt"
 
 echo echo off > "%new_dir%\%newPrefix%.bat" 
 echo CompileShaders %newPrefix% >> "%new_dir%\%newPrefix%.bat" 
+
+echo cd "C:\_DJ\gPCD\vulkan\run\particleOnly" > "%new_dir%\run.bat" 
+echo particleD studyFile "%new_dir%\%newPrefix%.cfg" >> "%new_dir%\run.bat" 
 pause

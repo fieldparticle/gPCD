@@ -128,7 +128,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL ReportCallback(VkDebugReportFlagsEXT flags
 		std::string pch = msg.substr(last+1, endof);
 		if (pch.compare("vkQueueSubmit"))
 			pch.erase(0, 42);
-		mout << msg.c_str() << ende;
+		mout << pch.c_str() << ende;
 	}
 
 	return false;
@@ -201,6 +201,20 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 	int32_t messageIdNumber = pCallbackData->messageIdNumber;
 	const char* message = pCallbackData->pMessage;
 
+	if (messageIdName && strcmp(messageIdName, "VVL-DEBUG-PRINTF") == 0)
+	{
+		std::string msg = message ? message : "";
+		std::string marker = "DebugPrintf:\n";
+		size_t pos = msg.find(marker);
+		if (pos != std::string::npos)
+		{
+			msg = msg.substr(pos + marker.size());
+		}
+
+		mout << "DEBUGPRINTEXT:" << msg.c_str() << ende;
+		return VK_FALSE;
+	}
+
 	std::string msgstr;
 
 	if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
@@ -224,7 +238,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 	{
 
 		msgstr = "Process Info: ";
-		Extflg = true;
+		Extflg = false;
 
 	}
 	else if (messageSeverity & VK_DEBUG_REPORT_ERROR_BIT_EXT)
@@ -266,7 +280,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 	
 	
 	objtxt << tmp_message;
-	memset(tmp_message, 0, sizeof(tmp_message));
+	memset(tmp_message, 0, sizeof(tmp_message)*8);
 			
 	if (pCallbackData->objectCount > 0)
 	{
@@ -367,9 +381,11 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance,
 void VulkanObj::PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) {
         createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        createInfo.messageSeverity =    VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT  | 
-                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		createInfo.messageSeverity =
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 
         createInfo.messageType =    VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | 
 									VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | 

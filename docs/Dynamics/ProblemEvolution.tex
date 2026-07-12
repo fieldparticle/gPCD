@@ -2152,6 +2152,66 @@ hardcoded.  The next cleanup is to export
 \texttt{compression\_stiffness\_power} from the configuration into generated
 local GLSL so Python and Vulkan cannot drift.
 
+\subsection{FreeStream Timed Release And Vulkan Debug Print Bring-Up}
+
+\subsubsection{previous form}
+
+\texttt{FreeStream} was introduced as a streaming inlet experiment using the
+new simple function-wall GLSL family.  Its generated mobile particles carried
+future release frames in \texttt{Data.w}, and the Vulkan wrapper was copied
+from nearby simple or reservoir wrapper structure during bring-up.  That made
+two separate problems easy to confuse: particles that were not visibly moving,
+and shader debug prints that appeared to change how long the application ran.
+
+The copied compute wrapper also enabled the optional piston include even
+though freestream flow is not a piston-driven reservoir.  That added an
+unwanted moving-wall path before the ordinary source-owned contact scan.
+
+\subsubsection{current form}
+
+\texttt{FreeStream} uses \texttt{GenStreaming.py} to generate timed inlet
+release records.  Mobile particles are written at the inlet with initial
+velocity from \texttt{initial\_particle\_velocity}.  Their
+\texttt{Data.w} value stores the frame at which they become active; negative
+values still mean dead particles.  Boundary markers remain ordinary
+\texttt{ptype=1} function-wall locality records.
+
+The freestream compute wrapper must include the base simple dynamics,
+boundary-particle locality helpers, and function-wall helpers only.  It must
+not include \texttt{ForceDynamicsSimplePiston.glsl} or define
+\texttt{FORCE\_DYNAMICS\_SIMPLE\_PISTON\_AVAILABLE}.
+
+During debugging, \texttt{debugPrintfEXT} messages were found to be active
+runtime events rather than passive log lines.  They arrive through the Vulkan
+debug-utils callback as \texttt{VVL-DEBUG-PRINTF} messages.  The callback was
+setting \texttt{Extflg} for informational messages, so a debug print at frame
+100 made the application stop or short-circuit at frame 100, while moving the
+same print to frame 200 let it run to frame 200.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+The FreeStream generated binary was not the immediate source of the missing
+motion: particle records had the expected mobile type, release frame, radius,
+mass, stiffness, and inlet velocity.  The first cleanup is therefore wrapper
+and diagnostic hygiene.  Freestream must not enable piston behavior, and
+shader debug-print messages should be intercepted separately from validation
+errors.
+
+The debug-utils callback should recognize \texttt{VVL-DEBUG-PRINTF}, strip
+the Vulkan wrapper text down to the shader message after
+\texttt{DebugPrintf:}, print that payload, and return without setting
+\texttt{Extflg}.  Validation errors and warnings may still set
+\texttt{Extflg}; shader printf output should not behave like a stop
+condition unless a separate debug-break option is explicitly added.
+
+This keeps shader printf usable as a frame-local diagnostic while preserving
+the distinction between a real Vulkan validation problem and an intentional
+particle-dynamics trace.
+
 \subsubsection{configuration synchronization}
 
 The CD-nozzle Python and Vulkan include configurations now carry the same

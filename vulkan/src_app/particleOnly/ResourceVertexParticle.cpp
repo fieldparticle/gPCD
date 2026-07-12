@@ -251,13 +251,24 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 
 	uint32_t i = 0;
 	objtxt << m_Name << " Number:" << i << std::ends;
-	m_App->VMACreateDeviceBuffer(m_BufSize,
+	VkBufferUsageFlags usage =
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_Buffers[i], m_Allocation[i], objtxt.str());
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
+	if (CfgApp->GetBool("application.auto_cap_frames", true))
+	{
+		mout << "PERFORMANCE WARING: Capture is enabled so Vertex Particle is in host-transfer mode" << ende;
+		usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	}
+
+	m_App->VMACreateDeviceBuffer(
+		m_BufSize,
+		usage,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_Buffers[i],
+		m_Allocation[i],
+		objtxt.str());
 	
 	m_BufferInfo[i].buffer = m_Buffers[i];
 	m_BufferInfo[i].offset = 0;

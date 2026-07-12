@@ -69,7 +69,35 @@ void SyncObj::AddFence(std::string Name)
 	
 	m_Fences.push_back(fce);
 }
+void SyncObj::AddSignalImageSemaphore(std::string Name, uint32_t Count)
+{
+	semdef sph{};
+	sph.name = Name;
+	sph.semvec.resize(Count);
 
+	VkSemaphoreCreateInfo semaphoreInfo{};
+	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	for (size_t i = 0; i < Count; i++)
+	{
+		if (vkCreateSemaphore(
+			m_App->GetLogicalDevice(),
+			&semaphoreInfo,
+			nullptr,
+			&sph.semvec[i]) != VK_SUCCESS)
+		{
+			std::string str = "AddSemaphore() could not add:" + Name;
+			throw std::runtime_error(str.c_str());
+		}
+
+		m_App->NameObject(
+			VK_OBJECT_TYPE_SEMAPHORE,
+			(uint64_t)sph.semvec[i],
+			Name.c_str());
+	}
+
+	m_SigSemaphores.push_back(sph);
+}
 // Signal Semaphores are not asscociated with pipline statge
 void SyncObj::AddSignalSemaphore(std::string Name)
 {
@@ -219,21 +247,28 @@ std::vector < VkFence> SyncObj::GetFences(uint32_t FrameNum)
 
 void SyncObj::Cleanup()
 {
-	for (size_t ii = 0;ii<m_WaitSemaphores.size(); ii++)
+	for (size_t ii = 0; ii < m_WaitSemaphores.size(); ii++)
 	{
-		for (size_t n = 0; n < m_thisFramesBuffered; n++) 
+		for (size_t n = 0; n < m_WaitSemaphores[ii].semvec.size(); n++)
 		{
-			vkDestroySemaphore(m_App->GetLogicalDevice(), m_WaitSemaphores[ii].semvec[n], nullptr);
+			vkDestroySemaphore(
+				m_App->GetLogicalDevice(),
+				m_WaitSemaphores[ii].semvec[n],
+				nullptr);
+		}
+	}
+
+	for (size_t ii = 0; ii < m_SigSemaphores.size(); ii++)
+	{
+		for (size_t n = 0; n < m_SigSemaphores[ii].semvec.size(); n++)
+		{
+			vkDestroySemaphore(
+				m_App->GetLogicalDevice(),
+				m_SigSemaphores[ii].semvec[n],
+				nullptr);
 		}
 	}
 	
-	for (size_t ii = 0;ii<m_SigSemaphores.size();ii++)
-	{
-		for (size_t n = 0; n < m_thisFramesBuffered; n++)
-		{
-			vkDestroySemaphore(m_App->GetLogicalDevice(), m_SigSemaphores[ii].semvec[n], nullptr);
-		}
-	}
 	for (size_t ii = 0;ii<m_Fences.size();ii++)
 	{
 		for (size_t n = 0; n < m_thisFramesBuffered; n++)

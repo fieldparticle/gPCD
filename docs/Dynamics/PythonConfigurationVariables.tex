@@ -17,13 +17,43 @@ by \texttt{curve\_wall\_segments}; the active Python dynamics no longer reads
     generator.
     \item[\texttt{module\_class}] Generic explicit-particle cases select
     \texttt{GenericGenData.py}.  Reservoir generators inherit or reuse that
-    generic particle and parametric-wall contract.
+    generic particle and parametric-wall contract.  The FreeStream streaming
+    inlet experiment selects \texttt{GenStreaming.py}.
     \item[\texttt{include\_file}] Scale profile merged over the parent cfg.
     \texttt{sub\_BPRPPy.cfg} provides the reduced Python profile and
     \texttt{sub\_BPRPVk.cfg} provides the larger Vulkan profile.
     \item[\texttt{data\_dir}] Output directory.
     \item[\texttt{output\_file\_prefix}] Base name of generated output.
 \end{description}
+
+\subsection{FreeStream Streaming Inputs}
+
+\texttt{GenStreaming.py} extends the generic function-wall generator with
+timed inlet release records.  The generated mobile particles are placed at
+the configured inlet, receive \texttt{initial\_particle\_velocity}, and store
+their release frame in \texttt{Data.w}.  This section documents that
+FreeStream generator contract; it does not make scheduled reservoir birth an
+active \texttt{ForceDynamics} rule.
+
+\begin{description}
+    \item[\texttt{streaming\_release\_start\_frame}] First frame at which a
+    generated wave becomes active.
+    \item[\texttt{streaming\_release\_columns}] Number of release waves to
+    generate.
+    \item[\texttt{streaming\_particles\_per\_wave}] Number of mobile particles
+    in each inlet wave.
+    \item[\texttt{streaming\_spacing\_factor}] Multiplier applied to one
+    particle diameter when calculating the frame gap between waves.
+    \item[\texttt{streaming\_inlet\_x}] Optional fixed inlet x coordinate.
+    Exactly one inlet axis may be specified.
+    \item[\texttt{streaming\_inlet\_y}] Optional fixed inlet y coordinate.
+    Exactly one inlet axis may be specified.
+\end{description}
+
+The packing span is derived from reservoir-kind
+\texttt{curve\_wall\_segments} and \texttt{packing\_z\_bounds}.  Boundary
+markers are still generated from the configured function-wall segments and
+use \texttt{ptype=1}.  FreeStream does not require piston configuration.
 
 \subsection{Rectangular Cell Domain}
 

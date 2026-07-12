@@ -17,6 +17,32 @@ The former deferred-birth design remains documented as a historical
 investigation in \texttt{ProblemEvolution.tex}.  It is not an active
 generation or dynamics rule.
 
+\subsection{FreeStream Streaming Bring-Up}
+
+\texttt{FreeStream} is a focused streaming-inlet bring-up path, not the
+replacement reservoir or compressor piston model.  Its generator is:
+\begin{verbatim}
+gbase/GenStreaming.py
+cfg_gendata/FreeStream.cfg
+\end{verbatim}
+
+The generator emits mobile particles with timed release frames stored in
+\texttt{Data.w}.  This reuses the lifecycle field for a controlled inlet
+experiment, but it does not reintroduce the retired reservoir birth helpers
+into the active \texttt{ForceDynamics} Python path.  The distinction is:
+\begin{itemize}
+    \item active \texttt{ForceDynamics} simple and reservoir Python runs use
+          active generated mobile particles and permanent dead state;
+    \item \texttt{FreeStream} uses generated timed-release records to test
+          inlet streaming in the Vulkan simple wrapper family;
+    \item \texttt{FreeStream} is not piston driven and must not include the
+          optional simple piston GLSL helper.
+\end{itemize}
+
+Freestream boundary particles are the same generic function-wall locality
+markers used by the simple path.  They use positive \texttt{ptype} and do not
+store wall evaluator IDs in \texttt{Data.z}.
+
 The active generic generator contract is:
 \begin{itemize}
     \item mobile particles are active at frame zero;

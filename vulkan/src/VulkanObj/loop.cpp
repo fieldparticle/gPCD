@@ -179,14 +179,6 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 				}
 			}
 			
-			// Draw the frame.
-			//DrawInstance->DrawFrame();
-
-			 
-			// If the global exit flag has been set exit.
-			if(Extflg == true)
-				throw std::runtime_error("External Flag Exit.");
-
 			// Increment frame number to be sent as push element.
 			VulkanWin->m_FrameNumber++;
 

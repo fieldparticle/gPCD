@@ -1,0 +1,316 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_420pack : enable
+
+#include "debug.glsl"
+#if defined(DEBUG)
+    #extension GL_EXT_debug_printf : enable
+#endif
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_EXT_shader_atomic_float : enable
+
+#include "params.glsl"
+#include "../common/constants.glsl"
+#include "boundary.glsl"
+#include "../common/util.glsl"
+#include "../common/push.glsl"
+#include "../common/atomic.glsl"
+#include "../common/CollimageIndex.glsl"
+#include "../common/particle.glsl"
+#include "workgroups.glsl"
+
+#include "../common/ForceDynamicsSimple.glsl"
+#include "../common/ForceDynamicsSimpleBoundaryParticle.glsl"
+#include "../common/ForceDynamicsSimpleFunctionWall.glsl"
+
+// Generated from C:/_DJ/gPCD/python/base/ForceDynamics.py by tools/ExportForceDynamicsSimpleGLSL.py.
+// Simple source-owned compute schedule.
+// Do not hand edit generated dynamics content.
+
+void main()
+{
+    uint SourceID = gl_GlobalInvocationID.x;
+	
+	/// Keep this
+	#if defined(DEBUG)
+	if (SourceID == 1u && uint(ShaderFlags.frameNum) == 200)
+		debugPrintfEXT("DEBUG is ON");
+	#endif
+    if (SourceID == 0u) {
+        collOut.numParticles = 0u;
+        collOut.CollisionCount = 0u;
+        collOut.holdPidx = 0u;
+        collOut.vnumParticles = 0u;
+        return;
+    }
+
+    if (SourceID >= uint(ShaderFlags.Ptot)) {
+        return;
+    }
+
+    if (!IsMobileParticleActiveForDynamics(SourceID)) {
+#if defined(DEBUG)
+        if (SourceID == 2u && uint(ShaderFlags.frameNum) == 200u) {
+            debugPrintfEXT(
+                "P2 pre-velocity return: inactive ptype:%0.1f state:%0.3f pbuf:%u Ptot:%u",
+                P[SourceID].ptype,
+                P[SourceID].Data.w,
+                uint(ShaderFlags.positionBuffer),
+                uint(ShaderFlags.Ptot));
+        }
+#endif
+        return;
+    }
+
+#if defined(DEBUG)
+    atomicAdd(collOut.numParticles, 1u);
+#endif
+
+    P[SourceID].contactCount = 0u;
+    P[SourceID].colFlg = 0u;
+    vec3 totalForce = vec3(0.0);
+
+    const uint DUP_LIST_SIZE = MAX_CELL_OCCUPANY * 8u;
+    uint duplicateTargets[DUP_LIST_SIZE];
+    uint duplicateCount = 0u;
+    for (uint index = 0u; index < DUP_LIST_SIZE; ++index) {
+        duplicateTargets[index] = 0u;
+    }
+
+    for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
+        uint loc = P[SourceID].CornerList[CornerIndex].ploc;
+        if (loc == npos) {
+            continue;
+        }
+
+        for (uint CellSlot = 0u; CellSlot < MAX_CELL_OCCUPANY; ++CellSlot) {
+            uint TargetID = clink[loc].idx[CellSlot];
+            if (TargetID == 0u) {
+                break;
+            }
+            if (TargetID == SourceID) {
+                continue;
+            }
+            if (TargetID >= uint(ShaderFlags.Ptot)) {
+                continue;
+            }
+
+            if (IsBoundaryParticle(TargetID)) {
+                if (!BoundaryMarkerApplies(SourceID, TargetID)) {
+                    continue;
+                }
+
+                bool duplicate = false;
+                for (uint duplicateIndex = 0u;
+                        duplicateIndex < duplicateCount;
+                        ++duplicateIndex) {
+                    if (duplicateTargets[duplicateIndex] == TargetID) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (duplicate) {
+                    continue;
+                }
+                if (duplicateCount >= DUP_LIST_SIZE) {
+                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                    return;
+                }
+                duplicateTargets[duplicateCount] = TargetID;
+                duplicateCount += 1u;
+
+                BoundaryWallSegment segment =
+                    EvaluateFunctionWallSegment(SourceID, TargetID);
+                if (!segment.valid) {
+                    continue;
+                }
+                if (!ProcessFunctionWallCollision(
+                        SourceID,
+                        segment,
+                        totalForce)) {
+#if defined(DEBUG)
+                    if (SourceID == 2u && uint(ShaderFlags.frameNum) == 200u) {
+                        debugPrintfEXT(
+                            "P2 pre-velocity return: function wall target:%u wall:%u state:%0.3f",
+                            TargetID,
+                            segment.wallFlag,
+                            P[SourceID].Data.w);
+                    }
+#endif
+                    return;
+                }
+                continue;
+            }
+
+            if (!IsMobileParticleActiveForDynamics(TargetID)) {
+                continue;
+            }
+
+            bool duplicate = false;
+            for (uint duplicateIndex = 0u;
+                    duplicateIndex < duplicateCount;
+                    ++duplicateIndex) {
+                if (duplicateTargets[duplicateIndex] == TargetID) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate) {
+                continue;
+            }
+            if (duplicateCount >= DUP_LIST_SIZE) {
+                SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                return;
+            }
+            duplicateTargets[duplicateCount] = TargetID;
+            duplicateCount += 1u;
+
+            ParticleGeometry geometry =
+                GetPhysicalParticleContact(SourceID, TargetID);
+            if (!geometry.valid) {
+                continue;
+            }
+            if (!ProcessParticleCollision(
+                    TargetID,
+                    SourceID,
+                    totalForce,
+                    geometry)) {
+#if defined(DEBUG)
+                if (SourceID == 2u && uint(ShaderFlags.frameNum) == 200u) {
+                    debugPrintfEXT(
+                        "P2 pre-velocity return: particle collision target:%u state:%0.3f",
+                        TargetID,
+                        P[SourceID].Data.w);
+                }
+#endif
+                return;
+            }
+        }
+    }
+
+#if defined(DEBUG)
+    if (SourceID == 2u && uint(ShaderFlags.frameNum) == 200u) {
+        debugPrintfEXT(
+            "P2 reached CalcVelocity call state:%0.3f pos:<%0.6f,%0.6f,%0.6f> vel:<%0.6f,%0.6f,%0.6f>",
+            P[SourceID].Data.w,
+            GetParticlePosition(SourceID).x,
+            GetParticlePosition(SourceID).y,
+            GetParticlePosition(SourceID).z,
+            GetParticleVelocity(SourceID).x,
+            GetParticleVelocity(SourceID).y,
+            GetParticleVelocity(SourceID).z);
+    }
+#endif
+    if (!CalcVelocity(SourceID, totalForce)) {
+        return;
+    }
+    if (!ApplySourceMaximumDepth(SourceID, 9401u)) {
+        return;
+    }
+
+    duplicateCount = 0u;
+    for (uint index = 0u; index < DUP_LIST_SIZE; ++index) {
+        duplicateTargets[index] = 0u;
+    }
+
+    for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
+        uint loc = P[SourceID].CornerList[CornerIndex].ploc;
+        if (loc == npos) {
+            continue;
+        }
+
+        for (uint CellSlot = 0u; CellSlot < MAX_CELL_OCCUPANY; ++CellSlot) {
+            uint TargetID = clink[loc].idx[CellSlot];
+            if (TargetID == 0u) {
+                break;
+            }
+            if (TargetID == SourceID) {
+                continue;
+            }
+            if (TargetID >= uint(ShaderFlags.Ptot)) {
+                continue;
+            }
+
+            if (IsBoundaryParticle(TargetID)) {
+                if (!BoundaryMarkerApplies(SourceID, TargetID)) {
+                    continue;
+                }
+
+                bool duplicate = false;
+                for (uint duplicateIndex = 0u;
+                        duplicateIndex < duplicateCount;
+                        ++duplicateIndex) {
+                    if (duplicateTargets[duplicateIndex] == TargetID) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (duplicate) {
+                    continue;
+                }
+                if (duplicateCount >= DUP_LIST_SIZE) {
+                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                    return;
+                }
+                duplicateTargets[duplicateCount] = TargetID;
+                duplicateCount += 1u;
+
+                BoundaryWallSegment segment =
+                    EvaluateFunctionWallSegment(SourceID, TargetID);
+                if (!segment.valid) {
+                    continue;
+                }
+                if (!RegisterResolvedFunctionWallContactStep(
+                        SourceID,
+                        segment)) {
+                    return;
+                }
+                continue;
+            }
+
+            if (!IsMobileParticleActiveForDynamics(TargetID)) {
+                continue;
+            }
+
+            bool duplicate = false;
+            for (uint duplicateIndex = 0u;
+                    duplicateIndex < duplicateCount;
+                    ++duplicateIndex) {
+                if (duplicateTargets[duplicateIndex] == TargetID) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate) {
+                continue;
+            }
+            if (duplicateCount >= DUP_LIST_SIZE) {
+                SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                return;
+            }
+            duplicateTargets[duplicateCount] = TargetID;
+            duplicateCount += 1u;
+
+            ParticleGeometry geometry =
+                GetParticleGeometry(SourceID, TargetID);
+            if (!geometry.valid) {
+                continue;
+            }
+            if (!RegisterResolvedParticleContactStep(
+                    SourceID,
+                    TargetID,
+                    geometry)) {
+                return;
+            }
+        }
+    }
+
+    if (!ApplySourceMaximumDepth(SourceID, 9402u)) {
+        return;
+    }
+
+    if (!CalcPosition(SourceID)) {
+        return;
+    }
+}
