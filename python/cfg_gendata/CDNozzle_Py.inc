@@ -9,6 +9,17 @@
 // Required: default particle-owned contact stiffness written to Data.y.
 collision_stiffness_q = 0.5;
 
+// Required: depth-dependent stiffness shape for current contact dynamics.
+compression_stiffness_gain = 8.0;
+compression_stiffness_power = 2.0;
+
+// Required: penetration-depth limits for contact compression.
+target_penetration_fraction = 0.5;
+hard_penetration_fraction = 0.75;
+
+// Required: generation-time compression feasibility threshold.
+min_compression_frames = 3.0;
+
 // Required: simulation timestep.
 dt= 0.5;
 

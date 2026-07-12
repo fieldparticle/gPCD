@@ -104,6 +104,19 @@ In the active compute shader, error/status state is reported through
 \texttt{collOut.ErrorNumber}.  Generated ForceDynamics GLSL must not redefine
 the compute atomic buffer or create a competing counter layout.
 
+When C++ or any generator promotes numeric \texttt{.tst} values into GLSL
+preprocessor macros, the macro body must be a bare expression token and must
+not include a trailing semicolon.  For example:
+\begin{verbatim}
+#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN 8.000000000
+\end{verbatim}
+is valid inside later expressions, while:
+\begin{verbatim}
+#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN 8.000000000;
+\end{verbatim}
+expands a semicolon into the call site and can produce GLSL parser errors in
+ordinary expressions such as \texttt{max(...)}.
+
 The compute atomic structure is defined below:
 \begin{verbatim}
 layout (binding = 5) coherent buffer CollisionOut

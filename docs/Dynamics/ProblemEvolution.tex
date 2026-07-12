@@ -2151,3 +2151,31 @@ hardcoded.  The next cleanup is to export
 \texttt{compression\_stiffness\_gain} and
 \texttt{compression\_stiffness\_power} from the configuration into generated
 local GLSL so Python and Vulkan cannot drift.
+
+\subsubsection{configuration synchronization}
+
+The CD-nozzle Python and Vulkan include configurations now carry the same
+depth-dependent contact controls:
+\begin{verbatim}
+compression_stiffness_gain
+compression_stiffness_power
+target_penetration_fraction
+hard_penetration_fraction
+min_compression_frames
+\end{verbatim}
+This keeps data generation, Python dynamics, and Vulkan test-file metadata on
+the same material convention.
+
+A Vulkan compile failure exposed one important porting rule.  When a
+\texttt{.tst} value is promoted into local GLSL as a preprocessor macro, the
+macro body must be the raw numeric token and must not include a trailing
+semicolon.  Otherwise an expression such as
+\begin{verbatim}
+max(0.0, FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN)
+\end{verbatim}
+expands into invalid GLSL.  The generated local GLSL should therefore emit:
+\begin{verbatim}
+#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN 8.000000000
+#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER 2.000000000
+\end{verbatim}
+rather than semicolon-terminated macro values.

@@ -443,6 +443,14 @@ class GenReservoir(GenericGenData):
         hard_penetration_fraction = float(
             self.itemcfg.get("hard_penetration_fraction", 0.75)
         )
+        compression_stiffness_gain = max(
+            0.0,
+            float(self.itemcfg.get("compression_stiffness_gain", 0.0)),
+        )
+        compression_stiffness_power = max(
+            0.0,
+            float(self.itemcfg.get("compression_stiffness_power", 2.0)),
+        )
         piston_normal_speed = abs(float(self.piston_velocity[0]))
         per_frame_closing_distance = piston_normal_speed * self.dt
         target_penetration_depth = target_penetration_fraction * self.radius
@@ -480,9 +488,34 @@ class GenReservoir(GenericGenData):
         time_to_target_depth = frames_to_target_depth * self.dt
         time_to_hard_depth = frames_to_hard_depth * self.dt
         stiffness_at_contact = float(self.itemcfg.get("collision_stiffness_q", 0.0))
+        if (
+            compression_stiffness_gain > 0.0
+            and hard_penetration_depth > 0.0
+        ):
+            target_compression_fraction = max(
+                0.0,
+                min(1.0, target_penetration_depth / hard_penetration_depth),
+            )
+            effective_stiffness_at_target = stiffness_at_contact * (
+                1.0
+                + compression_stiffness_gain
+                * (target_compression_fraction ** compression_stiffness_power)
+            )
+            effective_stiffness_at_hard = stiffness_at_contact * (
+                1.0 + compression_stiffness_gain
+            )
+        else:
+            effective_stiffness_at_target = stiffness_at_contact
+            effective_stiffness_at_hard = stiffness_at_contact
         force_at_target_depth = stiffness_at_contact * target_penetration_depth
+        effective_force_at_target_depth = (
+            effective_stiffness_at_target * target_penetration_depth
+        )
         source_dv_per_frame_at_max = force_at_target_depth * self.dt
-        relative_dv_per_frame_at_max = source_dv_per_frame_at_max
+        effective_source_dv_per_frame_at_max = (
+            effective_force_at_target_depth * self.dt
+        )
+        relative_dv_per_frame_at_max = effective_source_dv_per_frame_at_max
         if (
             piston_normal_speed > 0.0
             and frames_to_target_depth > 0.0
@@ -542,8 +575,18 @@ class GenReservoir(GenericGenData):
             f"  time from contact to hard depth: {time_to_hard_depth:.6f}\n"
             f"  minimum compression frames: {min_compression_frames:.3f}\n"
             f"  stiffness at contact: {stiffness_at_contact:.6f}\n"
+            f"  compression stiffness gain: {compression_stiffness_gain:.6f}\n"
+            f"  compression stiffness power: {compression_stiffness_power:.6f}\n"
+            f"  effective stiffness at target depth: "
+            f"{effective_stiffness_at_target:.6f}\n"
+            f"  effective stiffness at hard depth: "
+            f"{effective_stiffness_at_hard:.6f}\n"
             f"  force at target depth: {force_at_target_depth:.6f}\n"
+            f"  effective force at target depth: "
+            f"{effective_force_at_target_depth:.6f}\n"
             f"  source dv/frame at max: {source_dv_per_frame_at_max:.6f}\n"
+            f"  effective source dv/frame at max: "
+            f"{effective_source_dv_per_frame_at_max:.6f}\n"
             f"  relative dv/frame at max: {relative_dv_per_frame_at_max:.6f}\n"
             f"  frames to cancel relative speed: "
             f"{frames_to_cancel_relative_speed:.3f}\n"
@@ -574,8 +617,16 @@ class GenReservoir(GenericGenData):
             "frames_to_hard_depth": frames_to_hard_depth,
             "time_to_hard_depth": time_to_hard_depth,
             "stiffness_at_contact": stiffness_at_contact,
+            "compression_stiffness_gain": compression_stiffness_gain,
+            "compression_stiffness_power": compression_stiffness_power,
+            "effective_stiffness_at_target": effective_stiffness_at_target,
+            "effective_stiffness_at_hard": effective_stiffness_at_hard,
             "force_at_target_depth": force_at_target_depth,
+            "effective_force_at_target_depth": effective_force_at_target_depth,
             "source_dv_per_frame_at_max": source_dv_per_frame_at_max,
+            "effective_source_dv_per_frame_at_max": (
+                effective_source_dv_per_frame_at_max
+            ),
             "relative_dv_per_frame_at_max": relative_dv_per_frame_at_max,
             "frames_to_cancel_relative_speed": frames_to_cancel_relative_speed,
             "time_to_cancel_relative_speed": time_to_cancel_relative_speed,
