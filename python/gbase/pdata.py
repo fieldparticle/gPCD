@@ -48,8 +48,9 @@ class pdata(ctypes.Structure):
       identify boundary markers. Generic function-wall simulations use
       ``ptype == 1`` for all boundary markers; the simulation wall model and
       ``curve_wall_segments`` determine how those markers are evaluated.
-    - ``temp_vel`` is independent reserved particle data. It is not used for
-      boundary classification or wall-evaluator dispatch.
+    - ``material_id`` identifies the material/species used for rendering and
+      heterogeneous dynamics. It is independent of boundary classification and
+      wall-evaluator dispatch.
     - ``state_flg`` becomes ``Data.w``.
     - ``molar_mass`` becomes ``parms.x``.
 
@@ -81,7 +82,7 @@ class pdata(ctypes.Structure):
         ("ptype", ctypes.c_double),       # 0 mobile; positive values identify boundary markers.
         ("state_flg", ctypes.c_double),   # Runtime lifecycle copied to Data.w.
         ("molar_mass", ctypes.c_double),  # Particle mass; copied to Vulkan parms.x.
-        ("temp_vel", ctypes.c_double),    # Reserved particle data; independent of boundary dispatch.
+        ("material_id", ctypes.c_double),    # Material/species id; independent of boundary dispatch.
         ("collision_stiffness_q", ctypes.c_double),  # Particle-owned collision stiffness; copied to Data.y.
         ]
         

@@ -128,7 +128,7 @@ void ResourceVertexCube::MakeAxes(uint32_t sidelen)
 
 	glm::vec3 minCorner;
 	glm::vec3 maxCorner;
-
+#if 0
 	if (show_wall_as_boundary_cube ==true)
 	{
 		minCorner = glm::vec3(
@@ -143,14 +143,20 @@ void ResourceVertexCube::MakeAxes(uint32_t sidelen)
 			CfgTst->GetFloat("wallZMAX", true)
 		);
 	}
-	
+#endif	
+
 	if (show_cell_boundary_cube == true)
 	{
+		m_CellW = CfgTst->GetUInt("CellAryW", true);
+		m_CellL = CfgTst->GetUInt("CellAryL", true);
+		m_CellH = CfgTst->GetUInt("CellAryH", true);
 		minCorner = glm::vec3(0.5f, 0.5f, 0.5f);
+		maxCorner = glm::vec3(
+			static_cast<float>(m_CellW) - 0.5f,
+			static_cast<float>(m_CellH) - 0.5f,
+			static_cast<float>(m_CellL) - 0.5f
+		);
 
-		float side = static_cast<float>(sidelen);
-
-		maxCorner = glm::vec3(side - 0.5, side - 0.5, side - 0.5);
 	}
 
 	if (show_cell_boundary_cube == true || show_wall_as_boundary_cube == true)

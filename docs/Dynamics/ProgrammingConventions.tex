@@ -22,8 +22,8 @@ The Python HSV velocity-angle helper is:
 gbase/utilities.py:hsv_angle(angle, value, sat)
 \end{verbatim}
 
-\texttt{SimulationRunner.py} applies this helper when the flat configuration
-item \texttt{hsv\_color} is true.  The helper reads the angle in
+\texttt{SimulationRunner\_HSVPanel.py} applies this helper when the flat
+configuration item \texttt{hsv\_color} is true.  The helper reads the angle in
 radians, maps it to hue with \(1/(2\pi)\), clamps saturation and value to
 \([0,1]\), and returns an RGB tuple for the Python renderer.
 

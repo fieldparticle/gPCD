@@ -55,7 +55,7 @@ struct Particle {
 	uint  sltnum;				// Use to store contact count.
 	uint  colFlg;				// 1 if in collision, 0 if not.
 	float MolarMatter;			// To be used later
-	float temp_vel;				// To be used later
+	float material_id;			// material/species id
 };
 struct boundStruct
 {

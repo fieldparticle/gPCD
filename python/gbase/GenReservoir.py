@@ -44,6 +44,19 @@ class GenReservoir(GenericGenData):
                 return ()
             return result
 
+        def required_nonnegative_float(name):
+            value = self.itemcfg.get(name)
+            try:
+                result = float(value)
+            except (TypeError, ValueError):
+                errors.append(f"{name} is required and must be numeric")
+                return None
+            if not math.isfinite(result):
+                errors.append(f"{name} must be finite")
+            elif result < 0.0:
+                errors.append(f"{name} must not be negative")
+            return result
+
         dimensions = []
         for name in (
             "cell_array_width",
@@ -100,7 +113,7 @@ class GenReservoir(GenericGenData):
             )
 
         death_bounds = required_values("death_bounds", 6)
-        packing_z_bounds = required_values("packing_z_bounds", 2)
+        particle_plane_z = required_nonnegative_float("particle_plane_z")
         initial_particle_velocity = required_values("initial_particle_velocity", 3)
 
         piston_enabled = optional_bool(
@@ -225,25 +238,40 @@ class GenReservoir(GenericGenData):
             elif piston_start_offset_value < 0.0:
                 errors.append("piston_start_offset must not be negative")
 
-        if packing_bounds and packing_z_bounds and len(dimensions) == 3:
+        try:
+            radius = float(self.itemcfg.radius)
+        except (AttributeError, TypeError, ValueError):
+            errors.append("radius is required and must be numeric")
+            radius = None
+
+        if radius is not None:
+            if not math.isfinite(radius):
+                errors.append("radius must be finite")
+            elif radius <= 0.0:
+                errors.append("radius must be positive")
+
+        if packing_bounds and particle_plane_z is not None and len(dimensions) == 3:
             x_start, x_end, y_bottom, y_top = packing_bounds
-            z_front, z_back = packing_z_bounds
             piston_x_start = x_start - (piston_start_offset_value or 0.0)
             if x_start >= x_end:
                 errors.append("packing curves: x_start must be less than x_end")
             if y_bottom >= y_top:
                 errors.append("packing curves: y_bottom must be less than y_top")
-            if z_front >= z_back:
-                errors.append("packing_z_bounds: z_front must be less than z_back")
             if (
                 x_start < 0.0
                 or x_end > dimensions[0]
                 or y_bottom < 0.0
                 or y_top > dimensions[1]
-                or z_front < 0.0
-                or z_back > dimensions[2]
+                or particle_plane_z >= dimensions[2]
             ):
                 errors.append("packing bounds must fit inside the cell array")
+            if abs((particle_plane_z - math.floor(particle_plane_z)) - 0.5) > 1.0e-9:
+                errors.append("particle_plane_z must be centered in a cell")
+            if radius is not None and (
+                particle_plane_z - radius < 0.0
+                or particle_plane_z + radius > dimensions[2]
+            ):
+                errors.append("particle_plane_z particle radius must fit inside the cell array")
             if (
                 death_bounds
                 and (
@@ -251,8 +279,8 @@ class GenReservoir(GenericGenData):
                     or x_end > death_bounds[1]
                     or y_bottom < death_bounds[2]
                     or y_top > death_bounds[3]
-                    or z_front < death_bounds[4]
-                    or z_back > death_bounds[5]
+                    or particle_plane_z - (radius or 0.0) < death_bounds[4]
+                    or particle_plane_z + (radius or 0.0) > death_bounds[5]
                 )
             ):
                 errors.append("packing bounds must fit inside death_bounds")
@@ -307,7 +335,7 @@ class GenReservoir(GenericGenData):
         self.curve_wall_segments = curve_segments
         self.packing_curve_segments = packing_curve_segments
         self.packing_bounds = packing_bounds
-        self.packing_z_bounds = packing_z_bounds
+        self.particle_plane_z = particle_plane_z
         self.piston_start_offset = piston_start_offset_value or 0.0
         self.piston_x_start = packing_bounds[0] - self.piston_start_offset
         self.piston_x_stop = packing_bounds[1]
@@ -318,7 +346,7 @@ class GenReservoir(GenericGenData):
         self.piston_start_frame = int(piston_start_frame_value)
         self.number_configured_particles = 0
         self.explicit_particles = []
-        self.radius = float(self.itemcfg.radius)
+        self.radius = radius
         self.wall_contact_offset = float(self.itemcfg.wall_contact_offset)
         self.dt = float(self.itemcfg.dt)
         self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
@@ -348,8 +376,6 @@ class GenReservoir(GenericGenData):
         center_spacing = 2.0 * radius + self.particle_separation_distance
         boundary_clearance = radius * (1.0 + self.wall_contact_offset) + 1.0e-9
         x_start, x_end, y_bottom, y_top = self.packing_bounds
-        z_front, z_back = self.packing_z_bounds
-        z_center = 0.5 * (z_front + z_back)
 
         x_center_min = x_start + boundary_clearance
         x_center_max = x_end - boundary_clearance
@@ -373,18 +399,17 @@ class GenReservoir(GenericGenData):
         self.packing_particle_count = x_count * y_count
         self.particle_center_spacing = center_spacing
         self.boundary_particle_clearance = boundary_clearance
-        self.particle_plane_z = z_center
-        self.packing_first_center = (first_x, first_y, z_center)
+        self.packing_first_center = (first_x, first_y, self.particle_plane_z)
         self.packing_last_center = (
             first_x + occupied_x,
             first_y + occupied_y,
-            z_center,
+            self.particle_plane_z,
         )
 
         self.packing_report_text = (
             "Reservoir packing report:\n"
             f"  packing bounds: {self.packing_bounds}\n"
-            f"  packing z bounds: {self.packing_z_bounds}\n"
+            f"  particle plane z: {self.particle_plane_z:g}\n"
             f"  piston x range: {self.piston_x_start:g} to {self.piston_x_stop:g}\n"
             f"  radius: {radius:g}\n"
             f"  surface separation: {self.particle_separation_distance:g}\n"

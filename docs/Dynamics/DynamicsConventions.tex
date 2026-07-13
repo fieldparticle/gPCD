@@ -8,6 +8,19 @@ The project maintains independently selectable dynamics models.  Each model is
 a readable Python implementation whose source-complete structure is intended
 to transfer to GLSL with minimal translation.
 
+\subsection{Particle Population Terminology}
+
+Polydisperse usually means a particle population with different sizes or
+radii, often with a size distribution.  It can imply different masses
+indirectly if mass follows radius and density, but the key distinction is size
+dispersion.
+
+Heterogeneous particles means particles may differ in material properties:
+mass, density, type, viscosity coupling, drag behavior, restitution, and
+similar material response parameters.  A population containing the existing
+substance particles plus air particles with much lower mass is therefore a
+heterogeneous mixture.
+
 \subsection{Source-Owned Execution}
 
 Each source particle reads immutable position and velocity snapshots,
@@ -202,6 +215,51 @@ coefficient.  That future model must still be local and causal: heat may be
 derived from force, momentum, compression, and material coefficients, but it
 must not be introduced as an after-the-fact command to make total energy match
 a desired value.
+
+\subsection{Deferred Heterogeneous Buoyancy Coupling}
+
+\texttt{FreeStreamHetero} introduces a heterogeneous particle population with
+substance particles and lower-mass air particles.  Mass difference alone is not
+the complete buoyancy model.  Substance particles must not act as unlimited
+vertical velocity injectors for the air population.
+
+The intended future model is a material-pair coupling rule.  Substance-air
+contacts may transfer upward vertical motion or force to air particles, but
+the transfer must be capped by material-pair properties.  The cap represents a
+limited buoyancy or entrainment effect rather than arbitrary velocity creation.
+
+A future configuration may define a material-pair block similar to:
+
+\begin{verbatim}
+material_pair_properties = (
+  {
+    source_material_id = 0;   // substance
+    target_material_id = 1;   // air
+    vertical_velocity_transfer_limit = ...;
+    vertical_force_limit = ...;
+    coupling = ...;
+  }
+);
+\end{verbatim}
+
+The ordinary integration rule remains force and mass based:
+
+\begin{verbatim}
+acceleration = totalForce / mass;
+velocity += acceleration * dt;
+\end{verbatim}
+
+The material mass controls how strongly a particle responds to applied force.
+The material-pair coupling limit controls how much upward motion substance can
+donate to air.  This work is deferred while the project moves to lighting and
+clearer 3D visualization.
+
+\subsection{Deferred Lighting Direction}
+
+Lighting is the preferred next graphics step toward readable 3D visualization.
+Before adding more heterogeneous dynamics complexity, particle rendering should
+make depth, surface shape, and material identity clear enough that substance
+and air structure can be inspected in 3D.
 
 \subsection{Visual Diagnostics}
 

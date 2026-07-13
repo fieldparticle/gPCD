@@ -392,54 +392,33 @@ def _runtime_particle_velocity(particle_index, particle, dynamics=None):
     )
 
 
-def _draw_piston_status_near_first_particle(
+def _draw_piston_status_overlay(
     screen,
-    particles,
     run_configuration,
     dynamics,
     frame_number,
-    view_box,
 ):
     if dynamics is None:
         return
     if not bool(run_configuration.get("dynamics_diagnostics", False)):
         return
 
-    screen_width, screen_height = screen.get_size()
-    anchor = None
-    for index, particle in enumerate(particles):
-        if _is_boundary_particle(index, particle, dynamics):
-            continue
-        if not _is_visible_particle(index, particle, dynamics):
-            continue
-        position = _runtime_particle_position(index, particle, dynamics)
-        anchor = _to_screen(
-            position.x,
-            position.y,
-            view_box,
-            screen_width,
-            screen_height,
-        )
-        break
-
-    if anchor is None:
+    enabled = bool(dynamics.PistonEnabled()) if hasattr(dynamics, "PistonEnabled") else False
+    if not enabled:
         return
 
-    enabled = bool(dynamics.PistonEnabled()) if hasattr(dynamics, "PistonEnabled") else False
-    if enabled:
-        piston_x = dynamics.GetPistonPosition(frame_number)
-        piston_velocity = dynamics.GetPistonVelocity(frame_number)
-        label = (
-            f"piston x={piston_x:.6f} "
-            f"v=({piston_velocity.x:.6f},{piston_velocity.y:.6f},{piston_velocity.z:.6f})"
-        )
-    else:
-        label = "piston disabled"
+    piston_x = dynamics.GetPistonPosition(frame_number)
+    piston_velocity = dynamics.GetPistonVelocity(frame_number)
+    label = (
+        f"piston x={piston_x:.6f} "
+        f"v=({piston_velocity.x:.6f},{piston_velocity.y:.6f},{piston_velocity.z:.6f})"
+    )
 
     font = pygame.font.SysFont("consolas", 18)
     text = font.render(label, True, (255, 255, 255))
     shadow = font.render(label, True, (0, 0, 0))
-    label_pos = (anchor[0] + 8, anchor[1] - 34)
+    screen_width, _screen_height = screen.get_size()
+    label_pos = (max(10, screen_width - text.get_width() - 12), 10)
     screen.blit(shadow, (label_pos[0] + 1, label_pos[1] + 1))
     screen.blit(text, label_pos)
 
@@ -1135,13 +1114,11 @@ def _draw_particles(
                 )
 
     _draw_piston(screen, run_configuration, dynamics, frame_number, view_box)
-    _draw_piston_status_near_first_particle(
+    _draw_piston_status_overlay(
         screen,
-        particles,
         run_configuration,
         dynamics,
         frame_number,
-        view_box,
     )
 
     show_particle_numbers = bool(run_configuration.get("simulation_particle_numbers", True))

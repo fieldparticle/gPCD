@@ -108,16 +108,25 @@ void VulkanObj::CreateLogicalDevice() {
         interlock.fragmentShaderPixelInterlock = VK_TRUE;
         interlock.fragmentShaderShadingRateInterlock = VK_TRUE;
         
+
+        
+        
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pQueueCreateInfos = queueCreateInfos.data();
 		createInfo.pNext = &interlock;
         createInfo.pEnabledFeatures = &deviceFeatures;
-
         createInfo.enabledExtensionCount = static_cast<uint32_t>(m_DeviceExtensions.size());
         createInfo.ppEnabledExtensionNames = m_DeviceExtensions.data();
+
+        VkPhysicalDeviceVulkan13Features vulkan13Features{};
+        vulkan13Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+        vulkan13Features.pNext = &interlock;
+        vulkan13Features.shaderDemoteToHelperInvocation = VK_TRUE;
+
+        createInfo.pNext = &vulkan13Features;
+
 
         for (uint32_t i = 0; i < m_DeviceExtensions.size(); i++)
         {

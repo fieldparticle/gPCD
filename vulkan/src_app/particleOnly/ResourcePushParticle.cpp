@@ -80,8 +80,8 @@ void ResourceParticlePush::PushMem(uint32_t currentBuffer)
 	{
 		m_ShaderFlags.actualFrame++;
 		m_ShaderFlags.StopFlg = 0.0;
-		if(static_cast<uint32_t>(m_ShaderFlags.actualFrame) % 1000 == 0)
-			std::cout << "Actual Frame :" <<  static_cast<uint32_t>(m_ShaderFlags.actualFrame) << std::endl;
+		//if(static_cast<uint32_t>(m_ShaderFlags.actualFrame) % 1000 == 0)
+		//	std::cout << "Actual Frame :" <<  static_cast<uint32_t>(m_ShaderFlags.actualFrame) << std::endl;
 	}
 
 	if(G_Boundary == true)

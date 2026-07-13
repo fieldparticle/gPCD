@@ -18,7 +18,8 @@ by \texttt{curve\_wall\_segments}; the active Python dynamics no longer reads
     \item[\texttt{module\_class}] Generic explicit-particle cases select
     \texttt{GenericGenData.py}.  Reservoir generators inherit or reuse that
     generic particle and parametric-wall contract.  The FreeStream streaming
-    inlet experiment selects \texttt{GenStreaming.py}.
+    inlet experiment selects \texttt{GenStreaming.py}.  Lighting and
+    visualization release-frame cases select \texttt{GenLightingData.py}.
     \item[\texttt{include\_file}] Scale profile merged over the parent cfg.
     \texttt{sub\_BPRPPy.cfg} provides the reduced Python profile and
     \texttt{sub\_BPRPVk.cfg} provides the larger Vulkan profile.
@@ -54,6 +55,29 @@ The packing span is derived from reservoir-kind
 \texttt{curve\_wall\_segments} and \texttt{packing\_z\_bounds}.  Boundary
 markers are still generated from the configured function-wall segments and
 use \texttt{ptype=1}.  FreeStream does not require piston configuration.
+
+\subsection{Lighting Release Inputs}
+
+\texttt{GenLightingData.py} inherits from \texttt{GenStreaming.py} so it can
+reuse the positive-\texttt{Data.w} release gate, but its population comes from
+explicit \texttt{PARTICLE\_DATA} entries.  Each particle may specify:
+\begin{verbatim}
+releaseFrame
+\end{verbatim}
+The generator stores that value in \texttt{pdata.state\_flg}.  Generated
+runtime records therefore use:
+\begin{itemize}
+    \item \(\texttt{Data.w}=0\): active from frame zero;
+    \item \(\texttt{Data.w}>0\): pending until the current frame reaches the
+          stored release frame;
+    \item \(\texttt{Data.w}<0\): dead state only, not a valid configured
+          release frame.
+\end{itemize}
+
+Lighting configurations should still provide \texttt{material\_properties}.
+Per-particle records select the material with \texttt{material\_id}; shared
+mass scaling, thermal velocity, color scheme, and density metadata belong to
+the material record.
 
 \subsection{Rectangular Cell Domain}
 

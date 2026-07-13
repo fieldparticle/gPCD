@@ -130,9 +130,9 @@ void CommandParticleBoundaryOnly::RecordSubPassCube(uint32_t imageindex, uint32_
 	// Record the viewpoer to be used
 	VkViewport viewport{};
 	viewport.x = 0.0f;
-	viewport.y = static_cast<float>(m_CPL->m_SCO->GetSwapHeight());
+	viewport.y = 0.0f;
 	viewport.width = static_cast<float>(m_CPL->m_SCO->GetSwapWidth());
-	viewport.height = -static_cast<float>(m_CPL->m_SCO->GetSwapHeight());
+	viewport.height = static_cast<float>(m_CPL->m_SCO->GetSwapHeight());
 	viewport.minDepth = static_cast<float>(m_CPL->m_SCO->GetSizzorMin());
 	viewport.maxDepth = static_cast<float>(m_CPL->m_SCO->GetSizzorMax());
 	vkCmdSetViewport(m_CommandBuffers[currentBuffer], 0, 1, &viewport);
@@ -156,12 +156,7 @@ void CommandParticleBoundaryOnly::RecordSubPassCube(uint32_t imageindex, uint32_
 	Resource* dvo = (m_RCO->GetResourceName("VertexCube"));
 	VkBuffer* vertexBuffers = static_cast<VkBuffer*>(&dvo->m_Buffers[0]);
 
-	VkDeviceSize offsets[] = { 0 };
-	vkCmdBindVertexBuffers(m_CommandBuffers[currentBuffer], 0, 1, vertexBuffers, offsets);
-	uint16_t inum = 0;
-	VkBuffer* indexBuffers = static_cast<VkBuffer*>(&dvo->m_Buffers[1]);
-
-	vkCmdBindIndexBuffer(m_CommandBuffers[currentBuffer], *indexBuffers, 0, VK_INDEX_TYPE_UINT32);
+	
 
 	// Bind the descriptor set associated with this record.
 	vkCmdBindDescriptorSets(m_CommandBuffers[currentBuffer],
@@ -189,12 +184,20 @@ void CommandParticleBoundaryOnly::RecordSubPassCube(uint32_t imageindex, uint32_
 	bool show_boundary_as_obj = CfgApp->GetBool("application.boundary_as_obj", true);
 	if (show_boundary_as_obj == true)
 	{
+		VkDeviceSize offsets[] = { 0 };
+		vkCmdBindVertexBuffers(m_CommandBuffers[currentBuffer], 0, 1, vertexBuffers, offsets);
 		uint32_t vnum = static_cast<uint32_t>(dvo->m_NumElements);
 		vkCmdDraw(m_CommandBuffers[currentBuffer], vnum, 1, 0, 0);
 	}
 	else
 	{
 		uint32_t vnum = 36;
+		VkDeviceSize offsets[] = { 0 };
+		vkCmdBindVertexBuffers(m_CommandBuffers[currentBuffer], 0, 1, vertexBuffers, offsets);
+		uint16_t inum = 0;
+		VkBuffer* indexBuffers = static_cast<VkBuffer*>(&dvo->m_Buffers[1]);
+
+		vkCmdBindIndexBuffer(m_CommandBuffers[currentBuffer], *indexBuffers, 0, VK_INDEX_TYPE_UINT32);
 		vkCmdDrawIndexed(m_CommandBuffers[currentBuffer], vnum, 1, 0, 0,0);
 	}
 
@@ -261,9 +264,9 @@ void CommandParticleBoundaryOnly::RecordSubPassParticle(uint32_t imageindex, uin
 	// Record the viewpoer to be used
 	VkViewport viewport{};
 	viewport.x			= 0.0f;
-	viewport.y			= static_cast<float>(m_SCO->GetSwapHeight());
+	viewport.y			= 0.0f;
 	viewport.width		= static_cast<float>(m_SCO->GetSwapWidth());
-	viewport.height		= -static_cast<float>(m_SCO->GetSwapHeight());
+	viewport.height		= static_cast<float>(m_SCO->GetSwapHeight());
 
 	viewport.minDepth	= static_cast<float>(m_SCO->GetSizzorMin());
 	viewport.maxDepth	= static_cast<float>(m_SCO->GetSizzorMax());

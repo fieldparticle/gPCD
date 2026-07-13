@@ -383,13 +383,27 @@ reliably represent several differently oriented contact ledgers.
 
 \subsection{Lifecycle and Domain Rules}
 
-All generated mobile particles begin active.  Runtime scheduled birth and
-deferred admission are retired.  Permanent life state is:
+The ordinary simple and reservoir models generate mobile particles active
+from frame zero.  Runtime reservoir birth and deferred admission are retired.
+Permanent life state is:
 
 \begin{itemize}
     \item zero: active mobile particle;
     \item negative: dead mobile particle.
 \end{itemize}
+
+Two generator-scoped exceptions intentionally use positive \texttt{Data.w} as
+a scheduled release frame:
+\begin{itemize}
+    \item \texttt{GenStreaming.py} uses positive \texttt{Data.w} for FreeStream
+          inlet waves;
+    \item \texttt{GenLightingData.py} uses positive \texttt{Data.w} for
+          explicit lighting and visualization sequences.
+\end{itemize}
+In those records, the particle is pending until the current frame reaches the
+stored value, then participates as an active mobile particle.  This is a
+precomputed generator release schedule, not runtime birth admission, and it
+does not write or relocate target particles.
 
 After integration, a mobile particle outside the rectangular cell array is an
 error.  A mobile particle outside any configured death plane becomes dead.

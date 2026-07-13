@@ -1,3 +1,0 @@
-x_axis_lims 
-y_axis_lims 
-z_axis_lims 

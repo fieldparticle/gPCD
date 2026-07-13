@@ -4,6 +4,10 @@ from gbase.GenDataBase import *
 import math
 from gbase.pdata import *
 from gbase.libconf import AttrDict
+from gbase.MaterialProperties import (
+    write_color_scheme_defines,
+    write_material_properties,
+)
 import io
 class GenMotionData():
 
@@ -154,6 +158,8 @@ class GenMotionData():
         f.write(fstr)
         fstr = f"hsv_val = {run_cfg.hsv_val:0.4f};\n"
         f.write(fstr)
+        write_color_scheme_defines(f)
+        write_material_properties(f, run_cfg)
         f.flush()
         f.close()
 
@@ -180,6 +186,7 @@ class GenMotionData():
                 particle_struct.vy = part.vy
                 particle_struct.vz = 0.0
                 particle_struct.molar_mass = part.mass
+                particle_struct.material_id = part.get("material_id", 0.0)
                 particle_struct.radius = part.radius
                 particle_struct.collision_stiffness_q = part.get(
                     "collision_stiffness_q",

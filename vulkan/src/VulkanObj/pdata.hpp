@@ -43,7 +43,7 @@ struct pdata
 	double ptype;		// boundary or particle		
 	double state_flg;	// 1 live or 0 dead
 	double molar_mass;
-	double temp_vel;
+	double material_id;	// material/species id; independent of ptype boundary role
 	double collision_stiffness_q;
 
 } ;

@@ -73,7 +73,7 @@ class GenStreaming(GenericGenData):
                 dimensions.append(value)
 
         death_bounds = required_values("death_bounds", 6)
-        packing_z_bounds = required_values("packing_z_bounds", 2)
+        particle_plane_z = required_nonnegative_float("particle_plane_z")
         initial_particle_velocity = required_values("initial_particle_velocity", 3)
 
         self.validate_penetration_fractions(errors)
@@ -179,24 +179,39 @@ class GenStreaming(GenericGenData):
                         f"death_bounds {axis}_min must be less than {axis}_max"
                     )
 
-        if packing_z_bounds and packing_z_bounds[0] >= packing_z_bounds[1]:
-            errors.append("packing_z_bounds: z_front must be less than z_back")
+        try:
+            radius = float(self.itemcfg.radius)
+        except (AttributeError, TypeError, ValueError):
+            errors.append("radius is required and must be numeric")
+            radius = None
 
-        if packing_bounds and packing_z_bounds and len(dimensions) == 3:
+        if radius is not None:
+            if not math.isfinite(radius):
+                errors.append("radius must be finite")
+            elif radius <= 0.0:
+                errors.append("radius must be positive")
+
+        if packing_bounds and particle_plane_z is not None and len(dimensions) == 3:
             x_min, x_max, y_min, y_max = packing_bounds
-            z_front, z_back = packing_z_bounds
             width, height, depth = dimensions
             if x_min < 0.0 or x_max > width or y_min < 0.0 or y_max > height:
                 errors.append("streaming packing bounds must fit inside cell array")
-            if z_front < 0.0 or z_back > depth:
-                errors.append("packing_z_bounds must fit inside cell array")
+            if particle_plane_z >= depth:
+                errors.append("particle_plane_z must fit inside cell array")
+            if abs((particle_plane_z - math.floor(particle_plane_z)) - 0.5) > 1.0e-9:
+                errors.append("particle_plane_z must be centered in a cell")
+            if radius is not None and (
+                particle_plane_z - radius < 0.0
+                or particle_plane_z + radius > depth
+            ):
+                errors.append("particle_plane_z particle radius must fit inside cell array")
             if death_bounds and (
                 x_min < death_bounds[0]
                 or x_max > death_bounds[1]
                 or y_min < death_bounds[2]
                 or y_max > death_bounds[3]
-                or z_front < death_bounds[4]
-                or z_back > death_bounds[5]
+                or particle_plane_z - (radius or 0.0) < death_bounds[4]
+                or particle_plane_z + (radius or 0.0) > death_bounds[5]
             ):
                 errors.append("streaming packing bounds must fit inside death_bounds")
 
@@ -217,6 +232,8 @@ class GenStreaming(GenericGenData):
                         f"curve_wall_segments[{index}] y extent is outside cell array"
                     )
 
+        self.validate_material_properties(errors)
+
         if errors:
             raise ValueError(
                 "Streaming configuration error(s):\n  - "
@@ -228,7 +245,7 @@ class GenStreaming(GenericGenData):
         self.curve_wall_segments = curve_segments
         self.packing_curve_segments = packing_curve_segments
         self.packing_bounds = packing_bounds
-        self.packing_z_bounds = packing_z_bounds
+        self.particle_plane_z = particle_plane_z
         self.initial_particle_velocity = initial_particle_velocity
         self.particle_separation_distance = particle_separation_distance
         self.release_start_frame = release_start_frame
@@ -239,7 +256,7 @@ class GenStreaming(GenericGenData):
         self.streaming_inlet_value = inlet_x if inlet_x is not None else inlet_y
         self.number_configured_particles = 0
         self.explicit_particles = []
-        self.radius = float(self.itemcfg.radius)
+        self.radius = radius
         self.wall_contact_offset = float(self.itemcfg.wall_contact_offset)
         self.dt = float(self.itemcfg.dt)
         self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
@@ -331,8 +348,6 @@ class GenStreaming(GenericGenData):
         center_spacing = 2.0 * radius + self.particle_separation_distance
         boundary_clearance = radius * (1.0 + self.wall_contact_offset) + 1.0e-9
         x_start, x_end, y_start, y_end = self.packing_bounds
-        z_front, z_back = self.packing_z_bounds
-        z_center = 0.5 * (z_front + z_back)
 
         if self.streaming_inlet_axis == "y":
             span_min = x_start + boundary_clearance
@@ -354,7 +369,6 @@ class GenStreaming(GenericGenData):
         occupied_span = (self.particles_per_wave - 1) * center_spacing
         first_span_center = span_min + 0.5 * (usable_span - occupied_span)
 
-        self.particle_plane_z = z_center
         self.particle_center_spacing = center_spacing
         self.boundary_particle_clearance = boundary_clearance
         self.frames_per_wave = self.frames_between_waves()
@@ -367,7 +381,7 @@ class GenStreaming(GenericGenData):
         self.streaming_report_text = (
             "Streaming reservoir report:\n"
             f"  packing bounds: {self.packing_bounds}\n"
-            f"  packing z bounds: {self.packing_z_bounds}\n"
+            f"  particle plane z: {self.particle_plane_z:g}\n"
             f"  inlet axis: {self.streaming_inlet_axis}\n"
             f"  inlet value: {self.streaming_inlet_value:g}\n"
             f"  release start frame: {self.release_start_frame:g}\n"

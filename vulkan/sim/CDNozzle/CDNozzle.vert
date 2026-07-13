@@ -22,11 +22,6 @@ layout(binding = 1) uniform UniformBufferObject{
     mat4 proj;
 } ubo;
 
-layout(binding = 7) uniform UniformBufferObjectS{
-    mat4 model;
-    mat4 view;
-    mat4 proj;
-} subo;
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -57,17 +52,7 @@ void main()
 		gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
 		fragColor = inColor;
 	}
-	else
-	{
-		vec3 sphereOffset = inPosition.xyz * P[ModelInstance].Data.x;
-		vec4 newPos = vec4(sphereOffset + P[ModelInstance].PosLocA.xyz, 1.0);
-		gl_Position = subo.proj * subo.view * subo.model * newPos;
-		if(uint(P[ModelInstance].colFlg) == 1)
-			fragColor = vec4(1.0,0.0,0.0,1.0);	
-		else if(uint(P[ModelInstance].colFlg) == 0)
-			fragColor = vec4(0.0,1.0,0.0,1.0);	
-		//fragColor = inColor;
-	}
+	
 	
 	
 }

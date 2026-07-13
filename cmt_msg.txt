@@ -1,18 +1,5 @@
 Current status:
-    - Depth-dependent contact stiffness is now the shared simple dynamics direction for Python and Vulkan.
-    - TestReservoir showed a major stability improvement after the GLSL update, confirming that constant collision_stiffness_q was too weak for dense reservoir compression.
-    - CDNozzle Python and Vulkan include configurations now carry the same depth-stiffness, penetration-fraction, and compression-feasibility fields.
-    - Reservoir feasibility reporting now uses effective stiffness so generated reports match the runtime force law.
-    - A GLSL compile issue exposed that generated numeric preprocessor macros must not include trailing semicolons.
-
+  - Documented GenLightingData release-frame semantics and lifecycle exception
 Code Changes:
-    - Added compression_stiffness_gain, compression_stiffness_power, target_penetration_fraction, hard_penetration_fraction, and min_compression_frames to CDNozzle_Py.inc and CDNozzle_Vk.inc.
-    - Updated GenReservoir.py feasibility reporting to show effective stiffness, effective force, effective dv/frame, and stiffness gain/power.
-    - Documented the CDNozzle configuration synchronization in ProblemEvolution.tex.
-    - Documented the GLSL macro export rule in Porting.tex: generated #define numeric values must be emitted without semicolons.
-    - Preserved the source-owned contact force path and maximum-depth containment behavior.
-
-Next:
-    - Confirm ShaderObj emits FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN and FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER as semicolon-free macros from the .tst values.
-    - Regenerate CDNozzle local GLSL files and continue CDNozzle Vulkan testing on the shared ForceDynamicsSimple path.
-    - Later, reduce Vulkan workload by replacing the second occupancy scan with cached source-owned contact records.
+  - Updated Dynamics convention docs, Python config docs, runner references, and ProblemEvolution
+Next: Fix lumens wall-segment validation and verify lighting data generation

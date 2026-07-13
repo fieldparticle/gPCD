@@ -408,7 +408,7 @@ class ForceDynamics(ForceContactDynamics):
         radius = fields.get("radius", 0.0)
         ptype = fields.get("ptype", 0.0)
         boundary_evaluator_id = float(ptype) if float(ptype) > 0.5 else 0.0
-        temp_vel = fields.get("temp_vel", 0.0)
+        material_id = fields.get("material_id", 0.0)
         velocity_angle = self.VelocityAngle(vx, vy)
         particle.PosLocA = self.create_vec4(rx, ry, rz, 0.0)
         particle.PosLocB = self.create_vec4(rx, ry, rz, 1.0)
@@ -435,7 +435,7 @@ class ForceDynamics(ForceContactDynamics):
         particle.radius = radius
         particle.ptype = ptype
         particle.boundary_evaluator_id = boundary_evaluator_id
-        particle.temp_vel = temp_vel
+        particle.material_id = material_id
         particle.state_flg = fields.get("state_flg", 1.0)
         particle.collision_list = fields.get("collision_list", [])
         particle.oa = fields.get("oa", 0.0)
@@ -498,7 +498,7 @@ class ForceDynamics(ForceContactDynamics):
             mass=particle_cfg.get("mass", 1.0),
             radius=particle_cfg.get("radius", 0.0),
             ptype=particle_cfg.get("ptype", 0.0),
-            temp_vel=particle_cfg.get("temp_vel", 0.0),
+            material_id=particle_cfg.get("material_id", 0.0),
             collision_stiffness_q=collision_stiffness_q,
             state_flg=particle_cfg.get("state_flg", 1.0),
         )
@@ -537,7 +537,7 @@ class ForceDynamics(ForceContactDynamics):
             particle["boundary_evaluator_id"] = (
                 pp.ptype if pp.ptype > 0.5 else 0.0
             )
-            particle["temp_vel"] = pp.temp_vel
+            particle["material_id"] = pp.material_id
             particle["collision_stiffness_q"] = pp.collision_stiffness_q
             particle["state_flg"] = int(pp.state_flg)
             particle["edge"] = (100, 170, 255)

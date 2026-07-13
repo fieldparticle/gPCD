@@ -1,0 +1,42 @@
+// OBSOLETE: GenericGenData uses PARTICLE_DATA directly; it does not read MotionData.csv.
+selections_file = "C:/_DJ/gPCD/python/cfg_gendata/MotionData.csv";
+
+
+// OBSOLETE: explicit PARTICLE_DATA owns each initial velocity.
+initial_particle_velocity = [0.0, 0.0, 0.0];
+
+// OBSOLETE: old random/selection generators used this for placement spacing.
+particle_separation = 0.15;
+
+// OBSOLETE: old block-writing generator option; GenericGenData writes its list directly.
+write_block_len = 10000;
+
+// OBSOLETE: old random/selection generator mode; PARTICLE_DATA is deterministic.
+particle_enumeration = "random";
+
+
+// OBSOLETE: current Python ForceDynamics frame step does not subdivide by this key.
+substeps = 5;
+
+
+// OBSOLETE: old generated-test accounting fields; GenericGenData writes these values
+// into .tst output itself.
+particles_per_cell = 0;
+num_particle_colliding = 0;
+exp_collisions_per_cell = 0;
+act_collisions_per_cell = 0;
+particles_in_row = 0;
+collision_density = 0;
+pdensity = 0;
+
+// OBSOLETE: old procedural grid dimensions. PARTICLE_DATA below currently defines
+// five particles, not num_particles_x*num_particles_y.
+num_particles_x = 2;
+num_particles_y = 3;
+
+
+// OBSOLETE: old cubic cell-array shorthand; use cell_array_width/height/depth.
+cell_array_size = 0;
+
+// OBSOLETE: current generated bin path is derived from data_dir/output_file_prefix.
+bin_file = "C:/_DJ/gPCDData/examples";

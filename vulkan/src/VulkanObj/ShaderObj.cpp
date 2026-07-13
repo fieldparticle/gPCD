@@ -41,9 +41,159 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 		WriteShaderDbgHeader();
 	//	WriteCDNoz();
 		WriteWalls();
-		
+		WriteMaterials();
 		Piston();
 		GenWorkGroups();
+}
+
+void ShaderObj::WriteMaterials()
+{
+	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
+	std::string filename = fildir + "/material.glsl";
+
+	std::ofstream ostrm(filename);
+	if (!ostrm.is_open())
+	{
+		std::string rpt = "Failed to open file:" + filename;
+		throw std::runtime_error(rpt.c_str());
+	}
+
+	ostrm << "#ifndef MATERIAL_GLSL\n";
+	ostrm << "#define MATERIAL_GLSL\n\n";
+
+	ostrm << "const uint COLOR_SCHEME_COLLISION = 0u;\n";
+	ostrm << "const uint COLOR_SCHEME_HSV = 1u;\n";
+	ostrm << "const uint COLOR_SCHEME_WHITE = 2u;\n";
+	ostrm << "const uint COLOR_SCHEME_RED = 3u;\n";
+	ostrm << "const uint COLOR_SCHEME_GREEN = 4u;\n";
+	ostrm << "const uint COLOR_SCHEME_BLUE = 5u;\n\n";
+
+	ostrm << "struct MaterialProperty\n";
+	ostrm << "{\n";
+	ostrm << "    uint materialID;\n";
+	ostrm << "    float relativeMass;\n";
+	ostrm << "    float tempVel;\n";
+	ostrm << "    uint colorScheme;\n";
+	ostrm << "    float cellDensity;\n";
+	ostrm << "};\n\n";
+
+	int materialCount = 0;
+	config_setting_t* materialList = nullptr;
+
+	if (CfgTst->CheckKey("material_properties"))
+		materialList = CfgTst->StartStructure("material_properties", materialCount);
+
+	if (materialList == nullptr || materialCount <= 0)
+	{
+		ostrm << "const uint MATERIAL_PROPERTY_COUNT = 1u;\n";
+		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](\n";
+		ostrm << "    MaterialProperty(0u, 1.000000000, 0.000000000, COLOR_SCHEME_HSV, 0.000000000)\n";
+		ostrm << ");\n\n";
+		ostrm << "#endif\n";
+		return;
+	}
+
+	ostrm << "const uint MATERIAL_PROPERTY_COUNT = " << materialCount << "u;\n";
+	ostrm << "const MaterialProperty MATERIAL_PROPERTIES[" << materialCount << "] = MaterialProperty["
+		<< materialCount << "](\n";
+
+	for (int index = 0; index < materialCount; ++index)
+	{
+		config_setting_t* material = CfgTst->GetSubStructAddress(materialList, index);
+		if (material == nullptr)
+		{
+			throw std::runtime_error(
+				"material_properties[" + std::to_string(index) + "] is invalid"
+			);
+		}
+
+		int materialID = 0;
+		int colorScheme = 0;
+		double relativeMass = 1.0;
+		double tempVel = 0.0;
+		double cellDensity = 0.0;
+
+		if (config_setting_lookup_int(material, "material_id", &materialID) == CONFIG_FALSE)
+			throw std::runtime_error("material_properties[" + std::to_string(index) + "].material_id missing");
+
+		if (config_setting_lookup_float(material, "relative_mass", &relativeMass) == CONFIG_FALSE)
+			throw std::runtime_error("material_properties[" + std::to_string(index) + "].relative_mass missing");
+
+		if (config_setting_lookup_float(material, "temp_vel", &tempVel) == CONFIG_FALSE)
+			throw std::runtime_error("material_properties[" + std::to_string(index) + "].temp_vel missing");
+
+		if (config_setting_lookup_int(material, "color_scheme", &colorScheme) == CONFIG_FALSE)
+			throw std::runtime_error("material_properties[" + std::to_string(index) + "].color_scheme missing");
+
+		if (config_setting_lookup_float(material, "cell_density", &cellDensity) == CONFIG_FALSE)
+			cellDensity = 0.0;
+
+		ostrm << "    MaterialProperty("
+			<< materialID << "u, "
+			<< std::fixed << std::setprecision(9) << relativeMass << ", "
+			<< std::fixed << std::setprecision(9) << tempVel << ", "
+			<< colorScheme << "u, "
+			<< std::fixed << std::setprecision(9) << cellDensity << ")";
+
+		if (index + 1 < materialCount)
+			ostrm << ",";
+
+		ostrm << "\n";
+	}
+
+	ostrm << ");\n\n";
+
+
+	float col_red = CfgApp->GetFloat("application.col_color.red", true);
+	float col_green = CfgApp->GetFloat("application.col_color.green", true);
+	float col_blue = CfgApp->GetFloat("application.col_color.blue", true);
+	float col_alpha = CfgApp->GetFloat("application.col_color.alpha", true);
+
+	float ncol_red = CfgApp->GetFloat("application.ncol_color.red", true);
+	float ncol_green = CfgApp->GetFloat("application.ncol_color.green", true);
+	float ncol_blue = CfgApp->GetFloat("application.ncol_color.blue", true);
+	float ncol_alpha = CfgApp->GetFloat("application.ncol_color.alpha", true);
+
+	std::ostringstream hsv_color_on;
+	std::ostringstream hsv_sat;
+	std::ostringstream hsv_val;
+
+
+	if (CfgApp->CheckKey("application.hsv_color"))
+	{
+		if (CfgApp->GetBool("application.hsv_color", true) == 1)
+		{
+			hsv_color_on << "const uint HSV_ON = 1u;\n";
+			hsv_sat << "const float HSV_SAT = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_sat", true) << ";\n";
+			hsv_val << "const float HSV_VAL = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_val", true) << ";\n";
+		}
+		else
+		{
+			hsv_color_on << "const uint HSV_ON = 0u;\n";
+			hsv_sat << "const float HSV_SAT = 0.000f" << ";\n";
+			hsv_val << "const float HSV_VAL = 0.000f" << ";\n";
+		}
+		ostrm << hsv_color_on.str() << hsv_sat.str() << hsv_val.str();
+	}
+
+	std::ostringstream col_color;
+	col_color << "vec3("
+		<< std::fixed << std::setprecision(1) << col_red << "f,"
+		<< std::fixed << std::setprecision(1) << col_green << "f,"
+		<< std::fixed << std::setprecision(1) << col_blue << "f)";
+
+	std::ostringstream ncol_color;
+	ncol_color << "vec3("
+		<< std::fixed << std::setprecision(1) << ncol_red << "f,"
+		<< std::fixed << std::setprecision(1) << ncol_green << "f,"
+		<< std::fixed << std::setprecision(1) << ncol_blue << "f)";
+	
+	ostrm << "vec3 ncolcolor = "
+		<< ncol_color.str() << ";\n"
+		<< "vec3 colcolor = "
+		<< col_color.str() << ";\n";
+	
+	ostrm << "#endif\n";
 }
 std::ostringstream ShaderObj::FunctionWalls()
 {
@@ -290,40 +440,6 @@ void  ShaderObj::WriteShaderHeader()
 		float ncol_blue = CfgApp->GetFloat("application.ncol_color.blue", true);
 		float ncol_alpha = CfgApp->GetFloat("application.ncol_color.alpha", true);
 
-		std::ostringstream hsv_color_on;
-		std::ostringstream hsv_sat;
-		std::ostringstream hsv_val;
-		
-		
-		if (CfgApp->CheckKey("application.hsv_color"))
-		{
-			if (CfgApp->GetBool("application.hsv_color", true) == 1)
-			{
-				hsv_color_on << "const uint HSV_ON = 1u;\n";
-				hsv_sat << "const float HSV_SAT = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_sat", true) << ";\n";
-				hsv_val << "const float HSV_VAL = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_val", true) << ";\n";
-			}
-			else
-			{
-				hsv_color_on << "const uint HSV_ON = 0u;\n";
-				hsv_sat << "const float HSV_SAT = 0.000f" << ";\n";
-				hsv_val << "const float HSV_VAL = 0.000f" << ";\n";
-			}
-			
-		}
-
-		std::ostringstream col_color;
-		col_color << "vec3("
-			<< std::fixed << std::setprecision(1) << col_red << "f,"
-			<< std::fixed << std::setprecision(1) << col_green << "f,"
-			<< std::fixed << std::setprecision(1) << col_blue << "f)";
-
-		std::ostringstream ncol_color;
-		ncol_color << "vec3("
-			<< std::fixed << std::setprecision(1) << ncol_red << "f,"
-			<< std::fixed << std::setprecision(1) << ncol_green << "f,"
-			<< std::fixed << std::setprecision(1) << ncol_blue << "f)";
-			
         std::ofstream ostrm(filename);
 		if (!ostrm.is_open())
 		{
@@ -369,16 +485,12 @@ void  ShaderObj::WriteShaderHeader()
 			<< m_VPO->BoundaryParticleLimit << ";\n"
 			<< "const float point_size = "
 			<< std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.gl_point_size", true) << ";\n"
-			<< "vec3 ncolcolor = "
-			<< ncol_color.str() << ";\n"
-			<< "vec3 colcolor = "
-			<< col_color.str() << ";\n"
 			<< "#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN "
 			<< std::setprecision(9) << CfgTst->GetFloat("compression_stiffness_gain", true) << "\n"
 			<< "#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER " <<
 			std::setprecision(9) << CfgTst->GetFloat("compression_stiffness_power", true) << "\n";
 		
-			ostrm << hsv_color_on.str() << hsv_sat.str() << hsv_val.str();
+			
 					
 		ostrm.flush();
 		ostrm.close();

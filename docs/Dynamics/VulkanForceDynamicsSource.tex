@@ -1,0 +1,206 @@
+% !TeX root = main.tex
+\newpage
+\section{Vulkan Force Dynamics Source Flow}
+
+\subsection{Purpose}
+
+This section documents the GLSL-side source flow used by the Vulkan
+\texttt{ForceDynamicsSimple} family.  It is the Vulkan companion to
+\texttt{ForceDynamicsSource.tex}: the Python source document explains the
+portable model functions, while this section explains how scenario wrappers
+assemble those functions with cell occupancy, lifecycle gates, and optional
+features.
+
+The Vulkan wrapper family currently has three documentation targets:
+\begin{itemize}
+    \item simple particle and function-wall flow;
+    \item reservoir piston flow;
+    \item streaming reservoir or freestream flow.
+\end{itemize}
+
+This update documents the streaming reservoir path used by
+\texttt{FreeStream}.  The simple and reservoir-piston sections remain
+placeholders until their wrappers are reviewed in the same way.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{0.98\textwidth}{!}{\input{VulkanlForceDynamicsFlowTikz}}
+\caption{High-level Vulkan FreeStream compute flow for one source invocation.}
+\label{fig:vulkan-force-dynamics-flow}
+\end{figure}
+
+\clearpage
+
+\subsection{Simple Wrapper Placeholder}
+
+The simple wrapper is the ordinary particle and function-wall path.  It uses
+the shared simple dynamics include, boundary-particle locality helper, and
+function-wall helper.  It does not own scheduled inlet release or piston
+motion.  This path should be documented after the current FreeStream
+performance investigation identifies which common stages are permanent and
+which are scenario-specific.
+
+\subsection{Reservoir Piston Placeholder}
+
+The reservoir piston wrapper adds \texttt{ForceDynamicsSimplePiston.glsl} and
+defines \texttt{FORCE\_DYNAMICS\_SIMPLE\_PISTON\_AVAILABLE}.  It is the only
+simple-wrapper family member that should process a moving analytic piston
+before the ordinary target scan.  FreeStream must not enable this path.
+
+\subsection{Streaming Reservoir: FreeStream}
+
+\subsubsection{Files}
+
+The current FreeStream Vulkan path is built from:
+\begin{verbatim}
+vulkan/sim/FreeStream/FreeStreamP.vert
+vulkan/sim/FreeStream/FreeStreamP.comp
+vulkan/sim/FreeStream/boundary.glsl
+vulkan/sim/FreeStream/params.glsl
+vulkan/sim/common/ForceDynamicsSimple.glsl
+vulkan/sim/common/ForceDynamicsSimpleBoundaryParticle.glsl
+vulkan/sim/common/ForceDynamicsSimpleFunctionWall.glsl
+\end{verbatim}
+
+The generated data source is:
+\begin{verbatim}
+gbase/GenStreaming.py
+cfg_gendata/FreeStream.cfg
+cfg_gendata/FreeStream_Py.inc
+\end{verbatim}
+
+\subsubsection{Streaming Lifecycle}
+
+FreeStream stores timed inlet release state in \texttt{P[SourceID].Data.w}.
+The current GLSL lifecycle convention is:
+\begin{itemize}
+    \item \(\texttt{Data.w}<0\): dead particle;
+    \item \(\texttt{Data.w}=0\): active from frame zero;
+    \item \(\texttt{Data.w}>0\): pending until
+          \(\texttt{ShaderFlags.frameNum} \ge \texttt{Data.w}\).
+\end{itemize}
+
+The compute shader applies this gate before force accumulation:
+\begin{verbatim}
+if (!IsMobileParticleActiveForDynamics(SourceID))
+    return;
+\end{verbatim}
+
+The vertex shader applies the corresponding lifecycle test before inserting a
+particle into the cell-occupancy lists.  Pending and dead particles clear
+their corner list to \texttt{npos}, write a suppressed vertex output, and do
+not reserve cell slots.
+
+\subsubsection{Graphics Cell-List Stage}
+
+\texttt{FreeStreamP.vert} performs two jobs during the graphics pass:
+rendering and broad-phase cell-list construction.  For each non-null active
+particle it:
+\begin{enumerate}
+    \item clears the particle's eight \texttt{CornerList} entries to
+          \texttt{npos};
+    \item reads the current position buffer selected by
+          \texttt{ShaderFlags.positionBuffer};
+    \item builds the particle radius AABB;
+    \item maps the AABB corners into cell locations;
+    \item deduplicates repeated corner cells;
+    \item atomically reserves slots in \texttt{L[cell]};
+    \item writes the particle ID into \texttt{clink[cell].idx[slot]}.
+\end{enumerate}
+
+This makes graphics a required broad-phase stage for compute.  If a particle
+does not pass the vertex lifecycle gate, compute will later see no valid
+corner cells for that particle.
+
+\subsubsection{Compute Source Stage}
+
+\texttt{FreeStreamP.comp} launches one invocation per particle index.  The
+source invocation flow is:
+\begin{enumerate}
+    \item source zero clears compute counters and returns;
+    \item sources beyond \texttt{ShaderFlags.Ptot} return;
+    \item non-mobile, pending, or dead sources return;
+    \item source diagnostics are cleared;
+    \item \texttt{totalForce} is initialized to zero;
+    \item a duplicate target array of
+          \texttt{MAX\_CELL\_OCCUPANY * 8} entries is initialized;
+    \item all source corner cells are scanned for boundary-marker and mobile
+          targets;
+    \item valid wall and particle contacts accumulate force into
+          \texttt{totalForce};
+    \item \texttt{CalcVelocity(SourceID, totalForce)} writes the alternate
+          velocity buffer;
+    \item \texttt{ApplySourceMaximumDepth(SourceID, 9401u)} projects the
+          force-driven candidate velocity when needed;
+    \item saved wall and particle contact records are replayed to register
+          post-resolution remaining-depth constraints;
+    \item \texttt{ApplySourceMaximumDepth(SourceID, 9402u)} applies the second
+          projection phase;
+    \item \texttt{CalcPosition(SourceID)} writes the alternate position buffer
+          and applies domain and death-bound rules.
+\end{enumerate}
+
+The wrapper does not include piston support.  It includes only the base simple
+dynamics, boundary-particle locality helper, and function-wall helper.
+
+\subsubsection{Performance-Relevant Structure}
+
+The current FreeStream performance risk is visible in the wrapper flow rather
+than hidden inside the force law.  Each active source pays for:
+\begin{itemize}
+    \item clearing a duplicate-target array sized by
+          \texttt{MAX\_CELL\_OCCUPANY * 8};
+    \item scanning up to eight occupied corner cells;
+    \item scanning up to \texttt{MAX\_CELL\_OCCUPANY} entries in each cell;
+    \item repeating that duplicate-array initialization and cell scan for the
+          second maximum-depth phase.
+\end{itemize}
+
+Lowering \texttt{MAX\_CELL\_OCCUPANY} improves performance because it reduces
+both the scan upper bound and the duplicate-list initialization size.  That
+capacity must still remain large enough for the generated initial and runtime
+cell occupancy.  The generator should therefore report the smallest safe
+capacity and the wrapper should avoid rediscovering the same contact set when
+a compact source-owned contact list can carry first-scan results into the
+projection phases.
+
+\subsubsection{Intended FreeStream Optimization}
+
+The current wrapper performs two broad-phase scans because the first pass owns
+force accumulation and the second pass owns post-velocity remaining-depth
+constraint registration.  The two logical phases are still required, but the
+second cell-list traversal is not.  The intended FreeStream wrapper shape is:
+\begin{verbatim}
+scan source corner cells once
+deduplicate targets once
+save valid particle and wall contact geometry in local contact records
+accumulate force while those contacts are discovered
+CalcVelocity(SourceID, totalForce)
+ApplySourceMaximumDepth(SourceID, 9401u)
+loop saved contact records to register/check remaining-depth constraints
+ApplySourceMaximumDepth(SourceID, 9402u)
+CalcPosition(SourceID)
+\end{verbatim}
+
+This changes the second phase from a repeated broad-phase discovery pass into
+a compact narrow-phase replay over the actual contacts found for one source.
+The saved records are source-local shader temporaries; they are not persistent
+particle state and do not change the source-owned dynamics model.
+
+The wrapper should define a source-local contact capacity that represents the
+maximum valid simultaneous contacts for one source.  If the saved-contact
+array overflows, the shader should report a contact-list capacity error
+rather than silently dropping contacts or falling back to a second broad-phase
+scan.
+
+\subsubsection{Current Diagnostic Notes}
+
+Shader \texttt{debugPrintfEXT} output is useful for this wrapper, but it must
+be treated as diagnostic text rather than a runtime stop condition.  The
+Vulkan debug callback should intercept \texttt{VVL-DEBUG-PRINTF}, print only
+the message payload, and avoid setting \texttt{Extflg}.
+
+The compute counter \texttt{collOut.numParticles} is incremented after the
+active-mobile lifecycle gate when \texttt{DEBUG} is enabled.  This is the
+preferred coarse diagnostic for confirming that timed-release particles have
+entered compute without using frame-stopping shader printf output.

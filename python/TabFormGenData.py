@@ -27,11 +27,9 @@ from gbase.GenPQBData import *
 from SimulationRunner_HSVPanel import run_analysis as simulation_run_analysis
 from base.ForcePlots import run_force_plots
 from gbase.ReadCaptureFile import *
-#from GenMotionData import *
-#from subprocess import Popen
 import subprocess
 subprocess.__file__
-#import asyncio
+
 
 
 
@@ -646,7 +644,8 @@ class TabGenData(QTabWidget):
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TestCompressor.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TestReservoir.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/CDNozzle.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/FreeStream.cfg")
+        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/FreeStream.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/FreeStreamHeteroPy.cfg")
         self.update_list_widget()
         self.update_data_list_widget()
         

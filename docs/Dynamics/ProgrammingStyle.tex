@@ -34,7 +34,7 @@ copies document the unchanged starting model before development begins.
 
 \item Add <new model>DynamicsSource.tex to \texttt{main.tex}.
 
-\item Register <new model>Dynamics in \texttt{SimulationRunner.py} so that
+\item Register <new model>Dynamics in \texttt{SimulationRunner\_HSVPanel.py} so that
 \texttt{live\_base} and \texttt{shadow\_base} can select the new model.
 
 \item Now \texttt{live\_base = <old model>}. Change \texttt{ParticleUtil.cfg} to make \texttt{live\_base = "<new model>Dynamics";} and 
@@ -280,7 +280,7 @@ C:\_DJ\gPCD\vulkan\sim\BoundarySpheresReservoir\BoundarySpheresReservoirP.comp
 
 Python names should stay coordinated with those files whenever possible.  If a
 Python-only harness name is needed, it belongs in
-\texttt{<model>DynamicsBase.py}, \texttt{SimulationRunner.py}, or
+\texttt{<model>DynamicsBase.py}, \texttt{SimulationRunner\_HSVPanel.py}, or
 \texttt{Reporting.py}, not in \texttt{<model>Dynamics.py}.
 
 \subsection{Data Convention}

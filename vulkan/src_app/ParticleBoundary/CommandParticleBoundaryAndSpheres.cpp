@@ -130,9 +130,9 @@ void CommandParticleBoundaryAndSpheres::RecordSubPassCube(uint32_t imageindex, u
 	// Record the viewpoer to be used
 	VkViewport viewport{};
 	viewport.x = 0.0f;
-	viewport.y = static_cast<float>(m_CPL->m_SCO->GetSwapHeight());
+	viewport.y = 0.0f;
 	viewport.width = static_cast<float>(m_CPL->m_SCO->GetSwapWidth());
-	viewport.height = -static_cast<float>(m_CPL->m_SCO->GetSwapHeight());
+	viewport.height = static_cast<float>(m_CPL->m_SCO->GetSwapHeight());
 	viewport.minDepth = static_cast<float>(m_CPL->m_SCO->GetSizzorMin());
 	viewport.maxDepth = static_cast<float>(m_CPL->m_SCO->GetSizzorMax());
 	vkCmdSetViewport(m_CommandBuffers[currentBuffer], 0, 1, &viewport);
@@ -262,9 +262,9 @@ void CommandParticleBoundaryAndSpheres::RecordSubPassParticle(uint32_t imageinde
 	// Record the viewpoer to be used
 	VkViewport viewport{};
 	viewport.x = 0.0f;
-	viewport.y = static_cast<float>(m_SCO->GetSwapHeight());
+	viewport.y = 0.0f;
 	viewport.width = static_cast<float>(m_SCO->GetSwapWidth());
-	viewport.height = -static_cast<float>(m_SCO->GetSwapHeight());
+	viewport.height = static_cast<float>(m_SCO->GetSwapHeight());
 
 	viewport.minDepth = static_cast<float>(m_SCO->GetSizzorMin());
 	viewport.maxDepth = static_cast<float>(m_SCO->GetSizzorMax());

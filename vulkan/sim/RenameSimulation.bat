@@ -1,7 +1,7 @@
 @echo off
 
-set oldPrefix=FreeConvection
-set newPrefix=FreeStream
+set oldPrefix=FreeStream
+set newPrefix=FreeStreamHetero
 
 
 

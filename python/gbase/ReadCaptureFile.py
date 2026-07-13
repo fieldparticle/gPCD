@@ -22,7 +22,7 @@ particle_dtype = np.dtype([
     ("contactCount", np.uint32),
     ("colFlg", np.uint32),
     ("ptype", np.float32),
-    ("temp_vel", np.float32),
+    ("material_id", np.float32),
 ])
 
 input_particle_dtype = np.dtype([
@@ -37,7 +37,7 @@ input_particle_dtype = np.dtype([
     ("ptype", np.float64),
     ("state_flg", np.float64),
     ("molar_mass", np.float64),
-    ("temp_vel", np.float64),
+    ("material_id", np.float64),
     ("collision_stiffness_q", np.float64),
 ])
 

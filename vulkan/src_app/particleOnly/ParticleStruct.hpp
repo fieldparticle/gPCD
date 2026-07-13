@@ -34,7 +34,7 @@ struct Particle {
 	uint32_t colFlg;       // 1 if in collision, 0 if not
 
 	float ptype;           // runtime particle type copied from binary pdata.ptype
-	float temp_vel;        // reserved
+	float material_id;        // material/species id; independent of ptype boundary role
 };
 
 #endif

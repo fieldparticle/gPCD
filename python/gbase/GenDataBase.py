@@ -11,6 +11,10 @@ import ctypes
 import math
 from gbase.ConfigUtility import *
 from gbase.BinaryFileUtilities import *
+from gbase.MaterialProperties import (
+    write_color_scheme_defines,
+    write_material_properties,
+)
 from gbase.utilities import *
 from gbase.pdata import *
 from abc import ABC, abstractmethod
@@ -28,7 +32,7 @@ from abc import ABC, abstractmethod
 	#double acc_r;
 	#double acc_a;
 	#double molar_mass;
-	#double temp_vel;
+	#double material_id;
 
 
 
@@ -327,6 +331,8 @@ class GenDataBase:
         f.write(fstr)
         fstr = f"hsv_val = {run_cfg.hsv_val:0.4f};\n"
         f.write(fstr)
+        write_color_scheme_defines(f)
+        write_material_properties(f, run_cfg)
         f.flush()
         f.close()
 

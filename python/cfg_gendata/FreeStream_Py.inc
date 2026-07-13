@@ -51,8 +51,8 @@ flow_angle = 90.0;
 // random contribution is proportional to (1 - flow_alignment).
 flow_alignment = 1.00;
 
-// 2D packing curves derive x/y packing bounds. Z is configured separately.
-packing_z_bounds 				= [0, 3];
+// 2D packing curves derive x/y packing bounds. Particles live on one Z cell center.
+particle_plane_z 				= 1.5;
 // Function wall format:
 // [boundary_kind, independent_axis, u_start, u_end,
 //  f_start, a1, a2, a3, normal_sign, wall_flag]

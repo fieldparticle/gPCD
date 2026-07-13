@@ -232,7 +232,8 @@ void Resource::GeneralViewing(uint32_t CurrentBuffer)
     );
 
     //mout << "rRotZ:" << rRotZ << "," << "rRotY:" << rRotY << "," << "rRotX:" << rRotX << "," "zoom:" << ZoomX << ende;
-    // Vulkan clip-space correction
+    // Vulkan clip-space correction. Command recorders should use a positive
+    // viewport height; this matrix owns the single Y-axis conversion.
     m_UBO.proj[1][1] *= -1.0f;
 
     vmaCopyMemoryToAllocation(

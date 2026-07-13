@@ -28,6 +28,16 @@
 // Simple source-owned compute schedule.
 // Do not hand edit generated dynamics content.
 
+const uint MAX_SOURCE_CONTACTS = 64u;
+
+struct SourceContactRecord
+{
+    uint contactType;
+    uint targetID;
+    ParticleGeometry particleGeometry;
+    BoundaryWallSegment wallSegment;
+};
+
 void main()
 {
     uint SourceID = gl_GlobalInvocationID.x;
@@ -50,16 +60,6 @@ void main()
     }
 
     if (!IsMobileParticleActiveForDynamics(SourceID)) {
-#if defined(DEBUG)
-        if (SourceID == 2u && uint(ShaderFlags.frameNum) == 200u) {
-            debugPrintfEXT(
-                "P2 pre-velocity return: inactive ptype:%0.1f state:%0.3f pbuf:%u Ptot:%u",
-                P[SourceID].ptype,
-                P[SourceID].Data.w,
-                uint(ShaderFlags.positionBuffer),
-                uint(ShaderFlags.Ptot));
-        }
-#endif
         return;
     }
 
@@ -70,6 +70,8 @@ void main()
     P[SourceID].contactCount = 0u;
     P[SourceID].colFlg = 0u;
     vec3 totalForce = vec3(0.0);
+    SourceContactRecord sourceContacts[MAX_SOURCE_CONTACTS];
+    uint sourceContactCount = 0u;
 
     const uint DUP_LIST_SIZE = MAX_CELL_OCCUPANY * 8u;
     uint duplicateTargets[DUP_LIST_SIZE];
@@ -125,19 +127,20 @@ void main()
                 if (!segment.valid) {
                     continue;
                 }
+                if (sourceContactCount >= MAX_SOURCE_CONTACTS) {
+                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                    return;
+                }
+                sourceContacts[sourceContactCount] = SourceContactRecord(
+                    CONTACT_WALL,
+                    TargetID,
+                    ParticleGeometry(vec3(0.0), 0.0, 0.0, 0.0, 0.0, false),
+                    segment);
+                sourceContactCount += 1u;
                 if (!ProcessFunctionWallCollision(
                         SourceID,
                         segment,
                         totalForce)) {
-#if defined(DEBUG)
-                    if (SourceID == 2u && uint(ShaderFlags.frameNum) == 200u) {
-                        debugPrintfEXT(
-                            "P2 pre-velocity return: function wall target:%u wall:%u state:%0.3f",
-                            TargetID,
-                            segment.wallFlag,
-                            P[SourceID].Data.w);
-                    }
-#endif
                     return;
                 }
                 continue;
@@ -171,37 +174,26 @@ void main()
             if (!geometry.valid) {
                 continue;
             }
+            if (sourceContactCount >= MAX_SOURCE_CONTACTS) {
+                SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                return;
+            }
+            sourceContacts[sourceContactCount] = SourceContactRecord(
+                CONTACT_PARTICLE,
+                TargetID,
+                geometry,
+                BoundaryWallSegment(vec3(0.0), 0.0, 0.0, 0u, false));
+            sourceContactCount += 1u;
             if (!ProcessParticleCollision(
                     TargetID,
                     SourceID,
                     totalForce,
                     geometry)) {
-#if defined(DEBUG)
-                if (SourceID == 2u && uint(ShaderFlags.frameNum) == 200u) {
-                    debugPrintfEXT(
-                        "P2 pre-velocity return: particle collision target:%u state:%0.3f",
-                        TargetID,
-                        P[SourceID].Data.w);
-                }
-#endif
                 return;
             }
         }
     }
 
-#if defined(DEBUG)
-    if (SourceID == 2u && uint(ShaderFlags.frameNum) == 200u) {
-        debugPrintfEXT(
-            "P2 reached CalcVelocity call state:%0.3f pos:<%0.6f,%0.6f,%0.6f> vel:<%0.6f,%0.6f,%0.6f>",
-            P[SourceID].Data.w,
-            GetParticlePosition(SourceID).x,
-            GetParticlePosition(SourceID).y,
-            GetParticlePosition(SourceID).z,
-            GetParticleVelocity(SourceID).x,
-            GetParticleVelocity(SourceID).y,
-            GetParticleVelocity(SourceID).z);
-    }
-#endif
     if (!CalcVelocity(SourceID, totalForce)) {
         return;
     }
@@ -209,98 +201,24 @@ void main()
         return;
     }
 
-    duplicateCount = 0u;
-    for (uint index = 0u; index < DUP_LIST_SIZE; ++index) {
-        duplicateTargets[index] = 0u;
-    }
-
-    for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
-        uint loc = P[SourceID].CornerList[CornerIndex].ploc;
-        if (loc == npos) {
+    for (uint contactIndex = 0u;
+            contactIndex < sourceContactCount;
+            ++contactIndex) {
+        SourceContactRecord contact = sourceContacts[contactIndex];
+        if (contact.contactType == CONTACT_WALL) {
+            if (!RegisterResolvedFunctionWallContactStep(
+                    SourceID,
+                    contact.wallSegment)) {
+                return;
+            }
             continue;
         }
 
-        for (uint CellSlot = 0u; CellSlot < MAX_CELL_OCCUPANY; ++CellSlot) {
-            uint TargetID = clink[loc].idx[CellSlot];
-            if (TargetID == 0u) {
-                break;
-            }
-            if (TargetID == SourceID) {
-                continue;
-            }
-            if (TargetID >= uint(ShaderFlags.Ptot)) {
-                continue;
-            }
-
-            if (IsBoundaryParticle(TargetID)) {
-                if (!BoundaryMarkerApplies(SourceID, TargetID)) {
-                    continue;
-                }
-
-                bool duplicate = false;
-                for (uint duplicateIndex = 0u;
-                        duplicateIndex < duplicateCount;
-                        ++duplicateIndex) {
-                    if (duplicateTargets[duplicateIndex] == TargetID) {
-                        duplicate = true;
-                        break;
-                    }
-                }
-                if (duplicate) {
-                    continue;
-                }
-                if (duplicateCount >= DUP_LIST_SIZE) {
-                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
-                    return;
-                }
-                duplicateTargets[duplicateCount] = TargetID;
-                duplicateCount += 1u;
-
-                BoundaryWallSegment segment =
-                    EvaluateFunctionWallSegment(SourceID, TargetID);
-                if (!segment.valid) {
-                    continue;
-                }
-                if (!RegisterResolvedFunctionWallContactStep(
-                        SourceID,
-                        segment)) {
-                    return;
-                }
-                continue;
-            }
-
-            if (!IsMobileParticleActiveForDynamics(TargetID)) {
-                continue;
-            }
-
-            bool duplicate = false;
-            for (uint duplicateIndex = 0u;
-                    duplicateIndex < duplicateCount;
-                    ++duplicateIndex) {
-                if (duplicateTargets[duplicateIndex] == TargetID) {
-                    duplicate = true;
-                    break;
-                }
-            }
-            if (duplicate) {
-                continue;
-            }
-            if (duplicateCount >= DUP_LIST_SIZE) {
-                SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
-                return;
-            }
-            duplicateTargets[duplicateCount] = TargetID;
-            duplicateCount += 1u;
-
-            ParticleGeometry geometry =
-                GetParticleGeometry(SourceID, TargetID);
-            if (!geometry.valid) {
-                continue;
-            }
+        if (contact.contactType == CONTACT_PARTICLE) {
             if (!RegisterResolvedParticleContactStep(
                     SourceID,
-                    TargetID,
-                    geometry)) {
+                    contact.targetID,
+                    contact.particleGeometry)) {
                 return;
             }
         }

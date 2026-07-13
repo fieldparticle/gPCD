@@ -1,3 +1,0 @@
-
-from 
-class TableValDB(ValuesDataBase):

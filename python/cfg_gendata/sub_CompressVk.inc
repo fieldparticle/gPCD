@@ -53,8 +53,8 @@ death_bounds = [
 initial_particle_velocity = [ 0.0, 0.0, 0.0 ];
 piston_velocity = [ 0.005, 0.0, 0.0 ];
 
-// 2D packing curves derive x/y packing bounds. Z is configured separately.
-packing_z_bounds = [0, 3];
+// 2D packing curves derive x/y packing bounds. Particles live on one Z cell center.
+particle_plane_z = 1.5;
 
 // Function wall format:
 // [boundary_kind, independent_axis, u_start, u_end,

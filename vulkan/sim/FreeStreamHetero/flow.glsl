@@ -1,0 +1,1 @@
+particle_rate=2inlet_velocity=0.5inlet_x=1outlet_x=6pipe_y_min=1pipe_y_max=6escape_mode=1

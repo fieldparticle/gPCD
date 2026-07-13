@@ -294,7 +294,7 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 			
 		}
 
-		//vkDeviceWaitIdle(VulkanWin->GetLogicalDevice());
+		vkDeviceWaitIdle(VulkanWin->GetLogicalDevice());
 		
 	}
 	catch (const std::exception& e)

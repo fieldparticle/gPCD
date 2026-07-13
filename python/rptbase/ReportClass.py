@@ -1,0 +1,210 @@
+import matplotlib.pyplot as plt
+import matplotlib.ticker
+import os
+from gbase.AttrDictFields import *
+from matplotlib.ticker import (MultipleLocator,
+                               FormatStrFormatter,
+                               AutoMinorLocator,
+                               FuncFormatter,
+                               EngFormatter,
+                               ScalarFormatter)
+
+class ReportClass():
+    
+    lines_list = None
+    itemcfg = None
+    itemcfg_main = None
+    tex_output_name = None
+    cap_file = ""
+    caption = ""
+    range = 0
+    images = []
+    
+    def __init__(self, parent,itemcfg):
+        self.itemcfg = itemcfg
+        self.bobj = parent.bobj
+        self.cfg = self.bobj.cfg.config
+        self.log = self.bobj.log
+        self.vals_list = AttrDictFields()
+    
+
+    def do_report(self):
+        pass
+
+    def save_single_image(self):
+        
+        self.read_caption()
+        self.read_description()
+        self.tex_output_name = self.itemcfg.tex_dir + "/" + self.itemcfg.name + ".tex"
+        try:
+            f = open(self.tex_output_name , "w")
+        except IOError as e:
+            print(e)
+            self.log.log(self,f"Couldn't write to file ({e})")
+            return
+        tex_output_name = self.tex_output_name 
+        try:
+            w ="\\begingroup\n"
+            f.write(w)
+            w = "\\begin{figure*}[" + self.itemcfg.placement + "]\n"
+            f.write(w)
+            if self.itemcfg.centering == True:
+                w = "\\centering\n"
+                f.write(w)
+            previewTex = f"{self.itemcfg.plots_dir}/{self.itemcfg.name}.png"
+            gdir = "".join(previewTex.rsplit(self.itemcfg.tex_dir))
+            sgdir = ''.join( c for c in gdir if  c not in '/' )
+    #                print(sgdir)    
+            w = "\t\t\\includegraphics[width=" +  str(self.itemcfg.plot_width) +  "in]{" + sgdir + "}\n"
+            f.write(w)
+            refname = os.path.splitext(os.path.basename(gdir))[0]
+            w = "\\hspace{" + str(self.itemcfg.hspace) + "in}\n"
+            f.write(w)
+            w = "\\caption[TITLE:" + self.itemcfg.title + "]{" + self.caption + "}\n"
+            f.write(w)
+            w = "\\Description[TITLE:" + self.itemcfg.title + "]{" + self.description + "}\n"
+            f.write(w)
+            w = "\t\t\\label{fig:" + self.itemcfg.name + "}\n"
+            f.write(w)
+            w = "\\end{figure*}\n"
+            f.write(w)
+            w = "\\endgroup"
+            f.write(w)
+        except IOError as err:
+            self.log.log(self,f"Couldn't write to file ({err})")
+            f.close()
+            return
+        f.close()
+
+    def extract_field(self,string):
+        nn = 0
+        new_str = ""
+        fmt_str = ""
+        str_len = len(string)
+        out_list = []
+        bld_fld = []
+        ss = 0
+        while (nn < str_len):
+            jj = string.find('fld.',nn)
+            if jj > -1:
+                
+                stop_len = str_len
+                start_len = jj+4
+                ss+= start_len
+                for ii in range(start_len,stop_len):
+                    if string[ii] not in "()/+-:{}*":
+                        #print(string[ii])
+                        bld_fld.append(string[ii])
+                        ss +=1
+                    else:
+                        break
+                new_str = "".join(bld_fld)
+                
+                nn = jj +1 #print(new_str)                
+            else:
+                fmt_str = string[ss:-1]
+                break
+        out_list = []
+
+        return new_str,fmt_str        
+
+    def save_multi_image(self):
+        self.read_caption()
+        self.read_description()
+        cfg = self.itemcfg
+        self.tex_output_name = self.itemcfg.tex_dir + "/" + self.itemcfg.name + ".tex"
+        try:
+            f = open(self.tex_output_name , "w")
+        except BaseException as e:
+            print(e)
+            self.log.log(self,f"Couldn't write to file ({e})")
+            return
+            
+            
+        tex_output_name = self.tex_output_name 
+        w ="\\begingroup\n"
+        f.write(w)
+        
+        w = "\\begin{figure*}[" + cfg.placement + "]\n"
+        f.write(w)
+        if cfg.centering == True:
+            w = "\\centering\n"
+            f.write(w)
+            w = "\\hspace{" + cfg.hspace + "in}\n"
+            f.write(w)
+        try:
+            for ii in range(0,len(self.itemcfg.input_images)):
+                #w = "\t\\begin{subfigure}[b]{" + cfg.plot_width_array[ii] + "in}\n"
+                w = "\t\\begin{subfigure}[b]{" + str(cfg.plot_scale[ii]) + "\\textwidth}\n"
+                f.write(w)
+                previewTex = f"{self.itemcfg.input_images[ii]}"
+                gdir = "".join(previewTex.rsplit(self.itemcfg.tex_dir))
+                sgdir = ''.join( c for c in gdir if  c not in '/' )
+                #print(sgdir)    
+                w = "\t\t\\includegraphics[width=\\textwidth]{" + sgdir + "}\n"
+                f.write(w)
+                w = "\t\t\\subcaption[" + "" +"]{" + cfg.sub_caption[ii] + "}\n"
+                f.write(w)
+                refname = os.path.splitext(os.path.basename(sgdir))[0]
+                w = "\t\t\\label{fig:" + refname + "}\n"
+                f.write(w)
+                w = "\t\\end{subfigure}\n"
+                f.write(w)
+                w = "\\hspace{" + cfg.hspace + "in}\n"
+                f.write(w)
+               
+            w = "\\caption[TITLE:" + cfg.title + "]{" + self.caption + "}\n"
+            f.write(w)
+            w = "\\Description[TITLE:" + cfg.title + "]{" + self.description + "}\n"
+            f.write(w)
+            w = "\\label{fig:" + cfg.name + "}\n"
+            f.write(w)
+            w = "\\end{figure*}\n"
+            f.write(w)
+            w = "\\endgroup"
+            f.write(w)
+        except IOError as e:
+            self.log.log(self,f"Couldn't write to file ({e})")
+            f.close()
+            return
+        f.close()
+
+
+
+    def save_latex(self):
+        images = self.itemcfg.input_images
+        if len(self.itemcfg.input_images) == 1:
+            self.save_single_image()
+        else:
+            self.save_multi_image()
+            #print("multiimage")
+        return
+        
+
+
+    def read_caption(self):
+        raw_name = os.path.basename(self.itemcfg.caption_file)
+        filename_without_ext = os.path.splitext(raw_name)[0]
+        self.cap_file = f"{self.cfg.report_start_dir}/{filename_without_ext}.cap"
+        if os.path.exists(self.cap_file):
+            with open(self.cap_file, 'r') as file:
+                self.caption = file.read()
+        else:
+            file = open(self.cap_file, 'w') 
+            file.close()
+        pass
+
+    def read_description(self):
+        raw_name = os.path.basename(self.itemcfg.caption_file)
+        filename_without_ext = os.path.splitext(raw_name)[0]
+        self.des_file= f"{self.cfg.report_start_dir}/{filename_without_ext}.des"
+        if os.path.exists(self.des_file):
+            with open(self.des_file, 'r') as file:
+                self.description = file.read()
+        else:
+            file = open(self.des_file, 'w') 
+            file.close()
+        pass    
+
+    def write_captions(self):
+      pass

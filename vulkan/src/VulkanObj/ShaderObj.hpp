@@ -52,7 +52,7 @@ public:
 	ShaderObj(VulkanObj* App, std::string Name) : BaseObj(Name, 0, App) {};
 	void GenWorkGroups();
 	void WriteShaderHeader();
-	void WriteShaderHeaderCDNOZ();
+	void WriteMaterials();
 	void WriteShaderDbgHeader();
 	void WriteWalls();
 	void Piston();

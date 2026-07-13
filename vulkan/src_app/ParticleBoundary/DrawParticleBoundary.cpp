@@ -172,14 +172,14 @@ void DrawParticleBoundary::DrawFrame()
 		// Acquire next completed image from swap-chain. Get the id of swap chain image
 	// 
 		//=========================================================
-		uint32_t ImageIndex;
+		uint32_t imageIndex;
 		VkResult result = vkAcquireNextImageKHR(
 			m_App->GetLogicalDevice(),
 			m_SCO->m_SwapChain,
 			UINT64_MAX,
 			m_SO->m_WaitSemaphores[SyncObjPO::W_IMAGAVAIL].semvec[currentBuffer],
 			VK_NULL_HANDLE,
-			&ImageIndex);
+			&imageIndex);
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
 		{
 			//m_SCO->RecreateSwapChain(m_FBO);
@@ -223,7 +223,7 @@ void DrawParticleBoundary::DrawFrame()
 		}
 
 		// Record a new command buffer for the current frame and associate with swap chain image.
-		m_GraphicsCommandObj->RecordCommands(ImageIndex, currentBuffer);
+		m_GraphicsCommandObj->RecordCommands(imageIndex, currentBuffer);
 
 		VkSemaphore waitSemaphores[] = 
 		{ m_SO->m_WaitSemaphores[SyncObjPO::W_COMPUTEFIN].semvec[currentBuffer] ,
@@ -242,7 +242,7 @@ void DrawParticleBoundary::DrawFrame()
 		submitInfo.commandBufferCount = 1;
 		submitInfo.pCommandBuffers = &m_GraphicsCommandObj->m_CommandBuffers[currentBuffer];
 		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = &m_SO->m_SigSemaphores[SyncObjPO::S_RENDERFIN].semvec[ImageIndex];
+		submitInfo.pSignalSemaphores = &m_SO->m_SigSemaphores[SyncObjPO::S_RENDERFIN].semvec[imageIndex];
 
 
 		// Submit the command pool to the graphics command queue.
@@ -286,10 +286,10 @@ void DrawParticleBoundary::DrawFrame()
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &m_SO->m_SigSemaphores[SyncObjPO::S_RENDERFIN].semvec[ImageIndex];
+		presentInfo.pWaitSemaphores = &m_SO->m_SigSemaphores[SyncObjPO::S_RENDERFIN].semvec[imageIndex];
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = swapChains;
-		presentInfo.pImageIndices = &ImageIndex;
+		presentInfo.pImageIndices = &imageIndex;
 
 		// Send to presentation device
 		result = vkQueuePresentKHR(m_App->GetPresentQueue(), &presentInfo);

@@ -3,15 +3,18 @@
 
 \subsection{Current Simple-Model Direction}
 
-Scheduled particle birth, lifecycle gating through \texttt{Data.w}, and
-outlet retirement have been retired from the live Python
-\texttt{ForceDynamics} path.  Mobile particles are generated active from
-frame zero.  The current verification target is the simple particle model:
-mobile particles, boundary-particle locality markers, and stationary
-parametric walls generated from \texttt{curve\_wall\_segments}.  Reservoir
-work is now being reintroduced as a generator extension of the same simple
-model rather than as a separate wall or lifecycle system.  CD-nozzle flow
-remains separate until the generic simple and reservoir paths are stable.
+Scheduled reservoir birth, deferred admission, and outlet retirement have
+been retired from the live Python \texttt{ForceDynamics} path.  Ordinary
+mobile particles are generated active from frame zero.  Generator-owned
+release-frame records are allowed only for focused bring-up paths such as
+\texttt{GenStreaming.py} and \texttt{GenLightingData.py}; they are
+precomputed visibility/dynamics schedules, not reservoir birth systems.  The
+current verification target is the simple particle model: mobile particles,
+boundary-particle locality markers, and stationary parametric walls generated
+from \texttt{curve\_wall\_segments}.  Reservoir work is now being reintroduced
+as a generator extension of the same simple model rather than as a separate
+wall or lifecycle system.  CD-nozzle flow remains separate until the generic
+simple and reservoir paths are stable.
 
 The former deferred-birth design remains documented as a historical
 investigation in \texttt{ProblemEvolution.tex}.  It is not an active
@@ -42,6 +45,27 @@ into the active \texttt{ForceDynamics} Python path.  The distinction is:
 Freestream boundary particles are the same generic function-wall locality
 markers used by the simple path.  They use positive \texttt{ptype} and do not
 store wall evaluator IDs in \texttt{Data.z}.
+
+\subsection{Lighting Release Generator}
+
+\texttt{GenLightingData.py} inherits the FreeStream release-frame machinery
+from \texttt{GenStreaming.py}, but it uses explicit
+\texttt{PARTICLE\_DATA} records rather than inlet-wave population.  Each
+configured particle may provide:
+\begin{verbatim}
+releaseFrame
+\end{verbatim}
+The generator copies this value into \texttt{pdata.state\_flg}, which becomes
+\texttt{Data.w} in the runtime particle record.  A missing value defaults to
+zero, which means active from frame zero.  Positive values are pending release
+frames, and negative values are rejected by the generator.
+
+This generator is for lighting, 3D visualization, and small explicit motion
+sequences.  It does not reintroduce reservoir birth admission, does not pack a
+reservoir, and does not move particles into an inlet position at runtime.
+Material assignment still belongs to the ordinary particle/material contract:
+explicit particles carry \texttt{material\_id}, while shared material behavior
+comes from \texttt{material\_properties}.
 
 The active generic generator contract is:
 \begin{itemize}

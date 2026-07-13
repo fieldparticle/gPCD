@@ -2,6 +2,17 @@ import os
 
 from gbase.FunctionWall import bounds as wall_bounds
 from gbase.FunctionWall import sample_points
+from gbase.MaterialProperties import (
+    COLOR_SCHEME_BLUE,
+    COLOR_SCHEME_COLLISION,
+    COLOR_SCHEME_GREEN,
+    COLOR_SCHEME_HSV,
+    COLOR_SCHEME_RED,
+    COLOR_SCHEME_WHITE,
+    DEFAULT_MATERIAL_PROPERTIES,
+    write_color_scheme_defines,
+    write_material_properties,
+)
 from gbase.pdata import PTYPE_MOBILE, PTYPE_NULL, pdata
 import math
 
@@ -10,6 +21,28 @@ class GenericGenData:
     """Generate particle data from declarative particle and wall configuration."""
 
     BOUNDARY_PARTICLE_PTYPE = 1.0
+    COLOR_SCHEME_COLLISION = COLOR_SCHEME_COLLISION
+    COLOR_SCHEME_HSV = COLOR_SCHEME_HSV
+    COLOR_SCHEME_WHITE = COLOR_SCHEME_WHITE
+    COLOR_SCHEME_RED = COLOR_SCHEME_RED
+    COLOR_SCHEME_GREEN = COLOR_SCHEME_GREEN
+    COLOR_SCHEME_BLUE = COLOR_SCHEME_BLUE
+    COLOR_SCHEME_NAMES = {
+        "COLLISION": COLOR_SCHEME_COLLISION,
+        "HSV": COLOR_SCHEME_HSV,
+        "WHITE": COLOR_SCHEME_WHITE,
+        "RED": COLOR_SCHEME_RED,
+        "GREEN": COLOR_SCHEME_GREEN,
+        "BLUE": COLOR_SCHEME_BLUE,
+        "COLOR_SCHEME_COLLISION": COLOR_SCHEME_COLLISION,
+        "COLOR_SCHEME_HSV": COLOR_SCHEME_HSV,
+        "COLOR_SCHEME_WHITE": COLOR_SCHEME_WHITE,
+        "COLOR_SCHEME_RED": COLOR_SCHEME_RED,
+        "COLOR_SCHEME_GREEN": COLOR_SCHEME_GREEN,
+        "COLOR_SCHEME_BLUE": COLOR_SCHEME_BLUE,
+    }
+    COLOR_SCHEME_VALUES = set(COLOR_SCHEME_NAMES.values())
+    DEFAULT_MATERIAL_PROPERTIES = DEFAULT_MATERIAL_PROPERTIES
 
     def __init__(self):
         self.parent = None
@@ -23,6 +56,11 @@ class GenericGenData:
         self.number_particles = 0
         self.number_active_particles = 0
         self.number_boundary_particles = 0
+        self.material_properties = [dict(item) for item in self.DEFAULT_MATERIAL_PROPERTIES]
+        self.material_properties_by_id = {
+            int(item["material_id"]): dict(item)
+            for item in self.material_properties
+        }
 
     def create(self, parent, itemcfg):
         self.parent = parent
@@ -42,6 +80,134 @@ class GenericGenData:
 
     def do_all_files_dbg(self):
         return self.runner()
+
+    def parse_color_scheme(self, raw_value, errors, context):
+        if isinstance(raw_value, str):
+            color_scheme = self.COLOR_SCHEME_NAMES.get(raw_value.strip().upper())
+            if color_scheme is None:
+                errors.append(f"{context}.color_scheme is unknown: {raw_value}")
+                return None
+            return color_scheme
+        try:
+            color_scheme = int(raw_value)
+        except (TypeError, ValueError):
+            errors.append(f"{context}.color_scheme must be an integer or known name")
+            return None
+        if color_scheme not in self.COLOR_SCHEME_VALUES:
+            errors.append(f"{context}.color_scheme is not a known color scheme")
+            return None
+        return color_scheme
+
+    def validate_material_properties(self, errors):
+        raw_materials = self.itemcfg.get("material_properties")
+        if raw_materials is None:
+            materials = [dict(item) for item in self.DEFAULT_MATERIAL_PROPERTIES]
+            self.set_material_properties(materials)
+            return materials
+
+        materials = []
+        material_ids = set()
+        try:
+            material_count = len(raw_materials)
+        except TypeError:
+            errors.append("material_properties must be a list or tuple")
+            return []
+
+        for index, raw_material in enumerate(raw_materials):
+            context = f"material_properties[{index}]"
+            try:
+                material_id = int(raw_material.material_id)
+            except (AttributeError, TypeError, ValueError):
+                errors.append(f"{context}.material_id is required and must be an integer")
+                continue
+
+            if material_id < 0:
+                errors.append(f"{context}.material_id must not be negative")
+            if material_id in material_ids:
+                errors.append(f"{context}.material_id duplicates {material_id}")
+            material_ids.add(material_id)
+
+            name = str(raw_material.get("name", f"material_{material_id}"))
+
+            try:
+                relative_mass = float(raw_material.get("relative_mass", 1.0))
+            except (TypeError, ValueError):
+                errors.append(f"{context}.relative_mass must be numeric")
+                relative_mass = None
+            if relative_mass is not None:
+                if not math.isfinite(relative_mass):
+                    errors.append(f"{context}.relative_mass must be finite")
+                elif relative_mass <= 0.0:
+                    errors.append(f"{context}.relative_mass must be positive")
+
+            try:
+                thermal_velocity = float(raw_material.get("thermal_velocity", 0.0))
+            except (TypeError, ValueError):
+                errors.append(f"{context}.thermal_velocity must be numeric")
+                thermal_velocity = None
+            if thermal_velocity is not None:
+                if not math.isfinite(thermal_velocity):
+                    errors.append(f"{context}.thermal_velocity must be finite")
+                elif thermal_velocity < 0.0:
+                    errors.append(f"{context}.thermal_velocity must not be negative")
+
+            try:
+                cell_density = float(raw_material.get("cell_density", 0.0))
+            except (TypeError, ValueError):
+                errors.append(f"{context}.cell_density must be numeric")
+                cell_density = None
+            if cell_density is not None:
+                if not math.isfinite(cell_density):
+                    errors.append(f"{context}.cell_density must be finite")
+                elif not 0.0 <= cell_density <= 1.0:
+                    errors.append(f"{context}.cell_density must be between 0 and 1")
+                elif material_id == 0 and cell_density > 0.0:
+                    errors.append(
+                        f"{context}.cell_density must be 0 for stream-generated material 0"
+                    )
+
+            color_scheme = self.parse_color_scheme(
+                raw_material.get("color_scheme", self.COLOR_SCHEME_HSV),
+                errors,
+                context,
+            )
+
+            if (
+                material_id >= 0
+                and relative_mass is not None
+                and thermal_velocity is not None
+                and cell_density is not None
+                and color_scheme is not None
+            ):
+                materials.append(
+                    {
+                        "material_id": material_id,
+                        "name": name,
+                        "relative_mass": relative_mass,
+                        "thermal_velocity": thermal_velocity,
+                        "color_scheme": color_scheme,
+                        "cell_density": cell_density,
+                    }
+                )
+
+        if material_count == 0:
+            errors.append("material_properties must not be empty")
+        if 0 not in material_ids:
+            errors.append("material_properties must define material_id 0")
+
+        if not errors:
+            self.set_material_properties(materials)
+        return materials
+
+    def set_material_properties(self, materials):
+        self.material_properties = sorted(
+            (dict(material) for material in materials),
+            key=lambda material: int(material["material_id"]),
+        )
+        self.material_properties_by_id = {
+            int(material["material_id"]): dict(material)
+            for material in self.material_properties
+        }
 
     def validate_simulation_configuration(self):
         errors = []
@@ -204,6 +370,9 @@ class GenericGenData:
                     errors.append(f"PARTICLE_DATA.{name} is required")
                     continue
                 try:
+                    material_id = int(particle.get("material_id", 0))
+                    raw_mass = particle.get("mass")
+                    mass = None if raw_mass is None else float(raw_mass)
                     values = {
                         "name": name,
                         "x": float(particle.location.x1),
@@ -212,8 +381,9 @@ class GenericGenData:
                         "vx": float(particle.vx),
                         "vy": float(particle.vy),
                         "vz": float(particle.get("vz", 0.0)),
-                        "mass": float(particle.mass),
+                        "mass": mass,
                         "radius": float(particle.radius),
+                        "material_id": material_id,
                         "collision_stiffness_q": float(
                             particle.get(
                                 "collision_stiffness_q",
@@ -225,13 +395,15 @@ class GenericGenData:
                     errors.append(f"PARTICLE_DATA.{name} is invalid: {error}")
                     continue
                 numeric_values = (
-                    value for key, value in values.items() if key != "name"
+                    value
+                    for key, value in values.items()
+                    if key != "name" and value is not None
                 )
                 if not all(math.isfinite(value) for value in numeric_values):
                     errors.append(f"PARTICLE_DATA.{name} values must be finite")
                 if values["radius"] <= 0.0:
                     errors.append(f"PARTICLE_DATA.{name}.radius must be positive")
-                if values["mass"] <= 0.0:
+                if values["mass"] is not None and values["mass"] <= 0.0:
                     errors.append(f"PARTICLE_DATA.{name}.mass must be positive")
                 if values["collision_stiffness_q"] < 0.0:
                     errors.append(
@@ -269,6 +441,19 @@ class GenericGenData:
                     errors.append(
                         f"PARTICLE_DATA.p{index} position is outside the cell array"
                     )
+
+        self.validate_material_properties(errors)
+        known_material_ids = set(self.material_properties_by_id)
+        for index, particle in enumerate(particles, start=1):
+            material_id = particle.get("material_id", 0)
+            if material_id not in known_material_ids:
+                errors.append(
+                    f"PARTICLE_DATA.p{index}.material_id is not defined"
+                )
+            elif particle["mass"] is None:
+                particle["mass"] = float(
+                    self.material_properties_by_id[material_id]["relative_mass"]
+                )
 
         if errors:
             raise ValueError(
@@ -598,10 +783,17 @@ class GenericGenData:
             output.write(text.rstrip())
             output.write("\n")
 
+    def write_color_scheme_defines(self, output):
+        write_color_scheme_defines(output)
+
+    def write_material_properties(self, output):
+        write_material_properties(output, {"material_properties": self.material_properties})
+
     def add_null_particle(self):
         particle = pdata()
         particle.pnum = 0
         particle.ptype = PTYPE_NULL
+        particle.material_id = 0.0
         self.p_list.append(particle)
         return particle
 
@@ -610,18 +802,25 @@ class GenericGenData:
         position,
         velocity,
         radius=None,
-        mass=1.0,
+        mass=None,
+        material_id=0,
         collision_stiffness_q=None,
     ):
+        material_id = int(material_id)
+        if material_id not in self.material_properties_by_id:
+            raise ValueError(f"material_id {material_id} is not defined")
+        if mass is None:
+            mass = float(self.material_properties_by_id[material_id]["relative_mass"])
         particle = pdata()
         self.number_particles += 1
         self.number_active_particles += 1
         particle.pnum = self.number_particles
         particle.ptype = PTYPE_MOBILE
+        particle.material_id = float(material_id)
         particle.rx, particle.ry, particle.rz = position
         particle.vx, particle.vy, particle.vz = velocity
         particle.radius = self.radius if radius is None else radius
-        particle.molar_mass = mass
+        particle.molar_mass = float(mass)
         particle.state_flg = 0.0
         particle.collision_stiffness_q = (
             float(self.itemcfg.get("collision_stiffness_q", 0.0))
@@ -639,6 +838,7 @@ class GenericGenData:
                 (configured["vx"], configured["vy"], configured["vz"]),
                 radius=configured["radius"],
                 mass=configured["mass"],
+                material_id=configured.get("material_id", 0),
                 collision_stiffness_q=configured["collision_stiffness_q"],
             )
 
@@ -654,12 +854,13 @@ class GenericGenData:
         self.number_boundary_particles += 1
         particle.pnum = self.number_particles
         particle.ptype = self.BOUNDARY_PARTICLE_PTYPE
+        particle.material_id = 0.0
         particle.rx, particle.ry, particle.rz = position
         particle.vx = 0.0
         particle.vy = 0.0
         particle.vz = 0.0
         particle.radius = self.radius
-        particle.molar_mass = 1.0
+        particle.molar_mass = float(self.material_properties_by_id[0]["relative_mass"])
         particle.state_flg = 0.0
         particle.collision_stiffness_q = 0.0
         self.p_list.append(particle)
@@ -681,7 +882,7 @@ class GenericGenData:
             for marker_x, marker_y in points:
                 cell_x = round(marker_x)
                 cell_y = round(marker_y)
-                cell_z = round(self.particle_plane_z)
+                cell_z = int(math.floor(self.particle_plane_z))
                 marker_cell_key = (
                     cell_x,
                     cell_y,
@@ -1105,6 +1306,8 @@ class GenericGenData:
             )
             output.write(f"hsv_sat = {float(self.itemcfg.hsv_sat):.9f};\n")
             output.write(f"hsv_val = {float(self.itemcfg.hsv_val):.9f};\n")
+            self.write_color_scheme_defines(output)
+            self.write_material_properties(output)
             output.write(
                 f"as_points = {1 if self.itemcfg.get('as_points', False) else 0};\n"
             )

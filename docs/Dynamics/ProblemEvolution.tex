@@ -416,7 +416,7 @@ changes in particle velocity angle during reservoir and box tests.
 \subsubsection{<current form>}
 
 The Python viewer now supports \texttt{RUN\_CONFIGURATION.hsv\_color}.  When
-enabled, \texttt{SimulationRunner.py} colors each active particle from
+enabled, \texttt{SimulationRunner\_HSVPanel.py} colors each active particle from
 \texttt{VelRad.w} using \texttt{gbase/utilities.py:hsv\_angle}.  The helper
 maps a radians angle to hue using \(1/(2\pi)\), clamps
 \texttt{hsv\_sat} and \texttt{hsv\_val} to \([0,1]\), and returns a Python RGB
@@ -434,7 +434,7 @@ detection, force accumulation, integration, reservoir lifecycle, or energy and
 momentum reports.
 
 Keeping the HSV helper in \texttt{gbase/utilities.py} and applying it in
-\texttt{SimulationRunner.py} preserves the boundary between portable dynamics
+\texttt{SimulationRunner\_HSVPanel.py} preserves the boundary between portable dynamics
 logic and Python display logic.  A later GLSL utility can mirror the same
 \texttt{hsv\_angle(angle, value, sat)} interface for Vulkan rendering without
 changing the ForceDynamics collision model.
@@ -2239,3 +2239,42 @@ expands into invalid GLSL.  The generated local GLSL should therefore emit:
 #define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER 2.000000000
 \end{verbatim}
 rather than semicolon-terminated macro values.
+
+\subsection{Lighting Generator Uses Release Frames}
+
+\subsubsection{previous form}
+
+The project had two competing lifecycle descriptions.  The current simple and
+reservoir theory correctly retired runtime scheduled birth and deferred
+admission, while FreeStream still used positive \texttt{Data.w} values for
+timed inlet release records.  That made a new lighting/visualization
+generator ambiguous: it needed scheduled appearance without reviving the old
+reservoir birth model.
+
+\subsubsection{current form}
+
+\texttt{GenLightingData.py} inherits \texttt{GenStreaming.py} and uses
+explicit \texttt{PARTICLE\_DATA} records.  Each particle may provide
+\texttt{releaseFrame}; the generator validates that it is finite and
+nonnegative, then writes it to \texttt{pdata.state\_flg}.  In the generated
+runtime record this becomes \texttt{Data.w}.  Zero means active from frame
+zero, and a positive value means pending until the current frame reaches that
+release frame.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+Positive \texttt{Data.w} is now a generator-scoped release-frame convention
+for \texttt{GenStreaming.py} and \texttt{GenLightingData.py}.  It is not a
+general reservoir birth/admission rule.  The generator never relocates the
+particle at runtime and never writes target particles; it only emits an
+initial record whose lifecycle gate delays participation until the configured
+frame.
+
+The ordinary simple and reservoir models still generate particles active from
+frame zero and use negative \texttt{Data.w} as permanent dead state.  This
+keeps the retired deferred-birth investigation separate from controlled
+streaming and lighting release schedules.
