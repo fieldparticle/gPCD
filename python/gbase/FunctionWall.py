@@ -1,10 +1,129 @@
 import math
+from collections.abc import Mapping
 
 
 BOUNDARY_KIND_REGULAR = 0
 BOUNDARY_KIND_RESERVOIR = 1
 AXIS_X = 0
 AXIS_Y = 1
+
+BOUNDARY_KIND_BY_NAME = {
+    "regular": BOUNDARY_KIND_REGULAR,
+    "reservoir": BOUNDARY_KIND_RESERVOIR,
+}
+
+FUNCTION_AXIS_BY_NAME = {
+    "y_of_x": AXIS_X,
+    "x_of_y": AXIS_Y,
+}
+
+
+def _required_field(segment_name, segment_config, field_name, errors):
+    if field_name not in segment_config:
+        errors.append(f"curve_wall_segments.{segment_name}.{field_name} is required")
+        return None
+    return segment_config[field_name]
+
+
+def _required_number(segment_name, segment_config, field_name, errors):
+    raw_value = _required_field(segment_name, segment_config, field_name, errors)
+    if raw_value is None:
+        return None
+    try:
+        value = float(raw_value)
+    except (TypeError, ValueError):
+        errors.append(f"curve_wall_segments.{segment_name}.{field_name} must be numeric")
+        return None
+    if not math.isfinite(value):
+        errors.append(f"curve_wall_segments.{segment_name}.{field_name} must be finite")
+        return None
+    return value
+
+
+def parse_segment(segment_name, segment_config):
+    """Parse one canonical key-value wall segment into numeric internal form."""
+    errors = []
+
+    if not isinstance(segment_config, Mapping):
+        return None, [
+            f"curve_wall_segments.{segment_name} must be a key-value object"
+        ]
+
+    boundary_kind_name = _required_field(
+        segment_name, segment_config, "boundary_kind", errors
+    )
+    function_name = _required_field(segment_name, segment_config, "function", errors)
+    boundary_kind = BOUNDARY_KIND_BY_NAME.get(str(boundary_kind_name))
+    independent_axis = FUNCTION_AXIS_BY_NAME.get(str(function_name))
+    if boundary_kind is None and boundary_kind_name is not None:
+        errors.append(
+            f"curve_wall_segments.{segment_name}.boundary_kind "
+            "must be \"regular\" or \"reservoir\""
+        )
+    if independent_axis is None and function_name is not None:
+        errors.append(
+            f"curve_wall_segments.{segment_name}.function "
+            "must be \"y_of_x\" or \"x_of_y\""
+        )
+
+    u_start = _required_number(segment_name, segment_config, "u_start", errors)
+    u_end = _required_number(segment_name, segment_config, "u_end", errors)
+    f_start = _required_number(segment_name, segment_config, "f_start", errors)
+    a1 = _required_number(segment_name, segment_config, "a1", errors)
+    a2 = _required_number(segment_name, segment_config, "a2", errors)
+    a3 = _required_number(segment_name, segment_config, "a3", errors)
+    normal_sign = _required_number(
+        segment_name, segment_config, "normal_sign", errors
+    )
+    wall_flag = _required_number(segment_name, segment_config, "wall_flag", errors)
+
+    if u_start is not None and u_end is not None and abs(u_end - u_start) <= 1.0e-12:
+        errors.append(f"curve_wall_segments.{segment_name} has zero length")
+    if normal_sign is not None and normal_sign == 0.0:
+        errors.append(
+            f"curve_wall_segments.{segment_name}.normal_sign must not be zero"
+        )
+    if wall_flag is not None and (
+        not wall_flag.is_integer() or int(wall_flag) <= 0
+    ):
+        errors.append(
+            f"curve_wall_segments.{segment_name}.wall_flag "
+            "must be a positive integer"
+        )
+
+    values = (
+        boundary_kind,
+        independent_axis,
+        u_start,
+        u_end,
+        f_start,
+        a1,
+        a2,
+        a3,
+        normal_sign,
+        wall_flag,
+    )
+    if errors or any(value is None for value in values):
+        return None, errors
+    return tuple(float(value) for value in values), []
+
+
+def parse_keyed_curve_wall_segments(raw_segments):
+    """Parse the canonical key-value curve_wall_segments config object."""
+    if not raw_segments:
+        return (), ["curve_wall_segments is required and must not be empty"]
+    if not isinstance(raw_segments, Mapping):
+        return (), ["curve_wall_segments must be a key-value object"]
+
+    errors = []
+    parsed_segments = []
+    for segment_name, segment_config in raw_segments.items():
+        segment, segment_errors = parse_segment(segment_name, segment_config)
+        errors.extend(segment_errors)
+        if segment is not None:
+            parsed_segments.append(segment)
+
+    return tuple(parsed_segments), errors
 
 
 def segment_values(segment):

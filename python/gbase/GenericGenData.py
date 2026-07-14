@@ -1,12 +1,15 @@
 import os
 
 from gbase.FunctionWall import bounds as wall_bounds
+from gbase.FunctionWall import parse_keyed_curve_wall_segments
 from gbase.FunctionWall import sample_points
 from gbase.MaterialProperties import (
     COLOR_SCHEME_BLUE,
     COLOR_SCHEME_COLLISION,
     COLOR_SCHEME_GREEN,
     COLOR_SCHEME_HSV,
+    COLOR_SCHEME_LUMENS,
+    COLOR_SCHEME_NAMES,
     COLOR_SCHEME_RED,
     COLOR_SCHEME_WHITE,
     DEFAULT_MATERIAL_PROPERTIES,
@@ -27,20 +30,8 @@ class GenericGenData:
     COLOR_SCHEME_RED = COLOR_SCHEME_RED
     COLOR_SCHEME_GREEN = COLOR_SCHEME_GREEN
     COLOR_SCHEME_BLUE = COLOR_SCHEME_BLUE
-    COLOR_SCHEME_NAMES = {
-        "COLLISION": COLOR_SCHEME_COLLISION,
-        "HSV": COLOR_SCHEME_HSV,
-        "WHITE": COLOR_SCHEME_WHITE,
-        "RED": COLOR_SCHEME_RED,
-        "GREEN": COLOR_SCHEME_GREEN,
-        "BLUE": COLOR_SCHEME_BLUE,
-        "COLOR_SCHEME_COLLISION": COLOR_SCHEME_COLLISION,
-        "COLOR_SCHEME_HSV": COLOR_SCHEME_HSV,
-        "COLOR_SCHEME_WHITE": COLOR_SCHEME_WHITE,
-        "COLOR_SCHEME_RED": COLOR_SCHEME_RED,
-        "COLOR_SCHEME_GREEN": COLOR_SCHEME_GREEN,
-        "COLOR_SCHEME_BLUE": COLOR_SCHEME_BLUE,
-    }
+    COLOR_SCHEME_LUMENS = COLOR_SCHEME_LUMENS
+    COLOR_SCHEME_NAMES = COLOR_SCHEME_NAMES
     COLOR_SCHEME_VALUES = set(COLOR_SCHEME_NAMES.values())
     DEFAULT_MATERIAL_PROPERTIES = DEFAULT_MATERIAL_PROPERTIES
 
@@ -298,65 +289,8 @@ class GenericGenData:
                     )
 
         raw_segments = self.itemcfg.get("curve_wall_segments")
-        curve_segments = []
-        if not raw_segments:
-            errors.append("curve_wall_segments is required and must not be empty")
-        else:
-            for index, raw_segment in enumerate(raw_segments):
-                if len(raw_segment) != 10:
-                    errors.append(
-                        f"curve_wall_segments[{index}] must contain 10 values"
-                    )
-                    continue
-                try:
-                    segment = tuple(float(value) for value in raw_segment)
-                except (TypeError, ValueError):
-                    errors.append(
-                        f"curve_wall_segments[{index}] values must be numeric"
-                    )
-                    continue
-                if not all(math.isfinite(value) for value in segment):
-                    errors.append(
-                        f"curve_wall_segments[{index}] values must be finite"
-                    )
-                    continue
-                (
-                    boundary_kind,
-                    independent_axis,
-                    u_start,
-                    u_end,
-                    _f_start,
-                    _a1,
-                    _a2,
-                    _a3,
-                    normal_sign,
-                    wall_flag,
-                ) = segment
-                if (
-                    not boundary_kind.is_integer()
-                    or int(boundary_kind) not in (0, 1)
-                ):
-                    errors.append(
-                        f"curve_wall_segments[{index}] boundary_kind must be 0 or 1"
-                    )
-                if (
-                    not independent_axis.is_integer()
-                    or int(independent_axis) not in (0, 1)
-                ):
-                    errors.append(
-                        f"curve_wall_segments[{index}] independent_axis must be 0 or 1"
-                    )
-                if not wall_flag.is_integer() or int(wall_flag) <= 0:
-                    errors.append(
-                        f"curve_wall_segments[{index}] wall_flag must be a positive integer"
-                    )
-                if abs(u_end - u_start) <= 1.0e-12:
-                    errors.append(f"curve_wall_segments[{index}] has zero length")
-                if normal_sign == 0.0:
-                    errors.append(
-                        f"curve_wall_segments[{index}] normal_sign must not be zero"
-                    )
-                curve_segments.append(segment)
+        curve_segments, curve_errors = parse_keyed_curve_wall_segments(raw_segments)
+        errors.extend(curve_errors)
 
         particle_data = self.itemcfg.get("PARTICLE_DATA")
         particles = []
@@ -1300,9 +1234,6 @@ class GenericGenData:
             output.write(
                 "contact_force_measure = "
                 f'"{self.itemcfg.get("contact_force_measure", "depth")}";\n'
-            )
-            output.write(
-                f"hsv_color = {1 if self.itemcfg.get('hsv_color', False) else 0};\n"
             )
             output.write(f"hsv_sat = {float(self.itemcfg.hsv_sat):.9f};\n")
             output.write(f"hsv_val = {float(self.itemcfg.hsv_val):.9f};\n")

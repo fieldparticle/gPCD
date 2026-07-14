@@ -1,5 +1,8 @@
-Current status:
-  - Documented GenLightingData release-frame semantics and lifecycle exception
-Code Changes:
-  - Updated Dynamics convention docs, Python config docs, runner references, and ProblemEvolution
-Next: Fix lumens wall-segment validation and verify lighting data generation
+Document lumens material color and Python eye diagnostics
+
+- document material-owned color schemes and retire flat hsv_color
+- document Python lumens eye/FOV/aperture visibility controls
+- document SpecificDraw scenario diagnostic hook
+- record lumens eye-aperture visualization in ProblemEvolution
+
+Next: 3D camera-derived eye/view state

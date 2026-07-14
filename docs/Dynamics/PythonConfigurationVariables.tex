@@ -79,6 +79,60 @@ Per-particle records select the material with \texttt{material\_id}; shared
 mass scaling, thermal velocity, color scheme, and density metadata belong to
 the material record.
 
+\subsection{Lighting/Lumens View Inputs}
+
+The Python lumens viewer is a render diagnostic for photon-style particles.
+It is Python-only for now; Vulkan will later derive the eye position and look
+angle dynamically from the 3D camera/view state rather than from static cfg
+values.
+
+\begin{description}
+    \item[\texttt{lumens\_eye\_position}] Two values giving the eye center in
+    world coordinates.  \([0.0,0.0]\) is valid.
+    \item[\texttt{lumens\_eye\_angle\_degrees}] Direction the eye is looking,
+    in degrees.
+    \item[\texttt{lumens\_eye\_fov\_degrees}] Angular field of view centered
+    on the eye look direction.
+    \item[\texttt{lumens\_eye\_radius}] Aperture radius around the eye center.
+    A photon must cross this current-position radius before it can become
+    visible.
+    \item[\texttt{lumens\_fade\_in}] When true, brightness fades from the
+    aperture boundary toward the eye center.  When false, distance inside the
+    aperture does not reduce brightness.
+    \item[\texttt{lumens\_surface\_color}] Base RGB color used for visible
+    photons before brightness scaling.
+    \item[\texttt{lumens\_debug\_dim}] When true, non-visible photons are
+    drawn very dim for debugging.  When false, non-visible photons are not
+    drawn.
+    \item[\texttt{lumens\_draw\_eye\_radius}] Optional diagnostic drawing of
+    the eye aperture in scenarios that provide the custom draw hook.
+\end{description}
+
+First-pass visibility uses the current particle position, the particle's
+current velocity angle in \texttt{VelRad.w}, the eye position, the configured
+eye angle, the configured field of view, and the eye radius.  A photon is not
+allowed to change to its visible color at rebound merely because its future
+ray would intersect the eye; the color change is gated by the current
+position crossing the eye aperture.
+
+\subsection{Material Color Schemes}
+
+\texttt{material\_properties.color\_scheme} owns particle color selection.
+The active named schemes are:
+\begin{verbatim}
+COLLISION
+HSV
+WHITE
+RED
+GREEN
+BLUE
+LUMENS
+\end{verbatim}
+
+The former flat \texttt{hsv\_color} switch is retired.  \texttt{HSV} uses
+\texttt{hsv\_sat} and \texttt{hsv\_val} as viewer parameters; \texttt{LUMENS}
+uses the lumens eye/aperture fields above.
+
 \subsection{Rectangular Cell Domain}
 
 All active cfg files use explicit dimensions:
@@ -153,18 +207,44 @@ cfg fields.
 
 \subsection{Parametric Wall Inputs}
 
-\texttt{curve\_wall\_segments} is an ordered collection of finite cubic
-parametric wall segments.  Each record has the form:
+\texttt{curve\_wall\_segments} is a keyed collection of finite function-wall
+segments.  Source cfg and include files use only the key-value form:
 \begin{verbatim}
-[ax, bx, cx, dx, ay, by, cy, dy, wall_flag]
+curve_wall_segments = {
+    wall2 = {
+        boundary_kind = "regular";
+        function = "x_of_y";
+        u_start = 1.5;
+        u_end = 6.0;
+        f_start = 6.0;
+        a1 = 0.0;
+        a2 = 0.0;
+        a3 = 0.0;
+        normal_sign = 1;
+        wall_flag = 2;
+    };
+};
 \end{verbatim}
-and defines
-\(x(t)=a_x+b_xt+c_xt^2+d_xt^3\) and
-\(y(t)=a_y+b_yt+c_yt^2+d_yt^3\) for \(0\leq t\leq1\).
-The positive wall flag identifies one physical wall for contact
-deduplication.  Segment direction determines the outward right-hand normal.
-Segments must remain inside the cell and death bounds; connected conduit
-profiles must remain continuous and preserve their intended gap.
+
+\texttt{function="y\_of\_x"} means \(y=f(x)\).  \texttt{function="x\_of\_y"}
+means \(x=f(y)\).  The function is:
+\[
+f(u)=f_{\mathrm{start}}+a_1(u-u_{\mathrm{start}})
+     +a_2(u-u_{\mathrm{start}})^2
+     +a_3(u-u_{\mathrm{start}})^3.
+\]
+\texttt{boundary\_kind} is \texttt{"regular"} or \texttt{"reservoir"}.
+\texttt{normal\_sign} selects the outward normal from the local slope.  The
+positive \texttt{wall\_flag} identifies one physical wall for contact
+deduplication.  Segments must remain inside the cell and death bounds;
+connected conduit profiles must remain continuous and preserve their intended
+gap.
+
+The parser normalizes the key-value records to the internal numeric wall
+representation used by Python dynamics and generated output.  Old source cfg
+rows such as \texttt{[0, 1, ...]} are invalid and should fail at load time.
+Generated \texttt{.tst} or GLSL-facing output may still use numeric wall rows
+when that is the required downstream format.
 
 The generic generator uses these segments for validation, boundary-marker
 locality, Python wall response, generated GLSL metadata, and any visual wall
@@ -200,8 +280,9 @@ modes use the shared marker sampling in
 
 \texttt{x\_axis\_lims}, \texttt{y\_axis\_lims}, and
 \texttt{z\_axis\_lims} control Python plotting and game-camera bounds.
-\texttt{hsv\_color}, \texttt{hsv\_sat}, and \texttt{hsv\_val} control
-velocity-angle coloring only and do not affect dynamics.
+\texttt{material\_properties.color\_scheme} controls particle coloring and
+does not affect dynamics.  \texttt{hsv\_sat} and \texttt{hsv\_val} parameterize
+the \texttt{HSV} material color scheme only.
 The game simulation draws the analytic piston as a vertical line and reports
 its position, velocity, contacts, impulse, and cumulative momentum transfer.
 In sphere mode, boundary markers retain their configured visual radius but

@@ -78,39 +78,131 @@ piston_velocity = [ 0.05, 0.0, 0.0 ];
 particle_plane_z = 1.5;
 
 // Function wall format:
-// [boundary_kind, independent_axis, u_start, u_end,
-//  f_start, a1, a2, a3, normal_sign, wall_flag]
-// boundary_kind: 0 = regular collision boundary, 1 = reservoir packing boundary
-// independent_axis: 0 = y=f(x), 1 = x=f(y)
-// f(u) = f_start + a1*du + a2*du^2 + a3*du^3, du = u - u_start
-// normal_sign selects the outward normal from the local slope:
 //   -1 for lower walls where outward is below the conduit
 //    1 for upper walls where outward is above the conduit
-// wall_flag is the physical wall identity used for contact diagnostics.
 // Boundary particles are cell-locality sentinels; they are not wall geometry.
-curve_wall_segments = (
-    // Reservoir/chamber packing walls, x=2 through x=30.
-    // The reservoir connects directly to the converging curve; there is no
-    // separate constant-radius inlet pipe ahead of the nozzle.
-    [1, 0, 2, 30, 15, 0, 0, 0, -1, 3],
-    [1, 0, 2, 30, 35, 0, 0, 0,  1, 4],
-
-    // Quadratic convergence, x=30 through x=50.
-    [0, 0, 30, 50, 15,  0.25, -0.00625, 0, -1, 3],
-    [0, 0, 30, 50, 35, -0.25,  0.00625, 0,  1, 4],
-
-    // Constant-radius throat, x=50 through x=55.
-    [0, 0, 50, 55, 17.5, 0, 0, 0, -1, 3],
-    [0, 0, 50, 55, 32.5, 0, 0, 0,  1, 4],
-
-    // Quadratic divergence, x=55 through x=75.
-    [0, 0, 55, 75, 17.5, 0, -0.00625, 0, -1, 3],
-    [0, 0, 55, 75, 32.5, 0,  0.00625, 0,  1, 4],
-
-    // Constant-radius exit, x=75 through x=85.
-    [0, 0, 75, 85, 15, 0, 0, 0, -1, 3],
-    [0, 0, 75, 85, 35, 0, 0, 0,  1, 4]
-);
+curve_wall_segments = {
+    wall3 = {
+        boundary_kind = "reservoir";
+        function = "y_of_x";
+        u_start = 2;
+        u_end = 30;
+        f_start = 15;
+        a1 = 0;
+        a2 = 0;
+        a3 = 0;
+        normal_sign = -1;
+        wall_flag = 3;
+    };
+    wall4 = {
+        boundary_kind = "reservoir";
+        function = "y_of_x";
+        u_start = 2;
+        u_end = 30;
+        f_start = 35;
+        a1 = 0;
+        a2 = 0;
+        a3 = 0;
+        normal_sign = 1;
+        wall_flag = 4;
+    };
+    wall3_segment03 = {
+        boundary_kind = "regular";
+        function = "y_of_x";
+        u_start = 30;
+        u_end = 50;
+        f_start = 15;
+        a1 = 0.25;
+        a2 = -0.00625;
+        a3 = 0;
+        normal_sign = -1;
+        wall_flag = 3;
+    };
+    wall4_segment04 = {
+        boundary_kind = "regular";
+        function = "y_of_x";
+        u_start = 30;
+        u_end = 50;
+        f_start = 35;
+        a1 = -0.25;
+        a2 = 0.00625;
+        a3 = 0;
+        normal_sign = 1;
+        wall_flag = 4;
+    };
+    wall3_segment05 = {
+        boundary_kind = "regular";
+        function = "y_of_x";
+        u_start = 50;
+        u_end = 55;
+        f_start = 17.5;
+        a1 = 0;
+        a2 = 0;
+        a3 = 0;
+        normal_sign = -1;
+        wall_flag = 3;
+    };
+    wall4_segment06 = {
+        boundary_kind = "regular";
+        function = "y_of_x";
+        u_start = 50;
+        u_end = 55;
+        f_start = 32.5;
+        a1 = 0;
+        a2 = 0;
+        a3 = 0;
+        normal_sign = 1;
+        wall_flag = 4;
+    };
+    wall3_segment07 = {
+        boundary_kind = "regular";
+        function = "y_of_x";
+        u_start = 55;
+        u_end = 75;
+        f_start = 17.5;
+        a1 = 0;
+        a2 = -0.00625;
+        a3 = 0;
+        normal_sign = -1;
+        wall_flag = 3;
+    };
+    wall4_segment08 = {
+        boundary_kind = "regular";
+        function = "y_of_x";
+        u_start = 55;
+        u_end = 75;
+        f_start = 32.5;
+        a1 = 0;
+        a2 = 0.00625;
+        a3 = 0;
+        normal_sign = 1;
+        wall_flag = 4;
+    };
+    wall3_segment09 = {
+        boundary_kind = "regular";
+        function = "y_of_x";
+        u_start = 75;
+        u_end = 85;
+        f_start = 15;
+        a1 = 0;
+        a2 = 0;
+        a3 = 0;
+        normal_sign = -1;
+        wall_flag = 3;
+    };
+    wall4_segment10 = {
+        boundary_kind = "regular";
+        function = "y_of_x";
+        u_start = 75;
+        u_end = 85;
+        f_start = 35;
+        a1 = 0;
+        a2 = 0;
+        a3 = 0;
+        normal_sign = 1;
+        wall_flag = 4;
+    };
+};
 
 // Required: tells ForceDynamicsBase to load particles from bin_file.
 pdata_from_file = true;

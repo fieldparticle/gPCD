@@ -9,7 +9,7 @@ import math
 import re
 from pathlib import Path
 from gbase.libconf import AttrDict
-from gbase.FunctionWall import wall_marker_positions
+from gbase.FunctionWall import parse_keyed_curve_wall_segments, wall_marker_positions
 from gbase.pdata import PTYPE_NULL
 
 PTYPE_BOUNDARY = 1.0
@@ -343,6 +343,21 @@ class ForceDynamics(ForceContactDynamics):
         self.config_error_return = None
         self.initial_geometry_validated = False
         self.run_configuration = get_run_configuration(self.config)
+        raw_segments = self.run_configuration.get("curve_wall_segments")
+        if isinstance(raw_segments, AttrDict):
+            curve_segments, curve_errors = parse_keyed_curve_wall_segments(raw_segments)
+            if curve_errors:
+                raise ValueError(
+                    "Runtime wall configuration error(s):\n  - "
+                    + "\n  - ".join(curve_errors)
+                )
+            self.run_configuration["curve_wall_segments"] = curve_segments
+            self.config["curve_wall_segments"] = curve_segments
+        else:
+            raise ValueError(
+                "Runtime wall configuration error(s):\n  - "
+                "curve_wall_segments must be a key-value object"
+            )
         if self.config.pdata_from_file == True:
             self.particle_data = self.getParticleData(self.config)
         else:
@@ -597,6 +612,10 @@ class ForceDynamics(ForceContactDynamics):
     def create_particle_from_cfg(self, particle_name, particle_cfg):
         particle_number = int(str(particle_name).lstrip("p") or 0)
         location = particle_cfg.get("location", {})
+        state_flg = particle_cfg.get(
+            "releaseFrame",
+            particle_cfg.get("state_flg", 1.0),
+        )
         if "collision_stiffness_q" not in particle_cfg:
             collision_stiffness_q = 4.0
         else:
@@ -615,7 +634,7 @@ class ForceDynamics(ForceContactDynamics):
             ptype=particle_cfg.get("ptype", 0.0),
             material_id=particle_cfg.get("material_id", 0.0),
             collision_stiffness_q=collision_stiffness_q,
-            state_flg=particle_cfg.get("state_flg", 1.0),
+            state_flg=state_flg,
         )
 
     def getParticleData(self,config):

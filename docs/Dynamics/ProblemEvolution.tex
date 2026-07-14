@@ -2278,3 +2278,63 @@ The ordinary simple and reservoir models still generate particles active from
 frame zero and use negative \texttt{Data.w} as permanent dead state.  This
 keeps the retired deferred-birth investigation separate from controlled
 streaming and lighting release schedules.
+
+\subsection{Python Lumens Eye-Aperture Visualization}
+
+\subsubsection{previous form}
+
+Python particle coloring was still partly described by the retired flat
+\texttt{hsv\_color} switch, and lighting particles had no material-owned
+lumens color scheme.  The first lumens visibility pass also made it easy to
+color a photon at wall rebound if its future ray would pass near the eye,
+even though the particle had not yet reached the eye aperture in the current
+simulation frame.
+
+\subsubsection{current form}
+
+Color selection belongs to \texttt{material\_properties.color\_scheme}.  The
+named material schemes include \texttt{COLLISION}, \texttt{HSV},
+\texttt{WHITE}, \texttt{RED}, \texttt{GREEN}, \texttt{BLUE}, and
+\texttt{LUMENS}.  The \texttt{LUMENS} scheme is Python-only in this pass.
+It uses:
+\begin{verbatim}
+lumens_eye_position
+lumens_eye_angle_degrees
+lumens_eye_fov_degrees
+lumens_eye_radius
+lumens_fade_in
+lumens_surface_color
+lumens_debug_dim
+lumens_draw_eye_radius
+\end{verbatim}
+
+The lumens renderer evaluates the current particle position, the current
+velocity angle stored in \texttt{VelRad.w}, the eye position, the eye look
+angle, and the eye field of view.  A photon can become visibly colored only
+after its current position crosses the configured eye radius.  If
+\texttt{lumens\_fade\_in} is true, brightness ramps from the aperture boundary
+toward the eye center; otherwise visibility inside the aperture uses the
+alignment/FOV brightness without distance fade.
+
+\subsubsection{difference outcome}
+
+rendering and diagnostics
+
+\subsubsection{Analysis}
+
+The lumens model is now a controlled Python visualization prototype rather
+than a dynamics rule.  It does not change particle forces, positions,
+velocities, or release-frame lifecycle state.  Non-visible photons may be
+hidden or drawn dimly for debugging, but that decision remains a viewer
+choice.
+
+\texttt{GenLightingData.py} provides a scenario-specific
+\texttt{SpecificDraw} hook used by the Python pygame runner to draw the eye
+point, look ray, field-of-view rays, and optional aperture radius.  This keeps
+lighting diagnostics beside the lighting generator while leaving the generic
+dynamics model independent of renderer-only tools.
+
+The Vulkan side is intentionally unchanged for this check-in.  The later 3D
+work should replace static Python eye cfg values with camera-derived eye
+position and view direction, then port the material-owned lumens display rule
+to the Vulkan rendering path.

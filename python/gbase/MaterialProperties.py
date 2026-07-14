@@ -7,6 +7,33 @@ COLOR_SCHEME_WHITE = 2
 COLOR_SCHEME_RED = 3
 COLOR_SCHEME_GREEN = 4
 COLOR_SCHEME_BLUE = 5
+COLOR_SCHEME_LUMENS = 6
+
+COLOR_SCHEME_NAMES = {
+    "COLLISION": COLOR_SCHEME_COLLISION,
+    "HSV": COLOR_SCHEME_HSV,
+    "WHITE": COLOR_SCHEME_WHITE,
+    "RED": COLOR_SCHEME_RED,
+    "GREEN": COLOR_SCHEME_GREEN,
+    "BLUE": COLOR_SCHEME_BLUE,
+    "LUMENS": COLOR_SCHEME_LUMENS,
+    "COLOR_SCHEME_COLLISION": COLOR_SCHEME_COLLISION,
+    "COLOR_SCHEME_HSV": COLOR_SCHEME_HSV,
+    "COLOR_SCHEME_WHITE": COLOR_SCHEME_WHITE,
+    "COLOR_SCHEME_RED": COLOR_SCHEME_RED,
+    "COLOR_SCHEME_GREEN": COLOR_SCHEME_GREEN,
+    "COLOR_SCHEME_BLUE": COLOR_SCHEME_BLUE,
+    "COLOR_SCHEME_LUMENS": COLOR_SCHEME_LUMENS,
+}
+
+
+def parse_color_scheme(raw_value):
+    if isinstance(raw_value, str):
+        color_scheme = COLOR_SCHEME_NAMES.get(raw_value.strip().upper())
+        if color_scheme is None:
+            raise ValueError(f"unknown color_scheme: {raw_value}")
+        return color_scheme
+    return int(raw_value)
 
 DEFAULT_MATERIAL_PROPERTIES = (
     {
@@ -38,7 +65,9 @@ def normalized_material_properties(source=None):
         material_id = int(_material_get(raw_material, "material_id", 0))
         relative_mass = float(_material_get(raw_material, "relative_mass", 1.0))
         thermal_velocity = float(_material_get(raw_material, "thermal_velocity", 0.0))
-        color_scheme = int(_material_get(raw_material, "color_scheme", COLOR_SCHEME_HSV))
+        color_scheme = parse_color_scheme(
+            _material_get(raw_material, "color_scheme", COLOR_SCHEME_HSV)
+        )
         cell_density = float(_material_get(raw_material, "cell_density", 0.0))
         name = str(_material_get(raw_material, "name", f"material_{material_id}"))
 
@@ -69,6 +98,7 @@ def write_color_scheme_defines(output):
     output.write(f"COLOR_SCHEME_RED = {COLOR_SCHEME_RED};\n")
     output.write(f"COLOR_SCHEME_GREEN = {COLOR_SCHEME_GREEN};\n")
     output.write(f"COLOR_SCHEME_BLUE = {COLOR_SCHEME_BLUE};\n")
+    output.write(f"COLOR_SCHEME_LUMENS = {COLOR_SCHEME_LUMENS};\n")
 
 
 def write_material_properties(output, source=None):

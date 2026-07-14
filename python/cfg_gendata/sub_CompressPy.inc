@@ -44,21 +44,45 @@ piston_velocity 				= [ 0.005, 0.0, 0.0 ];
 // 2D packing curves derive x/y packing bounds. Particles live on one Z cell center.
 particle_plane_z 				= 1.5;
 // Function wall format:
-// [boundary_kind, independent_axis, u_start, u_end,
-//  f_start, a1, a2, a3, normal_sign, wall_flag]
-// boundary_kind: 0 = regular boundary, 1 = reservoir boundary
-// independent_axis: 0 = y = f(x), 1 = x = f(y)
-// f(u) = f_start + a1*du + a2*du^2 + a3*du^3, du = u - u_start
-// normal_sign selects the outward normal from the local slope.
 // boundary particles are cell-locality sentinels; they are not wall geometry.
-curve_wall_segments = (
-    // reservoir wall 3: y=2, y=f(x), x in [2, 2.23], normal_sign=-1
-    [1, 0, 2, 2.23, 2, 0, 0, 0, -1, 3],
-    // reservoir wall 4: y=8, y=f(x), x in [2.23, 2], normal_sign=1
-    [1, 0, 2.23, 2, 8, 0, 0, 0, 1, 4],
-    // regular wall 2: closed exhaust cap, x=f(y), y in [2, 8], normal_sign=1
-    [0, 1, 2, 8, 2.23, 0, 0, 0, 1, 2]
-);
+curve_wall_segments = {
+    wall3 = {
+        boundary_kind = "reservoir";
+        function = "y_of_x";
+        u_start = 2;
+        u_end = 2.23;
+        f_start = 2;
+        a1 = 0;
+        a2 = 0;
+        a3 = 0;
+        normal_sign = -1;
+        wall_flag = 3;
+    };
+    wall4 = {
+        boundary_kind = "reservoir";
+        function = "y_of_x";
+        u_start = 2.23;
+        u_end = 2;
+        f_start = 8;
+        a1 = 0;
+        a2 = 0;
+        a3 = 0;
+        normal_sign = 1;
+        wall_flag = 4;
+    };
+    wall2 = {
+        boundary_kind = "regular";
+        function = "x_of_y";
+        u_start = 2;
+        u_end = 8;
+        f_start = 2.23;
+        a1 = 0;
+        a2 = 0;
+        a3 = 0;
+        normal_sign = 1;
+        wall_flag = 2;
+    };
+};
 
 
 // --------------------------------------------------------------------------

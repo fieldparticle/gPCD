@@ -1,6 +1,7 @@
 import pygame
 from pathlib import Path
 import math
+import importlib.util
 from types import SimpleNamespace
 from gbase.HSVWheelPyGame import *
 from base.ForceDynamicsBase import ForceDynamics
@@ -12,12 +13,24 @@ import io, libconf
 from gbase.utilities import get_cell_dimensions, hsv_angle
 from gbase.FunctionWall import bounds as wall_bounds
 from gbase.FunctionWall import sample_points
+from gbase.MaterialProperties import (
+    COLOR_SCHEME_BLUE,
+    COLOR_SCHEME_COLLISION,
+    COLOR_SCHEME_GREEN,
+    COLOR_SCHEME_HSV,
+    COLOR_SCHEME_LUMENS,
+    COLOR_SCHEME_RED,
+    COLOR_SCHEME_WHITE,
+    normalized_material_properties,
+)
 
 
 BASE_CLASS_REGISTRY = {
     "ForceDynamics": ForceDynamics,
     "VerAForceDynamics": VerAForceDynamics,
 }
+
+_SPECIFIC_DRAW_CACHE = {}
 
 
 def _particle_util_cfg():
@@ -93,6 +106,61 @@ def _clear_report_directory(report_dir):
 def _window_size(run_configuration):
     window_size = run_configuration.get("window_size", (1000, 1000))
     return int(window_size[0]), int(window_size[1])
+
+
+class _DrawHelpers:
+    def __init__(self, screen, view_box):
+        self.screen = screen
+        self.view_box = view_box
+
+    def to_screen(self, x, y):
+        width, height = self.screen.get_size()
+        return _to_screen(x, y, self.view_box, width, height)
+
+    def radius_to_pixels(self, radius):
+        width, height = self.screen.get_size()
+        return _radius_to_pixels(radius, self.view_box, width, height)
+
+
+def _specific_draw_callable(run_configuration):
+    module_dir = run_configuration.get("module_dir")
+    module_class = run_configuration.get("module_class")
+    if not module_dir or not module_class:
+        return None
+
+    module_path = Path(str(module_dir)) / str(module_class)
+    cache_key = str(module_path.resolve())
+    if cache_key in _SPECIFIC_DRAW_CACHE:
+        return _SPECIFIC_DRAW_CACHE[cache_key]
+    if not module_path.exists():
+        _SPECIFIC_DRAW_CACHE[cache_key] = None
+        return None
+
+    module_name = module_path.stem
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None or spec.loader is None:
+        _SPECIFIC_DRAW_CACHE[cache_key] = None
+        return None
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    scenario_class = getattr(module, module_name, None)
+    specific_draw = getattr(scenario_class, "SpecificDraw", None)
+    _SPECIFIC_DRAW_CACHE[cache_key] = specific_draw if callable(specific_draw) else None
+    return _SPECIFIC_DRAW_CACHE[cache_key]
+
+
+def _draw_specific(screen, run_configuration, dynamics, view_box):
+    specific_draw = _specific_draw_callable(run_configuration)
+    if specific_draw is None:
+        return
+    specific_draw(
+        screen,
+        run_configuration,
+        dynamics,
+        view_box,
+        _DrawHelpers(screen, view_box),
+    )
 
 
 def _ui_layout(screen, run_configuration):
@@ -478,19 +546,161 @@ def _particle_contact_target_ids(particle_index, particle, dynamics=None):
     return list(getattr(particle, "collision_list", ()))
 
 
+def _wrap_angle_radians(angle):
+    return (float(angle) + math.pi) % (2.0 * math.pi) - math.pi
+
+
+def _unit_vector_from_angle(angle_radians):
+    return math.cos(angle_radians), math.sin(angle_radians)
+
+
+def _lumens_visibility(
+    particle_index,
+    particle,
+    dynamics,
+    run_configuration,
+):
+    return _lumens_brightness(
+        particle_index,
+        particle,
+        dynamics,
+        run_configuration,
+    ) is not None
+
+
+def _lumens_brightness(
+    particle_index,
+    particle,
+    dynamics,
+    run_configuration,
+):
+    position = _runtime_particle_position(particle_index, particle, dynamics)
+    eye_position = run_configuration.get("lumens_eye_position", (0.0, 0.0))
+    eye_x = float(eye_position[0])
+    eye_y = float(eye_position[1])
+    photon_x = float(position.x)
+    photon_y = float(position.y)
+    current_eye_distance = math.hypot(eye_x - photon_x, eye_y - photon_y)
+    eye_radius = max(0.0, float(run_configuration.get("lumens_eye_radius", 0.10)))
+    if current_eye_distance > eye_radius:
+        return None
+
+    photon_angle = float(particle.VelRad.w)
+    photon_dir_x, photon_dir_y = _unit_vector_from_angle(photon_angle)
+    to_eye_x = eye_x - photon_x
+    to_eye_y = eye_y - photon_y
+    along_path = to_eye_x * photon_dir_x + to_eye_y * photon_dir_y
+    if along_path < 0.0:
+        return None
+
+    closest_x = photon_x + photon_dir_x * along_path
+    closest_y = photon_y + photon_dir_y * along_path
+    miss_distance = math.hypot(eye_x - closest_x, eye_y - closest_y)
+    if miss_distance > eye_radius:
+        return None
+    if eye_radius <= 1.0e-12:
+        distance_factor = 1.0
+    elif not bool(run_configuration.get("lumens_fade_in", True)):
+        distance_factor = 1.0
+    else:
+        distance_factor = 1.0 - current_eye_distance / eye_radius
+
+    eye_angle = math.radians(float(run_configuration.get("lumens_eye_angle_degrees", 0.0)))
+    eye_look_x, eye_look_y = _unit_vector_from_angle(eye_angle)
+    arrival_x = -photon_dir_x
+    arrival_y = -photon_dir_y
+    if arrival_x * eye_look_x + arrival_y * eye_look_y < 0.0:
+        return None
+
+    arrival_angle = math.atan2(arrival_y, arrival_x)
+    fov = math.radians(float(run_configuration.get("lumens_eye_fov_degrees", 90.0)))
+    half_fov = max(0.0, fov * 0.5)
+    angle_delta = abs(_wrap_angle_radians(arrival_angle - eye_angle))
+    if angle_delta > half_fov:
+        return None
+    if half_fov <= 1.0e-12:
+        angle_factor = 1.0
+    else:
+        angle_factor = 1.0 - angle_delta / half_fov
+    return max(0.0, min(1.0, distance_factor * angle_factor))
+
+
+def _unit_rgb_from_config(run_configuration, key, default):
+    raw_color = run_configuration.get(key, default)
+    if raw_color is None or len(raw_color) < 3:
+        raw_color = default
+    values = [float(raw_color[index]) for index in range(3)]
+    if max(values) <= 1.0:
+        values = [value * 255.0 for value in values]
+    return tuple(int(round(max(0.0, min(255.0, value)))) for value in values)
+
+
+def _lumens_color(
+    particle_index,
+    particle,
+    dynamics,
+    run_configuration,
+):
+    surface_color = _unit_rgb_from_config(
+        run_configuration,
+        "lumens_surface_color",
+        (1.0, 1.0, 1.0),
+    )
+    brightness = _lumens_brightness(
+        particle_index,
+        particle,
+        dynamics,
+        run_configuration,
+    )
+    if brightness is None:
+        if not bool(run_configuration.get("lumens_debug_dim", False)):
+            return None
+        brightness = 0.08
+    return tuple(
+        int(round(max(0.0, min(255.0, component * brightness))))
+        for component in surface_color
+    )
+
+
+def _material_color_scheme(particle, run_configuration):
+    material_id = int(getattr(particle, "material_id", 0))
+    try:
+        materials = normalized_material_properties(run_configuration)
+    except ValueError:
+        return COLOR_SCHEME_HSV
+    for material in materials:
+        if int(material["material_id"]) == material_id:
+            return int(material["color_scheme"])
+    return COLOR_SCHEME_HSV
+
+
 def _particle_colors(
     particle_index,
     particle,
     dynamics,
-    hsv_color,
+    run_configuration,
     hsv_sat,
     hsv_val,
 ):
     if _is_boundary_particle(particle_index, particle, dynamics):
         return (60, 220, 90), (150, 255, 175)
-    if hsv_color:
+    color_scheme = _material_color_scheme(particle, run_configuration)
+    if color_scheme == COLOR_SCHEME_LUMENS:
+        color = _lumens_color(particle_index, particle, dynamics, run_configuration)
+        if color is None:
+            return None, None
+        return color, color
+    if color_scheme == COLOR_SCHEME_HSV:
         color = hsv_angle(particle.VelRad.w, hsv_val, hsv_sat)
         return color, color
+    if color_scheme == COLOR_SCHEME_WHITE:
+        return (255, 255, 255), (255, 255, 255)
+    if color_scheme == COLOR_SCHEME_RED:
+        return (255, 60, 60), (255, 210, 210)
+    if color_scheme == COLOR_SCHEME_GREEN:
+        return (60, 220, 90), (150, 255, 175)
+    if color_scheme == COLOR_SCHEME_BLUE:
+        return (65, 125, 255), (145, 190, 255)
     if _has_active_wall_contact(particle) or _particle_contact_target_ids(
         particle_index,
         particle,
@@ -963,8 +1173,11 @@ def _draw_particles(
     screen.fill((0, 0, 0))
     _draw_particle_diameter_grid(screen, particles, run_configuration, dynamics, view_box)
     _draw_configuration_boundaries(screen, run_configuration, view_box)
+    _draw_specific(screen, run_configuration, dynamics, view_box)
     _draw_piston(screen, run_configuration, dynamics, frame_number, view_box)
     if fast_ui:
+        hsv_sat = float(run_configuration.get("hsv_sat", 0.707))
+        hsv_val = float(run_configuration.get("hsv_val", 1.0))
         for index, particle in enumerate(particles):
             if not _is_visible_particle(index, particle, dynamics):
                 continue
@@ -987,7 +1200,17 @@ def _draw_particles(
             elif _particle_contact_target_ids(index, particle, dynamics):
                 pygame.draw.circle(screen, (255, 80, 80), center, radius)
             else:
-                pygame.draw.circle(screen, (90, 160, 255), center, radius)
+                fill, _edge = _particle_colors(
+                    index,
+                    particle,
+                    dynamics,
+                    run_configuration,
+                    hsv_sat,
+                    hsv_val,
+                )
+                if fill is None:
+                    continue
+                pygame.draw.circle(screen, fill, center, radius)
         _draw_piston(screen, run_configuration, dynamics, frame_number, view_box)
         return
 
@@ -995,7 +1218,6 @@ def _draw_particles(
     as_points = _as_points(run_configuration)
 
     if as_points:
-        hsv_color = bool(run_configuration.get("hsv_color", False))
         hsv_sat = float(run_configuration.get("hsv_sat", 0.707))
         hsv_val = float(run_configuration.get("hsv_val", 1.0))
         for index, particle in enumerate(particles):
@@ -1013,10 +1235,12 @@ def _draw_particles(
                 index,
                 particle,
                 dynamics,
-                hsv_color,
+                run_configuration,
                 hsv_sat,
                 hsv_val,
             )
+            if fill is None:
+                continue
             pygame.draw.circle(screen, fill, center, 1)
         return
 
@@ -1026,7 +1250,6 @@ def _draw_particles(
         dynamics,
     )
 
-    hsv_color = bool(run_configuration.get("hsv_color", False))
     hsv_sat = float(run_configuration.get("hsv_sat", 0.707))
     hsv_val = float(run_configuration.get("hsv_val", 1.0))
     particle_screen_data = []
@@ -1056,10 +1279,12 @@ def _draw_particles(
             index,
             particle,
             dynamics,
-            hsv_color,
+            run_configuration,
             hsv_sat,
             hsv_val,
         )
+        if fill is None:
+            continue
         particle_screen_data.append(
             (index, particle, center, radius, edge, is_boundary)
         )

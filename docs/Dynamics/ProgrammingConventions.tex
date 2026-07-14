@@ -22,10 +22,12 @@ The Python HSV velocity-angle helper is:
 gbase/utilities.py:hsv_angle(angle, value, sat)
 \end{verbatim}
 
-\texttt{SimulationRunner\_HSVPanel.py} applies this helper when the flat
-configuration item \texttt{hsv\_color} is true.  The helper reads the angle in
-radians, maps it to hue with \(1/(2\pi)\), clamps saturation and value to
-\([0,1]\), and returns an RGB tuple for the Python renderer.
+\texttt{SimulationRunner\_HSVPanel.py} applies this helper when a particle's
+material \texttt{color\_scheme} is \texttt{HSV}.  The helper reads the angle
+in radians, maps it to hue with \(1/(2\pi)\), clamps saturation and value to
+\([0,1]\), and returns an RGB tuple for the Python renderer.  The former
+global \texttt{hsv\_color} switch is retired; color scheme selection belongs
+to \texttt{material\_properties}.
 
 \subsection{Flat Runtime Configuration}
 
@@ -39,6 +41,25 @@ the flat form.
 Future GLSL color utilities should mirror this interface but remain separate
 from generated ForceDynamics collision code.  Color is diagnostic display
 state and must not become a dynamics input.
+
+\subsection{Scenario-Specific Python Drawing}
+
+Python simulation-specific diagnostic drawing belongs in the generator module,
+not in the dynamics model.  A generator may expose:
+\begin{verbatim}
+SpecificDraw(screen, run_configuration, dynamics, view_box, draw_helpers)
+\end{verbatim}
+
+\texttt{SimulationRunner\_HSVPanel.py} calls this optional hook after drawing
+configuration boundaries and before drawing particles.  The hook may draw
+scenario aids such as a lumens eye point, look ray, field-of-view rays, or eye
+aperture.  It must not mutate particle state, contact state, or dynamics
+configuration.
+
+The \texttt{draw\_helpers} object owns viewer conversion helpers such as
+world-to-screen mapping and world-radius-to-pixel conversion.  Custom draw
+code should use those helpers instead of duplicating screen-coordinate math in
+each generator.
 
 \subsection{GLSL Viewer Color Utilities}
 

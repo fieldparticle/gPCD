@@ -146,11 +146,6 @@ class GenMotionData():
         f.write(fstr)
         fstr = f"wallZMAX = {run_cfg.WallZMAX};\n"
         f.write(fstr)
-        if run_cfg.hsv_color == True:
-            fstr = f"hsv_color = 1;\n"
-        else:
-            fstr = f"hsv_color = 0;\n"
-        f.write(fstr)
         contact_force_measure = getattr(run_cfg, "contact_force_measure", "area")
         fstr = f"contact_force_measure = \"{contact_force_measure}\";\n"
         f.write(fstr)
