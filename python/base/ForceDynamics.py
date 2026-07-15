@@ -293,6 +293,108 @@ class ForceContactDynamics:
                 contacts[wall_flag] = (penetration_depth, contact)
         return contacts
 
+    def EvaluateRectangleWallSegment(self, SourceID, wall_config):
+        """Evaluate one configured 3D rectangle wall against a mobile source.
+
+        rectangle_wall_segments store normals that point into the valid
+        particle region. Contact slots store the opposite normal because the
+        source force path applies -F * normal.
+        """
+        source_position = self.GetParticlePosition(SourceID)
+        source_point = (
+            float(source_position.x),
+            float(source_position.y),
+            float(source_position.z),
+        )
+        origin = self._vector3(wall_config.get("origin"), "origin")
+        u_axis = self._axis_vector(wall_config.get("u_axis"))
+        v_axis = self._axis_vector(wall_config.get("v_axis"))
+        inward_normal = self._vector3(wall_config.get("normal"), "normal")
+        normal_length = math.sqrt(
+            inward_normal[0] * inward_normal[0]
+            + inward_normal[1] * inward_normal[1]
+            + inward_normal[2] * inward_normal[2]
+        )
+        if normal_length <= self.EPSILON:
+            return None
+        inward_normal = (
+            inward_normal[0] / normal_length,
+            inward_normal[1] / normal_length,
+            inward_normal[2] / normal_length,
+        )
+
+        rel = (
+            source_point[0] - origin[0],
+            source_point[1] - origin[1],
+            source_point[2] - origin[2],
+        )
+        u_coord = rel[0] * u_axis[0] + rel[1] * u_axis[1] + rel[2] * u_axis[2]
+        v_coord = rel[0] * v_axis[0] + rel[1] * v_axis[1] + rel[2] * v_axis[2]
+        u_length = float(wall_config.get("u_length", 0.0))
+        v_length = float(wall_config.get("v_length", 0.0))
+        if u_coord < -self.EPSILON or u_coord > u_length + self.EPSILON:
+            return None
+        if v_coord < -self.EPSILON or v_coord > v_length + self.EPSILON:
+            return None
+
+        signed_inward_distance = (
+            rel[0] * inward_normal[0]
+            + rel[1] * inward_normal[1]
+            + rel[2] * inward_normal[2]
+        )
+        radius = float(self.particles[SourceID].Data.x)
+        penetration_depth = radius - signed_inward_distance
+        if penetration_depth <= self.EPSILON:
+            return None
+
+        center_distance = max(0.0, 2.0 * radius - penetration_depth)
+        overlap_area = self.particle_overlap_area(radius, radius, center_distance)
+        wall_flag = int(wall_config.get("wall_flag", 0))
+        if wall_flag <= 0:
+            return None
+        outward_normal = (
+            -inward_normal[0],
+            -inward_normal[1],
+            -inward_normal[2],
+        )
+        return (*outward_normal, overlap_area, center_distance, wall_flag)
+
+    def EvaluateRectangleWallContacts(self, SourceID):
+        """Return the deepest current rectangle-wall contact per wall flag."""
+        radius = float(self.particles[SourceID].Data.x)
+        contacts = {}
+        segments = self.run_configuration.get("rectangle_wall_segments")
+        if not segments:
+            return contacts
+        for _wall_name, wall_config in segments.items():
+            contact = self.EvaluateRectangleWallSegment(SourceID, wall_config)
+            if contact is None:
+                continue
+            wall_flag = int(contact[-1])
+            penetration_depth = self.ParticlePenetrationDepth(
+                radius,
+                radius,
+                float(contact[-2]),
+            )
+            previous = contacts.get(wall_flag)
+            if previous is None or penetration_depth > previous[0]:
+                contacts[wall_flag] = (penetration_depth, contact)
+        return contacts
+
+    def RectangleWallPhysicalPenetration(self, SourceID, wall_config):
+        """Return physical penetration into one finite 3D rectangle wall."""
+        contact = self.EvaluateRectangleWallSegment(SourceID, wall_config)
+        if contact is None:
+            return None
+        radius = float(self.particles[SourceID].Data.x)
+        return self.ParticlePenetrationDepth(radius, radius, float(contact[-2]))
+
+    def EvaluateConfiguredWallContacts(self, SourceID):
+        """Return current wall contacts for the active configured wall model."""
+        if self.run_configuration.get("rectangle_wall_segments"):
+            return self.EvaluateRectangleWallContacts(SourceID)
+        return self.EvaluateFunctionWallContacts(SourceID)
+
     def GetPistonPosition(self, frame):
         """Return the piston x position for the specified simulation frame."""
         start_x = float(self.run_configuration["piston_x_start"])

@@ -58,7 +58,7 @@ public:
 	void Piston();
 	void WriteCDNoz();
 	std::ostringstream FunctionWalls();
-
+	std::ostringstream RectangleWalls();
 
 	std::vector<char> ReadSPVFile(const std::string& filename);
 	int WriteBinaryFile(std::string fileName, std::vector<char> buffer);

@@ -1,13 +1,13 @@
 Current status:
-	- Added Open3D GUI SceneWidget viewer with top info strip and 3D diagnostic rendering.
-	- Added 3D TwoParticleHorizontal configuration with rectangle_wall_segments.
-	- Added runtime rectangle-wall boundary marker generation for Python cfg loading.
-	- Added visual separation for axes, death bounds, and rectangle wall outlines.
+	- Added rectangle_wall_segments as the active 3D simple wall model when present.
+	- Added rectangle-wall boundary metadata and generated GLSL wrapper support.
+	- Updated GenericGenData to emit rectangle wall markers and 15-value rectangle_wall_segments rows.
+	- Updated dynamics documentation and ProblemEvolution for the rectangle-wall Vulkan port.
 
 Code Changes:
-	- Connected TabFormGenData to SimulationRunner3D_HSVPanel.
-	- Added Open3D rendering controls for frame_rate, end_frame, spheres/points, boundary markers, rectangle wall outlines, and diagnostic axes.
-	- Added rectangle_wall_segments marker generation in ForceDynamicsBase.
-	- Updated cfg_gendata configs for current dimensions/material/dispatch conventions.
+	- Added Python rectangle-wall evaluation and configured-wall precedence.
+	- Added ForceDynamicsSimpleRectangleWall.glsl generation and configured-wall wrapper calls.
+	- Updated TestPythonBoundarySpheres generated/config shader artifacts for rectangle walls and marker-only boundary particles.
+	- Retired active use of the older ForceDynamicsGLSL exporter in favor of ExportForceDynamicsSimpleGLSL.py.
 
-Next: correct 3d wall dynamics
+Next: update and test all vulkan projects

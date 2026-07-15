@@ -110,7 +110,7 @@ float particle_overlap_area(float sourceRadius, float targetRadius, float center
     return sourceArea + targetArea - triangleArea;
 }
 
-// Python source: ForceDynamics.py:536
+// Python source: ForceDynamics.py:638
 float ParticlePenetrationDepth(float sourceRadius, float targetRadius, float centerDistance)
 {
     return sourceRadius + targetRadius - centerDistance;
@@ -782,10 +782,6 @@ bool ApplySourceMaximumDepth(uint SourceID, uint failureDetail)
 
 bool CalcVelocity(uint SourceID, vec3 totalForce)
 {
-	#if defined(DEBUG)
-		if (SourceID == 2 && uint(ShaderFlags.frameNum) == 200)
-			debugPrintfEXT("Particle %d is caluating velcoity",SourceID);
-	#endif
     float dt = ShaderFlags.dt;
     if (dt <= 0.0) { return SetError(ERROR_INVALID_DT, SourceID); }
     float mass = GetParticleMass(SourceID);

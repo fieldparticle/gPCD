@@ -1,9 +1,8 @@
-"""First gates for exporting ForceDynamics.py to GLSL.
+"""Legacy exporter for the retired ForceDynamics.glsl compatibility family.
 
-By default this tool does not generate GLSL. It parses the Python dynamics
-source, lists the methods available for export, and reports self-method calls
-that are not defined in the export source. Known translation primitives are
-allowed explicitly so hidden dependencies stay visible.
+Active Vulkan porting uses tools/ExportForceDynamicsSimpleGLSL.py and the
+ForceDynamicsSimple*.glsl family.  This tool is retained only for historical
+inspection of old backup wrappers and should not be used for new work.
 """
 
 from __future__ import annotations
@@ -2144,7 +2143,10 @@ def write_stub_file(output_path: Path, source_path: Path, visitor: ForceDynamics
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Report the ForceDynamics.py surface available for GLSL export."
+        description=(
+            "Legacy ForceDynamics.glsl exporter. Active work should use "
+            "tools/ExportForceDynamicsSimpleGLSL.py."
+        )
     )
     parser.add_argument(
         "--source",
@@ -2164,6 +2166,12 @@ def main() -> int:
         help="Write a stub ForceDynamics.glsl artifact after the report gate passes.",
     )
     args = parser.parse_args()
+
+    print(
+        "WARNING: ExportForceDynamicsGLSL.py is legacy. "
+        "Use tools/ExportForceDynamicsSimpleGLSL.py for active Vulkan work."
+    )
+    print()
 
     source_path = args.source.resolve()
     visitor = parse_source(source_path)

@@ -349,6 +349,7 @@ class ForceDynamics(ForceContactDynamics):
         self.initial_geometry_validated = False
         self.run_configuration = get_run_configuration(self.config)
         raw_segments = self.run_configuration.get("curve_wall_segments")
+        rectangle_segments = self.run_configuration.get("rectangle_wall_segments")
         if isinstance(raw_segments, AttrDict):
             curve_segments, curve_errors = parse_keyed_curve_wall_segments(raw_segments)
             if curve_errors:
@@ -358,10 +359,13 @@ class ForceDynamics(ForceContactDynamics):
                 )
             self.run_configuration["curve_wall_segments"] = curve_segments
             self.config["curve_wall_segments"] = curve_segments
+        elif isinstance(rectangle_segments, AttrDict):
+            self.run_configuration["curve_wall_segments"] = ()
+            self.config["curve_wall_segments"] = ()
         else:
             raise ValueError(
                 "Runtime wall configuration error(s):\n  - "
-                "curve_wall_segments must be a key-value object"
+                "curve_wall_segments or rectangle_wall_segments must be a key-value object"
             )
         if self.config.pdata_from_file == True:
             self.particle_data = self.getParticleData(self.config)
@@ -875,21 +879,38 @@ class ForceDynamics(ForceContactDynamics):
                         target_id=target_id,
                     )
 
-        segments = self.run_configuration.get("curve_wall_segments", ())
-        for source_id in mobile_ids:
-            for segment in segments:
-                penetration = self.FunctionWallPhysicalPenetration(
-                    source_id,
-                    segment,
-                )
-                if penetration is None or penetration <= self.EPSILON:
-                    continue
-                return self.SetError(
-                    self.constants.ERROR_INITIAL_WALL_OVERLAP,
-                    error_kind="initial-wall-overlap",
-                    source_id=source_id,
-                    wall_flag=int(round(float(segment[9]))),
-                )
+        rectangle_segments = self.run_configuration.get("rectangle_wall_segments")
+        if rectangle_segments:
+            for source_id in mobile_ids:
+                for _wall_name, wall_config in rectangle_segments.items():
+                    penetration = self.RectangleWallPhysicalPenetration(
+                        source_id,
+                        wall_config,
+                    )
+                    if penetration is None or penetration <= self.EPSILON:
+                        continue
+                    return self.SetError(
+                        self.constants.ERROR_INITIAL_WALL_OVERLAP,
+                        error_kind="initial-wall-overlap",
+                        source_id=source_id,
+                        wall_flag=int(wall_config.get("wall_flag", 0)),
+                    )
+        else:
+            segments = self.run_configuration.get("curve_wall_segments", ())
+            for source_id in mobile_ids:
+                for segment in segments:
+                    penetration = self.FunctionWallPhysicalPenetration(
+                        source_id,
+                        segment,
+                    )
+                    if penetration is None or penetration <= self.EPSILON:
+                        continue
+                    return self.SetError(
+                        self.constants.ERROR_INITIAL_WALL_OVERLAP,
+                        error_kind="initial-wall-overlap",
+                        source_id=source_id,
+                        wall_flag=int(round(float(segment[9]))),
+                    )
 
         if self.PistonEnabled():
             piston_x = self.GetPistonPosition(self.ShaderFlags.frameNum)
@@ -950,7 +971,7 @@ class ForceDynamics(ForceContactDynamics):
                     return False
             if not has_local_boundary_marker:
                 continue
-            boundary_contacts = self.EvaluateFunctionWallContacts(source_id)
+            boundary_contacts = self.EvaluateConfiguredWallContacts(source_id)
             for wall_flag in sorted(boundary_contacts):
                 _penetration_depth, contact = boundary_contacts[wall_flag]
                 if not self.ProcessFunctionWallCollision(
@@ -1408,7 +1429,7 @@ class ForceDynamics(ForceContactDynamics):
             if not self.IsMobileParticleActiveForDynamics(source_id):
                 continue
             stiffness = max(0.0, float(source.Data.y or 0.0))
-            contacts = self.EvaluateFunctionWallContacts(source_id)
+            contacts = self.EvaluateConfiguredWallContacts(source_id)
             for _penetration_depth, geometry in contacts.values():
                 radius = float(source.Data.x)
                 total += self.GetOverlapPotentialEnergy(

@@ -24,7 +24,7 @@
 
 
 // Color of this particle from vertex shader.
-layout(location = 0) in vec3 fragColor;
+layout(location = 0) in vec4 fragColor;
 // The particle radius and type from vertex shader.
 layout(location = 1) in vec2 parms;
 //layout(location = 3) in vec3 matpos;
@@ -46,6 +46,6 @@ void main()
 		discard;
 	}
 	//outColor = vec4(1.0,0.0,0.0,1.0);
-	outColor = vec4(fragColor,1.0);
+	outColor =fragColor;
 		
 }

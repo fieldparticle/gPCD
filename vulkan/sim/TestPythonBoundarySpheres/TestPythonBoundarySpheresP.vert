@@ -9,6 +9,7 @@
 
 
 #include "params.glsl"
+#include "material.glsl"
 #include "../common/constants.glsl"
 #include "../common/util.glsl"
 #include "../common/push.glsl"
@@ -16,6 +17,7 @@
 #include "../common/CollimageIndex.glsl"
 #include "../common/Lockimage.glsl"
 #include "../common/particle.glsl"
+#include "../common/color_map.glsl"
 
 
 
@@ -40,7 +42,7 @@ layout(location = 2) in vec4 inColor;
 layout(location = 3) in vec2 inParms;
 
 // Output to fragment shader.
-layout(location = 0) out vec3 fragColor;
+layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 outParms;
 layout(location = 2) out vec3 matpos;
 
@@ -127,7 +129,7 @@ void main(){
 	{
 		gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
 		gl_PointSize = 0.0;
-		fragColor = vec3(0.0, 0.0, 0.0);
+		fragColor = vec4(0.0, 0.0, 0.0, 0.0);
 		return;
 	}
 
@@ -307,25 +309,7 @@ void main(){
 	#endif
 		
 	}
-	if(HSV_ON == 1)
-	{
-		if (P[index].ptype == 0)
-		{
-			float velocityAngle = ShaderFlags.positionBuffer == 0u
-				? P[index].VelRadA.w
-				: P[index].VelRadB.w;
-			fragColor = colorizeVelocity(velocityAngle, HSV_SAT, HSV_VAL);
-		}
-		else
-			fragColor = vec3(1.0, 1.0, 1.0);
-	}
-	else
-	{
-	if(uint(P[index].colFlg) == 1)
-		fragColor = vec3(1.0,0.0,0.0);	
-	else if(uint(P[index].colFlg) == 0)
-		fragColor = vec3(0.0,1.0,0.0);	
-	}
+	fragColor = color_map(uint(index));
 	
 	
 }

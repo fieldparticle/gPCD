@@ -20,6 +20,113 @@ from gbase.pdata import PTYPE_MOBILE, PTYPE_NULL, pdata
 import math
 
 
+AXIS_VECTOR = {
+    "X": (1.0, 0.0, 0.0),
+    "Y": (0.0, 1.0, 0.0),
+    "Z": (0.0, 0.0, 1.0),
+}
+
+
+def _rectangle_axis_vector(axis_name, errors, context):
+    axis_key = str(axis_name).strip().upper()
+    if axis_key not in AXIS_VECTOR:
+        errors.append(f"{context} must be X, Y, or Z")
+        return None
+    return AXIS_VECTOR[axis_key]
+
+
+def _rectangle_vector3(raw_value, errors, context):
+    if raw_value is None:
+        errors.append(f"{context} is required")
+        return None
+    if len(raw_value) != 3:
+        errors.append(f"{context} must contain exactly 3 values")
+        return None
+    try:
+        values = tuple(float(value) for value in raw_value)
+    except (TypeError, ValueError):
+        errors.append(f"{context} values must be numeric")
+        return None
+    if not all(math.isfinite(value) for value in values):
+        errors.append(f"{context} values must be finite")
+        return None
+    return values
+
+
+def parse_keyed_rectangle_wall_segments(raw_segments):
+    """Parse keyed 3D rectangle wall config into numeric internal records."""
+    if not raw_segments:
+        return (), []
+
+    errors = []
+    parsed_segments = []
+    try:
+        items = raw_segments.items()
+    except AttributeError:
+        return (), ["rectangle_wall_segments must be a key-value object"]
+
+    for segment_name, segment_config in items:
+        context = f"rectangle_wall_segments.{segment_name}"
+        try:
+            origin = _rectangle_vector3(
+                segment_config.get("origin"),
+                errors,
+                f"{context}.origin",
+            )
+            u_axis = _rectangle_axis_vector(
+                segment_config.get("u_axis"),
+                errors,
+                f"{context}.u_axis",
+            )
+            v_axis = _rectangle_axis_vector(
+                segment_config.get("v_axis"),
+                errors,
+                f"{context}.v_axis",
+            )
+            u_length = float(segment_config.get("u_length"))
+            v_length = float(segment_config.get("v_length"))
+            inward_normal = _rectangle_vector3(
+                segment_config.get("normal"),
+                errors,
+                f"{context}.normal",
+            )
+            wall_flag = int(segment_config.get("wall_flag"))
+        except (AttributeError, TypeError, ValueError):
+            errors.append(f"{context} is invalid")
+            continue
+
+        if origin is None or u_axis is None or v_axis is None or inward_normal is None:
+            continue
+        if u_axis == v_axis:
+            errors.append(f"{context}.u_axis and v_axis must differ")
+        if not math.isfinite(u_length) or u_length < 0.0:
+            errors.append(f"{context}.u_length must be a finite nonnegative number")
+        if not math.isfinite(v_length) or v_length < 0.0:
+            errors.append(f"{context}.v_length must be a finite nonnegative number")
+        normal_length = math.sqrt(sum(component * component for component in inward_normal))
+        if normal_length <= 1.0e-12:
+            errors.append(f"{context}.normal must not be zero")
+        if wall_flag <= 0:
+            errors.append(f"{context}.wall_flag must be a positive integer")
+
+        parsed_segments.append(
+            {
+                "name": str(segment_name),
+                "origin": origin,
+                "u_axis": u_axis,
+                "v_axis": v_axis,
+                "u_length": u_length,
+                "v_length": v_length,
+                "normal": inward_normal,
+                "wall_flag": wall_flag,
+            }
+        )
+
+    if errors:
+        return (), errors
+    return tuple(parsed_segments), []
+
+
 class GenericGenData:
     """Generate particle data from declarative particle and wall configuration."""
 
@@ -289,8 +396,16 @@ class GenericGenData:
                     )
 
         raw_segments = self.itemcfg.get("curve_wall_segments")
-        curve_segments, curve_errors = parse_keyed_curve_wall_segments(raw_segments)
-        errors.extend(curve_errors)
+        rectangle_raw_segments = self.itemcfg.get("rectangle_wall_segments")
+        rectangle_wall_segments, rectangle_errors = parse_keyed_rectangle_wall_segments(
+            rectangle_raw_segments
+        )
+        errors.extend(rectangle_errors)
+        if rectangle_wall_segments:
+            curve_segments = ()
+        else:
+            curve_segments, curve_errors = parse_keyed_curve_wall_segments(raw_segments)
+            errors.extend(curve_errors)
 
         particle_data = self.itemcfg.get("PARTICLE_DATA")
         particles = []
@@ -366,6 +481,46 @@ class GenericGenData:
                     errors.append(
                         f"curve_wall_segments[{index}] y extent is outside the cell array"
                     )
+            for segment in rectangle_wall_segments:
+                origin = segment["origin"]
+                u_axis = segment["u_axis"]
+                v_axis = segment["v_axis"]
+                corners = (
+                    origin,
+                    (
+                        origin[0] + u_axis[0] * segment["u_length"],
+                        origin[1] + u_axis[1] * segment["u_length"],
+                        origin[2] + u_axis[2] * segment["u_length"],
+                    ),
+                    (
+                        origin[0] + v_axis[0] * segment["v_length"],
+                        origin[1] + v_axis[1] * segment["v_length"],
+                        origin[2] + v_axis[2] * segment["v_length"],
+                    ),
+                    (
+                        origin[0]
+                        + u_axis[0] * segment["u_length"]
+                        + v_axis[0] * segment["v_length"],
+                        origin[1]
+                        + u_axis[1] * segment["u_length"]
+                        + v_axis[1] * segment["v_length"],
+                        origin[2]
+                        + u_axis[2] * segment["u_length"]
+                        + v_axis[2] * segment["v_length"],
+                    ),
+                )
+                if any(
+                    point[0] < 0.0
+                    or point[0] > width
+                    or point[1] < 0.0
+                    or point[1] > height
+                    or point[2] < 0.0
+                    or point[2] > depth
+                    for point in corners
+                ):
+                    errors.append(
+                        f"rectangle_wall_segments.{segment['name']} extent is outside the cell array"
+                    )
             for index, particle in enumerate(particles, start=1):
                 if not (
                     0.0 <= particle["x"] <= width
@@ -398,6 +553,7 @@ class GenericGenData:
         self.cell_array_width, self.cell_array_height, self.cell_array_depth = dimensions
         self.death_bounds = death_bounds
         self.curve_wall_segments = curve_segments
+        self.rectangle_wall_segments = rectangle_wall_segments
         self.explicit_particles = particles
         self.number_configured_particles = len(particles)
         self.particle_plane_z = particles[0]["z"]
@@ -846,6 +1002,72 @@ class GenericGenData:
         self.write_validation_log(report_text)
         return self.number_boundary_particles
 
+    def rectangle_marker_points(self, segment):
+        """Return sampled integer-cell points for one rectangle wall patch."""
+        origin = segment["origin"]
+        u_axis = segment["u_axis"]
+        v_axis = segment["v_axis"]
+        u_steps = max(1, int(math.floor(segment["u_length"])) + 1)
+        v_steps = max(1, int(math.floor(segment["v_length"])) + 1)
+        points = []
+        for u_index in range(u_steps):
+            for v_index in range(v_steps):
+                points.append(
+                    (
+                        origin[0] + u_axis[0] * u_index + v_axis[0] * v_index,
+                        origin[1] + u_axis[1] * u_index + v_axis[1] * v_index,
+                        origin[2] + u_axis[2] * u_index + v_axis[2] * v_index,
+                    )
+                )
+        return points
+
+    def add_rectangle_wall_markers(self):
+        """Create deduplicated boundary-sentinel markers on rectangle walls."""
+        marker_cells = set()
+        segment_marker_counts = []
+
+        for segment in self.rectangle_wall_segments:
+            wall_flag = int(segment["wall_flag"])
+            added_for_segment = 0
+            for marker_x, marker_y, marker_z in self.rectangle_marker_points(segment):
+                cell_x = round(marker_x)
+                cell_y = round(marker_y)
+                cell_z = round(marker_z)
+                marker_cell_key = (
+                    cell_x,
+                    cell_y,
+                    cell_z,
+                    wall_flag,
+                )
+                if marker_cell_key in marker_cells:
+                    continue
+                marker_cells.add(marker_cell_key)
+                self.add_boundary_particle(
+                    (float(cell_x), float(cell_y), float(cell_z))
+                )
+                added_for_segment += 1
+            segment_marker_counts.append(added_for_segment)
+
+        report_text = (
+            "Rectangle wall-marker report:\n"
+            f"  rectangle segments: {len(self.rectangle_wall_segments)}\n"
+            f"  unique boundary markers: {self.number_boundary_particles}\n"
+            f"  boundary ptype: {self.BOUNDARY_PARTICLE_PTYPE:g}\n"
+            f"  markers added per segment: {segment_marker_counts}\n"
+            "  occupancy rule: boundary markers are cell-locality sentinels\n"
+            "  marker position: integer cell center\n"
+            "  maximum sampled rectangle interval: 1 cell"
+        )
+        print(report_text)
+        self.write_validation_log(report_text)
+        return self.number_boundary_particles
+
+    def add_configured_wall_markers(self):
+        """Create boundary markers for the active wall model."""
+        if self.rectangle_wall_segments:
+            return self.add_rectangle_wall_markers()
+        return self.add_function_wall_markers()
+
     def write_function_wall_obj(self):
         """Write triangle ribbons sampled from function-wall paths."""
         half_thickness = 0.25
@@ -1213,13 +1435,39 @@ class GenericGenData:
             output.write(f"death_z_min = {death_z_min:.9f};\n")
             output.write(f"death_z_max = {death_z_max:.9f};\n")
 
+            active_curve_wall_segments = (
+                () if self.rectangle_wall_segments else self.curve_wall_segments
+            )
             output.write("curve_wall_segments = (\n")
-            for segment_index, segment in enumerate(self.curve_wall_segments):
+            for segment_index, segment in enumerate(active_curve_wall_segments):
                 separator = (
-                    "," if segment_index + 1 < len(self.curve_wall_segments) else ""
+                    "," if segment_index + 1 < len(active_curve_wall_segments) else ""
                 )
                 values = ", ".join(f"{float(value):.9f}" for value in segment)
                 output.write(f"    [{values}]{separator}\n")
+            output.write(");\n")
+
+            output.write("rectangle_wall_segments = (\n")
+            for segment_index, segment in enumerate(self.rectangle_wall_segments):
+                separator = (
+                    ","
+                    if segment_index + 1 < len(self.rectangle_wall_segments)
+                    else ""
+                )
+                values = (
+                    *segment["origin"],
+                    *segment["u_axis"],
+                    *segment["v_axis"],
+                    segment["u_length"],
+                    segment["v_length"],
+                    *segment["normal"],
+                    float(segment["wall_flag"]),
+                )
+                output.write(
+                    "    ["
+                    + ", ".join(f"{float(value):.9f}" for value in values)
+                    + f"]{separator}\n"
+                )
             output.write(");\n")
 
             output.write(f"wall_contact_offset = {self.wall_contact_offset:.9f};\n")
@@ -1261,7 +1509,8 @@ class GenericGenData:
             f"  particle records excluding null: {self.number_particles}\n"
             f"  mobile compute records including null: "
             f"{self.number_active_particles + 1}\n"
-            f"  curve segments: {len(self.curve_wall_segments)}"
+            f"  curve segments: {len(self.curve_wall_segments)}\n"
+            f"  rectangle segments: {len(self.rectangle_wall_segments)}"
         )
         print(report_text)
         self.write_validation_log(report_text)
@@ -1282,7 +1531,7 @@ class GenericGenData:
             self.report_collision_feasibility()
             self.add_null_particle()
             self.add_explicit_mobile_particles()
-            self.add_function_wall_markers()
+            self.add_configured_wall_markers()
             self.report_cell_occupancy_capacity()
             self.write_particle_bin()
             self.write_test_file()

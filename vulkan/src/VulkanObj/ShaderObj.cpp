@@ -119,8 +119,12 @@ void ShaderObj::WriteMaterials()
 		if (config_setting_lookup_float(material, "relative_mass", &relativeMass) == CONFIG_FALSE)
 			throw std::runtime_error("material_properties[" + std::to_string(index) + "].relative_mass missing");
 
-		if (config_setting_lookup_float(material, "temp_vel", &tempVel) == CONFIG_FALSE)
-			throw std::runtime_error("material_properties[" + std::to_string(index) + "].temp_vel missing");
+		if (config_setting_lookup_float(material, "temp_vel", &tempVel) == CONFIG_FALSE
+			&& config_setting_lookup_float(material, "thermal_velocity", &tempVel) == CONFIG_FALSE)
+			throw std::runtime_error(
+				"material_properties[" + std::to_string(index) +
+				"].temp_vel/thermal_velocity missing"
+			);
 
 		if (config_setting_lookup_int(material, "color_scheme", &colorScheme) == CONFIG_FALSE)
 			throw std::runtime_error("material_properties[" + std::to_string(index) + "].color_scheme missing");
@@ -216,14 +220,24 @@ std::ostringstream ShaderObj::FunctionWalls()
 		<< "};\n\n";
 
 	int segmentCount = 0;
-	config_setting_t* segmentList =
-		CfgTst->StartStructure("curve_wall_segments", segmentCount);
+	config_setting_t* segmentList = nullptr;
 
-	if (segmentCount <= 0)
+	if (CfgTst->CheckKey("curve_wall_segments"))
+		segmentList = CfgTst->StartStructure("curve_wall_segments", segmentCount);
+
+	if (segmentList == nullptr || segmentCount <= 0)
 	{
-		throw std::runtime_error(
-			"curve_wall_segments must contain at least one segment"
-		);
+		wall_str
+			<< "const uint CURVE_WALL_SEGMENT_COUNT = 0u;\n"
+			<< "const FunctionWallSegment CURVE_WALL_SEGMENTS[1] = "
+			<< "FunctionWallSegment[1](\n"
+			<< "    FunctionWallSegment("
+			<< "0u, 0u, "
+			<< "0.000000000, 0.000000000, 0.000000000, "
+			<< "0.000000000, 0.000000000, 0.000000000, "
+			<< "1.000000000, 0u)\n"
+			<< ");\n\n";
+		return wall_str;
 	}
 
 	wall_str
@@ -369,11 +383,113 @@ void ShaderObj::WriteWalls()
 		ostrm << death_str.str();
 		std::ostringstream curve_ostr = FunctionWalls();
 		ostrm << curve_ostr.str();
-
+		std::ostringstream rectangle_ostr = RectangleWalls();
+		ostrm << rectangle_ostr.str();
 		ostrm << "#endif\n";
 	}
 
 	
+}
+std::ostringstream ShaderObj::RectangleWalls()
+{
+	std::ostringstream wall_str;
+	wall_str << std::fixed << std::setprecision(9);
+
+	wall_str
+		<< "struct RectangleWallSegment\n"
+		<< "{\n"
+		<< "    vec3 origin;\n"
+		<< "    vec3 uAxis;\n"
+		<< "    vec3 vAxis;\n"
+		<< "    float uLength;\n"
+		<< "    float vLength;\n"
+		<< "    vec3 inwardNormal;\n"
+		<< "    uint wallFlag;\n"
+		<< "};\n\n";
+
+	int segmentCount = 0;
+	config_setting_t* segmentList = nullptr;
+
+	if (CfgTst->CheckKey("rectangle_wall_segments"))
+		segmentList = CfgTst->StartStructure("rectangle_wall_segments", segmentCount);
+
+	if (segmentList == nullptr || segmentCount <= 0)
+	{
+		wall_str
+			<< "const uint RECTANGLE_WALL_SEGMENT_COUNT = 0u;\n"
+			<< "const RectangleWallSegment RECTANGLE_WALL_SEGMENTS[1] = "
+			<< "RectangleWallSegment[1](\n"
+			<< "    RectangleWallSegment("
+			<< "vec3(0.000000000), "
+			<< "vec3(1.000000000, 0.000000000, 0.000000000), "
+			<< "vec3(0.000000000, 1.000000000, 0.000000000), "
+			<< "0.000000000, 0.000000000, "
+			<< "vec3(0.000000000, 0.000000000, 1.000000000), "
+			<< "0u)\n"
+			<< ");\n\n";
+		return wall_str;
+	}
+
+	wall_str
+		<< "const uint RECTANGLE_WALL_SEGMENT_COUNT = "
+		<< segmentCount << "u;\n"
+		<< "const RectangleWallSegment RECTANGLE_WALL_SEGMENTS["
+		<< segmentCount << "] = RectangleWallSegment["
+		<< segmentCount << "](\n";
+
+	for (int index = 0; index < segmentCount; ++index)
+	{
+		config_setting_t* segment = CfgTst->GetSubStructAddress(segmentList, index);
+
+		if (segment == nullptr || config_setting_length(segment) != 15)
+		{
+			throw std::runtime_error(
+				"rectangle_wall_segments[" + std::to_string(index) +
+				"] must contain fifteen values"
+			);
+		}
+
+		double originX = config_setting_get_float_elem(segment, 0);
+		double originY = config_setting_get_float_elem(segment, 1);
+		double originZ = config_setting_get_float_elem(segment, 2);
+
+		double uAxisX = config_setting_get_float_elem(segment, 3);
+		double uAxisY = config_setting_get_float_elem(segment, 4);
+		double uAxisZ = config_setting_get_float_elem(segment, 5);
+
+		double vAxisX = config_setting_get_float_elem(segment, 6);
+		double vAxisY = config_setting_get_float_elem(segment, 7);
+		double vAxisZ = config_setting_get_float_elem(segment, 8);
+
+		double uLength = config_setting_get_float_elem(segment, 9);
+		double vLength = config_setting_get_float_elem(segment, 10);
+
+		double normalX = config_setting_get_float_elem(segment, 11);
+		double normalY = config_setting_get_float_elem(segment, 12);
+		double normalZ = config_setting_get_float_elem(segment, 13);
+
+		uint32_t wallFlag = static_cast<uint32_t>(
+			config_setting_get_float_elem(segment, 14)
+			);
+
+		wall_str
+			<< "    RectangleWallSegment("
+			<< "vec3(" << originX << ", " << originY << ", " << originZ << "), "
+			<< "vec3(" << uAxisX << ", " << uAxisY << ", " << uAxisZ << "), "
+			<< "vec3(" << vAxisX << ", " << vAxisY << ", " << vAxisZ << "), "
+			<< uLength << ", "
+			<< vLength << ", "
+			<< "normalize(vec3(" << normalX << ", " << normalY << ", " << normalZ << ")), "
+			<< wallFlag << "u)";
+
+		if (index + 1 < segmentCount)
+			wall_str << ",";
+
+		wall_str << "\n";
+	}
+
+	wall_str << ");\n\n";
+	return wall_str;
 }
 void ShaderObj::GenWorkGroups()
 {

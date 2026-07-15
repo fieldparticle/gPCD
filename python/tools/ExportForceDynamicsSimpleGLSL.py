@@ -74,6 +74,11 @@ SIMPLE_FUNCTION_WALL_METHODS = [
     "EvaluateFunctionWallSegment",
 ]
 
+SIMPLE_RECTANGLE_WALL_METHODS = [
+    "EvaluateRectangleWallSegment",
+    "EvaluateConfiguredWallContacts",
+]
+
 SIMPLE_PISTON_METHODS = [
     "PistonEnabled",
     "GetPistonPosition",
@@ -147,6 +152,7 @@ def validate_surface(visitor: ForceDynamicsVisitor) -> list[str]:
         SIMPLE_CORE_METHODS
         + SIMPLE_BOUNDARY_METHODS
         + SIMPLE_FUNCTION_WALL_METHODS
+        + SIMPLE_RECTANGLE_WALL_METHODS
         + SIMPLE_PISTON_METHODS
     )
     errors: list[str] = []
@@ -1172,6 +1178,127 @@ BoundaryWallSegment EvaluateFunctionWallSegment(uint SourceID, uint BoundaryID)
 """
 
 
+def render_rectangle_wall(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
+    line = lambda name: method_line(visitor, name)
+    return f"""#ifndef FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL
+#define FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL
+
+// Generated from {source_path.as_posix()} by tools/ExportForceDynamicsSimpleGLSL.py.
+// Rectangle-wall evaluator for the simple generic 3D model.
+// Do not hand edit generated dynamics content.
+
+bool RectangleWallProjectPoint(
+    RectangleWallSegment segment,
+    vec3 point,
+    out float uCoord,
+    out float vCoord,
+    out float signedInwardDistance)
+{{
+    vec3 inwardNormal = normalize(segment.inwardNormal);
+    if (any(isnan(inwardNormal)) || any(isinf(inwardNormal))) {{
+        return false;
+    }}
+
+    vec3 rel = point - segment.origin;
+    uCoord = dot(rel, segment.uAxis);
+    vCoord = dot(rel, segment.vAxis);
+    if (uCoord < -EPSILON || uCoord > segment.uLength + EPSILON) {{
+        return false;
+    }}
+    if (vCoord < -EPSILON || vCoord > segment.vLength + EPSILON) {{
+        return false;
+    }}
+
+    signedInwardDistance = dot(rel, inwardNormal);
+    return true;
+}}
+
+float RectangleWallPhysicalPenetration(
+    RectangleWallSegment segment,
+    vec3 point,
+    float radius)
+{{
+    float uCoord = 0.0;
+    float vCoord = 0.0;
+    float signedInwardDistance = 0.0;
+    if (!RectangleWallProjectPoint(
+            segment,
+            point,
+            uCoord,
+            vCoord,
+            signedInwardDistance)) {{
+        return -1.0;
+    }}
+    return radius - signedInwardDistance;
+}}
+
+RectangleWallSegment SelectRectangleWallSegment(uint SourceID, uint BoundaryID)
+{{
+    vec3 marker = GetParticlePosition(BoundaryID).xyz;
+    RectangleWallSegment selected = RECTANGLE_WALL_SEGMENTS[0];
+    float bestDistance = 3.402823466e+38;
+    for (uint index = 0u; index < RECTANGLE_WALL_SEGMENT_COUNT; ++index) {{
+        RectangleWallSegment candidate = RECTANGLE_WALL_SEGMENTS[index];
+        float uCoord = 0.0;
+        float vCoord = 0.0;
+        float signedInwardDistance = 0.0;
+        if (!RectangleWallProjectPoint(
+                candidate,
+                marker,
+                uCoord,
+                vCoord,
+                signedInwardDistance)) {{
+            continue;
+        }}
+
+        float distance = abs(signedInwardDistance);
+        if (distance < bestDistance) {{
+            bestDistance = distance;
+            selected = candidate;
+        }}
+    }}
+    return selected;
+}}
+
+// Python source: ForceDynamics.py:{line("EvaluateRectangleWallSegment")}
+BoundaryWallSegment EvaluateRectangleWallSegment(uint SourceID, uint BoundaryID)
+{{
+    RectangleWallSegment selected = SelectRectangleWallSegment(SourceID, BoundaryID);
+    vec3 sourcePosition = GetParticlePosition(SourceID).xyz;
+    float radius = P[SourceID].Data.x;
+    float penetrationDepth = RectangleWallPhysicalPenetration(
+        selected,
+        sourcePosition,
+        radius);
+
+    vec3 inwardNormal = normalize(selected.inwardNormal);
+    vec3 forcePathNormal = -inwardNormal;
+    if (penetrationDepth <= EPSILON
+        || any(isnan(forcePathNormal))
+        || any(isinf(forcePathNormal))) {{
+        float centerDistance = max(0.0, 2.0 * radius - penetrationDepth);
+        return BoundaryWallSegment(
+            forcePathNormal,
+            0.0,
+            centerDistance,
+            selected.wallFlag,
+            false);
+    }}
+
+    float centerDistance = max(0.0, 2.0 * radius - penetrationDepth);
+    float overlapArea = particle_overlap_area(radius, radius, centerDistance);
+    return BoundaryWallSegment(
+        forcePathNormal,
+        overlapArea,
+        centerDistance,
+        selected.wallFlag,
+        true);
+}}
+
+#endif
+"""
+
+
 def render_piston(source_path: Path, visitor: ForceDynamicsVisitor) -> str:
     line = lambda name: method_line(visitor, name)
     return f"""#ifndef FORCE_DYNAMICS_SIMPLE_PISTON_GLSL
@@ -1365,6 +1492,7 @@ def render_compute(source_path: Path, enable_piston: bool = False) -> str:
 #include "../common/ForceDynamicsSimple.glsl"
 #include "../common/ForceDynamicsSimpleBoundaryParticle.glsl"
 #include "../common/ForceDynamicsSimpleFunctionWall.glsl"
+#include "../common/ForceDynamicsSimpleRectangleWall.glsl"
 #if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
 #include "../common/ForceDynamicsSimplePiston.glsl"
 #endif
@@ -1372,6 +1500,14 @@ def render_compute(source_path: Path, enable_piston: bool = False) -> str:
 // Generated from {source_path.as_posix()} by tools/ExportForceDynamicsSimpleGLSL.py.
 // Simple source-owned compute schedule.
 // Do not hand edit generated dynamics content.
+
+BoundaryWallSegment EvaluateConfiguredWallSegment(uint SourceID, uint BoundaryID)
+{{
+    if (RECTANGLE_WALL_SEGMENT_COUNT > 0u) {{
+        return EvaluateRectangleWallSegment(SourceID, BoundaryID);
+    }}
+    return EvaluateFunctionWallSegment(SourceID, BoundaryID);
+}}
 
 void main()
 {{
@@ -1457,7 +1593,7 @@ void main()
                 duplicateCount += 1u;
 
                 BoundaryWallSegment segment =
-                    EvaluateFunctionWallSegment(SourceID, TargetID);
+                    EvaluateConfiguredWallSegment(SourceID, TargetID);
                 if (!segment.valid) {{
                     continue;
                 }}
@@ -1569,7 +1705,7 @@ void main()
                 duplicateCount += 1u;
 
                 BoundaryWallSegment segment =
-                    EvaluateFunctionWallSegment(SourceID, TargetID);
+                    EvaluateConfiguredWallSegment(SourceID, TargetID);
                 if (!segment.valid) {{
                     continue;
                 }}
@@ -1652,6 +1788,11 @@ def write_outputs(
         encoding="utf-8",
         newline="\n",
     )
+    (output_dir / "ForceDynamicsSimpleRectangleWall.glsl").write_text(
+        render_rectangle_wall(source_path, visitor),
+        encoding="utf-8",
+        newline="\n",
+    )
     (output_dir / "ForceDynamicsSimplePiston.glsl").write_text(
         render_piston(source_path, visitor),
         encoding="utf-8",
@@ -1701,6 +1842,9 @@ def main() -> int:
         print(f"  - {method}")
     print("Function-wall methods:")
     for method in SIMPLE_FUNCTION_WALL_METHODS:
+        print(f"  - {method}")
+    print("Rectangle/configured-wall methods:")
+    for method in SIMPLE_RECTANGLE_WALL_METHODS:
         print(f"  - {method}")
     print("Piston methods:")
     for method in SIMPLE_PISTON_METHODS:

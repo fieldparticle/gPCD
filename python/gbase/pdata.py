@@ -45,9 +45,10 @@ class pdata(ctypes.Structure):
     - ``collision_stiffness_q`` becomes ``Data.y``.
     - ``ptype == -1`` identifies the reserved null particle at index zero.
     - ``ptype == 0`` identifies a mobile particle. Positive ``ptype`` values
-      identify boundary markers. Generic function-wall simulations use
-      ``ptype == 1`` for all boundary markers; the simulation wall model and
-      ``curve_wall_segments`` determine how those markers are evaluated.
+      identify boundary markers. Generic function-wall and rectangle-wall
+      simulations use ``ptype == 1`` for all boundary markers; the simulation
+      wall model and configured wall segments determine how those markers are
+      evaluated.
     - ``material_id`` identifies the material/species used for rendering and
       heterogeneous dynamics. It is independent of boundary classification and
       wall-evaluator dispatch.

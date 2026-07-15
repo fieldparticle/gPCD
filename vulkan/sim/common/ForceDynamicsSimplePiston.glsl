@@ -7,13 +7,13 @@
 
 #if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
 
-// Python source: ForceDynamics.py:307
+// Python source: ForceDynamics.py:409
 bool PistonEnabled()
 {
     return true;
 }
 
-// Python source: ForceDynamics.py:296
+// Python source: ForceDynamics.py:398
 float GetPistonPosition(uint frame)
 {
     uint pistonStartFrame = uint(piston_start_frame);
@@ -31,7 +31,7 @@ float GetPistonPosition(uint frame)
     return min(position, piston_x_stop);
 }
 
-// Python source: ForceDynamics.py:321
+// Python source: ForceDynamics.py:423
 vec3 GetPistonVelocity(uint frame)
 {
     uint pistonStartFrame = uint(piston_start_frame);
@@ -47,7 +47,7 @@ vec3 GetPistonVelocity(uint frame)
         piston_velocity_z);
 }
 
-// Python source: ForceDynamics.py:332
+// Python source: ForceDynamics.py:434
 BoundaryWallSegment EvaluatePistonWall(uint SourceID)
 {
     vec3 sourcePosition = GetParticlePosition(SourceID).xyz;
@@ -68,7 +68,7 @@ BoundaryWallSegment EvaluatePistonWall(uint SourceID)
     return BoundaryWallSegment(normal, overlapArea, centerDistance, 1u, true);
 }
 
-// Python source: ForceDynamics.py:346
+// Python source: ForceDynamics.py:448
 bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
 {
     if (!PistonEnabled()) { return true; }

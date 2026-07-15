@@ -2338,3 +2338,55 @@ The Vulkan side is intentionally unchanged for this check-in.  The later 3D
 work should replace static Python eye cfg values with camera-derived eye
 position and view direction, then port the material-owned lumens display rule
 to the Vulkan rendering path.
+
+\subsection{Three-Dimensional Rectangle Walls Enter The Simple Path}
+
+\subsubsection{previous form}
+
+The active simple wall path was documented and generated around
+\texttt{curve\_wall\_segments}.  Those segments represented finite
+two-dimensional function walls.  Boundary markers provided locality, but the
+wall evaluator was still the function-wall helper.  The Vulkan
+\texttt{TestPythonBoundarySpheres} wrapper therefore had no active finite
+rectangle-wall model for three-dimensional box walls.
+
+\subsubsection{current form}
+
+\texttt{rectangle\_wall\_segments} is now the active three-dimensional simple
+wall model when present.  Each segment carries:
+\begin{verbatim}
+origin, uAxis, vAxis, uLength, vLength, inwardNormal, wallFlag
+\end{verbatim}
+and the generated test-file row uses fifteen numeric values.  Boundary marker
+particles remain locality sentinels with \texttt{ptype=1}; they are not
+physical wall geometry and do not store evaluator IDs.
+
+The Python runtime, generic data generator, simple GLSL exporter, and
+\texttt{TestPythonBoundarySpheres} compute wrapper now share the configured
+wall precedence rule: rectangle walls take precedence when present; otherwise
+the simple path falls back to function-wall segments.  The active generated
+GLSL family includes \texttt{ForceDynamicsSimpleRectangleWall.glsl}, and the
+scenario wrapper calls \texttt{EvaluateConfiguredWallSegment(...)} for
+boundary-marker targets.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+This milestone moves the simple path from a two-dimensional wall-only Vulkan
+port toward the intended three-dimensional boundary model.  The rectangle
+wall evaluator performs finite patch checks in the configured \(u\) and \(v\)
+directions, tests inward-normal penetration, and returns the inverted normal
+needed by the existing source-owned force path.  The generated
+\texttt{boundary.glsl} contract now requires both the rectangle segment array
+and a zero-count fallback so wrappers can compile in either wall mode.
+
+The data generator must size cell occupancy for boundary-marker locality, not
+for physical wall volume.  In \texttt{TwoParticleHorizontal}, the six
+rectangle patches require \texttt{cell\_occupancy\_list\_size=16}.  Smaller
+values fail the generator's corner-occupancy capacity check before runtime.
+The remaining work is broad Vulkan validation across every active scenario
+wrapper and cleanup of any generated or hand-maintained shader drift found by
+that validation.
