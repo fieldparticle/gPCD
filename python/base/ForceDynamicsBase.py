@@ -13,6 +13,11 @@ from gbase.FunctionWall import parse_keyed_curve_wall_segments, wall_marker_posi
 from gbase.pdata import PTYPE_NULL
 
 PTYPE_BOUNDARY = 1.0
+AXIS_VECTOR = {
+    "X": (1.0, 0.0, 0.0),
+    "Y": (0.0, 1.0, 0.0),
+    "Z": (0.0, 0.0, 1.0),
+}
 
 class ParticleFields(AttrDictFields):
     def __setattr__(self, attr, value):
@@ -366,6 +371,7 @@ class ForceDynamics(ForceContactDynamics):
         self.particles = self.create_particle_array_from_cfg(self.particle_data)
         if self.config.pdata_from_file == False:
             self.add_function_boundary_markers_from_cfg()
+            self.add_rectangle_boundary_markers_from_cfg()
         self.ShaderFlags = self.create_shader_flags_from_cfg(self.run_configuration)
         self.wall_contact_offset = max(
             0.0,
@@ -419,6 +425,93 @@ class ForceDynamics(ForceContactDynamics):
                 )
             )
             marker_count += 1
+        return marker_count
+
+    def _axis_vector(self, axis_name):
+        axis_key = str(axis_name).strip().upper()
+        if axis_key not in AXIS_VECTOR:
+            raise ValueError(
+                "rectangle_wall_segments axis values must be one of X, Y, or Z"
+            )
+        return AXIS_VECTOR[axis_key]
+
+    @staticmethod
+    def _vector3(raw_value, field_name):
+        if raw_value is None or len(raw_value) != 3:
+            raise ValueError(f"rectangle_wall_segments.{field_name} must have 3 values")
+        return tuple(float(value) for value in raw_value)
+
+    def _sample_rectangle_wall_points(self, wall_name, wall_config):
+        origin = self._vector3(wall_config.get("origin"), f"{wall_name}.origin")
+        normal = self._vector3(wall_config.get("normal"), f"{wall_name}.normal")
+        if math.sqrt(sum(component * component for component in normal)) <= 1.0e-12:
+            raise ValueError(f"rectangle_wall_segments.{wall_name}.normal must not be zero")
+
+        u_axis = self._axis_vector(wall_config.get("u_axis"))
+        v_axis = self._axis_vector(wall_config.get("v_axis"))
+        if u_axis == v_axis:
+            raise ValueError(
+                f"rectangle_wall_segments.{wall_name}.u_axis and v_axis must differ"
+            )
+
+        u_length = float(wall_config.get("u_length", 0.0))
+        v_length = float(wall_config.get("v_length", 0.0))
+        if u_length < 0.0 or v_length < 0.0:
+            raise ValueError(
+                f"rectangle_wall_segments.{wall_name}.u_length/v_length must be nonnegative"
+            )
+
+        u_steps = max(1, int(math.floor(u_length)) + 1)
+        v_steps = max(1, int(math.floor(v_length)) + 1)
+        for u_index in range(u_steps):
+            for v_index in range(v_steps):
+                yield (
+                    origin[0] + u_axis[0] * u_index + v_axis[0] * v_index,
+                    origin[1] + u_axis[1] * u_index + v_axis[1] * v_index,
+                    origin[2] + u_axis[2] * u_index + v_axis[2] * v_index,
+                )
+
+    def add_rectangle_boundary_markers_from_cfg(self):
+        """Build runtime boundary markers from 3D rectangle wall patches."""
+        segments = self.run_configuration.get("rectangle_wall_segments")
+        if not isinstance(segments, AttrDict):
+            return 0
+
+        marker_cells = {
+            (
+                int(round(float(particle.PosLocA.x))),
+                int(round(float(particle.PosLocA.y))),
+                int(round(float(particle.PosLocA.z))),
+            )
+            for particle in self.particles
+            if float(getattr(particle, "ptype", 0.0)) > 0.5
+        }
+        radius = float(self.run_configuration.get("radius", 0.0))
+        marker_count = 0
+        for wall_name, wall_config in segments.items():
+            if not isinstance(wall_config, AttrDict):
+                raise ValueError(
+                    f"rectangle_wall_segments.{wall_name} must be a key-value object"
+                )
+            for point in self._sample_rectangle_wall_points(wall_name, wall_config):
+                marker_cell = tuple(int(round(value)) for value in point)
+                if marker_cell in marker_cells:
+                    continue
+                marker_cells.add(marker_cell)
+                self.particles.append(
+                    self.create_particle(
+                        pnum=len(self.particles),
+                        rx=point[0],
+                        ry=point[1],
+                        rz=point[2],
+                        radius=radius,
+                        mass=1.0,
+                        ptype=PTYPE_BOUNDARY,
+                        collision_stiffness_q=0.0,
+                        state_flg=0.0,
+                    )
+                )
+                marker_count += 1
         return marker_count
 
     def load_constants(self, constants_file_name=None):
@@ -614,7 +707,7 @@ class ForceDynamics(ForceContactDynamics):
         location = particle_cfg.get("location", {})
         state_flg = particle_cfg.get(
             "releaseFrame",
-            particle_cfg.get("state_flg", 1.0),
+            particle_cfg.get("state_flg", 0.0),
         )
         if "collision_stiffness_q" not in particle_cfg:
             collision_stiffness_q = 4.0

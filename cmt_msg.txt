@@ -1,8 +1,13 @@
-Document lumens material color and Python eye diagnostics
+Current status:
+	- Added Open3D GUI SceneWidget viewer with top info strip and 3D diagnostic rendering.
+	- Added 3D TwoParticleHorizontal configuration with rectangle_wall_segments.
+	- Added runtime rectangle-wall boundary marker generation for Python cfg loading.
+	- Added visual separation for axes, death bounds, and rectangle wall outlines.
 
-- document material-owned color schemes and retire flat hsv_color
-- document Python lumens eye/FOV/aperture visibility controls
-- document SpecificDraw scenario diagnostic hook
-- record lumens eye-aperture visualization in ProblemEvolution
+Code Changes:
+	- Connected TabFormGenData to SimulationRunner3D_HSVPanel.
+	- Added Open3D rendering controls for frame_rate, end_frame, spheres/points, boundary markers, rectangle wall outlines, and diagnostic axes.
+	- Added rectangle_wall_segments marker generation in ForceDynamicsBase.
+	- Updated cfg_gendata configs for current dimensions/material/dispatch conventions.
 
-Next: 3D camera-derived eye/view state
+Next: correct 3d wall dynamics

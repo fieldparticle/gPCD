@@ -24,7 +24,7 @@ from gbase.BinaryFileUtilities import *
 from gbase.import_module import load_class_from_file
 from gbase.pdata import *
 from gbase.GenPQBData import *
-from SimulationRunner_HSVPanel import run_analysis as simulation_run_analysis
+from SimulationRunner3D_HSVPanel import run_analysis as simulation_run_analysis
 from base.ForcePlots import run_force_plots
 from gbase.ReadCaptureFile import *
 import subprocess
@@ -639,14 +639,14 @@ class TabGenData(QTabWidget):
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenDUP.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
-        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleAngled.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TestCompressor.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TestReservoir.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/CDNozzle.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/FreeStream.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/FreeStreamHeteroPy.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/lumens.cfg")
+        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/lumens.cfg")
         self.update_list_widget()
         self.update_data_list_widget()
         

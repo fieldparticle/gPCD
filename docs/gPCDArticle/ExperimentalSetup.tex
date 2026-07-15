@@ -11,8 +11,7 @@ The gPCD framework was implemented using Vulkan, with broad-phase
 occupancy generation executed within the graphics pipeline and
 narrow-phase evaluation executed through compute shaders. 
 
-As a GPU-resident framework, the maximum problem size is constrained by the
-available storage-buffer capacity of the target device.
+As a GPU-resident framework, the maximum problem size is constrained by the available storage-buffer capacity of the target device.
 
 Let \(M_{\max}\) denote the maximum addressable storage-buffer range
 supported by the device and let $S_p$ denote the memory footprint of
@@ -49,7 +48,7 @@ initialization.
 
 Benchmark datasets consisted of randomly distributed particle
 configurations with increasing particle count while maintaining an
-approximately constant collision fraction. Particle counts ranged from
+approximately constant one half particle--particle  collision fraction. Particle counts ranged from
 \numprint{16} to \numprint{\APBQRCURVATUREtotMaxParticles{}} particles.
 
 Because gPCD performs exact collision detection, verification and

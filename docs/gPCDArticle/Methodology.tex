@@ -61,7 +61,7 @@ occupancy cells satisfy
 X>0,\qquad Y>0,\qquad Z>0.
 \end{equation}
 
-Cell coordinates are converted into a flattened cell index,
+Cell coordinates are then converted into a flattened cell index,
 
 \begin{equation}
 I = X + W(Y + HZ).
@@ -70,17 +70,10 @@ I = X + W(Y + HZ).
 The flattened index serves as the primary cell identifier throughout
 the collision-detection pipeline.
 
-Each particle maintains a \emph{particle corner occupancy list} containing the
-flattened cell identifiers associated with its eight AABB corners.
-These cell identifiers are generated during occupancy construction and
-retained for subsequent narrow-phase evaluation.
+Each particle maintains a \emph{particle corner occupancy list} containing the flattened cell identifiers associated with its eight AABB corners. These cell identifiers are generated during occupancy construction and retained for subsequent narrow-phase evaluation.
 
-Each cell maintains a \emph{cell-array particle occupancy list}
-containing the identifiers of particles occupying that cell. During
-occupancy generation, the cell identifiers stored in the particle
-corner occupancy list are used to locate the corresponding cell-array
-particle occupancy lists and insert the particle identifier into each
-occupied cell.
+During occupancy generation, the cell identifiers stored in the particle
+corner occupancy list are used to locate the corresponding \emph{cell-array particle occupancy lists} and insert the particle identifier into each occupied cell.
 
 Because occupancy generation is particle-driven, only cells referenced
 by particle AABB corners are accessed during broad-phase construction.
@@ -90,37 +83,24 @@ number of particles and their occupied cells rather than the total
 number of cells in the cell array.
 
 As illustrated in \Figo{CellSpansA}, multiple AABB corners from
-the same particle may map to a common cell. These duplicate corner
-references are suppressed during occupancy generation so that only a
+the same particle may map to a common cell. These \emph{duplicate corner] references are suppressed during occupancy generation so that only a
 single copy of the particle identifier is stored within a given
 cell-array particle occupancy list.
 
+Following duplicate suppression, insertion into shared cell-array occupancy lists is performed using an atomic operation on a \emph{slot reservation array} the same length as the cell array. In this way, an atomic slot counter is availble for each cell-array occupancy list to produce a unique slot within the target list.
 
-Following duplicate suppression, insertion into shared occupancy lists
-is performed using an atomic reservation operation that obtains a
-unique slot within the target list.
-
-The resulting occupancy lists constitute the potentially colliding set
-(PCS) used during narrow-phase evaluation. Consequently, occupancy
-generation directly constructs the PCS without requiring a separate
-candidate-construction stage.
+The resulting cell--occupancy lists constitute the potentially colliding set (PCS) used during narrow-phase evaluation. Consequently, occupancy generation directly constructs the PCS without requiring a separate candidate-construction stage.
 
 \subsection{Narrow-Phase Evaluation}
 
 During narrow-phase evaluation, each source particle traverses its
 particle corner occupancy list and accesses the corresponding
-cell-array particle occupancy lists. The particles referenced by these
-occupancy lists constitute the candidate neighbors considered for
-collision detection. Each candidate is subsequently evaluated to
-determine contact.
+cell-array occupancy lists. The particles referenced by these
+cell-array occupancy lists constitute the candidate neighbors considered for collision detection. Each candidate is subsequently evaluated to determine contact.
 
 As illustrated in \Figo{CellSpansB}, the same source--target
 interaction may be encountered through multiple occupied cells during
-occupancy-list traversal. To prevent duplicate collision evaluations,
-each particle maintains a collision list containing the identifiers of
-previously registered interactions. When a collision is detected, the
-target particle identifier is added to this list, and subsequent
-evaluations of the same source--target pair are discarded.
+occupancy-list traversal. To prevent \emph{duplicate collision} evaluations, each particle maintains a collision list containing the identifiers of previously registered interactions. When a collision is detected, the target particle identifier is added to this list, and subsequent evaluations of the same source--target pair are discarded.
 
 Because candidate discovery is performed independently for each source
 particle, collision evaluation remains source-owned throughout the

@@ -27,7 +27,7 @@ contact laws, continuum approximations, or specialized response models. Particle
 which interactions are evaluated and state updates are performed. These can significantly influence parallel
 execution characteristics, synchronization requirements, and computational efficiency.
 
-The Field Particle System adopts the source-owned interaction model introduced by gPCD. Particle
+The Field Particle Method adopts the source-owned interaction model introduced by gPCD. Particle
 interactions are evaluated from the perspective of the source particle, and state updates are restricted
 to quantities owned by the evaluating particle. This ownership model eliminates shared-state
 modification during pair interactions, reduces synchronization requirements, and naturally supports

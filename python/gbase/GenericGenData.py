@@ -1194,12 +1194,13 @@ class GenericGenData:
                 f'particle_data_bin_file = "{particle_data_bin_file}";\n'
             )
             output.write(f'report_file = "{report_file}";\n')
-            output.write(f"dispatchx = {self.number_active_particles + 1};\n")
-            output.write(f"dispatchy = {int(self.itemcfg.dispatchy)};\n")
-            output.write(f"dispatchz = {int(self.itemcfg.dispatchz)};\n")
-            output.write(f"workGroupsx = {int(self.itemcfg.workGroupsx)};\n")
-            output.write(f"workGroupsy = {int(self.itemcfg.workGroupsy)};\n")
-            output.write(f"workGroupsz = {int(self.itemcfg.workGroupsz)};\n")
+            dispatchx = self.number_active_particles + 1
+            output.write(f"dispatchx = {dispatchx};\n")
+            output.write(f"dispatchy = {int(self.itemcfg.get('dispatchy', 1))};\n")
+            output.write(f"dispatchz = {int(self.itemcfg.get('dispatchz', 1))};\n")
+            output.write(f"workGroupsx = {int(self.itemcfg.get('workGroupsx', dispatchx))};\n")
+            output.write(f"workGroupsy = {int(self.itemcfg.get('workGroupsy', 1))};\n")
+            output.write(f"workGroupsz = {int(self.itemcfg.get('workGroupsz', 1))};\n")
             output.write(
                 "cell_occupancy_list_size = "
                 f"{self.cell_occupancy_list_size};\n"

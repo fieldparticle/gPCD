@@ -3,18 +3,12 @@
 
 Numerous methodologies and execution architectures have been proposed
 to improve collision-detection performance, particularly for large-scale
-particle simulations. These approaches differ in the data structures
-used to generate collision candidates, the execution architectures used
-to process them, and their interaction with the rendering pipeline.
-This section reviews representative collision-detection methodologies,
-execution architectures, and rendering strategies, and identifies the
-architectural gap addressed by the gPCD framework.
+particle simulations. These approaches differ in, (1) the data structures used to generate collision candidates,(2) the execution architectures used to process them, and (3) their interaction with the rendering pipeline. This section reviews representative collision-detection methodologies, execution architectures, and rendering strategies, and identifies the architectural gap addressed by the gPCD framework.
 
 Most collision--detection frameworks separate candidate generation from
 collision evaluation through broad-phase and narrow--phase stages. The
 primary contribution of gPCD occurs during broad--phase occupancy
-generation, while narrow-phase evaluation completes the collision--detection framework. 
-Consequently, broad--phase methodologies play a
+generation, while narrow-phase evaluation completes the collision--detection framework. Consequently, broad--phase methodologies play a
 central role in determining the scalability of large-scale collision-
 detection systems.
 
@@ -29,7 +23,6 @@ of pairwise evaluations passed to the narrow phase. As particle counts
 and GPU capabilities have increased, research has expanded beyond
 broad-phase methodologies to consider the execution architectures used
 to implement them.
-
 
 Collision-detection methodologies have been implemented using a wide
 range of execution architectures. Early systems performed both
@@ -46,9 +39,7 @@ selected collision-detection operations to the GPU while maintaining
 CPU-managed coordination and data structures. GPU-resident
 architectures further reduce data movement by performing both
 broad-phase and narrow-phase operations on the GPU, improving parallel
-utilization and minimizing host-device communication. Although these architectures differ 
-in execution location and data movement, they do not fundamentally
-alter the rendering scheme.
+utilization and minimizing host-device communication. Although these architectures differ in execution location and data movement, they do not fundamentally alter the rendering scheme.
 
 Collision detection and rendering have historically served distinct
 roles within simulation systems. Collision detection identifies particle
