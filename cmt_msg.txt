@@ -1,13 +1,10 @@
 Current status:
-	- Added rectangle_wall_segments as the active 3D simple wall model when present.
-	- Added rectangle-wall boundary metadata and generated GLSL wrapper support.
-	- Updated GenericGenData to emit rectangle wall markers and 15-value rectangle_wall_segments rows.
-	- Updated dynamics documentation and ProblemEvolution for the rectangle-wall Vulkan port.
+	- Added the 3D lighting boundary-rendering evolution note.
+	- Documented the Vulkan boundary/sphere feature-flag contract.
+	- Recorded the common shader wrapper direction for active Vulkan scenarios.
+	- Recorded the command-recording fix that skips boundary buffers when boundary drawing is disabled.
 
 Code Changes:
-	- Added Python rectangle-wall evaluation and configured-wall precedence.
-	- Added ForceDynamicsSimpleRectangleWall.glsl generation and configured-wall wrapper calls.
-	- Updated TestPythonBoundarySpheres generated/config shader artifacts for rectangle walls and marker-only boundary particles.
-	- Retired active use of the older ForceDynamicsGLSL exporter in favor of ExportForceDynamicsSimpleGLSL.py.
+	- Updated docs/Dynamics/ProblemEvolution.tex with a separate Lighting In 3D Vulkan Boundary Rendering entry.
 
-Next: update and test all vulkan projects
+Next: Lighting in 3d

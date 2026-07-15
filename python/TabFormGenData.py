@@ -24,7 +24,8 @@ from gbase.BinaryFileUtilities import *
 from gbase.import_module import load_class_from_file
 from gbase.pdata import *
 from gbase.GenPQBData import *
-from SimulationRunner3D_HSVPanel import run_analysis as simulation_run_analysis
+from SimulationRunner_HSVPanel import run_analysis as simulation_run_analysis_2d
+from SimulationRunner3D_HSVPanel import run_analysis as simulation_run_analysis_3d
 from base.ForcePlots import run_force_plots
 from gbase.ReadCaptureFile import *
 import subprocess
@@ -228,13 +229,44 @@ class TabGenData(QTabWidget):
             return self.selected_run_analysis(self.CfgFile)
 
     def selected_run_analysis(self, cfg_file, batch_mode=False, study=False, study_number=None, end_frame=None):
-        return simulation_run_analysis(
+        return self.selected_simulation_runner(cfg_file)(
             cfg_file,
             batch_mode=batch_mode,
             study=study,
             study_number=study_number,
             end_frame=end_frame,
         )
+
+    def selected_simulation_runner(self, cfg_file):
+        dimensions = self.simulation_dimensions(cfg_file)
+        if dimensions == 3:
+            return simulation_run_analysis_3d
+        return simulation_run_analysis_2d
+
+    def simulation_dimensions(self, cfg_file):
+        if cfg_file == self.CfgFile and self.itemcfg is not None:
+            cfg = self.itemcfg
+        else:
+            cfg_file_obj = ConfigUtility(cfg_file)
+            cfg_file_obj.Create(self.bobj.log, cfg_file)
+            cfg = cfg_file_obj.config
+            if "include_file" in cfg:
+                include_items = cfg_file_obj.open_log(cfg.include_file)
+                for key, value in include_items.items():
+                    cfg[key] = value
+
+        raw_dimensions = cfg.get("dimensions", 2)
+        try:
+            dimensions = int(raw_dimensions)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"{cfg_file} dimensions must be 2 or 3, got {raw_dimensions!r}"
+            )
+        if dimensions not in (2, 3):
+            raise ValueError(
+                f"{cfg_file} dimensions must be 2 or 3, got {dimensions}"
+            )
+        return dimensions
 
     #******************************************************************
     # Generate the data

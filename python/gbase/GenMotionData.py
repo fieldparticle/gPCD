@@ -120,12 +120,6 @@ class GenMotionData():
         f.write(fstr)
         fstr = f"pdensity = {run_cfg.pdensity};\n"
         f.write(fstr)
-        fstr = f"dispatchx = {run_cfg.dispatchx};\n"
-        f.write(fstr)
-        fstr = f"dispatchy = {run_cfg.dispatchy};\n"
-        f.write(fstr)
-        fstr = f"dispatchz = {run_cfg.dispatchz};\n"
-        f.write(fstr)
         fstr = f"workGroupsx = {run_cfg.workGroupsx}\n"
         f.write(fstr)
         fstr = f"workGroupsy = {run_cfg.workGroupsy};\n"

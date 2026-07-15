@@ -1416,13 +1416,23 @@ class GenericGenData:
                 f'particle_data_bin_file = "{particle_data_bin_file}";\n'
             )
             output.write(f'report_file = "{report_file}";\n')
-            dispatchx = self.number_active_particles + 1
-            output.write(f"dispatchx = {dispatchx};\n")
-            output.write(f"dispatchy = {int(self.itemcfg.get('dispatchy', 1))};\n")
-            output.write(f"dispatchz = {int(self.itemcfg.get('dispatchz', 1))};\n")
-            output.write(f"workGroupsx = {int(self.itemcfg.get('workGroupsx', dispatchx))};\n")
-            output.write(f"workGroupsy = {int(self.itemcfg.get('workGroupsy', 1))};\n")
-            output.write(f"workGroupsz = {int(self.itemcfg.get('workGroupsz', 1))};\n")
+            workgroups_local_size = int(
+                self.itemcfg.get(
+                    "workgroups_localSize",
+                    self.itemcfg.get("workGroupsx", 128),
+                )
+            )
+            if workgroups_local_size <= 0:
+                raise ValueError("workgroups_localSize must be positive")
+            group_count_x = (
+                self.number_particles + 1 + workgroups_local_size - 1
+            ) // workgroups_local_size
+            output.write(f"workGroupsx = {workgroups_local_size};\n")
+            output.write("workGroupsy = 1;\n")
+            output.write("workGroupsz = 1;\n")
+            output.write(f"groupCountX = {group_count_x};\n")
+            output.write("groupCountY = 1;\n")
+            output.write("groupCountZ = 1;\n")
             output.write(
                 "cell_occupancy_list_size = "
                 f"{self.cell_occupancy_list_size};\n"
@@ -1435,8 +1445,9 @@ class GenericGenData:
             output.write(f"death_z_min = {death_z_min:.9f};\n")
             output.write(f"death_z_max = {death_z_max:.9f};\n")
 
+            rectangle_wall_segments = getattr(self, "rectangle_wall_segments", ())
             active_curve_wall_segments = (
-                () if self.rectangle_wall_segments else self.curve_wall_segments
+                () if rectangle_wall_segments else self.curve_wall_segments
             )
             output.write("curve_wall_segments = (\n")
             for segment_index, segment in enumerate(active_curve_wall_segments):
@@ -1448,10 +1459,10 @@ class GenericGenData:
             output.write(");\n")
 
             output.write("rectangle_wall_segments = (\n")
-            for segment_index, segment in enumerate(self.rectangle_wall_segments):
+            for segment_index, segment in enumerate(rectangle_wall_segments):
                 separator = (
                     ","
-                    if segment_index + 1 < len(self.rectangle_wall_segments)
+                    if segment_index + 1 < len(rectangle_wall_segments)
                     else ""
                 )
                 values = (
@@ -1510,7 +1521,7 @@ class GenericGenData:
             f"  mobile compute records including null: "
             f"{self.number_active_particles + 1}\n"
             f"  curve segments: {len(self.curve_wall_segments)}\n"
-            f"  rectangle segments: {len(self.rectangle_wall_segments)}"
+            f"  rectangle segments: {len(getattr(self, 'rectangle_wall_segments', ()))}"
         )
         print(report_text)
         self.write_validation_log(report_text)

@@ -7,6 +7,7 @@
 #endif
 #extension GL_EXT_scalar_block_layout :enable
 #include "params.glsl"
+#include "material.glsl"
 #include "..\common\constants.glsl"
 #include "..\common\atomicg.glsl"
 #include "..\common\push.glsl"
@@ -14,6 +15,8 @@
 #include "..\common\Lockimage.glsl"
 #include "..\common\particle.glsl"
 #include "..\common\util.glsl"
+#include "..\common\color_map.glsl"
+#include "boundary.glsl"
 
 
 layout(binding = 1) uniform UniformBufferObject{
@@ -22,6 +25,13 @@ layout(binding = 1) uniform UniformBufferObject{
     mat4 proj;
 } ubo;
 
+/*
+layout(binding = 7) uniform UniformBufferObjectS{
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+} subo;
+*/
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -40,10 +50,11 @@ mat4 BuildTranslation(vec3 delta)
         vec4(0.0, 0.0, 1.0, 0.0),
         vec4(delta, 1.0));
 }
-
+#include "..\common\Boundary.vert"
 void main()
 {
-
+	boundary_vert_main();
+	/*
 	vec3 delta = vec3(0.5,0.5,0.5);
 	mat4 trans = BuildTranslation(delta);
 	uint ModelInstance = gl_InstanceIndex+1;
@@ -52,7 +63,18 @@ void main()
 		gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
 		fragColor = inColor;
 	}
-	
-	
-	
+	else
+	{
+		if (P[ModelInstance].ptype > 0.5)
+		{
+			gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+			fragColor = vec4(0.0, 0.0, 0.0, 0.0);
+			return;
+		}
+
+		vec3 sphereOffset = inPosition.xyz * P[ModelInstance].Data.x;
+		vec4 newPos = vec4(sphereOffset + P[ModelInstance].PosLocA.xyz, 1.0);
+		//gl_Position = subo.proj * subo.view * subo.model * newPos;
+		fragColor = color_map(ModelInstance);
+	}*/
 }

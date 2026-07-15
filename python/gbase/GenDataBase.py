@@ -308,12 +308,6 @@ class GenDataBase:
         f.write(fstr)
         fstr = f"pdensity = 0;\n"
         f.write(fstr)
-        fstr = f"dispatchx = {self.number_particles+1};\n"
-        f.write(fstr)
-        fstr = f"dispatchy = {self.select_list[self.index]['dy']};\n"
-        f.write(fstr)
-        fstr = f"dispatchz = {self.select_list[self.index]['dz']};\n"
-        f.write(fstr)
         fstr = f"workGroupsx = {self.select_list[self.index]['wx']};\n"
         f.write(fstr)
         fstr = f"workGroupsy = {self.select_list[self.index]['wy']};\n"

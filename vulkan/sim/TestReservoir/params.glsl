@@ -19,10 +19,5 @@ const uint LockAryLen=2145;
 const uint MAX_CELL_ARRAY_LOCATIONS =2145;
 const uint bbound =48;
 const float point_size = 1.00;
-vec3 ncolcolor = vec3(0.0f,1.0f,0.0f);
-vec3 colcolor = vec3(1.0f,0.0f,0.0f);
 #define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN 0.000000000
 #define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER 2.000000000
-const uint HSV_ON = 0u;
-const float HSV_SAT = 0.000f;
-const float HSV_VAL = 0.000f;

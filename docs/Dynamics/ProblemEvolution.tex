@@ -2390,3 +2390,118 @@ values fail the generator's corner-occupancy capacity check before runtime.
 The remaining work is broad Vulkan validation across every active scenario
 wrapper and cleanup of any generated or hand-maintained shader drift found by
 that validation.
+
+\subsection{Runner Selection For 3D Lumens Bring-Up}
+
+\subsubsection{previous form}
+
+The data-generation UI's \texttt{Simulate} action imported only
+\texttt{SimulationRunner3D\_HSVPanel.py}.  As a result, every simulation run
+entered the Open3D runner even when the cfg declared:
+\begin{verbatim}
+dimensions = 2;
+\end{verbatim}
+This made the lumens configuration difficult to reason about because
+\texttt{lumens.cfg} is currently a two-dimensional pygame visualization
+prototype, while the next planned work is three-dimensional lumens behavior.
+
+\subsubsection{current form}
+
+The UI now treats \texttt{dimensions} as the runner-selection contract.
+\texttt{dimensions=2} selects \texttt{SimulationRunner\_HSVPanel.py}, and
+\texttt{dimensions=3} selects \texttt{SimulationRunner3D\_HSVPanel.py}.
+Missing \texttt{dimensions} defaults to the two-dimensional runner for
+compatibility with older cfg files.  Included cfg values are folded into the
+selection path before the runner is chosen.
+
+\subsubsection{difference outcome}
+
+rendering and diagnostics
+
+\subsubsection{Analysis}
+
+This change separates two decisions that had been accidentally coupled:
+whether a scenario is simulated in the two-dimensional pygame viewer or the
+three-dimensional Open3D viewer, and how lumens visibility should eventually
+derive its eye state.  The current \texttt{lumens.cfg} remains a
+two-dimensional diagnostic that uses static eye position, look angle, field
+of view, and aperture radius.  The planned 3D lumens work belongs in the
+three-dimensional runner, where the eye can be derived from camera/view state
+instead of static two-dimensional cfg fields.
+
+This is a viewer-routing change only.  It does not change particle dynamics,
+release-frame lifecycle, material selection, or the lumens color rule.
+
+\subsection{Lighting In 3D Vulkan Boundary Rendering}
+
+\subsubsection{previous form}
+
+The Vulkan lighting bring-up still inherited boundary rendering assumptions
+from the older particle-boundary application split.  Scenario shaders carried
+large duplicated boundary, sphere, particle, fragment, and compute bodies, so
+common changes could drift between \texttt{CDNozzle}, \texttt{FreeStream},
+\texttt{FreeStreamHetero}, \texttt{TestPythonBoundarySpheres}, and
+\texttt{TestReservoir}.  Rendering switches such as
+\texttt{boundary\_as\_obj}, \texttt{particle\_as\_spheres},
+\texttt{show\_cell\_boundary\_cube}, and
+\texttt{show\_wall\_as\_boundary\_cube} were not consistently represented in
+both the generated shader metadata and the Vulkan draw command path.
+
+This created two visible failure modes during 3D lighting work.  First, a
+run with boundary drawing disabled could still record an indexed boundary
+draw and bind a null cube index buffer.  Second, a run with
+\texttt{boundary\_as\_obj=true} could generate \texttt{HAS\_BOUNDARY} in
+\texttt{boundary.glsl} but fail to expose that define to the common boundary
+vertex shader, collapsing the boundary vertices instead of drawing the OBJ.
+
+\subsubsection{current form}
+
+Boundary and sphere rendering are now controlled by generated
+\texttt{boundary.glsl} feature defines:
+\begin{verbatim}
+HAS_BOUNDARY
+HAS_SPHERE
+\end{verbatim}
+\texttt{HAS\_BOUNDARY} is emitted when a cell cube, wall cube, or boundary
+OBJ is configured for drawing.  \texttt{HAS\_SPHERE} is emitted when
+particle spheres are configured for drawing.  The common boundary vertex
+shader consumes those defines, while each scenario wrapper includes its local
+\texttt{boundary.glsl} before including \texttt{../common/Boundary.vert}.
+
+The duplicated scenario shader bodies have been reduced to wrappers around
+the common shader bodies:
+\begin{verbatim}
+../common/Boundary.vert
+../common/FPM.vert
+../common/FPM.frag
+../common/FPM.comp
+\end{verbatim}
+Scenario wrappers remain responsible for local generated metadata, uniforms,
+materials, and optional helper includes.  The shared compute body calls
+\texttt{EvaluateConfiguredWallSegment(...)} so rectangle-wall scenarios can
+override the wall evaluator while function-wall scenarios use the default
+function-wall path.
+
+The Vulkan boundary-and-sphere command path now mirrors the same rendering
+contract.  It records boundary cube or OBJ draws only when a boundary is
+configured, records sphere draws only when spheres are configured, and no
+longer binds the cube index buffer for sphere-only or no-boundary cases.
+
+\subsubsection{difference outcome}
+
+rendering and diagnostics
+
+\subsubsection{Analysis}
+
+This work is part of the 3D lighting visualization path, not a change to the
+force law.  It does not change contact detection, contact force, release-frame
+lifecycle, wall geometry, or particle integration.  It makes the Vulkan
+renderer obey the same feature flags that the generated shader metadata
+advertises, which is required before lighting particles can be inspected
+reliably in three-dimensional scenes.
+
+The important separation is that shader feature defines hide or show rendered
+geometry, while Vulkan command recording controls which buffers may legally be
+bound and drawn.  A disabled boundary must be skipped before command
+recording reaches the cube vertex or index buffers; a shader cannot repair a
+null-buffer validation error after the command has already been recorded.

@@ -82,9 +82,11 @@ the material record.
 \subsection{Lighting/Lumens View Inputs}
 
 The Python lumens viewer is a render diagnostic for photon-style particles.
-It is Python-only for now; Vulkan will later derive the eye position and look
-angle dynamically from the 3D camera/view state rather than from static cfg
-values.
+It is Python-only for now.  The two-dimensional pygame runner uses the static
+cfg eye fields below.  The three-dimensional Open3D runner is selected by
+\texttt{dimensions=3}; later Vulkan work should derive the eye position and
+look angle dynamically from the 3D camera/view state rather than from static
+cfg values.
 
 \begin{description}
     \item[\texttt{lumens\_eye\_position}] Two values giving the eye center in
@@ -114,6 +116,25 @@ eye angle, the configured field of view, and the eye radius.  A photon is not
 allowed to change to its visible color at rebound merely because its future
 ray would intersect the eye; the color change is gated by the current
 position crossing the eye aperture.
+
+\subsection{Simulation Runner Selection}
+
+The data-generation UI selects the Python simulation runner from the flat
+configuration value:
+\begin{verbatim}
+dimensions
+\end{verbatim}
+
+\texttt{dimensions=2} selects the pygame runner
+\texttt{SimulationRunner\_HSVPanel.py}.  This runner is a two-dimensional
+display path and currently projects particle positions as \(x,y\).  Future
+two-dimensional projection work may add an explicit view-plane selector, but
+that remains a viewer option rather than a dynamics rule.
+
+\texttt{dimensions=3} selects the Open3D runner
+\texttt{SimulationRunner3D\_HSVPanel.py}.  This runner displays the full
+three-dimensional particle positions and is the intended place for the
+camera-derived 3D lumens eye work.
 
 \subsection{Material Color Schemes}
 

@@ -133,7 +133,8 @@ int main(int argc, const char* argv[]) try
 
 
 		// If this has both a boundary and spheres.
-		if (particle_as_spheres == true && (show_cell_boundary_cube == true || show_wall_as_boundary_cube ==true))
+		//if (particle_as_spheres == true && (show_cell_boundary_cube == true || show_wall_as_boundary_cube ==true))
+		if (show_cell_boundary_cube == true || show_wall_as_boundary_cube == true || show_boundary_as_obj == true	|| particle_as_spheres == true)
 		{
 			
 			if (ParticleBoundaryandSphere(pf, nullptr, nullptr, false))
@@ -142,7 +143,7 @@ int main(int argc, const char* argv[]) try
 			}
 		}
 		// If this has a boundary and no spheres.
-		else if ((show_cell_boundary_cube == true || show_wall_as_boundary_cube == true || show_boundary_as_obj == true) 
+		/*else if ((show_cell_boundary_cube == true || show_wall_as_boundary_cube == true || show_boundary_as_obj == true) 
 			&& particle_as_spheres == false)
 		{
 			if (ParticleBoundaryOnly(pf, nullptr, nullptr, false))
@@ -150,7 +151,7 @@ int main(int argc, const char* argv[]) try
 				return 1;
 			}
 
-		}
+		}*/
 		// No boudary and no spheres
 		else
 		{

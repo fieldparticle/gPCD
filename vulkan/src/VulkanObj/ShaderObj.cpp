@@ -48,6 +48,7 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 
 void ShaderObj::WriteMaterials()
 {
+	bool usesHSV = false;
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
 	std::string filename = fildir + "/material.glsl";
 
@@ -129,6 +130,10 @@ void ShaderObj::WriteMaterials()
 		if (config_setting_lookup_int(material, "color_scheme", &colorScheme) == CONFIG_FALSE)
 			throw std::runtime_error("material_properties[" + std::to_string(index) + "].color_scheme missing");
 
+		if (static_cast<uint32_t>(colorScheme) == 1u)
+			usesHSV = true;
+
+
 		if (config_setting_lookup_float(material, "cell_density", &cellDensity) == CONFIG_FALSE)
 			cellDensity = 0.0;
 
@@ -163,22 +168,21 @@ void ShaderObj::WriteMaterials()
 	std::ostringstream hsv_val;
 
 
-	if (CfgApp->CheckKey("application.hsv_color"))
+	
+	if (usesHSV == true)
 	{
-		if (CfgApp->GetBool("application.hsv_color", true) == 1)
-		{
-			hsv_color_on << "const uint HSV_ON = 1u;\n";
-			hsv_sat << "const float HSV_SAT = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_sat", true) << ";\n";
-			hsv_val << "const float HSV_VAL = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_val", true) << ";\n";
-		}
-		else
-		{
-			hsv_color_on << "const uint HSV_ON = 0u;\n";
-			hsv_sat << "const float HSV_SAT = 0.000f" << ";\n";
-			hsv_val << "const float HSV_VAL = 0.000f" << ";\n";
-		}
-		ostrm << hsv_color_on.str() << hsv_sat.str() << hsv_val.str();
+		hsv_color_on << "const uint HSV_ON = 1u;\n";
+		hsv_sat << "const float HSV_SAT = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_sat", true) << ";\n";
+		hsv_val << "const float HSV_VAL = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_val", true) << ";\n";
 	}
+	else
+	{
+		hsv_color_on << "const uint HSV_ON = 0u;\n";
+		hsv_sat << "const float HSV_SAT = 0.000f" << ";\n";
+		hsv_val << "const float HSV_VAL = 0.000f" << ";\n";
+	}
+	ostrm << hsv_color_on.str() << hsv_sat.str() << hsv_val.str();
+	
 
 	std::ostringstream col_color;
 	col_color << "vec3("
@@ -343,9 +347,24 @@ void ShaderObj::Piston()
 // do with drawing the boundaries. That is in ResourceVertexCube.cpp
 void ShaderObj::WriteWalls()
 {
+
+	bool show_cell_boundary_cube = CfgApp->GetBool("application.show_cell_boundary_cube", true);
+	bool show_wall_as_boundary_cube = CfgApp->GetBool("application.show_wall_as_boundary_cube", true);
+	bool particle_as_spheres = CfgApp->GetBool("application.particle_as_spheres", true);
+	bool show_boundary_as_obj = CfgApp->GetBool("application.boundary_as_obj", true);
+
 	std::string wlflg = "0u";
 	wlflg = "1u;";
 	
+	std::ostringstream boundary;
+	if (show_cell_boundary_cube == true || show_wall_as_boundary_cube == true || show_boundary_as_obj == true)
+	{
+		boundary << "#define HAS_BOUNDARY" << "\n";
+
+	}
+	if (particle_as_spheres == true)
+		boundary << "#define HAS_SPHERE" << "\n";
+
 	std::ostringstream death_str;
 	death_str
 		<< "const float death_x_min = " << std::fixed << std::setprecision(9)
@@ -385,6 +404,7 @@ void ShaderObj::WriteWalls()
 		ostrm << curve_ostr.str();
 		std::ostringstream rectangle_ostr = RectangleWalls();
 		ostrm << rectangle_ostr.str();
+		ostrm << boundary.str();
 		ostrm << "#endif\n";
 	}
 
@@ -503,9 +523,13 @@ void ShaderObj::GenWorkGroups()
 			std::string rpt = "Failed to open file:" + filename;
 			throw std::runtime_error(rpt.c_str());
 		}
-		ostrm << "layout(local_size_x = " << CfgTst->GetInt("workGroupsx", true) <<
-			", local_size_y = " << CfgTst->GetInt("workGroupsy", true) <<
-			", local_size_z = " << CfgTst->GetInt("workGroupsz", true) << ") in;\n";
+		ostrm 
+			<< "layout(local_size_x = " 
+				<< CfgTst->GetInt("workGroupsx", true) 
+			<< ", local_size_y = " 
+				<< CfgTst->GetInt("workGroupsy", true) <<
+			", local_size_z = " 
+				<< CfgTst->GetInt("workGroupsz", true) << ") in;\n";
 	}
 }
 

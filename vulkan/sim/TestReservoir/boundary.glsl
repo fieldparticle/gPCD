@@ -30,4 +30,20 @@ const FunctionWallSegment CURVE_WALL_SEGMENTS[4] = FunctionWallSegment[4](
     FunctionWallSegment(0u, 0u, 25.000000000, 20.000000000, 6.750000000, -0.250000000, 0.000000000, 0.000000000, 1.000000000, 4u)
 );
 
+struct RectangleWallSegment
+{
+    vec3 origin;
+    vec3 uAxis;
+    vec3 vAxis;
+    float uLength;
+    float vLength;
+    vec3 inwardNormal;
+    uint wallFlag;
+};
+
+const uint RECTANGLE_WALL_SEGMENT_COUNT = 0u;
+const RectangleWallSegment RECTANGLE_WALL_SEGMENTS[1] = RectangleWallSegment[1](
+    RectangleWallSegment(vec3(0.000000000), vec3(1.000000000, 0.000000000, 0.000000000), vec3(0.000000000, 1.000000000, 0.000000000), 0.000000000, 0.000000000, vec3(0.000000000, 0.000000000, 1.000000000), 0u)
+);
+
 #endif

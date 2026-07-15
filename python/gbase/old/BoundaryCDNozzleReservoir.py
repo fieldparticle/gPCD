@@ -472,9 +472,6 @@ class BoundaryCDNozzleReservoir:
                 f'particle_data_bin_file = "{self.test_bin_name}";\n'
             )
             output.write(f'report_file = "{self.report_file}";\n')
-            output.write(f"dispatchx = {self.number_active_particles + 1};\n")
-            output.write(f"dispatchy = {int(self.itemcfg.dispatchy)};\n")
-            output.write(f"dispatchz = {int(self.itemcfg.dispatchz)};\n")
             output.write(f"workGroupsx = {int(self.itemcfg.workGroupsx)};\n")
             output.write(f"workGroupsy = {int(self.itemcfg.workGroupsy)};\n")
             output.write(f"workGroupsz = {int(self.itemcfg.workGroupsz)};\n")

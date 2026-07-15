@@ -142,7 +142,8 @@ int ParticleOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	// frame buffer and pipelines
 	commandPool->Create(physDevObj,swapChain, renderPass, frameBuffer,
 			{ commandParticleGraphics,commandParticleCompute });
-	exportObject->Create(resourceVertexParticle);
+	//exportObject->Create(resourceVertexParticle);
+	exportObject->Create(resourceCollMatrix);
 
 	Extflg = false;
 	if(Extflg == true)

@@ -155,12 +155,6 @@ class BoundaryParticleReservoirHorizontal():
         f.write(fstr)
         fstr = f"report_file = \"{self.report_file}\";\n"
         f.write(fstr)
-        fstr = f"dispatchx = {self.number_active_particles+1};\n"
-        f.write(fstr)
-        fstr = f"dispatchy = {run_cfg.dispatchy};\n"
-        f.write(fstr)
-        fstr = f"dispatchz = {run_cfg.dispatchz};\n"
-        f.write(fstr)
         fstr = f"workGroupsx = {run_cfg.workGroupsx};\n"
         f.write(fstr)
         fstr = f"workGroupsy = {run_cfg.workGroupsy};\n"

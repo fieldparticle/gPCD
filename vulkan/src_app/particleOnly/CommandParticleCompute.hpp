@@ -35,9 +35,6 @@
 class CommandParticleCompute : public CommandObj
 {
 
-	uint32_t	m_dkx						= 0;
-	uint32_t	m_dky						= 0;
-	uint32_t	m_dkz						= 0;
 
 public:
 	virtual void RecordCommands( uint32_t imageIndex, uint32_t currentBuffer);

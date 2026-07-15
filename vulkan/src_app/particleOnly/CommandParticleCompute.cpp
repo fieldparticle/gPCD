@@ -40,9 +40,6 @@ void CommandParticleCompute::Create(SwapChainObj* SCO,
 {
 	CommandObj::Create(SCO,FBO,RPO,RCO,PLO);
 
-	m_dkx = CfgTst->GetInt("workGroupsx", true);
-	m_dky = CfgTst->GetInt("workGroupsy", true);
-	m_dkz = CfgTst->GetInt("workGroupsz", true);
 
 }
 //
@@ -105,10 +102,10 @@ void CommandParticleCompute::RecordCommands(uint32_t imageIndex, uint32_t curren
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_PerfQueryPool, 0);
 		
 	}
-	uint64_t vnum = dvo->m_NumElements;
-	uint32_t workgroupCount =
-    (vnum + m_dkx - 1) / m_dkx;
-	vkCmdDispatch(m_CommandBuffers[currentBuffer], workgroupCount, m_dky, m_dkz);
+	uint32_t groupCountX = CfgTst->GetInt("groupCountX", true);
+	uint32_t groupCountY = CfgTst->GetInt("groupCountY", true);
+	uint32_t groupCountZ = CfgTst->GetInt("groupCountZ", true);
+	vkCmdDispatch(m_CommandBuffers[currentBuffer], groupCountX, groupCountY, groupCountZ);
 	
 	if (trace_on_flag == true)
 	{
