@@ -26,6 +26,16 @@ COLOR_SCHEME_NAMES = {
     "COLOR_SCHEME_LUMENS": COLOR_SCHEME_LUMENS,
 }
 
+PARTICLE_TYPE_REGULAR = 0
+PARTICLE_TYPE_PHOTON = 1
+
+PARTICLE_TYPE_NAMES = {
+    "REGULAR": PARTICLE_TYPE_REGULAR,
+    "PHOTON": PARTICLE_TYPE_PHOTON,
+    "PARTICLE_TYPE_REGULAR": PARTICLE_TYPE_REGULAR,
+    "PARTICLE_TYPE_PHOTON": PARTICLE_TYPE_PHOTON,
+}
+
 
 def parse_color_scheme(raw_value):
     if isinstance(raw_value, str):
@@ -35,10 +45,21 @@ def parse_color_scheme(raw_value):
         return color_scheme
     return int(raw_value)
 
+
+def parse_particle_type(raw_value):
+    if isinstance(raw_value, str):
+        particle_type = PARTICLE_TYPE_NAMES.get(raw_value.strip().upper())
+        if particle_type is None:
+            raise ValueError(f"unknown particle_type: {raw_value}")
+        return particle_type
+    return int(raw_value)
+
+
 DEFAULT_MATERIAL_PROPERTIES = (
     {
         "material_id": 0,
         "name": "substance",
+        "particle_type": PARTICLE_TYPE_REGULAR,
         "relative_mass": 1.0,
         "thermal_velocity": 0.0,
         "color_scheme": COLOR_SCHEME_HSV,
@@ -70,6 +91,9 @@ def normalized_material_properties(source=None):
         )
         cell_density = float(_material_get(raw_material, "cell_density", 0.0))
         name = str(_material_get(raw_material, "name", f"material_{material_id}"))
+        particle_type = parse_particle_type(
+            _material_get(raw_material, "particle_type", PARTICLE_TYPE_REGULAR)
+        )
 
         if not all(
             math.isfinite(value)
@@ -81,6 +105,7 @@ def normalized_material_properties(source=None):
             {
                 "material_id": material_id,
                 "name": name,
+                "particle_type": particle_type,
                 "relative_mass": relative_mass,
                 "thermal_velocity": thermal_velocity,
                 "color_scheme": color_scheme,
@@ -101,8 +126,14 @@ def write_color_scheme_defines(output):
     output.write(f"COLOR_SCHEME_LUMENS = {COLOR_SCHEME_LUMENS};\n")
 
 
+def write_particle_type_defines(output):
+    output.write(f"PARTICLE_TYPE_REGULAR = {PARTICLE_TYPE_REGULAR};\n")
+    output.write(f"PARTICLE_TYPE_PHOTON = {PARTICLE_TYPE_PHOTON};\n")
+
+
 def write_material_properties(output, source=None):
     materials = normalized_material_properties(source)
+    write_particle_type_defines(output)
     output.write(f"num_material_properties = {len(materials)};\n")
     output.write("material_properties = (\n")
     for material_index, material in enumerate(materials):
@@ -110,6 +141,7 @@ def write_material_properties(output, source=None):
         output.write("    {\n")
         output.write(f"        material_id = {int(material['material_id'])};\n")
         output.write(f"        name = \"{material['name']}\";\n")
+        output.write(f"        particle_type = {int(material['particle_type'])};\n")
         output.write(f"        relative_mass = {float(material['relative_mass']):.9f};\n")
         output.write(
             f"        thermal_velocity = {float(material['thermal_velocity']):.9f};\n"

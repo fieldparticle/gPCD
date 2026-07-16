@@ -75,7 +75,249 @@ class GenStreaming(GenericGenData):
 
         death_bounds = required_values("death_bounds", 6)
         particle_plane_z = required_nonnegative_float("particle_plane_z")
-        initial_particle_velocity = required_values("initial_particle_velocity", 3)
+
+        def stream_values(stream, context, name, count):
+            values = stream.get(name)
+            if values is None:
+                errors.append(f"{context}.{name} is required")
+                return ()
+            if len(values) != count:
+                errors.append(
+                    f"{context}.{name} must contain exactly {count} values"
+                )
+                return ()
+            try:
+                result = tuple(float(value) for value in values)
+            except (TypeError, ValueError):
+                errors.append(f"{context}.{name} values must be numeric")
+                return ()
+            if not all(math.isfinite(value) for value in result):
+                errors.append(f"{context}.{name} values must be finite")
+                return ()
+            return result
+
+        def stream_positive_float(stream, context, name):
+            value = stream.get(name)
+            try:
+                result = float(value)
+            except (TypeError, ValueError):
+                errors.append(f"{context}.{name} is required and must be numeric")
+                return None
+            if not math.isfinite(result):
+                errors.append(f"{context}.{name} must be finite")
+            elif result <= 0.0:
+                errors.append(f"{context}.{name} must be positive")
+            return result
+
+        def stream_nonnegative_float(stream, context, name):
+            value = stream.get(name)
+            try:
+                result = float(value)
+            except (TypeError, ValueError):
+                errors.append(f"{context}.{name} is required and must be numeric")
+                return None
+            if not math.isfinite(result):
+                errors.append(f"{context}.{name} must be finite")
+            elif result < 0.0:
+                errors.append(f"{context}.{name} must not be negative")
+            return result
+
+        def stream_positive_int(stream, context, name):
+            value = stream.get(name)
+            if not isinstance(value, int) or value <= 0:
+                errors.append(f"{context}.{name} must be a positive integer")
+                return None
+            return value
+
+        def optional_stream_axis(stream, context, name):
+            if name not in stream:
+                return None
+            axis = str(stream.get(name, "")).lower()
+            if axis not in ("x", "y", "z"):
+                errors.append(f"{context}.{name} must be 'x', 'y', or 'z'")
+                return None
+            return axis
+
+        def optional_stream_float(stream, context, name):
+            if name not in stream:
+                return None
+            value = stream.get(name)
+            try:
+                result = float(value)
+            except (TypeError, ValueError):
+                errors.append(f"{context}.{name} must be numeric")
+                return None
+            if not math.isfinite(result):
+                errors.append(f"{context}.{name} must be finite")
+                return None
+            return result
+
+        def optional_stream_positive_int(stream, context, name):
+            if name not in stream:
+                return None
+            return stream_positive_int(stream, context, name)
+
+        def parse_stream(stream, index, context):
+            stream_name = str(stream.get("name", f"stream{index}"))
+            initial_particle_velocity = stream_values(
+                stream, context, "initial_particle_velocity", 3
+            )
+            release_start_frame = stream_nonnegative_float(
+                stream, context, "release_start_frame"
+            )
+            release_columns = stream_positive_int(stream, context, "release_columns")
+            particles_per_wave = stream_positive_int(
+                stream, context, "particles_per_wave"
+            )
+            spacing_factor = stream_positive_float(stream, context, "spacing_factor")
+            inlet_axis = str(stream.get("inlet_axis", "")).lower()
+            inlet_value = stream_nonnegative_float(stream, context, "inlet_value")
+            try:
+                material_id = int(stream.get("material_id", 0))
+            except (TypeError, ValueError):
+                errors.append(f"{context}.material_id must be an integer")
+                material_id = 0
+            span_min = stream.get("span_min")
+            span_max = stream.get("span_max")
+            if (span_min is None) != (span_max is None):
+                errors.append(f"{context}.span_min and span_max must be set together")
+            if span_min is not None and span_max is not None:
+                try:
+                    span_min = float(span_min)
+                    span_max = float(span_max)
+                except (TypeError, ValueError):
+                    errors.append(f"{context}.span_min and span_max must be numeric")
+                    span_min = None
+                    span_max = None
+                else:
+                    if not math.isfinite(span_min) or not math.isfinite(span_max):
+                        errors.append(f"{context}.span_min and span_max must be finite")
+                    elif span_min >= span_max:
+                        errors.append(f"{context}.span_min must be less than span_max")
+
+            span_u_axis = optional_stream_axis(stream, context, "span_u_axis")
+            span_u_min = optional_stream_float(stream, context, "span_u_min")
+            span_u_max = optional_stream_float(stream, context, "span_u_max")
+            span_u_count = optional_stream_positive_int(stream, context, "span_u_count")
+            span_v_axis = optional_stream_axis(stream, context, "span_v_axis")
+            span_v_min = optional_stream_float(stream, context, "span_v_min")
+            span_v_max = optional_stream_float(stream, context, "span_v_max")
+            span_v_count = optional_stream_positive_int(stream, context, "span_v_count")
+            patch_values = (
+                span_u_axis,
+                span_u_min,
+                span_u_max,
+                span_u_count,
+                span_v_axis,
+                span_v_min,
+                span_v_max,
+                span_v_count,
+            )
+            has_patch_fields = any(value is not None for value in patch_values)
+            patch_mode = all(value is not None for value in patch_values)
+            if has_patch_fields and not patch_mode:
+                errors.append(
+                    f"{context} patch streams require span_u_axis/span_u_min/"
+                    "span_u_max/span_u_count and span_v_axis/span_v_min/"
+                    "span_v_max/span_v_count"
+                )
+            if patch_mode:
+                if span_u_count > 1 and span_u_min >= span_u_max:
+                    errors.append(f"{context}.span_u_min must be less than span_u_max")
+                if span_v_count > 1 and span_v_min >= span_v_max:
+                    errors.append(f"{context}.span_v_min must be less than span_v_max")
+                if span_u_count * span_v_count != particles_per_wave:
+                    errors.append(
+                        f"{context}.particles_per_wave must equal "
+                        "span_u_count * span_v_count"
+                    )
+
+            if inlet_axis not in ("x", "y", "z"):
+                errors.append(f"{context}.inlet_axis must be 'x', 'y', or 'z'")
+            if patch_mode and len({inlet_axis, span_u_axis, span_v_axis}) != 3:
+                errors.append(
+                    f"{context}.inlet_axis, span_u_axis, and span_v_axis "
+                    "must be distinct"
+                )
+            if not patch_mode and inlet_axis == "z":
+                errors.append(f"{context}.inlet_axis='z' requires patch stream fields")
+
+            return {
+                "name": stream_name,
+                "initial_particle_velocity": initial_particle_velocity,
+                "release_start_frame": release_start_frame,
+                "release_columns": release_columns,
+                "particles_per_wave": particles_per_wave,
+                "spacing_factor": spacing_factor,
+                "inlet_axis": inlet_axis,
+                "inlet_value": inlet_value,
+                "material_id": material_id,
+                "span_min": span_min,
+                "span_max": span_max,
+                "patch_mode": patch_mode,
+                "span_u_axis": span_u_axis,
+                "span_u_min": span_u_min,
+                "span_u_max": span_u_max,
+                "span_u_count": span_u_count,
+                "span_v_axis": span_v_axis,
+                "span_v_min": span_v_min,
+                "span_v_max": span_v_max,
+                "span_v_count": span_v_count,
+            }
+
+        raw_streams = self.itemcfg.get("particle_streams")
+        if raw_streams is not None:
+            if len(raw_streams) == 0:
+                errors.append("particle_streams must contain at least one stream")
+            streams = [
+                parse_stream(stream, index, f"particle_streams[{index}]")
+                for index, stream in enumerate(raw_streams)
+            ]
+        else:
+            legacy_stream = {
+                "name": "legacy",
+                "initial_particle_velocity": self.itemcfg.get(
+                    "initial_particle_velocity"
+                ),
+                "release_start_frame": self.itemcfg.get(
+                    "streaming_release_start_frame"
+                ),
+                "release_columns": self.itemcfg.get("streaming_release_columns"),
+                "particles_per_wave": self.itemcfg.get(
+                    "streaming_particles_per_wave"
+                ),
+                "spacing_factor": self.itemcfg.get("streaming_spacing_factor"),
+                "material_id": 0,
+            }
+            inlet_x = self.optional_axis_value("streaming_inlet_x", errors)
+            inlet_y = self.optional_axis_value("streaming_inlet_y", errors)
+            if inlet_x is None and inlet_y is None:
+                errors.append("streaming_inlet_x or streaming_inlet_y is required")
+            if inlet_x is not None and inlet_y is not None:
+                errors.append("only one of streaming_inlet_x or streaming_inlet_y may be set")
+            legacy_stream["inlet_axis"] = "x" if inlet_x is not None else "y"
+            legacy_stream["inlet_value"] = inlet_x if inlet_x is not None else inlet_y
+            streams = [parse_stream(legacy_stream, 0, "legacy_stream")]
+
+        for stream in streams:
+            if (
+                stream["inlet_axis"] == "x"
+                and stream["initial_particle_velocity"]
+                and float(stream["initial_particle_velocity"][0]) == 0.0
+            ):
+                errors.append(f"{stream['name']} x-inlet stream velocity must have vx")
+            if (
+                stream["inlet_axis"] == "y"
+                and stream["initial_particle_velocity"]
+                and float(stream["initial_particle_velocity"][1]) == 0.0
+            ):
+                errors.append(f"{stream['name']} y-inlet stream velocity must have vy")
+            if (
+                stream["inlet_axis"] == "z"
+                and stream["initial_particle_velocity"]
+                and float(stream["initial_particle_velocity"][2]) == 0.0
+            ):
+                errors.append(f"{stream['name']} z-inlet stream velocity must have vz")
 
         self.validate_penetration_fractions(errors)
 
@@ -88,11 +330,19 @@ class GenStreaming(GenericGenData):
             if int(round(segment[0])) == BOUNDARY_KIND_RESERVOIR
         ]
 
-        if not packing_curve_segments:
+        all_streams_have_spans = all(
+            stream["patch_mode"]
+            or (stream["span_min"] is not None and stream["span_max"] is not None)
+            for stream in streams
+        )
+        if not packing_curve_segments and not all_streams_have_spans:
             errors.append(
                 "curve_wall_segments must include at least one streaming inlet "
-                "packing segment (boundary_kind=1)"
+                "packing segment (boundary_kind=1) unless every stream sets "
+                "span_min/span_max"
             )
+            packing_bounds = ()
+        elif not packing_curve_segments:
             packing_bounds = ()
         else:
             packing_bounds = self.derive_packing_bounds(packing_curve_segments)
@@ -100,20 +350,6 @@ class GenStreaming(GenericGenData):
         particle_separation_distance = required_nonnegative_float(
             "particle_separation_distance"
         )
-        release_start_frame = required_nonnegative_float(
-            "streaming_release_start_frame"
-        )
-        release_columns = required_positive_int("streaming_release_columns")
-        particles_per_wave = required_positive_int("streaming_particles_per_wave")
-        spacing_factor = required_positive_float("streaming_spacing_factor")
-
-        inlet_x = self.optional_axis_value("streaming_inlet_x", errors)
-        inlet_y = self.optional_axis_value("streaming_inlet_y", errors)
-        if inlet_x is None and inlet_y is None:
-            errors.append("streaming_inlet_x or streaming_inlet_y is required")
-        if inlet_x is not None and inlet_y is not None:
-            errors.append("only one of streaming_inlet_x or streaming_inlet_y may be set")
-
         if death_bounds:
             for axis, minimum, maximum in (
                 ("x", death_bounds[0], death_bounds[1]),
@@ -137,11 +373,12 @@ class GenStreaming(GenericGenData):
             elif radius <= 0.0:
                 errors.append("radius must be positive")
 
-        if packing_bounds and particle_plane_z is not None and len(dimensions) == 3:
-            x_min, x_max, y_min, y_max = packing_bounds
+        if particle_plane_z is not None and len(dimensions) == 3:
             width, height, depth = dimensions
-            if x_min < 0.0 or x_max > width or y_min < 0.0 or y_max > height:
-                errors.append("streaming packing bounds must fit inside cell array")
+            if packing_bounds:
+                x_min, x_max, y_min, y_max = packing_bounds
+                if x_min < 0.0 or x_max > width or y_min < 0.0 or y_max > height:
+                    errors.append("streaming packing bounds must fit inside cell array")
             if particle_plane_z >= depth:
                 errors.append("particle_plane_z must fit inside cell array")
             if abs((particle_plane_z - math.floor(particle_plane_z)) - 0.5) > 1.0e-9:
@@ -151,21 +388,52 @@ class GenStreaming(GenericGenData):
                 or particle_plane_z + radius > depth
             ):
                 errors.append("particle_plane_z particle radius must fit inside cell array")
-            if death_bounds and (
-                x_min < death_bounds[0]
-                or x_max > death_bounds[1]
-                or y_min < death_bounds[2]
-                or y_max > death_bounds[3]
-                or particle_plane_z - (radius or 0.0) < death_bounds[4]
-                or particle_plane_z + (radius or 0.0) > death_bounds[5]
+            if death_bounds and packing_bounds and (
+                    x_min < death_bounds[0]
+                    or x_max > death_bounds[1]
+                    or y_min < death_bounds[2]
+                    or y_max > death_bounds[3]
+                    or particle_plane_z - (radius or 0.0) < death_bounds[4]
+                    or particle_plane_z + (radius or 0.0) > death_bounds[5]
             ):
                 errors.append("streaming packing bounds must fit inside death_bounds")
 
-            inlet_value = inlet_x if inlet_x is not None else inlet_y
-            if inlet_x is not None and not (0.0 <= inlet_value <= width):
-                errors.append("streaming_inlet_x must fit inside cell array")
-            if inlet_y is not None and not (0.0 <= inlet_value <= height):
-                errors.append("streaming_inlet_y must fit inside cell array")
+            for stream in streams:
+                inlet_value = stream["inlet_value"]
+                if stream["inlet_axis"] == "x" and not (0.0 <= inlet_value <= width):
+                    errors.append(
+                        f"{stream['name']} x-inlet value must fit inside cell array"
+                    )
+                if stream["inlet_axis"] == "y" and not (0.0 <= inlet_value <= height):
+                    errors.append(
+                        f"{stream['name']} y-inlet value must fit inside cell array"
+                    )
+                if stream["inlet_axis"] == "z" and not (0.0 <= inlet_value <= depth):
+                    errors.append(
+                        f"{stream['name']} z-inlet value must fit inside cell array"
+                    )
+                if stream["span_min"] is not None:
+                    span_limit = height if stream["inlet_axis"] == "x" else width
+                    if (
+                        stream["span_min"] < 0.0
+                        or stream["span_max"] > span_limit
+                    ):
+                        errors.append(
+                            f"{stream['name']} span_min/span_max must fit inside "
+                            "cell array"
+                        )
+                if stream["patch_mode"]:
+                    axis_limits = {"x": width, "y": height, "z": depth}
+                    for span_name in ("u", "v"):
+                        span_axis = stream[f"span_{span_name}_axis"]
+                        span_min = stream[f"span_{span_name}_min"]
+                        span_max = stream[f"span_{span_name}_max"]
+                        span_limit = axis_limits[span_axis]
+                        if span_min < 0.0 or span_max > span_limit:
+                            errors.append(
+                                f"{stream['name']} span_{span_name}_min/"
+                                f"span_{span_name}_max must fit inside cell array"
+                            )
 
             for index, segment in enumerate(curve_segments):
                 x_min, x_max, y_min, y_max = wall_bounds(segment)
@@ -179,6 +447,9 @@ class GenStreaming(GenericGenData):
                     )
 
         self.validate_material_properties(errors)
+        for stream in streams:
+            if stream["material_id"] not in getattr(self, "material_properties_by_id", {}):
+                errors.append(f"{stream['name']} material_id is not defined")
 
         if errors:
             raise ValueError(
@@ -192,14 +463,8 @@ class GenStreaming(GenericGenData):
         self.packing_curve_segments = packing_curve_segments
         self.packing_bounds = packing_bounds
         self.particle_plane_z = particle_plane_z
-        self.initial_particle_velocity = initial_particle_velocity
         self.particle_separation_distance = particle_separation_distance
-        self.release_start_frame = release_start_frame
-        self.release_columns = release_columns
-        self.particles_per_wave = particles_per_wave
-        self.streaming_spacing_factor = spacing_factor
-        self.streaming_inlet_axis = "x" if inlet_x is not None else "y"
-        self.streaming_inlet_value = inlet_x if inlet_x is not None else inlet_y
+        self.streaming_streams = streams
         self.number_configured_particles = 0
         self.explicit_particles = []
         self.radius = radius
@@ -276,114 +541,282 @@ class GenStreaming(GenericGenData):
             max(y_max_values),
         )
 
-    def frames_between_waves(self):
-        velocity = self.stream_normal_speed()
+    def frames_between_waves(self, stream):
+        velocity = self.stream_normal_speed(stream)
         if velocity <= 0.0:
             raise ValueError("initial_particle_velocity must move away from inlet")
-        clearance_distance = self.streaming_spacing_factor * 2.0 * self.radius
+        clearance_distance = stream["spacing_factor"] * 2.0 * self.radius
         distance_per_frame = velocity * self.dt
         return int(math.ceil(clearance_distance / distance_per_frame))
 
-    def stream_normal_speed(self):
-        if self.streaming_inlet_axis == "x":
-            return abs(float(self.initial_particle_velocity[0]))
-        return abs(float(self.initial_particle_velocity[1]))
+    def stream_normal_speed(self, stream=None):
+        if stream is None:
+            stream = self.streaming_streams[0]
+        velocity = stream["initial_particle_velocity"]
+        if stream["inlet_axis"] == "x":
+            return abs(float(velocity[0]))
+        if stream["inlet_axis"] == "y":
+            return abs(float(velocity[1]))
+        return abs(float(velocity[2]))
+
+    def span_centers(self, span_min, span_max, count, boundary_clearance):
+        if count == 1:
+            return (0.5 * (span_min + span_max),)
+        center_spacing = self.particle_center_spacing
+        lower = span_min + boundary_clearance
+        upper = span_max - boundary_clearance
+        usable_span = upper - lower
+        if usable_span < 0.0:
+            raise ValueError("streaming inlet span is too small for particles")
+        max_particles = int(math.floor((usable_span / center_spacing) + 1.0e-12)) + 1
+        if count > max_particles:
+            raise ValueError(
+                f"streaming span count {count} does not fit in span; "
+                f"maximum {max_particles}"
+            )
+        occupied_span = (count - 1) * center_spacing
+        first_center = lower + 0.5 * (usable_span - occupied_span)
+        return tuple(first_center + index * center_spacing for index in range(count))
 
     def calculate_streaming_layout(self):
         radius = self.radius
         center_spacing = 2.0 * radius + self.particle_separation_distance
         boundary_clearance = radius * (1.0 + self.wall_contact_offset) + 1.0e-9
-        x_start, x_end, y_start, y_end = self.packing_bounds
-
-        if self.streaming_inlet_axis == "y":
-            span_min = x_start + boundary_clearance
-            span_max = x_end - boundary_clearance
+        if self.packing_bounds:
+            x_start, x_end, y_start, y_end = self.packing_bounds
         else:
-            span_min = y_start + boundary_clearance
-            span_max = y_end - boundary_clearance
-        usable_span = span_max - span_min
-        if usable_span < 0.0:
-            raise ValueError("streaming inlet span is too small for particles")
+            x_start = x_end = y_start = y_end = 0.0
+        report_lines = [
+            "Streaming reservoir report:",
+            f"  packing bounds: {self.packing_bounds}",
+            f"  particle plane z: {self.particle_plane_z:g}",
+            f"  radius: {radius:g}",
+            f"  surface separation: {self.particle_separation_distance:g}",
+            f"  center spacing: {center_spacing:g}",
+            f"  boundary clearance: {boundary_clearance:g}",
+        ]
+        total_particle_count = 0
+        self.particle_center_spacing = center_spacing
 
-        max_particles = int(math.floor((usable_span / center_spacing) + 1.0e-12)) + 1
-        if self.particles_per_wave > max_particles:
-            raise ValueError(
-                "streaming_particles_per_wave does not fit in the inlet span: "
-                f"requested {self.particles_per_wave}, maximum {max_particles}"
+        for stream in self.streaming_streams:
+            if stream["patch_mode"]:
+                u_centers = self.span_centers(
+                    stream["span_u_min"],
+                    stream["span_u_max"],
+                    stream["span_u_count"],
+                    boundary_clearance,
+                )
+                v_centers = self.span_centers(
+                    stream["span_v_min"],
+                    stream["span_v_max"],
+                    stream["span_v_count"],
+                    boundary_clearance,
+                )
+                frames_per_wave = self.frames_between_waves(stream)
+                particle_count = stream["release_columns"] * stream["particles_per_wave"]
+                material = self.material_properties_by_id[stream["material_id"]]
+                stream.update(
+                    {
+                        "particle_type": material.get("particle_type", "regular"),
+                        "layout_mode": "patch",
+                        "span_u_centers": u_centers,
+                        "span_v_centers": v_centers,
+                        "frames_per_wave": frames_per_wave,
+                        "particle_count": particle_count,
+                    }
+                )
+                total_particle_count += particle_count
+                report_lines.extend(
+                    (
+                        f"  stream: {stream['name']}",
+                        f"    layout mode: patch",
+                        f"    inlet axis: {stream['inlet_axis']}",
+                        f"    inlet value: {stream['inlet_value']:g}",
+                        f"    span u: {stream['span_u_axis']} "
+                        f"[{stream['span_u_min']:g}, {stream['span_u_max']:g}] "
+                        f"count {stream['span_u_count']}",
+                        f"    span v: {stream['span_v_axis']} "
+                        f"[{stream['span_v_min']:g}, {stream['span_v_max']:g}] "
+                        f"count {stream['span_v_count']}",
+                        f"    material_id: {stream['material_id']}",
+                        f"    particle type: {stream['particle_type']}",
+                        f"    release start frame: {stream['release_start_frame']:g}",
+                        f"    release columns/waves: {stream['release_columns']}",
+                        f"    particles per wave: {stream['particles_per_wave']}",
+                        f"    frames per wave: {stream['frames_per_wave']}",
+                        f"    mobile particle count: {stream['particle_count']}",
+                        "    initial particle velocity: "
+                        f"{stream['initial_particle_velocity']}",
+                    )
+                )
+                continue
+
+            if stream["span_min"] is not None:
+                span_min = stream["span_min"] + boundary_clearance
+                span_max = stream["span_max"] - boundary_clearance
+            elif stream["inlet_axis"] == "y":
+                span_min = x_start + boundary_clearance
+                span_max = x_end - boundary_clearance
+            else:
+                span_min = y_start + boundary_clearance
+                span_max = y_end - boundary_clearance
+            usable_span = span_max - span_min
+            if usable_span < 0.0:
+                raise ValueError(
+                    f"{stream['name']} streaming inlet span is too small for particles"
+                )
+
+            max_particles = (
+                int(math.floor((usable_span / center_spacing) + 1.0e-12)) + 1
+            )
+            if stream["particles_per_wave"] > max_particles:
+                raise ValueError(
+                    f"{stream['name']} particles_per_wave does not fit in the "
+                    f"inlet span: requested {stream['particles_per_wave']}, "
+                    f"maximum {max_particles}"
+                )
+
+            occupied_span = (stream["particles_per_wave"] - 1) * center_spacing
+            first_span_center = span_min + 0.5 * (usable_span - occupied_span)
+            frames_per_wave = self.frames_between_waves(stream)
+            particle_count = stream["release_columns"] * stream["particles_per_wave"]
+            material = self.material_properties_by_id[stream["material_id"]]
+            stream.update(
+                {
+                    "particle_type": material.get("particle_type", "regular"),
+                    "layout_mode": "line",
+                    "first_span_center": first_span_center,
+                    "last_span_center": first_span_center + occupied_span,
+                    "frames_per_wave": frames_per_wave,
+                    "particle_count": particle_count,
+                }
+            )
+            total_particle_count += particle_count
+            report_lines.extend(
+                (
+                    f"  stream: {stream['name']}",
+                    f"    layout mode: line",
+                    f"    inlet axis: {stream['inlet_axis']}",
+                    f"    inlet value: {stream['inlet_value']:g}",
+                    f"    material_id: {stream['material_id']}",
+                    f"    particle type: {stream['particle_type']}",
+                    f"    release start frame: {stream['release_start_frame']:g}",
+                    f"    release columns/waves: {stream['release_columns']}",
+                    f"    particles per wave: {stream['particles_per_wave']}",
+                    f"    frames per wave: {stream['frames_per_wave']}",
+                    f"    mobile particle count: {stream['particle_count']}",
+                    "    initial particle velocity: "
+                    f"{stream['initial_particle_velocity']}",
+                )
             )
 
-        occupied_span = (self.particles_per_wave - 1) * center_spacing
-        first_span_center = span_min + 0.5 * (usable_span - occupied_span)
-
-        self.particle_center_spacing = center_spacing
         self.boundary_particle_clearance = boundary_clearance
-        self.frames_per_wave = self.frames_between_waves()
-        self.streaming_first_span_center = first_span_center
-        self.streaming_last_span_center = first_span_center + occupied_span
-        self.streaming_particle_count = (
-            self.release_columns * self.particles_per_wave
-        )
+        self.streaming_particle_count = total_particle_count
+        self.streaming_report_text = "\n".join(report_lines)
 
-        self.streaming_report_text = (
-            "Streaming reservoir report:\n"
-            f"  packing bounds: {self.packing_bounds}\n"
-            f"  particle plane z: {self.particle_plane_z:g}\n"
-            f"  inlet axis: {self.streaming_inlet_axis}\n"
-            f"  inlet value: {self.streaming_inlet_value:g}\n"
-            f"  release start frame: {self.release_start_frame:g}\n"
-            f"  release columns/waves: {self.release_columns}\n"
-            f"  particles per wave: {self.particles_per_wave}\n"
-            f"  frames per wave: {self.frames_per_wave}\n"
-            f"  radius: {radius:g}\n"
-            f"  surface separation: {self.particle_separation_distance:g}\n"
-            f"  center spacing: {center_spacing:g}\n"
-            f"  boundary clearance: {boundary_clearance:g}\n"
-            f"  mobile particle count: {self.streaming_particle_count}\n"
-            f"  initial particle velocity: {self.initial_particle_velocity}"
-        )
+        first_stream = self.streaming_streams[0]
+        self.initial_particle_velocity = first_stream["initial_particle_velocity"]
+        self.release_start_frame = first_stream["release_start_frame"]
+        self.release_columns = first_stream["release_columns"]
+        self.particles_per_wave = first_stream["particles_per_wave"]
+        self.streaming_spacing_factor = first_stream["spacing_factor"]
+        self.streaming_inlet_axis = first_stream["inlet_axis"]
+        self.streaming_inlet_value = first_stream["inlet_value"]
+        self.streaming_stream_name = first_stream["name"]
+        self.streaming_particle_type = first_stream["particle_type"]
+        self.streaming_material_id = first_stream["material_id"]
+        self.frames_per_wave = first_stream["frames_per_wave"]
+        self.streaming_first_span_center = first_stream.get("first_span_center", 0.0)
+        self.streaming_last_span_center = first_stream.get("last_span_center", 0.0)
         return self.streaming_particle_count
 
+    def stream_position(self, stream, span_center=None, u_center=None, v_center=None):
+        position = {"x": 0.0, "y": 0.0, "z": self.particle_plane_z}
+        position[stream["inlet_axis"]] = stream["inlet_value"]
+        if stream["layout_mode"] == "patch":
+            position[stream["span_u_axis"]] = u_center
+            position[stream["span_v_axis"]] = v_center
+        elif stream["inlet_axis"] == "y":
+            position["x"] = span_center
+        else:
+            position["y"] = span_center
+        return (position["x"], position["y"], position["z"])
+
     def add_streaming_mobile_particles(self):
-        velocity = self.initial_particle_velocity
-        first_center = self.streaming_first_span_center
-        for column in range(self.release_columns):
-            birth_frame = self.release_start_frame + column * self.frames_per_wave
-            for row in range(self.particles_per_wave):
-                span_center = first_center + row * self.particle_center_spacing
-                if self.streaming_inlet_axis == "y":
-                    position = (
-                        span_center,
-                        self.streaming_inlet_value,
-                        self.particle_plane_z,
-                    )
-                else:
-                    position = (
-                        self.streaming_inlet_value,
-                        span_center,
-                        self.particle_plane_z,
-                    )
-                particle = self.add_mobile_particle(
-                    position,
-                    velocity,
-                    radius=self.radius,
-                    mass=1.0,
-                    collision_stiffness_q=float(
-                        self.itemcfg.get("collision_stiffness_q", 0.0)
-                    ),
+        reports = []
+        first_particle = self.number_active_particles + 1
+        for stream in self.streaming_streams:
+            velocity = stream["initial_particle_velocity"]
+            stream_first_particle = self.number_active_particles + 1
+            for column in range(stream["release_columns"]):
+                birth_frame = (
+                    stream["release_start_frame"]
+                    + column * stream["frames_per_wave"]
                 )
-                particle.state_flg = float(birth_frame)
+                if stream["layout_mode"] == "patch":
+                    for v_center in stream["span_v_centers"]:
+                        for u_center in stream["span_u_centers"]:
+                            position = self.stream_position(
+                                stream,
+                                u_center=u_center,
+                                v_center=v_center,
+                            )
+                            particle = self.add_mobile_particle(
+                                position,
+                                velocity,
+                                radius=self.radius,
+                                material_id=stream["material_id"],
+                                collision_stiffness_q=float(
+                                    self.itemcfg.get("collision_stiffness_q", 0.0)
+                                ),
+                            )
+                            particle.state_flg = float(birth_frame)
+                else:
+                    first_center = stream["first_span_center"]
+                    for row in range(stream["particles_per_wave"]):
+                        span_center = first_center + row * self.particle_center_spacing
+                        position = self.stream_position(
+                            stream,
+                            span_center=span_center,
+                        )
+                        particle = self.add_mobile_particle(
+                            position,
+                            velocity,
+                            radius=self.radius,
+                            material_id=stream["material_id"],
+                            collision_stiffness_q=float(
+                                self.itemcfg.get("collision_stiffness_q", 0.0)
+                            ),
+                        )
+                        particle.state_flg = float(birth_frame)
+
+            stream_last_particle = self.number_active_particles
+            stream["first_particle_number"] = stream_first_particle
+            stream["last_particle_number"] = stream_last_particle
+            reports.append(
+                "Streaming mobile-particle stream:\n"
+                f"  stream: {stream['name']}\n"
+                f"  mobile particles: {stream['particle_count']}\n"
+                f"  material_id: {stream['material_id']}\n"
+                f"  particle type: {stream['particle_type']}\n"
+                f"  first release frame: {stream['release_start_frame']:g}\n"
+                f"  last release frame: "
+                f"{stream['release_start_frame'] + (stream['release_columns'] - 1) * stream['frames_per_wave']:g}\n"
+                f"  frames per wave: {stream['frames_per_wave']}\n"
+                f"  particles per wave: {stream['particles_per_wave']}\n"
+                f"  velocity: {stream['initial_particle_velocity']}\n"
+                f"  first particle number: {stream_first_particle}\n"
+                f"  last particle number: {stream_last_particle}"
+            )
 
         report_text = (
             "Streaming mobile-particle report:\n"
             f"  mobile particles: {self.number_active_particles}\n"
-            f"  first release frame: {self.release_start_frame:g}\n"
-            f"  last release frame: "
-            f"{self.release_start_frame + (self.release_columns - 1) * self.frames_per_wave:g}\n"
-            f"  frames per wave: {self.frames_per_wave}\n"
-            f"  particles per wave: {self.particles_per_wave}\n"
-            f"  velocity: {self.initial_particle_velocity}\n"
-            f"  first particle number: 1\n"
-            f"  last particle number: {self.number_active_particles}"
+            f"  streaming particles: {self.number_active_particles - first_particle + 1}\n"
+            f"  first particle number: {first_particle}\n"
+            f"  last particle number: {self.number_active_particles}\n"
+            + "\n"
+            + "\n".join(reports)
         )
         print(report_text)
         self.write_validation_log(report_text)
@@ -393,27 +826,39 @@ class GenStreaming(GenericGenData):
         min_compression_frames = float(
             self.itemcfg.get("min_compression_frames", 3.0)
         )
-        speed = self.stream_normal_speed()
-        per_frame_distance = speed * self.dt
-        report_text = (
-            "Collision Feasibility:\n"
-            "  model: streaming inlet release\n"
-            f"  stream normal speed: {speed:.6f}\n"
-            f"  dt: {self.dt:.6f}\n"
-            f"  per-frame travel distance: {per_frame_distance:.6f}\n"
-            f"  center spacing: {self.particle_center_spacing:.6f}\n"
-            f"  frames per wave: {self.frames_per_wave}\n"
-            f"  release spacing distance: "
-            f"{self.frames_per_wave * per_frame_distance:.6f}\n"
-            f"  minimum compression frames: {min_compression_frames:.3f}\n"
-            "  status: OK"
-        )
+        report_lines = [
+            "Collision Feasibility:",
+            "  model: streaming inlet release",
+            f"  dt: {self.dt:.6f}",
+            f"  center spacing: {self.particle_center_spacing:.6f}",
+            f"  minimum compression frames: {min_compression_frames:.3f}",
+        ]
+        first_speed = 0.0
+        first_per_frame_distance = 0.0
+        for index, stream in enumerate(self.streaming_streams):
+            speed = self.stream_normal_speed(stream)
+            per_frame_distance = speed * self.dt
+            if index == 0:
+                first_speed = speed
+                first_per_frame_distance = per_frame_distance
+            report_lines.extend(
+                (
+                    f"  stream: {stream['name']}",
+                    f"    stream normal speed: {speed:.6f}",
+                    f"    per-frame travel distance: {per_frame_distance:.6f}",
+                    f"    frames per wave: {stream['frames_per_wave']}",
+                    "    release spacing distance: "
+                    f"{stream['frames_per_wave'] * per_frame_distance:.6f}",
+                )
+            )
+        report_lines.append("  status: OK")
+        report_text = "\n".join(report_lines)
         print(report_text)
         self.write_validation_log(report_text)
         return {
             "model": "streaming inlet release",
-            "stream_normal_speed": speed,
-            "per_frame_distance": per_frame_distance,
+            "stream_normal_speed": first_speed,
+            "per_frame_distance": first_per_frame_distance,
             "frames_per_wave": self.frames_per_wave,
             "status": "OK",
         }

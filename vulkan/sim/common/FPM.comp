@@ -42,12 +42,9 @@ void fpm_comp_main()
     }
 #endif
 
-    const uint DUP_LIST_SIZE = MAX_CELL_OCCUPANY * 8u;
+
     uint duplicateTargets[DUP_LIST_SIZE];
     uint duplicateCount = 0u;
-    for (uint index = 0u; index < DUP_LIST_SIZE; ++index) {
-        duplicateTargets[index] = 0u;
-    }
 
     for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
         uint loc = P[SourceID].CornerList[CornerIndex].ploc;
@@ -84,18 +81,18 @@ void fpm_comp_main()
                 if (duplicate) {
                     continue;
                 }
-                if (duplicateCount >= DUP_LIST_SIZE) {
-                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
-                    return;
-                }
-                duplicateTargets[duplicateCount] = TargetID;
-                duplicateCount += 1u;
 
                 BoundaryWallSegment segment =
                     EvaluateConfiguredWallSegment(SourceID, TargetID);
                 if (!segment.valid) {
                     continue;
                 }
+                if (duplicateCount >= DUP_LIST_SIZE) {
+                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                    return;
+                }
+                duplicateTargets[duplicateCount] = TargetID;
+                duplicateCount += 1u;
                 if (!ProcessFunctionWallCollision(
                         SourceID,
                         segment,
@@ -106,6 +103,10 @@ void fpm_comp_main()
             }
 
             if (!IsMobileParticleActiveForDynamics(TargetID)) {
+                continue;
+            }
+
+            if (ShouldSkipParticlePair(SourceID, TargetID)) {
                 continue;
             }
 
@@ -121,18 +122,18 @@ void fpm_comp_main()
             if (duplicate) {
                 continue;
             }
-            if (duplicateCount >= DUP_LIST_SIZE) {
-                SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
-                return;
-            }
-            duplicateTargets[duplicateCount] = TargetID;
-            duplicateCount += 1u;
 
             ParticleGeometry geometry =
                 GetPhysicalParticleContact(SourceID, TargetID);
             if (!geometry.valid) {
                 continue;
             }
+            if (duplicateCount >= DUP_LIST_SIZE) {
+                SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                return;
+            }
+            duplicateTargets[duplicateCount] = TargetID;
+            duplicateCount += 1u;
             if (!ProcessParticleCollision(
                     TargetID,
                     SourceID,
@@ -157,9 +158,6 @@ void fpm_comp_main()
 #endif
 
     duplicateCount = 0u;
-    for (uint index = 0u; index < DUP_LIST_SIZE; ++index) {
-        duplicateTargets[index] = 0u;
-    }
 
     for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
         uint loc = P[SourceID].CornerList[CornerIndex].ploc;
@@ -196,18 +194,18 @@ void fpm_comp_main()
                 if (duplicate) {
                     continue;
                 }
-                if (duplicateCount >= DUP_LIST_SIZE) {
-                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
-                    return;
-                }
-                duplicateTargets[duplicateCount] = TargetID;
-                duplicateCount += 1u;
 
                 BoundaryWallSegment segment =
                     EvaluateConfiguredWallSegment(SourceID, TargetID);
                 if (!segment.valid) {
                     continue;
                 }
+                if (duplicateCount >= DUP_LIST_SIZE) {
+                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                    return;
+                }
+                duplicateTargets[duplicateCount] = TargetID;
+                duplicateCount += 1u;
                 if (!RegisterResolvedFunctionWallContactStep(
                         SourceID,
                         segment)) {
@@ -217,6 +215,10 @@ void fpm_comp_main()
             }
 
             if (!IsMobileParticleActiveForDynamics(TargetID)) {
+                continue;
+            }
+
+            if (ShouldSkipParticlePair(SourceID, TargetID)) {
                 continue;
             }
 
@@ -232,18 +234,18 @@ void fpm_comp_main()
             if (duplicate) {
                 continue;
             }
-            if (duplicateCount >= DUP_LIST_SIZE) {
-                SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
-                return;
-            }
-            duplicateTargets[duplicateCount] = TargetID;
-            duplicateCount += 1u;
 
             ParticleGeometry geometry =
                 GetParticleGeometry(SourceID, TargetID);
             if (!geometry.valid) {
                 continue;
             }
+            if (duplicateCount >= DUP_LIST_SIZE) {
+                SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                return;
+            }
+            duplicateTargets[duplicateCount] = TargetID;
+            duplicateCount += 1u;
             if (!RegisterResolvedParticleContactStep(
                     SourceID,
                     TargetID,

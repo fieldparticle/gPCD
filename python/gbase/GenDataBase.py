@@ -316,6 +316,11 @@ class GenDataBase:
         f.write(fstr)
         fstr = f"cell_occupancy_list_size = {self.cell_occupancy_list_size};\n"
         f.write(fstr)
+        duplicates_list_size = int(run_cfg.duplicates_list_size)
+        if duplicates_list_size <= 0:
+            raise ValueError("duplicates_list_size must be positive")
+        fstr = f"duplicates_list_size = {duplicates_list_size};\n"
+        f.write(fstr)
         fstr = f"hsv_sat = {run_cfg.hsv_sat:0.4f};\n"
         f.write(fstr)
         fstr = f"hsv_val = {run_cfg.hsv_val:0.4f};\n"

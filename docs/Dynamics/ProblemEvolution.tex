@@ -2505,3 +2505,68 @@ geometry, while Vulkan command recording controls which buffers may legally be
 bound and drawn.  A disabled boundary must be skipped before command
 recording reaches the cube vertex or index buffers; a shader cannot repair a
 null-buffer validation error after the command has already been recorded.
+
+\subsection{Photon Material Behavior And Three-Dimensional Streams}
+
+\subsubsection{previous form}
+
+The cathedral lighting scene began as a regular streaming setup with one light
+stream and one dust stream.  The streams could release particles over time, but
+the stream shape was still effectively a line on one depth plane.  Photon and
+dust particles were distinguished mainly by material naming and color intent;
+the force path had no material-owned rule that prevented photons from
+colliding with other photons.
+
+This made the intended lighting behavior ambiguous.  A photon beam could create
+ordinary particle-particle contacts inside itself, and a three-dimensional
+cathedral beam could still look like a two-dimensional sheet if the generator
+only varied one span axis.
+
+\subsubsection{current form}
+
+Particle type is now a material property.  A material may declare:
+\begin{verbatim}
+particle_type = "regular";
+particle_type = "photon";
+\end{verbatim}
+The generated material contract preserves this value in the \texttt{.tst}
+material entries and in \texttt{material.glsl}.  The shader-side material
+record carries \texttt{particleType}, and the photon helper identifies photon
+particles by looking up the particle's material id.
+
+The common particle-particle force loop skips a pair only when both source and
+target particles are photons.  Photon-dust, dust-photon, dust-dust, and
+photon-wall interactions remain available to the ordinary dynamics path.  The
+boundary and wall paths are therefore unchanged by the photon-photon skip.
+
+The streaming generator also supports emitter-plane patches.  A stream fixes
+one inlet coordinate and spans finite \(u\) and \(v\) axes with independent
+counts.  \texttt{FreeStream} uses the same structure with a degenerate
+one-cell \(v\) span so its historical line stream remains unchanged.
+\texttt{Cathedral} uses non-degenerate rectangular patches for both the photon
+beam and the dust source, producing a true three-dimensional release pattern.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+The photon rule is intentionally material-owned rather than scenario-name
+owned.  This keeps the force decision local to the particle pair and lets later
+lighting scenarios reuse the same shader helper without hard-coding Cathedral
+particle ids.  The rule is also intentionally narrow: it removes only
+photon-photon particle contacts, so real particles can still interact with
+photons and walls can still reflect or constrain photons through the existing
+wall evaluator.
+
+The emitter-plane fields are generator input, not runtime shader metadata.
+Python expands each configured stream patch into concrete particle positions,
+velocities, materials, and release frames.  The Vulkan path sees the resulting
+particle data and material contract; it does not need to know which stream
+span axes created the particles.
+
+Cell-occupancy sizing remains a data-capacity question rather than a
+dimension-flag question.  Moving from a line stream to a rectangular patch can
+change which particles share a cell or cell corner, so the generator report is
+still the authority for \texttt{cell\_occupancy\_list\_size}.

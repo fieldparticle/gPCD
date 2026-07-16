@@ -35,6 +35,96 @@ def _unit_color(rgb255):
     return [max(0.0, min(1.0, float(component) / 255.0)) for component in rgb255]
 
 
+def _wrap_angle_radians(angle):
+    return (float(angle) + math.pi) % (2.0 * math.pi) - math.pi
+
+
+def _unit_vector_from_angle(angle_radians):
+    return math.cos(angle_radians), math.sin(angle_radians)
+
+
+def _unit_rgb_from_config(run_configuration, key, default):
+    raw_color = run_configuration.get(key, default)
+    if raw_color is None or len(raw_color) < 3:
+        raw_color = default
+    values = [float(raw_color[index]) for index in range(3)]
+    if max(values) > 1.0:
+        values = [value / 255.0 for value in values]
+    return [max(0.0, min(1.0, value)) for value in values]
+
+
+def _lumens_brightness(particle_id, particle, dynamics, run_configuration):
+    position = dynamics.GetCurrentParticlePosition(particle_id)
+    eye_position = run_configuration.get("lumens_eye_position", (0.0, 0.0))
+    eye_x = float(eye_position[0])
+    eye_y = float(eye_position[1])
+    photon_x = float(position.x)
+    photon_y = float(position.y)
+
+    current_eye_distance = math.hypot(eye_x - photon_x, eye_y - photon_y)
+    eye_radius = max(0.0, float(run_configuration.get("lumens_eye_radius", 0.10)))
+    if current_eye_distance > eye_radius:
+        return None
+
+    photon_angle = float(particle.VelRad.w)
+    photon_dir_x, photon_dir_y = _unit_vector_from_angle(photon_angle)
+    to_eye_x = eye_x - photon_x
+    to_eye_y = eye_y - photon_y
+    along_path = to_eye_x * photon_dir_x + to_eye_y * photon_dir_y
+    if along_path < 0.0:
+        return None
+
+    closest_x = photon_x + photon_dir_x * along_path
+    closest_y = photon_y + photon_dir_y * along_path
+    miss_distance = math.hypot(eye_x - closest_x, eye_y - closest_y)
+    if miss_distance > eye_radius:
+        return None
+
+    if eye_radius <= 1.0e-12 or not bool(run_configuration.get("lumens_fade_in", True)):
+        distance_factor = 1.0
+    else:
+        distance_factor = 1.0 - current_eye_distance / eye_radius
+
+    eye_angle = math.radians(float(run_configuration.get("lumens_eye_angle_degrees", 0.0)))
+    eye_look_x, eye_look_y = _unit_vector_from_angle(eye_angle)
+    arrival_x = -photon_dir_x
+    arrival_y = -photon_dir_y
+    if arrival_x * eye_look_x + arrival_y * eye_look_y < 0.0:
+        return None
+
+    arrival_angle = math.atan2(arrival_y, arrival_x)
+    fov = math.radians(float(run_configuration.get("lumens_eye_fov_degrees", 90.0)))
+    half_fov = max(0.0, fov * 0.5)
+    angle_delta = abs(_wrap_angle_radians(arrival_angle - eye_angle))
+    if angle_delta > half_fov:
+        return None
+
+    if half_fov <= 1.0e-12:
+        angle_factor = 1.0
+    else:
+        angle_factor = 1.0 - angle_delta / half_fov
+    return max(0.0, min(1.0, distance_factor * angle_factor))
+
+
+def _lumens_color(particle_id, particle, dynamics, run_configuration):
+    surface_color = _unit_rgb_from_config(
+        run_configuration,
+        "lumens_surface_color",
+        (1.0, 1.0, 1.0),
+    )
+    brightness = _lumens_brightness(
+        particle_id,
+        particle,
+        dynamics,
+        run_configuration,
+    )
+    if brightness is None:
+        if not bool(run_configuration.get("lumens_debug_dim", False)):
+            return None
+        brightness = 0.08
+    return [component * brightness for component in surface_color]
+
+
 def _material_color_scheme(particle, run_configuration):
     material_id = int(getattr(particle, "material_id", 0))
     try:
@@ -47,7 +137,7 @@ def _material_color_scheme(particle, run_configuration):
     return COLOR_SCHEME_HSV
 
 
-def _particle_color(particle, run_configuration):
+def _particle_color(particle_id, particle, dynamics, run_configuration):
     color_scheme = _material_color_scheme(particle, run_configuration)
     if color_scheme == COLOR_SCHEME_HSV:
         hsv_sat = float(run_configuration.get("hsv_sat", 0.707))
@@ -62,7 +152,7 @@ def _particle_color(particle, run_configuration):
     if color_scheme == COLOR_SCHEME_BLUE:
         return _unit_color((65, 125, 255))
     if color_scheme == COLOR_SCHEME_LUMENS:
-        return _unit_color((255, 255, 255))
+        return _lumens_color(particle_id, particle, dynamics, run_configuration)
     if color_scheme == COLOR_SCHEME_COLLISION:
         return _unit_color((65, 125, 255))
     return _unit_color((65, 125, 255))
@@ -101,11 +191,19 @@ def _collect_particles(dynamics, run_configuration):
             boundary_points.append(point)
             boundary_colors.append(_unit_color((255, 255, 255)))
         else:
+            color = _particle_color(
+                particle_id,
+                particle,
+                dynamics,
+                run_configuration,
+            )
+            if color is None:
+                continue
             mobile_particles.append(
                 {
                     "particle_id": particle_id,
                     "point": point,
-                    "color": _particle_color(particle, run_configuration),
+                    "color": color,
                     "radius": _particle_radius(particle),
                 }
             )

@@ -13,6 +13,7 @@ from gbase.MaterialProperties import (
     COLOR_SCHEME_RED,
     COLOR_SCHEME_WHITE,
     DEFAULT_MATERIAL_PROPERTIES,
+    parse_particle_type,
     write_color_scheme_defines,
     write_material_properties,
 )
@@ -226,6 +227,13 @@ class GenericGenData:
             material_ids.add(material_id)
 
             name = str(raw_material.get("name", f"material_{material_id}"))
+            try:
+                particle_type = parse_particle_type(
+                    raw_material.get("particle_type", "regular")
+                )
+            except (TypeError, ValueError):
+                errors.append(f"{context}.particle_type is unknown")
+                particle_type = None
 
             try:
                 relative_mass = float(raw_material.get("relative_mass", 1.0))
@@ -276,11 +284,13 @@ class GenericGenData:
                 and thermal_velocity is not None
                 and cell_density is not None
                 and color_scheme is not None
+                and particle_type is not None
             ):
                 materials.append(
                     {
                         "material_id": material_id,
                         "name": name,
+                        "particle_type": particle_type,
                         "relative_mass": relative_mass,
                         "thermal_velocity": thermal_velocity,
                         "color_scheme": color_scheme,
@@ -1437,6 +1447,10 @@ class GenericGenData:
                 "cell_occupancy_list_size = "
                 f"{self.cell_occupancy_list_size};\n"
             )
+            duplicates_list_size = int(self.itemcfg.duplicates_list_size)
+            if duplicates_list_size <= 0:
+                raise ValueError("duplicates_list_size must be positive")
+            output.write(f"duplicates_list_size = {duplicates_list_size};\n")
 
             output.write(f"death_x_min = {death_x_min:.9f};\n")
             output.write(f"death_x_max = {death_x_max:.9f};\n")

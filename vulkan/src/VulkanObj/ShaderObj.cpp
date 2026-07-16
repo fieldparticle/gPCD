@@ -68,10 +68,13 @@ void ShaderObj::WriteMaterials()
 	ostrm << "const uint COLOR_SCHEME_RED = 3u;\n";
 	ostrm << "const uint COLOR_SCHEME_GREEN = 4u;\n";
 	ostrm << "const uint COLOR_SCHEME_BLUE = 5u;\n\n";
+	ostrm << "const uint PARTICLE_TYPE_REGULAR = 0u;\n";
+	ostrm << "const uint PARTICLE_TYPE_PHOTON = 1u;\n\n";
 
 	ostrm << "struct MaterialProperty\n";
 	ostrm << "{\n";
 	ostrm << "    uint materialID;\n";
+	ostrm << "    uint particleType;\n";
 	ostrm << "    float relativeMass;\n";
 	ostrm << "    float tempVel;\n";
 	ostrm << "    uint colorScheme;\n";
@@ -88,7 +91,7 @@ void ShaderObj::WriteMaterials()
 	{
 		ostrm << "const uint MATERIAL_PROPERTY_COUNT = 1u;\n";
 		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](\n";
-		ostrm << "    MaterialProperty(0u, 1.000000000, 0.000000000, COLOR_SCHEME_HSV, 0.000000000)\n";
+		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_SCHEME_HSV, 0.000000000)\n";
 		ostrm << ");\n\n";
 		ostrm << "#endif\n";
 		return;
@@ -110,12 +113,16 @@ void ShaderObj::WriteMaterials()
 
 		int materialID = 0;
 		int colorScheme = 0;
+		int particleType = 0;
 		double relativeMass = 1.0;
 		double tempVel = 0.0;
 		double cellDensity = 0.0;
 
 		if (config_setting_lookup_int(material, "material_id", &materialID) == CONFIG_FALSE)
 			throw std::runtime_error("material_properties[" + std::to_string(index) + "].material_id missing");
+
+		if (config_setting_lookup_int(material, "particle_type", &particleType) == CONFIG_FALSE)
+			particleType = 0;
 
 		if (config_setting_lookup_float(material, "relative_mass", &relativeMass) == CONFIG_FALSE)
 			throw std::runtime_error("material_properties[" + std::to_string(index) + "].relative_mass missing");
@@ -139,6 +146,7 @@ void ShaderObj::WriteMaterials()
 
 		ostrm << "    MaterialProperty("
 			<< materialID << "u, "
+			<< particleType << "u, "
 			<< std::fixed << std::setprecision(9) << relativeMass << ", "
 			<< std::fixed << std::setprecision(9) << tempVel << ", "
 			<< colorScheme << "u, "
@@ -592,43 +600,45 @@ void  ShaderObj::WriteShaderHeader()
 			<< "const uint DEPTH=" << CfgTst->GetUInt("CellAryL", true) << ";\n"
 			//##JMB Get RID
 			<< "const uint CENTER="
-			<< 0.0 << ";\n"
+				<< 0.0 << ";\n"
 			<< "const float RADIUS="
-			<< 0.0 << ";\n"
+				<< 0.0 << ";\n"
 			<< "const uint MAX_CELL_OCCUPANY="
-			<< CfgTst->GetInt("cell_occupancy_list_size", true) << ";\n"
+				<< CfgTst->GetInt("cell_occupancy_list_size", true) << ";\n"
 			<< "const uint SCR_W ="
-			<< m_SCO->m_SwapWidth << ";\n"
+				<< m_SCO->m_SwapWidth << ";\n"
 			<< "const uint SCR_H ="
-			<< m_SCO->m_SwapHeight << ";\n"
+				<< m_SCO->m_SwapHeight << ";\n"
 			<< "const uint SCR_X ="
-			<< m_SCO->m_SwapX << ";\n"
+				<< m_SCO->m_SwapX << ";\n"
 			<< "const uint SCR_Y ="
-			<< m_SCO->m_SwapY << ";\n"
+				<< m_SCO->m_SwapY << ";\n"
 			<< "const uint NUMPARTS ="
-			<< m_VPO->m_NumParticles << ";\n"
+				<< m_VPO->m_NumParticles << ";\n"
 			<< "const uint NUM_PARICLES_COLLIDING ="
-			<< CfgTst->GetInt("num_particle_colliding", true) << ";\n"
+				<< CfgTst->GetInt("num_particle_colliding", true) << ";\n"
 			<< "const uint MAXSPCOLLS ="
-			<< m_VPO->m_MaxColls << ";\n"
+				<< m_VPO->m_MaxColls << ";\n"
 			<< "const uint ColArySize="
-			<< m_CMO->m_BufSize << ";\n"
+				<< m_CMO->m_BufSize << ";\n"
 			<< "const uint LockArySize="
-			<< m_LMO->m_BufSize << ";\n"
+				<< m_LMO->m_BufSize << ";\n"
 			<< "const uint ColAryLen="
-			<< m_CMO->m_MaxLoc << ";\n"
+				<< m_CMO->m_MaxLoc << ";\n"
 			<< "const uint LockAryLen="
-			<< m_LMO->m_MaxLoc << ";\n"
+				<< m_LMO->m_MaxLoc << ";\n"
 			<< "const uint MAX_CELL_ARRAY_LOCATIONS ="
-			<< m_CMO->m_MaxLoc << ";\n"
+				<< m_CMO->m_MaxLoc << ";\n"
 			<< "const uint bbound ="
-			<< m_VPO->BoundaryParticleLimit << ";\n"
+				<< m_VPO->BoundaryParticleLimit << ";\n"
 			<< "const float point_size = "
-			<< std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.gl_point_size", true) << ";\n"
+				<< std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.gl_point_size", true) << ";\n"
 			<< "#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN "
-			<< std::setprecision(9) << CfgTst->GetFloat("compression_stiffness_gain", true) << "\n"
+				<< std::setprecision(9) << CfgTst->GetFloat("compression_stiffness_gain", true) << "\n"
 			<< "#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER " <<
-			std::setprecision(9) << CfgTst->GetFloat("compression_stiffness_power", true) << "\n";
+				std::setprecision(9) << CfgTst->GetFloat("compression_stiffness_power", true) << "\n"
+			<< "const uint DUP_LIST_SIZE = "
+				<< CfgTst->GetInt("duplicates_list_size", true) << ";\n";
 		
 			
 					

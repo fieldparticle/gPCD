@@ -671,7 +671,7 @@ class TabGenData(QTabWidget):
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenDUP.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBSequential.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/GenPQBRandom.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
+        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleHorizontal.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleAngled.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TestCompressor.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TestReservoir.cfg")
@@ -679,6 +679,7 @@ class TabGenData(QTabWidget):
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/FreeStream.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/FreeStreamHeteroPy.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/lumens.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/Cathedral.cfg")
         self.update_list_widget()
         self.update_data_list_widget()
         

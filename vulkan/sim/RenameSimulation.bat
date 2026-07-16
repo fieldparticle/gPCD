@@ -1,7 +1,7 @@
 @echo off
 
 set oldPrefix=FreeStream
-set newPrefix=FreeStreamHetero
+set newPrefix=Cathedral
 
 
 

@@ -150,3 +150,12 @@ class GenLightingData(GenStreaming):
         print(report_text)
         self.write_validation_log(report_text)
         return self.number_active_particles
+
+    def report_collision_feasibility(self):
+        return GenericGenData.report_collision_feasibility(self)
+
+    def report_cell_occupancy_capacity(self):
+        return GenericGenData.report_cell_occupancy_capacity(self)
+
+    def runner(self):
+        return GenericGenData.runner(self)

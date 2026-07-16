@@ -32,17 +32,36 @@ cell_occupancy_list_size		= 128;
 
 death_bounds 					= [1, 30,1, 9,0, 4];
 
-initial_particle_velocity 		= [ 0.0, 0.05, 0.0 ];
-
 // Streaming inlet release model.
 // Each release wave is assigned a future birth frame in Data.w.  Particles
 // with Data.w greater than the current frame are pending; particles with
 // Data.w less than zero are dead.
-streaming_release_start_frame 		= 10;
-streaming_release_columns 			= 10;
-streaming_particles_per_wave 		= 32;
-streaming_spacing_factor 			= 1.05;
-streaming_inlet_y 					= 1.0;
+particle_streams = (
+  {
+    name = "inlet";
+    material_id = 0;
+
+    initial_particle_velocity = [ 0.0, 0.05, 0.0 ];
+
+    release_start_frame = 10;
+    release_columns = 10;
+    particles_per_wave = 32;
+    spacing_factor = 1.05;
+
+    inlet_axis = "y";
+    inlet_value = 1.0;
+
+    span_u_axis = "x";
+    span_u_min = 2.0;
+    span_u_max = 8.0;
+    span_u_count = 32;
+
+    span_v_axis = "z";
+    span_v_min = 1.5;
+    span_v_max = 1.5;
+    span_v_count = 1;
+  }
+);
 // Optional: preferred flow angle in degrees.
 //   flow_direction = (cos(flow_angle), sin(flow_angle))
 flow_angle = 90.0;

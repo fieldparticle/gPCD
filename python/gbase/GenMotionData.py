@@ -128,6 +128,11 @@ class GenMotionData():
         f.write(fstr)
         fstr = f"cell_occupancy_list_size = {run_cfg.cell_occupancy_list_size};\n"
         f.write(fstr)
+        duplicates_list_size = int(run_cfg.duplicates_list_size)
+        if duplicates_list_size <= 0:
+            raise ValueError("duplicates_list_size must be positive")
+        fstr = f"duplicates_list_size = {duplicates_list_size};\n"
+        f.write(fstr)
         fstr = f"wallXMIN = {run_cfg.WallXMIN};\n"
         f.write(fstr)
         fstr = f"wallXMAX = {run_cfg.WallXMAX};\n"

@@ -1,5 +1,0 @@
- p1 = { location = {use=0; x1=3.0;    y1=5.7500; z1=2.0;}; vx=0.06; vy=-0.17; mass=1.0; radius=0.25; collision_stiffness_q=10.0; releaseFrame=1; };
-    p2 = { location = {use=0; x1=2.6527; y1=5.7196; z1=2.0;}; vx=0.06; vy=-0.17; mass=1.0; radius=0.25; collision_stiffness_q=10.0; releaseFrame=1; };
-    p3 = { location = {use=0; x1=2.3160; y1=5.6294; z1=2.0;}; vx=0.1136; vy=-0.16; mass=1.0; radius=0.25; collision_stiffness_q=10.0; releaseFrame=1; };
-    p4 = { location = {use=0; x1=2.0000; y1=5.4821; z1=2.0;}; vx=0.05; vy=0.0; mass=1.0; radius=0.25; collision_stiffness_q=10.0; releaseFrame=1; };
-	p5 = { location = {use=0; x1=1.7144; y1=5.2821; z1=2.0;}; vx=0.15; vy=-0.095; mass=1.0; radius=0.25; collision_stiffness_q=10.0; releaseFrame=1; };
