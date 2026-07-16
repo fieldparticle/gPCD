@@ -114,15 +114,12 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 	{
 		// While window is open.
 	
-		
+	
 		while (!glfwWindowShouldClose(VulkanWin->GetGLFWWindow())
 			&& glfwGetKey(VulkanWin->GetGLFWWindow(), GLFW_KEY_ESCAPE) != GLFW_PRESS)
 		{
-			if (G_Stop == true && VulkanWin->m_FrameNumber != 0)
-			{
-				glfwWaitEvents();
-				continue;
-			}
+			
+
 			perfObj->m_ReportBuffer[aprCount].SecondPerFrame = timerstep->elapsed();
 			timerstep->reset();
 			//Esc normal termination
@@ -149,8 +146,12 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 			// Get the current time
 			double currentTime = glfwGetTime();
 
+			
+
+
 			// Draw the frame.
 			DrawInstance->DrawFrame();
+	
 
 			if(VulkanWin->m_quit_event > 0)
 			{

@@ -2534,10 +2534,18 @@ material entries and in \texttt{material.glsl}.  The shader-side material
 record carries \texttt{particleType}, and the photon helper identifies photon
 particles by looking up the particle's material id.
 
-The common particle-particle force loop skips a pair only when both source and
-target particles are photons.  Photon-dust, dust-photon, dust-dust, and
-photon-wall interactions remain available to the ordinary dynamics path.  The
-boundary and wall paths are therefore unchanged by the photon-photon skip.
+The common particle-particle force loop skips photon targets.  Photon-photon
+pairs are skipped, and regular-source/photon-target pairs are skipped so dust
+cannot receive force from photons.  Photon-source/dust-target pairs remain
+active so the photon can redirect at fixed speed.  Dust-dust and photon-wall
+interactions remain available to their ordinary paths.  The boundary and wall
+paths are not disabled by the particle-pair skip.
+
+Photon speed is invariant.  The configured stream
+\texttt{initial\_particle\_velocity} sets the speed by vector magnitude, so the
+material contract does not add a separate \texttt{particle\_speed} or
+\texttt{photon\_speed} field.  Photon collisions with dust or walls may change
+direction, but the outgoing photon velocity must retain the incoming speed.
 
 The streaming generator also supports emitter-plane patches.  A stream fixes
 one inlet coordinate and spans finite \(u\) and \(v\) axes with independent
@@ -2555,10 +2563,20 @@ particle solution
 The photon rule is intentionally material-owned rather than scenario-name
 owned.  This keeps the force decision local to the particle pair and lets later
 lighting scenarios reuse the same shader helper without hard-coding Cathedral
-particle ids.  The rule is also intentionally narrow: it removes only
-photon-photon particle contacts, so real particles can still interact with
-photons and walls can still reflect or constrain photons through the existing
-wall evaluator.
+particle ids.
+
+The photon-dust rule is intentionally non-Newtonian light behavior, not
+reciprocal particle momentum exchange.  Photon and dust particles are treated
+as separate momentum systems: photon contacts may redirect photons at fixed
+speed, while dust momentum remains controlled by dust-dust and dust-wall
+interactions.  A dust source therefore skips photon targets instead of
+accumulating photon contact force.
+
+Keeping photon speed on the stream velocity avoids duplicating speed in both
+material and stream configuration.  The material identifies photon behavior;
+the stream supplies the actual velocity vector.  A fixed-speed photon response
+therefore reflects direction from the contact normal and then normalizes back
+to the incoming speed magnitude.
 
 The emitter-plane fields are generator input, not runtime shader metadata.
 Python expands each configured stream patch into concrete particle positions,
@@ -2570,3 +2588,56 @@ Cell-occupancy sizing remains a data-capacity question rather than a
 dimension-flag question.  Moving from a line stream to a rectangular patch can
 change which particles share a cell or cell corner, so the generator report is
 still the authority for \texttt{cell\_occupancy\_list\_size}.
+
+\subsection{Stopped Vulkan Frames And Simulation Time}
+
+\subsubsection{previous form}
+
+The Vulkan stop flag was added as a compute-side pause control, but the frame
+clock semantics were still mixed.  \texttt{StopFlg} could make
+\texttt{FPM.comp} return before particle dynamics, while the frame value used
+by shader lifecycle checks still advanced with the render/application frame.
+The selected particle position buffer could also be treated as a render-frame
+toggle instead of a simulation-frame toggle.
+
+This produced a confusing partial-pause state.  The scene continued to draw,
+but timed-release particles could become active because
+\texttt{frameNum} advanced while dynamics were stopped.  In a lighting stream
+scenario, that made one stream appear to continue running even though the
+compute shader had been told not to process particles.
+
+\subsubsection{current form}
+
+The push-constant contract now separates render time from simulation time:
+\begin{itemize}
+    \item \texttt{actualFrame} is render/application time and may always
+          advance;
+    \item \texttt{frameNum} is simulation time and advances only when dynamics
+          are allowed to run;
+    \item \texttt{positionBuffer} advances only with \texttt{frameNum};
+    \item \texttt{StopFlg} pauses compute particle processing while graphics
+          continues to draw the current simulation state.
+\end{itemize}
+
+Shader code that controls lifecycle, timed release, piston motion, or
+dynamics diagnostics uses \texttt{frameNum}.  Render-only reporting or capture
+logic may use \texttt{actualFrame} when it needs wall-clock frame progression.
+
+\subsubsection{difference outcome}
+
+rendering and diagnostics
+
+\subsubsection{Analysis}
+
+The stop flag is not a complete pause by itself.  It only prevents the compute
+shader from updating particle dynamics.  A correct stopped frame also requires
+the simulation clock and simulation buffer selector to remain frozen, because
+graphics shaders still evaluate lifecycle state and draw from the selected
+particle buffer.
+
+This distinction is especially important for lighting streams, where pending
+particles use \texttt{Data.w} release frames.  If render time and simulation
+time are conflated, a stopped scene can still release new particles.  Keeping
+\texttt{frameNum} in the simulation-time domain preserves the visible paused
+state while allowing the application to continue drawing and responding to
+input.

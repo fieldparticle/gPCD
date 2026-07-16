@@ -105,6 +105,27 @@ particle fields: \texttt{PosLocA}, \texttt{PosLocB}, \texttt{VelRadA},
 \texttt{colFlg}, etc.  Python aliases like \texttt{rx}, \texttt{vx},
 \texttt{mass}, \texttt{radius}, and reporting fields are not portable.
 
+\subsection{Push-Constant Frame Clocks}
+
+The shared particle push constants expose both render/application time and
+simulation time.  They must not be treated as aliases:
+\begin{itemize}
+    \item \texttt{actualFrame} is the render/application frame and may advance
+          while the application is stopped;
+    \item \texttt{frameNum} is the simulation frame visible to dynamics,
+          release gates, piston timing, and lifecycle checks;
+    \item \texttt{positionBuffer} selects the current particle state buffer and
+          must advance with \texttt{frameNum}, not with every rendered frame;
+    \item \texttt{StopFlg} tells compute dispatches to skip particle dynamics
+          while the scene continues to draw.
+\end{itemize}
+
+When \texttt{StopFlg} is set, \texttt{frameNum} and
+\texttt{positionBuffer} remain frozen.  This prevents timed-release streams,
+piston motion, lifecycle checks, and double-buffer selection from advancing
+while \texttt{FPM.comp} is intentionally not processing particles.  Graphics
+may continue to draw from the frozen simulation state.
+
 \subsection{Compute Atomics}
 
 Compute-shader atomic counters are defined by \texttt{atomic.glsl}.  Graphics

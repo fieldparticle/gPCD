@@ -71,15 +71,28 @@ photon-photon pairs before contact evaluation.  A photon stream can therefore
 pass through itself without creating photon-photon pressure, compression, or
 scattering.
 
+Photon speed is invariant.  The configured stream
+\texttt{initial\_particle\_velocity} sets the photon speed by its vector
+magnitude.  There is no separate material speed field.  When a photon collides
+with dust or a wall, the collision may change the photon's direction, but the
+outgoing photon velocity must be renormalized to the incoming photon speed.
+
 Photons only collide with real material particles, such as the rising dust
 particles in the cathedral scene.  Those interactions are the intended source
 of visible lighting behavior: photons crossing the dust stream can mark,
 illuminate, or otherwise interact with the real particles, while remaining
 transparent to other photons.
 
-Photon-wall interaction remains active.  The photon-photon skip applies only
-to particle-particle pairs whose source and target are both photon material
-types; wall and boundary-marker paths are not disabled by the photon rule.
+Photon and dust particles are separate momentum systems.  A photon-dust
+interaction redirects the photon only; the dust particle's velocity is
+unchanged by that photon.  Dust momentum is governed by dust-dust and dust-wall
+interactions, not by photon contacts.
+
+Photon-wall interaction remains active.  The particle-pair skip applies to
+photon-photon pairs and to regular-source/photon-target pairs.  Photon-source
+and dust-target pairs remain active so the photon can reflect without applying
+a reciprocal force to the dust.  Wall and boundary-marker paths are not
+disabled by the photon rule.
 
 Photons are also allowed to tunnel.  A photon may pass through intervening
 space without requiring the ordinary particle rebound behavior used by real

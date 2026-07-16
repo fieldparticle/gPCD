@@ -1,11 +1,11 @@
-phton behavour
-
 Current status:
-	- Cathedral photon and dust streams are documented as 3D emitter-plane patches.
-	- Photon behavior is material-owned, with photon-photon pairs skipped while photon-dust and photon-wall interactions remain active.
+	- Photon behavior is material-owned, fixed-speed, and asymmetric with dust.
+	- Cathedral streams use 3D emitter-plane patches.
+	- Vulkan stop now separates render time from simulation time.
 
 Code Changes:
-	- Added Cathedral documentation for stream shape, photon collision behavior, and wall behavior.
-	- Added ProblemEvolution entry for photon material behavior and three-dimensional stream generation.
+	- Documented particle_streams and Cathedral photon behavior.
+	- Documented push-constant frame-clock contract for StopFlg, frameNum, actualFrame, and positionBuffer.
+	- Recorded stopped-frame simulation-time investigation in ProblemEvolution.
 
-Next: Test Cathedral generation and Vulkan behavior with photon/dust streams.
+Next: next lighting

@@ -216,12 +216,14 @@ void DrawParticleBoundary::DrawFrame()
 			objtxt << "DrawIParticle::DrawFrame() vkResetCommandBuffer m_CommandGBuffers failed:" << ret << std::ends;
 			throw std::runtime_error(objtxt.str().c_str());
 		};
-
+		
 		for (size_t ii = 0; ii < m_Graphicslst.size(); ii++)
 		{
-			m_Graphicslst[ii]->PushMem(currentBuffer);
+			// Dont update push constants twice. already done in compute
+			if (ii != 3)
+				m_Graphicslst[ii]->PushMem(currentBuffer);
 		}
-
+		
 		// Record a new command buffer for the current frame and associate with swap chain image.
 		m_GraphicsCommandObj->RecordCommands(imageIndex, currentBuffer);
 

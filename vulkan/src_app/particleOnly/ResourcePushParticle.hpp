@@ -37,16 +37,15 @@ class ResourceParticlePush : public Resource
 {
     public:
     
-	struct ShaderFlags 
+	struct ShaderFlags
 	{
 		float DrawInstance;
 		float SideLength;
 		float Ptot;
 		float dt;
 		float systemp;
-		float ColorMap;		// 1.0 = Color Collision 
-						// 2.0 = Color velocity angle.
-		float Boundary; //0.0 off, 1.0 on
+		float ColorMap;
+		float Boundary;
 		float StopFlg;
 		float frameNum;
 		float actualFrame;
@@ -57,9 +56,12 @@ class ResourceParticlePush : public Resource
 	float m_numParts = 0.0;
 	void Create(ResourceVertexParticle* vertP);
 	ResourceVertexParticle* m_VertP{};
-	ResourceParticlePush(VulkanObj* App, std::string Name) : Resource(App,Name, VBW_DESCRIPTOR_TYPE_PUSH_CONSTANT)
+	ResourceParticlePush(VulkanObj* App, std::string Name)
+		: Resource(App, Name, VBW_DESCRIPTOR_TYPE_PUSH_CONSTANT),
+		m_ShaderFlags{}
 	{
-	};
+		m_ShaderFlags.StopFlg = 1.0f;
+	}
 	std::vector<VkVertexInputAttributeDescription>* GetAttributeDescriptions() { return {}; };
 	VkVertexInputBindingDescription* GetBindingDescription() { return {}; };
 	virtual void AskObject(uint32_t AnyNumber) {};

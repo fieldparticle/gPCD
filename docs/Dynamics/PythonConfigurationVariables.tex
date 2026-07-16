@@ -27,34 +27,130 @@ by \texttt{curve\_wall\_segments}; the active Python dynamics no longer reads
     \item[\texttt{output\_file\_prefix}] Base name of generated output.
 \end{description}
 
-\subsection{FreeStream Streaming Inputs}
+\subsection{Streaming Inputs}
 
 \texttt{GenStreaming.py} extends the generic function-wall generator with
 timed inlet release records.  The generated mobile particles are placed at
 the configured inlet, receive \texttt{initial\_particle\_velocity}, and store
 their release frame in \texttt{Data.w}.  This section documents that
-FreeStream generator contract; it does not make scheduled reservoir birth an
+streaming generator contract; it does not make scheduled reservoir birth an
 active \texttt{ForceDynamics} rule.
 
+The active streaming contract is \texttt{particle\_streams}.  It is a list of
+stream records.  Each stream record defines one material, one release schedule,
+one inlet plane, and the particle lattice emitted on that plane.  This supports
+single-source cases such as \texttt{FreeStream} and multi-source cases such as
+\texttt{Cathedral}.
+
+\begin{verbatim}
+particle_streams = (
+  {
+    name                       = "photon_beam";
+    material_id                = 0;
+
+    // Particle behavior comes from material_properties.particle_type.
+    initial_particle_velocity  = [ 0.048296, -0.012941, 0.0 ];
+
+    release_start_frame        = 10;
+    release_columns            = 10;
+    particles_per_wave         = 32;
+    spacing_factor             = 1.05;
+
+    inlet_axis                 = "x";
+    inlet_value                = 2.25;
+
+    span_u_axis                = "y";
+    span_u_min                 = 2.0;
+    span_u_max                 = 8.0;
+    span_u_count               = 8;
+
+    span_v_axis                = "z";
+    span_v_min                 = 1.25;
+    span_v_max                 = 3.75;
+    span_v_count               = 4;
+  },
+  {
+    name                       = "dust_rise";
+    material_id                = 1;
+
+    // Particle behavior comes from material_properties.particle_type.
+    initial_particle_velocity  = [ 0.0, 0.05, 0.0 ];
+
+    release_start_frame        = 10;
+    release_columns            = 10;
+    particles_per_wave         = 32;
+    spacing_factor             = 1.05;
+
+    inlet_axis                 = "y";
+    inlet_value                = 1.0;
+
+    span_u_axis                = "x";
+    span_u_min                 = 2.0;
+    span_u_max                 = 8.0;
+    span_u_count               = 8;
+
+    span_v_axis                = "z";
+    span_v_min                 = 1.25;
+    span_v_max                 = 3.75;
+    span_v_count               = 4;
+  }
+);
+\end{verbatim}
+
 \begin{description}
-    \item[\texttt{streaming\_release\_start\_frame}] First frame at which a
+    \item[\texttt{name}] Human-readable stream name used for diagnostics.
+    Names should be unique within one configuration.
+    \item[\texttt{material\_id}] Material id assigned to every particle emitted
+    by this stream.  Material-owned behavior such as photon versus regular
+    particle type belongs in \texttt{material\_properties}, not in the stream
+    record.
+    \item[\texttt{initial\_particle\_velocity}] Three values giving the
+    initial velocity for particles emitted by the stream.
+    \item[\texttt{release\_start\_frame}] First frame at which the first
     generated wave becomes active.
-    \item[\texttt{streaming\_release\_columns}] Number of release waves to
-    generate.
-    \item[\texttt{streaming\_particles\_per\_wave}] Number of mobile particles
-    in each inlet wave.
-    \item[\texttt{streaming\_spacing\_factor}] Multiplier applied to one
-    particle diameter when calculating the frame gap between waves.
-    \item[\texttt{streaming\_inlet\_x}] Optional fixed inlet x coordinate.
-    Exactly one inlet axis may be specified.
-    \item[\texttt{streaming\_inlet\_y}] Optional fixed inlet y coordinate.
-    Exactly one inlet axis may be specified.
+    \item[\texttt{release\_columns}] Number of release waves to generate.
+    \item[\texttt{particles\_per\_wave}] Number of mobile particles in each
+    released wave.  For emitter-plane patch streams this must equal
+    \(\texttt{span\_u\_count} \times \texttt{span\_v\_count}\).
+    \item[\texttt{spacing\_factor}] Multiplier applied to one particle
+    diameter when calculating the frame gap between waves.
+    \item[\texttt{inlet\_axis}] Fixed coordinate axis for the inlet plane.
+    Valid values are \texttt{"x"}, \texttt{"y"}, and \texttt{"z"}.
+    \item[\texttt{inlet\_value}] Fixed coordinate value on
+    \texttt{inlet\_axis}.  For example, \texttt{inlet\_axis="x"} and
+    \texttt{inlet\_value=2.25} emits particles on the plane \(x=2.25\).
+    \item[\texttt{span\_u\_axis}] First varying coordinate axis on the inlet
+    plane.  It must differ from \texttt{inlet\_axis}.
+    \item[\texttt{span\_u\_min}, \texttt{span\_u\_max}] Inclusive coordinate
+    range for the first lattice direction.
+    \item[\texttt{span\_u\_count}] Number of particles in the first lattice
+    direction.
+    \item[\texttt{span\_v\_axis}] Second varying coordinate axis on the inlet
+    plane.  It must differ from both \texttt{inlet\_axis} and
+    \texttt{span\_u\_axis}.
+    \item[\texttt{span\_v\_min}, \texttt{span\_v\_max}] Inclusive coordinate
+    range for the second lattice direction.
+    \item[\texttt{span\_v\_count}] Number of particles in the second lattice
+    direction.  Set this to \texttt{1}, with equal min and max, for a
+    one-dimensional line stream expressed through the same structure.
 \end{description}
 
-The packing span is derived from reservoir-kind
-\texttt{curve\_wall\_segments} and \texttt{packing\_z\_bounds}.  Boundary
-markers are still generated from the configured function-wall segments and
-use \texttt{ptype=1}.  FreeStream does not require piston configuration.
+Emitter-plane fields are consumed by Python during generation.  They are not
+written as stream-shape metadata to \texttt{.tst} or generated GLSL files.
+The generated particle records carry the resulting positions, velocities,
+materials, and release frames.
+
+The older single-stream fields
+\texttt{streaming\_release\_start\_frame},
+\texttt{streaming\_release\_columns},
+\texttt{streaming\_particles\_per\_wave},
+\texttt{streaming\_spacing\_factor},
+\texttt{streaming\_inlet\_x}, and \texttt{streaming\_inlet\_y} describe the
+retired flat form.  Active streaming cfg files should use
+\texttt{particle\_streams}.
+
+Boundary markers are still generated from the configured wall segments and use
+\texttt{ptype=1}.  Streaming scenarios do not require piston configuration.
 
 \subsection{Lighting Release Inputs}
 

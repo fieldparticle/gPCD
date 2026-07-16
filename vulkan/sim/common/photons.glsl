@@ -19,7 +19,26 @@ bool IsPhotonParticle(uint particleID)
 
 bool ShouldSkipParticlePair(uint sourceID, uint targetID)
 {
-    return IsPhotonParticle(sourceID) && IsPhotonParticle(targetID);
+    bool sourcePhoton = IsPhotonParticle(sourceID);
+    bool targetPhoton = IsPhotonParticle(targetID);
+    return (sourcePhoton && targetPhoton) || (!sourcePhoton && targetPhoton);
+}
+
+vec3 ReflectFixedSpeed(vec3 velocity, vec3 normal)
+{
+    float speed = length(velocity);
+    float normalLength = length(normal);
+    if (speed <= 0.0 || normalLength <= 0.0) {
+        return velocity;
+    }
+
+    vec3 unitNormal = normal / normalLength;
+    vec3 reflected = velocity - 2.0 * dot(velocity, unitNormal) * unitNormal;
+    float reflectedLength = length(reflected);
+    if (reflectedLength <= 0.0) {
+        return velocity;
+    }
+    return speed * reflected / reflectedLength;
 }
 
 #endif

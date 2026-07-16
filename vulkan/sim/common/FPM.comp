@@ -11,7 +11,7 @@ BoundaryWallSegment EvaluateConfiguredWallSegment(uint SourceID, uint BoundaryID
 void fpm_comp_main()
 {
     uint SourceID = gl_GlobalInvocationID.x;
-
+	
     if (SourceID == 0u) {
         collOut.numParticles = 0u;
         collOut.CollisionCount = 0u;
@@ -20,6 +20,11 @@ void fpm_comp_main()
         return;
     }
 
+
+	if (ShaderFlags.StopFlg > 0.0) {
+		return;
+	}
+	
     if (SourceID >= uint(ShaderFlags.Ptot)) {
         return;
     }
@@ -35,6 +40,9 @@ void fpm_comp_main()
     P[SourceID].contactCount = 0u;
     P[SourceID].colFlg = 0u;
     vec3 totalForce = vec3(0.0);
+    bool photonSource = IsPhotonParticle(SourceID);
+    bool photonReflected = false;
+    vec3 photonVelocity = GetStartFrameVelocity(SourceID).xyz;
 
 #if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
     if (!ProcessPistonCollision(SourceID, totalForce)) {
@@ -87,6 +95,11 @@ void fpm_comp_main()
                 if (!segment.valid) {
                     continue;
                 }
+                if (photonSource) {
+                    photonVelocity =
+                        ReflectFixedSpeed(photonVelocity, segment.normal);
+                    photonReflected = true;
+                }
                 if (duplicateCount >= DUP_LIST_SIZE) {
                     SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
                     return;
@@ -128,6 +141,11 @@ void fpm_comp_main()
             if (!geometry.valid) {
                 continue;
             }
+            if (photonSource) {
+                photonVelocity =
+                    ReflectFixedSpeed(photonVelocity, geometry.normal);
+                photonReflected = true;
+            }
             if (duplicateCount >= DUP_LIST_SIZE) {
                 SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
                 return;
@@ -149,6 +167,13 @@ void fpm_comp_main()
     }
     if (!ApplySourceMaximumDepth(SourceID, 9401u)) {
         return;
+    }
+    if (photonReflected) {
+        SetNextParticleVelocity(
+            SourceID,
+            vec4(
+                photonVelocity,
+                VelocityAngle(photonVelocity.x, photonVelocity.y)));
     }
 
 #if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
@@ -257,6 +282,13 @@ void fpm_comp_main()
 
     if (!ApplySourceMaximumDepth(SourceID, 9402u)) {
         return;
+    }
+    if (photonReflected) {
+        SetNextParticleVelocity(
+            SourceID,
+            vec4(
+                photonVelocity,
+                VelocityAngle(photonVelocity.x, photonVelocity.y)));
     }
 
     if (!CalcPosition(SourceID)) {
