@@ -23,8 +23,8 @@ struct MaterialProperty
 
 const uint MATERIAL_PROPERTY_COUNT = 2u;
 const MaterialProperty MATERIAL_PROPERTIES[2] = MaterialProperty[2](
-    MaterialProperty(0u, 1u, 1.000000000, 0.000000000, 0u, 0.000000000),
-    MaterialProperty(1u, 0u, 1.000000000, 0.000000000, 2u, 0.000000000)
+    MaterialProperty(0u, 1u, 1.000000000, 0.000000000, 2u, 0.000000000),
+    MaterialProperty(1u, 0u, 1.000000000, 0.000000000, 4u, 0.000000000)
 );
 
 const uint HSV_ON = 0u;

@@ -8,9 +8,13 @@ const uint COLOR_SCHEME_RED = 3u;
 const uint COLOR_SCHEME_GREEN = 4u;
 const uint COLOR_SCHEME_BLUE = 5u;
 
+const uint PARTICLE_TYPE_REGULAR = 0u;
+const uint PARTICLE_TYPE_PHOTON = 1u;
+
 struct MaterialProperty
 {
     uint materialID;
+    uint particleType;
     float relativeMass;
     float tempVel;
     uint colorScheme;
@@ -19,7 +23,7 @@ struct MaterialProperty
 
 const uint MATERIAL_PROPERTY_COUNT = 1u;
 const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](
-    MaterialProperty(0u, 1.000000000, 0.000000000, 1u, 0.000000000)
+    MaterialProperty(0u, 0u, 1.000000000, 0.000000000, 1u, 0.000000000)
 );
 
 const uint HSV_ON = 1u;

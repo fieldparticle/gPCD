@@ -88,6 +88,15 @@ interaction redirects the photon only; the dust particle's velocity is
 unchanged by that photon.  Dust momentum is governed by dust-dust and dust-wall
 interactions, not by photon contacts.
 
+The current photon-dust response is optical rather than mechanical.  When a
+photon source crosses or overlaps a dust target, the dynamics performs a swept
+intersection against the dust particle, reflects the photon direction at the
+configured fixed speed, and places the photon at the reflected end-of-frame
+position.  That event does not call the ordinary particle collision processor,
+does not allocate a mechanical contact slot, does not add source-local force,
+and does not accumulate internal contact momentum.  This prevents a photon from
+remaining trapped inside a dust contact while the dust drifts away.
+
 Photon-wall interaction remains active.  The particle-pair skip applies to
 photon-photon pairs and to regular-source/photon-target pairs.  Photon-source
 and dust-target pairs remain active so the photon can reflect without applying

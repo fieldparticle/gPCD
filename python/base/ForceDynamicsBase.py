@@ -76,6 +76,8 @@ class ForceDynamics(ForceContactDynamics):
         self.piston_frame_momentum = self.create_vec4()
         self.piston_total_impulse = 0.0
         self.piston_total_momentum = self.create_vec4()
+        self.photon_reflected_velocity = {}
+        self.photon_reflected_position = {}
 
     def ClearContactDiagnostics(self, contact_state):
         """Reset reporting-only diagnostics on one reusable contact slot."""
@@ -303,6 +305,7 @@ class ForceDynamics(ForceContactDynamics):
             return False
         if not self.ApplySourceMaximumDepth(SourceID):
             return False
+        self.ApplyPhotonVelocityOverride(SourceID)
         if not self.CheckResolvedContactStep(SourceID):
             return False
         source = self.particles[SourceID]
@@ -935,6 +938,8 @@ class ForceDynamics(ForceContactDynamics):
 
     def NaiveContactDetermination(self, total_forces):
         """Scan Python particles and process each source-owned contact."""
+        self.photon_reflected_velocity = {}
+        self.photon_reflected_position = {}
         for source_id in range(len(self.particles)):
             if not self.IsMobileParticleActiveForDynamics(source_id):
                 continue
@@ -958,8 +963,13 @@ class ForceDynamics(ForceContactDynamics):
                     continue
                 if not self.IsMobileParticleActiveForDynamics(target_id):
                     continue
+                if self.ShouldSkipParticlePair(source_id, target_id):
+                    continue
+                if self.TryPhotonParticleReflection(source_id, target_id):
+                    continue
                 geometry = self.GetPhysicalParticleContact(source_id, target_id)
                 if geometry is not None:
+                    self.RecordPhotonReflection(source_id, geometry[:3])
                     if not self.ProcessParticleCollision(
                         target_id,
                         source_id,
@@ -974,6 +984,7 @@ class ForceDynamics(ForceContactDynamics):
             boundary_contacts = self.EvaluateConfiguredWallContacts(source_id)
             for wall_flag in sorted(boundary_contacts):
                 _penetration_depth, contact = boundary_contacts[wall_flag]
+                self.RecordPhotonReflection(source_id, contact[:3])
                 if not self.ProcessFunctionWallCollision(
                     source_id,
                     contact,

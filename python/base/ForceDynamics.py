@@ -3,6 +3,11 @@ import itertools
 
 from gbase.FunctionWall import evaluate_wall_at_point
 from gbase.FunctionWall import physical_penetration
+from gbase.MaterialProperties import (
+    PARTICLE_TYPE_PHOTON,
+    PARTICLE_TYPE_REGULAR,
+    parse_particle_type,
+)
 
 
 class ForceContactDynamics:
@@ -19,6 +24,213 @@ class ForceContactDynamics:
     def VelocityAngle(vx, vy):
         """Return the GLSL VelRad.w velocity angle for an xy velocity."""
         return math.atan2(vy, vx) if vx != 0.0 or vy != 0.0 else 0.0
+
+    def GetParticleType(self, ParticleID):
+        """Return the material-owned particle type for one particle."""
+        material_id = int(
+            round(float(getattr(self.particles[ParticleID], "material_id", 0.0)))
+        )
+        materials = ()
+        if getattr(self, "run_configuration", None) is not None:
+            materials = self.run_configuration.get("material_properties", ())
+        for material in materials or ():
+            if hasattr(material, "get"):
+                candidate_id = material.get("material_id", 0)
+                raw_particle_type = material.get("particle_type", PARTICLE_TYPE_REGULAR)
+            else:
+                candidate_id = getattr(material, "material_id", 0)
+                raw_particle_type = getattr(
+                    material,
+                    "particle_type",
+                    PARTICLE_TYPE_REGULAR,
+                )
+            if int(candidate_id) == material_id:
+                return parse_particle_type(raw_particle_type)
+        return PARTICLE_TYPE_REGULAR
+
+    def IsPhotonParticle(self, ParticleID):
+        """Return true when a particle's material marks it as a photon."""
+        return self.GetParticleType(ParticleID) == PARTICLE_TYPE_PHOTON
+
+    def ShouldSkipParticlePair(self, SourceID, TargetID):
+        """Mirror photons.glsl pair filtering for Python direct scans."""
+        source_photon = self.IsPhotonParticle(SourceID)
+        target_photon = self.IsPhotonParticle(TargetID)
+        return (source_photon and target_photon) or (
+            not source_photon and target_photon
+        )
+
+    def ReflectFixedSpeed(self, velocity, normal):
+        """Reflect a velocity across a normal while preserving speed."""
+        vx, vy, vz = (float(velocity[0]), float(velocity[1]), float(velocity[2]))
+        nx, ny, nz = (float(normal[0]), float(normal[1]), float(normal[2]))
+        speed = math.sqrt(vx * vx + vy * vy + vz * vz)
+        normal_length = math.sqrt(nx * nx + ny * ny + nz * nz)
+        if speed <= 0.0 or normal_length <= 0.0:
+            return vx, vy, vz
+
+        ux, uy, uz = nx / normal_length, ny / normal_length, nz / normal_length
+        dot = vx * ux + vy * uy + vz * uz
+        rx = vx - 2.0 * dot * ux
+        ry = vy - 2.0 * dot * uy
+        rz = vz - 2.0 * dot * uz
+        reflected_length = math.sqrt(rx * rx + ry * ry + rz * rz)
+        if reflected_length <= 0.0:
+            return vx, vy, vz
+        scale = speed / reflected_length
+        return rx * scale, ry * scale, rz * scale
+
+    def RecordPhotonReflection(self, SourceID, normal):
+        """Remember a fixed-speed reflected photon velocity for this source."""
+        if not self.IsPhotonParticle(SourceID):
+            return
+        velocity = self.photon_reflected_velocity.get(SourceID)
+        if velocity is None:
+            start_velocity = self.GetStartFrameVelocity(SourceID)
+            velocity = (
+                float(start_velocity.x),
+                float(start_velocity.y),
+                float(start_velocity.z),
+            )
+        self.photon_reflected_velocity[SourceID] = self.ReflectFixedSpeed(
+            velocity,
+            normal,
+        )
+
+    def ApplyPhotonVelocityOverride(self, SourceID):
+        """Apply the remembered reflected photon velocity after normal solving."""
+        velocity = self.photon_reflected_velocity.get(SourceID)
+        if velocity is None:
+            return
+        particle = self.particles[SourceID]
+        particle.VelRad.x = velocity[0]
+        particle.VelRad.y = velocity[1]
+        particle.VelRad.z = velocity[2]
+        particle.VelRad.w = self.VelocityAngle(velocity[0], velocity[1])
+
+    def RecordPhotonParticleReflection(self, SourceID, TargetID, normal, hit_t):
+        """Reflect one photon and remember where it ends this frame."""
+        dt = float(self.ShaderFlags.dt)
+        source_position = self.GetParticlePosition(SourceID)
+        target_position = self.GetParticlePosition(TargetID)
+        source_velocity = self.GetStartFrameVelocity(SourceID)
+        target_velocity = self.GetStartFrameVelocity(TargetID)
+        reflected_velocity = self.ReflectFixedSpeed(
+            (
+                float(source_velocity.x),
+                float(source_velocity.y),
+                float(source_velocity.z),
+            ),
+            normal,
+        )
+        hit_t = max(0.0, min(1.0, float(hit_t)))
+        target_hit_x = float(target_position.x) + float(target_velocity.x) * dt * hit_t
+        target_hit_y = float(target_position.y) + float(target_velocity.y) * dt * hit_t
+        target_hit_z = float(target_position.z) + float(target_velocity.z) * dt * hit_t
+        source_radius = float(self.particles[SourceID].Data.x)
+        target_radius = float(self.particles[TargetID].Data.x)
+        contact_radius = source_radius + target_radius
+        normal_x, normal_y, normal_z = (
+            float(normal[0]),
+            float(normal[1]),
+            float(normal[2]),
+        )
+        hit_x = target_hit_x - normal_x * contact_radius
+        hit_y = target_hit_y - normal_y * contact_radius
+        hit_z = target_hit_z - normal_z * contact_radius
+        remaining_dt = dt * (1.0 - hit_t)
+        exit_epsilon = max(self.EPSILON, source_radius * 0.01)
+        self.photon_reflected_velocity[SourceID] = reflected_velocity
+        self.photon_reflected_position[SourceID] = (
+            hit_x + reflected_velocity[0] * remaining_dt - normal_x * exit_epsilon,
+            hit_y + reflected_velocity[1] * remaining_dt - normal_y * exit_epsilon,
+            hit_z + reflected_velocity[2] * remaining_dt - normal_z * exit_epsilon,
+        )
+
+    def TryPhotonParticleReflection(self, SourceID, TargetID):
+        """Handle photon-dust overlap or swept crossing without mechanical force."""
+        if not self.IsPhotonParticle(SourceID) or self.IsPhotonParticle(TargetID):
+            return False
+
+        dt = float(self.ShaderFlags.dt)
+        if dt <= 0.0:
+            return False
+
+        source_position = self.GetParticlePosition(SourceID)
+        target_position = self.GetParticlePosition(TargetID)
+        source_velocity = self.GetStartFrameVelocity(SourceID)
+        target_velocity = self.GetStartFrameVelocity(TargetID)
+        rel_vx = (float(source_velocity.x) - float(target_velocity.x)) * dt
+        rel_vy = (float(source_velocity.y) - float(target_velocity.y)) * dt
+        rel_vz = (float(source_velocity.z) - float(target_velocity.z)) * dt
+        motion_length_sq = rel_vx * rel_vx + rel_vy * rel_vy + rel_vz * rel_vz
+        if motion_length_sq <= self.EPSILON:
+            return False
+
+        start_dx = float(source_position.x) - float(target_position.x)
+        start_dy = float(source_position.y) - float(target_position.y)
+        start_dz = float(source_position.z) - float(target_position.z)
+        source_radius = float(self.particles[SourceID].Data.x)
+        target_radius = float(self.particles[TargetID].Data.x)
+        contact_radius = source_radius + target_radius
+
+        start_distance_sq = (
+            start_dx * start_dx + start_dy * start_dy + start_dz * start_dz
+        )
+        if start_distance_sq < contact_radius * contact_radius:
+            hit_t = 0.0
+            center_distance = math.sqrt(max(start_distance_sq, 0.0))
+            if center_distance <= self.EPSILON:
+                normal = (1.0, 0.0, 0.0)
+            else:
+                normal = (
+                    -start_dx / center_distance,
+                    -start_dy / center_distance,
+                    -start_dz / center_distance,
+                )
+        else:
+            a = motion_length_sq
+            b = 2.0 * (start_dx * rel_vx + start_dy * rel_vy + start_dz * rel_vz)
+            c = start_distance_sq - contact_radius * contact_radius
+            discriminant = b * b - 4.0 * a * c
+            if discriminant < 0.0:
+                return False
+            sqrt_discriminant = math.sqrt(discriminant)
+            first_t = (-b - sqrt_discriminant) / (2.0 * a)
+            second_t = (-b + sqrt_discriminant) / (2.0 * a)
+            if 0.0 <= first_t <= 1.0:
+                hit_t = first_t
+            elif 0.0 <= second_t <= 1.0:
+                hit_t = second_t
+            else:
+                return False
+            hit_dx = start_dx + rel_vx * hit_t
+            hit_dy = start_dy + rel_vy * hit_t
+            hit_dz = start_dz + rel_vz * hit_t
+            center_distance = math.sqrt(
+                max(hit_dx * hit_dx + hit_dy * hit_dy + hit_dz * hit_dz, 0.0)
+            )
+            if center_distance <= self.EPSILON:
+                normal = (1.0, 0.0, 0.0)
+            else:
+                normal = (
+                    -hit_dx / center_distance,
+                    -hit_dy / center_distance,
+                    -hit_dz / center_distance,
+                )
+
+        self.RecordPhotonParticleReflection(SourceID, TargetID, normal, hit_t)
+        return True
+
+    def ApplyPhotonPositionOverride(self, SourceID, output_position):
+        """Move a reflected photon to its remembered end-of-frame position."""
+        position = self.photon_reflected_position.get(SourceID)
+        if position is None:
+            return False
+        output_position.x = position[0]
+        output_position.y = position[1]
+        output_position.z = position[2]
+        return True
 
     @staticmethod
     def particle_position(particle, positionBuffer):
@@ -90,6 +302,9 @@ class ForceContactDynamics:
         wall_flag=None,
     ):
         """Require one step to consume no more than the penetration reserve."""
+        if self.IsPhotonParticle(SourceID):
+            return True
+
         source_velocity = self.GetStartFrameVelocity(SourceID)
         relative_normal_velocity = (
             (float(target_velocity.x) - float(source_velocity.x)) * normal[0]
@@ -202,6 +417,9 @@ class ForceContactDynamics:
 
     def CheckContactPenetrationStepResolution(self, SourceID, contact_state, velocity=None):
         """Require the next source step to fit inside remaining contact depth."""
+        if self.IsPhotonParticle(SourceID):
+            return True
+
         penetration_depth = max(0.0, float(contact_state.aux.y))
         hard_depth = self.GetContactHardDepth(contact_state)
         if penetration_depth > hard_depth + self.EPSILON:
@@ -1102,16 +1320,18 @@ class ForceContactDynamics:
         position = self.GetParticlePosition(SourceID)
         velocity = particle.VelRad
         if position_buffer == 0:
-            particle.PosLocB.x = position.x + velocity.x * dt
-            particle.PosLocB.y = position.y + velocity.y * dt
-            particle.PosLocB.z = position.z + velocity.z * dt
+            if not self.ApplyPhotonPositionOverride(SourceID, particle.PosLocB):
+                particle.PosLocB.x = position.x + velocity.x * dt
+                particle.PosLocB.y = position.y + velocity.y * dt
+                particle.PosLocB.z = position.z + velocity.z * dt
             particle.PosLocA.w = 1.0
             particle.PosLocB.w = 0.0
             output_position = particle.PosLocB
         else:
-            particle.PosLocA.x = position.x + velocity.x * dt
-            particle.PosLocA.y = position.y + velocity.y * dt
-            particle.PosLocA.z = position.z + velocity.z * dt
+            if not self.ApplyPhotonPositionOverride(SourceID, particle.PosLocA):
+                particle.PosLocA.x = position.x + velocity.x * dt
+                particle.PosLocA.y = position.y + velocity.y * dt
+                particle.PosLocA.z = position.z + velocity.z * dt
             particle.PosLocA.w = 0.0
             particle.PosLocB.w = 1.0
             output_position = particle.PosLocA
@@ -1161,7 +1381,7 @@ class ForceContactDynamics:
         ) = geometry
 
         physical_proximity = center_distance - target_radius
-        if physical_proximity < -self.EPSILON:
+        if physical_proximity < -self.EPSILON and not self.IsPhotonParticle(SourceID):
             self.SetError(
                 self.constants.ERROR_PARTICLE_TUNNELING,
                 error_kind="particle-particle",

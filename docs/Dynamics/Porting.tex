@@ -63,6 +63,8 @@ walls.
 
 The new simple generated files are:
 \begin{itemize}
+    \item \texttt{photons.glsl};
+    \item \texttt{FPM.comp};
     \item \texttt{ForceDynamicsSimple.glsl};
     \item \texttt{ForceDynamicsSimpleBoundaryParticle.glsl};
     \item \texttt{ForceDynamicsSimpleFunctionWall.glsl};
@@ -82,6 +84,15 @@ Any scenario wrapper that includes \texttt{photons.glsl} requires a
 \texttt{PARTICLE\_TYPE\_PHOTON}, and a \texttt{MaterialProperty.particleType}
 field.  Fixing Python export parity means every active generator path must
 emit that material contract consistently before wrappers are regenerated.
+
+\texttt{photons.glsl} owns the material lookup and optical photon helpers.  In
+the simple path a photon-source/dust-target event is not an ordinary mechanical
+particle collision.  The generated helper performs swept particle crossing,
+fixed-speed reflection, and reflected end-of-frame position calculation.
+\texttt{FPM.comp} consumes that event before the ordinary particle collision
+processor and skips the mechanical force/contact path for that pair.  This
+keeps photons from allocating contact slots or accumulating internal contact
+momentum while preserving ordinary dust-dust and wall response.
 
 They are produced by:
 \begin{verbatim}

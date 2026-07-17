@@ -85,7 +85,7 @@ particle_streams = (
     // Regular particles for now; material_properties carries particle_type.
     initial_particle_velocity 	= [ 0.048296, -0.012941, 0.0 ];
 
-    release_start_frame 		= 10;
+    release_start_frame 		= 6500;
     release_columns 			= 10;
     particles_per_wave 			= 32;
     spacing_factor 				= 1.05;
@@ -108,7 +108,7 @@ particle_streams = (
     material_id 				= 1;
 
     // Regular particles for now; material_properties carries particle_type.
-    initial_particle_velocity 	= [ 0.0, 0.05, 0.0 ];
+    initial_particle_velocity 	= [ 0.0, 0.01, 0.0 ];
 
     release_start_frame 		= 10;
     release_columns 			= 10;

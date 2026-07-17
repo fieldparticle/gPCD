@@ -146,9 +146,6 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 			// Get the current time
 			double currentTime = glfwGetTime();
 
-			
-
-
 			// Draw the frame.
 			DrawInstance->DrawFrame();
 	

@@ -1,11 +1,11 @@
 Current status:
-	- Vulkan compute wrappers now use the shared common FPM path instead of regenerating stale inline dynamics.
-	- Documentation records the shader export recovery and the remaining Python/export parity issue.
-	- Cathedral include files now document the particle_streams structure in detail.
+	- Cathedral photon-dust behavior is now documented as optical, not mechanical.
+	- The Vulkan simple exporter owns photon helpers and the shared FPM compute schedule.
+	- Python and Vulkan photon handling are aligned for Cathedral customization.
 
 Code Changes:
-	- Updated ExportForceDynamicsSimpleGLSL.py wrapper generation to include material, photon, rectangle-wall, and common FPM shader pieces.
-	- Added PyVista 3D runner support and axis labels for Python visualization.
-	- Updated generated Vulkan scenario wrappers for the simple/common FPM path.
+	- Updated Cathedral docs for swept fixed-speed photon reflection.
+	- Updated Porting docs for generated photons.glsl and FPM.comp ownership.
+	- Added ProblemEvolution entry for Cathedral optical photon export.
 
-Next: fix python export
+Next: customize catherdral

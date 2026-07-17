@@ -83,7 +83,8 @@ particle_streams = (
     material_id 				= 0;
 
     // Regular particles for now; material_properties carries particle_type.
-    initial_particle_velocity 	= [ 0.048296, -0.012941, 0.0 ];
+    //initial_particle_velocity 	= [ 0.048296, -0.012941, 0.0 ];
+	initial_particle_velocity 	= [ 0.2, -0.0536, 0.0 ];
 
     release_start_frame 		= 10;
     release_columns 			= 1;
@@ -91,11 +92,11 @@ particle_streams = (
     spacing_factor 				= 1.05;
 
     inlet_axis 					= "x";
-    inlet_value 				= 2.25;
+    inlet_value 				= 4.0;
 
     span_u_axis 				= "y";
-    span_u_min 					= 2.0;
-    span_u_max 					= 8.0;
+    span_u_min 					= 1.5;
+    span_u_max 					= 7.5;
     span_u_count 				= 8;
 
     span_v_axis 				= "z";
@@ -116,7 +117,7 @@ particle_streams = (
     spacing_factor 				= 1.05;
 
     inlet_axis 					= "y";
-    inlet_value 				= 1.0;
+    inlet_value 				= 3.9;
 
     span_u_axis 				= "x";
     span_u_min 					= 2.0;

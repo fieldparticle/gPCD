@@ -5,11 +5,16 @@ import math
 import time
 
 from base.ForceDynamicsBase import ForceDynamics
+from base.Reporting import Reporting
 from gbase.utilities import get_cell_dimensions
 from SimulationRunner3D_HSVPanel import (
     _axis_vector,
     _collect_particles,
     _is_visible_particle,
+)
+from SimulationRunner_HSVPanel import (
+    _report_particles,
+    _run_start_diagnostics,
 )
 
 
@@ -131,11 +136,17 @@ def _rectangle_wall_polydata(np, pv, rectangle_wall_segments):
     return walls
 
 
+def _axis_label_origin_distance(width, height, depth, offset):
+    extent = max(float(width), float(height), float(depth))
+    return max(float(offset), extent * 0.08)
+
+
 def _axis_label_points(width, height, depth, offset):
+    distance = _axis_label_origin_distance(width, height, depth, offset)
     return [
-        [float(width) + offset, 0.0, 0.0],
-        [0.0, float(height) + offset, 0.0],
-        [0.0, 0.0, float(depth) + offset],
+        [distance, 0.0, 0.0],
+        [0.0, distance, 0.0],
+        [0.0, 0.0, distance],
     ]
 
 
@@ -176,6 +187,28 @@ class SimulationRunner3DPyVistaApp:
         self.stop_frame = end_frame
         if self.stop_frame is None:
             self.stop_frame = int(configured_end_frame) if configured_end_frame else None
+
+        self.dynamics_diagnostics = bool(
+            self.run_configuration.get("dynamics_diagnostics", False)
+        )
+        self.reporting = None
+        self.start_diagnostics = None
+        if self.dynamics_diagnostics:
+            if "run_debug_dir" not in self.run_configuration:
+                raise RuntimeError(
+                    "SimulationRunner3D_PyVista requires run_debug_dir when "
+                    "dynamics_diagnostics is enabled"
+                )
+            self.reporting = Reporting(
+                Path(self.run_configuration["run_debug_dir"]),
+                self.run_configuration.get("rpt_frames"),
+            )
+            self.start_diagnostics = _run_start_diagnostics(self.dynamics)
+            print(
+                "SimulationRunner3D_PyVista cleared "
+                f"{self.reporting.cleared_report_count} report file(s): "
+                f"{self.reporting.output_dir}"
+            )
 
         self.plotter = None
         self.status_actor = None
@@ -403,6 +436,14 @@ class SimulationRunner3DPyVistaApp:
 
         self.dynamics.ShaderFlags.frameNum = self.frame
         self.last_particles = self.dynamics.CollisionRun()
+        if self.reporting is not None:
+            _report_particles(
+                self.reporting,
+                self.frame,
+                self.last_particles,
+                self.start_diagnostics,
+                self.dynamics,
+            )
         self._render_scene(reset_camera=False)
         if self.frame_interval > 0.0:
             self.next_step_time = now + self.frame_interval
@@ -419,12 +460,16 @@ class SimulationRunner3DPyVistaApp:
         self._build_plotter()
         print("SimulationRunner3D PyVista controls: mouse orbit/pan/zoom, SPACE pause, ESC quit")
         self.plotter.show(interactive_update=True, auto_close=False)
-        while not self._is_plotter_closed():
-            self._step()
-            try:
-                self.plotter.update(stime=1, force_redraw=True)
-            except TypeError:
-                self.plotter.update()
+        try:
+            while not self._is_plotter_closed():
+                self._step()
+                try:
+                    self.plotter.update(stime=1, force_redraw=True)
+                except TypeError:
+                    self.plotter.update()
+        finally:
+            if self.reporting is not None:
+                self.reporting.close()
         return self.last_particles
 
 

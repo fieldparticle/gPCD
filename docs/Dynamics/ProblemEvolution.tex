@@ -2693,3 +2693,57 @@ include photon helpers while still carrying an older \texttt{MaterialProperty}
 layout without \texttt{particleType}.  The exporter should also document and
 own the current wrapper contract explicitly so regeneration is a validation
 step rather than a chance to regress a working Vulkan shader.
+
+\subsection{Cathedral Optical Photon Export}
+
+\subsubsection{previous form}
+
+The Python Cathedral prototype proved that photon-dust interaction should
+redirect photons without pushing dust, but the first Vulkan photon path still
+used the ordinary particle collision processor after detecting a photon-source
+and dust-target contact.  That preserved fixed photon speed, but it also
+allowed the source to allocate contact state, accumulate force, and enter the
+ordinary maximum-depth/contact-resolution machinery.
+
+The result was a sticky optical contact.  A photon could appear to lose useful
+motion while it remained inside the dust contact region, and diagnostic
+internal momentum could grow even though photons are not supposed to own
+mechanical contact storage.
+
+\subsubsection{current form}
+
+Photon-dust contact is now an optical event in both Python and the generated
+simple Vulkan shader path.  For a photon source targeting a dust particle, the
+runtime performs swept source motion against the target's physical radius,
+reflects the photon direction at its incoming fixed speed, computes the
+reflected end-of-frame position from the impact point and remaining timestep,
+and then skips the ordinary particle collision processor.
+
+The active simple exporter now owns this common shader behavior.  It writes
+\texttt{vulkan/sim/common/photons.glsl} with material-owned photon lookup,
+pair filtering, fixed-speed reflection, and swept optical contact helpers.  It
+also writes \texttt{vulkan/sim/common/FPM.comp}, so the shared compute loop
+consumes optical photon-dust events before mechanical collision processing and
+keeps scenario wrappers as thin includes around the common schedule.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+The important separation is between optical redirection and mechanical
+contact.  Dust-dust and wall interactions remain ordinary force contacts.
+Photon-photon pairs are skipped.  Regular-source/photon-target pairs are
+skipped so dust is not moved by photons.  Photon-source/dust-target pairs
+remain detectable, but successful detection does not allocate a contact slot,
+does not add source-local force, and does not accumulate internal contact
+momentum.
+
+Export ownership matters as much as the physics rule.  The working Vulkan
+behavior is no longer a hand-edited exception: regeneration through
+\texttt{tools/ExportForceDynamicsSimpleGLSL.py --write} now rewrites the
+photon helper and the shared FPM schedule with the optical rule intact.  The
+next Cathedral customization can therefore adjust stream placement, material
+display, and scene geometry without re-opening the Python/Vulkan photon drift
+that caused the sticky-contact behavior.

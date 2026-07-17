@@ -647,10 +647,14 @@ class SimulationRunner3DApp:
             return
         offset = float(self.run_configuration.get("open3d_axis_label_offset", 0.15))
         label_scale = float(self.run_configuration.get("open3d_axis_label_scale", 2.0))
+        label_distance = max(
+            offset,
+            0.08 * max(float(self.width), float(self.height), float(self.depth)),
+        )
         labels = [
-            ([float(self.width) + offset, 0.0, 0.0], "X"),
-            ([0.0, float(self.height) + offset, 0.0], "Y"),
-            ([0.0, 0.0, float(self.depth) + offset], "Z"),
+            ([label_distance, 0.0, 0.0], "X"),
+            ([0.0, label_distance, 0.0], "Y"),
+            ([0.0, 0.0, label_distance], "Z"),
         ]
         self.axis_labels = []
         for position, text in labels:

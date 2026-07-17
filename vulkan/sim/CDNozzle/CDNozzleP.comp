@@ -11,6 +11,7 @@
 #extension GL_EXT_shader_atomic_float : enable
 
 #include "params.glsl"
+#include "material.glsl"
 #include "../common/constants.glsl"
 #include "boundary.glsl"
 #include "../common/util.glsl"
@@ -18,13 +19,13 @@
 #include "../common/atomic.glsl"
 #include "../common/CollimageIndex.glsl"
 #include "../common/particle.glsl"
+#include "../common/photons.glsl"
 #include "workgroups.glsl"
 
-#include "piston.glsl"
-#define FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE
 #include "../common/ForceDynamicsSimple.glsl"
 #include "../common/ForceDynamicsSimpleBoundaryParticle.glsl"
 #include "../common/ForceDynamicsSimpleFunctionWall.glsl"
+#include "../common/ForceDynamicsSimpleRectangleWall.glsl"
 #if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
 #include "../common/ForceDynamicsSimplePiston.glsl"
 #endif
