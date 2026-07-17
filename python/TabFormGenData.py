@@ -25,7 +25,9 @@ from gbase.import_module import load_class_from_file
 from gbase.pdata import *
 from gbase.GenPQBData import *
 from SimulationRunner_HSVPanel import run_analysis as simulation_run_analysis_2d
-from SimulationRunner3D_HSVPanel import run_analysis as simulation_run_analysis_3d
+#from SimulationRunner3D_HSVPanel import run_analysis as simulation_run_analysis_3d
+
+from SimulationRunner3D_PyVista import run_analysis as simulation_run_analysis_3d
 from base.ForcePlots import run_force_plots
 from gbase.ReadCaptureFile import *
 import subprocess

@@ -2641,3 +2641,55 @@ time are conflated, a stopped scene can still release new particles.  Keeping
 \texttt{frameNum} in the simulation-time domain preserves the visible paused
 state while allowing the application to continue drawing and responding to
 input.
+
+\subsection{Vulkan Shader Export Recovery}
+
+\subsubsection{previous form}
+
+During the three-dimensional lighting work, Vulkan dynamics behavior moved
+ahead through direct edits to shared shader files.  The common compute path
+gained rectangle-wall dispatch, photon pair filtering, fixed-speed photon
+reflection, stop-flag handling, and a configured duplicate-list size.  Those
+changes proved the intended runtime behavior, but they also allowed the Python
+exporter to fall behind.
+
+The immediate risk was that regenerating simple GLSL wrappers could reintroduce
+the old inline compute loop, including stale duplicate-list sizing and missing
+photon helper usage.  That made the export path unsafe even though the current
+Vulkan shader files were still the working reference.
+
+\subsubsection{current form}
+
+The active Vulkan compute schedule is centralized in
+\texttt{vulkan/sim/common/FPM.comp}.  Scenario compute wrappers include that
+common file and provide only scenario-owned setup: generated params, material
+metadata, boundary metadata, workgroup layout, simple dynamics helpers, optional
+piston support, and the configured-wall dispatcher that chooses rectangle walls
+when present.
+
+\texttt{tools/ExportForceDynamicsSimpleGLSL.py} was adjusted so it no longer
+emits a second stale copy of the FPM loop into scenario wrappers.  The exporter
+now emits wrappers that include \texttt{material.glsl},
+\texttt{photons.glsl}, \texttt{ForceDynamicsSimpleRectangleWall.glsl}, the
+configured-wall dispatcher, and \texttt{../common/FPM.comp}.  This prevents a
+wrapper regeneration from overwriting the manually proven common compute
+schedule with the old inline loop.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+This is a recovery step, not the final export architecture.  Vulkan is
+currently working from the shared common shader path, but the source-of-truth
+boundary is still imperfect: \texttt{FPM.comp} is hand-maintained common GLSL
+while the helper functions and scenario wrappers are generated from Python.
+
+The next correction is to repair Python export parity.  The Python-generated
+data and GLSL metadata must always emit the photon-aware material contract
+before wrappers depend on \texttt{photons.glsl}; otherwise a scenario can
+include photon helpers while still carrying an older \texttt{MaterialProperty}
+layout without \texttt{particleType}.  The exporter should also document and
+own the current wrapper contract explicitly so regeneration is a validation
+step rather than a chance to regress a working Vulkan shader.

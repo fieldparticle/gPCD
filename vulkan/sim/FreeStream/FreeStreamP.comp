@@ -25,13 +25,27 @@
 #include "../common/ForceDynamicsSimple.glsl"
 #include "../common/ForceDynamicsSimpleBoundaryParticle.glsl"
 #include "../common/ForceDynamicsSimpleFunctionWall.glsl"
+#include "../common/ForceDynamicsSimpleRectangleWall.glsl"
+#if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
+#include "../common/ForceDynamicsSimplePiston.glsl"
+#endif
 
 // Generated from C:/_DJ/gPCD/python/base/ForceDynamics.py by tools/ExportForceDynamicsSimpleGLSL.py.
 // Simple source-owned compute schedule.
 // Do not hand edit generated dynamics content.
-#include "..\common\FPM.comp"
+
+#define EVALUATE_CONFIGURED_WALL_SEGMENT_DEFINED
+BoundaryWallSegment EvaluateConfiguredWallSegment(uint SourceID, uint BoundaryID)
+{
+    if (RECTANGLE_WALL_SEGMENT_COUNT > 0u) {
+        return EvaluateRectangleWallSegment(SourceID, BoundaryID);
+    }
+    return EvaluateFunctionWallSegment(SourceID, BoundaryID);
+}
+
+#include "../common/FPM.comp"
 
 void main()
 {
-	fpm_comp_main();
+    fpm_comp_main();
 }

@@ -11,6 +11,7 @@
 #extension GL_EXT_shader_atomic_float : enable
 
 #include "params.glsl"
+#include "material.glsl"
 #include "../common/constants.glsl"
 #include "boundary.glsl"
 #include "../common/util.glsl"
@@ -18,6 +19,7 @@
 #include "../common/atomic.glsl"
 #include "../common/CollimageIndex.glsl"
 #include "../common/particle.glsl"
+#include "../common/photons.glsl"
 #include "workgroups.glsl"
 
 #include "../common/ForceDynamicsSimple.glsl"
@@ -41,9 +43,9 @@ BoundaryWallSegment EvaluateConfiguredWallSegment(uint SourceID, uint BoundaryID
     return EvaluateFunctionWallSegment(SourceID, BoundaryID);
 }
 
-#include "..\common\FPM.comp"
+#include "../common/FPM.comp"
 
 void main()
 {
-	fpm_comp_main();
+    fpm_comp_main();
 }

@@ -34,10 +34,19 @@ excludes reservoir behavior.  Reservoir wrappers may include the optional
 
 \subsection{Stable Shader Wrapper}
 
-The compute shader stays hand-maintained.  Generated GLSL is included by it
-and may be regenerated.  Existing contact-query helpers such as
-\texttt{isParticleContact.glsl} remain hand-maintained shader infrastructure
-and are not rewritten by the ForceDynamics export.
+The shared compute schedule currently lives in
+\texttt{vulkan/sim/common/FPM.comp}.  Scenario compute shaders are generated
+as thin wrappers around that common file.  They include generated scenario
+metadata, generated simple helper GLSL, optional piston helpers, and then call
+\texttt{fpm\_comp\_main()} from the common FPM file.
+
+Generated GLSL may be regenerated, but the wrapper generator must not emit a
+second inline copy of the FPM loop.  Keeping one common compute schedule avoids
+regenerating stale duplicate-list logic, stale photon filtering, or stale
+configured-wall dispatch into individual scenario wrappers.  Existing
+contact-query helpers such as \texttt{isParticleContact.glsl} remain
+hand-maintained shader infrastructure and are not rewritten by the
+ForceDynamics export.
 
 \texttt{ForceDynamicsSimple.glsl} exports reusable simple dynamics
 functions.  The generated scenario compute shader owns contact discovery by
@@ -61,6 +70,18 @@ The new simple generated files are:
     \item \texttt{ForceDynamicsSimplePiston.glsl};
     \item \texttt{TestPythonBoundarySpheresP.comp}.
 \end{itemize}
+
+Generated scenario wrappers must include the material metadata before photon
+helpers:
+\begin{verbatim}
+#include "material.glsl"
+#include "../common/photons.glsl"
+\end{verbatim}
+Any scenario wrapper that includes \texttt{photons.glsl} requires a
+\texttt{material.glsl} file with \texttt{PARTICLE\_TYPE\_REGULAR},
+\texttt{PARTICLE\_TYPE\_PHOTON}, and a \texttt{MaterialProperty.particleType}
+field.  Fixing Python export parity means every active generator path must
+emit that material contract consistently before wrappers are regenerated.
 
 They are produced by:
 \begin{verbatim}

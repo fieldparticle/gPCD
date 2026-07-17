@@ -232,6 +232,29 @@ that remains a viewer option rather than a dynamics rule.
 three-dimensional particle positions and is the intended place for the
 camera-derived 3D lumens eye work.
 
+The Open3D runner uses an orthographic camera by default so Python 3D
+inspection matches the Vulkan projection convention.  Camera configuration is:
+\begin{description}
+    \item[\texttt{camera\_projection}] Projection mode.  The default is
+    \texttt{"orthographic"}.  \texttt{"perspective"} may be used for
+    exploratory viewing.
+    \item[\texttt{camera\_ortho\_scale}] Vertical orthographic view size.
+    Missing values default from the largest cell-domain dimension.
+    \item[\texttt{camera\_target}] Three values giving the look-at point.
+    Missing values default to the center of the cell domain.
+    \item[\texttt{camera\_yaw\_degrees}] Yaw angle used to derive the camera
+    eye from \texttt{camera\_target}.
+    \item[\texttt{camera\_pitch\_degrees}] Pitch angle used to derive the
+    camera eye from \texttt{camera\_target}.
+    \item[\texttt{camera\_distance}] Distance from target to eye.  In
+    orthographic mode this controls view direction placement and clipping
+    range, not visual scale.
+    \item[\texttt{camera\_near\_plane}, \texttt{camera\_far\_plane}] Optional
+    camera clipping planes for the Open3D view.
+    \item[\texttt{camera\_fov\_degrees}] Perspective field of view, used only
+    when \texttt{camera\_projection="perspective"}.
+\end{description}
+
 \subsection{Material Color Schemes}
 
 \texttt{material\_properties.color\_scheme} owns particle color selection.

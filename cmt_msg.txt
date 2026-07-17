@@ -1,11 +1,11 @@
 Current status:
-	- Photon behavior is material-owned, fixed-speed, and asymmetric with dust.
-	- Cathedral streams use 3D emitter-plane patches.
-	- Vulkan stop now separates render time from simulation time.
+	- Vulkan compute wrappers now use the shared common FPM path instead of regenerating stale inline dynamics.
+	- Documentation records the shader export recovery and the remaining Python/export parity issue.
+	- Cathedral include files now document the particle_streams structure in detail.
 
 Code Changes:
-	- Documented particle_streams and Cathedral photon behavior.
-	- Documented push-constant frame-clock contract for StopFlg, frameNum, actualFrame, and positionBuffer.
-	- Recorded stopped-frame simulation-time investigation in ProblemEvolution.
+	- Updated ExportForceDynamicsSimpleGLSL.py wrapper generation to include material, photon, rectangle-wall, and common FPM shader pieces.
+	- Added PyVista 3D runner support and axis labels for Python visualization.
+	- Updated generated Vulkan scenario wrappers for the simple/common FPM path.
 
-Next: next lighting
+Next: fix python export

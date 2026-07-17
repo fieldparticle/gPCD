@@ -417,6 +417,7 @@ class SimulationRunner3DApp:
         self.last_particles = self.dynamics.particles
         self.closed = False
         self.axis_labels = []
+        self.scene_geometry_names = set()
         self.frame_rate = float(self.run_configuration.get("frame_rate", 0.0))
         self.frame_interval = 1.0 / self.frame_rate if self.frame_rate > 0.0 else 0.0
         self.next_step_time = 0.0
@@ -576,15 +577,62 @@ class SimulationRunner3DApp:
             target[2] + distance * math.sin(pitch),
         ]
 
+    def _camera_aspect_ratio(self):
+        frame = self.scene_widget.frame
+        if frame.height > 0:
+            return max(0.1, float(frame.width) / float(frame.height))
+        window_size = self.run_configuration.get("window_size", (1200, 900))
+        return max(0.1, float(window_size[0]) / float(window_size[1]))
+
     def _setup_camera(self):
         bounds = self._scene_bounds()
         target = self._camera_target()
-        self.scene_widget.setup_camera(
-            float(self.run_configuration.get("camera_fov_degrees", 60.0)),
-            bounds,
-            target,
+        eye = self._camera_eye(target)
+        projection = str(
+            self.run_configuration.get("camera_projection", "orthographic")
+        ).strip().lower()
+        if projection in ("perspective", "persp"):
+            self.scene_widget.setup_camera(
+                float(self.run_configuration.get("camera_fov_degrees", 60.0)),
+                bounds,
+                target,
+            )
+            self.scene_widget.look_at(target, eye, [0.0, 0.0, 1.0])
+            return
+
+        extent = max(float(self.width), float(self.height), float(self.depth))
+        ortho_scale = float(
+            self.run_configuration.get("camera_ortho_scale", extent * 1.15)
         )
-        self.scene_widget.look_at(target, self._camera_eye(target), [0.0, 0.0, 1.0])
+        ortho_scale = max(0.1, ortho_scale)
+        aspect = self._camera_aspect_ratio()
+        half_height = 0.5 * ortho_scale
+        half_width = half_height * aspect
+        diagonal = math.sqrt(
+            float(self.width) * float(self.width)
+            + float(self.height) * float(self.height)
+            + float(self.depth) * float(self.depth)
+        )
+        camera_distance = math.dist(eye, target)
+        near_plane = float(self.run_configuration.get("camera_near_plane", 1.0))
+        near_plane = max(1.0e-3, near_plane)
+        far_plane = float(
+            self.run_configuration.get(
+                "camera_far_plane",
+                max(near_plane + 1.0, camera_distance + diagonal * 2.0),
+            )
+        )
+        far_plane = max(near_plane + 1.0e-3, far_plane)
+        self.scene_widget.scene.camera.set_projection(
+            self.rendering.Camera.Projection.Ortho,
+            -half_width,
+            half_width,
+            -half_height,
+            half_height,
+            near_plane,
+            far_plane,
+        )
+        self.scene_widget.scene.camera.look_at(target, eye, [0.0, 0.0, 1.0])
 
     def _clear_axis_labels(self):
         if not hasattr(self.scene_widget, "remove_3d_label"):
@@ -613,29 +661,42 @@ class SimulationRunner3DApp:
                 label.scale = label_scale
             self.axis_labels.append(label)
 
-    def _render_scene(self, reset_camera=False):
+    def _clear_scene_geometry(self):
         scene = self.scene_widget.scene
-        self._clear_axis_labels()
+        if hasattr(scene, "remove_geometry"):
+            for name in list(self.scene_geometry_names):
+                scene.remove_geometry(name)
+            self.scene_geometry_names = set()
+            return
         scene.clear_geometry()
+        self.scene_geometry_names = set()
+
+    def _add_scene_geometry(self, name, geometry, material):
+        self.scene_widget.scene.add_geometry(name, geometry, material)
+        self.scene_geometry_names.add(name)
+
+    def _render_scene(self, reset_camera=False):
+        self._clear_axis_labels()
+        self._clear_scene_geometry()
 
         line_material = _material(
             self.rendering,
             shader="unlitLine",
             line_width=float(self.run_configuration.get("open3d_line_width", 1.0)),
         )
-        scene.add_geometry(
+        self._add_scene_geometry(
             "cell_box",
             _cell_box_lines(self.o3d, self.width, self.height, self.depth),
             line_material,
         )
-        scene.add_geometry(
+        self._add_scene_geometry(
             "origin_axes",
             _origin_axis_lines(self.o3d, self.width, self.height, self.depth),
             line_material,
         )
         death_bounds = self.run_configuration.get("death_bounds")
         if death_bounds is not None and len(death_bounds) == 6:
-            scene.add_geometry(
+            self._add_scene_geometry(
                 "death_bounds",
                 _box_lines_from_bounds(
                     self.o3d,
@@ -650,7 +711,7 @@ class SimulationRunner3DApp:
                 self.run_configuration.get("rectangle_wall_segments"),
                 [0.2, 1.0, 0.2],
             ):
-                scene.add_geometry(
+                self._add_scene_geometry(
                     f"rectangle_wall_{wall_name}",
                     line_set,
                     line_material,
@@ -663,7 +724,7 @@ class SimulationRunner3DApp:
                 origin=[0.0, 0.0, 0.0],
             )
             axes.compute_vertex_normals()
-            scene.add_geometry(
+            self._add_scene_geometry(
                 "axes",
                 axes,
                 _material(self.rendering, shader="defaultUnlit"),
@@ -677,7 +738,7 @@ class SimulationRunner3DApp:
             mobile_points = [item["point"] for item in mobile_particles]
             mobile_colors = [item["color"] for item in mobile_particles]
             if mobile_points:
-                scene.add_geometry(
+                self._add_scene_geometry(
                     "mobile_points",
                     _point_cloud(self.o3d, mobile_points, mobile_colors),
                     _material(
@@ -688,14 +749,14 @@ class SimulationRunner3DApp:
                 )
         else:
             for item in mobile_particles:
-                scene.add_geometry(
+                self._add_scene_geometry(
                     f"particle_{item['particle_id']}",
                     _particle_sphere(self.o3d, item, self.run_configuration),
                     _material(self.rendering, shader="defaultUnlit", color=item["color"]),
                 )
 
         if self.show_boundaries and self.boundary_as_particles and boundary_points:
-            scene.add_geometry(
+            self._add_scene_geometry(
                 "boundary_points",
                 _point_cloud(self.o3d, boundary_points, boundary_colors),
                 _material(
