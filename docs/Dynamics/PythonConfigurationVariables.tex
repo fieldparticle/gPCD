@@ -38,8 +38,9 @@ active \texttt{ForceDynamics} rule.
 
 The active streaming contract is \texttt{particle\_streams}.  It is a list of
 stream records.  Each stream record defines one material, one release schedule,
-one inlet plane, and the particle lattice emitted on that plane.  This supports
-single-source cases such as \texttt{FreeStream} and multi-source cases such as
+and one source geometry.  The source geometry may be an axis-aligned inlet
+plane patch or a curve emitter with finite width.  This supports single-source
+cases such as \texttt{FreeStream} and multi-source cases such as
 \texttt{Cathedral}.
 
 \begin{verbatim}
@@ -81,18 +82,21 @@ particle_streams = (
     particles_per_wave         = 32;
     spacing_factor             = 1.05;
 
-    inlet_axis                 = "y";
-    inlet_value                = 1.0;
+    emitter = {
+      type = "curve";
+      length_count = 8;
+      width_axis = [0.0, 0.0, 1.0];
+      width = 2.5;
+      width_count = 4;
 
-    span_u_axis                = "x";
-    span_u_min                 = 2.0;
-    span_u_max                 = 8.0;
-    span_u_count               = 8;
-
-    span_v_axis                = "z";
-    span_v_min                 = 1.25;
-    span_v_max                 = 3.75;
-    span_v_count               = 4;
+      curve = {
+        kind = "cubic_bezier";
+        p0 = [2.0, 1.0, 2.5];
+        p1 = [3.5, 1.4, 2.5];
+        p2 = [6.5, 0.8, 2.5];
+        p3 = [8.0, 1.2, 2.5];
+      };
+    };
   }
 );
 \end{verbatim}
@@ -111,7 +115,10 @@ particle_streams = (
     \item[\texttt{release\_columns}] Number of release waves to generate.
     \item[\texttt{particles\_per\_wave}] Number of mobile particles in each
     released wave.  For emitter-plane patch streams this must equal
-    \(\texttt{span\_u\_count} \times \texttt{span\_v\_count}\).
+    \(\texttt{span\_u\_count} \times \texttt{span\_v\_count}\).  For curve
+    emitters this must equal
+    \(\texttt{emitter.length\_count} \times
+    \texttt{emitter.width\_count}\).
     \item[\texttt{spacing\_factor}] Multiplier applied to one particle
     diameter when calculating the frame gap between waves.
     \item[\texttt{inlet\_axis}] Fixed coordinate axis for the inlet plane.
@@ -133,12 +140,31 @@ particle_streams = (
     \item[\texttt{span\_v\_count}] Number of particles in the second lattice
     direction.  Set this to \texttt{1}, with equal min and max, for a
     one-dimensional line stream expressed through the same structure.
+    \item[\texttt{emitter}] Optional generalized source geometry.  When this
+    block is present, it replaces the axis-aligned
+    \texttt{inlet\_axis}/\texttt{span\_u}/\texttt{span\_v} fields.
+    The current supported form is \texttt{type="curve"}.
+    \item[\texttt{emitter.length\_count}] Number of samples along the curve.
+    Samples include both curve ends when the count is greater than one.
+    \item[\texttt{emitter.width\_axis}] Three-value direction for the finite
+    width across the curve.  The generator normalizes this vector.
+    \item[\texttt{emitter.width}] Total physical width across
+    \texttt{emitter.width\_axis}.
+    \item[\texttt{emitter.width\_count}] Number of samples across the width.
+    Samples are centered around the curve; a count of one uses zero offset.
+    \item[\texttt{emitter.curve.kind}] Supported values are
+    \texttt{"polyline"} and \texttt{"cubic\_bezier"}.
+    \item[\texttt{emitter.curve.points}] For \texttt{"polyline"}, a sequence
+    of three-value points.  Particles are sampled by arc length along the
+    polyline.
+    \item[\texttt{emitter.curve.p0}--\texttt{p3}] For
+    \texttt{"cubic\_bezier"}, four three-value control points.
 \end{description}
 
-Emitter-plane fields are consumed by Python during generation.  They are not
-written as stream-shape metadata to \texttt{.tst} or generated GLSL files.
-The generated particle records carry the resulting positions, velocities,
-materials, and release frames.
+Emitter-plane and curve-emitter fields are consumed by Python during
+generation.  They are not written as stream-shape metadata to \texttt{.tst}
+or generated GLSL files.  The generated particle records carry the resulting
+positions, velocities, materials, and release frames.
 
 The older single-stream fields
 \texttt{streaming\_release\_start\_frame},
@@ -185,8 +211,10 @@ look angle dynamically from the 3D camera/view state rather than from static
 cfg values.
 
 \begin{description}
-    \item[\texttt{lumens\_eye\_position}] Two values giving the eye center in
-    world coordinates.  \([0.0,0.0]\) is valid.
+    \item[\texttt{lumens\_eye\_position}] Three values giving the eye center
+    in world coordinates as \([x,y,z]\).  The 3D viewer uses all three values
+    for eye-radius and photon path checks.  The 2D pygame prototype uses the
+    first two values and ignores \(z\).
     \item[\texttt{lumens\_eye\_angle\_degrees}] Direction the eye is looking,
     in degrees.
     \item[\texttt{lumens\_eye\_fov\_degrees}] Angular field of view centered
@@ -241,11 +269,19 @@ inspection matches the Vulkan projection convention.  Camera configuration is:
     \item[\texttt{camera\_ortho\_scale}] Vertical orthographic view size.
     Missing values default from the largest cell-domain dimension.
     \item[\texttt{camera\_target}] Three values giving the look-at point.
-    Missing values default to the center of the cell domain.
+    Missing values default to \texttt{view\_center} when it is present, then
+    to the center of the cell domain.
+    \item[\texttt{view}] Three rotation values \texttt{[rotx, roty, rotz]} in
+    degrees for the 3D camera.  When present, this item overrides the older
+    yaw/pitch camera direction.  \texttt{[0,0,0]} is the \(xy\) view looking
+    along \(z\); \texttt{[90,0,0]} is an \(xz\)-style view; and
+    \texttt{[0,90,0]} is a \(zy\)-style view.  The same rotation is applied
+    to the camera up vector so the PyVista and Open3D runners present the same
+    orientation.
     \item[\texttt{camera\_yaw\_degrees}] Yaw angle used to derive the camera
-    eye from \texttt{camera\_target}.
+    eye from \texttt{camera\_target} when \texttt{view} is absent.
     \item[\texttt{camera\_pitch\_degrees}] Pitch angle used to derive the
-    camera eye from \texttt{camera\_target}.
+    camera eye from \texttt{camera\_target} when \texttt{view} is absent.
     \item[\texttt{camera\_distance}] Distance from target to eye.  In
     orthographic mode this controls view direction placement and clipping
     range, not visual scale.

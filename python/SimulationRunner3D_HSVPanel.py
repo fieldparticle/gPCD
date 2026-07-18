@@ -53,47 +53,34 @@ def _unit_rgb_from_config(run_configuration, key, default):
     return [max(0.0, min(1.0, value)) for value in values]
 
 
-def _lumens_brightness(particle_id, particle, dynamics, run_configuration):
+def _lighting_brightness(particle_id, particle, dynamics, run_configuration):
+    if int(getattr(particle, "report_contacts", 0)) <= 0:
+        return None
+
     position = dynamics.GetCurrentParticlePosition(particle_id)
-    eye_position = run_configuration.get("lumens_eye_position", (0.0, 0.0))
+    eye_position = run_configuration.get("lighting_eye_position", (0.0, 0.0, 0.0))
     eye_x = float(eye_position[0])
     eye_y = float(eye_position[1])
-    photon_x = float(position.x)
-    photon_y = float(position.y)
+    eye_z = float(eye_position[2]) if len(eye_position) >= 3 else 0.0
 
-    current_eye_distance = math.hypot(eye_x - photon_x, eye_y - photon_y)
-    eye_radius = max(0.0, float(run_configuration.get("lumens_eye_radius", 0.10)))
-    if current_eye_distance > eye_radius:
+    to_eye_x = eye_x - float(position.x)
+    to_eye_y = eye_y - float(position.y)
+    to_eye_z = eye_z - float(position.z)
+    eye_distance = math.sqrt(
+        to_eye_x * to_eye_x + to_eye_y * to_eye_y + to_eye_z * to_eye_z
+    )
+    if eye_distance <= 1.0e-12:
         return None
 
-    photon_angle = float(particle.VelRad.w)
-    photon_dir_x, photon_dir_y = _unit_vector_from_angle(photon_angle)
-    to_eye_x = eye_x - photon_x
-    to_eye_y = eye_y - photon_y
-    along_path = to_eye_x * photon_dir_x + to_eye_y * photon_dir_y
-    if along_path < 0.0:
-        return None
-
-    closest_x = photon_x + photon_dir_x * along_path
-    closest_y = photon_y + photon_dir_y * along_path
-    miss_distance = math.hypot(eye_x - closest_x, eye_y - closest_y)
-    if miss_distance > eye_radius:
-        return None
-
-    if eye_radius <= 1.0e-12 or not bool(run_configuration.get("lumens_fade_in", True)):
-        distance_factor = 1.0
-    else:
-        distance_factor = 1.0 - current_eye_distance / eye_radius
-
-    eye_angle = math.radians(float(run_configuration.get("lumens_eye_angle_degrees", 0.0)))
+    eye_angle = math.radians(float(run_configuration.get("lighting_eye_angle_degrees", 0.0)))
     eye_look_x, eye_look_y = _unit_vector_from_angle(eye_angle)
-    arrival_x = -photon_dir_x
-    arrival_y = -photon_dir_y
-    if arrival_x * eye_look_x + arrival_y * eye_look_y < 0.0:
+    to_surface_x = -to_eye_x / eye_distance
+    to_surface_y = -to_eye_y / eye_distance
+    if to_surface_x * eye_look_x + to_surface_y * eye_look_y < 0.0:
         return None
 
-    arrival_angle = math.atan2(arrival_y, arrival_x)
-    fov = math.radians(float(run_configuration.get("lumens_eye_fov_degrees", 90.0)))
+    arrival_angle = math.atan2(to_surface_y, to_surface_x)
+    fov = math.radians(float(run_configuration.get("lighting_eye_fov_degrees", 90.0)))
     half_fov = max(0.0, fov * 0.5)
     angle_delta = abs(_wrap_angle_radians(arrival_angle - eye_angle))
     if angle_delta > half_fov:
@@ -103,25 +90,42 @@ def _lumens_brightness(particle_id, particle, dynamics, run_configuration):
         angle_factor = 1.0
     else:
         angle_factor = 1.0 - angle_delta / half_fov
-    return max(0.0, min(1.0, distance_factor * angle_factor))
+
+    normal_x = float(getattr(particle, "report_normal_x", 0.0))
+    normal_y = float(getattr(particle, "report_normal_y", 0.0))
+    normal_z = float(getattr(particle, "report_normal_z", 0.0))
+    normal_length = math.sqrt(
+        normal_x * normal_x + normal_y * normal_y + normal_z * normal_z
+    )
+    if normal_length <= 1.0e-12:
+        return None
+
+    normal_x /= normal_length
+    normal_y /= normal_length
+    normal_z /= normal_length
+    eye_vector_x = to_eye_x / eye_distance
+    eye_vector_y = to_eye_y / eye_distance
+    eye_vector_z = to_eye_z / eye_distance
+    surface_factor = abs(
+        normal_x * eye_vector_x + normal_y * eye_vector_y + normal_z * eye_vector_z
+    )
+    return max(0.0, min(1.0, surface_factor * angle_factor))
 
 
-def _lumens_color(particle_id, particle, dynamics, run_configuration):
+def _lighting_color(particle_id, particle, dynamics, run_configuration):
     surface_color = _unit_rgb_from_config(
         run_configuration,
-        "lumens_surface_color",
+        "lighting_surface_color",
         (1.0, 1.0, 1.0),
     )
-    brightness = _lumens_brightness(
+    brightness = _lighting_brightness(
         particle_id,
         particle,
         dynamics,
         run_configuration,
     )
     if brightness is None:
-        if not bool(run_configuration.get("lumens_debug_dim", False)):
-            return None
-        brightness = 0.08
+        return None
     return [component * brightness for component in surface_color]
 
 
@@ -152,7 +156,7 @@ def _particle_color(particle_id, particle, dynamics, run_configuration):
     if color_scheme == COLOR_SCHEME_BLUE:
         return _unit_color((65, 125, 255))
     if color_scheme == COLOR_SCHEME_LUMENS:
-        return _lumens_color(particle_id, particle, dynamics, run_configuration)
+        return _lighting_color(particle_id, particle, dynamics, run_configuration)
     if color_scheme == COLOR_SCHEME_COLLISION:
         return _unit_color((65, 125, 255))
     return _unit_color((65, 125, 255))
@@ -188,8 +192,16 @@ def _collect_particles(dynamics, run_configuration):
         position = dynamics.GetCurrentParticlePosition(particle_id)
         point = [float(position.x), float(position.y), float(position.z)]
         if dynamics.IsBoundaryParticle(particle_id):
+            color = _particle_color(
+                particle_id,
+                particle,
+                dynamics,
+                run_configuration,
+            )
+            if color is None:
+                continue
             boundary_points.append(point)
-            boundary_colors.append(_unit_color((255, 255, 255)))
+            boundary_colors.append(color)
         else:
             color = _particle_color(
                 particle_id,
@@ -300,6 +312,55 @@ def _box_lines_from_bounds(o3d, bounds, color):
     return line_set
 
 
+def _lighting_eye_geometry(run_configuration, segment_count=96):
+    if not bool(run_configuration.get("lighting_draw_eye_vector", True)):
+        return None
+    eye_position = run_configuration.get("lighting_eye_position", (0.0, 0.0))
+    if eye_position is None or len(eye_position) < 2:
+        return None
+    eye_x = float(eye_position[0])
+    eye_y = float(eye_position[1])
+    eye_z = float(eye_position[2]) if len(eye_position) >= 3 else 0.0
+    vector_length = max(0.0, float(run_configuration.get("lighting_eye_vector_length", 3.0)))
+    points = [[eye_x, eye_y, eye_z]]
+    lines = []
+    if vector_length > 0.0:
+        eye_angle = math.radians(
+            float(run_configuration.get("lighting_eye_angle_degrees", 0.0))
+        )
+        vector_endpoint = [
+            eye_x + vector_length * math.cos(eye_angle),
+            eye_y + vector_length * math.sin(eye_angle),
+            eye_z,
+        ]
+        points.append(vector_endpoint)
+        lines.append((0, len(points) - 1))
+    return points, lines
+
+
+def _lighting_eye_line_set(o3d, run_configuration, color):
+    geometry = _lighting_eye_geometry(run_configuration)
+    if geometry is None:
+        return None
+    points, lines = geometry
+    line_set = o3d.geometry.LineSet()
+    line_set.points = o3d.utility.Vector3dVector(points)
+    line_set.lines = o3d.utility.Vector2iVector(lines)
+    line_set.colors = o3d.utility.Vector3dVector([color for _ in lines])
+    return line_set
+
+
+def _lighting_ball_config(run_configuration):
+    values = run_configuration.get("Lighting_ball")
+    if values is None or len(values) < 4:
+        return None
+    center = [float(values[index]) for index in range(3)]
+    radius = float(values[3])
+    if radius <= 0.0:
+        return None
+    return center, radius
+
+
 def _axis_vector(axis_name):
     axis_key = str(axis_name).strip().upper()
     if axis_key == "X":
@@ -309,6 +370,46 @@ def _axis_vector(axis_name):
     if axis_key == "Z":
         return [0.0, 0.0, 1.0]
     raise ValueError("rectangle_wall_segments axis values must be X, Y, or Z")
+
+
+def _view_rotation(raw_view):
+    if raw_view is None:
+        return None
+    if len(raw_view) != 3:
+        raise ValueError("view must be [rotx, roty, rotz] in degrees")
+    return [math.radians(float(value)) for value in raw_view[:3]]
+
+
+def _rotate_view_vector(vector, view_radians):
+    x, y, z = [float(value) for value in vector]
+    rotx, roty, rotz = view_radians
+
+    cos_x = math.cos(rotx)
+    sin_x = math.sin(rotx)
+    y, z = y * cos_x - z * sin_x, y * sin_x + z * cos_x
+
+    cos_y = math.cos(roty)
+    sin_y = math.sin(roty)
+    x, z = x * cos_y + z * sin_y, -x * sin_y + z * cos_y
+
+    cos_z = math.cos(rotz)
+    sin_z = math.sin(rotz)
+    x, y = x * cos_z - y * sin_z, x * sin_z + y * cos_z
+    return [x, y, z]
+
+
+def _camera_eye_up_from_view(target, distance, raw_view):
+    view_radians = _view_rotation(raw_view)
+    if view_radians is None:
+        return None
+    eye_offset = _rotate_view_vector([0.0, 0.0, float(distance)], view_radians)
+    up = _rotate_view_vector([0.0, 1.0, 0.0], view_radians)
+    eye = [
+        float(target[0]) + eye_offset[0],
+        float(target[1]) + eye_offset[1],
+        float(target[2]) + eye_offset[2],
+    ]
+    return eye, up
 
 
 def _vector3(raw_value, default=None):
@@ -387,7 +488,8 @@ def _material(rendering, shader="defaultUnlit", color=None, point_size=None, lin
     material = rendering.MaterialRecord()
     material.shader = shader
     if color is not None:
-        material.base_color = [float(color[0]), float(color[1]), float(color[2]), 1.0]
+        alpha = float(color[3]) if len(color) >= 4 else 1.0
+        material.base_color = [float(color[0]), float(color[1]), float(color[2]), alpha]
     if point_size is not None:
         material.point_size = float(point_size)
     if line_width is not None:
@@ -557,25 +659,40 @@ class SimulationRunner3DApp:
         )
 
     def _camera_target(self):
-        target = self.run_configuration.get("camera_target")
+        target = self.run_configuration.get(
+            "view_center",
+            self.run_configuration.get("camera_target"),
+        )
         if target is None:
             return [0.5 * self.width, 0.5 * self.height, 0.5 * self.depth]
         return [float(value) for value in target[:3]]
 
-    def _camera_eye(self, target):
-        yaw = math.radians(float(self.run_configuration.get("camera_yaw_degrees", 35.0)))
-        pitch = math.radians(float(self.run_configuration.get("camera_pitch_degrees", 25.0)))
-        distance = float(
+    def _camera_distance(self):
+        return float(
             self.run_configuration.get(
                 "camera_distance",
                 max(self.width, self.height, self.depth) * 2.5,
             )
         )
-        return [
+
+    def _camera_eye_up(self, target):
+        distance = self._camera_distance()
+        view_camera = _camera_eye_up_from_view(
+            target,
+            distance,
+            self.run_configuration.get("view"),
+        )
+        if view_camera is not None:
+            return view_camera
+
+        yaw = math.radians(float(self.run_configuration.get("camera_yaw_degrees", 35.0)))
+        pitch = math.radians(float(self.run_configuration.get("camera_pitch_degrees", 25.0)))
+        eye = [
             target[0] + distance * math.cos(pitch) * math.cos(yaw),
             target[1] + distance * math.cos(pitch) * math.sin(yaw),
             target[2] + distance * math.sin(pitch),
         ]
+        return eye, [0.0, 0.0, 1.0]
 
     def _camera_aspect_ratio(self):
         frame = self.scene_widget.frame
@@ -587,7 +704,7 @@ class SimulationRunner3DApp:
     def _setup_camera(self):
         bounds = self._scene_bounds()
         target = self._camera_target()
-        eye = self._camera_eye(target)
+        eye, up = self._camera_eye_up(target)
         projection = str(
             self.run_configuration.get("camera_projection", "orthographic")
         ).strip().lower()
@@ -597,13 +714,17 @@ class SimulationRunner3DApp:
                 bounds,
                 target,
             )
-            self.scene_widget.look_at(target, eye, [0.0, 0.0, 1.0])
+            self.scene_widget.look_at(target, eye, up)
             return
 
         extent = max(float(self.width), float(self.height), float(self.depth))
         ortho_scale = float(
             self.run_configuration.get("camera_ortho_scale", extent * 1.15)
         )
+        zoom = float(self.run_configuration.get("zoom", 1.0))
+        if zoom <= 0.0:
+            zoom = 1.0
+        ortho_scale /= zoom
         ortho_scale = max(0.1, ortho_scale)
         aspect = self._camera_aspect_ratio()
         half_height = 0.5 * ortho_scale
@@ -632,7 +753,7 @@ class SimulationRunner3DApp:
             near_plane,
             far_plane,
         )
-        self.scene_widget.scene.camera.look_at(target, eye, [0.0, 0.0, 1.0])
+        self.scene_widget.scene.camera.look_at(target, eye, up)
 
     def _clear_axis_labels(self):
         if not hasattr(self.scene_widget, "remove_3d_label"):
@@ -720,6 +841,63 @@ class SimulationRunner3DApp:
                     line_set,
                     line_material,
                 )
+        lighting_ball = _lighting_ball_config(self.run_configuration)
+        if lighting_ball is not None:
+            center, radius = lighting_ball
+            ball_mesh = self.o3d.geometry.TriangleMesh.create_sphere(
+                radius=radius,
+                resolution=int(
+                    self.run_configuration.get("open3d_lighting_ball_resolution", 32)
+                ),
+            )
+            ball_mesh.translate(center)
+            ball_mesh.compute_vertex_normals()
+            ball_color = self.run_configuration.get(
+                "open3d_lighting_ball_color",
+                (0.2, 1.0, 0.35),
+            )
+            ball_opacity = float(
+                self.run_configuration.get("open3d_lighting_ball_opacity", 0.18)
+            )
+            self._add_scene_geometry(
+                "lighting_ball_shell",
+                ball_mesh,
+                _material(
+                    self.rendering,
+                    shader="defaultLitTransparency",
+                    color=[
+                        float(ball_color[0]),
+                        float(ball_color[1]),
+                        float(ball_color[2]),
+                        ball_opacity,
+                    ],
+                ),
+            )
+        lighting_eye = _lighting_eye_line_set(
+            self.o3d,
+            self.run_configuration,
+            [1.0, 0.94, 0.47],
+        )
+        if lighting_eye is not None:
+            self._add_scene_geometry("lighting_eye_vector", lighting_eye, line_material)
+            eye_position = self.run_configuration.get("lighting_eye_position", (0.0, 0.0))
+            eye_z = float(eye_position[2]) if len(eye_position) >= 3 else 0.0
+            eye_marker = self.o3d.geometry.TriangleMesh.create_sphere(
+                radius=float(self.run_configuration.get("lighting_eye_marker_radius", 0.05))
+            )
+            eye_marker.translate(
+                [float(eye_position[0]), float(eye_position[1]), eye_z]
+            )
+            eye_marker.compute_vertex_normals()
+            self._add_scene_geometry(
+                "lighting_eye_center",
+                eye_marker,
+                _material(
+                    self.rendering,
+                    shader="defaultUnlit",
+                    color=[1.0, 0.94, 0.47, 1.0],
+                ),
+            )
         self._add_axis_labels()
 
         if bool(self.run_configuration.get("open3d_show_axes", False)):

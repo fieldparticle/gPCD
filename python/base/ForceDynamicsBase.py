@@ -165,6 +165,9 @@ class ForceDynamics(ForceContactDynamics):
         normal_x = float(contact_state.geom.x)
         normal_y = float(contact_state.geom.y)
         normal_z = float(contact_state.geom.z)
+        source.report_normal_x = normal_x
+        source.report_normal_y = normal_y
+        source.report_normal_z = normal_z
         source_velocity = self.GetStartFrameVelocity(SourceID)
         target_velocity = (
             getattr(contact_state, "wall_target_velocity", self.create_vec4())
@@ -336,6 +339,11 @@ class ForceDynamics(ForceContactDynamics):
         with open(self.config.include_file, "r", encoding="utf-8") as cfg_file:
             include_config = libconf.load(cfg_file)
         for key, value in include_config.items():
+            if key in self.config:
+                raise ValueError(
+                    f"include_file {self.config.include_file!r} tries to override "
+                    f"existing cfg item {key!r}"
+                )
             self.config[key] = value
         
     def load_cfg_file(self, cfg_file_name):
@@ -676,6 +684,7 @@ class ForceDynamics(ForceContactDynamics):
         particle.report_center_distance = 0.0
         particle.report_normal_x = 0.0
         particle.report_normal_y = 0.0
+        particle.report_normal_z = 0.0
         particle.report_stored_mom = 0.0
         particle.report_alpha_zero = 0.0
         particle.report_zero_area = 0.0
@@ -949,10 +958,17 @@ class ForceDynamics(ForceContactDynamics):
             ):
                 return False
             has_local_boundary_marker = False
+            has_local_lighting_ball_marker = False
             for target_id in range(len(self.particles)):
                 if source_id == target_id:
                     continue
                 if self.IsBoundaryParticle(target_id):
+                    if self.BoundaryParticleNormal(target_id) is not None:
+                        has_local_lighting_ball_marker = (
+                            has_local_lighting_ball_marker
+                            or self.BoundaryMarkerApplies(source_id, target_id)
+                        )
+                        continue
                     has_local_boundary_marker = (
                         has_local_boundary_marker
                         or self.BoundaryMarkerApplies(
@@ -977,6 +993,14 @@ class ForceDynamics(ForceContactDynamics):
                         geometry,
                     ):
                         return False
+                if self.collIn.ErrorReturn != self.constants.ERROR_NONE:
+                    return False
+            if has_local_lighting_ball_marker:
+                if not self.ProcessLightingBallCollision(
+                    source_id,
+                    total_forces[source_id],
+                ):
+                    return False
                 if self.collIn.ErrorReturn != self.constants.ERROR_NONE:
                     return False
             if not has_local_boundary_marker:
@@ -1113,6 +1137,7 @@ class ForceDynamics(ForceContactDynamics):
             particle.report_center_distance = 0.0
             particle.report_normal_x = 0.0
             particle.report_normal_y = 0.0
+            particle.report_normal_z = 0.0
             particle.report_stored_mom = 0.0
             particle.report_alpha_zero = 0.0
             particle.report_zero_area = 0.0

@@ -1,27 +1,28 @@
 // ============================================================================
-// Cathedral: Catherdral Lighting
+// LightingBall: Catherdral Lighting
 // ============================================================================
-
+//Lighting_ball					= [x,y,z,radius, material]
+Lighting_ball					= [7.0,5.0,5.0,2.0,1];
 // --------------------------------------------------------------------------
 // Shared preview and Python game-camera bounds
 // --------------------------------------------------------------------------
 // PlotParticles uses all three axis ranges. SimulationRunner uses the x and y
 // ranges first and falls back to legacy Wall* values only when these are absent.
 // SimulationRunner then applies zoom around each axis-range center.
-x_axis_lims 					= [-2.0,20.0];
-y_axis_lims 					= [0.0,10.0];
-z_axis_lims 					= [0.0,3.0];
+x_axis_lims 					= [0.0,20.0];
+y_axis_lims 					= [0.0,20.0];
+z_axis_lims 					= [0.0,20.0];
 
 //  Distance between particle perimiters
 particle_separation_distance 	= 0.005;
 // Required: explicit cell counts for the cell-array domain.
-cell_array_width 				= 11;
-cell_array_height 				= 13;
-cell_array_depth 				= 5;
-
-view_center 					= [ 4,4,2];
+cell_array_width 				= 20;
+cell_array_height 				= 20;
+cell_array_depth 				= 20;
 
 
+view_center 					= [ 3.5,2.5,2.5];
+zoom							= 1.25;
 //death_bounds = [
 //    x_min, x_max,
 //    y_min, y_max,
@@ -30,7 +31,7 @@ view_center 					= [ 4,4,2];
 // Required: cell occupancy list capacity written to the .tst file.
 cell_occupancy_list_size		= 256;
 
-death_bounds 					= [1, 10,1, 9,0, 4];
+death_bounds 					= [1, 19,1, 19, 1, 19];
 
 // Streaming inlet release model.
 //
@@ -84,7 +85,7 @@ particle_streams = (
 
     // Regular particles for now; material_properties carries particle_type.
     //initial_particle_velocity 	= [ 0.048296, -0.012941, 0.0 ];
-	initial_particle_velocity 	= [ 0.2, -0.0536, 0.0 ];
+	initial_particle_velocity 	= [ 0.2, -0.2, 0.0 ];
 
     release_start_frame 		= 10;
     release_columns 			= 1;
@@ -95,40 +96,16 @@ particle_streams = (
     inlet_value 				= 4.0;
 
     span_u_axis 				= "y";
-    span_u_min 					= 1.5;
-    span_u_max 					= 7.5;
+    span_u_min 					= 5.0;
+    span_u_max 					= 12.0;
     span_u_count 				= 8;
 
     span_v_axis 				= "z";
-    span_v_min 					= 1.25;
-    span_v_max 					= 3.75;
-    span_v_count 				= 4;
-  },
-  {
-    name 						= "dust_rise";
-    material_id 				= 1;
-
-    // Regular particles for now; material_properties carries particle_type.
-    initial_particle_velocity 	= [ 0.0, 0.05, 0.0 ];
-
-    release_start_frame 		= 10;
-    release_columns 			= 1;
-    particles_per_wave 			= 32;
-    spacing_factor 				= 1.05;
-
-    inlet_axis 					= "y";
-    inlet_value 				= 3.9;
-
-    span_u_axis 				= "x";
-    span_u_min 					= 2.0;
-    span_u_max 					= 8.0;
-    span_u_count 				= 8;
-
-    span_v_axis 				= "z";
-    span_v_min 					= 1.25;
-    span_v_max 					= 3.75;
+    span_v_min 					= 3.5;
+    span_v_max 					= 6.0;
     span_v_count 				= 4;
   }
+
 );
 // Optional: preferred flow angle in degrees.
 //   flow_direction = (cos(flow_angle), sin(flow_angle))
@@ -138,7 +115,7 @@ flow_angle 		= 90.0;
 // random contribution is proportional to (1 - flow_alignment).
 flow_alignment = 1.00;
 
-// Stream span_u/span_v controls inlet packing, so Cathedral does not need
+// Stream span_u/span_v controls inlet packing, so LightingBall does not need
 // reservoir helper walls. particle_plane_z remains for wall-marker placement.
 particle_plane_z 				= 1.5;
 // Function wall format:
@@ -167,9 +144,6 @@ radius 					= 0.05;
 
 // Simulation timestep used by both dynamics integration and wave-frame spacing.
 dt 							= 0.045;
-target_penetration_fraction = 0.5;
-hard_penetration_fraction 	= 0.75;
-
 // --------------------------------------------------------------------------
 // Front-end study and output selection
 // --------------------------------------------------------------------------
@@ -178,4 +152,4 @@ hard_penetration_fraction 	= 0.75;
 study 					= false;
 num_studies 			= 0;
 
-output_file_prefix 		= "Cathedral_Py";
+output_file_prefix 		= "LightingBall_Vk";

@@ -224,6 +224,11 @@ class ForceDynamics(ForceContactDynamics):
         with open(self.config.include_file, "r", encoding="utf-8") as cfg_file:
             include_config = libconf.load(cfg_file)
         for key, value in include_config.items():
+            if key in self.config:
+                raise ValueError(
+                    f"include_file {self.config.include_file!r} tries to override "
+                    f"existing cfg item {key!r}"
+                )
             self.config[key] = value
 
 

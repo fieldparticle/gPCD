@@ -1,0 +1,86 @@
+% !TeX root = main.tex
+\newpage
+\section{Lighting Ball}
+
+\subsection{Purpose}
+
+\texttt{LightingBall} is the current lighting bring-up scenario after the
+Cathedral and FreeStreamHetero studies were retired.  It keeps the useful
+parts of the lighting work in a smaller, more inspectable scene: a stream of
+mobile light particles approaches a spherical surface made visible by ordinary
+boundary-marker particles.  The sphere gives a known three-dimensional shape
+for testing lighting response, surface normals, reflection, and Vulkan export
+parity.
+
+\subsection{Configured Sphere}
+
+The scenario uses the configuration item:
+\begin{verbatim}
+Lighting_ball = [x_center, y_center, z_center, radius, material_id];
+\end{verbatim}
+
+The generator samples this sphere and inserts standard boundary particles at
+the sampled locations.  These particles remain ordinary boundary markers:
+they have positive boundary \texttt{ptype}, occupy cells for broad-phase
+locality, and are not mobile physical objects.
+
+The marker particles do not define the collision surface.  When a mobile
+source discovers a local sphere marker, the dynamics evaluate the analytic
+sphere equation from \texttt{Lighting\_ball}.  The sphere normal is:
+\[
+    \mathbf n =
+    \frac{\mathbf x_{\mathrm{source}}-\mathbf c}
+         {\lVert\mathbf x_{\mathrm{source}}-\mathbf c\rVert},
+\]
+where \(\mathbf c\) is the configured sphere center.  Physical penetration is
+computed from the source radius and the signed distance to the analytic sphere
+surface.  This keeps the boundary particles in the same role as wall markers:
+they make nearby analytic geometry discoverable without becoming the geometry.
+
+\subsection{Python Status}
+
+The Python path is the working reference for the lighting ball.  The
+generator \texttt{gbase/GenLightingBall.py} creates the sphere markers and
+uses the shared streaming structure for the mobile particle stream.
+\texttt{base/ForceDynamics.py} owns the analytic lighting-ball evaluator and
+reflects a source from the configured sphere normal when the source is moving
+into the surface.
+
+Lighting display is contact-based.  A light particle illuminates only when it
+is in contact with a surface.  The displayed brightness is calculated from the
+surface contact normal and the configured eye vector; rendering color remains
+diagnostic display state and does not affect dynamics.
+
+\subsection{Vulkan Status}
+
+\texttt{LightingBall\_Vk.inc} is aligned with the Python include at the
+configuration level.  It selects the same sphere, cell domain, death bounds,
+stream geometry, material properties, radius, and timestep, but writes Vulkan
+output names such as \texttt{LightingBall\_Vk.tst}.
+
+The current Vulkan shader export is not yet at parity with the Python
+lighting-ball dynamics.  The shared Vulkan simple path has photon behavior,
+function walls, rectangle walls, boundary-marker locality, and the common
+\texttt{FPM.comp} schedule.  It does not yet export the analytic
+lighting-ball sphere evaluator.  Without that evaluator, a Vulkan
+LightingBall run can discover boundary markers, but it cannot reflect from
+the configured sphere equation in the same way as Python.
+
+\subsection{Next Export Work}
+
+The next porting step is to make the simple GLSL exporter own the
+lighting-ball sphere path.  The required generated contract is:
+\begin{itemize}
+    \item emit lighting-ball center, radius, material, enable state, and wall
+          flag into generated boundary metadata;
+    \item generate a reusable lighting-ball GLSL helper that evaluates the
+          analytic sphere normal and physical penetration from the configured
+          sphere;
+    \item make boundary-marker contacts dispatch to the lighting-ball
+          evaluator when a configured lighting ball is present;
+    \item keep marker particles as locality sentinels only, not as physical
+          particle-particle collision targets;
+    \item regenerate the Vulkan simple common shader family from
+          \texttt{tools/ExportForceDynamicsSimpleGLSL.py} rather than
+          hand-editing the common GLSL files.
+\end{itemize}

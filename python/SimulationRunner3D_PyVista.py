@@ -9,8 +9,10 @@ from base.Reporting import Reporting
 from gbase.utilities import get_cell_dimensions
 from SimulationRunner3D_HSVPanel import (
     _axis_vector,
+    _camera_eye_up_from_view,
     _collect_particles,
     _is_visible_particle,
+    _lighting_eye_geometry,
 )
 from SimulationRunner_HSVPanel import (
     _report_particles,
@@ -136,6 +138,17 @@ def _rectangle_wall_polydata(np, pv, rectangle_wall_segments):
     return walls
 
 
+def _lighting_ball_config(run_configuration):
+    values = run_configuration.get("Lighting_ball")
+    if values is None or len(values) < 4:
+        return None
+    center = [float(values[index]) for index in range(3)]
+    radius = float(values[3])
+    if radius <= 0.0:
+        return None
+    return center, radius
+
+
 def _axis_label_origin_distance(width, height, depth, offset):
     extent = max(float(width), float(height), float(depth))
     return max(float(offset), extent * 0.08)
@@ -179,6 +192,7 @@ class SimulationRunner3DPyVistaApp:
         self.frame = 0
         self.paused = False
         self.closed = False
+        self.closing = False
         self.last_particles = self.dynamics.particles
         self.frame_rate = float(self.run_configuration.get("frame_rate", 0.0))
         self.frame_interval = 1.0 / self.frame_rate if self.frame_rate > 0.0 else 0.0
@@ -215,34 +229,53 @@ class SimulationRunner3DPyVistaApp:
         self.static_geometry_rendered = False
 
     def _camera_target(self):
-        target = self.run_configuration.get("camera_target")
+        target = self.run_configuration.get(
+            "view_center",
+            self.run_configuration.get("camera_target"),
+        )
         if target is None:
             return [0.5 * self.width, 0.5 * self.height, 0.5 * self.depth]
         return [float(value) for value in target[:3]]
 
-    def _camera_eye(self, target):
-        yaw = math.radians(float(self.run_configuration.get("camera_yaw_degrees", 35.0)))
-        pitch = math.radians(float(self.run_configuration.get("camera_pitch_degrees", 25.0)))
-        distance = float(
+    def _camera_distance(self):
+        return float(
             self.run_configuration.get(
                 "camera_distance",
                 max(self.width, self.height, self.depth) * 2.5,
             )
         )
-        return [
+
+    def _camera_eye_up(self, target):
+        distance = self._camera_distance()
+        view_camera = _camera_eye_up_from_view(
+            target,
+            distance,
+            self.run_configuration.get("view"),
+        )
+        if view_camera is not None:
+            return view_camera
+
+        yaw = math.radians(float(self.run_configuration.get("camera_yaw_degrees", 35.0)))
+        pitch = math.radians(float(self.run_configuration.get("camera_pitch_degrees", 25.0)))
+        eye = [
             target[0] + distance * math.cos(pitch) * math.cos(yaw),
             target[1] + distance * math.cos(pitch) * math.sin(yaw),
             target[2] + distance * math.sin(pitch),
         ]
+        return eye, [0.0, 0.0, 1.0]
 
     def _camera_scale(self):
         extent = max(float(self.width), float(self.height), float(self.depth))
-        return max(0.1, float(self.run_configuration.get("camera_ortho_scale", extent * 1.15)))
+        zoom = float(self.run_configuration.get("zoom", 1.0))
+        if zoom <= 0.0:
+            zoom = 1.0
+        scale = float(self.run_configuration.get("camera_ortho_scale", extent * 1.15))
+        return max(0.1, scale / zoom)
 
     def _setup_camera(self):
         target = self._camera_target()
-        eye = self._camera_eye(target)
-        self.plotter.camera_position = (eye, target, (0.0, 0.0, 1.0))
+        eye, up = self._camera_eye_up(target)
+        self.plotter.camera_position = (eye, target, up)
         self.plotter.enable_parallel_projection()
         self.plotter.camera.parallel_scale = self._camera_scale()
 
@@ -257,17 +290,47 @@ class SimulationRunner3DPyVistaApp:
         self.plotter.add_key_event("Escape", self._close)
         self._render_scene(reset_camera=True)
 
+    def _mark_closed(self, *_args):
+        self.closed = True
+        self.closing = True
+
+    def _install_close_observers(self):
+        if self.plotter is None:
+            return
+        iren = getattr(self.plotter, "iren", None)
+        observer_sources = []
+        if iren is not None:
+            observer_sources.append((iren, "add_observer"))
+            interactor = getattr(iren, "interactor", None)
+            if interactor is not None:
+                observer_sources.append((interactor, "AddObserver"))
+
+        for observer_source, method_name in observer_sources:
+            add_observer = getattr(observer_source, method_name, None)
+            if add_observer is None:
+                continue
+            for event_name in ("ExitEvent", "WindowCloseEvent", "DeleteEvent"):
+                try:
+                    add_observer(event_name, self._mark_closed)
+                except (AttributeError, TypeError, RuntimeError):
+                    pass
+
     def _toggle_pause(self):
+        if self.closing:
+            return
         self.paused = not self.paused
         self._update_status()
 
     def _close(self):
-        self.closed = True
+        self._mark_closed()
         if self.plotter is not None:
-            self.plotter.close()
+            try:
+                self.plotter.close()
+            except (AttributeError, RuntimeError, TypeError):
+                pass
 
     def _is_plotter_closed(self):
-        if self.closed:
+        if self.closed or self.closing:
             return True
         if self.plotter is None:
             return True
@@ -313,6 +376,58 @@ class SimulationRunner3DPyVistaApp:
                     line_width=line_width,
                     name=f"rectangle_wall_{wall_name}",
                 )
+        lighting_ball = _lighting_ball_config(self.run_configuration)
+        if lighting_ball is not None:
+            center, radius = lighting_ball
+            self.plotter.add_mesh(
+                self.pv.Sphere(
+                    radius=radius,
+                    center=center,
+                    theta_resolution=int(
+                        self.run_configuration.get(
+                            "pyvista_lighting_ball_theta_resolution",
+                            48,
+                        )
+                    ),
+                    phi_resolution=int(
+                        self.run_configuration.get(
+                            "pyvista_lighting_ball_phi_resolution",
+                            24,
+                        )
+                    ),
+                ),
+                color=tuple(
+                    float(value)
+                    for value in self.run_configuration.get(
+                        "pyvista_lighting_ball_color",
+                        (0.2, 1.0, 0.35),
+                    )[:3]
+                ),
+                opacity=float(
+                    self.run_configuration.get("pyvista_lighting_ball_opacity", 0.18)
+                ),
+                smooth_shading=True,
+                name="lighting_ball_shell",
+            )
+        lighting_eye = _lighting_eye_geometry(self.run_configuration)
+        if lighting_eye is not None:
+            points, lines = lighting_eye
+            if lines:
+                self.plotter.add_mesh(
+                    _line_polydata(self.np, self.pv, points, lines),
+                    color=(1.0, 0.94, 0.47),
+                    line_width=line_width,
+                    name="lighting_eye_vector",
+                )
+            self.plotter.add_points(
+                self.np.array([points[0]], dtype=float),
+                color=(1.0, 0.94, 0.47),
+                point_size=float(
+                    self.run_configuration.get("pyvista_lighting_eye_point_size", 10.0)
+                ),
+                render_points_as_spheres=True,
+                name="lighting_eye_center",
+            )
         self._render_axis_labels()
         self.static_geometry_rendered = True
 
@@ -339,12 +454,16 @@ class SimulationRunner3DPyVistaApp:
         )
 
     def _remove_actor(self, actor_name):
+        if self.closing or self.plotter is None:
+            return
         try:
             self.plotter.remove_actor(actor_name, reset_camera=False, render=False)
         except (KeyError, ValueError, TypeError):
             pass
 
     def _render_particles(self):
+        if self.closing:
+            return
         mobile_particles, boundary_points, boundary_colors = _collect_particles(
             self.dynamics,
             self.run_configuration,
@@ -387,6 +506,8 @@ class SimulationRunner3DPyVistaApp:
             self._remove_actor("boundary_particles")
 
     def _render_scene(self, reset_camera=False):
+        if self.closing:
+            return
         self._render_static_geometry()
         self._render_particles()
         self._update_status()
@@ -394,6 +515,8 @@ class SimulationRunner3DPyVistaApp:
             self._setup_camera()
 
     def _update_status(self):
+        if self.closing:
+            return
         self._remove_actor("status_text")
         self.status_actor = None
 
@@ -428,6 +551,8 @@ class SimulationRunner3DPyVistaApp:
         )
 
     def _step(self):
+        if self.closing:
+            return
         if self.paused:
             return
         now = time.perf_counter()
@@ -460,14 +585,23 @@ class SimulationRunner3DPyVistaApp:
         self._build_plotter()
         print("SimulationRunner3D PyVista controls: mouse orbit/pan/zoom, SPACE pause, ESC quit")
         self.plotter.show(interactive_update=True, auto_close=False)
+        self._install_close_observers()
         try:
             while not self._is_plotter_closed():
                 self._step()
+                if self._is_plotter_closed():
+                    break
                 try:
                     self.plotter.update(stime=1, force_redraw=True)
                 except TypeError:
-                    self.plotter.update()
+                    try:
+                        self.plotter.update()
+                    except RuntimeError:
+                        self._mark_closed()
+                except RuntimeError:
+                    self._mark_closed()
         finally:
+            self._mark_closed()
             if self.reporting is not None:
                 self.reporting.close()
         return self.last_particles
@@ -485,7 +619,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "cfg_file",
         nargs="?",
-        default="C:/_DJ/gPCD/python/cfg_gendata/Cathedral.cfg",
+        default="C:/_DJ/gPCD/python/cfg_gendata/LightingBall.cfg",
     )
     parser.add_argument("--end-frame", type=int, default=None)
     args = parser.parse_args()

@@ -157,6 +157,87 @@ class GenStreaming(GenericGenData):
                 return None
             return stream_positive_int(stream, context, name)
 
+        def parse_vector3(container, context, name):
+            values = container.get(name)
+            if values is None:
+                errors.append(f"{context}.{name} is required")
+                return ()
+            if len(values) != 3:
+                errors.append(f"{context}.{name} must contain exactly 3 values")
+                return ()
+            try:
+                result = tuple(float(value) for value in values)
+            except (TypeError, ValueError):
+                errors.append(f"{context}.{name} values must be numeric")
+                return ()
+            if not all(math.isfinite(value) for value in result):
+                errors.append(f"{context}.{name} values must be finite")
+                return ()
+            return result
+
+        def parse_curve_emitter(emitter, context, particles_per_wave):
+            emitter_type = str(emitter.get("type", "")).lower()
+            if emitter_type != "curve":
+                errors.append(f"{context}.type must be 'curve'")
+                return None
+            length_count = stream_positive_int(emitter, context, "length_count")
+            width_axis = parse_vector3(emitter, context, "width_axis")
+            width = stream_positive_float(emitter, context, "width")
+            width_count = stream_positive_int(emitter, context, "width_count")
+            if (
+                length_count is not None
+                and width_count is not None
+                and length_count * width_count != particles_per_wave
+            ):
+                errors.append(
+                    f"{context}.length_count * width_count must equal "
+                    "particles_per_wave"
+                )
+            if width_axis and self.vector_length(width_axis) <= 0.0:
+                errors.append(f"{context}.width_axis must not be zero")
+
+            curve = emitter.get("curve")
+            if curve is None:
+                errors.append(f"{context}.curve is required")
+                return None
+            curve_context = f"{context}.curve"
+            curve_kind = str(curve.get("kind", "")).lower()
+            if curve_kind == "polyline":
+                points = curve.get("points")
+                if points is None or len(points) < 2:
+                    errors.append(f"{curve_context}.points must contain at least two points")
+                    points = ()
+                parsed_points = [
+                    parse_vector3({"point": point}, curve_context, "point")
+                    for point in points
+                ]
+                if any(not point for point in parsed_points):
+                    parsed_points = []
+                return {
+                    "type": "curve",
+                    "kind": "polyline",
+                    "points": tuple(parsed_points),
+                    "length_count": length_count,
+                    "width_axis": width_axis,
+                    "width": width,
+                    "width_count": width_count,
+                }
+            if curve_kind == "cubic_bezier":
+                return {
+                    "type": "curve",
+                    "kind": "cubic_bezier",
+                    "p0": parse_vector3(curve, curve_context, "p0"),
+                    "p1": parse_vector3(curve, curve_context, "p1"),
+                    "p2": parse_vector3(curve, curve_context, "p2"),
+                    "p3": parse_vector3(curve, curve_context, "p3"),
+                    "length_count": length_count,
+                    "width_axis": width_axis,
+                    "width": width,
+                    "width_count": width_count,
+                }
+            errors.append(f"{curve_context}.kind must be 'polyline' or 'cubic_bezier'")
+            return None
+
         def parse_stream(stream, index, context):
             stream_name = str(stream.get("name", f"stream{index}"))
             initial_particle_velocity = stream_values(
@@ -170,8 +251,19 @@ class GenStreaming(GenericGenData):
                 stream, context, "particles_per_wave"
             )
             spacing_factor = stream_positive_float(stream, context, "spacing_factor")
+            emitter = None
+            emitter_mode = False
+            if "emitter" in stream:
+                emitter = parse_curve_emitter(
+                    stream.get("emitter"),
+                    f"{context}.emitter",
+                    particles_per_wave,
+                )
+                emitter_mode = emitter is not None
             inlet_axis = str(stream.get("inlet_axis", "")).lower()
-            inlet_value = stream_nonnegative_float(stream, context, "inlet_value")
+            inlet_value = None if emitter_mode else stream_nonnegative_float(
+                stream, context, "inlet_value"
+            )
             try:
                 material_id = int(stream.get("material_id", 0))
             except (TypeError, ValueError):
@@ -232,14 +324,14 @@ class GenStreaming(GenericGenData):
                         "span_u_count * span_v_count"
                     )
 
-            if inlet_axis not in ("x", "y", "z"):
+            if not emitter_mode and inlet_axis not in ("x", "y", "z"):
                 errors.append(f"{context}.inlet_axis must be 'x', 'y', or 'z'")
-            if patch_mode and len({inlet_axis, span_u_axis, span_v_axis}) != 3:
+            if not emitter_mode and patch_mode and len({inlet_axis, span_u_axis, span_v_axis}) != 3:
                 errors.append(
                     f"{context}.inlet_axis, span_u_axis, and span_v_axis "
                     "must be distinct"
                 )
-            if not patch_mode and inlet_axis == "z":
+            if not emitter_mode and not patch_mode and inlet_axis == "z":
                 errors.append(f"{context}.inlet_axis='z' requires patch stream fields")
 
             return {
@@ -263,6 +355,8 @@ class GenStreaming(GenericGenData):
                 "span_v_min": span_v_min,
                 "span_v_max": span_v_max,
                 "span_v_count": span_v_count,
+                "emitter_mode": emitter_mode,
+                "emitter": emitter,
             }
 
         raw_streams = self.itemcfg.get("particle_streams")
@@ -300,6 +394,8 @@ class GenStreaming(GenericGenData):
             streams = [parse_stream(legacy_stream, 0, "legacy_stream")]
 
         for stream in streams:
+            if stream["emitter_mode"]:
+                continue
             if (
                 stream["inlet_axis"] == "x"
                 and stream["initial_particle_velocity"]
@@ -331,6 +427,8 @@ class GenStreaming(GenericGenData):
         ]
 
         all_streams_have_spans = all(
+            stream["emitter_mode"]
+            or
             stream["patch_mode"]
             or (stream["span_min"] is not None and stream["span_max"] is not None)
             for stream in streams
@@ -399,6 +497,8 @@ class GenStreaming(GenericGenData):
                 errors.append("streaming packing bounds must fit inside death_bounds")
 
             for stream in streams:
+                if stream["emitter_mode"]:
+                    continue
                 inlet_value = stream["inlet_value"]
                 if stream["inlet_axis"] == "x" and not (0.0 <= inlet_value <= width):
                     errors.append(
@@ -473,6 +573,123 @@ class GenStreaming(GenericGenData):
         self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
         self.calculate_streaming_layout()
         return True
+
+    @staticmethod
+    def vector_length(vector):
+        return math.sqrt(sum(float(value) * float(value) for value in vector))
+
+    @classmethod
+    def normalize_vector(cls, vector):
+        length = cls.vector_length(vector)
+        if length <= 0.0:
+            return (0.0, 0.0, 0.0)
+        return tuple(float(value) / length for value in vector)
+
+    @staticmethod
+    def lerp(a, b, t):
+        return tuple(float(a[index]) + (float(b[index]) - float(a[index])) * t for index in range(3))
+
+    def evaluate_polyline_curve(self, points, t):
+        if len(points) == 1:
+            return points[0]
+        segment_lengths = [
+            self.vector_length(
+                tuple(float(points[index + 1][axis]) - float(points[index][axis]) for axis in range(3))
+            )
+            for index in range(len(points) - 1)
+        ]
+        total_length = sum(segment_lengths)
+        if total_length <= 0.0:
+            return points[0]
+        target_length = max(0.0, min(1.0, float(t))) * total_length
+        walked = 0.0
+        for index, segment_length in enumerate(segment_lengths):
+            if walked + segment_length >= target_length:
+                local_t = 0.0 if segment_length <= 0.0 else (target_length - walked) / segment_length
+                return self.lerp(points[index], points[index + 1], local_t)
+            walked += segment_length
+        return points[-1]
+
+    @staticmethod
+    def evaluate_cubic_bezier(p0, p1, p2, p3, t):
+        t = max(0.0, min(1.0, float(t)))
+        u = 1.0 - t
+        return tuple(
+            u * u * u * float(p0[index])
+            + 3.0 * u * u * t * float(p1[index])
+            + 3.0 * u * t * t * float(p2[index])
+            + t * t * t * float(p3[index])
+            for index in range(3)
+        )
+
+    def evaluate_stream_curve(self, emitter, t):
+        if emitter["kind"] == "polyline":
+            return self.evaluate_polyline_curve(emitter["points"], t)
+        return self.evaluate_cubic_bezier(
+            emitter["p0"],
+            emitter["p1"],
+            emitter["p2"],
+            emitter["p3"],
+            t,
+        )
+
+    def stream_curve_samples(self, emitter, sample_count=128):
+        count = max(2, int(sample_count))
+        return tuple(
+            self.evaluate_stream_curve(emitter, index / (count - 1))
+            for index in range(count)
+        )
+
+    def stream_curve_length(self, emitter):
+        points = self.stream_curve_samples(emitter)
+        return sum(
+            self.vector_length(
+                tuple(
+                    float(points[index + 1][axis]) - float(points[index][axis])
+                    for axis in range(3)
+                )
+            )
+            for index in range(len(points) - 1)
+        )
+
+    def evaluate_stream_curve_at_distance(self, emitter, distance):
+        points = self.stream_curve_samples(emitter)
+        target_distance = max(0.0, float(distance))
+        walked = 0.0
+        for index in range(len(points) - 1):
+            segment = tuple(
+                float(points[index + 1][axis]) - float(points[index][axis])
+                for axis in range(3)
+            )
+            segment_length = self.vector_length(segment)
+            if segment_length <= 0.0:
+                continue
+            if walked + segment_length >= target_distance:
+                local_t = (target_distance - walked) / segment_length
+                return self.lerp(points[index], points[index + 1], local_t)
+            walked += segment_length
+        return points[-1]
+
+    @staticmethod
+    def sample_centered_spacing(count, center_spacing):
+        if count == 1:
+            return (0.0,)
+        first_offset = -0.5 * (count - 1) * float(center_spacing)
+        return tuple(first_offset + index * float(center_spacing) for index in range(count))
+
+    @staticmethod
+    def sample_unit_interval(count):
+        if count == 1:
+            return (0.5,)
+        return tuple(index / (count - 1) for index in range(count))
+
+    @staticmethod
+    def sample_centered_width(width, count):
+        if count == 1:
+            return (0.0,)
+        lower = -0.5 * float(width)
+        step = float(width) / (count - 1)
+        return tuple(lower + index * step for index in range(count))
 
     def validate_penetration_fractions(self, errors):
         try:
@@ -553,6 +770,8 @@ class GenStreaming(GenericGenData):
         if stream is None:
             stream = self.streaming_streams[0]
         velocity = stream["initial_particle_velocity"]
+        if stream.get("emitter_mode"):
+            return self.vector_length(velocity)
         if stream["inlet_axis"] == "x":
             return abs(float(velocity[0]))
         if stream["inlet_axis"] == "y":
@@ -599,6 +818,83 @@ class GenStreaming(GenericGenData):
         self.particle_center_spacing = center_spacing
 
         for stream in self.streaming_streams:
+            if stream["emitter_mode"]:
+                emitter = stream["emitter"]
+                stream_center_spacing = 2.0 * radius * stream["spacing_factor"]
+                curve_length = self.stream_curve_length(emitter)
+                occupied_curve_length = (
+                    (emitter["length_count"] - 1) * stream_center_spacing
+                )
+                occupied_width = (
+                    (emitter["width_count"] - 1) * stream_center_spacing
+                )
+                if occupied_curve_length > curve_length + 1.0e-12:
+                    raise ValueError(
+                        f"{stream['name']} curve emitter length_count and "
+                        "spacing_factor do not fit on the configured curve"
+                    )
+                if occupied_width > emitter["width"] + 1.0e-12:
+                    raise ValueError(
+                        f"{stream['name']} curve emitter width_count and "
+                        "spacing_factor do not fit inside emitter.width"
+                    )
+                curve_mid_distance = 0.5 * curve_length
+                length_offsets = self.sample_centered_spacing(
+                    emitter["length_count"],
+                    stream_center_spacing,
+                )
+                length_centers = tuple(
+                    curve_mid_distance + offset for offset in length_offsets
+                )
+                width_centers = self.sample_centered_spacing(
+                    emitter["width_count"],
+                    stream_center_spacing,
+                )
+                width_axis = self.normalize_vector(emitter["width_axis"])
+                frames_per_wave = self.frames_between_waves(stream)
+                particle_count = stream["release_columns"] * stream["particles_per_wave"]
+                material = self.material_properties_by_id[stream["material_id"]]
+                stream.update(
+                    {
+                        "particle_type": material.get("particle_type", "regular"),
+                        "layout_mode": "curve",
+                        "length_centers": length_centers,
+                        "width_centers": width_centers,
+                        "width_axis": width_axis,
+                        "curve_length": curve_length,
+                        "curve_center_spacing": stream_center_spacing,
+                        "occupied_curve_length": occupied_curve_length,
+                        "occupied_width": occupied_width,
+                        "frames_per_wave": frames_per_wave,
+                        "particle_count": particle_count,
+                    }
+                )
+                total_particle_count += particle_count
+                report_lines.extend(
+                    (
+                        f"  stream: {stream['name']}",
+                        "    layout mode: curve",
+                        f"    curve kind: {emitter['kind']}",
+                        f"    length count: {emitter['length_count']}",
+                        f"    width: {emitter['width']:g}",
+                        f"    width count: {emitter['width_count']}",
+                        f"    center spacing: {stream_center_spacing:g}",
+                        f"    curve length: {curve_length:g}",
+                        f"    occupied curve length: {occupied_curve_length:g}",
+                        f"    occupied width: {occupied_width:g}",
+                        f"    material_id: {stream['material_id']}",
+                        f"    particle type: {stream['particle_type']}",
+                        f"    release start frame: {stream['release_start_frame']:g}",
+                        f"    release columns/waves: {stream['release_columns']}",
+                        f"    particles per wave: {stream['particles_per_wave']}",
+                        f"    frames per wave: {stream['frames_per_wave']}",
+                        f"    mobile particle count: {stream['particle_count']}",
+                        "    initial particle velocity: "
+                        f"{stream['initial_particle_velocity']}",
+                    )
+                )
+                continue
+
             if stream["patch_mode"]:
                 u_centers = self.span_centers(
                     stream["span_u_min"],
@@ -731,6 +1027,19 @@ class GenStreaming(GenericGenData):
         return self.streaming_particle_count
 
     def stream_position(self, stream, span_center=None, u_center=None, v_center=None):
+        if stream["layout_mode"] == "curve":
+            emitter = stream["emitter"]
+            curve_position = self.evaluate_stream_curve_at_distance(
+                emitter,
+                u_center,
+            )
+            width_offset = float(v_center)
+            width_axis = stream["width_axis"]
+            return tuple(
+                curve_position[index] + width_axis[index] * width_offset
+                for index in range(3)
+            )
+
         position = {"x": 0.0, "y": 0.0, "z": self.particle_plane_z}
         position[stream["inlet_axis"]] = stream["inlet_value"]
         if stream["layout_mode"] == "patch":
@@ -760,6 +1069,24 @@ class GenStreaming(GenericGenData):
                                 stream,
                                 u_center=u_center,
                                 v_center=v_center,
+                            )
+                            particle = self.add_mobile_particle(
+                                position,
+                                velocity,
+                                radius=self.radius,
+                                material_id=stream["material_id"],
+                                collision_stiffness_q=float(
+                                    self.itemcfg.get("collision_stiffness_q", 0.0)
+                                ),
+                            )
+                            particle.state_flg = float(birth_frame)
+                elif stream["layout_mode"] == "curve":
+                    for width_center in stream["width_centers"]:
+                        for length_center in stream["length_centers"]:
+                            position = self.stream_position(
+                                stream,
+                                u_center=length_center,
+                                v_center=width_center,
                             )
                             particle = self.add_mobile_particle(
                                 position,

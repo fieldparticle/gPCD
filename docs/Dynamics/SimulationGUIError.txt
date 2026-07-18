@@ -1,0 +1,976 @@
+
+22: // optional normal declaration
+23: //VTK::Normal::Dec
+24: 
+25: // extra lighting parameters
+26: //VTK::Light::Dec
+27: 
+28: // Texture coordinates
+29: //VTK::TCoord::Dec
+30: 
+31: // material property values
+32: //VTK::Color::Dec
+33: 
+34: // clipping plane vars
+35: //VTK::Clip::Dec
+36: 
+37: // camera and actor matrix values
+38: uniform mat4 MCDCMatrix;
+39: 
+40: // Apple Bug
+41: //VTK::PrimID::Dec
+42: 
+43: // Value raster
+44: //VTK::ValuePass::Dec
+45: 
+46: // picking support
+47: //VTK::Picking::Dec
+48: 
+49: // Surface with edges on GLES 3.0
+50: //VTK::EdgesGLES30::Dec
+51: 
+52: // PointSize on GLES 3.0
+53: //VTK::PointSizeGLES30::Dec
+54: 
+55: // LineWidth on GLES 3.0
+56: //VTK::LineWidthGLES30::Dec
+57: 
+58: void main()
+59: {
+60:   //VTK::CustomBegin::Impl
+61: 
+62:   //VTK::PointSizeGLES30::Impl
+63: 
+64:   //VTK::Color::Impl
+65: 
+66:   //VTK::Normal::Impl
+67: 
+68:   //VTK::TCoord::Impl
+69: 
+70:   //VTK::Clip::Impl
+71: 
+72:   //VTK::PrimID::Impl
+73: 
+74:     gl_Position = MCDCMatrix * vertexMC;
+75: 
+76: 
+77:   //VTK::LineWidthGLES30::Impl
+78: 
+79:   //VTK::ValuePass::Impl
+80: 
+81:   //VTK::Light::Impl
+82: 
+83:   //VTK::Picking::Impl
+84: 
+85:   //VTK::CustomEnd::Impl
+86: 
+87:   //VTK::EdgesGLES30::Impl
+88: }
+2026-07-18 11:00:42.139 (  30.720s) [B79C000061721910]   vtkShaderProgram.cxx:1145   ERR| vtkShaderProgram (00000198435FD570): Could not create shader object.
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1145
+vtkShaderProgram (00000198435FD570): Could not create shader object.
+2026-07-18 11:00:42.144 (  30.725s) [B79C000061721910]vtkOpenGLPolyDataMapper:2706   ERR| vtkOpenGLPolyDataMapper (000001983B3360D0): Could not set shader program
+WARNING:root:ERROR: In vtkOpenGLPolyDataMapper.cxx, line 2706
+vtkOpenGLPolyDataMapper (000001983B3360D0): Could not set shader program
+2026-07-18 11:00:42.149 (  30.730s) [B79C000061721910]   vtkShaderProgram.cxx:1144   ERR| vtkShaderProgram (00000198435FE830): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: 
+12: // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+13: // SPDX-License-Identifier: BSD-3-Clause
+14: 
+15: in vec4 vertexMC;
+16: 
+17: 
+18: 
+19: // frag position in VC
+20: out vec4 vertexVCVSOutput;
+21: 
+22: // optional normal declaration
+23: //VTK::Normal::Dec
+24: 
+25: // extra lighting parameters
+26: //VTK::Light::Dec
+27: 
+28: // Texture coordinates
+29: //VTK::TCoord::Dec
+30: 
+31: // material property values
+32: in vec4 scalarColor;
+33: out vec4 vertexColorVSOutput;
+34: 
+35: // clipping plane vars
+36: //VTK::Clip::Dec
+37: 
+38: // camera and actor matrix values
+39: uniform mat4 MCDCMatrix;
+40: uniform mat4 MCVCMatrix;
+41: 
+42: // Apple Bug
+43: //VTK::PrimID::Dec
+44: 
+45: // Value raster
+46: //VTK::ValuePass::Dec
+47: 
+48: // picking support
+49: //VTK::Picking::Dec
+50: 
+51: // Surface with edges on GLES 3.0
+52: //VTK::EdgesGLES30::Dec
+53: 
+54: // PointSize on GLES 3.0
+55: //VTK::PointSizeGLES30::Dec
+56: 
+57: // LineWidth on GLES 3.0
+58: //VTK::LineWidthGLES30::Dec
+59: 
+60: void main()
+61: {
+62:   //VTK::CustomBegin::Impl
+63: 
+64:   //VTK::PointSizeGLES30::Impl
+65: 
+66:   vertexColorVSOutput = scalarColor;
+67: 
+68:   //VTK::Normal::Impl
+69: 
+70:   //VTK::TCoord::Impl
+71: 
+72:   //VTK::Clip::Impl
+73: 
+74:   //VTK::PrimID::Impl
+75: 
+76:   vertexVCVSOutput = MCVCMatrix * vertexMC;
+77:   gl_Position = MCDCMatrix * vertexMC;
+78: 
+79: 
+80:   //VTK::LineWidthGLES30::Impl
+81: 
+82:   //VTK::ValuePass::Impl
+83: 
+84:   //VTK::Light::Impl
+85: 
+86:   //VTK::Picking::Impl
+87: 
+88:   //VTK::CustomEnd::Impl
+89: 
+90:   //VTK::EdgesGLES30::Impl
+91: }
+
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1144
+vtkShaderProgram (00000198435FE830): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: 
+12: // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+13: // SPDX-License-Identifier: BSD-3-Clause
+14: 
+15: in vec4 vertexMC;
+16: 
+17: 
+18: 
+19: // frag position in VC
+20: out vec4 vertexVCVSOutput;
+21: 
+22: // optional normal declaration
+23: //VTK::Normal::Dec
+24: 
+25: // extra lighting parameters
+26: //VTK::Light::Dec
+27: 
+28: // Texture coordinates
+29: //VTK::TCoord::Dec
+30: 
+31: // material property values
+32: in vec4 scalarColor;
+33: out vec4 vertexColorVSOutput;
+34: 
+35: // clipping plane vars
+36: //VTK::Clip::Dec
+37: 
+38: // camera and actor matrix values
+39: uniform mat4 MCDCMatrix;
+40: uniform mat4 MCVCMatrix;
+41: 
+42: // Apple Bug
+43: //VTK::PrimID::Dec
+44: 
+45: // Value raster
+46: //VTK::ValuePass::Dec
+47: 
+48: // picking support
+49: //VTK::Picking::Dec
+50: 
+51: // Surface with edges on GLES 3.0
+52: //VTK::EdgesGLES30::Dec
+53: 
+54: // PointSize on GLES 3.0
+55: //VTK::PointSizeGLES30::Dec
+56: 
+57: // LineWidth on GLES 3.0
+58: //VTK::LineWidthGLES30::Dec
+59: 
+60: void main()
+61: {
+62:   //VTK::CustomBegin::Impl
+63: 
+64:   //VTK::PointSizeGLES30::Impl
+65: 
+66:   vertexColorVSOutput = scalarColor;
+67: 
+68:   //VTK::Normal::Impl
+69: 
+70:   //VTK::TCoord::Impl
+71: 
+72:   //VTK::Clip::Impl
+73: 
+74:   //VTK::PrimID::Impl
+75: 
+76:   vertexVCVSOutput = MCVCMatrix * vertexMC;
+77:   gl_Position = MCDCMatrix * vertexMC;
+78: 
+79: 
+80:   //VTK::LineWidthGLES30::Impl
+81: 
+82:   //VTK::ValuePass::Impl
+83: 
+84:   //VTK::Light::Impl
+85: 
+86:   //VTK::Picking::Impl
+87: 
+88:   //VTK::CustomEnd::Impl
+89: 
+90:   //VTK::EdgesGLES30::Impl
+91: }
+2026-07-18 11:00:42.194 (  30.775s) [B79C000061721910]   vtkShaderProgram.cxx:1145   ERR| vtkShaderProgram (00000198435FE830): Could not create shader object.
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1145
+vtkShaderProgram (00000198435FE830): Could not create shader object.
+2026-07-18 11:00:42.199 (  30.779s) [B79C000061721910]vtkOpenGLPolyDataMapper:2706   ERR| vtkOpenGLPolyDataMapper (000001983B337300): Could not set shader program
+WARNING:root:ERROR: In vtkOpenGLPolyDataMapper.cxx, line 2706
+vtkOpenGLPolyDataMapper (000001983B337300): Could not set shader program
+2026-07-18 11:00:42.204 (  30.784s) [B79C000061721910]   vtkShaderProgram.cxx:1144   ERR| vtkShaderProgram (00000198435FE830): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: 
+12: // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+13: // SPDX-License-Identifier: BSD-3-Clause
+14: 
+15: in vec4 vertexMC;
+16: 
+17: 
+18: 
+19: // frag position in VC
+20: out vec4 vertexVCVSOutput;
+21: 
+22: // optional normal declaration
+23: //VTK::Normal::Dec
+24: 
+25: // extra lighting parameters
+26: //VTK::Light::Dec
+27: 
+28: // Texture coordinates
+29: //VTK::TCoord::Dec
+30: 
+31: // material property values
+32: in vec4 scalarColor;
+33: out vec4 vertexColorVSOutput;
+34: 
+35: // clipping plane vars
+36: //VTK::Clip::Dec
+37: 
+38: // camera and actor matrix values
+39: uniform mat4 MCDCMatrix;
+40: uniform mat4 MCVCMatrix;
+41: 
+42: // Apple Bug
+43: //VTK::PrimID::Dec
+44: 
+45: // Value raster
+46: //VTK::ValuePass::Dec
+47: 
+48: // picking support
+49: //VTK::Picking::Dec
+50: 
+51: // Surface with edges on GLES 3.0
+52: //VTK::EdgesGLES30::Dec
+53: 
+54: // PointSize on GLES 3.0
+55: //VTK::PointSizeGLES30::Dec
+56: 
+57: // LineWidth on GLES 3.0
+58: //VTK::LineWidthGLES30::Dec
+59: 
+60: void main()
+61: {
+62:   //VTK::CustomBegin::Impl
+63: 
+64:   //VTK::PointSizeGLES30::Impl
+65: 
+66:   vertexColorVSOutput = scalarColor;
+67: 
+68:   //VTK::Normal::Impl
+69: 
+70:   //VTK::TCoord::Impl
+71: 
+72:   //VTK::Clip::Impl
+73: 
+74:   //VTK::PrimID::Impl
+75: 
+76:   vertexVCVSOutput = MCVCMatrix * vertexMC;
+77:   gl_Position = MCDCMatrix * vertexMC;
+78: 
+79: 
+80:   //VTK::LineWidthGLES30::Impl
+81: 
+82:   //VTK::ValuePass::Impl
+83: 
+84:   //VTK::Light::Impl
+85: 
+86:   //VTK::Picking::Impl
+87: 
+88:   //VTK::CustomEnd::Impl
+89: 
+90:   //VTK::EdgesGLES30::Impl
+91: }
+
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1144
+vtkShaderProgram (00000198435FE830): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: 
+12: // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+13: // SPDX-License-Identifier: BSD-3-Clause
+14: 
+15: in vec4 vertexMC;
+16: 
+17: 
+18: 
+19: // frag position in VC
+20: out vec4 vertexVCVSOutput;
+21: 
+22: // optional normal declaration
+23: //VTK::Normal::Dec
+24: 
+25: // extra lighting parameters
+26: //VTK::Light::Dec
+27: 
+28: // Texture coordinates
+29: //VTK::TCoord::Dec
+30: 
+31: // material property values
+32: in vec4 scalarColor;
+33: out vec4 vertexColorVSOutput;
+34: 
+35: // clipping plane vars
+36: //VTK::Clip::Dec
+37: 
+38: // camera and actor matrix values
+39: uniform mat4 MCDCMatrix;
+40: uniform mat4 MCVCMatrix;
+41: 
+42: // Apple Bug
+43: //VTK::PrimID::Dec
+44: 
+45: // Value raster
+46: //VTK::ValuePass::Dec
+47: 
+48: // picking support
+49: //VTK::Picking::Dec
+50: 
+51: // Surface with edges on GLES 3.0
+52: //VTK::EdgesGLES30::Dec
+53: 
+54: // PointSize on GLES 3.0
+55: //VTK::PointSizeGLES30::Dec
+56: 
+57: // LineWidth on GLES 3.0
+58: //VTK::LineWidthGLES30::Dec
+59: 
+60: void main()
+61: {
+62:   //VTK::CustomBegin::Impl
+63: 
+64:   //VTK::PointSizeGLES30::Impl
+65: 
+66:   vertexColorVSOutput = scalarColor;
+67: 
+68:   //VTK::Normal::Impl
+69: 
+70:   //VTK::TCoord::Impl
+71: 
+72:   //VTK::Clip::Impl
+73: 
+74:   //VTK::PrimID::Impl
+75: 
+76:   vertexVCVSOutput = MCVCMatrix * vertexMC;
+77:   gl_Position = MCDCMatrix * vertexMC;
+78: 
+79: 
+80:   //VTK::LineWidthGLES30::Impl
+81: 
+82:   //VTK::ValuePass::Impl
+83: 
+84:   //VTK::Light::Impl
+85: 
+86:   //VTK::Picking::Impl
+87: 
+88:   //VTK::CustomEnd::Impl
+89: 
+90:   //VTK::EdgesGLES30::Impl
+91: }
+2026-07-18 11:00:42.250 (  30.831s) [B79C000061721910]   vtkShaderProgram.cxx:1145   ERR| vtkShaderProgram (00000198435FE830): Could not create shader object.
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1145
+vtkShaderProgram (00000198435FE830): Could not create shader object.
+2026-07-18 11:00:42.255 (  30.836s) [B79C000061721910]vtkOpenGLPolyDataMapper:2706   ERR| vtkOpenGLPolyDataMapper (000001983B339D70): Could not set shader program
+WARNING:root:ERROR: In vtkOpenGLPolyDataMapper.cxx, line 2706
+vtkOpenGLPolyDataMapper (000001983B339D70): Could not set shader program
+2026-07-18 11:00:42.259 (  30.840s) [B79C000061721910]     vtkOpenGLState.cxx:1806  WARN| Hardware does not support the number of textures defined.
+2026-07-18 11:00:42.264 (  30.844s) [B79C000061721910]     vtkOpenGLState.cxx:1806  WARN| Hardware does not support the number of textures defined.
+2026-07-18 11:00:42.268 (  30.849s) [B79C000061721910]     vtkOpenGLState.cxx:1806  WARN| Hardware does not support the number of textures defined.
+2026-07-18 11:00:42.272 (  30.853s) [B79C000061721910]   vtkShaderProgram.cxx:1144   ERR| vtkShaderProgram (00000198435FCDF0): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: 
+12: // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+13: // SPDX-License-Identifier: BSD-3-Clause
+14: 
+15: // all variables that represent positions or directions have a suffix
+16: // indicating the coordinate system they are in. The possible values are
+17: // MC - Model Coordinates
+18: // WC - WC world coordinates
+19: // VC - View Coordinates
+20: // DC - Display Coordinates
+21: 
+22: in vec4 vertexWC;
+23: 
+24: // Custom uniforms
+25: 
+26: 
+27: // material property values
+28: //VTK::Color::Dec
+29: 
+30: // Texture coordinates
+31: in vec2 tcoordMC; out vec2 tcoordVCVSOutput;
+32: 
+33: // Apple Bug
+34: //VTK::PrimID::Dec
+35: 
+36: // PointSize on GLES 3.0
+37: //VTK::PointSizeGLES30::Dec
+38: 
+39: // LineWidth on GLES 3.0
+40: //VTK::LineWidthGLES30::Dec
+41: 
+42: uniform mat4 WCVCMatrix;  // World to view matrix
+43: 
+44: void main()
+45: {
+46:   //VTK::PointSizeGLES30::Impl
+47: 
+48:   // Apple Bug
+49:   //VTK::PrimID::Impl
+50: 
+51:   gl_Position = WCVCMatrix*vertexWC;
+52:   //VTK::LineWidthGLES30::Impl
+53:   tcoordVCVSOutput = tcoordMC;
+54:   //VTK::Color::Impl
+55: }
+
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1144
+vtkShaderProgram (00000198435FCDF0): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: 
+12: // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+13: // SPDX-License-Identifier: BSD-3-Clause
+14: 
+15: // all variables that represent positions or directions have a suffix
+16: // indicating the coordinate system they are in. The possible values are
+17: // MC - Model Coordinates
+18: // WC - WC world coordinates
+19: // VC - View Coordinates
+20: // DC - Display Coordinates
+21: 
+22: in vec4 vertexWC;
+23: 
+24: // Custom uniforms
+25: 
+26: 
+27: // material property values
+28: //VTK::Color::Dec
+29: 
+30: // Texture coordinates
+31: in vec2 tcoordMC; out vec2 tcoordVCVSOutput;
+32: 
+33: // Apple Bug
+34: //VTK::PrimID::Dec
+35: 
+36: // PointSize on GLES 3.0
+37: //VTK::PointSizeGLES30::Dec
+38: 
+39: // LineWidth on GLES 3.0
+40: //VTK::LineWidthGLES30::Dec
+41: 
+42: uniform mat4 WCVCMatrix;  // World to view matrix
+43: 
+44: void main()
+45: {
+46:   //VTK::PointSizeGLES30::Impl
+47: 
+48:   // Apple Bug
+49:   //VTK::PrimID::Impl
+50: 
+51:   gl_Position = WCVCMatrix*vertexWC;
+52:   //VTK::LineWidthGLES30::Impl
+53:   tcoordVCVSOutput = tcoordMC;
+54:   //VTK::Color::Impl
+55: }
+2026-07-18 11:00:42.309 (  30.890s) [B79C000061721910]   vtkShaderProgram.cxx:1145   ERR| vtkShaderProgram (00000198435FCDF0): Could not create shader object.
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1145
+vtkShaderProgram (00000198435FCDF0): Could not create shader object.
+2026-07-18 11:00:42.314 (  30.895s) [B79C000061721910]     vtkOpenGLState.cxx:1806  WARN| Hardware does not support the number of textures defined.
+2026-07-18 11:00:42.318 (  30.899s) [B79C000061721910]     vtkOpenGLState.cxx:1806  WARN| Hardware does not support the number of textures defined.
+2026-07-18 11:00:42.323 (  30.903s) [B79C000061721910]     vtkOpenGLState.cxx:1806  WARN| Hardware does not support the number of textures defined.
+2026-07-18 11:00:42.327 (  30.908s) [B79C000061721910]   vtkShaderProgram.cxx:1144   ERR| vtkShaderProgram (00000198435FCDF0): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: 
+12: // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+13: // SPDX-License-Identifier: BSD-3-Clause
+14: 
+15: // all variables that represent positions or directions have a suffix
+16: // indicating the coordinate system they are in. The possible values are
+17: // MC - Model Coordinates
+18: // WC - WC world coordinates
+19: // VC - View Coordinates
+20: // DC - Display Coordinates
+21: 
+22: in vec4 vertexWC;
+23: 
+24: // Custom uniforms
+25: 
+26: 
+27: // material property values
+28: //VTK::Color::Dec
+29: 
+30: // Texture coordinates
+31: in vec2 tcoordMC; out vec2 tcoordVCVSOutput;
+32: 
+33: // Apple Bug
+34: //VTK::PrimID::Dec
+35: 
+36: // PointSize on GLES 3.0
+37: //VTK::PointSizeGLES30::Dec
+38: 
+39: // LineWidth on GLES 3.0
+40: //VTK::LineWidthGLES30::Dec
+41: 
+42: uniform mat4 WCVCMatrix;  // World to view matrix
+43: 
+44: void main()
+45: {
+46:   //VTK::PointSizeGLES30::Impl
+47: 
+48:   // Apple Bug
+49:   //VTK::PrimID::Impl
+50: 
+51:   gl_Position = WCVCMatrix*vertexWC;
+52:   //VTK::LineWidthGLES30::Impl
+53:   tcoordVCVSOutput = tcoordMC;
+54:   //VTK::Color::Impl
+55: }
+
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1144
+vtkShaderProgram (00000198435FCDF0): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: 
+12: // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+13: // SPDX-License-Identifier: BSD-3-Clause
+14: 
+15: // all variables that represent positions or directions have a suffix
+16: // indicating the coordinate system they are in. The possible values are
+17: // MC - Model Coordinates
+18: // WC - WC world coordinates
+19: // VC - View Coordinates
+20: // DC - Display Coordinates
+21: 
+22: in vec4 vertexWC;
+23: 
+24: // Custom uniforms
+25: 
+26: 
+27: // material property values
+28: //VTK::Color::Dec
+29: 
+30: // Texture coordinates
+31: in vec2 tcoordMC; out vec2 tcoordVCVSOutput;
+32: 
+33: // Apple Bug
+34: //VTK::PrimID::Dec
+35: 
+36: // PointSize on GLES 3.0
+37: //VTK::PointSizeGLES30::Dec
+38: 
+39: // LineWidth on GLES 3.0
+40: //VTK::LineWidthGLES30::Dec
+41: 
+42: uniform mat4 WCVCMatrix;  // World to view matrix
+43: 
+44: void main()
+45: {
+46:   //VTK::PointSizeGLES30::Impl
+47: 
+48:   // Apple Bug
+49:   //VTK::PrimID::Impl
+50: 
+51:   gl_Position = WCVCMatrix*vertexWC;
+52:   //VTK::LineWidthGLES30::Impl
+53:   tcoordVCVSOutput = tcoordMC;
+54:   //VTK::Color::Impl
+55: }
+2026-07-18 11:00:42.363 (  30.943s) [B79C000061721910]   vtkShaderProgram.cxx:1145   ERR| vtkShaderProgram (00000198435FCDF0): Could not create shader object.
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1145
+vtkShaderProgram (00000198435FCDF0): Could not create shader object.
+2026-07-18 11:00:42.367 (  30.948s) [B79C000061721910]     vtkOpenGLState.cxx:1806  WARN| Hardware does not support the number of textures defined.
+2026-07-18 11:00:42.371 (  30.951s) [B79C000061721910]     vtkOpenGLState.cxx:1806  WARN| Hardware does not support the number of textures defined.
+2026-07-18 11:00:42.375 (  30.955s) [B79C000061721910]     vtkOpenGLState.cxx:1806  WARN| Hardware does not support the number of textures defined.
+2026-07-18 11:00:42.379 (  30.960s) [B79C000061721910]   vtkShaderProgram.cxx:1144   ERR| vtkShaderProgram (00000198435FCDF0): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: 
+12: // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+13: // SPDX-License-Identifier: BSD-3-Clause
+14: 
+15: // all variables that represent positions or directions have a suffix
+16: // indicating the coordinate system they are in. The possible values are
+17: // MC - Model Coordinates
+18: // WC - WC world coordinates
+19: // VC - View Coordinates
+20: // DC - Display Coordinates
+21: 
+22: in vec4 vertexWC;
+23: 
+24: // Custom uniforms
+25: 
+26: 
+27: // material property values
+28: //VTK::Color::Dec
+29: 
+30: // Texture coordinates
+31: in vec2 tcoordMC; out vec2 tcoordVCVSOutput;
+32: 
+33: // Apple Bug
+34: //VTK::PrimID::Dec
+35: 
+36: // PointSize on GLES 3.0
+37: //VTK::PointSizeGLES30::Dec
+38: 
+39: // LineWidth on GLES 3.0
+40: //VTK::LineWidthGLES30::Dec
+41: 
+42: uniform mat4 WCVCMatrix;  // World to view matrix
+43: 
+44: void main()
+45: {
+46:   //VTK::PointSizeGLES30::Impl
+47: 
+48:   // Apple Bug
+49:   //VTK::PrimID::Impl
+50: 
+51:   gl_Position = WCVCMatrix*vertexWC;
+52:   //VTK::LineWidthGLES30::Impl
+53:   tcoordVCVSOutput = tcoordMC;
+54:   //VTK::Color::Impl
+55: }
+
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1144
+vtkShaderProgram (00000198435FCDF0): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: 
+12: // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+13: // SPDX-License-Identifier: BSD-3-Clause
+14: 
+15: // all variables that represent positions or directions have a suffix
+16: // indicating the coordinate system they are in. The possible values are
+17: // MC - Model Coordinates
+18: // WC - WC world coordinates
+19: // VC - View Coordinates
+20: // DC - Display Coordinates
+21: 
+22: in vec4 vertexWC;
+23: 
+24: // Custom uniforms
+25: 
+26: 
+27: // material property values
+28: //VTK::Color::Dec
+29: 
+30: // Texture coordinates
+31: in vec2 tcoordMC; out vec2 tcoordVCVSOutput;
+32: 
+33: // Apple Bug
+34: //VTK::PrimID::Dec
+35: 
+36: // PointSize on GLES 3.0
+37: //VTK::PointSizeGLES30::Dec
+38: 
+39: // LineWidth on GLES 3.0
+40: //VTK::LineWidthGLES30::Dec
+41: 
+42: uniform mat4 WCVCMatrix;  // World to view matrix
+43: 
+44: void main()
+45: {
+46:   //VTK::PointSizeGLES30::Impl
+47: 
+48:   // Apple Bug
+49:   //VTK::PrimID::Impl
+50: 
+51:   gl_Position = WCVCMatrix*vertexWC;
+52:   //VTK::LineWidthGLES30::Impl
+53:   tcoordVCVSOutput = tcoordMC;
+54:   //VTK::Color::Impl
+55: }
+2026-07-18 11:00:42.417 (  30.997s) [B79C000061721910]   vtkShaderProgram.cxx:1145   ERR| vtkShaderProgram (00000198435FCDF0): Could not create shader object.
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1145
+vtkShaderProgram (00000198435FCDF0): Could not create shader object.
+2026-07-18 11:00:42.422 (  31.002s) [B79C000061721910]     vtkOpenGLState.cxx:1806  WARN| Hardware does not support the number of textures defined.
+2026-07-18 11:00:42.425 (  31.006s) [B79C000061721910]     vtkOpenGLState.cxx:1806  WARN| Hardware does not support the number of textures defined.
+2026-07-18 11:00:42.428 (  31.009s) [B79C000061721910]     vtkOpenGLState.cxx:1806  WARN| Hardware does not support the number of textures defined.
+2026-07-18 11:00:42.433 (  31.013s) [B79C000061721910]   vtkShaderProgram.cxx:1144   ERR| vtkShaderProgram (00000198435FCDF0): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: 
+12: // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+13: // SPDX-License-Identifier: BSD-3-Clause
+14: 
+15: // all variables that represent positions or directions have a suffix
+16: // indicating the coordinate system they are in. The possible values are
+17: // MC - Model Coordinates
+18: // WC - WC world coordinates
+19: // VC - View Coordinates
+20: // DC - Display Coordinates
+21: 
+22: in vec4 vertexWC;
+23: 
+24: // Custom uniforms
+25: 
+26: 
+27: // material property values
+28: //VTK::Color::Dec
+29: 
+30: // Texture coordinates
+31: in vec2 tcoordMC; out vec2 tcoordVCVSOutput;
+32: 
+33: // Apple Bug
+34: //VTK::PrimID::Dec
+35: 
+36: // PointSize on GLES 3.0
+37: //VTK::PointSizeGLES30::Dec
+38: 
+39: // LineWidth on GLES 3.0
+40: //VTK::LineWidthGLES30::Dec
+41: 
+42: uniform mat4 WCVCMatrix;  // World to view matrix
+43: 
+44: void main()
+45: {
+46:   //VTK::PointSizeGLES30::Impl
+47: 
+48:   // Apple Bug
+49:   //VTK::PrimID::Impl
+50: 
+51:   gl_Position = WCVCMatrix*vertexWC;
+52:   //VTK::LineWidthGLES30::Impl
+53:   tcoordVCVSOutput = tcoordMC;
+54:   //VTK::Color::Impl
+55: }
+
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1144
+vtkShaderProgram (00000198435FCDF0): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: 
+12: // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+13: // SPDX-License-Identifier: BSD-3-Clause
+14: 
+15: // all variables that represent positions or directions have a suffix
+16: // indicating the coordinate system they are in. The possible values are
+17: // MC - Model Coordinates
+18: // WC - WC world coordinates
+19: // VC - View Coordinates
+20: // DC - Display Coordinates
+21: 
+22: in vec4 vertexWC;
+23: 
+24: // Custom uniforms
+25: 
+26: 
+27: // material property values
+28: //VTK::Color::Dec
+29: 
+30: // Texture coordinates
+31: in vec2 tcoordMC; out vec2 tcoordVCVSOutput;
+32: 
+33: // Apple Bug
+34: //VTK::PrimID::Dec
+35: 
+36: // PointSize on GLES 3.0
+37: //VTK::PointSizeGLES30::Dec
+38: 
+39: // LineWidth on GLES 3.0
+40: //VTK::LineWidthGLES30::Dec
+41: 
+42: uniform mat4 WCVCMatrix;  // World to view matrix
+43: 
+44: void main()
+45: {
+46:   //VTK::PointSizeGLES30::Impl
+47: 
+48:   // Apple Bug
+49:   //VTK::PrimID::Impl
+50: 
+51:   gl_Position = WCVCMatrix*vertexWC;
+52:   //VTK::LineWidthGLES30::Impl
+53:   tcoordVCVSOutput = tcoordMC;
+54:   //VTK::Color::Impl
+55: }
+2026-07-18 11:00:42.466 (  31.047s) [B79C000061721910]   vtkShaderProgram.cxx:1145   ERR| vtkShaderProgram (00000198435FCDF0): Could not create shader object.
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1145
+vtkShaderProgram (00000198435FCDF0): Could not create shader object.
+2026-07-18 11:00:42.470 (  31.051s) [B79C000061721910]   vtkShaderProgram.cxx:1144   ERR| vtkShaderProgram (00000198435FBC70): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: in vec4 ndCoordIn;
+12: in vec2 texCoordIn;
+13: out vec2 texCoord;
+14: void main()
+15: {
+16:   gl_Position = ndCoordIn;
+17:   texCoord = texCoordIn;
+18:   //VTK::TCoord::Flip
+19: }
+
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1144
+vtkShaderProgram (00000198435FBC70): 1: #version 150
+2: #ifndef GL_ES
+3: #define highp
+4: #define mediump
+5: #define lowp
+6: #define texelFetchBuffer texelFetch
+7: #endif // GL_ES
+8: #define attribute in
+9: #define varying out
+10: 
+11: in vec4 ndCoordIn;
+12: in vec2 texCoordIn;
+13: out vec2 texCoord;
+14: void main()
+15: {
+16:   gl_Position = ndCoordIn;
+17:   texCoord = texCoordIn;
+18:   //VTK::TCoord::Flip
+19: }
+2026-07-18 11:00:42.482 (  31.063s) [B79C000061721910]   vtkShaderProgram.cxx:1145   ERR| vtkShaderProgram (00000198435FBC70): Could not create shader object.
+WARNING:root:ERROR: In vtkShaderProgram.cxx, line 1145
+vtkShaderProgram (00000198435FBC70): Could not create shader object.
+2026-07-18 11:00:42.487 (  31.067s) [B79C000061721910]vtkOpenGLVertexArrayObj:255    ERR| vtkOpenGLVertexArrayObject (000001984347DA60): attempt to add attribute without a program for attribute ndCoordIn
+WARNING:root:ERROR: In vtkOpenGLVertexArrayObject.cxx, line 255
+vtkOpenGLVertexArrayObject (000001984347DA60): attempt to add attribute without a program for attribute ndCoordIn
+2026-07-18 11:00:42.492 (  31.073s) [B79C000061721910]vtkOpenGLQuadHelper.cxx:60    WARN| Error binding ndCoords to VAO.
+2026-07-18 11:00:42.496 (  31.076s) [B79C000061721910]vtkOpenGLRenderWindow.c:1545   ERR| vtkWin32OpenGLRenderWindow (000001983A588960): Couldn't build the shader program for depth blits
+WARNING:root:ERROR: In vtkOpenGLRenderWindow.cxx, line 1545
+vtkWin32OpenGLRenderWindow (000001983A588960): Couldn't build the shader program for depth blits

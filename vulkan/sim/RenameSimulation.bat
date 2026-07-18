@@ -1,7 +1,7 @@
 @echo off
 
-set oldPrefix=FreeStream
-set newPrefix=Cathedral
+set oldPrefix=Cathedral
+set newPrefix=LightingBall
 
 
 

@@ -554,13 +554,13 @@ def _unit_vector_from_angle(angle_radians):
     return math.cos(angle_radians), math.sin(angle_radians)
 
 
-def _lumens_visibility(
+def _lighting_visibility(
     particle_index,
     particle,
     dynamics,
     run_configuration,
 ):
-    return _lumens_brightness(
+    return _lighting_brightness(
         particle_index,
         particle,
         dynamics,
@@ -568,52 +568,34 @@ def _lumens_visibility(
     ) is not None
 
 
-def _lumens_brightness(
+def _lighting_brightness(
     particle_index,
     particle,
     dynamics,
     run_configuration,
 ):
+    if int(getattr(particle, "report_contacts", 0)) <= 0:
+        return None
+
     position = _runtime_particle_position(particle_index, particle, dynamics)
-    eye_position = run_configuration.get("lumens_eye_position", (0.0, 0.0))
+    eye_position = run_configuration.get("lighting_eye_position", (0.0, 0.0))
     eye_x = float(eye_position[0])
     eye_y = float(eye_position[1])
-    photon_x = float(position.x)
-    photon_y = float(position.y)
-    current_eye_distance = math.hypot(eye_x - photon_x, eye_y - photon_y)
-    eye_radius = max(0.0, float(run_configuration.get("lumens_eye_radius", 0.10)))
-    if current_eye_distance > eye_radius:
+    to_eye_x = eye_x - float(position.x)
+    to_eye_y = eye_y - float(position.y)
+    eye_distance = math.hypot(to_eye_x, to_eye_y)
+    if eye_distance <= 1.0e-12:
         return None
 
-    photon_angle = float(particle.VelRad.w)
-    photon_dir_x, photon_dir_y = _unit_vector_from_angle(photon_angle)
-    to_eye_x = eye_x - photon_x
-    to_eye_y = eye_y - photon_y
-    along_path = to_eye_x * photon_dir_x + to_eye_y * photon_dir_y
-    if along_path < 0.0:
-        return None
-
-    closest_x = photon_x + photon_dir_x * along_path
-    closest_y = photon_y + photon_dir_y * along_path
-    miss_distance = math.hypot(eye_x - closest_x, eye_y - closest_y)
-    if miss_distance > eye_radius:
-        return None
-    if eye_radius <= 1.0e-12:
-        distance_factor = 1.0
-    elif not bool(run_configuration.get("lumens_fade_in", True)):
-        distance_factor = 1.0
-    else:
-        distance_factor = 1.0 - current_eye_distance / eye_radius
-
-    eye_angle = math.radians(float(run_configuration.get("lumens_eye_angle_degrees", 0.0)))
+    eye_angle = math.radians(float(run_configuration.get("lighting_eye_angle_degrees", 0.0)))
     eye_look_x, eye_look_y = _unit_vector_from_angle(eye_angle)
-    arrival_x = -photon_dir_x
-    arrival_y = -photon_dir_y
-    if arrival_x * eye_look_x + arrival_y * eye_look_y < 0.0:
+    to_surface_x = -to_eye_x / eye_distance
+    to_surface_y = -to_eye_y / eye_distance
+    if to_surface_x * eye_look_x + to_surface_y * eye_look_y < 0.0:
         return None
 
-    arrival_angle = math.atan2(arrival_y, arrival_x)
-    fov = math.radians(float(run_configuration.get("lumens_eye_fov_degrees", 90.0)))
+    arrival_angle = math.atan2(to_surface_y, to_surface_x)
+    fov = math.radians(float(run_configuration.get("lighting_eye_fov_degrees", 90.0)))
     half_fov = max(0.0, fov * 0.5)
     angle_delta = abs(_wrap_angle_radians(arrival_angle - eye_angle))
     if angle_delta > half_fov:
@@ -622,7 +604,19 @@ def _lumens_brightness(
         angle_factor = 1.0
     else:
         angle_factor = 1.0 - angle_delta / half_fov
-    return max(0.0, min(1.0, distance_factor * angle_factor))
+
+    normal_x = float(getattr(particle, "report_normal_x", 0.0))
+    normal_y = float(getattr(particle, "report_normal_y", 0.0))
+    normal_length = math.hypot(normal_x, normal_y)
+    if normal_length <= 1.0e-12:
+        return None
+
+    normal_x /= normal_length
+    normal_y /= normal_length
+    eye_vector_x = to_eye_x / eye_distance
+    eye_vector_y = to_eye_y / eye_distance
+    surface_factor = abs(normal_x * eye_vector_x + normal_y * eye_vector_y)
+    return max(0.0, min(1.0, surface_factor * angle_factor))
 
 
 def _unit_rgb_from_config(run_configuration, key, default):
@@ -635,7 +629,7 @@ def _unit_rgb_from_config(run_configuration, key, default):
     return tuple(int(round(max(0.0, min(255.0, value)))) for value in values)
 
 
-def _lumens_color(
+def _lighting_color(
     particle_index,
     particle,
     dynamics,
@@ -643,19 +637,17 @@ def _lumens_color(
 ):
     surface_color = _unit_rgb_from_config(
         run_configuration,
-        "lumens_surface_color",
+        "lighting_surface_color",
         (1.0, 1.0, 1.0),
     )
-    brightness = _lumens_brightness(
+    brightness = _lighting_brightness(
         particle_index,
         particle,
         dynamics,
         run_configuration,
     )
     if brightness is None:
-        if not bool(run_configuration.get("lumens_debug_dim", False)):
-            return None
-        brightness = 0.08
+        return None
     return tuple(
         int(round(max(0.0, min(255.0, component * brightness))))
         for component in surface_color
@@ -686,8 +678,15 @@ def _particle_colors(
         return (60, 220, 90), (150, 255, 175)
     color_scheme = _material_color_scheme(particle, run_configuration)
     if color_scheme == COLOR_SCHEME_LUMENS:
-        color = _lumens_color(particle_index, particle, dynamics, run_configuration)
+        if (
+            bool(run_configuration.get("lighting_debug_spheres", False))
+            and int(getattr(particle, "report_contacts", 0)) > 0
+        ):
+            return (255, 80, 80), (255, 180, 180)
+        color = _lighting_color(particle_index, particle, dynamics, run_configuration)
         if color is None:
+            if bool(run_configuration.get("lighting_debug_spheres", False)):
+                return (45, 45, 55), (90, 90, 110)
             return None, None
         return color, color
     if color_scheme == COLOR_SCHEME_HSV:

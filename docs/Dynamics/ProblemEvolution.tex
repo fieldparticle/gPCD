@@ -2747,3 +2747,59 @@ photon helper and the shared FPM schedule with the optical rule intact.  The
 next Cathedral customization can therefore adjust stream placement, material
 display, and scene geometry without re-opening the Python/Vulkan photon drift
 that caused the sticky-contact behavior.
+
+\subsection{Lighting Ball Sphere Export}
+
+\subsubsection{previous form}
+
+The lighting work first tried to use streams of dust and photons in a broad
+Cathedral scene.  That proved several optical rules, but it also made the
+visual result hard to reason about because the surface being illuminated was
+not a simple known object.  The next simplification was a lighting ball: a
+large sphere represented in the particle data by ordinary boundary-marker
+particles.
+
+The first mental model treated those marker particles as if they might be the
+physical collision geometry.  That would make the visible sampled markers and
+the analytic surface diverge: a source would rebound from whichever marker
+particle happened to be local rather than from the intended sphere surface.
+
+\subsubsection{current form}
+
+\texttt{LightingBall} now treats the sphere markers exactly like wall
+markers.  They provide cell-locality only.  When a source sees a local marker
+belonging to the configured lighting ball, Python evaluates the analytic
+sphere equation from:
+\begin{verbatim}
+Lighting_ball = [x_center, y_center, z_center, radius, material_id];
+\end{verbatim}
+The contact normal is the normalized vector from the sphere center to the
+source position, and penetration is computed from the source radius and the
+distance to the analytic sphere surface.  This gives a stable sphere normal
+for reflection and contact-based lighting.
+
+The Python path is working with this convention.  The Vulkan simple export is
+not yet at parity: it can discover boundary-marker targets and evaluate
+function or rectangle walls, but it does not yet generate the analytic
+lighting-ball sphere evaluator or its boundary metadata.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+This change preserves the core wall-marker rule: boundary particles are
+locality sentinels, not geometry.  It also gives the lighting model a known
+surface with predictable normals, which is better for validating illumination
+than the earlier dust-stream experiment.
+
+The next implementation risk is export drift.  Python has
+\texttt{EvaluateLightingBallContact} and
+\texttt{ProcessLightingBallCollision}; Vulkan currently has no generated
+equivalent.  The simple exporter must therefore add lighting-ball metadata to
+\texttt{boundary.glsl}, generate a lighting-ball helper include, and route
+local sphere markers through that analytic evaluator before ordinary
+configured-wall processing.  This work belongs in
+\texttt{tools/ExportForceDynamicsSimpleGLSL.py}, not in hand edits to
+\texttt{vulkan/sim/common/*.glsl}.

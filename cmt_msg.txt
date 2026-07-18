@@ -1,11 +1,10 @@
 Current status:
-	- Cathedral photon-dust behavior is now documented as optical, not mechanical.
-	- The Vulkan simple exporter owns photon helpers and the shared FPM compute schedule.
-	- Python and Vulkan photon handling are aligned for Cathedral customization.
+	- LightingBall Python sphere-marker model is documented
+	- Vulkan export parity gap for analytic lighting-ball sphere collision is documented
+	- Porting contract now includes ForceDynamicsSimpleLightingBall.glsl and boundary metadata requirements
 
 Code Changes:
-	- Updated Cathedral docs for swept fixed-speed photon reflection.
-	- Updated Porting docs for generated photons.glsl and FPM.comp ownership.
-	- Added ProblemEvolution entry for Cathedral optical photon export.
+	- Documentation only
+	- Updated LightingBall, ProblemEvolution, and Porting docs
 
-Next: customize catherdral
+Next: implement Python exporter support for LightingBall Vulkan sphere metadata and GLSL helper generation

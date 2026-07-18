@@ -613,6 +613,88 @@ class ForceContactDynamics:
             return self.EvaluateRectangleWallContacts(SourceID)
         return self.EvaluateFunctionWallContacts(SourceID)
 
+    def LightingBallConfig(self):
+        """Return configured lighting-ball center/radius, if present."""
+        values = self.run_configuration.get("Lighting_ball")
+        if values is None or len(values) < 4:
+            return None
+        radius = float(values[3])
+        if radius <= 0.0:
+            return None
+        return (
+            (float(values[0]), float(values[1]), float(values[2])),
+            radius,
+        )
+
+    def EvaluateLightingBallContact(self, SourceID):
+        """Evaluate contact against the configured sphere equation."""
+        lighting_ball = self.LightingBallConfig()
+        if lighting_ball is None:
+            return None
+
+        center, ball_radius = lighting_ball
+        source_position = self.GetParticlePosition(SourceID)
+        dx = float(source_position.x) - center[0]
+        dy = float(source_position.y) - center[1]
+        dz = float(source_position.z) - center[2]
+        center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if center_distance <= self.EPSILON:
+            return None
+
+        source_radius = float(self.particles[SourceID].Data.x)
+        signed_surface_distance = center_distance - ball_radius
+        penetration_depth = source_radius - signed_surface_distance
+        if penetration_depth <= self.EPSILON:
+            return None
+
+        normal = (
+            dx / center_distance,
+            dy / center_distance,
+            dz / center_distance,
+        )
+        contact_center_distance = max(0.0, 2.0 * source_radius - penetration_depth)
+        overlap_area = self.particle_overlap_area(
+            source_radius,
+            source_radius,
+            contact_center_distance,
+        )
+        wall_flag = int(self.run_configuration.get("lighting_ball_wall_flag", 1000))
+        return (*normal, overlap_area, contact_center_distance, wall_flag)
+
+    def ProcessLightingBallCollision(self, SourceID, totalForce):
+        """Reflect a source from the configured lighting-ball sphere."""
+        contact = self.EvaluateLightingBallContact(SourceID)
+        if contact is None:
+            return True
+
+        normal = contact[:3]
+        start_velocity = self.GetStartFrameVelocity(SourceID)
+        velocity = (
+            float(start_velocity.x),
+            float(start_velocity.y),
+            float(start_velocity.z),
+        )
+        inward_speed = -(
+            velocity[0] * normal[0]
+            + velocity[1] * normal[1]
+            + velocity[2] * normal[2]
+        )
+        if inward_speed <= self.EPSILON:
+            return True
+
+        source = self.particles[SourceID]
+        self.photon_reflected_velocity[SourceID] = self.ReflectFixedSpeed(
+            velocity,
+            normal,
+        )
+        source.colFlg = 1
+        source.report_contacts = max(int(getattr(source, "report_contacts", 0)), 1)
+        source.report_target = int(contact[-1])
+        source.report_normal_x = normal[0]
+        source.report_normal_y = normal[1]
+        source.report_normal_z = normal[2]
+        return True
+
     def GetPistonPosition(self, frame):
         """Return the piston x position for the specified simulation frame."""
         start_x = float(self.run_configuration["piston_x_start"])
@@ -743,6 +825,99 @@ class ForceContactDynamics:
             and abs(source_position.y - boundary_position.y) <= 1.0
             and abs(source_position.z - boundary_position.z) <= 1.0
         )
+
+    def BoundaryParticleNormal(self, BoundaryID):
+        """Return a boundary-particle normal stored in VelRad.xyz, if present."""
+        boundary = self.particles[BoundaryID]
+        nx = float(boundary.VelRad.x)
+        ny = float(boundary.VelRad.y)
+        nz = float(boundary.VelRad.z)
+        normal_length = math.sqrt(nx * nx + ny * ny + nz * nz)
+        if normal_length <= self.EPSILON:
+            return None
+        return nx / normal_length, ny / normal_length, nz / normal_length
+
+    def EvaluateBoundaryParticleContact(self, SourceID, BoundaryID):
+        """Evaluate a direct boundary-particle contact from marker normal data."""
+        if not self.BoundaryMarkerApplies(SourceID, BoundaryID):
+            return None
+
+        normal = self.BoundaryParticleNormal(BoundaryID)
+        if normal is None:
+            return None
+
+        source_position = self.GetParticlePosition(SourceID)
+        boundary_position = self.GetParticlePosition(BoundaryID)
+        source_radius = float(self.particles[SourceID].Data.x)
+        signed_distance = (
+            (float(source_position.x) - float(boundary_position.x)) * normal[0]
+            + (float(source_position.y) - float(boundary_position.y)) * normal[1]
+            + (float(source_position.z) - float(boundary_position.z)) * normal[2]
+        )
+        offset_x = float(source_position.x) - float(boundary_position.x)
+        offset_y = float(source_position.y) - float(boundary_position.y)
+        offset_z = float(source_position.z) - float(boundary_position.z)
+        tangent_x = offset_x - signed_distance * normal[0]
+        tangent_y = offset_y - signed_distance * normal[1]
+        tangent_z = offset_z - signed_distance * normal[2]
+        tangent_distance = math.sqrt(
+            tangent_x * tangent_x
+            + tangent_y * tangent_y
+            + tangent_z * tangent_z
+        )
+        marker_half_extent = float(
+            self.run_configuration.get("boundary_marker_contact_half_extent", 0.75)
+        )
+        if tangent_distance > marker_half_extent:
+            return None
+
+        penetration_depth = source_radius - signed_distance
+        if penetration_depth <= self.EPSILON:
+            return None
+
+        center_distance = max(0.0, 2.0 * source_radius - penetration_depth)
+        overlap_area = self.particle_overlap_area(
+            source_radius,
+            source_radius,
+            center_distance,
+        )
+        wall_flag = int(round(float(self.particles[BoundaryID].pnum)))
+        if wall_flag <= 0:
+            return None
+        return (*normal, overlap_area, center_distance, wall_flag)
+
+    def ProcessBoundaryParticleCollision(self, SourceID, BoundaryID, totalForce):
+        """Apply one source-owned direct boundary-particle contact."""
+        contact = self.EvaluateBoundaryParticleContact(SourceID, BoundaryID)
+        if contact is None:
+            return True
+        normal = contact[:3]
+        start_velocity = self.GetStartFrameVelocity(SourceID)
+        velocity = (
+            float(start_velocity.x),
+            float(start_velocity.y),
+            float(start_velocity.z),
+        )
+        inward_speed = -(
+            velocity[0] * normal[0]
+            + velocity[1] * normal[1]
+            + velocity[2] * normal[2]
+        )
+        if inward_speed <= self.EPSILON:
+            return True
+
+        source = self.particles[SourceID]
+        self.photon_reflected_velocity[SourceID] = self.ReflectFixedSpeed(
+            velocity,
+            normal,
+        )
+        source.colFlg = 1
+        source.report_contacts = max(int(getattr(source, "report_contacts", 0)), 1)
+        source.report_target = BoundaryID
+        source.report_normal_x = normal[0]
+        source.report_normal_y = normal[1]
+        source.report_normal_z = normal[2]
+        return True
 
     def InitializeContactState(self, SourceID, TargetID, geometry=None):
         """Initialize one current-frame source-target contact."""

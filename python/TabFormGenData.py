@@ -124,6 +124,11 @@ class TabGenData(QTabWidget):
     def load_include(self):
         include_items = self.itemcfgFile.open_log(self.itemcfg.include_file)
         for key, value in include_items.items():
+            if key in self.itemcfg:
+                raise ValueError(
+                    f"include_file {self.itemcfg.include_file!r} tries to override "
+                    f"existing cfg item {key!r}"
+                )
             self.itemcfg[key] = value
            #print(f'{key}')
 
@@ -255,6 +260,11 @@ class TabGenData(QTabWidget):
             if "include_file" in cfg:
                 include_items = cfg_file_obj.open_log(cfg.include_file)
                 for key, value in include_items.items():
+                    if key in cfg:
+                        raise ValueError(
+                            f"include_file {cfg.include_file!r} tries to override "
+                            f"existing cfg item {key!r}"
+                        )
                     cfg[key] = value
 
         raw_dimensions = cfg.get("dimensions", 2)
@@ -681,7 +691,8 @@ class TabGenData(QTabWidget):
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/FreeStream.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/FreeStreamHeteroPy.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/lumens.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/Cathedral.cfg")
+        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/Cathedral.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/LightingBall.cfg")
         self.update_list_widget()
         self.update_data_list_widget()
         

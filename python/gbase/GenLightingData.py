@@ -40,13 +40,13 @@ class GenLightingData(GenStreaming):
         del dynamics
         import pygame
 
-        eye_position = run_configuration.get("lumens_eye_position", (0.0, 0.0))
+        eye_position = run_configuration.get("lighting_eye_position", (0.0, 0.0))
         eye_x = float(eye_position[0])
         eye_y = float(eye_position[1])
         eye_angle = math.radians(
-            float(run_configuration.get("lumens_eye_angle_degrees", 0.0))
+            float(run_configuration.get("lighting_eye_angle_degrees", 0.0))
         )
-        fov = math.radians(float(run_configuration.get("lumens_eye_fov_degrees", 90.0)))
+        fov = math.radians(float(run_configuration.get("lighting_eye_fov_degrees", 90.0)))
         half_fov = fov * 0.5
 
         eye_screen = draw_helpers.to_screen(eye_x, eye_y)
@@ -81,17 +81,6 @@ class GenLightingData(GenStreaming):
             )
 
         pygame.draw.circle(screen, (255, 240, 120), eye_screen, 4)
-        if bool(run_configuration.get("lumens_draw_eye_radius", False)):
-            radius = draw_helpers.radius_to_pixels(
-                float(run_configuration.get("lumens_eye_radius", 0.0))
-            )
-            pygame.draw.circle(
-                screen,
-                (255, 240, 120),
-                eye_screen,
-                max(1, radius),
-                1,
-            )
 
     def validate_simulation_configuration(self):
         GenericGenData.validate_simulation_configuration(self)

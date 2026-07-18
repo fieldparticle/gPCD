@@ -69,6 +69,7 @@ The new simple generated files are:
     \item \texttt{ForceDynamicsSimpleBoundaryParticle.glsl};
     \item \texttt{ForceDynamicsSimpleFunctionWall.glsl};
     \item \texttt{ForceDynamicsSimpleRectangleWall.glsl};
+    \item \texttt{ForceDynamicsSimpleLightingBall.glsl};
     \item \texttt{ForceDynamicsSimplePiston.glsl};
     \item \texttt{TestPythonBoundarySpheresP.comp}.
 \end{itemize}
@@ -93,6 +94,13 @@ fixed-speed reflection, and reflected end-of-frame position calculation.
 processor and skips the mechanical force/contact path for that pair.  This
 keeps photons from allocating contact slots or accumulating internal contact
 momentum while preserving ordinary dust-dust and wall response.
+
+\texttt{ForceDynamicsSimpleLightingBall.glsl} is the next required parity
+helper for \texttt{LightingBall}.  It must export the Python analytic sphere
+behavior from \texttt{EvaluateLightingBallContact} and
+\texttt{ProcessLightingBallCollision}: boundary particles remain locality
+markers, while the physical collision normal and penetration come from the
+configured \texttt{Lighting\_ball} sphere equation.
 
 They are produced by:
 \begin{verbatim}
@@ -221,6 +229,23 @@ Boundary parameters are generated from the scenario cfg into
     \item \texttt{RECTANGLE\_WALL\_SEGMENT\_COUNT};
     \item \texttt{RECTANGLE\_WALL\_SEGMENTS}.
 \end{itemize}
+
+Lighting-ball scenarios additionally require generated sphere metadata when
+\texttt{Lighting\_ball} is present:
+\begin{itemize}
+    \item an enable/count constant for the configured lighting ball;
+    \item the sphere center;
+    \item the sphere radius;
+    \item the sphere material identifier;
+    \item the wall flag used for diagnostics and contact identity.
+\end{itemize}
+
+This metadata is consumed by
+\texttt{ForceDynamicsSimpleLightingBall.glsl}.  The sampled sphere particles
+remain positive-\texttt{ptype} boundary markers.  Their target IDs are
+broad-phase locality records only; the shader must evaluate the analytic
+sphere from the generated metadata rather than treating the marker particle
+as the collision surface.
 
 When \texttt{RECTANGLE\_WALL\_SEGMENT\_COUNT} is nonzero, the simple wall
 path must evaluate rectangle walls and must not also evaluate
