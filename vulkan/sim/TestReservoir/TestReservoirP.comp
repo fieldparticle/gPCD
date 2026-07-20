@@ -14,6 +14,7 @@
 #include "material.glsl"
 #include "../common/constants.glsl"
 #include "boundary.glsl"
+#include "sphere.glsl"
 #include "../common/util.glsl"
 #include "../common/push.glsl"
 #include "../common/atomic.glsl"
@@ -28,6 +29,7 @@
 #include "../common/ForceDynamicsSimpleBoundaryParticle.glsl"
 #include "../common/ForceDynamicsSimpleFunctionWall.glsl"
 #include "../common/ForceDynamicsSimpleRectangleWall.glsl"
+#include "../common/ForceDynamicsSimpleLightingBall.glsl"
 #if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
 #include "../common/ForceDynamicsSimplePiston.glsl"
 #endif

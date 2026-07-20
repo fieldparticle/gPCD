@@ -10,17 +10,26 @@ class GenLightingBall(GenStreaming):
         values = self.itemcfg.get("Lighting_ball")
         if values is None:
             return None
-        if len(values) not in (4, 5):
-            raise ValueError(
-                "Lighting_ball must be [x_center, y_center, z_center, radius]"
-                " or [x_center, y_center, z_center, radius, material_id]"
+        if hasattr(values, "get"):
+            center = (
+                float(values.get("x")),
+                float(values.get("y")),
+                float(values.get("z")),
             )
+            ball_radius = float(values.get("radius"))
+            material_id = int(values.get("material_id", 0))
+        else:
+            if len(values) not in (4, 5):
+                raise ValueError(
+                    "Lighting_ball must be [x_center, y_center, z_center, radius]"
+                    " or [x_center, y_center, z_center, radius, material_id]"
+                )
+            center = tuple(float(values[index]) for index in range(3))
+            ball_radius = float(values[3])
+            material_id = int(values[4]) if len(values) == 5 else 0
 
-        center = tuple(float(values[index]) for index in range(3))
-        ball_radius = float(values[3])
         if ball_radius <= 0.0:
             raise ValueError("Lighting_ball radius must be greater than zero")
-        material_id = int(values[4]) if len(values) == 5 else 0
         if material_id not in self.material_properties_by_id:
             raise ValueError(f"Lighting_ball material_id {material_id} is not defined")
         return center, ball_radius, material_id

@@ -1,10 +1,14 @@
+Flush out LightingBall scene coordination
+
 Current status:
-	- LightingBall Python sphere-marker model is documented
-	- Vulkan export parity gap for analytic lighting-ball sphere collision is documented
-	- Porting contract now includes ForceDynamicsSimpleLightingBall.glsl and boundary metadata requirements
+    - Vulkan LightingBall scene now documents sphere export, material color modes, and eye-aligned viewing.
+    - Active docs use color_mode/color instead of retired color_scheme and named solid schemes.
+    - ProblemEvolution records the scene flush-out and remaining LUMENS brightness parity.
 
 Code Changes:
-	- Documentation only
-	- Updated LightingBall, ProblemEvolution, and Porting docs
+    - Update LightingBall, configuration variable, programming convention, porting, and evolution docs.
+    - Clarify COLOR_MODE_COLLISION, COLOR_MODE_VELOCITY, COLOR_MODE_SOLID, and COLOR_MODE_LUMENS contracts.
+    - Document align_with_eye and eye_view_distance behavior for Vulkan scene framing.
 
-Next: implement Python exporter support for LightingBall Vulkan sphere metadata and GLSL helper generation
+Next:
+    - Flush out full Vulkan LUMENS brightness parity using contact normals and Python lighting parameters.

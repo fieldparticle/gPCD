@@ -31,6 +31,68 @@
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
 
+namespace
+{
+	config_setting_t* LookupStrict(ConfigObj* config, const char* key)
+	{
+		config_setting_t* setting = config->CheckKey(key);
+		if (setting == nullptr)
+			throw std::runtime_error(std::string("Missing required config item: ") + key);
+		return setting;
+	}
+
+	bool LookupBoolStrict(ConfigObj* config, const char* key, bool defaultValue)
+	{
+		config_setting_t* setting = config->CheckKey(key);
+		if (setting == nullptr)
+			return defaultValue;
+		if (config_setting_type(setting) != CONFIG_TYPE_BOOL)
+			throw std::runtime_error(std::string(key) + " must be a bool");
+		return config_setting_get_bool(setting) != CONFIG_FALSE;
+	}
+
+	float LookupFloatStrict(ConfigObj* config, const char* key)
+	{
+		config_setting_t* setting = LookupStrict(config, key);
+		if (config_setting_type(setting) != CONFIG_TYPE_FLOAT)
+			throw std::runtime_error(std::string(key) + " must be a float");
+		return static_cast<float>(config_setting_get_float(setting));
+	}
+
+	glm::vec3 LookupVec3Strict(ConfigObj* config, const char* key)
+	{
+		config_setting_t* setting = LookupStrict(config, key);
+		if (config_setting_length(setting) != 3)
+			throw std::runtime_error(std::string(key) + " must contain exactly three values");
+
+		glm::vec3 value(0.0f);
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			config_setting_t* element = config_setting_get_elem(setting, axis);
+			if (element == nullptr || config_setting_type(element) != CONFIG_TYPE_FLOAT)
+				throw std::runtime_error(std::string(key) + " values must be floats");
+			value[axis] = static_cast<float>(config_setting_get_float(element));
+		}
+		return value;
+	}
+
+	bool LookupOptionalVec3Strict(ConfigObj* config, const char* key, glm::vec3& value)
+	{
+		if (config->CheckKey(key) == nullptr)
+			return false;
+		value = LookupVec3Strict(config, key);
+		return true;
+	}
+
+	glm::vec3 EyeUpVector(glm::vec3 direction)
+	{
+		glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
+		if (glm::abs(glm::dot(glm::normalize(direction), worldUp)) > 0.98f)
+			return glm::vec3(0.0f, 1.0f, 0.0f);
+		return worldUp;
+	}
+}
+
 void Resource::CheckBindPoint( uint32_t BindPoint)
 {
 	if (m_Type == VBW_TYPE_UNIFORM_BUFFER)
@@ -50,35 +112,19 @@ void Resource::CheckBindPoint( uint32_t BindPoint)
 
 void Resource::GeneralViewing(uint32_t CurrentBuffer)
 {
+	if (LookupBoolStrict(CfgTst, "align_with_eye", false))
+	{
+		GeneralViewingEye(CurrentBuffer);
+		return;
+	}
+
     glm::vec3 center(
         0.5f * static_cast<float>(m_CellW),
         0.5f * static_cast<float>(m_CellH),
         0.5f * static_cast<float>(m_CellL)
     );
 
-    config_setting_t* viewCenter = CfgTst->CheckKey("view_center");
-    if (viewCenter != nullptr)
-    {
-        if (config_setting_length(viewCenter) != 3)
-            throw std::runtime_error("view_center must contain exactly three values");
-
-        for (int axis = 0; axis < 3; ++axis)
-        {
-            config_setting_t* value = config_setting_get_elem(viewCenter, axis);
-            if (value == nullptr)
-                throw std::runtime_error("view_center contains an invalid value");
-
-            int valueType = config_setting_type(value);
-            if (valueType == CONFIG_TYPE_FLOAT)
-                center[axis] = static_cast<float>(config_setting_get_float(value));
-            else if (valueType == CONFIG_TYPE_INT)
-                center[axis] = static_cast<float>(config_setting_get_int(value));
-            else if (valueType == CONFIG_TYPE_INT64)
-                center[axis] = static_cast<float>(config_setting_get_int64(value));
-            else
-                throw std::runtime_error("view_center values must be numeric");
-        }
-    }
+	LookupOptionalVec3Strict(CfgTst, "view_center", center);
 
     float cellWidth = static_cast<float>(m_CellW);
     float cellHeight = static_cast<float>(m_CellH);
@@ -245,4 +291,63 @@ void Resource::GeneralViewing(uint32_t CurrentBuffer)
     );
 
    
+}
+
+void Resource::GeneralViewingEye(uint32_t CurrentBuffer)
+{
+	glm::vec3 center(
+		0.5f * static_cast<float>(m_CellW),
+		0.5f * static_cast<float>(m_CellH),
+		0.5f * static_cast<float>(m_CellL)
+	);
+	LookupOptionalVec3Strict(CfgTst, "view_center", center);
+
+	float cellWidth = static_cast<float>(m_CellW);
+	float cellHeight = static_cast<float>(m_CellH);
+	float cellDepth = static_cast<float>(m_CellL);
+	float maxExtent = glm::max(cellWidth, glm::max(cellHeight, cellDepth));
+
+	glm::vec3 lightingEye = LookupVec3Strict(CfgTst, "lighting_eye_position");
+	glm::vec3 direction = LookupVec3Strict(CfgTst, "lighting_eye_direction");
+	float directionLength = glm::length(direction);
+	if (directionLength <= 1.0e-6f)
+		throw std::runtime_error("lighting_eye_direction must not be zero length");
+	direction /= directionLength;
+
+	float eyeViewDistance = LookupFloatStrict(CfgTst, "eye_view_distance");
+	if (eyeViewDistance <= 0.0f)
+		throw std::runtime_error("eye_view_distance must be greater than zero");
+
+	float fovDegrees = LookupFloatStrict(CfgTst, "lighting_eye_fov_degrees");
+	if (fovDegrees <= 0.0f || fovDegrees >= 179.0f)
+		throw std::runtime_error("lighting_eye_fov_degrees must be greater than 0 and less than 179");
+
+	float viewWidth = static_cast<float>(m_SCO->m_SwapChainExtent.width);
+	float viewHeight = static_cast<float>(m_SCO->m_SwapChainExtent.height);
+	if (viewWidth <= 0.0f || viewHeight <= 0.0f)
+		throw std::runtime_error("swap chain extent must be positive for eye-aligned viewing");
+
+	glm::vec3 eye = lightingEye - direction * eyeViewDistance;
+	glm::vec3 target = lightingEye;
+	glm::vec3 up = EyeUpVector(direction);
+	float farPlane = glm::max(maxExtent * 100.0f, glm::length(eye - center) + maxExtent * 10.0f);
+
+	m_UBO = {};
+	m_UBO.model = glm::mat4(1.0f);
+	m_UBO.view = glm::lookAt(eye, target, up);
+	m_UBO.proj = glm::perspective(
+		glm::radians(fovDegrees),
+		viewWidth / viewHeight,
+		0.1f,
+		farPlane
+	);
+	m_UBO.proj[1][1] *= -1.0f;
+
+	vmaCopyMemoryToAllocation(
+		m_App->m_vmaAllocator,
+		&m_UBO,
+		m_Allocation[CurrentBuffer],
+		0,
+		sizeof(m_UBO)
+	);
 }

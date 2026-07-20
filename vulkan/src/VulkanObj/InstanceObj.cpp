@@ -41,6 +41,84 @@ void InstanceObj::Create()
 	m_App->CreateReportUtilsMessengerEXT();
 	CreateSurface();
 };
+
+void InstanceObj::InitWindow()
+{
+	int requestedWidth = MpsApp->GetInt("window.size.w", true);
+	int requestedHeight = MpsApp->GetInt("window.size.h", true);
+	int monitorIndex = MpsApp->GetInt("window.monitor", true);
+	glfwSetErrorCallback(GLFWError);
+	glfwInit();
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	int monitorCount = 0;
+	GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+
+	if (!monitors || monitorCount == 0)
+		throw std::runtime_error("No monitors found");
+
+	// Prevent an invalid monitor index.
+	monitorIndex = std::clamp(monitorIndex, 0, monitorCount - 1);
+
+	GLFWmonitor* monitor = monitors[monitorIndex];
+
+	int workX = 0;
+	int workY = 0;
+	int workWidth = 0;
+	int workHeight = 0;
+
+	// Excludes the Windows taskbar and similar desktop areas.
+	glfwGetMonitorWorkarea(
+		monitor,
+		&workX,
+		&workY,
+		&workWidth,
+		&workHeight);
+
+	// Keep the requested window inside the monitor.
+	const int windowWidth =
+		std::min(requestedWidth, workWidth);
+
+	const int windowHeight =
+		std::min(requestedHeight, workHeight);
+
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+
+	m_App->m_Window = glfwCreateWindow(
+		windowWidth,
+		windowHeight,
+		"Vulkan Science",
+		nullptr,       // nullptr means windowed mode
+		nullptr);
+
+	if (!m_App->m_Window)
+		throw std::runtime_error("Failed to create GLFW window");
+
+	// Center the window within the selected monitor's work area.
+	const int windowX =
+		workX + (workWidth - windowWidth) / 2;
+
+	const int windowY =
+		workY + (workHeight - windowHeight) / 2;
+
+	glfwSetWindowPos(m_App->m_Window, windowX, windowY);
+	glfwShowWindow(m_App->m_Window);
+
+	std::cout
+		<< "Monitor: " << glfwGetMonitorName(monitor) << '\n'
+		<< "Work area: "
+		<< workWidth << " x " << workHeight << '\n'
+		<< "Window: "
+		<< windowWidth << " x " << windowHeight << '\n';
+
+	glfwSetWindowUserPointer(m_App->m_Window, this);
+	glfwSetFramebufferSizeCallback(m_App->m_Window, m_App->FramebufferResizeCallback);
+
+
+
+}
+#if 0
 void InstanceObj::InitWindow()
 {
 	
@@ -68,6 +146,8 @@ void InstanceObj::InitWindow()
 	glfwSetWindowUserPointer(m_App->m_Window, this);
 	glfwSetFramebufferSizeCallback(m_App->m_Window, m_App->FramebufferResizeCallback);
 }
+
+#endif
 void InstanceObj::CreateInstance()
 {
 	if (m_App->m_EnableValidationLayers && !CheckValidationLayerSupport())

@@ -1,0 +1,60 @@
+int requested_height = 0;
+int requested_width = 0;
+
+int monitorCount = 0;
+int monitorIndex = CfgApp->GetInt("application.monitor_number", true);
+GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+
+if (!monitors || monitorCount == 0)
+	throw std::runtime_error("No monitors found");
+
+// Prevent an invalid monitor index.
+uint32_t monitorIndex = std::clamp(monitorIndex, 0, monitorCount - 1);
+
+GLFWmonitor* monitor = monitors[monitorIndex];
+
+int workX = 0;
+int workY = 0;
+int workWidth = 0;
+int workHeight = 0;
+
+// Excludes the Windows taskbar and similar desktop areas.
+glfwGetMonitorWorkarea(
+	monitor,
+	&workX,
+	&workY,
+	&workWidth,
+	&workHeight);
+
+glfwSetErrorCallback(GLFWError);
+glfwInit();
+glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
+requested_width = static_cast<int>(CfgApp->GetInt("application.window_width", true));
+requested_height = static_cast<int>(CfgApp->GetInt("application.window_height", true);
+
+// Keep the requested window inside the monitor.
+const int windowWidth =
+	std::min(requested_width, workWidth);
+
+const int windowHeight =
+	std::min(requested_height, workHeight);
+	
+const GLFWvidmode * mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+
+uint32_t window_width = mode->width;
+uint32_t window_height = mode->height;
+
+
+
+if(MpsApp->GetBool("window.usedefault",true) == true)
+	m_App->m_Window = glfwCreateWindow(mode->width,
+		mode->height, "Vulkan", nullptr, nullptr);
+else
+	m_App->m_Window = glfwCreateWindow(MpsApp->GetInt("window.size.w", true),
+		MpsApp->GetInt("window.size.h", true), "Vulkan", nullptr, nullptr);
+ glfwSetWindowPos(m_App->m_Window,
+             0,
+             0); 
+glfwSetWindowUserPointer(m_App->m_Window, this);
+glfwSetFramebufferSizeCallback(m_App->m_Window, m_App->FramebufferResizeCallback);

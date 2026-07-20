@@ -357,11 +357,12 @@ and the vertex shader should scale each instance by \texttt{P[index].Data.x}.
 This keeps the rendered radius tied to the particle ABI rather than to a
 separate scenario configuration radius or OBJ-file diameter.
 
-Velocity-angle HSV rendering uses scenario-generated constants such as
-\texttt{HSV\_ON}, \texttt{HSV\_SAT}, and \texttt{HSV\_VAL} from
-\texttt{params.glsl}.  The shared utility
+Velocity-angle rendering is selected with material
+\texttt{color\_mode = "VELOCITY"}.  The shared HSV utility
 \texttt{colorizeVelocity(angle, sat, val)} expects \texttt{angle} in radians
-from the velocity buffer selected with \texttt{ShaderFlags.positionBuffer}.
+from the velocity buffer selected with \texttt{ShaderFlags.positionBuffer};
+\texttt{hsv\_sat} and \texttt{hsv\_val} remain scalar tuning values for that
+mode.
 
 \subsection{Known Translation Rules}
 

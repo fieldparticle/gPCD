@@ -1,0 +1,44 @@
+% !TeX root = main.tex
+\newpage
+\section{Future Modification and Cleanup}
+
+\subsection{Lighting Eye Direction Contract}
+
+\subsubsection{Schedule}
+
+Retire \texttt{lighting\_eye\_angle\_degrees} as the primary lighting-eye
+configuration item after the 2D and 3D runners both support the shared
+position/target contract:
+\begin{verbatim}
+lighting_eye_position = [x, y, z];
+lighting_eye_target   = [x, y, z];
+lighting_eye_fov_degrees = 90.0;
+\end{verbatim}
+
+\subsubsection{Target Form}
+
+Both two-dimensional and three-dimensional lighting views should resolve the
+eye direction the same way.  The preferred form is
+\texttt{lighting\_eye\_target}; the runtime computes:
+\[
+    \mathbf d =
+    \frac{\mathbf t-\mathbf e}{\lVert\mathbf t-\mathbf e\rVert},
+\]
+where \(\mathbf e\) is \texttt{lighting\_eye\_position} and \(\mathbf t\) is
+\texttt{lighting\_eye\_target}.  Two-dimensional scenarios use the same
+three-component vectors with \(z=0\).
+
+\subsubsection{Compatibility}
+
+During transition, keep \texttt{lighting\_eye\_direction} as an advanced
+manual vector and keep \texttt{lighting\_eye\_angle\_degrees} only as a legacy
+fallback:
+\begin{enumerate}
+    \item use \texttt{lighting\_eye\_target} when present;
+    \item otherwise use normalized \texttt{lighting\_eye\_direction};
+    \item otherwise fall back to \texttt{lighting\_eye\_angle\_degrees}.
+\end{enumerate}
+
+After all active cfg files use \texttt{lighting\_eye\_target}, remove the
+legacy angle fallback from the active configuration documentation and leave it
+only in historical notes if needed.

@@ -55,6 +55,7 @@ void fpm_comp_main()
 
     uint duplicateTargets[DUP_LIST_SIZE];
     uint duplicateCount = 0u;
+    bool lightingBallContactProcessed = false;
 
     for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
         uint loc = P[SourceID].CornerList[CornerIndex].ploc;
@@ -76,6 +77,24 @@ void fpm_comp_main()
 
             if (IsBoundaryParticle(TargetID)) {
                 if (!BoundaryMarkerApplies(SourceID, TargetID)) {
+                    continue;
+                }
+
+                if (IsLightingBallMarker(TargetID)) {
+                    if (!lightingBallContactProcessed) {
+                        LightingBallCollisionResult lightingBallResult =
+                            ProcessLightingBallCollision(SourceID, totalForce);
+                        if (!lightingBallResult.ok) {
+                            return;
+                        }
+                        if (lightingBallResult.handled) {
+                            lightingBallContactProcessed = true;
+                            photonVelocity = ReflectFixedSpeed(
+                                photonVelocity,
+                                lightingBallResult.segment.normal);
+                            photonReflected = true;
+                        }
+                    }
                     continue;
                 }
 
@@ -197,6 +216,7 @@ void fpm_comp_main()
 #endif
 
     duplicateCount = 0u;
+    bool lightingBallResolvedProcessed = false;
 
     for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
         uint loc = P[SourceID].CornerList[CornerIndex].ploc;
@@ -218,6 +238,16 @@ void fpm_comp_main()
 
             if (IsBoundaryParticle(TargetID)) {
                 if (!BoundaryMarkerApplies(SourceID, TargetID)) {
+                    continue;
+                }
+
+                if (IsLightingBallMarker(TargetID)) {
+                    if (!lightingBallResolvedProcessed) {
+                        if (!RegisterResolvedLightingBallContactStep(SourceID)) {
+                            return;
+                        }
+                        lightingBallResolvedProcessed = true;
+                    }
                     continue;
                 }
 

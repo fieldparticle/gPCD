@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import QApplication, QWidget,  QFormLayout, QGridLayout, QT
 from PyQt6.QtCore import Qt
 from UtilityMainWin import *
 from gbase.ParticleBase import *
+from gbase.MonitorSelection import load_preferred_monitor
 import matplotlib
 ## Create a base class.
 bc = ParticleBase("FrontEnd")
@@ -31,7 +32,12 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     screens = app.screens()
     window = UtilityMainWin(bc,"UtilMainWin")
-    screen = screens[1] if len(screens) > 1 else screens[0]
+    preferred_monitor = load_preferred_monitor(0)
+    if preferred_monitor < 0:
+        preferred_monitor = 0
+    if preferred_monitor >= len(screens):
+        preferred_monitor = len(screens) - 1
+    screen = screens[preferred_monitor] if screens else app.primaryScreen()
     qr = screen.geometry()
     window.move(qr.left(), qr.top())
     window.Create(bc)

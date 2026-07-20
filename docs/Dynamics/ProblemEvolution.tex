@@ -2292,10 +2292,11 @@ simulation frame.
 
 \subsubsection{current form}
 
-Color selection belongs to \texttt{material\_properties.color\_scheme}.  The
-named material schemes include \texttt{COLLISION}, \texttt{HSV},
-\texttt{WHITE}, \texttt{RED}, \texttt{GREEN}, \texttt{BLUE}, and
-\texttt{LUMENS}.  The \texttt{LUMENS} scheme is Python-only in this pass.
+Color selection belongs to \texttt{material\_properties.color\_mode}.  The
+active material modes are \texttt{COLLISION}, \texttt{VELOCITY},
+\texttt{SOLID}, and \texttt{LUMENS}; solid display color is stored in the
+separate \texttt{color} field.  The \texttt{LUMENS} mode is Python-only in
+this pass.
 It uses:
 \begin{verbatim}
 lumens_eye_position
@@ -2778,10 +2779,11 @@ source position, and penetration is computed from the source radius and the
 distance to the analytic sphere surface.  This gives a stable sphere normal
 for reflection and contact-based lighting.
 
-The Python path is working with this convention.  The Vulkan simple export is
-not yet at parity: it can discover boundary-marker targets and evaluate
-function or rectangle walls, but it does not yet generate the analytic
-lighting-ball sphere evaluator or its boundary metadata.
+The Python path established this convention first.  The Vulkan simple export
+now follows the same locality rule: generated lighting-ball metadata and
+\texttt{ForceDynamicsSimpleLightingBall.glsl} route local sphere markers
+through the analytic sphere evaluator instead of treating the marker particles
+as the physical collision surface.
 
 \subsubsection{difference outcome}
 
@@ -2794,12 +2796,81 @@ locality sentinels, not geometry.  It also gives the lighting model a known
 surface with predictable normals, which is better for validating illumination
 than the earlier dust-stream experiment.
 
-The next implementation risk is export drift.  Python has
+The implementation risk was export drift.  Python had
 \texttt{EvaluateLightingBallContact} and
-\texttt{ProcessLightingBallCollision}; Vulkan currently has no generated
-equivalent.  The simple exporter must therefore add lighting-ball metadata to
-\texttt{boundary.glsl}, generate a lighting-ball helper include, and route
-local sphere markers through that analytic evaluator before ordinary
-configured-wall processing.  This work belongs in
-\texttt{tools/ExportForceDynamicsSimpleGLSL.py}, not in hand edits to
+\texttt{ProcessLightingBallCollision} before Vulkan had a generated
+equivalent.  The simple exporter now owns the lighting-ball helper include and
+the wrapper schedule that dispatches local sphere markers through that
+analytic evaluator.  Future changes to the sphere path should still be made in
+\texttt{tools/ExportForceDynamicsSimpleGLSL.py}, not as one-off edits to
 \texttt{vulkan/sim/common/*.glsl}.
+
+\subsection{Lighting Ball Scene Flush-Out}
+
+\subsubsection{previous form}
+
+After the first lighting-ball sphere export, the Vulkan scene still mixed
+several display contracts.  The generated test file carried
+\texttt{view\_center}, but the lighting-eye configuration remained only in the
+Python source configuration.  Vulkan could therefore render from a camera
+unrelated to the optical eye used by Python \texttt{LUMENS} display.  The
+material display path also still had historical color-scheme names in parts of
+the Vulkan render code, and uncontacted photon particles could appear as solid
+white because \texttt{LUMENS} fell back to the material color without an
+invisible no-contact state.
+
+\subsubsection{current form}
+
+The scene contract is now explicit.  Active material configuration uses
+\texttt{color\_mode} and \texttt{color}; the Vulkan material writer emits
+\texttt{COLOR\_MODE\_COLLISION}, \texttt{COLOR\_MODE\_VELOCITY},
+\texttt{COLOR\_MODE\_SOLID}, and \texttt{COLOR\_MODE\_LUMENS}.  The shared
+Vulkan color map is exporter-owned and maps velocity, collision, solid, and
+lumens display through that material contract.  \texttt{LUMENS} particles
+without contact state return transparent color, and the common fragment shader
+discards zero-alpha fragments.
+
+The generated Vulkan test file also carries the eye-alignment fields:
+\begin{verbatim}
+align_with_eye = true;
+eye_view_distance = 30.0;
+lighting_eye_position = [2.5, 7.0, 6.0];
+lighting_eye_direction = [0.810026, -0.424246, -0.404812];
+lighting_eye_fov_degrees = 90.0;
+\end{verbatim}
+When alignment is enabled, Vulkan type-checks these fields and builds a
+perspective view that looks at \texttt{lighting\_eye\_position} from a backed
+off camera position:
+\[
+    \mathbf e_{\mathrm{camera}} =
+    \mathbf e_{\mathrm{lighting}} -
+    d_{\mathrm{view}}\,
+    \widehat{\mathbf d}_{\mathrm{lighting}} .
+\]
+This keeps the render camera aligned with the lighting-eye direction while
+\texttt{eye\_view\_distance} frames more of the scene.
+
+\subsubsection{difference outcome}
+
+rendering and diagnostics
+
+\subsubsection{Analysis}
+
+This step separates the optical eye from the render camera without letting the
+two drift in direction.  The lighting eye remains the physical diagnostic
+point used by Python brightness logic.  The Vulkan camera is a viewer placed
+behind that point along the same direction so a human can see the full
+lighting-ball setup.
+
+The typed configuration rule is intentionally strict.  If the generated test
+file says \texttt{align\_with\_eye}, Vulkan expects a boolean.  If eye vectors
+are present, they must be three-float arrays.  This makes the cfg-to-exe
+contract fail early instead of accepting ambiguous integers or malformed
+arrays.
+
+Full \texttt{LUMENS} parity is still pending.  Python brightness uses reported
+contact normals, eye field of view, diffuse strength, specular strength, and
+shininess.  Vulkan currently gates lumens visibility on contact state and uses
+the material color for contacted particles.  The next scene flush-out step is
+to carry or reconstruct the contact normal needed by the Vulkan render pass
+and port the Python brightness calculation into the exported color path.

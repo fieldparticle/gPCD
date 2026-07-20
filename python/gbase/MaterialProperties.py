@@ -1,29 +1,27 @@
 import math
 
 
-COLOR_SCHEME_COLLISION = 0
-COLOR_SCHEME_HSV = 1
-COLOR_SCHEME_WHITE = 2
-COLOR_SCHEME_RED = 3
-COLOR_SCHEME_GREEN = 4
-COLOR_SCHEME_BLUE = 5
-COLOR_SCHEME_LUMENS = 6
+COLOR_MODE_COLLISION = 0
+COLOR_MODE_VELOCITY = 1
+COLOR_MODE_SOLID = 2
+COLOR_MODE_LUMENS = 3
 
-COLOR_SCHEME_NAMES = {
-    "COLLISION": COLOR_SCHEME_COLLISION,
-    "HSV": COLOR_SCHEME_HSV,
-    "WHITE": COLOR_SCHEME_WHITE,
-    "RED": COLOR_SCHEME_RED,
-    "GREEN": COLOR_SCHEME_GREEN,
-    "BLUE": COLOR_SCHEME_BLUE,
-    "LUMENS": COLOR_SCHEME_LUMENS,
-    "COLOR_SCHEME_COLLISION": COLOR_SCHEME_COLLISION,
-    "COLOR_SCHEME_HSV": COLOR_SCHEME_HSV,
-    "COLOR_SCHEME_WHITE": COLOR_SCHEME_WHITE,
-    "COLOR_SCHEME_RED": COLOR_SCHEME_RED,
-    "COLOR_SCHEME_GREEN": COLOR_SCHEME_GREEN,
-    "COLOR_SCHEME_BLUE": COLOR_SCHEME_BLUE,
-    "COLOR_SCHEME_LUMENS": COLOR_SCHEME_LUMENS,
+COLOR_MODE_NAMES = {
+    "COLLISION": COLOR_MODE_COLLISION,
+    "VELOCITY": COLOR_MODE_VELOCITY,
+    "SOLID": COLOR_MODE_SOLID,
+    "LUMENS": COLOR_MODE_LUMENS,
+    "COLOR_MODE_COLLISION": COLOR_MODE_COLLISION,
+    "COLOR_MODE_VELOCITY": COLOR_MODE_VELOCITY,
+    "COLOR_MODE_SOLID": COLOR_MODE_SOLID,
+    "COLOR_MODE_LUMENS": COLOR_MODE_LUMENS,
+}
+
+DEFAULT_COLOR_BY_MODE = {
+    COLOR_MODE_COLLISION: (0.0, 1.0, 0.0, 1.0),
+    COLOR_MODE_VELOCITY: (1.0, 1.0, 1.0, 1.0),
+    COLOR_MODE_SOLID: (1.0, 1.0, 1.0, 1.0),
+    COLOR_MODE_LUMENS: (1.0, 1.0, 1.0, 1.0),
 }
 
 PARTICLE_TYPE_REGULAR = 0
@@ -37,13 +35,30 @@ PARTICLE_TYPE_NAMES = {
 }
 
 
-def parse_color_scheme(raw_value):
+def parse_color_mode(raw_value):
     if isinstance(raw_value, str):
-        color_scheme = COLOR_SCHEME_NAMES.get(raw_value.strip().upper())
-        if color_scheme is None:
-            raise ValueError(f"unknown color_scheme: {raw_value}")
-        return color_scheme
+        color_mode = COLOR_MODE_NAMES.get(raw_value.strip().upper())
+        if color_mode is None:
+            raise ValueError(f"unknown color_mode: {raw_value}")
+        return color_mode
     return int(raw_value)
+
+
+def default_color_for_mode(color_mode):
+    return DEFAULT_COLOR_BY_MODE.get(int(color_mode), (1.0, 1.0, 1.0, 1.0))
+
+
+def parse_material_color(raw_value, color_mode):
+    if raw_value is None:
+        return default_color_for_mode(color_mode)
+    if len(raw_value) not in (3, 4):
+        raise ValueError("color must contain 3 or 4 values")
+    values = [float(raw_value[index]) for index in range(len(raw_value))]
+    if not all(math.isfinite(value) for value in values):
+        raise ValueError("color values must be finite")
+    if len(values) == 3:
+        values.append(1.0)
+    return tuple(max(0.0, min(1.0, value)) for value in values)
 
 
 def parse_particle_type(raw_value):
@@ -62,7 +77,8 @@ DEFAULT_MATERIAL_PROPERTIES = (
         "particle_type": PARTICLE_TYPE_REGULAR,
         "relative_mass": 1.0,
         "thermal_velocity": 0.0,
-        "color_scheme": COLOR_SCHEME_HSV,
+        "color_mode": COLOR_MODE_VELOCITY,
+        "color": default_color_for_mode(COLOR_MODE_VELOCITY),
         "cell_density": 0.0,
     },
 )
@@ -86,9 +102,14 @@ def normalized_material_properties(source=None):
         material_id = int(_material_get(raw_material, "material_id", 0))
         relative_mass = float(_material_get(raw_material, "relative_mass", 1.0))
         thermal_velocity = float(_material_get(raw_material, "thermal_velocity", 0.0))
-        color_scheme = parse_color_scheme(
-            _material_get(raw_material, "color_scheme", COLOR_SCHEME_HSV)
+        color_mode = parse_color_mode(
+            _material_get(
+                raw_material,
+                "color_mode",
+                COLOR_MODE_VELOCITY,
+            )
         )
+        color = parse_material_color(_material_get(raw_material, "color", None), color_mode)
         cell_density = float(_material_get(raw_material, "cell_density", 0.0))
         name = str(_material_get(raw_material, "name", f"material_{material_id}"))
         particle_type = parse_particle_type(
@@ -108,7 +129,8 @@ def normalized_material_properties(source=None):
                 "particle_type": particle_type,
                 "relative_mass": relative_mass,
                 "thermal_velocity": thermal_velocity,
-                "color_scheme": color_scheme,
+                "color_mode": color_mode,
+                "color": color,
                 "cell_density": cell_density,
             }
         )
@@ -116,14 +138,11 @@ def normalized_material_properties(source=None):
     return sorted(materials, key=lambda material: int(material["material_id"]))
 
 
-def write_color_scheme_defines(output):
-    output.write(f"COLOR_SCHEME_COLLISION = {COLOR_SCHEME_COLLISION};\n")
-    output.write(f"COLOR_SCHEME_HSV = {COLOR_SCHEME_HSV};\n")
-    output.write(f"COLOR_SCHEME_WHITE = {COLOR_SCHEME_WHITE};\n")
-    output.write(f"COLOR_SCHEME_RED = {COLOR_SCHEME_RED};\n")
-    output.write(f"COLOR_SCHEME_GREEN = {COLOR_SCHEME_GREEN};\n")
-    output.write(f"COLOR_SCHEME_BLUE = {COLOR_SCHEME_BLUE};\n")
-    output.write(f"COLOR_SCHEME_LUMENS = {COLOR_SCHEME_LUMENS};\n")
+def write_color_mode_defines(output):
+    output.write(f"COLOR_MODE_COLLISION = {COLOR_MODE_COLLISION};\n")
+    output.write(f"COLOR_MODE_VELOCITY = {COLOR_MODE_VELOCITY};\n")
+    output.write(f"COLOR_MODE_SOLID = {COLOR_MODE_SOLID};\n")
+    output.write(f"COLOR_MODE_LUMENS = {COLOR_MODE_LUMENS};\n")
 
 
 def write_particle_type_defines(output):
@@ -146,7 +165,14 @@ def write_material_properties(output, source=None):
         output.write(
             f"        thermal_velocity = {float(material['thermal_velocity']):.9f};\n"
         )
-        output.write(f"        color_scheme = {int(material['color_scheme'])};\n")
+        output.write(f"        color_mode = {int(material['color_mode'])};\n")
+        output.write(
+            "        color = "
+            f"[{float(material['color'][0]):.9f}, "
+            f"{float(material['color'][1]):.9f}, "
+            f"{float(material['color'][2]):.9f}, "
+            f"{float(material['color'][3]):.9f}];\n"
+        )
         output.write(f"        cell_density = {float(material['cell_density']):.9f};\n")
         output.write(f"    }}{separator}\n")
     output.write(");\n")

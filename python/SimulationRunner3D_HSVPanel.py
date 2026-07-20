@@ -6,15 +6,13 @@ import time
 
 from base.ForceDynamicsBase import ForceDynamics
 from gbase.MaterialProperties import (
-    COLOR_SCHEME_BLUE,
-    COLOR_SCHEME_COLLISION,
-    COLOR_SCHEME_GREEN,
-    COLOR_SCHEME_HSV,
-    COLOR_SCHEME_LUMENS,
-    COLOR_SCHEME_RED,
-    COLOR_SCHEME_WHITE,
+    COLOR_MODE_COLLISION,
+    COLOR_MODE_LUMENS,
+    COLOR_MODE_SOLID,
+    COLOR_MODE_VELOCITY,
     normalized_material_properties,
 )
+from gbase.MonitorSelection import preferred_window_position
 from gbase.utilities import get_cell_dimensions, hsv_angle
 
 
@@ -43,6 +41,119 @@ def _unit_vector_from_angle(angle_radians):
     return math.cos(angle_radians), math.sin(angle_radians)
 
 
+def _vector3_from_config(raw_value, default):
+    if raw_value is None:
+        return tuple(default)
+    values = [float(raw_value[index]) for index in range(min(3, len(raw_value)))]
+    while len(values) < 3:
+        values.append(0.0)
+    return tuple(values)
+
+
+def _normalize3(vector):
+    length = math.sqrt(sum(component * component for component in vector))
+    if length <= 1.0e-12:
+        return None
+    return tuple(component / length for component in vector)
+
+
+def _lighting_eye_position3(run_configuration):
+    return _vector3_from_config(
+        run_configuration.get("lighting_eye_position"),
+        (0.0, 0.0, 0.0),
+    )
+
+
+def _lighting_eye_direction3(run_configuration):
+    eye_position = _lighting_eye_position3(run_configuration)
+    target = run_configuration.get("lighting_eye_target")
+    if target is not None:
+        target_position = _vector3_from_config(target, (0.0, 0.0, 0.0))
+        direction = tuple(
+            target_position[index] - eye_position[index]
+            for index in range(3)
+        )
+        normalized = _normalize3(direction)
+        if normalized is not None:
+            return normalized
+
+    raw_direction = run_configuration.get("lighting_eye_direction")
+    if raw_direction is not None:
+        normalized = _normalize3(_vector3_from_config(raw_direction, (1.0, 0.0, 0.0)))
+        if normalized is not None:
+            return normalized
+
+    eye_angle = math.radians(
+        float(run_configuration.get("lighting_eye_angle_degrees", 0.0))
+    )
+    return math.cos(eye_angle), math.sin(eye_angle), 0.0
+
+
+def _reflect3(vector, normal):
+    dot_value = (
+        vector[0] * normal[0]
+        + vector[1] * normal[1]
+        + vector[2] * normal[2]
+    )
+    return (
+        vector[0] - 2.0 * dot_value * normal[0],
+        vector[1] - 2.0 * dot_value * normal[1],
+        vector[2] - 2.0 * dot_value * normal[2],
+    )
+
+
+def _lighting_surface_brightness3(
+    incoming_light,
+    surface_normal,
+    view_vector,
+    run_configuration,
+):
+    shininess = max(1.0, float(run_configuration.get("lighting_specular_shininess", 32.0)))
+    diffuse_strength = max(
+        0.0,
+        float(run_configuration.get("lighting_diffuse_strength", 0.20)),
+    )
+    specular_strength = max(
+        0.0,
+        float(run_configuration.get("lighting_specular_strength", 1.0)),
+    )
+
+    best = 0.0
+    inverted_normal = (
+        -surface_normal[0],
+        -surface_normal[1],
+        -surface_normal[2],
+    )
+    for normal in (surface_normal, inverted_normal):
+        surface_to_light = (
+            -incoming_light[0],
+            -incoming_light[1],
+            -incoming_light[2],
+        )
+        diffuse = max(
+            0.0,
+            normal[0] * surface_to_light[0]
+            + normal[1] * surface_to_light[1]
+            + normal[2] * surface_to_light[2],
+        )
+        reflected = _reflect3(incoming_light, normal)
+        specular_alignment = max(
+            0.0,
+            reflected[0] * view_vector[0]
+            + reflected[1] * view_vector[1]
+            + reflected[2] * view_vector[2],
+        )
+        specular = specular_alignment ** shininess
+        best = max(best, diffuse_strength * diffuse + specular_strength * specular)
+    return max(0.0, min(1.0, best))
+
+
+def _runtime_particle_velocity(particle_id, particle, dynamics):
+    if dynamics is not None and hasattr(dynamics, "GetCurrentParticleVelocity"):
+        return dynamics.GetCurrentParticleVelocity(particle_id)
+    return getattr(particle, "VelRad", None)
+
+
 def _unit_rgb_from_config(run_configuration, key, default):
     raw_color = run_configuration.get(key, default)
     if raw_color is None or len(raw_color) < 3:
@@ -58,10 +169,7 @@ def _lighting_brightness(particle_id, particle, dynamics, run_configuration):
         return None
 
     position = dynamics.GetCurrentParticlePosition(particle_id)
-    eye_position = run_configuration.get("lighting_eye_position", (0.0, 0.0, 0.0))
-    eye_x = float(eye_position[0])
-    eye_y = float(eye_position[1])
-    eye_z = float(eye_position[2]) if len(eye_position) >= 3 else 0.0
+    eye_x, eye_y, eye_z = _lighting_eye_position3(run_configuration)
 
     to_eye_x = eye_x - float(position.x)
     to_eye_y = eye_y - float(position.y)
@@ -72,17 +180,25 @@ def _lighting_brightness(particle_id, particle, dynamics, run_configuration):
     if eye_distance <= 1.0e-12:
         return None
 
-    eye_angle = math.radians(float(run_configuration.get("lighting_eye_angle_degrees", 0.0)))
-    eye_look_x, eye_look_y = _unit_vector_from_angle(eye_angle)
+    eye_look = _lighting_eye_direction3(run_configuration)
     to_surface_x = -to_eye_x / eye_distance
     to_surface_y = -to_eye_y / eye_distance
-    if to_surface_x * eye_look_x + to_surface_y * eye_look_y < 0.0:
+    to_surface_z = -to_eye_z / eye_distance
+    direction_dot = max(
+        -1.0,
+        min(
+            1.0,
+            to_surface_x * eye_look[0]
+            + to_surface_y * eye_look[1]
+            + to_surface_z * eye_look[2],
+        ),
+    )
+    if direction_dot < 0.0:
         return None
 
-    arrival_angle = math.atan2(to_surface_y, to_surface_x)
     fov = math.radians(float(run_configuration.get("lighting_eye_fov_degrees", 90.0)))
     half_fov = max(0.0, fov * 0.5)
-    angle_delta = abs(_wrap_angle_radians(arrival_angle - eye_angle))
+    angle_delta = math.acos(direction_dot)
     if angle_delta > half_fov:
         return None
 
@@ -106,17 +222,43 @@ def _lighting_brightness(particle_id, particle, dynamics, run_configuration):
     eye_vector_x = to_eye_x / eye_distance
     eye_vector_y = to_eye_y / eye_distance
     eye_vector_z = to_eye_z / eye_distance
-    surface_factor = abs(
-        normal_x * eye_vector_x + normal_y * eye_vector_y + normal_z * eye_vector_z
+    velocity = _runtime_particle_velocity(particle_id, particle, dynamics)
+    velocity_x = float(getattr(velocity, "x", 0.0))
+    velocity_y = float(getattr(velocity, "y", 0.0))
+    velocity_z = float(getattr(velocity, "z", 0.0))
+    velocity_length = math.sqrt(
+        velocity_x * velocity_x
+        + velocity_y * velocity_y
+        + velocity_z * velocity_z
     )
-    return max(0.0, min(1.0, surface_factor * angle_factor))
+    if velocity_length <= 1.0e-12:
+        return None
+
+    incoming_light = (
+        velocity_x / velocity_length,
+        velocity_y / velocity_length,
+        velocity_z / velocity_length,
+    )
+    surface_normal = (normal_x, normal_y, normal_z)
+    view_vector = (eye_vector_x, eye_vector_y, eye_vector_z)
+    return angle_factor * _lighting_surface_brightness3(
+        incoming_light,
+        surface_normal,
+        view_vector,
+        run_configuration,
+    )
 
 
 def _lighting_color(particle_id, particle, dynamics, run_configuration):
-    surface_color = _unit_rgb_from_config(
-        run_configuration,
-        "lighting_surface_color",
-        (1.0, 1.0, 1.0),
+    material = _material_property(particle, run_configuration)
+    surface_color = (
+        _material_unit_color(particle, run_configuration)
+        if material is not None
+        else _unit_rgb_from_config(
+            run_configuration,
+            "lighting_surface_color",
+            (1.0, 1.0, 1.0),
+        )
     )
     brightness = _lighting_brightness(
         particle_id,
@@ -129,35 +271,44 @@ def _lighting_color(particle_id, particle, dynamics, run_configuration):
     return [component * brightness for component in surface_color]
 
 
-def _material_color_scheme(particle, run_configuration):
+def _material_property(particle, run_configuration):
     material_id = int(getattr(particle, "material_id", 0))
     try:
         materials = normalized_material_properties(run_configuration)
     except ValueError:
-        return COLOR_SCHEME_HSV
+        return None
     for material in materials:
         if int(material["material_id"]) == material_id:
-            return int(material["color_scheme"])
-    return COLOR_SCHEME_HSV
+            return material
+    return None
+
+
+def _material_color_mode(particle, run_configuration):
+    material = _material_property(particle, run_configuration)
+    if material is not None:
+        return int(material["color_mode"])
+    return COLOR_MODE_VELOCITY
+
+
+def _material_unit_color(particle, run_configuration):
+    material = _material_property(particle, run_configuration)
+    if material is None:
+        return _unit_color((65, 125, 255))
+    color = material.get("color", (0.25, 0.49, 1.0, 1.0))
+    return [max(0.0, min(1.0, float(color[index]))) for index in range(3)]
 
 
 def _particle_color(particle_id, particle, dynamics, run_configuration):
-    color_scheme = _material_color_scheme(particle, run_configuration)
-    if color_scheme == COLOR_SCHEME_HSV:
+    color_mode = _material_color_mode(particle, run_configuration)
+    if color_mode == COLOR_MODE_VELOCITY:
         hsv_sat = float(run_configuration.get("hsv_sat", 0.707))
         hsv_val = float(run_configuration.get("hsv_val", 1.0))
         return _unit_color(hsv_angle(float(particle.VelRad.w), hsv_val, hsv_sat))
-    if color_scheme == COLOR_SCHEME_WHITE:
-        return _unit_color((255, 255, 255))
-    if color_scheme == COLOR_SCHEME_RED:
-        return _unit_color((255, 60, 60))
-    if color_scheme == COLOR_SCHEME_GREEN:
-        return _unit_color((60, 220, 90))
-    if color_scheme == COLOR_SCHEME_BLUE:
-        return _unit_color((65, 125, 255))
-    if color_scheme == COLOR_SCHEME_LUMENS:
+    if color_mode == COLOR_MODE_SOLID:
+        return _material_unit_color(particle, run_configuration)
+    if color_mode == COLOR_MODE_LUMENS:
         return _lighting_color(particle_id, particle, dynamics, run_configuration)
-    if color_scheme == COLOR_SCHEME_COLLISION:
+    if color_mode == COLOR_MODE_COLLISION:
         return _unit_color((65, 125, 255))
     return _unit_color((65, 125, 255))
 
@@ -315,23 +466,16 @@ def _box_lines_from_bounds(o3d, bounds, color):
 def _lighting_eye_geometry(run_configuration, segment_count=96):
     if not bool(run_configuration.get("lighting_draw_eye_vector", True)):
         return None
-    eye_position = run_configuration.get("lighting_eye_position", (0.0, 0.0))
-    if eye_position is None or len(eye_position) < 2:
-        return None
-    eye_x = float(eye_position[0])
-    eye_y = float(eye_position[1])
-    eye_z = float(eye_position[2]) if len(eye_position) >= 3 else 0.0
+    eye_x, eye_y, eye_z = _lighting_eye_position3(run_configuration)
     vector_length = max(0.0, float(run_configuration.get("lighting_eye_vector_length", 3.0)))
     points = [[eye_x, eye_y, eye_z]]
     lines = []
     if vector_length > 0.0:
-        eye_angle = math.radians(
-            float(run_configuration.get("lighting_eye_angle_degrees", 0.0))
-        )
+        eye_direction = _lighting_eye_direction3(run_configuration)
         vector_endpoint = [
-            eye_x + vector_length * math.cos(eye_angle),
-            eye_y + vector_length * math.sin(eye_angle),
-            eye_z,
+            eye_x + vector_length * eye_direction[0],
+            eye_y + vector_length * eye_direction[1],
+            eye_z + vector_length * eye_direction[2],
         ]
         points.append(vector_endpoint)
         lines.append((0, len(points) - 1))
@@ -352,10 +496,20 @@ def _lighting_eye_line_set(o3d, run_configuration, color):
 
 def _lighting_ball_config(run_configuration):
     values = run_configuration.get("Lighting_ball")
-    if values is None or len(values) < 4:
+    if values is None:
         return None
-    center = [float(values[index]) for index in range(3)]
-    radius = float(values[3])
+    if hasattr(values, "get"):
+        center = [
+            float(values.get("x")),
+            float(values.get("y")),
+            float(values.get("z")),
+        ]
+        radius = float(values.get("radius"))
+    else:
+        if len(values) < 4:
+            return None
+        center = [float(values[index]) for index in range(3)]
+        radius = float(values[3])
     if radius <= 0.0:
         return None
     return center, radius
@@ -542,6 +696,14 @@ class SimulationRunner3DApp:
             window_width,
             window_height,
         )
+        position = preferred_window_position(window_width, window_height)
+        if position is not None and hasattr(self.window, "os_frame"):
+            self.window.os_frame = self.gui.Rect(
+                position[0],
+                position[1],
+                window_width,
+                window_height,
+            )
 
         self.info_panel = self.gui.Horiz(
             0,

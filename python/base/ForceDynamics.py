@@ -616,15 +616,27 @@ class ForceContactDynamics:
     def LightingBallConfig(self):
         """Return configured lighting-ball center/radius, if present."""
         values = self.run_configuration.get("Lighting_ball")
-        if values is None or len(values) < 4:
+        if values is None:
             return None
-        radius = float(values[3])
+        if hasattr(values, "get"):
+            center = (
+                float(values.get("x")),
+                float(values.get("y")),
+                float(values.get("z")),
+            )
+            radius = float(values.get("radius"))
+        else:
+            if len(values) < 4:
+                return None
+            center = (
+                float(values[0]),
+                float(values[1]),
+                float(values[2]),
+            )
+            radius = float(values[3])
         if radius <= 0.0:
             return None
-        return (
-            (float(values[0]), float(values[1]), float(values[2])),
-            radius,
-        )
+        return (center, radius)
 
     def EvaluateLightingBallContact(self, SourceID):
         """Evaluate contact against the configured sphere equation."""
@@ -658,7 +670,11 @@ class ForceContactDynamics:
             source_radius,
             contact_center_distance,
         )
-        wall_flag = int(self.run_configuration.get("lighting_ball_wall_flag", 1000))
+        values = self.run_configuration.get("Lighting_ball")
+        if hasattr(values, "get"):
+            wall_flag = int(values.get("wall_flag", 1000))
+        else:
+            wall_flag = int(self.run_configuration.get("lighting_ball_wall_flag", 1000))
         return (*normal, overlap_area, contact_center_distance, wall_flag)
 
     def ProcessLightingBallCollision(self, SourceID, totalForce):

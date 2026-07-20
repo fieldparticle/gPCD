@@ -5,7 +5,7 @@ import math
 from gbase.pdata import *
 from gbase.libconf import AttrDict
 from gbase.MaterialProperties import (
-    write_color_scheme_defines,
+    write_color_mode_defines,
     write_material_properties,
 )
 import io
@@ -152,7 +152,7 @@ class GenMotionData():
         f.write(fstr)
         fstr = f"hsv_val = {run_cfg.hsv_val:0.4f};\n"
         f.write(fstr)
-        write_color_scheme_defines(f)
+        write_color_mode_defines(f)
         write_material_properties(f, run_cfg)
         f.flush()
         f.close()

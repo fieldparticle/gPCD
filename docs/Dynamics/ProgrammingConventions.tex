@@ -23,11 +23,12 @@ gbase/utilities.py:hsv_angle(angle, value, sat)
 \end{verbatim}
 
 \texttt{SimulationRunner\_HSVPanel.py} applies this helper when a particle's
-material \texttt{color\_scheme} is \texttt{HSV}.  The helper reads the angle
-in radians, maps it to hue with \(1/(2\pi)\), clamps saturation and value to
-\([0,1]\), and returns an RGB tuple for the Python renderer.  The former
-global \texttt{hsv\_color} switch is retired; color scheme selection belongs
-to \texttt{material\_properties}.
+material \texttt{color\_mode} is \texttt{VELOCITY}.  The helper reads the
+angle in radians, maps it to hue with \(1/(2\pi)\), clamps saturation and
+value to \([0,1]\), and returns an RGB tuple for the Python renderer.  The
+former global \texttt{hsv\_color} switch and the old named solid color schemes
+are retired; display selection belongs to \texttt{material\_properties} as
+\texttt{color\_mode} and \texttt{color}.
 
 \subsection{Flat Runtime Configuration}
 
@@ -72,12 +73,10 @@ vulkan/sim/common/util.glsl:colorizeVelocity(angle, sat, val)
 
 The helper reads \texttt{angle} in radians, maps it to hue with
 \(1/(2\pi)\), clamps saturation and value to \([0,1]\), and returns a
-\texttt{vec3} RGB color.  Scenario-generated \texttt{params.glsl} files may
-provide:
+\texttt{vec3} RGB color.  Runtime color selection is driven by material
+\texttt{color\_mode}; the velocity path uses the mode constant:
 \begin{verbatim}
-const uint HSV_ON;
-const float HSV_SAT;
-const float HSV_VAL;
+const uint COLOR_MODE_VELOCITY;
 \end{verbatim}
 
 Vertex shaders that output \texttt{vec4} colors must wrap the returned

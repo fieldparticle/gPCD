@@ -54,6 +54,7 @@ public:
 	void WriteShaderHeader();
 	void WriteMaterials();
 	void WriteShaderDbgHeader();
+	void WriteSphere();
 	void WriteWalls();
 	void Piston();
 	void WriteCDNoz();

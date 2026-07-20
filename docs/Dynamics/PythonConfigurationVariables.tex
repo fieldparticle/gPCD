@@ -198,7 +198,7 @@ runtime records therefore use:
 
 Lighting configurations should still provide \texttt{material\_properties}.
 Per-particle records select the material with \texttt{material\_id}; shared
-mass scaling, thermal velocity, color scheme, and density metadata belong to
+mass scaling, thermal velocity, color mode, color, and density metadata belong to
 the material record.
 
 \subsection{Lighting/Lumens View Inputs}
@@ -291,23 +291,22 @@ inspection matches the Vulkan projection convention.  Camera configuration is:
     when \texttt{camera\_projection="perspective"}.
 \end{description}
 
-\subsection{Material Color Schemes}
+\subsection{Material Color Modes}
 
-\texttt{material\_properties.color\_scheme} owns particle color selection.
-The active named schemes are:
+\texttt{material\_properties.color\_mode} owns particle color selection.
+The active named modes are:
 \begin{verbatim}
 COLLISION
-HSV
-WHITE
-RED
-GREEN
-BLUE
+VELOCITY
+SOLID
 LUMENS
 \end{verbatim}
 
-The former flat \texttt{hsv\_color} switch is retired.  \texttt{HSV} uses
-\texttt{hsv\_sat} and \texttt{hsv\_val} as viewer parameters; \texttt{LUMENS}
-uses the lumens eye/aperture fields above.
+The former flat \texttt{hsv\_color} switch and the old named solid color
+schemes are retired.  \texttt{VELOCITY} uses \texttt{hsv\_sat} and
+\texttt{hsv\_val} as viewer parameters.  \texttt{SOLID} uses the material
+\texttt{color} array.  \texttt{LUMENS} uses the lumens eye/aperture fields
+above and the material \texttt{color} for visible surface color.
 
 \subsection{Rectangular Cell Domain}
 
@@ -456,9 +455,10 @@ modes use the shared marker sampling in
 
 \texttt{x\_axis\_lims}, \texttt{y\_axis\_lims}, and
 \texttt{z\_axis\_lims} control Python plotting and game-camera bounds.
-\texttt{material\_properties.color\_scheme} controls particle coloring and
-does not affect dynamics.  \texttt{hsv\_sat} and \texttt{hsv\_val} parameterize
-the \texttt{HSV} material color scheme only.
+\texttt{material\_properties.color\_mode} and
+\texttt{material\_properties.color} control particle coloring and do not
+affect dynamics.  \texttt{hsv\_sat} and \texttt{hsv\_val} parameterize the
+\texttt{VELOCITY} material color mode only.
 The game simulation draws the analytic piston as a vertical line and reports
 its position, velocity, contacts, impulse, and cumulative momentum transfer.
 In sphere mode, boundary markers retain their configured visual radius but

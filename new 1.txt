@@ -1,1 +1,0 @@
-This is a example of using Vulkan for science. The system is a combination of fast particle collision detection (throughput 131M p/s ) and a geometry based, source owned, instantaneous,  massively parallel particle method. The collision detection is graphics based which makes Vulkan a very powerful fit (no CUDA). 

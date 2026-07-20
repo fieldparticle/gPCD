@@ -36,62 +36,72 @@
 #endif
 vec3 hsv2rgb(in vec3 hsv);
 vec3 colorizeVelocity(float v_ang, float sat, float val);
-uint material_color_scheme(uint materialID);
-vec4 color_from_scheme(uint index, uint colorScheme);
-vec4 solid_color(uint colorScheme);
+uint material_color_mode(uint materialID);
+vec4 material_color(uint materialID);
+vec4 lumens_color(uint index, vec4 baseColor);
+vec4 color_from_mode(uint index, uint colorMode, vec4 baseColor);
 
 vec4 color_map(uint index)
 {
-	if (P[index].ptype > 0.5)
-		return vec4(1.0, 1.0, 1.0, 1.0);
-
 	uint materialID = uint(round(P[index].material_id));
-	uint colorScheme = material_color_scheme(materialID);
-	return color_from_scheme(index, colorScheme);
+	uint colorMode = material_color_mode(materialID);
+	vec4 baseColor = material_color(materialID);
+	return color_from_mode(index, colorMode, baseColor);
 
 }
 
-uint material_color_scheme(uint materialID)
+uint material_color_mode(uint materialID)
 {
 	for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
 	{
 		if (MATERIAL_PROPERTIES[ii].materialID == materialID)
-			return MATERIAL_PROPERTIES[ii].colorScheme;
+			return MATERIAL_PROPERTIES[ii].colorMode;
 	}
 
-	return COLOR_SCHEME_COLLISION;
+	return COLOR_MODE_COLLISION;
 }
 
-vec4 color_from_scheme(uint index, uint colorScheme)
+vec4 material_color(uint materialID)
 {
-	if (colorScheme == COLOR_SCHEME_HSV)
+	for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+	{
+		if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+			return MATERIAL_PROPERTIES[ii].color;
+	}
+
+	return vec4(1.0, 1.0, 1.0, 1.0);
+}
+
+vec4 lumens_color(uint index, vec4 baseColor)
+{
+	if (P[index].contactCount == 0u && uint(P[index].colFlg) == 0u)
+		return vec4(0.0, 0.0, 0.0, 0.0);
+
+	return baseColor;
+}
+
+vec4 color_from_mode(uint index, uint colorMode, vec4 baseColor)
+{
+	if (colorMode == COLOR_MODE_VELOCITY)
 	{
 		float velocityAngle = ShaderFlags.positionBuffer == 0u
 			? P[index].VelRadA.w
 			: P[index].VelRadB.w;
-		return vec4(colorizeVelocity(velocityAngle, HSV_SAT, HSV_VAL), 1.0);
+		return vec4(colorizeVelocity(velocityAngle, HSV_SAT, HSV_VAL), baseColor.a);
 	}
 
-	if (colorScheme == COLOR_SCHEME_COLLISION)
+	if (colorMode == COLOR_MODE_COLLISION)
 	{
 		if (uint(P[index].colFlg) == 1u)
 			return vec4(colcolor, 1.0);
 		return vec4(ncolcolor, 1.0);
 	}
 
-	return solid_color(colorScheme);
-}
+	if (colorMode == COLOR_MODE_SOLID)
+		return baseColor;
 
-vec4 solid_color(uint colorScheme)
-{
-	if (colorScheme == COLOR_SCHEME_WHITE)
-		return vec4(1.0, 1.0, 1.0, 1.0);
-	if (colorScheme == COLOR_SCHEME_RED)
-		return vec4(1.0, 0.0, 0.0, 1.0);
-	if (colorScheme == COLOR_SCHEME_GREEN)
-		return vec4(0.0, 1.0, 0.0, 1.0);
-	if (colorScheme == COLOR_SCHEME_BLUE)
-		return vec4(0.2, 0.6, 1.0, 1.0);
+	if (colorMode == COLOR_MODE_LUMENS)
+		return lumens_color(index, baseColor);
 
 	return vec4(1.0, 1.0, 1.0, 1.0);
 }

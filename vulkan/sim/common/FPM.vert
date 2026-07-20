@@ -29,7 +29,7 @@ void fpm_vert_main(){
 	
 	
 	// Set point size 
-	gl_PointSize = 1.0;
+	gl_PointSize = 3.0;
 	if(uint(ShaderFlags.frameNum) == 0u)
 	{
 		gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
@@ -70,8 +70,8 @@ void fpm_vert_main(){
 	// Render the particle from the same selected position buffer used to build
 	// the corner list and drive compute collision detection.
 	vec3 particleCenter = vec3(cx, cy, cz);
-	//gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz + particleCenter, 1.0);
-	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
+	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz + particleCenter, 1.0);
+	//gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
 
 	uint duplist[8];
 	uint dupcntr = 0;

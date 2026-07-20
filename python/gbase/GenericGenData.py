@@ -4,17 +4,15 @@ from gbase.FunctionWall import bounds as wall_bounds
 from gbase.FunctionWall import parse_keyed_curve_wall_segments
 from gbase.FunctionWall import sample_points
 from gbase.MaterialProperties import (
-    COLOR_SCHEME_BLUE,
-    COLOR_SCHEME_COLLISION,
-    COLOR_SCHEME_GREEN,
-    COLOR_SCHEME_HSV,
-    COLOR_SCHEME_LUMENS,
-    COLOR_SCHEME_NAMES,
-    COLOR_SCHEME_RED,
-    COLOR_SCHEME_WHITE,
+    COLOR_MODE_COLLISION,
+    COLOR_MODE_LUMENS,
+    COLOR_MODE_NAMES,
+    COLOR_MODE_SOLID,
+    COLOR_MODE_VELOCITY,
     DEFAULT_MATERIAL_PROPERTIES,
+    parse_material_color,
     parse_particle_type,
-    write_color_scheme_defines,
+    write_color_mode_defines,
     write_material_properties,
 )
 from gbase.pdata import PTYPE_MOBILE, PTYPE_NULL, pdata
@@ -132,15 +130,12 @@ class GenericGenData:
     """Generate particle data from declarative particle and wall configuration."""
 
     BOUNDARY_PARTICLE_PTYPE = 1.0
-    COLOR_SCHEME_COLLISION = COLOR_SCHEME_COLLISION
-    COLOR_SCHEME_HSV = COLOR_SCHEME_HSV
-    COLOR_SCHEME_WHITE = COLOR_SCHEME_WHITE
-    COLOR_SCHEME_RED = COLOR_SCHEME_RED
-    COLOR_SCHEME_GREEN = COLOR_SCHEME_GREEN
-    COLOR_SCHEME_BLUE = COLOR_SCHEME_BLUE
-    COLOR_SCHEME_LUMENS = COLOR_SCHEME_LUMENS
-    COLOR_SCHEME_NAMES = COLOR_SCHEME_NAMES
-    COLOR_SCHEME_VALUES = set(COLOR_SCHEME_NAMES.values())
+    COLOR_MODE_COLLISION = COLOR_MODE_COLLISION
+    COLOR_MODE_VELOCITY = COLOR_MODE_VELOCITY
+    COLOR_MODE_SOLID = COLOR_MODE_SOLID
+    COLOR_MODE_LUMENS = COLOR_MODE_LUMENS
+    COLOR_MODE_NAMES = COLOR_MODE_NAMES
+    COLOR_MODE_VALUES = set(COLOR_MODE_NAMES.values())
     DEFAULT_MATERIAL_PROPERTIES = DEFAULT_MATERIAL_PROPERTIES
 
     def __init__(self):
@@ -180,22 +175,22 @@ class GenericGenData:
     def do_all_files_dbg(self):
         return self.runner()
 
-    def parse_color_scheme(self, raw_value, errors, context):
+    def parse_color_mode(self, raw_value, errors, context):
         if isinstance(raw_value, str):
-            color_scheme = self.COLOR_SCHEME_NAMES.get(raw_value.strip().upper())
-            if color_scheme is None:
-                errors.append(f"{context}.color_scheme is unknown: {raw_value}")
+            color_mode = self.COLOR_MODE_NAMES.get(raw_value.strip().upper())
+            if color_mode is None:
+                errors.append(f"{context}.color_mode is unknown: {raw_value}")
                 return None
-            return color_scheme
+            return color_mode
         try:
-            color_scheme = int(raw_value)
+            color_mode = int(raw_value)
         except (TypeError, ValueError):
-            errors.append(f"{context}.color_scheme must be an integer or known name")
+            errors.append(f"{context}.color_mode must be an integer or known name")
             return None
-        if color_scheme not in self.COLOR_SCHEME_VALUES:
-            errors.append(f"{context}.color_scheme is not a known color scheme")
+        if color_mode not in self.COLOR_MODE_VALUES:
+            errors.append(f"{context}.color_mode is not a known color mode")
             return None
-        return color_scheme
+        return color_mode
 
     def validate_material_properties(self, errors):
         raw_materials = self.itemcfg.get("material_properties")
@@ -272,18 +267,31 @@ class GenericGenData:
                         f"{context}.cell_density must be 0 for stream-generated material 0"
                     )
 
-            color_scheme = self.parse_color_scheme(
-                raw_material.get("color_scheme", self.COLOR_SCHEME_HSV),
+            color_mode = self.parse_color_mode(
+                raw_material.get(
+                    "color_mode",
+                    self.COLOR_MODE_VELOCITY,
+                ),
                 errors,
                 context,
             )
+            color = None
+            if color_mode is not None:
+                try:
+                    color = parse_material_color(
+                        raw_material.get("color"),
+                        color_mode,
+                    )
+                except (TypeError, ValueError) as exc:
+                    errors.append(f"{context}.color is invalid: {exc}")
 
             if (
                 material_id >= 0
                 and relative_mass is not None
                 and thermal_velocity is not None
                 and cell_density is not None
-                and color_scheme is not None
+                and color_mode is not None
+                and color is not None
                 and particle_type is not None
             ):
                 materials.append(
@@ -293,7 +301,8 @@ class GenericGenData:
                         "particle_type": particle_type,
                         "relative_mass": relative_mass,
                         "thermal_velocity": thermal_velocity,
-                        "color_scheme": color_scheme,
+                        "color_mode": color_mode,
+                        "color": color,
                         "cell_density": cell_density,
                     }
                 )
@@ -883,8 +892,8 @@ class GenericGenData:
             output.write(text.rstrip())
             output.write("\n")
 
-    def write_color_scheme_defines(self, output):
-        write_color_scheme_defines(output)
+    def write_color_mode_defines(self, output):
+        write_color_mode_defines(output)
 
     def write_material_properties(self, output):
         write_material_properties(output, {"material_properties": self.material_properties})
@@ -1413,6 +1422,54 @@ class GenericGenData:
                 f"{float(view_center[1]):.9f}, "
                 f"{float(view_center[2]):.9f}];\n"
             )
+            align_with_eye = bool(self.itemcfg.get("align_with_eye", False))
+            output.write(
+                f"align_with_eye = {'true' if align_with_eye else 'false'};\n"
+            )
+            if align_with_eye:
+                lighting_eye_position = self.itemcfg.get("lighting_eye_position")
+                lighting_eye_direction = self.itemcfg.get("lighting_eye_direction")
+                if lighting_eye_position is None:
+                    raise ValueError(
+                        "lighting_eye_position is required when align_with_eye is true"
+                    )
+                if lighting_eye_direction is None:
+                    raise ValueError(
+                        "lighting_eye_direction is required when align_with_eye is true"
+                    )
+                if len(lighting_eye_position) != 3:
+                    raise ValueError("lighting_eye_position must contain three values")
+                if len(lighting_eye_direction) != 3:
+                    raise ValueError("lighting_eye_direction must contain three values")
+                lighting_eye_fov = float(
+                    self.itemcfg.get("lighting_eye_fov_degrees", 90.0)
+                )
+                eye_view_distance = float(
+                    self.itemcfg.get("eye_view_distance", 0.0)
+                )
+                if eye_view_distance <= 0.0:
+                    raise ValueError(
+                        "eye_view_distance must be greater than zero when "
+                        "align_with_eye is true"
+                    )
+                output.write(
+                    f"eye_view_distance = {eye_view_distance:.9f};\n"
+                )
+                output.write(
+                    "lighting_eye_position = ["
+                    f"{float(lighting_eye_position[0]):.9f}, "
+                    f"{float(lighting_eye_position[1]):.9f}, "
+                    f"{float(lighting_eye_position[2]):.9f}];\n"
+                )
+                output.write(
+                    "lighting_eye_direction = ["
+                    f"{float(lighting_eye_direction[0]):.9f}, "
+                    f"{float(lighting_eye_direction[1]):.9f}, "
+                    f"{float(lighting_eye_direction[2]):.9f}];\n"
+                )
+                output.write(
+                    f"lighting_eye_fov_degrees = {lighting_eye_fov:.9f};\n"
+                )
             output.write(f"radius = {self.radius:.9f};\n")
             output.write(f"num_particles = {self.number_particles};\n")
             output.write("particles_per_cell = 0;\n")
@@ -1495,6 +1552,39 @@ class GenericGenData:
                 )
             output.write(");\n")
 
+            lighting_ball = self.itemcfg.get("Lighting_ball")
+            if lighting_ball is not None:
+                if hasattr(lighting_ball, "get"):
+                    ball_x = float(lighting_ball.get("x"))
+                    ball_y = float(lighting_ball.get("y"))
+                    ball_z = float(lighting_ball.get("z"))
+                    ball_radius = float(lighting_ball.get("radius"))
+                    ball_material_id = int(lighting_ball.get("material_id", 0))
+                    ball_wall_flag = int(lighting_ball.get("wall_flag", 1000))
+                else:
+                    if len(lighting_ball) < 4:
+                        raise ValueError(
+                            "Lighting_ball must contain at least x, y, z, and radius"
+                        )
+                    ball_x = float(lighting_ball[0])
+                    ball_y = float(lighting_ball[1])
+                    ball_z = float(lighting_ball[2])
+                    ball_radius = float(lighting_ball[3])
+                    ball_material_id = int(lighting_ball[4]) if len(lighting_ball) >= 5 else 0
+                    ball_wall_flag = int(
+                        self.itemcfg.get("lighting_ball_wall_flag", 1000)
+                    )
+                if ball_radius <= 0.0:
+                    raise ValueError("Lighting_ball.radius must be greater than zero")
+                output.write("Lighting_ball = {\n")
+                output.write(f"    x = {ball_x:.9f};\n")
+                output.write(f"    y = {ball_y:.9f};\n")
+                output.write(f"    z = {ball_z:.9f};\n")
+                output.write(f"    radius = {ball_radius:.9f};\n")
+                output.write(f"    material_id = {ball_material_id};\n")
+                output.write(f"    wall_flag = {ball_wall_flag};\n")
+                output.write("};\n")
+
             output.write(f"wall_contact_offset = {self.wall_contact_offset:.9f};\n")
             output.write(
                 "compression_stiffness_gain = "
@@ -1511,7 +1601,7 @@ class GenericGenData:
             )
             output.write(f"hsv_sat = {float(self.itemcfg.hsv_sat):.9f};\n")
             output.write(f"hsv_val = {float(self.itemcfg.hsv_val):.9f};\n")
-            self.write_color_scheme_defines(output)
+            self.write_color_mode_defines(output)
             self.write_material_properties(output)
             output.write(
                 f"as_points = {1 if self.itemcfg.get('as_points', False) else 0};\n"

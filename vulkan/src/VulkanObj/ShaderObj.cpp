@@ -42,13 +42,14 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 	//	WriteCDNoz();
 		WriteWalls();
 		WriteMaterials();
+		WriteSphere();
 		Piston();
 		GenWorkGroups();
 }
 
 void ShaderObj::WriteMaterials()
 {
-	bool usesHSV = false;
+	bool usesVelocityColor = false;
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
 	std::string filename = fildir + "/material.glsl";
 
@@ -62,12 +63,10 @@ void ShaderObj::WriteMaterials()
 	ostrm << "#ifndef MATERIAL_GLSL\n";
 	ostrm << "#define MATERIAL_GLSL\n\n";
 
-	ostrm << "const uint COLOR_SCHEME_COLLISION = 0u;\n";
-	ostrm << "const uint COLOR_SCHEME_HSV = 1u;\n";
-	ostrm << "const uint COLOR_SCHEME_WHITE = 2u;\n";
-	ostrm << "const uint COLOR_SCHEME_RED = 3u;\n";
-	ostrm << "const uint COLOR_SCHEME_GREEN = 4u;\n";
-	ostrm << "const uint COLOR_SCHEME_BLUE = 5u;\n\n";
+	ostrm << "const uint COLOR_MODE_COLLISION = 0u;\n";
+	ostrm << "const uint COLOR_MODE_VELOCITY = 1u;\n";
+	ostrm << "const uint COLOR_MODE_SOLID = 2u;\n";
+	ostrm << "const uint COLOR_MODE_LUMENS = 3u;\n\n";
 	ostrm << "const uint PARTICLE_TYPE_REGULAR = 0u;\n";
 	ostrm << "const uint PARTICLE_TYPE_PHOTON = 1u;\n\n";
 
@@ -77,7 +76,8 @@ void ShaderObj::WriteMaterials()
 	ostrm << "    uint particleType;\n";
 	ostrm << "    float relativeMass;\n";
 	ostrm << "    float tempVel;\n";
-	ostrm << "    uint colorScheme;\n";
+	ostrm << "    uint colorMode;\n";
+	ostrm << "    vec4 color;\n";
 	ostrm << "    float cellDensity;\n";
 	ostrm << "};\n\n";
 
@@ -91,74 +91,98 @@ void ShaderObj::WriteMaterials()
 	{
 		ostrm << "const uint MATERIAL_PROPERTY_COUNT = 1u;\n";
 		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](\n";
-		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_SCHEME_HSV, 0.000000000)\n";
+		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0.000000000)\n";
 		ostrm << ");\n\n";
-		ostrm << "#endif\n";
-		return;
+		usesVelocityColor = true;
 	}
-
-	ostrm << "const uint MATERIAL_PROPERTY_COUNT = " << materialCount << "u;\n";
-	ostrm << "const MaterialProperty MATERIAL_PROPERTIES[" << materialCount << "] = MaterialProperty["
-		<< materialCount << "](\n";
-
-	for (int index = 0; index < materialCount; ++index)
+	else
 	{
-		config_setting_t* material = CfgTst->GetSubStructAddress(materialList, index);
-		if (material == nullptr)
+		ostrm << "const uint MATERIAL_PROPERTY_COUNT = " << materialCount << "u;\n";
+		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[" << materialCount << "] = MaterialProperty["
+			<< materialCount << "](\n";
+
+		for (int index = 0; index < materialCount; ++index)
 		{
-			throw std::runtime_error(
-				"material_properties[" + std::to_string(index) + "] is invalid"
-			);
+			config_setting_t* material = CfgTst->GetSubStructAddress(materialList, index);
+			if (material == nullptr)
+			{
+				throw std::runtime_error(
+					"material_properties[" + std::to_string(index) + "] is invalid"
+				);
+			}
+
+			int materialID = 0;
+			int colorMode = 0;
+			int particleType = 0;
+			double relativeMass = 1.0;
+			double tempVel = 0.0;
+			double cellDensity = 0.0;
+			double colorRed = 1.0;
+			double colorGreen = 1.0;
+			double colorBlue = 1.0;
+			double colorAlpha = 1.0;
+
+			if (config_setting_lookup_int(material, "material_id", &materialID) == CONFIG_FALSE)
+				throw std::runtime_error("material_properties[" + std::to_string(index) + "].material_id missing");
+
+			if (config_setting_lookup_int(material, "particle_type", &particleType) == CONFIG_FALSE)
+				particleType = 0;
+
+			if (config_setting_lookup_float(material, "relative_mass", &relativeMass) == CONFIG_FALSE)
+				throw std::runtime_error("material_properties[" + std::to_string(index) + "].relative_mass missing");
+
+			if (config_setting_lookup_float(material, "temp_vel", &tempVel) == CONFIG_FALSE
+				&& config_setting_lookup_float(material, "thermal_velocity", &tempVel) == CONFIG_FALSE)
+				throw std::runtime_error(
+					"material_properties[" + std::to_string(index) +
+					"].temp_vel/thermal_velocity missing"
+				);
+
+			if (config_setting_lookup_int(material, "color_mode", &colorMode) == CONFIG_FALSE)
+				throw std::runtime_error("material_properties[" + std::to_string(index) + "].color_mode missing");
+
+			config_setting_t* color = config_setting_lookup(material, "color");
+			if (color != nullptr)
+			{
+				int colorLength = config_setting_length(color);
+				if (colorLength != 3 && colorLength != 4)
+					throw std::runtime_error("material_properties[" + std::to_string(index) + "].color must contain 3 or 4 values");
+
+				colorRed = config_setting_get_float_elem(color, 0);
+				colorGreen = config_setting_get_float_elem(color, 1);
+				colorBlue = config_setting_get_float_elem(color, 2);
+				if (colorLength == 4)
+					colorAlpha = config_setting_get_float_elem(color, 3);
+			}
+
+			if (static_cast<uint32_t>(colorMode) == 1u)
+				usesVelocityColor = true;
+
+
+			if (config_setting_lookup_float(material, "cell_density", &cellDensity) == CONFIG_FALSE)
+				cellDensity = 0.0;
+
+			ostrm << "    MaterialProperty("
+				<< materialID << "u, "
+				<< particleType << "u, "
+				<< std::fixed << std::setprecision(9) << relativeMass << ", "
+				<< std::fixed << std::setprecision(9) << tempVel << ", "
+				<< colorMode << "u, "
+				<< "vec4("
+				<< std::fixed << std::setprecision(9) << colorRed << ", "
+				<< std::fixed << std::setprecision(9) << colorGreen << ", "
+				<< std::fixed << std::setprecision(9) << colorBlue << ", "
+				<< std::fixed << std::setprecision(9) << colorAlpha << "), "
+				<< std::fixed << std::setprecision(9) << cellDensity << ")";
+
+			if (index + 1 < materialCount)
+				ostrm << ",";
+
+			ostrm << "\n";
 		}
 
-		int materialID = 0;
-		int colorScheme = 0;
-		int particleType = 0;
-		double relativeMass = 1.0;
-		double tempVel = 0.0;
-		double cellDensity = 0.0;
-
-		if (config_setting_lookup_int(material, "material_id", &materialID) == CONFIG_FALSE)
-			throw std::runtime_error("material_properties[" + std::to_string(index) + "].material_id missing");
-
-		if (config_setting_lookup_int(material, "particle_type", &particleType) == CONFIG_FALSE)
-			particleType = 0;
-
-		if (config_setting_lookup_float(material, "relative_mass", &relativeMass) == CONFIG_FALSE)
-			throw std::runtime_error("material_properties[" + std::to_string(index) + "].relative_mass missing");
-
-		if (config_setting_lookup_float(material, "temp_vel", &tempVel) == CONFIG_FALSE
-			&& config_setting_lookup_float(material, "thermal_velocity", &tempVel) == CONFIG_FALSE)
-			throw std::runtime_error(
-				"material_properties[" + std::to_string(index) +
-				"].temp_vel/thermal_velocity missing"
-			);
-
-		if (config_setting_lookup_int(material, "color_scheme", &colorScheme) == CONFIG_FALSE)
-			throw std::runtime_error("material_properties[" + std::to_string(index) + "].color_scheme missing");
-
-		if (static_cast<uint32_t>(colorScheme) == 1u)
-			usesHSV = true;
-
-
-		if (config_setting_lookup_float(material, "cell_density", &cellDensity) == CONFIG_FALSE)
-			cellDensity = 0.0;
-
-		ostrm << "    MaterialProperty("
-			<< materialID << "u, "
-			<< particleType << "u, "
-			<< std::fixed << std::setprecision(9) << relativeMass << ", "
-			<< std::fixed << std::setprecision(9) << tempVel << ", "
-			<< colorScheme << "u, "
-			<< std::fixed << std::setprecision(9) << cellDensity << ")";
-
-		if (index + 1 < materialCount)
-			ostrm << ",";
-
-		ostrm << "\n";
+		ostrm << ");\n\n";
 	}
-
-	ostrm << ");\n\n";
 
 
 	float col_red = CfgApp->GetFloat("application.col_color.red", true);
@@ -177,7 +201,7 @@ void ShaderObj::WriteMaterials()
 
 
 	
-	if (usesHSV == true)
+	if (usesVelocityColor == true)
 	{
 		hsv_color_on << "const uint HSV_ON = 1u;\n";
 		hsv_sat << "const float HSV_SAT = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_sat", true) << ";\n";
@@ -349,6 +373,66 @@ void ShaderObj::Piston()
 			<< "const float piston_start_frame=" << std::fixed << std::setprecision(9)
 			<< CfgTst->GetInt("piston_start_frame", true) << ";\n";
 	}
+}
+void ShaderObj::WriteSphere()
+{
+	if (!CfgTst->CheckKey("Lighting_ball"))
+		return;
+
+
+	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
+	std::string filename = fildir + "/sphere.glsl";
+
+	std::ofstream ostrm(filename);
+	if (!ostrm.is_open())
+	{
+		std::string rpt = "Failed to open file:" + filename;
+		throw std::runtime_error(rpt.c_str());
+	}
+
+	ostrm << "#ifndef SPHERE_GLSL\n#define SPHERE_GLSL\n";
+	ostrm << std::fixed << std::setprecision(9);
+
+	if (!CfgTst->CheckKey("Lighting_ball"))
+	{
+		ostrm
+			<< "const uint LIGHTING_BALL_ENABLED = 0u;\n"
+			<< "const vec3 LIGHTING_BALL_CENTER = vec3(0.000000000, 0.000000000, 0.000000000);\n"
+			<< "const float LIGHTING_BALL_RADIUS = 0.000000000;\n"
+			<< "const uint LIGHTING_BALL_MATERIAL_ID = 0u;\n"
+			<< "const uint LIGHTING_BALL_WALL_FLAG = 1000u;\n"
+			<< "#endif\n";
+		return;
+	}
+
+	double centerX = CfgTst->GetFloat("Lighting_ball.x", true);
+	double centerY = CfgTst->GetFloat("Lighting_ball.y", true);
+	double centerZ = CfgTst->GetFloat("Lighting_ball.z", true);
+	double radius = CfgTst->GetFloat("Lighting_ball.radius", true);
+
+	if (radius <= 0.0)
+		throw std::runtime_error("Lighting_ball.radius must be greater than zero");
+
+	uint32_t materialID = 0u;
+	if (CfgTst->CheckKey("Lighting_ball.material_id"))
+		materialID = static_cast<uint32_t>(
+			CfgTst->GetInt("Lighting_ball.material_id", false)
+			);
+
+	uint32_t wallFlag = 1000u;
+	if (CfgTst->CheckKey("Lighting_ball.wall_flag"))
+		wallFlag = static_cast<uint32_t>(
+			CfgTst->GetInt("Lighting_ball.wall_flag", false)
+			);
+
+	ostrm
+		<< "const uint LIGHTING_BALL_ENABLED = 1u;\n"
+		<< "const vec3 LIGHTING_BALL_CENTER = vec3("
+		<< centerX << ", " << centerY << ", " << centerZ << ");\n"
+		<< "const float LIGHTING_BALL_RADIUS = " << radius << ";\n"
+		<< "const uint LIGHTING_BALL_MATERIAL_ID = " << materialID << "u;\n"
+		<< "const uint LIGHTING_BALL_WALL_FLAG = " << wallFlag << "u;\n"
+		<< "#endif\n";
 }
 // This function is only for walls that are passed to glsl.
 // It is up to the glsl version to use it or not. It has nothing to

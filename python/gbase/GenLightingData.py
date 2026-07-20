@@ -8,10 +8,61 @@ class GenLightingData(GenStreaming):
     """Generate explicit lighting/demo particles with scheduled release frames."""
 
     @staticmethod
-    def _ray_endpoint(origin_x, origin_y, angle_radians, view_box):
+    def _vector3_from_config(raw_value, default):
+        if raw_value is None:
+            return tuple(default)
+        values = [float(raw_value[index]) for index in range(min(3, len(raw_value)))]
+        while len(values) < 3:
+            values.append(0.0)
+        return tuple(values)
+
+    @staticmethod
+    def _normalize3(vector):
+        length = math.sqrt(sum(component * component for component in vector))
+        if length <= 1.0e-12:
+            return None
+        return tuple(component / length for component in vector)
+
+    @staticmethod
+    def _lighting_eye_position3(run_configuration):
+        return GenLightingData._vector3_from_config(
+            run_configuration.get("lighting_eye_position"),
+            (0.0, 0.0, 0.0),
+        )
+
+    @staticmethod
+    def _lighting_eye_direction3(run_configuration):
+        eye_position = GenLightingData._lighting_eye_position3(run_configuration)
+        target = run_configuration.get("lighting_eye_target")
+        if target is not None:
+            target_position = GenLightingData._vector3_from_config(
+                target,
+                (0.0, 0.0, 0.0),
+            )
+            direction = tuple(
+                target_position[index] - eye_position[index]
+                for index in range(3)
+            )
+            normalized = GenLightingData._normalize3(direction)
+            if normalized is not None:
+                return normalized
+
+        raw_direction = run_configuration.get("lighting_eye_direction")
+        if raw_direction is not None:
+            normalized = GenLightingData._normalize3(
+                GenLightingData._vector3_from_config(raw_direction, (1.0, 0.0, 0.0))
+            )
+            if normalized is not None:
+                return normalized
+
+        eye_angle = math.radians(
+            float(run_configuration.get("lighting_eye_angle_degrees", 0.0))
+        )
+        return math.cos(eye_angle), math.sin(eye_angle), 0.0
+
+    @staticmethod
+    def _ray_endpoint_from_direction(origin_x, origin_y, dir_x, dir_y, view_box):
         x_min, x_max, y_min, y_max = view_box
-        dir_x = math.cos(angle_radians)
-        dir_y = math.sin(angle_radians)
         candidates = []
         if abs(dir_x) > 1.0e-12:
             for x_bound in (x_min, x_max):
@@ -35,22 +86,42 @@ class GenLightingData(GenStreaming):
         return end_x, end_y
 
     @staticmethod
+    def _ray_endpoint(origin_x, origin_y, angle_radians, view_box):
+        return GenLightingData._ray_endpoint_from_direction(
+            origin_x,
+            origin_y,
+            math.cos(angle_radians),
+            math.sin(angle_radians),
+            view_box,
+        )
+
+    @staticmethod
     def SpecificDraw(screen, run_configuration, dynamics, view_box, draw_helpers):
         """Draw lighting-specific eye/FOV diagnostics in the Python viewer."""
         del dynamics
         import pygame
 
-        eye_position = run_configuration.get("lighting_eye_position", (0.0, 0.0))
-        eye_x = float(eye_position[0])
-        eye_y = float(eye_position[1])
-        eye_angle = math.radians(
-            float(run_configuration.get("lighting_eye_angle_degrees", 0.0))
+        eye_x, eye_y, _eye_z = GenLightingData._lighting_eye_position3(
+            run_configuration
         )
+        eye_direction = GenLightingData._lighting_eye_direction3(run_configuration)
+        eye_direction_xy_length = math.hypot(eye_direction[0], eye_direction[1])
+        if eye_direction_xy_length <= 1.0e-12:
+            return
+        eye_dir_x = eye_direction[0] / eye_direction_xy_length
+        eye_dir_y = eye_direction[1] / eye_direction_xy_length
+        eye_angle = math.atan2(eye_dir_y, eye_dir_x)
         fov = math.radians(float(run_configuration.get("lighting_eye_fov_degrees", 90.0)))
         half_fov = fov * 0.5
 
         eye_screen = draw_helpers.to_screen(eye_x, eye_y)
-        look_end = GenLightingData._ray_endpoint(eye_x, eye_y, eye_angle, view_box)
+        look_end = GenLightingData._ray_endpoint_from_direction(
+            eye_x,
+            eye_y,
+            eye_dir_x,
+            eye_dir_y,
+            view_box,
+        )
         left_end = GenLightingData._ray_endpoint(
             eye_x,
             eye_y,

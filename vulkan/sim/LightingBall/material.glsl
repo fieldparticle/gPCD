@@ -1,12 +1,10 @@
 #ifndef MATERIAL_GLSL
 #define MATERIAL_GLSL
 
-const uint COLOR_SCHEME_COLLISION = 0u;
-const uint COLOR_SCHEME_HSV = 1u;
-const uint COLOR_SCHEME_WHITE = 2u;
-const uint COLOR_SCHEME_RED = 3u;
-const uint COLOR_SCHEME_GREEN = 4u;
-const uint COLOR_SCHEME_BLUE = 5u;
+const uint COLOR_MODE_COLLISION = 0u;
+const uint COLOR_MODE_VELOCITY = 1u;
+const uint COLOR_MODE_SOLID = 2u;
+const uint COLOR_MODE_LUMENS = 3u;
 
 const uint PARTICLE_TYPE_REGULAR = 0u;
 const uint PARTICLE_TYPE_PHOTON = 1u;
@@ -17,14 +15,15 @@ struct MaterialProperty
     uint particleType;
     float relativeMass;
     float tempVel;
-    uint colorScheme;
+    uint colorMode;
+    vec4 color;
     float cellDensity;
 };
 
 const uint MATERIAL_PROPERTY_COUNT = 2u;
 const MaterialProperty MATERIAL_PROPERTIES[2] = MaterialProperty[2](
-    MaterialProperty(0u, 1u, 1.000000000, 0.000000000, 2u, 0.000000000),
-    MaterialProperty(1u, 0u, 1.000000000, 0.000000000, 4u, 0.000000000)
+    MaterialProperty(0u, 1u, 1.000000000, 0.000000000, 3u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0.000000000),
+    MaterialProperty(1u, 0u, 1.000000000, 0.000000000, 2u, vec4(0.000000000, 1.000000000, 0.000000000, 1.000000000), 0.000000000)
 );
 
 const uint HSV_ON = 0u;

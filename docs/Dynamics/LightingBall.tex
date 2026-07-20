@@ -16,7 +16,14 @@ parity.
 
 The scenario uses the configuration item:
 \begin{verbatim}
-Lighting_ball = [x_center, y_center, z_center, radius, material_id];
+Lighting_ball = {
+    x = x_center;
+    y = y_center;
+    z = z_center;
+    radius = radius;
+    material_id = material_id;
+    wall_flag = wall_flag;
+};
 \end{verbatim}
 
 The generator samples this sphere and inserts standard boundary particles at
@@ -58,29 +65,49 @@ configuration level.  It selects the same sphere, cell domain, death bounds,
 stream geometry, material properties, radius, and timestep, but writes Vulkan
 output names such as \texttt{LightingBall\_Vk.tst}.
 
-The current Vulkan shader export is not yet at parity with the Python
-lighting-ball dynamics.  The shared Vulkan simple path has photon behavior,
-function walls, rectangle walls, boundary-marker locality, and the common
-\texttt{FPM.comp} schedule.  It does not yet export the analytic
-lighting-ball sphere evaluator.  Without that evaluator, a Vulkan
-LightingBall run can discover boundary markers, but it cannot reflect from
-the configured sphere equation in the same way as Python.
+The current Vulkan simple export now carries the lighting-ball sphere into the
+runtime scene.  The generated test file writes \texttt{Lighting\_ball} as a
+typed structure, and \texttt{ShaderObj} emits \texttt{sphere.glsl} with the
+enabled state, center, radius, material id, and wall flag.  The simple exporter
+emits \texttt{ForceDynamicsSimpleLightingBall.glsl}; the common
+\texttt{FPM.comp} schedule routes a local marker belonging to the configured
+lighting ball through the analytic sphere evaluator before ordinary
+particle-particle collision handling.
+
+Vulkan rendering also uses the material-owned color-mode contract.  Material
+records contain \texttt{color\_mode} and \texttt{color}.  The generated
+\texttt{material.glsl} exposes \texttt{COLOR\_MODE\_COLLISION},
+\texttt{COLOR\_MODE\_VELOCITY}, \texttt{COLOR\_MODE\_SOLID}, and
+\texttt{COLOR\_MODE\_LUMENS}.  The shared \texttt{color\_map.glsl} no longer
+uses the old named solid color schemes.  In \texttt{LUMENS} mode, uncontacted
+particles are transparent; particles with contact state use the configured
+material color until the full Python brightness calculation is ported.
+
+The render camera may be aligned with the configured lighting eye:
+\begin{verbatim}
+align_with_eye = true;
+eye_view_distance = 30.0;
+lighting_eye_position = [2.5, 7.0, 6.0];
+lighting_eye_direction = [0.810026, -0.424246, -0.404812];
+lighting_eye_fov_degrees = 90.0;
+\end{verbatim}
+When \texttt{align\_with\_eye} is true, Vulkan type-checks the eye settings
+from the generated test file.  The view target is the lighting eye position,
+and the render eye is moved backward along the negative lighting-eye direction
+by \texttt{eye\_view\_distance}.  This keeps the view aligned with the optical
+eye while allowing the whole scene to be framed.
 
 \subsection{Next Export Work}
 
-The next porting step is to make the simple GLSL exporter own the
-lighting-ball sphere path.  The required generated contract is:
+The next porting step is to finish visual lighting parity rather than sphere
+collision export.  The remaining generated contract is:
 \begin{itemize}
-    \item emit lighting-ball center, radius, material, enable state, and wall
-          flag into generated boundary metadata;
-    \item generate a reusable lighting-ball GLSL helper that evaluates the
-          analytic sphere normal and physical penetration from the configured
-          sphere;
-    \item make boundary-marker contacts dispatch to the lighting-ball
-          evaluator when a configured lighting ball is present;
-    \item keep marker particles as locality sentinels only, not as physical
-          particle-particle collision targets;
-    \item regenerate the Vulkan simple common shader family from
-          \texttt{tools/ExportForceDynamicsSimpleGLSL.py} rather than
-          hand-editing the common GLSL files.
+    \item carry or reconstruct the surface normal needed by
+          \texttt{COLOR\_MODE\_LUMENS};
+    \item port Python's lighting brightness calculation, including eye field
+          of view, diffuse strength, specular strength, and shininess;
+    \item keep \texttt{color\_map.glsl} under exporter ownership so material
+          display behavior cannot drift from the generated Vulkan contract;
+    \item validate the eye-aligned camera and backed-off
+          \texttt{eye\_view\_distance} in the live Vulkan scene.
 \end{itemize}

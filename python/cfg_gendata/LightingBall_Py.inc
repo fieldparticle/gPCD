@@ -23,6 +23,19 @@ cell_array_depth 				= 20;
 
 view_center 					= [ 3.5,2.5,2.5];
 zoom							= 1.25;
+
+align_with_eye					= true;
+eye_view_distance 				= 30.0;
+lighting_eye_position 			= [2.5, 7.0, 6.0];
+lighting_eye_direction 			= [0.810026, -0.424246, -0.404812];
+//lighting_eye_target   		= [5.1259, 5.6247, 4.6877];
+//lighting_eye_angle_degrees 	= 45.0;
+lighting_eye_fov_degrees 		= 90.0;
+lighting_diffuse_strength 		= 0.20;
+lighting_specular_strength 		= 1.0;
+lighting_specular_shininess 	= 32.0;
+lighting_surface_color 			= [1.0, 1.0, 1.0];
+
 //death_bounds = [
 //    x_min, x_max,
 //    y_min, y_max,
@@ -83,9 +96,8 @@ particle_streams = (
     name 						= "photon_beam";
     material_id 				= 0;
 
-    // Regular particles for now; material_properties carries particle_type.
-    //initial_particle_velocity 	= [ 0.048296, -0.012941, 0.0 ];
-	initial_particle_velocity 	= [ 0.2, -0.2, 0.0 ];
+    // Reflection-law beam aimed for a bright point at [5.1259, 5.6247, 4.6877].
+	initial_particle_velocity 	= [ 0.209968, -0.026364, 0.187666 ];
 
     release_start_frame 		= 10;
     release_columns 			= 1;
@@ -96,13 +108,13 @@ particle_streams = (
     inlet_value 				= 4.0;
 
     span_u_axis 				= "y";
-    span_u_min 					= 5.0;
-    span_u_max 					= 12.0;
+    span_u_min 					= 2.2661;
+    span_u_max 					= 9.2661;
     span_u_count 				= 8;
 
     span_v_axis 				= "z";
-    span_v_min 					= 3.5;
-    span_v_max 					= 6.0;
+    span_v_min 					= 2.4314;
+    span_v_max 					= 4.9314;
     span_v_count 				= 4;
   }
 

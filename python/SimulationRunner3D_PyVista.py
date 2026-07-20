@@ -2,10 +2,14 @@
 
 from pathlib import Path
 import math
+import os
+import subprocess
+import sys
 import time
 
 from base.ForceDynamicsBase import ForceDynamics
 from base.Reporting import Reporting
+from gbase.MonitorSelection import preferred_window_position
 from gbase.utilities import get_cell_dimensions
 from SimulationRunner3D_HSVPanel import (
     _axis_vector,
@@ -35,6 +39,33 @@ def _require_pyvista():
 def _window_size(run_configuration):
     window_size = run_configuration.get("window_size", (1200, 900))
     return max(500, int(window_size[0])), max(400, int(window_size[1]))
+
+
+def _disable_windows_close_button(window_title):
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+    except ImportError:
+        return
+
+    user32 = ctypes.windll.user32
+    hwnd = user32.FindWindowW(None, window_title)
+    if not hwnd:
+        return
+
+    SC_CLOSE = 0xF060
+    MF_BYCOMMAND = 0x00000000
+    GWL_STYLE = -16
+    WS_SYSMENU = 0x00080000
+
+    menu = user32.GetSystemMenu(hwnd, False)
+    if menu:
+        user32.RemoveMenu(menu, SC_CLOSE, MF_BYCOMMAND)
+    style = user32.GetWindowLongW(hwnd, GWL_STYLE)
+    if style:
+        user32.SetWindowLongW(hwnd, GWL_STYLE, style & ~WS_SYSMENU)
+    user32.DrawMenuBar(hwnd)
 
 
 def _vector3(raw_value, default=None):
@@ -140,10 +171,20 @@ def _rectangle_wall_polydata(np, pv, rectangle_wall_segments):
 
 def _lighting_ball_config(run_configuration):
     values = run_configuration.get("Lighting_ball")
-    if values is None or len(values) < 4:
+    if values is None:
         return None
-    center = [float(values[index]) for index in range(3)]
-    radius = float(values[3])
+    if hasattr(values, "get"):
+        center = [
+            float(values.get("x")),
+            float(values.get("y")),
+            float(values.get("z")),
+        ]
+        radius = float(values.get("radius"))
+    else:
+        if len(values) < 4:
+            return None
+        center = [float(values[index]) for index in range(3)]
+        radius = float(values[3])
     if radius <= 0.0:
         return None
     return center, radius
@@ -193,6 +234,8 @@ class SimulationRunner3DPyVistaApp:
         self.paused = False
         self.closed = False
         self.closing = False
+        self.native_window_closed = False
+        self.programmatic_close = False
         self.last_particles = self.dynamics.particles
         self.frame_rate = float(self.run_configuration.get("frame_rate", 0.0))
         self.frame_interval = 1.0 / self.frame_rate if self.frame_rate > 0.0 else 0.0
@@ -281,24 +324,39 @@ class SimulationRunner3DPyVistaApp:
 
     def _build_plotter(self):
         window_width, window_height = _window_size(self.run_configuration)
+        self.window_title = f"SimulationRunner3D PyVista - {self.study_name}"
         self.plotter = self.pv.Plotter(
             window_size=(window_width, window_height),
-            title=f"SimulationRunner3D PyVista - {self.study_name}",
+            title=self.window_title,
         )
+        position = preferred_window_position(window_width, window_height)
+        if position is not None:
+            self.plotter.ren_win.SetPosition(position[0], position[1])
         self.plotter.set_background("black")
         self.plotter.add_key_event("space", self._toggle_pause)
         self.plotter.add_key_event("Escape", self._close)
         self._render_scene(reset_camera=True)
 
+    def _close_quietly_on_window_error(self, exc):
+        self._mark_closed()
+        print(f"SimulationRunner3D PyVista window closed: {exc}")
+
     def _mark_closed(self, *_args):
         self.closed = True
         self.closing = True
+
+    def _mark_native_window_closed(self, *_args):
+        self.native_window_closed = True
+        self._mark_closed()
 
     def _install_close_observers(self):
         if self.plotter is None:
             return
         iren = getattr(self.plotter, "iren", None)
+        render_window = getattr(self.plotter, "ren_win", None)
         observer_sources = []
+        if render_window is not None:
+            observer_sources.append((render_window, "AddObserver"))
         if iren is not None:
             observer_sources.append((iren, "add_observer"))
             interactor = getattr(iren, "interactor", None)
@@ -311,7 +369,7 @@ class SimulationRunner3DPyVistaApp:
                 continue
             for event_name in ("ExitEvent", "WindowCloseEvent", "DeleteEvent"):
                 try:
-                    add_observer(event_name, self._mark_closed)
+                    add_observer(event_name, self._mark_native_window_closed)
                 except (AttributeError, TypeError, RuntimeError):
                     pass
 
@@ -322,11 +380,12 @@ class SimulationRunner3DPyVistaApp:
         self._update_status()
 
     def _close(self):
+        self.programmatic_close = True
         self._mark_closed()
         if self.plotter is not None:
             try:
                 self.plotter.close()
-            except (AttributeError, RuntimeError, TypeError):
+            except (AttributeError, RuntimeError, TypeError, ValueError):
                 pass
 
     def _is_plotter_closed(self):
@@ -458,7 +517,7 @@ class SimulationRunner3DPyVistaApp:
             return
         try:
             self.plotter.remove_actor(actor_name, reset_camera=False, render=False)
-        except (KeyError, ValueError, TypeError):
+        except (AttributeError, KeyError, RuntimeError, ValueError, TypeError):
             pass
 
     def _render_particles(self):
@@ -477,14 +536,18 @@ class SimulationRunner3DPyVistaApp:
                     self.run_configuration.get("open3d_point_size", 14.0),
                 )
             )
-            self.plotter.add_points(
-                _point_cloud(self.np, self.pv, mobile_points, mobile_colors),
-                scalars="rgb",
-                rgb=True,
-                point_size=point_size,
-                render_points_as_spheres=True,
-                name="mobile_particles",
-            )
+            try:
+                self.plotter.add_points(
+                    _point_cloud(self.np, self.pv, mobile_points, mobile_colors),
+                    scalars="rgb",
+                    rgb=True,
+                    point_size=point_size,
+                    render_points_as_spheres=True,
+                    name="mobile_particles",
+                )
+            except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+                self._close_quietly_on_window_error(exc)
+                return
         else:
             self._remove_actor("mobile_particles")
         if self.show_boundaries and self.boundary_as_particles and boundary_points:
@@ -494,14 +557,17 @@ class SimulationRunner3DPyVistaApp:
                     self.run_configuration.get("open3d_boundary_point_size", 12.0),
                 )
             )
-            self.plotter.add_points(
-                _point_cloud(self.np, self.pv, boundary_points, boundary_colors),
-                scalars="rgb",
-                rgb=True,
-                point_size=boundary_point_size,
-                render_points_as_spheres=True,
-                name="boundary_particles",
-            )
+            try:
+                self.plotter.add_points(
+                    _point_cloud(self.np, self.pv, boundary_points, boundary_colors),
+                    scalars="rgb",
+                    rgb=True,
+                    point_size=boundary_point_size,
+                    render_points_as_spheres=True,
+                    name="boundary_particles",
+                )
+            except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+                self._close_quietly_on_window_error(exc)
         else:
             self._remove_actor("boundary_particles")
 
@@ -542,13 +608,16 @@ class SimulationRunner3DPyVistaApp:
             f"Mobile: {mobile_count}   Boundary: {boundary_count}   "
             f"{state}   Error: {error_text}"
         )
-        self.status_actor = self.plotter.add_text(
-            text,
-            position="upper_left",
-            font_size=int(self.run_configuration.get("pyvista_status_font_size", 10)),
-            color="white",
-            name="status_text",
-        )
+        try:
+            self.status_actor = self.plotter.add_text(
+                text,
+                position="upper_left",
+                font_size=int(self.run_configuration.get("pyvista_status_font_size", 10)),
+                color="white",
+                name="status_text",
+            )
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+            self._close_quietly_on_window_error(exc)
 
     def _step(self):
         if self.closing:
@@ -584,8 +653,13 @@ class SimulationRunner3DPyVistaApp:
     def run(self):
         self._build_plotter()
         print("SimulationRunner3D PyVista controls: mouse orbit/pan/zoom, SPACE pause, ESC quit")
-        self.plotter.show(interactive_update=True, auto_close=False)
-        self._install_close_observers()
+        try:
+            self._install_close_observers()
+            self.plotter.show(interactive_update=True, auto_close=False)
+            _disable_windows_close_button(self.window_title)
+            self._install_close_observers()
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+            self._close_quietly_on_window_error(exc)
         try:
             while not self._is_plotter_closed():
                 self._step()
@@ -596,10 +670,10 @@ class SimulationRunner3DPyVistaApp:
                 except TypeError:
                     try:
                         self.plotter.update()
-                    except RuntimeError:
-                        self._mark_closed()
-                except RuntimeError:
-                    self._mark_closed()
+                    except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+                        self._close_quietly_on_window_error(exc)
+                except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+                    self._close_quietly_on_window_error(exc)
         finally:
             self._mark_closed()
             if self.reporting is not None:
@@ -607,7 +681,28 @@ class SimulationRunner3DPyVistaApp:
         return self.last_particles
 
 
+def _run_analysis_subprocess(cfg_file, end_frame=None):
+    command = [sys.executable, str(Path(__file__).resolve()), str(cfg_file)]
+    if end_frame is not None:
+        command.extend(["--end-frame", str(end_frame)])
+    child_env = os.environ.copy()
+    child_env["GPCD_PYVISTA_CHILD"] = "1"
+    completed = subprocess.run(
+        command,
+        cwd=str(Path(__file__).resolve().parent),
+        env=child_env,
+    )
+    if completed.returncode != 0:
+        print(
+            "SimulationRunner3D PyVista child exited with "
+            f"code {completed.returncode}"
+        )
+    return None
+
+
 def run_analysis(cfg_file, batch_mode=False, end_frame=None, study=False, study_number=None):
+    if os.environ.get("GPCD_PYVISTA_CHILD") != "1":
+        return _run_analysis_subprocess(cfg_file, end_frame=end_frame)
     app = SimulationRunner3DPyVistaApp(cfg_file, batch_mode=batch_mode, end_frame=end_frame)
     return app.run()
 
@@ -624,3 +719,7 @@ if __name__ == "__main__":
     parser.add_argument("--end-frame", type=int, default=None)
     args = parser.parse_args()
     run_analysis(args.cfg_file, end_frame=args.end_frame)
+    if os.environ.get("GPCD_PYVISTA_CHILD") == "1":
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(0)

@@ -127,6 +127,7 @@ public:
 	virtual void PullMem(uint32_t currentBuffer) = 0;
 
 	void GeneralViewing(uint32_t CurrentBuffer);
+	void GeneralViewingEye(uint32_t CurrentBuffer);
 
 	//============================================================
 		

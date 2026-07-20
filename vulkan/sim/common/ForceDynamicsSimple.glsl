@@ -110,7 +110,7 @@ float particle_overlap_area(float sourceRadius, float targetRadius, float center
     return sourceArea + targetArea - triangleArea;
 }
 
-// Python source: ForceDynamics.py:856
+// Python source: ForceDynamics.py:1047
 float ParticlePenetrationDepth(float sourceRadius, float targetRadius, float centerDistance)
 {
     return sourceRadius + targetRadius - centerDistance;

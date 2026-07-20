@@ -3,11 +3,11 @@
 const uint BOUNDARY_ENABLED = 1u;
 const float wall_contact_offset = 0.062500000;
 const float death_x_min = 1.000000000;
-const float death_x_max = 10.000000000;
+const float death_x_max = 19.000000000;
 const float death_y_min = 1.000000000;
-const float death_y_max = 9.000000000;
-const float death_z_min = 0.000000000;
-const float death_z_max = 4.000000000;
+const float death_y_max = 19.000000000;
+const float death_z_min = 1.000000000;
+const float death_z_max = 19.000000000;
 struct FunctionWallSegment
 {
     uint boundaryKind;
