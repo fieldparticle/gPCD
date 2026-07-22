@@ -51,7 +51,7 @@ struct Particle {
     uint colFlg;               // 1 if in collision, 0 if not
 
     float ptype;                // runtime particle type copied from binary pdata.ptype
-    float material_id;            // material/species id; independent of ptype boundary role
+    float material_id;          // material/color source; photons may override while in contact
 };
 
 struct boundStruct {

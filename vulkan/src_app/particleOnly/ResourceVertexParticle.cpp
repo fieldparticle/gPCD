@@ -138,7 +138,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		part.ptype			= particleType;
 		part.parms			= glm::vec4(part_pos.molar_mass, 0.0, 0.0, 0.0);
 		part.colFlg			= 0;
-		part.material_id		= static_cast<float>(part_pos.material_id);
+		part.material_id	= static_cast<float>(part_pos.material_id);
 		part.contactCount	= 0;
 		
 		

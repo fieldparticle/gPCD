@@ -72,7 +72,7 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 	std::cout << "Filename       : " << p.filename() << '\n';
 	std::cout << "Stem           : " << p.stem() << '\n';
 	std::cout << "Extension      : " << p.extension() << '\n';
-			
+	
 	std::ostringstream  cap_prfx;
 	cap_prfx << out_dir << "/" << p.stem().string();
 	
@@ -169,6 +169,7 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 			}
 			else if (auto_cap_frames == true)
 			{
+				
 				if (cap_frames.find(VulkanWin->m_FrameNumber) != cap_frames.end())
 				{
 					std::ostringstream out_file;

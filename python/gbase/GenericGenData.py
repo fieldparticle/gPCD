@@ -10,12 +10,14 @@ from gbase.MaterialProperties import (
     COLOR_MODE_SOLID,
     COLOR_MODE_VELOCITY,
     DEFAULT_MATERIAL_PROPERTIES,
+    PARTICLE_TYPE_PHOTON,
+    parse_debug_visible,
     parse_material_color,
     parse_particle_type,
     write_color_mode_defines,
     write_material_properties,
 )
-from gbase.pdata import PTYPE_MOBILE, PTYPE_NULL, pdata
+from gbase.pdata import PTYPE_MOBILE, PTYPE_NULL, PTYPE_PHOTON, pdata
 import math
 
 
@@ -90,6 +92,7 @@ def parse_keyed_rectangle_wall_segments(raw_segments):
                 f"{context}.normal",
             )
             wall_flag = int(segment_config.get("wall_flag"))
+            material_id = int(segment_config.get("material_id", 0))
         except (AttributeError, TypeError, ValueError):
             errors.append(f"{context} is invalid")
             continue
@@ -107,6 +110,8 @@ def parse_keyed_rectangle_wall_segments(raw_segments):
             errors.append(f"{context}.normal must not be zero")
         if wall_flag <= 0:
             errors.append(f"{context}.wall_flag must be a positive integer")
+        if material_id < 0:
+            errors.append(f"{context}.material_id must be a non-negative integer")
 
         parsed_segments.append(
             {
@@ -118,6 +123,7 @@ def parse_keyed_rectangle_wall_segments(raw_segments):
                 "v_length": v_length,
                 "normal": inward_normal,
                 "wall_flag": wall_flag,
+                "material_id": material_id,
             }
         )
 
@@ -285,6 +291,22 @@ class GenericGenData:
                 except (TypeError, ValueError) as exc:
                     errors.append(f"{context}.color is invalid: {exc}")
 
+            try:
+                debug_visible = parse_debug_visible(
+                    raw_material.get("debug_visible", False)
+                )
+            except (TypeError, ValueError) as exc:
+                errors.append(f"{context}.debug_visible is invalid: {exc}")
+                debug_visible = None
+            debug_color = None
+            try:
+                debug_color = parse_material_color(
+                    raw_material.get("debug_color"),
+                    self.COLOR_MODE_SOLID,
+                )
+            except (TypeError, ValueError) as exc:
+                errors.append(f"{context}.debug_color is invalid: {exc}")
+
             if (
                 material_id >= 0
                 and relative_mass is not None
@@ -293,6 +315,8 @@ class GenericGenData:
                 and color_mode is not None
                 and color is not None
                 and particle_type is not None
+                and debug_visible is not None
+                and debug_color is not None
             ):
                 materials.append(
                     {
@@ -303,6 +327,8 @@ class GenericGenData:
                         "thermal_velocity": thermal_velocity,
                         "color_mode": color_mode,
                         "color": color,
+                        "debug_visible": debug_visible,
+                        "debug_color": debug_color,
                         "cell_density": cell_density,
                     }
                 )
@@ -552,6 +578,12 @@ class GenericGenData:
 
         self.validate_material_properties(errors)
         known_material_ids = set(self.material_properties_by_id)
+        for segment in rectangle_wall_segments:
+            material_id = int(segment.get("material_id", 0))
+            if material_id not in known_material_ids:
+                errors.append(
+                    f"rectangle_wall_segments.{segment['name']}.material_id is not defined"
+                )
         for index, particle in enumerate(particles, start=1):
             material_id = particle.get("material_id", 0)
             if material_id not in known_material_ids:
@@ -914,17 +946,27 @@ class GenericGenData:
         mass=None,
         material_id=0,
         collision_stiffness_q=None,
+        ptype=None,
     ):
         material_id = int(material_id)
         if material_id not in self.material_properties_by_id:
             raise ValueError(f"material_id {material_id} is not defined")
         if mass is None:
             mass = float(self.material_properties_by_id[material_id]["relative_mass"])
+        if ptype is None:
+            material_particle_type = int(
+                self.material_properties_by_id[material_id].get("particle_type", 0)
+            )
+            ptype = (
+                PTYPE_PHOTON
+                if material_particle_type == PARTICLE_TYPE_PHOTON
+                else PTYPE_MOBILE
+            )
         particle = pdata()
         self.number_particles += 1
         self.number_active_particles += 1
         particle.pnum = self.number_particles
-        particle.ptype = PTYPE_MOBILE
+        particle.ptype = float(ptype)
         particle.material_id = float(material_id)
         particle.rx, particle.ry, particle.rz = position
         particle.vx, particle.vy, particle.vz = velocity
@@ -957,19 +999,24 @@ class GenericGenData:
             )
         return self.number_active_particles
 
-    def add_boundary_particle(self, position):
+    def add_boundary_particle(self, position, material_id=0):
+        material_id = int(material_id)
+        if material_id not in self.material_properties_by_id:
+            raise ValueError(f"boundary material_id {material_id} is not defined")
         particle = pdata()
         self.number_particles += 1
         self.number_boundary_particles += 1
         particle.pnum = self.number_particles
         particle.ptype = self.BOUNDARY_PARTICLE_PTYPE
-        particle.material_id = 0.0
+        particle.material_id = float(material_id)
         particle.rx, particle.ry, particle.rz = position
         particle.vx = 0.0
         particle.vy = 0.0
         particle.vz = 0.0
         particle.radius = self.radius
-        particle.molar_mass = float(self.material_properties_by_id[0]["relative_mass"])
+        particle.molar_mass = float(
+            self.material_properties_by_id[material_id]["relative_mass"]
+        )
         particle.state_flg = 0.0
         particle.collision_stiffness_q = 0.0
         self.p_list.append(particle)
@@ -986,6 +1033,7 @@ class GenericGenData:
 
         for segment in self.curve_wall_segments:
             wall_flag = int(round(segment[9]))
+            material_id = int(round(segment[10])) if len(segment) >= 11 else 0
             points = self.curve_marker_points(segment)
             added_for_segment = 0
             for marker_x, marker_y in points:
@@ -1002,7 +1050,8 @@ class GenericGenData:
                     continue
                 marker_cells.add(marker_cell_key)
                 self.add_boundary_particle(
-                    (float(cell_x), float(cell_y), float(cell_z))
+                    (float(cell_x), float(cell_y), float(cell_z)),
+                    material_id=material_id,
                 )
                 added_for_segment += 1
             segment_marker_counts.append(added_for_segment)
@@ -1047,6 +1096,7 @@ class GenericGenData:
 
         for segment in self.rectangle_wall_segments:
             wall_flag = int(segment["wall_flag"])
+            material_id = int(segment.get("material_id", 0))
             added_for_segment = 0
             for marker_x, marker_y, marker_z in self.rectangle_marker_points(segment):
                 cell_x = round(marker_x)
@@ -1062,7 +1112,8 @@ class GenericGenData:
                     continue
                 marker_cells.add(marker_cell_key)
                 self.add_boundary_particle(
-                    (float(cell_x), float(cell_y), float(cell_z))
+                    (float(cell_x), float(cell_y), float(cell_z)),
+                    material_id=material_id,
                 )
                 added_for_segment += 1
             segment_marker_counts.append(added_for_segment)
@@ -1175,7 +1226,7 @@ class GenericGenData:
         mobile_particles = [
             particle
             for particle in self.p_list
-            if int(round(float(particle.ptype))) == int(PTYPE_MOBILE)
+            if float(particle.ptype) <= 0.5
             and int(round(float(particle.pnum))) != 0
         ]
         if not mobile_particles:
@@ -1422,7 +1473,9 @@ class GenericGenData:
                 f"{float(view_center[1]):.9f}, "
                 f"{float(view_center[2]):.9f}];\n"
             )
-            align_with_eye = bool(self.itemcfg.get("align_with_eye", False))
+            align_with_eye = self.itemcfg.get("align_with_eye", False)
+            if not isinstance(align_with_eye, bool):
+                raise ValueError("align_with_eye must be a boolean")
             output.write(
                 f"align_with_eye = {'true' if align_with_eye else 'false'};\n"
             )
@@ -1525,7 +1578,7 @@ class GenericGenData:
                 separator = (
                     "," if segment_index + 1 < len(active_curve_wall_segments) else ""
                 )
-                values = ", ".join(f"{float(value):.9f}" for value in segment)
+                values = ", ".join(f"{float(value):.9f}" for value in segment[:10])
                 output.write(f"    [{values}]{separator}\n")
             output.write(");\n")
 

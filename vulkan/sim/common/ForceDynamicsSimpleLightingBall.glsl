@@ -29,7 +29,7 @@ LightingBallCollisionResult NoLightingBallCollision()
         BoundaryWallSegment(vec3(0.0), 0.0, 0.0, LIGHTING_BALL_WALL_FLAG, false));
 }
 
-// Python source: ForceDynamics.py:641
+// Python source: ForceDynamics.py:631
 BoundaryWallSegment EvaluateLightingBallContact(uint SourceID)
 {
     if (LIGHTING_BALL_ENABLED == 0u || LIGHTING_BALL_RADIUS <= 0.0) {
@@ -84,7 +84,7 @@ BoundaryWallSegment EvaluateLightingBallContact(uint SourceID)
         true);
 }
 
-// Python source: ForceDynamics.py:680
+// Python source: ForceDynamics.py:670
 LightingBallCollisionResult ProcessLightingBallCollision(
     uint SourceID,
     inout vec3 totalForce)
@@ -95,13 +95,16 @@ LightingBallCollisionResult ProcessLightingBallCollision(
         return NoLightingBallCollision();
     }
 
+    P[SourceID].colFlg = 1u;
+    if (IsPhotonParticle(SourceID)) {
+        P[SourceID].material_id = float(LIGHTING_BALL_MATERIAL_ID);
+    }
     vec3 startVelocity = GetStartFrameVelocity(SourceID).xyz;
     float inwardSpeed = -dot(startVelocity, segment.normal);
     if (inwardSpeed <= EPSILON) {
         return NoLightingBallCollision();
     }
 
-    P[SourceID].colFlg = 1u;
     return LightingBallCollisionResult(true, true, segment);
 }
 

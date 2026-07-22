@@ -22,6 +22,7 @@ from gbase.MaterialProperties import (
     COLOR_MODE_VELOCITY,
     normalized_material_properties,
 )
+from gbase.pdata import PTYPE_PHOTON
 
 
 BASE_CLASS_REGISTRY = {
@@ -748,9 +749,10 @@ def _lighting_color(
     dynamics,
     run_configuration,
 ):
-    material = _material_property(particle, run_configuration)
+    material_id = int(round(float(getattr(particle, "material_id", 0.0))))
+    material = _material_property_by_id(material_id, run_configuration)
     surface_color = (
-        _material_rgb255(particle, run_configuration)
+        _material_rgb255_by_id(material_id, run_configuration)
         if material is not None
         else _unit_rgb_from_config(
             run_configuration,
@@ -772,8 +774,8 @@ def _lighting_color(
     )
 
 
-def _material_property(particle, run_configuration):
-    material_id = int(getattr(particle, "material_id", 0))
+def _material_property_by_id(material_id, run_configuration):
+    material_id = int(material_id)
     try:
         materials = normalized_material_properties(run_configuration)
     except ValueError:
@@ -784,6 +786,11 @@ def _material_property(particle, run_configuration):
     return None
 
 
+def _material_property(particle, run_configuration):
+    material_id = int(getattr(particle, "material_id", 0))
+    return _material_property_by_id(material_id, run_configuration)
+
+
 def _material_color_mode(particle, run_configuration):
     material = _material_property(particle, run_configuration)
     if material is not None:
@@ -792,7 +799,12 @@ def _material_color_mode(particle, run_configuration):
 
 
 def _material_rgb255(particle, run_configuration):
-    material = _material_property(particle, run_configuration)
+    material_id = int(getattr(particle, "material_id", 0))
+    return _material_rgb255_by_id(material_id, run_configuration)
+
+
+def _material_rgb255_by_id(material_id, run_configuration):
+    material = _material_property_by_id(material_id, run_configuration)
     if material is None:
         return (65, 125, 255)
     color = material.get("color", (0.25, 0.49, 1.0, 1.0))
@@ -800,6 +812,21 @@ def _material_rgb255(particle, run_configuration):
         int(round(max(0.0, min(1.0, float(color[index]))) * 255.0))
         for index in range(3)
     )
+
+
+def _material_debug_rgb255(particle, run_configuration):
+    material = _material_property(particle, run_configuration)
+    if material is None or not bool(material.get("debug_visible", False)):
+        return None
+    color = material.get("debug_color", (1.0, 1.0, 1.0, 1.0))
+    return tuple(
+        int(round(max(0.0, min(1.0, float(color[index]))) * 255.0))
+        for index in range(3)
+    )
+
+
+def _is_photon_particle(particle):
+    return int(round(float(getattr(particle, "ptype", 0.0)))) == int(PTYPE_PHOTON)
 
 
 def _particle_colors(
@@ -811,6 +838,8 @@ def _particle_colors(
     hsv_val,
 ):
     color_mode = _material_color_mode(particle, run_configuration)
+    if _is_photon_particle(particle):
+        color_mode = COLOR_MODE_LUMENS
     if color_mode == COLOR_MODE_LUMENS:
         if (
             bool(run_configuration.get("lighting_debug_spheres", False))
@@ -819,6 +848,9 @@ def _particle_colors(
             return (255, 80, 80), (255, 180, 180)
         color = _lighting_color(particle_index, particle, dynamics, run_configuration)
         if color is None:
+            color = _material_debug_rgb255(particle, run_configuration)
+            if color is not None:
+                return color, color
             if bool(run_configuration.get("lighting_debug_spheres", False)):
                 return (45, 45, 55), (90, 90, 110)
             return None, None

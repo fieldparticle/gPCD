@@ -6,8 +6,8 @@ from gbase.FunctionWall import physical_penetration
 from gbase.MaterialProperties import (
     PARTICLE_TYPE_PHOTON,
     PARTICLE_TYPE_REGULAR,
-    parse_particle_type,
 )
+from gbase.pdata import PTYPE_PHOTON
 
 
 class ForceContactDynamics:
@@ -26,30 +26,14 @@ class ForceContactDynamics:
         return math.atan2(vy, vx) if vx != 0.0 or vy != 0.0 else 0.0
 
     def GetParticleType(self, ParticleID):
-        """Return the material-owned particle type for one particle."""
-        material_id = int(
-            round(float(getattr(self.particles[ParticleID], "material_id", 0.0)))
-        )
-        materials = ()
-        if getattr(self, "run_configuration", None) is not None:
-            materials = self.run_configuration.get("material_properties", ())
-        for material in materials or ():
-            if hasattr(material, "get"):
-                candidate_id = material.get("material_id", 0)
-                raw_particle_type = material.get("particle_type", PARTICLE_TYPE_REGULAR)
-            else:
-                candidate_id = getattr(material, "material_id", 0)
-                raw_particle_type = getattr(
-                    material,
-                    "particle_type",
-                    PARTICLE_TYPE_REGULAR,
-                )
-            if int(candidate_id) == material_id:
-                return parse_particle_type(raw_particle_type)
+        """Return the runtime particle behavior encoded in pdata.ptype."""
+        ptype = int(round(float(getattr(self.particles[ParticleID], "ptype", 0.0))))
+        if ptype == int(PTYPE_PHOTON):
+            return PARTICLE_TYPE_PHOTON
         return PARTICLE_TYPE_REGULAR
 
     def IsPhotonParticle(self, ParticleID):
-        """Return true when a particle's material marks it as a photon."""
+        """Return true when a particle's runtime type marks it as a photon."""
         return self.GetParticleType(ParticleID) == PARTICLE_TYPE_PHOTON
 
     def ShouldSkipParticlePair(self, SourceID, TargetID):
@@ -145,6 +129,12 @@ class ForceContactDynamics:
             hit_x + reflected_velocity[0] * remaining_dt - normal_x * exit_epsilon,
             hit_y + reflected_velocity[1] * remaining_dt - normal_y * exit_epsilon,
             hit_z + reflected_velocity[2] * remaining_dt - normal_z * exit_epsilon,
+        )
+        self.particles[SourceID].colFlg = 1
+        self.particles[SourceID].material_id = getattr(
+            self.particles[TargetID],
+            "material_id",
+            self.particles[SourceID].material_id,
         )
 
     def TryPhotonParticleReflection(self, SourceID, TargetID):
@@ -683,7 +673,25 @@ class ForceContactDynamics:
         if contact is None:
             return True
 
+        source = self.particles[SourceID]
         normal = contact[:3]
+        source.colFlg = 1
+        if self.IsPhotonParticle(SourceID):
+            source.material_id = float(self.run_configuration.get(
+                "lighting_ball_material_id",
+                getattr(source, "material_id", 0.0),
+            ))
+            lighting_ball = self.run_configuration.get("Lighting_ball")
+            if hasattr(lighting_ball, "get"):
+                source.material_id = float(
+                    lighting_ball.get("material_id", source.material_id)
+                )
+        source.report_contacts = max(int(getattr(source, "report_contacts", 0)), 1)
+        source.report_target = int(contact[-1])
+        source.report_normal_x = normal[0]
+        source.report_normal_y = normal[1]
+        source.report_normal_z = normal[2]
+
         start_velocity = self.GetStartFrameVelocity(SourceID)
         velocity = (
             float(start_velocity.x),
@@ -698,17 +706,11 @@ class ForceContactDynamics:
         if inward_speed <= self.EPSILON:
             return True
 
-        source = self.particles[SourceID]
-        self.photon_reflected_velocity[SourceID] = self.ReflectFixedSpeed(
-            velocity,
-            normal,
-        )
-        source.colFlg = 1
-        source.report_contacts = max(int(getattr(source, "report_contacts", 0)), 1)
-        source.report_target = int(contact[-1])
-        source.report_normal_x = normal[0]
-        source.report_normal_y = normal[1]
-        source.report_normal_z = normal[2]
+        if self.IsPhotonParticle(SourceID):
+            self.photon_reflected_velocity[SourceID] = self.ReflectFixedSpeed(
+                velocity,
+                normal,
+            )
         return True
 
     def GetPistonPosition(self, frame):

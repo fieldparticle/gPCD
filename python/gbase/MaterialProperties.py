@@ -61,6 +61,18 @@ def parse_material_color(raw_value, color_mode):
     return tuple(max(0.0, min(1.0, value)) for value in values)
 
 
+def parse_debug_visible(raw_value):
+    if isinstance(raw_value, bool):
+        return raw_value
+    if isinstance(raw_value, str):
+        normalized = raw_value.strip().lower()
+        if normalized in ("true", "yes", "on", "1"):
+            return True
+        if normalized in ("false", "no", "off", "0"):
+            return False
+    return bool(raw_value)
+
+
 def parse_particle_type(raw_value):
     if isinstance(raw_value, str):
         particle_type = PARTICLE_TYPE_NAMES.get(raw_value.strip().upper())
@@ -79,6 +91,8 @@ DEFAULT_MATERIAL_PROPERTIES = (
         "thermal_velocity": 0.0,
         "color_mode": COLOR_MODE_VELOCITY,
         "color": default_color_for_mode(COLOR_MODE_VELOCITY),
+        "debug_visible": False,
+        "debug_color": (1.0, 1.0, 1.0, 1.0),
         "cell_density": 0.0,
     },
 )
@@ -110,6 +124,13 @@ def normalized_material_properties(source=None):
             )
         )
         color = parse_material_color(_material_get(raw_material, "color", None), color_mode)
+        debug_visible = parse_debug_visible(
+            _material_get(raw_material, "debug_visible", False)
+        )
+        debug_color = parse_material_color(
+            _material_get(raw_material, "debug_color", None),
+            COLOR_MODE_SOLID,
+        )
         cell_density = float(_material_get(raw_material, "cell_density", 0.0))
         name = str(_material_get(raw_material, "name", f"material_{material_id}"))
         particle_type = parse_particle_type(
@@ -131,6 +152,8 @@ def normalized_material_properties(source=None):
                 "thermal_velocity": thermal_velocity,
                 "color_mode": color_mode,
                 "color": color,
+                "debug_visible": debug_visible,
+                "debug_color": debug_color,
                 "cell_density": cell_density,
             }
         )
@@ -172,6 +195,18 @@ def write_material_properties(output, source=None):
             f"{float(material['color'][1]):.9f}, "
             f"{float(material['color'][2]):.9f}, "
             f"{float(material['color'][3]):.9f}];\n"
+        )
+        output.write(
+            "        debug_visible = "
+            f"{'true' if bool(material.get('debug_visible', False)) else 'false'};\n"
+        )
+        debug_color = material.get("debug_color", (1.0, 1.0, 1.0, 1.0))
+        output.write(
+            "        debug_color = "
+            f"[{float(debug_color[0]):.9f}, "
+            f"{float(debug_color[1]):.9f}, "
+            f"{float(debug_color[2]):.9f}, "
+            f"{float(debug_color[3]):.9f}];\n"
         )
         output.write(f"        cell_density = {float(material['cell_density']):.9f};\n")
         output.write(f"    }}{separator}\n")

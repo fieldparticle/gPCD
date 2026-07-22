@@ -12,6 +12,7 @@ from gbase.MaterialProperties import (
     COLOR_MODE_VELOCITY,
     normalized_material_properties,
 )
+from gbase.pdata import PTYPE_PHOTON
 from gbase.MonitorSelection import preferred_window_position
 from gbase.utilities import get_cell_dimensions, hsv_angle
 
@@ -250,9 +251,10 @@ def _lighting_brightness(particle_id, particle, dynamics, run_configuration):
 
 
 def _lighting_color(particle_id, particle, dynamics, run_configuration):
-    material = _material_property(particle, run_configuration)
+    material_id = int(round(float(getattr(particle, "material_id", 0.0))))
+    material = _material_property_by_id(material_id, run_configuration)
     surface_color = (
-        _material_unit_color(particle, run_configuration)
+        _material_unit_color_by_id(material_id, run_configuration)
         if material is not None
         else _unit_rgb_from_config(
             run_configuration,
@@ -271,8 +273,8 @@ def _lighting_color(particle_id, particle, dynamics, run_configuration):
     return [component * brightness for component in surface_color]
 
 
-def _material_property(particle, run_configuration):
-    material_id = int(getattr(particle, "material_id", 0))
+def _material_property_by_id(material_id, run_configuration):
+    material_id = int(material_id)
     try:
         materials = normalized_material_properties(run_configuration)
     except ValueError:
@@ -283,6 +285,11 @@ def _material_property(particle, run_configuration):
     return None
 
 
+def _material_property(particle, run_configuration):
+    material_id = int(getattr(particle, "material_id", 0))
+    return _material_property_by_id(material_id, run_configuration)
+
+
 def _material_color_mode(particle, run_configuration):
     material = _material_property(particle, run_configuration)
     if material is not None:
@@ -291,15 +298,34 @@ def _material_color_mode(particle, run_configuration):
 
 
 def _material_unit_color(particle, run_configuration):
-    material = _material_property(particle, run_configuration)
+    material_id = int(getattr(particle, "material_id", 0))
+    return _material_unit_color_by_id(material_id, run_configuration)
+
+
+def _material_unit_color_by_id(material_id, run_configuration):
+    material = _material_property_by_id(material_id, run_configuration)
     if material is None:
         return _unit_color((65, 125, 255))
     color = material.get("color", (0.25, 0.49, 1.0, 1.0))
     return [max(0.0, min(1.0, float(color[index]))) for index in range(3)]
 
 
+def _material_debug_color(particle, run_configuration):
+    material = _material_property(particle, run_configuration)
+    if material is None or not bool(material.get("debug_visible", False)):
+        return None
+    color = material.get("debug_color", (1.0, 1.0, 1.0, 1.0))
+    return [max(0.0, min(1.0, float(color[index]))) for index in range(3)]
+
+
+def _is_photon_particle(particle):
+    return int(round(float(getattr(particle, "ptype", 0.0)))) == int(PTYPE_PHOTON)
+
+
 def _particle_color(particle_id, particle, dynamics, run_configuration):
     color_mode = _material_color_mode(particle, run_configuration)
+    if _is_photon_particle(particle):
+        color_mode = COLOR_MODE_LUMENS
     if color_mode == COLOR_MODE_VELOCITY:
         hsv_sat = float(run_configuration.get("hsv_sat", 0.707))
         hsv_val = float(run_configuration.get("hsv_val", 1.0))
@@ -307,7 +333,10 @@ def _particle_color(particle_id, particle, dynamics, run_configuration):
     if color_mode == COLOR_MODE_SOLID:
         return _material_unit_color(particle, run_configuration)
     if color_mode == COLOR_MODE_LUMENS:
-        return _lighting_color(particle_id, particle, dynamics, run_configuration)
+        color = _lighting_color(particle_id, particle, dynamics, run_configuration)
+        if color is None:
+            return _material_debug_color(particle, run_configuration)
+        return color
     if color_mode == COLOR_MODE_COLLISION:
         return _unit_color((65, 125, 255))
     return _unit_color((65, 125, 255))

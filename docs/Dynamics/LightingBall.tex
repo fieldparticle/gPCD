@@ -80,8 +80,19 @@ records contain \texttt{color\_mode} and \texttt{color}.  The generated
 \texttt{COLOR\_MODE\_VELOCITY}, \texttt{COLOR\_MODE\_SOLID}, and
 \texttt{COLOR\_MODE\_LUMENS}.  The shared \texttt{color\_map.glsl} no longer
 uses the old named solid color schemes.  In \texttt{LUMENS} mode, uncontacted
-particles are transparent; particles with contact state use the configured
+photons are transparent unless their photon material has
+\texttt{debug\_visible=true}; contacted photons use the contacted surface
 material color until the full Python brightness calculation is ported.
+
+Photon behavior is carried by runtime \texttt{ptype}, not by the current
+\texttt{material\_id}.  During generation a stream whose base material has
+\texttt{particle\_type="photon"} emits particles with photon \texttt{ptype}.
+At the beginning of each compute frame the photon \texttt{material\_id} is
+reset to the base photon material.  When the photon contacts the sphere or a
+wall, the collision path sets the photon \texttt{material\_id} to the
+contacted surface material so rendering can use that material as the emitted
+color source.  No separate \texttt{hit\_material\_id} particle field is part
+of the active ABI.
 
 The render camera may be aligned with the configured lighting eye:
 \begin{verbatim}
@@ -106,7 +117,8 @@ collision export.  The remaining generated contract is:
           \texttt{COLOR\_MODE\_LUMENS};
     \item port Python's lighting brightness calculation, including eye field
           of view, diffuse strength, specular strength, and shininess;
-    \item keep \texttt{color\_map.glsl} under exporter ownership so material
+    \item keep \texttt{color\_map.glsl} under exporter ownership so photon
+          \texttt{ptype}, temporary photon \texttt{material\_id}, and material
           display behavior cannot drift from the generated Vulkan contract;
     \item validate the eye-aligned camera and backed-off
           \texttt{eye\_view\_distance} in the live Vulkan scene.

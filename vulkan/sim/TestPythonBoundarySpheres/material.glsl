@@ -29,6 +29,8 @@ const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](
 const uint HSV_ON = 1u;
 const float HSV_SAT = 1.00;
 const float HSV_VAL = 1.00;
+const uint LUMENS_DEBUG_ALWAYS_VISIBLE = 0u;
+const vec4 LUMENS_DEBUG_COLOR = vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000);
 vec3 ncolcolor = vec3(0.0f,1.0f,0.0f);
 vec3 colcolor = vec3(1.0f,0.0f,0.0f);
 #endif

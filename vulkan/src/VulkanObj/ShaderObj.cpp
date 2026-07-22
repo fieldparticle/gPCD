@@ -78,6 +78,8 @@ void ShaderObj::WriteMaterials()
 	ostrm << "    float tempVel;\n";
 	ostrm << "    uint colorMode;\n";
 	ostrm << "    vec4 color;\n";
+	ostrm << "    uint debugVisible;\n";
+	ostrm << "    vec4 debugColor;\n";
 	ostrm << "    float cellDensity;\n";
 	ostrm << "};\n\n";
 
@@ -91,7 +93,7 @@ void ShaderObj::WriteMaterials()
 	{
 		ostrm << "const uint MATERIAL_PROPERTY_COUNT = 1u;\n";
 		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](\n";
-		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0.000000000)\n";
+		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0.000000000)\n";
 		ostrm << ");\n\n";
 		usesVelocityColor = true;
 	}
@@ -121,6 +123,11 @@ void ShaderObj::WriteMaterials()
 			double colorGreen = 1.0;
 			double colorBlue = 1.0;
 			double colorAlpha = 1.0;
+			int debugVisible = 0;
+			double debugRed = 1.0;
+			double debugGreen = 1.0;
+			double debugBlue = 1.0;
+			double debugAlpha = 1.0;
 
 			if (config_setting_lookup_int(material, "material_id", &materialID) == CONFIG_FALSE)
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].material_id missing");
@@ -155,6 +162,33 @@ void ShaderObj::WriteMaterials()
 					colorAlpha = config_setting_get_float_elem(color, 3);
 			}
 
+			config_setting_t* debugVisibleSetting = config_setting_lookup(material, "debug_visible");
+			if (debugVisibleSetting != nullptr)
+			{
+				if (config_setting_type(debugVisibleSetting) != CONFIG_TYPE_BOOL)
+					throw std::runtime_error("material_properties[" + std::to_string(index) + "].debug_visible must be a boolean");
+				debugVisible = config_setting_get_bool(debugVisibleSetting);
+			}
+
+			config_setting_t* debugColor = config_setting_lookup(material, "debug_color");
+			if (debugColor != nullptr)
+			{
+				int colorLength = config_setting_length(debugColor);
+				if (colorLength != 3 && colorLength != 4)
+					throw std::runtime_error("material_properties[" + std::to_string(index) + "].debug_color must contain 3 or 4 values");
+				for (int colorIndex = 0; colorIndex < colorLength; ++colorIndex)
+				{
+					config_setting_t* element = config_setting_get_elem(debugColor, colorIndex);
+					if (element == nullptr || config_setting_type(element) != CONFIG_TYPE_FLOAT)
+						throw std::runtime_error("material_properties[" + std::to_string(index) + "].debug_color values must be floats");
+				}
+				debugRed = config_setting_get_float_elem(debugColor, 0);
+				debugGreen = config_setting_get_float_elem(debugColor, 1);
+				debugBlue = config_setting_get_float_elem(debugColor, 2);
+				if (colorLength == 4)
+					debugAlpha = config_setting_get_float_elem(debugColor, 3);
+			}
+
 			if (static_cast<uint32_t>(colorMode) == 1u)
 				usesVelocityColor = true;
 
@@ -173,6 +207,12 @@ void ShaderObj::WriteMaterials()
 				<< std::fixed << std::setprecision(9) << colorGreen << ", "
 				<< std::fixed << std::setprecision(9) << colorBlue << ", "
 				<< std::fixed << std::setprecision(9) << colorAlpha << "), "
+				<< (debugVisible ? "1u" : "0u") << ", "
+				<< "vec4("
+				<< std::fixed << std::setprecision(9) << debugRed << ", "
+				<< std::fixed << std::setprecision(9) << debugGreen << ", "
+				<< std::fixed << std::setprecision(9) << debugBlue << ", "
+				<< std::fixed << std::setprecision(9) << debugAlpha << "), "
 				<< std::fixed << std::setprecision(9) << cellDensity << ")";
 
 			if (index + 1 < materialCount)
@@ -198,8 +238,6 @@ void ShaderObj::WriteMaterials()
 	std::ostringstream hsv_color_on;
 	std::ostringstream hsv_sat;
 	std::ostringstream hsv_val;
-
-
 	
 	if (usesVelocityColor == true)
 	{

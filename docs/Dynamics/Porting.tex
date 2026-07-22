@@ -83,12 +83,15 @@ helpers:
 Any scenario wrapper that includes \texttt{photons.glsl} requires a
 \texttt{material.glsl} file with \texttt{PARTICLE\_TYPE\_REGULAR},
 \texttt{PARTICLE\_TYPE\_PHOTON}, and a \texttt{MaterialProperty.particleType}
-field.  Fixing Python export parity means every active generator path must
-emit that material contract consistently before wrappers are regenerated.
+field.  Material \texttt{particleType} seeds generated particle
+\texttt{ptype}; it is not the runtime photon lookup after generation.
 
-\texttt{photons.glsl} owns the material lookup and optical photon helpers.  In
-the simple path a photon-source/dust-target event is not an ordinary mechanical
-particle collision.  The generated helper performs swept particle crossing,
+\texttt{photons.glsl} owns optical photon helpers.  Runtime photon identity is
+encoded in \texttt{P[particle].ptype}; the current
+\texttt{P[particle].material\_id} may temporarily identify the contacted
+surface material for render color.  In the simple path a
+photon-source/dust-target event is not an ordinary mechanical particle
+collision.  The generated helper performs swept particle crossing,
 fixed-speed reflection, and reflected end-of-frame position calculation.
 \texttt{FPM.comp} consumes that event before the ordinary particle collision
 processor and skips the mechanical force/contact path for that pair.  This
@@ -142,8 +145,24 @@ Only fields actually present in \texttt{particle.glsl} are legal shader
 particle fields: \texttt{PosLocA}, \texttt{PosLocB}, \texttt{VelRadA},
 \texttt{VelRadB},
 \texttt{Data}, \texttt{parms}, \texttt{CornerList}, \texttt{contactCount},
-\texttt{colFlg}, etc.  Python aliases like \texttt{rx}, \texttt{vx},
+\texttt{colFlg}, \texttt{ptype}, \texttt{material\_id}, etc.  Python aliases like \texttt{rx}, \texttt{vx},
 \texttt{mass}, \texttt{radius}, and reporting fields are not portable.
+
+\texttt{ptype} is the stable runtime behavior/classification field.  The
+active simple values are:
+\begin{itemize}
+    \item \texttt{-2}: photon mobile particle;
+    \item \texttt{-1}: reserved null particle at index zero;
+    \item \texttt{0}: regular mobile particle;
+    \item positive values: boundary-marker particles.
+\end{itemize}
+\texttt{material\_id} identifies the current material or render color source.
+For ordinary particles and boundary markers it is stable material identity.
+For photons it is reset to the base photon material at the start of compute
+and may be overwritten during contact with the surface material whose color
+the photon should emit.  The active particle ABI does not contain
+\texttt{hit\_material\_id}; do not add shader logic that depends on that
+field.
 
 \subsection{Push-Constant Frame Clocks}
 
@@ -363,6 +382,14 @@ Velocity-angle rendering is selected with material
 from the velocity buffer selected with \texttt{ShaderFlags.positionBuffer};
 \texttt{hsv\_sat} and \texttt{hsv\_val} remain scalar tuning values for that
 mode.
+
+Photon rendering is selected by photon \texttt{ptype}, not by looking up the
+current material's \texttt{particleType}.  This is necessary because a photon
+uses its \texttt{material\_id} as the contacted surface material while
+\texttt{colFlg=1}.  In \texttt{LUMENS} display, uncontacted photons are
+transparent unless the photon material has \texttt{debug\_visible=true};
+contacted photons use the current \texttt{material\_id} color as the emitted
+surface color.
 
 \subsection{Known Translation Rules}
 

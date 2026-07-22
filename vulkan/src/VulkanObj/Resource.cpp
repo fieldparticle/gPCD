@@ -86,9 +86,9 @@ namespace
 
 	glm::vec3 EyeUpVector(glm::vec3 direction)
 	{
-		glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
+		glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
 		if (glm::abs(glm::dot(glm::normalize(direction), worldUp)) > 0.98f)
-			return glm::vec3(0.0f, 1.0f, 0.0f);
+			return glm::vec3(0.0f, 0.0f, 1.0f);
 		return worldUp;
 	}
 }

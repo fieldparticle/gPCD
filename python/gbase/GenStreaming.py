@@ -3,7 +3,7 @@ import math
 from gbase.FunctionWall import BOUNDARY_KIND_RESERVOIR
 from gbase.FunctionWall import bounds as wall_bounds
 from gbase.FunctionWall import parse_keyed_curve_wall_segments
-from gbase.GenericGenData import GenericGenData
+from gbase.GenericGenData import GenericGenData, parse_keyed_rectangle_wall_segments
 
 
 class GenStreaming(GenericGenData):
@@ -417,15 +417,6 @@ class GenStreaming(GenericGenData):
 
         self.validate_penetration_fractions(errors)
 
-        raw_segments = self.itemcfg.get("curve_wall_segments")
-        curve_segments, curve_errors = parse_keyed_curve_wall_segments(raw_segments)
-        errors.extend(curve_errors)
-        packing_curve_segments = [
-            segment
-            for segment in curve_segments
-            if int(round(segment[0])) == BOUNDARY_KIND_RESERVOIR
-        ]
-
         all_streams_have_spans = all(
             stream["emitter_mode"]
             or
@@ -433,6 +424,26 @@ class GenStreaming(GenericGenData):
             or (stream["span_min"] is not None and stream["span_max"] is not None)
             for stream in streams
         )
+        rectangle_raw_segments = self.itemcfg.get("rectangle_wall_segments")
+        rectangle_wall_segments, rectangle_errors = parse_keyed_rectangle_wall_segments(
+            rectangle_raw_segments
+        )
+        errors.extend(rectangle_errors)
+
+        raw_segments = self.itemcfg.get("curve_wall_segments")
+        if rectangle_wall_segments:
+            curve_segments = ()
+        elif raw_segments:
+            curve_segments, curve_errors = parse_keyed_curve_wall_segments(raw_segments)
+            errors.extend(curve_errors)
+        else:
+            curve_segments = ()
+        packing_curve_segments = [
+            segment
+            for segment in curve_segments
+            if int(round(segment[0])) == BOUNDARY_KIND_RESERVOIR
+        ]
+
         if not packing_curve_segments and not all_streams_have_spans:
             errors.append(
                 "curve_wall_segments must include at least one streaming inlet "
@@ -545,10 +556,56 @@ class GenStreaming(GenericGenData):
                     errors.append(
                         f"curve_wall_segments[{index}] y extent is outside cell array"
                     )
+            for segment in rectangle_wall_segments:
+                origin = segment["origin"]
+                u_axis = segment["u_axis"]
+                v_axis = segment["v_axis"]
+                corners = (
+                    origin,
+                    (
+                        origin[0] + u_axis[0] * segment["u_length"],
+                        origin[1] + u_axis[1] * segment["u_length"],
+                        origin[2] + u_axis[2] * segment["u_length"],
+                    ),
+                    (
+                        origin[0] + v_axis[0] * segment["v_length"],
+                        origin[1] + v_axis[1] * segment["v_length"],
+                        origin[2] + v_axis[2] * segment["v_length"],
+                    ),
+                    (
+                        origin[0]
+                        + u_axis[0] * segment["u_length"]
+                        + v_axis[0] * segment["v_length"],
+                        origin[1]
+                        + u_axis[1] * segment["u_length"]
+                        + v_axis[1] * segment["v_length"],
+                        origin[2]
+                        + u_axis[2] * segment["u_length"]
+                        + v_axis[2] * segment["v_length"],
+                    ),
+                )
+                if any(
+                    point[0] < 0.0
+                    or point[0] > width
+                    or point[1] < 0.0
+                    or point[1] > height
+                    or point[2] < 0.0
+                    or point[2] > depth
+                    for point in corners
+                ):
+                    errors.append(
+                        f"rectangle_wall_segments.{segment['name']} extent is outside cell array"
+                    )
 
         self.validate_material_properties(errors)
+        known_material_ids = set(getattr(self, "material_properties_by_id", {}))
+        for segment in rectangle_wall_segments:
+            if int(segment.get("material_id", 0)) not in known_material_ids:
+                errors.append(
+                    f"rectangle_wall_segments.{segment['name']}.material_id is not defined"
+                )
         for stream in streams:
-            if stream["material_id"] not in getattr(self, "material_properties_by_id", {}):
+            if stream["material_id"] not in known_material_ids:
                 errors.append(f"{stream['name']} material_id is not defined")
 
         if errors:
@@ -560,6 +617,7 @@ class GenStreaming(GenericGenData):
         self.cell_array_width, self.cell_array_height, self.cell_array_depth = dimensions
         self.death_bounds = death_bounds
         self.curve_wall_segments = curve_segments
+        self.rectangle_wall_segments = rectangle_wall_segments
         self.packing_curve_segments = packing_curve_segments
         self.packing_bounds = packing_bounds
         self.particle_plane_z = particle_plane_z
@@ -779,23 +837,15 @@ class GenStreaming(GenericGenData):
         return abs(float(velocity[2]))
 
     def span_centers(self, span_min, span_max, count, boundary_clearance):
-        if count == 1:
-            return (0.5 * (span_min + span_max),)
-        center_spacing = self.particle_center_spacing
         lower = span_min + boundary_clearance
         upper = span_max - boundary_clearance
         usable_span = upper - lower
         if usable_span < 0.0:
             raise ValueError("streaming inlet span is too small for particles")
-        max_particles = int(math.floor((usable_span / center_spacing) + 1.0e-12)) + 1
-        if count > max_particles:
-            raise ValueError(
-                f"streaming span count {count} does not fit in span; "
-                f"maximum {max_particles}"
-            )
-        occupied_span = (count - 1) * center_spacing
-        first_center = lower + 0.5 * (usable_span - occupied_span)
-        return tuple(first_center + index * center_spacing for index in range(count))
+        if count == 1:
+            return (0.5 * (lower + upper),)
+        step = usable_span / float(count - 1)
+        return tuple(lower + index * step for index in range(count))
 
     def calculate_streaming_layout(self):
         radius = self.radius
@@ -1226,7 +1276,7 @@ class GenStreaming(GenericGenData):
             self.report_collision_feasibility()
             self.add_null_particle()
             self.add_streaming_mobile_particles()
-            self.add_function_wall_markers()
+            self.add_configured_wall_markers()
             self.report_cell_occupancy_capacity()
             self.write_particle_bin()
             self.write_test_file()

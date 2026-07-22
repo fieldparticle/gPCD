@@ -2525,15 +2525,16 @@ only varied one span axis.
 
 \subsubsection{current form}
 
-Particle type is now a material property.  A material may declare:
+Particle type is declared on the material at generation time.  A material may
+declare:
 \begin{verbatim}
 particle_type = "regular";
 particle_type = "photon";
 \end{verbatim}
-The generated material contract preserves this value in the \texttt{.tst}
-material entries and in \texttt{material.glsl}.  The shader-side material
-record carries \texttt{particleType}, and the photon helper identifies photon
-particles by looking up the particle's material id.
+The generator uses this value to seed runtime \texttt{pdata.ptype}.  The
+shader-side material record still carries \texttt{particleType} so the base
+photon material can be found, but the photon helper identifies photon
+particles from \texttt{P[particle].ptype}, not from the current material id.
 
 The common particle-particle force loop skips photon targets.  Photon-photon
 pairs are skipped, and regular-source/photon-target pairs are skipped so dust
@@ -2561,10 +2562,10 @@ particle solution
 
 \subsubsection{Analysis}
 
-The photon rule is intentionally material-owned rather than scenario-name
-owned.  This keeps the force decision local to the particle pair and lets later
-lighting scenarios reuse the same shader helper without hard-coding Cathedral
-particle ids.
+The photon rule is intentionally encoded in particle runtime type rather than
+scenario-name logic.  Material configuration seeds that type during
+generation, which lets later lighting scenarios reuse the same shader helper
+without hard-coding Cathedral particle ids.
 
 The photon-dust rule is intentionally non-Newtonian light behavior, not
 reciprocal particle momentum exchange.  Photon and dust particles are treated
@@ -2574,10 +2575,10 @@ interactions.  A dust source therefore skips photon targets instead of
 accumulating photon contact force.
 
 Keeping photon speed on the stream velocity avoids duplicating speed in both
-material and stream configuration.  The material identifies photon behavior;
-the stream supplies the actual velocity vector.  A fixed-speed photon response
-therefore reflects direction from the contact normal and then normalizes back
-to the incoming speed magnitude.
+material and stream configuration.  Runtime \texttt{ptype} identifies photon
+behavior; the stream supplies the actual velocity vector.  A fixed-speed
+photon response therefore reflects direction from the contact normal and then
+normalizes back to the incoming speed magnitude.
 
 The emitter-plane fields are generator input, not runtime shader metadata.
 Python expands each configured stream patch into concrete particle positions,
@@ -2721,8 +2722,8 @@ reflected end-of-frame position from the impact point and remaining timestep,
 and then skips the ordinary particle collision processor.
 
 The active simple exporter now owns this common shader behavior.  It writes
-\texttt{vulkan/sim/common/photons.glsl} with material-owned photon lookup,
-pair filtering, fixed-speed reflection, and swept optical contact helpers.  It
+\texttt{vulkan/sim/common/photons.glsl} with \texttt{ptype}-owned photon
+lookup, pair filtering, fixed-speed reflection, and swept optical contact helpers.  It
 also writes \texttt{vulkan/sim/common/FPM.comp}, so the shared compute loop
 consumes optical photon-dust events before mechanical collision processing and
 keeps scenario wrappers as thin includes around the common schedule.
@@ -2874,3 +2875,61 @@ shininess.  Vulkan currently gates lumens visibility on contact state and uses
 the material color for contacted particles.  The next scene flush-out step is
 to carry or reconstruct the contact normal needed by the Vulkan render pass
 and port the Python brightness calculation into the exported color path.
+
+\subsection{Photon Behavior Moves From Material Lookup To Runtime ptype}
+
+\subsubsection{previous form}
+
+The photon rule was material-owned at runtime.  A particle was considered a
+photon by looking up its current \texttt{material\_id} in
+\texttt{material\_properties} and reading \texttt{particleType}.  When photon
+rendering needed the contacted surface material color, the first attempted
+solution added a separate \texttt{hit\_material\_id} field to the shader
+particle structure.
+
+That split the meaning across two material fields: one field identified what
+the photon was, and a second field identified what surface color it should
+emit.  It also risked particle ABI drift because every shader, Python runtime
+structure, capture reader, and host-side particle layout must agree on the
+same fields.
+
+\subsubsection{current form}
+
+Runtime photon behavior is now encoded in \texttt{ptype}.  The active values
+are:
+\begin{itemize}
+    \item \texttt{ptype=-2}: photon mobile particle;
+    \item \texttt{ptype=-1}: reserved null particle;
+    \item \texttt{ptype=0}: regular mobile particle;
+    \item \texttt{ptype>0}: boundary marker.
+\end{itemize}
+
+Material \texttt{particle\_type} still appears in configuration, but it is now
+a generation-time source for \texttt{pdata.ptype}.  Once the particle is in
+the runtime buffers, photon logic reads \texttt{ptype} directly.
+
+For photons, \texttt{material\_id} is allowed to be a temporary render color
+source.  At the start of the compute frame it is reset to the base photon
+material.  When the photon contacts the lighting sphere, a wall, or a regular
+particle target, the collision path sets \texttt{material\_id} to the
+contacted target material.  \texttt{LUMENS} rendering then uses that current
+material color while \texttt{colFlg=1}.  The separate
+\texttt{hit\_material\_id} field is not part of the active particle ABI.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+This keeps behavior and color source separate without adding another runtime
+particle field.  \texttt{ptype} answers ``what kind of particle is this?''
+and stays stable for the life of the particle.  \texttt{material\_id} answers
+``which material color should this particle currently emit or display?'' and
+may change for photons during the contact-render window.
+
+The change also makes the intended debug behavior explicit.  Uncontacted
+photons in \texttt{LUMENS} mode are transparent unless their base photon
+material has \texttt{debug\_visible=true}; contacted photons use the contacted
+surface material color.  This lets photon travel be debugged without changing
+the optical collision rule and without carrying a second hit-material slot.

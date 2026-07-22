@@ -9,7 +9,8 @@ import math
 import re
 from pathlib import Path
 from gbase.libconf import AttrDict
-from gbase.FunctionWall import parse_keyed_curve_wall_segments, wall_marker_positions
+from gbase.FunctionWall import parse_keyed_curve_wall_segments, wall_marker_records
+from gbase.MaterialProperties import PARTICLE_TYPE_PHOTON
 from gbase.pdata import PTYPE_NULL
 
 PTYPE_BOUNDARY = 1.0
@@ -127,6 +128,8 @@ class ForceDynamics(ForceContactDynamics):
         source = self.particles[SourceID]
         source.contactCount = 0
         source.colFlg = 0
+        if self.IsPhotonParticle(SourceID):
+            source.material_id = self.BasePhotonMaterialID(SourceID)
         if (
             hasattr(self, "IsMobileParticleActiveForDynamics")
             and self.IsMobileParticleActiveForDynamics(SourceID)
@@ -135,6 +138,22 @@ class ForceDynamics(ForceContactDynamics):
         source.total_overlap_area = 0.0
         for contact_state in self.GetContactSlots(SourceID):
             self.ClearContactSlot(contact_state)
+
+    def BasePhotonMaterialID(self, SourceID):
+        """Return the configured photon material id used between contacts."""
+        materials = ()
+        if getattr(self, "run_configuration", None) is not None:
+            materials = self.run_configuration.get("material_properties", ())
+        for material in materials or ():
+            if hasattr(material, "get"):
+                particle_type = int(material.get("particle_type", 0))
+                material_id = material.get("material_id", 0)
+            else:
+                particle_type = int(getattr(material, "particle_type", 0))
+                material_id = getattr(material, "material_id", 0)
+            if particle_type == PARTICLE_TYPE_PHOTON:
+                return float(material_id)
+        return float(getattr(self.particles[SourceID], "material_id", 0.0))
 
     def GetContactSlots(self, SourceID):
         """Return contact slots while preserving legacy Python structures."""
@@ -416,7 +435,7 @@ class ForceDynamics(ForceContactDynamics):
         mobile_particles = [
             particle
             for particle in self.particles
-            if float(getattr(particle, "ptype", 0.0)) == 0.0
+            if float(getattr(particle, "ptype", 0.0)) <= 0.5
             and int(getattr(particle, "pnum", 0)) != 0
         ]
         if not mobile_particles:
@@ -425,16 +444,20 @@ class ForceDynamics(ForceContactDynamics):
         plane_z = float(mobile_particles[0].PosLocA.z)
         radius = float(self.run_configuration.get("radius", 0.0))
         marker_count = 0
-        for position in wall_marker_positions(segments, plane_z):
+        for marker_x, marker_y, marker_z, material_id in wall_marker_records(
+            segments,
+            plane_z,
+        ):
             self.particles.append(
                 self.create_particle(
                     pnum=len(self.particles),
-                    rx=position[0],
-                    ry=position[1],
-                    rz=position[2],
+                    rx=marker_x,
+                    ry=marker_y,
+                    rz=marker_z,
                     radius=radius,
                     mass=1.0,
                     ptype=PTYPE_BOUNDARY,
+                    material_id=material_id,
                     collision_stiffness_q=0.0,
                     state_flg=0.0,
                 )
@@ -508,6 +531,7 @@ class ForceDynamics(ForceContactDynamics):
                 raise ValueError(
                     f"rectangle_wall_segments.{wall_name} must be a key-value object"
                 )
+            material_id = int(wall_config.get("material_id", 0))
             for point in self._sample_rectangle_wall_points(wall_name, wall_config):
                 marker_cell = tuple(int(round(value)) for value in point)
                 if marker_cell in marker_cells:
@@ -522,12 +546,27 @@ class ForceDynamics(ForceContactDynamics):
                         radius=radius,
                         mass=1.0,
                         ptype=PTYPE_BOUNDARY,
+                        material_id=material_id,
                         collision_stiffness_q=0.0,
                         state_flg=0.0,
                     )
                 )
                 marker_count += 1
         return marker_count
+
+    def ConfiguredWallMaterialID(self, wall_flag):
+        """Return the configured material id for a wall flag."""
+        wall_flag = int(wall_flag)
+        rectangle_segments = self.run_configuration.get("rectangle_wall_segments")
+        if isinstance(rectangle_segments, AttrDict):
+            for _wall_name, wall_config in rectangle_segments.items():
+                if int(wall_config.get("wall_flag", 0)) == wall_flag:
+                    return float(wall_config.get("material_id", 0))
+
+        for segment in self.run_configuration.get("curve_wall_segments", ()):
+            if len(segment) >= 11 and int(round(float(segment[9]))) == wall_flag:
+                return float(segment[10])
+        return 0.0
 
     def load_constants(self, constants_file_name=None):
         if constants_file_name is None:
@@ -665,7 +704,7 @@ class ForceDynamics(ForceContactDynamics):
         particle.internal_momentum = 0.0
         particle.contacts = (
             [self.create_geo_contact_state() for _ in range(16)]
-            if float(ptype) == 0.0
+            if float(ptype) <= 0.5
             else []
         )
         particle.gcs = particle.contacts
@@ -986,6 +1025,14 @@ class ForceDynamics(ForceContactDynamics):
                 geometry = self.GetPhysicalParticleContact(source_id, target_id)
                 if geometry is not None:
                     self.RecordPhotonReflection(source_id, geometry[:3])
+                    if self.IsPhotonParticle(source_id):
+                        self.particles[source_id].colFlg = 1
+                        self.particles[source_id].material_id = getattr(
+                            self.particles[target_id],
+                            "material_id",
+                            self.particles[source_id].material_id,
+                        )
+                        continue
                     if not self.ProcessParticleCollision(
                         target_id,
                         source_id,
@@ -1009,6 +1056,10 @@ class ForceDynamics(ForceContactDynamics):
             for wall_flag in sorted(boundary_contacts):
                 _penetration_depth, contact = boundary_contacts[wall_flag]
                 self.RecordPhotonReflection(source_id, contact[:3])
+                if self.IsPhotonParticle(source_id):
+                    self.particles[source_id].colFlg = 1
+                    self.particles[source_id].material_id = self.ConfiguredWallMaterialID(wall_flag)
+                    continue
                 if not self.ProcessFunctionWallCollision(
                     source_id,
                     contact,

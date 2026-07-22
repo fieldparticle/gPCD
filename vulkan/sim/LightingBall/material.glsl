@@ -17,13 +17,16 @@ struct MaterialProperty
     float tempVel;
     uint colorMode;
     vec4 color;
+    uint debugVisible;
+    vec4 debugColor;
     float cellDensity;
 };
 
-const uint MATERIAL_PROPERTY_COUNT = 2u;
-const MaterialProperty MATERIAL_PROPERTIES[2] = MaterialProperty[2](
-    MaterialProperty(0u, 1u, 1.000000000, 0.000000000, 3u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0.000000000),
-    MaterialProperty(1u, 0u, 1.000000000, 0.000000000, 2u, vec4(0.000000000, 1.000000000, 0.000000000, 1.000000000), 0.000000000)
+const uint MATERIAL_PROPERTY_COUNT = 3u;
+const MaterialProperty MATERIAL_PROPERTIES[3] = MaterialProperty[3](
+    MaterialProperty(0u, 1u, 1.000000000, 0.000000000, 3u, vec4(0.500000000, 0.500000000, 1.000000000, 1.000000000), 0u, vec4(0.000000000, 0.000000000, 1.000000000, 1.000000000), 0.000000000),
+    MaterialProperty(1u, 0u, 1.000000000, 0.000000000, 2u, vec4(1.000000000, 1.000000000, 0.000000000, 1.000000000), 0u, vec4(0.000000000, 0.000000000, 0.000000000, 0.000000000), 0.000000000),
+    MaterialProperty(2u, 0u, 1.000000000, 0.000000000, 2u, vec4(0.000000000, 0.000000000, 0.000000000, 0.000000000), 0u, vec4(0.000000000, 0.000000000, 0.000000000, 0.000000000), 0.000000000)
 );
 
 const uint HSV_ON = 0u;

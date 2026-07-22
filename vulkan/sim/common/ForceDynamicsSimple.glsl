@@ -72,13 +72,13 @@ float VelocityAngle(float vx, float vy)
     return (vx != 0.0 || vy != 0.0) ? atan(vy, vx) : 0.0;
 }
 
-// Python source: ForceDynamics.py:236
+// Python source: ForceDynamics.py:226
 vec4 particle_position(uint ParticleID, uint positionBuffer)
 {
     return (positionBuffer == 0u) ? P[ParticleID].PosLocA : P[ParticleID].PosLocB;
 }
 
-// Python source: ForceDynamics.py:243
+// Python source: ForceDynamics.py:233
 float particle_overlap_area(float sourceRadius, float targetRadius, float centerDistance)
 {
     if (centerDistance <= 0.0) {
@@ -110,7 +110,7 @@ float particle_overlap_area(float sourceRadius, float targetRadius, float center
     return sourceArea + targetArea - triangleArea;
 }
 
-// Python source: ForceDynamics.py:1047
+// Python source: ForceDynamics.py:1049
 float ParticlePenetrationDepth(float sourceRadius, float targetRadius, float centerDistance)
 {
     return sourceRadius + targetRadius - centerDistance;

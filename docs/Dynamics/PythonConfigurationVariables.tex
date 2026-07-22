@@ -49,7 +49,7 @@ particle_streams = (
     name                       = "photon_beam";
     material_id                = 0;
 
-    // Particle behavior comes from material_properties.particle_type.
+    // material_properties.particle_type seeds the generated pdata.ptype.
     initial_particle_velocity  = [ 0.048296, -0.012941, 0.0 ];
 
     release_start_frame        = 10;
@@ -74,7 +74,7 @@ particle_streams = (
     name                       = "dust_rise";
     material_id                = 1;
 
-    // Particle behavior comes from material_properties.particle_type.
+    // material_properties.particle_type seeds the generated pdata.ptype.
     initial_particle_velocity  = [ 0.0, 0.05, 0.0 ];
 
     release_start_frame        = 10;
@@ -104,10 +104,12 @@ particle_streams = (
 \begin{description}
     \item[\texttt{name}] Human-readable stream name used for diagnostics.
     Names should be unique within one configuration.
-    \item[\texttt{material\_id}] Material id assigned to every particle emitted
-    by this stream.  Material-owned behavior such as photon versus regular
-    particle type belongs in \texttt{material\_properties}, not in the stream
-    record.
+    \item[\texttt{material\_id}] Base material id assigned to every particle
+    emitted by this stream.  During generation, the selected material's
+    \texttt{particle\_type} seeds the particle's runtime \texttt{ptype}.
+    Photon runtime behavior is carried by \texttt{ptype}; photon
+    \texttt{material\_id} may later be overwritten during contact to identify
+    the contacted surface color.
     \item[\texttt{initial\_particle\_velocity}] Three values giving the
     initial velocity for particles emitted by the stream.
     \item[\texttt{release\_start\_frame}] First frame at which the first
@@ -305,8 +307,10 @@ LUMENS
 The former flat \texttt{hsv\_color} switch and the old named solid color
 schemes are retired.  \texttt{VELOCITY} uses \texttt{hsv\_sat} and
 \texttt{hsv\_val} as viewer parameters.  \texttt{SOLID} uses the material
-\texttt{color} array.  \texttt{LUMENS} uses the lumens eye/aperture fields
-above and the material \texttt{color} for visible surface color.
+\texttt{color} array.  \texttt{LUMENS} is forced for photon \texttt{ptype}
+records; uncontacted photons use material \texttt{debug\_visible} and
+\texttt{debug\_color}, while contacted photons use the current
+\texttt{material\_id} color as the visible surface color.
 
 \subsection{Rectangular Cell Domain}
 
@@ -435,7 +439,8 @@ The current binary contains:
 
 \begin{itemize}
     \item one null particle with \texttt{pnum=0};
-    \item mobile particles with \texttt{ptype=0};
+    \item regular mobile particles with \texttt{ptype=0};
+    \item photon mobile particles with \texttt{ptype=-2};
     \item boundary markers with \texttt{ptype=1}.
 \end{itemize}
 

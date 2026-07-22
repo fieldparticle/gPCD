@@ -88,11 +88,8 @@ class GenLightingBall(GenStreaming):
                         float(cell_position[0]),
                         float(cell_position[1]),
                         float(cell_position[2]),
-                    )
-                )
-                particle.material_id = float(material_id)
-                particle.molar_mass = float(
-                    self.material_properties_by_id[material_id]["relative_mass"]
+                    ),
+                    material_id=material_id,
                 )
                 particle.vx = normal_x / normal_length
                 particle.vy = normal_y / normal_length
@@ -113,7 +110,7 @@ class GenLightingBall(GenStreaming):
         self.write_validation_log(report_text)
         return added_count
 
-    def add_function_wall_markers(self):
-        super().add_function_wall_markers()
+    def add_configured_wall_markers(self):
+        super().add_configured_wall_markers()
         self.add_lighting_ball_boundary_particles()
         return self.number_boundary_particles

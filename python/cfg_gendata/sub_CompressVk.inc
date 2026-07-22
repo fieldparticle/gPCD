@@ -52,9 +52,9 @@ death_bounds 					= [1, 19,1, 19, 1, 19];
 //   name
 //     Human-readable stream name used in diagnostics.  Keep names unique.
 //   material_id
-//     Material assigned to every particle from the stream.  Particle behavior
-//     such as regular versus photon comes from material_properties, not from
-//     the stream record.
+//     Base material assigned to every particle from the stream.  During
+//     generation, material_properties seeds pdata.ptype so photon behavior is
+//     stable even if runtime material_id changes to a hit surface material.
 //   initial_particle_velocity
 //     Initial vx/vy/vz for every released particle.  For photons, this vector
 //     also defines the invariant photon speed used by the Vulkan force path.
@@ -83,7 +83,7 @@ particle_streams = (
     name 						= "photon_beam";
     material_id 				= 0;
 
-    // Regular particles for now; material_properties carries particle_type.
+    // material_properties seeds the generated pdata.ptype behavior.
     //initial_particle_velocity 	= [ 0.048296, -0.012941, 0.0 ];
 	initial_particle_velocity 	= [ 0.2, -0.2, 0.0 ];
 

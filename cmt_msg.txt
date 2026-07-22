@@ -1,14 +1,11 @@
-Flush out LightingBall scene coordination
-
 Current status:
-    - Vulkan LightingBall scene now documents sphere export, material color modes, and eye-aligned viewing.
-    - Active docs use color_mode/color instead of retired color_scheme and named solid schemes.
-    - ProblemEvolution records the scene flush-out and remaining LUMENS brightness parity.
+	- Photon behavior now lives in runtime ptype instead of material_id lookup
+	- Photon material_id can temporarily carry contacted surface color for LUMENS
+	- Documentation updated for the new photon/material ABI contract
 
 Code Changes:
-    - Update LightingBall, configuration variable, programming convention, porting, and evolution docs.
-    - Clarify COLOR_MODE_COLLISION, COLOR_MODE_VELOCITY, COLOR_MODE_SOLID, and COLOR_MODE_LUMENS contracts.
-    - Document align_with_eye and eye_view_distance behavior for Vulkan scene framing.
+	- Added/recorded ptype=-2 photon convention in generator and docs
+	- Removed active hit_material_id dependency from Python/shader paths
+	- Regenerated simple GLSL common files from ExportForceDynamicsSimpleGLSL.py
 
-Next:
-    - Flush out full Vulkan LUMENS brightness parity using contact normals and Python lighting parameters.
+Next: Regenerate LightingBall data and validate photon surface-color behavior in Vulkan
