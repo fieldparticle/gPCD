@@ -754,7 +754,7 @@ void  ShaderObj::WriteShaderHeader()
 			<< "const uint bbound ="
 				<< m_VPO->BoundaryParticleLimit << ";\n"
 			<< "const float point_size = "
-				<< std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.gl_point_size", true) << ";\n"
+				<< std::fixed << std::setprecision(2) << CfgTst->GetFloat("gl_point_size", true) << ";\n"
 			<< "#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN "
 				<< std::setprecision(9) << CfgTst->GetFloat("compression_stiffness_gain", true) << "\n"
 			<< "#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER " <<

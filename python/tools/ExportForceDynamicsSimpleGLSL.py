@@ -314,9 +314,11 @@ bool IsNullParticle(uint ParticleID)
     return ParticleID == 0u && P[ParticleID].ptype < -0.5;
 }}
 
+const float PTYPE_BOUNDARY = 2.0;
+
 bool IsBoundaryParticle(uint ParticleID)
 {{
-    return P[ParticleID].ptype > 0.5;
+    return int(round(P[ParticleID].ptype)) == int(PTYPE_BOUNDARY);
 }}
 
 bool IsParticleDead(uint ParticleID)
@@ -1612,6 +1614,9 @@ uint GetParticleType(uint particleID)
 {
     if (int(round(P[particleID].ptype)) == int(PTYPE_PHOTON)) {
         return PARTICLE_TYPE_PHOTON;
+    }
+    if (int(round(P[particleID].ptype)) == int(PTYPE_BOUNDARY)) {
+        return PARTICLE_TYPE_BOUNDARY;
     }
     return PARTICLE_TYPE_REGULAR;
 }

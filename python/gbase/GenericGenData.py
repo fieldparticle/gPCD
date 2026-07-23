@@ -1,5 +1,13 @@
 import os
 
+from gbase.BoundaryLighting import (
+    BOUNDARY_LIGHT_MODEL_LIGHTING_BALL,
+    BOUNDARY_LIGHT_MODEL_NONE,
+    BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL,
+    BOUNDARY_LIGHT_SURFACE_SPHERE,
+    parse_boundary_light_model,
+    parse_boundary_light_rgb,
+)
 from gbase.FunctionWall import bounds as wall_bounds
 from gbase.FunctionWall import parse_keyed_curve_wall_segments
 from gbase.FunctionWall import sample_points
@@ -10,6 +18,7 @@ from gbase.MaterialProperties import (
     COLOR_MODE_SOLID,
     COLOR_MODE_VELOCITY,
     DEFAULT_MATERIAL_PROPERTIES,
+    PARTICLE_TYPE_BOUNDARY,
     PARTICLE_TYPE_PHOTON,
     parse_debug_visible,
     parse_material_color,
@@ -17,7 +26,7 @@ from gbase.MaterialProperties import (
     write_color_mode_defines,
     write_material_properties,
 )
-from gbase.pdata import PTYPE_MOBILE, PTYPE_NULL, PTYPE_PHOTON, pdata
+from gbase.pdata import PTYPE_BOUNDARY, PTYPE_MOBILE, PTYPE_NULL, PTYPE_PHOTON, pdata
 import math
 
 
@@ -135,7 +144,7 @@ def parse_keyed_rectangle_wall_segments(raw_segments):
 class GenericGenData:
     """Generate particle data from declarative particle and wall configuration."""
 
-    BOUNDARY_PARTICLE_PTYPE = 1.0
+    BOUNDARY_PARTICLE_PTYPE = PTYPE_BOUNDARY
     COLOR_MODE_COLLISION = COLOR_MODE_COLLISION
     COLOR_MODE_VELOCITY = COLOR_MODE_VELOCITY
     COLOR_MODE_SOLID = COLOR_MODE_SOLID
@@ -156,6 +165,13 @@ class GenericGenData:
         self.number_particles = 0
         self.number_active_particles = 0
         self.number_boundary_particles = 0
+        self.boundary_lighting_enabled = False
+        self.boundary_lighting_model = BOUNDARY_LIGHT_MODEL_NONE
+        self.boundary_light_initial_rgb = (0.0, 0.0, 0.0)
+        self.boundary_space_patch_angle = 0.20
+        self.boundary_space_patch_radius = 0.50
+        self.boundary_space_patch_falloff = "quadratic"
+        self.boundary_light_source_metadata = {}
         self.material_properties = [dict(item) for item in self.DEFAULT_MATERIAL_PROPERTIES]
         self.material_properties_by_id = {
             int(item["material_id"]): dict(item)
@@ -577,6 +593,75 @@ class GenericGenData:
                     )
 
         self.validate_material_properties(errors)
+        try:
+            boundary_lighting_enabled = self.itemcfg.get(
+                "boundary_lighting_enabled",
+                False,
+            )
+            if not isinstance(boundary_lighting_enabled, bool):
+                errors.append("boundary_lighting_enabled must be a boolean")
+        except (TypeError, ValueError):
+            boundary_lighting_enabled = False
+            errors.append("boundary_lighting_enabled must be a boolean")
+
+        boundary_lighting_model = BOUNDARY_LIGHT_MODEL_NONE
+        if boundary_lighting_enabled:
+            try:
+                boundary_lighting_model = parse_boundary_light_model(
+                    self.itemcfg.get("boundary_lighting_model", "LightingBall")
+                )
+            except (TypeError, ValueError) as exc:
+                errors.append(str(exc))
+            if boundary_lighting_model != BOUNDARY_LIGHT_MODEL_LIGHTING_BALL:
+                errors.append(
+                    "boundary_lighting_model must be LightingBall when "
+                    "boundary_lighting_enabled is true"
+                )
+            if self.itemcfg.get("Lighting_ball") is None:
+                errors.append(
+                    "Lighting_ball is required when boundary_lighting_enabled is true"
+                )
+
+        try:
+            boundary_light_initial_rgb = parse_boundary_light_rgb(
+                self.itemcfg.get("boundary_light_initial_rgb", (0.0, 0.0, 0.0))
+            )
+        except (TypeError, ValueError) as exc:
+            boundary_light_initial_rgb = (0.0, 0.0, 0.0)
+            errors.append(str(exc))
+
+        try:
+            boundary_space_patch_angle = float(
+                self.itemcfg.get("boundary_space_patch_angle", 0.20)
+            )
+        except (TypeError, ValueError):
+            boundary_space_patch_angle = None
+            errors.append("boundary_space_patch_angle must be numeric")
+        if boundary_space_patch_angle is not None:
+            if not math.isfinite(boundary_space_patch_angle):
+                errors.append("boundary_space_patch_angle must be finite")
+            elif boundary_space_patch_angle <= 0.0:
+                errors.append("boundary_space_patch_angle must be positive")
+
+        try:
+            boundary_space_patch_radius = float(
+                self.itemcfg.get("boundary_space_patch_radius", 0.50)
+            )
+        except (TypeError, ValueError):
+            boundary_space_patch_radius = None
+            errors.append("boundary_space_patch_radius must be numeric")
+        if boundary_space_patch_radius is not None:
+            if not math.isfinite(boundary_space_patch_radius):
+                errors.append("boundary_space_patch_radius must be finite")
+            elif boundary_space_patch_radius <= 0.0:
+                errors.append("boundary_space_patch_radius must be positive")
+
+        boundary_space_patch_falloff = str(
+            self.itemcfg.get("boundary_space_patch_falloff", "quadratic")
+        ).strip().lower()
+        if boundary_space_patch_falloff not in ("linear", "quadratic"):
+            errors.append("boundary_space_patch_falloff must be linear or quadratic")
+
         known_material_ids = set(self.material_properties_by_id)
         for segment in rectangle_wall_segments:
             material_id = int(segment.get("material_id", 0))
@@ -612,6 +697,12 @@ class GenericGenData:
         self.wall_contact_offset = float(self.itemcfg.wall_contact_offset)
         self.dt = float(self.itemcfg.dt)
         self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
+        self.boundary_lighting_enabled = bool(boundary_lighting_enabled)
+        self.boundary_lighting_model = int(boundary_lighting_model)
+        self.boundary_light_initial_rgb = boundary_light_initial_rgb
+        self.boundary_space_patch_angle = float(boundary_space_patch_angle)
+        self.boundary_space_patch_radius = float(boundary_space_patch_radius)
+        self.boundary_space_patch_falloff = boundary_space_patch_falloff
         return True
 
     def report_collision_feasibility(self):
@@ -895,6 +986,7 @@ class GenericGenData:
         self.number_particles = 0
         self.number_active_particles = 0
         self.number_boundary_particles = 0
+        self.boundary_light_source_metadata = {}
 
         output_prefix = str(
             self.itemcfg.get("output_file_prefix", self.itemcfg.STUDY_NAME)
@@ -905,6 +997,7 @@ class GenericGenData:
         self.test_file_name = os.path.join(output_directory, f"{output_prefix}.tst")
         self.report_file = os.path.join(output_directory, f"{output_prefix}.rpt")
         self.validation_log_name = os.path.join(output_directory, f"{output_prefix}.log")
+        self.delete_stale_generated_outputs()
         with open(self.validation_log_name, "w", encoding="ascii", newline="\n") as output:
             output.write(
                 "Function-wall particle validation log\n"
@@ -918,6 +1011,18 @@ class GenericGenData:
                 output_directory,
                 f"{output_prefix}.obj",
             )
+
+    def delete_stale_generated_outputs(self):
+        removed_paths = []
+        for path in (self.test_bin_name, self.test_file_name):
+            if not os.path.exists(path):
+                continue
+            os.remove(path)
+            removed_paths.append(path)
+        if removed_paths:
+            print("Deleted stale generated output(s):")
+            for path in removed_paths:
+                print(f"  {path}")
 
     def write_validation_log(self, text):
         with open(self.validation_log_name, "a", encoding="ascii", newline="\n") as output:
@@ -937,6 +1042,23 @@ class GenericGenData:
         particle.material_id = 0.0
         self.p_list.append(particle)
         return particle
+
+    def register_boundary_light_source(
+        self,
+        particle_id,
+        surface_type,
+        surface_id,
+        material_id,
+        normal,
+        area=1.0,
+    ):
+        self.boundary_light_source_metadata[int(particle_id)] = {
+            "surface_type": int(surface_type),
+            "surface_id": int(surface_id),
+            "material_id": int(material_id),
+            "normal": tuple(float(value) for value in normal),
+            "area": float(area),
+        }
 
     def add_mobile_particle(
         self,
@@ -960,6 +1082,8 @@ class GenericGenData:
             ptype = (
                 PTYPE_PHOTON
                 if material_particle_type == PARTICLE_TYPE_PHOTON
+                else PTYPE_BOUNDARY
+                if material_particle_type == PARTICLE_TYPE_BOUNDARY
                 else PTYPE_MOBILE
             )
         particle = pdata()
@@ -1049,9 +1173,16 @@ class GenericGenData:
                 if marker_cell_key in marker_cells:
                     continue
                 marker_cells.add(marker_cell_key)
-                self.add_boundary_particle(
+                particle = self.add_boundary_particle(
                     (float(cell_x), float(cell_y), float(cell_z)),
                     material_id=material_id,
+                )
+                self.register_boundary_light_source(
+                    particle.pnum,
+                    BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL,
+                    wall_flag,
+                    material_id,
+                    segment["normal"],
                 )
                 added_for_segment += 1
             segment_marker_counts.append(added_for_segment)
@@ -1137,6 +1268,45 @@ class GenericGenData:
         if self.rectangle_wall_segments:
             return self.add_rectangle_wall_markers()
         return self.add_function_wall_markers()
+
+    def report_boundary_space_lighting(self):
+        report_text = (
+            "Boundary-space lighting report:\n"
+            f"  enabled: {self.boundary_lighting_enabled}\n"
+            f"  model: {self.boundary_lighting_model}\n"
+            f"  proxies: {len(self.boundary_light_source_metadata)}\n"
+            f"  patch angle: {self.boundary_space_patch_angle:g}\n"
+            f"  patch radius: {self.boundary_space_patch_radius:g}\n"
+            f"  patch falloff: {self.boundary_space_patch_falloff}"
+        )
+        print(report_text)
+        self.write_validation_log(report_text)
+        return len(self.boundary_light_source_metadata)
+
+    def write_boundary_space_lighting(self, output):
+        output.write(
+            "boundary_lighting_enabled = "
+            f"{'true' if self.boundary_lighting_enabled else 'false'};\n"
+        )
+        output.write(f"boundary_lighting_model = {self.boundary_lighting_model};\n")
+        output.write(
+            "boundary_light_initial_rgb = ["
+            f"{self.boundary_light_initial_rgb[0]:.9f}, "
+            f"{self.boundary_light_initial_rgb[1]:.9f}, "
+            f"{self.boundary_light_initial_rgb[2]:.9f}];\n"
+        )
+        output.write(
+            f"boundary_space_proxy_count = {len(self.boundary_light_source_metadata)};\n"
+        )
+        output.write(
+            f"boundary_space_patch_angle = {self.boundary_space_patch_angle:.9f};\n"
+        )
+        output.write(
+            f"boundary_space_patch_radius = {self.boundary_space_patch_radius:.9f};\n"
+        )
+        output.write(
+            f'boundary_space_patch_falloff = "{self.boundary_space_patch_falloff}";\n'
+        )
 
     def write_function_wall_obj(self):
         """Write triangle ribbons sampled from function-wall paths."""
@@ -1226,7 +1396,7 @@ class GenericGenData:
         mobile_particles = [
             particle
             for particle in self.p_list
-            if float(particle.ptype) <= 0.5
+            if int(round(float(particle.ptype))) not in (int(PTYPE_NULL), int(PTYPE_BOUNDARY))
             and int(round(float(particle.pnum))) != 0
         ]
         if not mobile_particles:
@@ -1473,6 +1643,10 @@ class GenericGenData:
                 f"{float(view_center[1]):.9f}, "
                 f"{float(view_center[2]):.9f}];\n"
             )
+            gl_point_size = float(self.itemcfg.get("gl_point_size", 3.0))
+            if not math.isfinite(gl_point_size) or gl_point_size <= 0.0:
+                raise ValueError("gl_point_size must be a positive finite number")
+            output.write(f"gl_point_size = {gl_point_size:.9f};\n")
             align_with_eye = self.itemcfg.get("align_with_eye", False)
             if not isinstance(align_with_eye, bool):
                 raise ValueError("align_with_eye must be a boolean")
@@ -1656,6 +1830,7 @@ class GenericGenData:
             output.write(f"hsv_val = {float(self.itemcfg.hsv_val):.9f};\n")
             self.write_color_mode_defines(output)
             self.write_material_properties(output)
+            self.write_boundary_space_lighting(output)
             output.write(
                 f"as_points = {1 if self.itemcfg.get('as_points', False) else 0};\n"
             )
@@ -1700,6 +1875,7 @@ class GenericGenData:
             self.add_null_particle()
             self.add_explicit_mobile_particles()
             self.add_configured_wall_markers()
+            self.report_boundary_space_lighting()
             self.report_cell_occupancy_capacity()
             self.write_particle_bin()
             self.write_test_file()

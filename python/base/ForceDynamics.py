@@ -4,10 +4,11 @@ import itertools
 from gbase.FunctionWall import evaluate_wall_at_point
 from gbase.FunctionWall import physical_penetration
 from gbase.MaterialProperties import (
+    PARTICLE_TYPE_BOUNDARY,
     PARTICLE_TYPE_PHOTON,
     PARTICLE_TYPE_REGULAR,
 )
-from gbase.pdata import PTYPE_PHOTON
+from gbase.pdata import PTYPE_BOUNDARY, PTYPE_PHOTON
 
 
 class ForceContactDynamics:
@@ -30,6 +31,8 @@ class ForceContactDynamics:
         ptype = int(round(float(getattr(self.particles[ParticleID], "ptype", 0.0))))
         if ptype == int(PTYPE_PHOTON):
             return PARTICLE_TYPE_PHOTON
+        if ptype == int(PTYPE_BOUNDARY):
+            return PARTICLE_TYPE_BOUNDARY
         return PARTICLE_TYPE_REGULAR
 
     def IsPhotonParticle(self, ParticleID):
@@ -686,6 +689,12 @@ class ForceContactDynamics:
                 source.material_id = float(
                     lighting_ball.get("material_id", source.material_id)
                 )
+            self.DepositBoundaryLightForSurface(
+                1,
+                int(contact[-1]),
+                source.material_id,
+                self.particle_position_tuple(source),
+            )
         source.report_contacts = max(int(getattr(source, "report_contacts", 0)), 1)
         source.report_target = int(contact[-1])
         source.report_normal_x = normal[0]
@@ -930,6 +939,15 @@ class ForceContactDynamics:
             normal,
         )
         source.colFlg = 1
+        if self.IsPhotonParticle(SourceID):
+            source.material_id = float(
+                getattr(
+                    self.particles[BoundaryID],
+                    "material_id",
+                    source.material_id,
+                )
+            )
+            self.DepositBoundaryLightForMaterial(BoundaryID, source.material_id)
         source.report_contacts = max(int(getattr(source, "report_contacts", 0)), 1)
         source.report_target = BoundaryID
         source.report_normal_x = normal[0]
@@ -1270,7 +1288,7 @@ class ForceContactDynamics:
 
     def IsBoundaryParticle(self, ParticleID):
         """Return True when a particle is an occupancy-only boundary marker."""
-        return float(getattr(self.particles[ParticleID], "ptype", 0.0)) > 0.5
+        return self.GetParticleType(ParticleID) == PARTICLE_TYPE_BOUNDARY
 
     def IsNullParticle(self, ParticleID):
         """Return True only for the reserved ABI particle at index zero."""

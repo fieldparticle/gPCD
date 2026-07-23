@@ -2,43 +2,65 @@
 \newpage
 \section{Future Modification and Cleanup}
 
-\subsection{Lighting Eye Direction Contract}
+\subsection{Boundary-Space Lighting}
 
 \subsubsection{Schedule}
 
-Retire \texttt{lighting\_eye\_angle\_degrees} as the primary lighting-eye
-configuration item after the 2D and 3D runners both support the shared
-position/target contract:
-\begin{verbatim}
-lighting_eye_position = [x, y, z];
-lighting_eye_target   = [x, y, z];
-lighting_eye_fov_degrees = 90.0;
-\end{verbatim}
+The next LightingBall work is boundary-space lighting.  The active scene has
+been reduced to the photon tracer, analytic sphere, ordinary view controls,
+and material color behavior.  Reintroduce lighting one small step at a time.
 
 \subsubsection{Target Form}
 
-Both two-dimensional and three-dimensional lighting views should resolve the
-eye direction the same way.  The preferred form is
-\texttt{lighting\_eye\_target}; the runtime computes:
+The first implementation should prove:
 \[
-    \mathbf d =
-    \frac{\mathbf t-\mathbf e}{\lVert\mathbf t-\mathbf e\rVert},
+    \textrm{photon hit}
+    \rightarrow
+    \textrm{persistent boundary proxy color}
+    \rightarrow
+    \textrm{kernel-spread surface color}.
 \]
-where \(\mathbf e\) is \texttt{lighting\_eye\_position} and \(\mathbf t\) is
-\texttt{lighting\_eye\_target}.  Two-dimensional scenarios use the same
-three-component vectors with \(z=0\).
 
-\subsubsection{Compatibility}
+Use existing boundary particles as the first persistent proxies.  Do not
+restore the retired \texttt{BoundaryLightSample}/\texttt{BoundaryLightState}
+arrays, visible surface-cell grid, eye-driven brightness, or per-frame
+clear/filter path.
 
-During transition, keep \texttt{lighting\_eye\_direction} as an advanced
-manual vector and keep \texttt{lighting\_eye\_angle\_degrees} only as a legacy
-fallback:
-\begin{enumerate}
-    \item use \texttt{lighting\_eye\_target} when present;
-    \item otherwise use normalized \texttt{lighting\_eye\_direction};
-    \item otherwise fall back to \texttt{lighting\_eye\_angle\_degrees}.
-\end{enumerate}
+\subsubsection{Deferred Work}
 
-After all active cfg files use \texttt{lighting\_eye\_target}, remove the
-legacy angle fallback from the active configuration documentation and leave it
-only in historical notes if needed.
+Directional specular, additive energy accumulation, temporal filtering,
+decay, and a separate compact Vulkan proxy table are deferred until the
+minimal boundary-space proxy-color path is visible and stable.
+
+\subsection{Photon-Direction Specular Lighting}
+
+\subsection{Boundary-Light Washout Cap}
+
+Add an optional render control for LightingBall boundary lighting:
+\begin{verbatim}
+boundary_light_washout_limit = 0.75;
+\end{verbatim}
+
+This would let a lit yellow sector become pale yellow without becoming pure
+white.  The center of a dense photon patch could still wash out strongly, but
+the final mix toward white would be capped by the configured limit.
+
+\subsubsection{Schedule}
+
+Defer photon-direction specular lighting until the scalar boundary-light path
+is proven in both Python and Vulkan:
+\[
+    \textrm{photon hit}
+    \rightarrow
+    \textrm{boundary sample energy}
+    \rightarrow
+    \textrm{filtered lit sector}.
+\]
+
+\subsubsection{Target Idea}
+
+Later, boundary light samples may accumulate the incoming photon direction as
+well as deposited energy.  A coherent set of photon directions could then
+produce a specular highlight from the simulation itself rather than from a
+configured analytic light vector.  This should be a second-stage extension,
+not part of the first LightingBall memory contract.

@@ -4,16 +4,22 @@ from gbase import libconf
 from base.ForceDynamics import ForceContactDynamics
 from base.InLineTest import InLineTest
 from gbase import BinaryFileUtilities
+from gbase.BoundaryLighting import (
+    BOUNDARY_LIGHT_MODEL_LIGHTING_BALL,
+    BOUNDARY_LIGHT_MODEL_NONE,
+    BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL,
+    BOUNDARY_LIGHT_SURFACE_SPHERE,
+    parse_boundary_light_model,
+    parse_boundary_light_rgb,
+)
 from gbase.utilities import get_cell_dimensions, get_run_configuration
 import math
 import re
 from pathlib import Path
 from gbase.libconf import AttrDict
 from gbase.FunctionWall import parse_keyed_curve_wall_segments, wall_marker_records
-from gbase.MaterialProperties import PARTICLE_TYPE_PHOTON
-from gbase.pdata import PTYPE_NULL
-
-PTYPE_BOUNDARY = 1.0
+from gbase.MaterialProperties import PARTICLE_TYPE_PHOTON, parse_particle_type
+from gbase.pdata import PTYPE_BOUNDARY, PTYPE_NULL
 AXIS_VECTOR = {
     "X": (1.0, 0.0, 0.0),
     "Y": (0.0, 1.0, 0.0),
@@ -79,6 +85,13 @@ class ForceDynamics(ForceContactDynamics):
         self.piston_total_momentum = self.create_vec4()
         self.photon_reflected_velocity = {}
         self.photon_reflected_position = {}
+        self.boundary_lighting_enabled = False
+        self.boundary_lighting_model = BOUNDARY_LIGHT_MODEL_NONE
+        self.boundary_light_initial_rgb = (0.0, 0.0, 0.0)
+        self.boundary_space_patch_angle = 0.20
+        self.boundary_space_patch_radius = 0.50
+        self.boundary_space_patch_falloff = "quadratic"
+        self.boundary_light_source_metadata = {}
 
     def ClearContactDiagnostics(self, contact_state):
         """Reset reporting-only diagnostics on one reusable contact slot."""
@@ -146,10 +159,12 @@ class ForceDynamics(ForceContactDynamics):
             materials = self.run_configuration.get("material_properties", ())
         for material in materials or ():
             if hasattr(material, "get"):
-                particle_type = int(material.get("particle_type", 0))
+                particle_type = parse_particle_type(material.get("particle_type", 0))
                 material_id = material.get("material_id", 0)
             else:
-                particle_type = int(getattr(material, "particle_type", 0))
+                particle_type = parse_particle_type(
+                    getattr(material, "particle_type", 0)
+                )
                 material_id = getattr(material, "material_id", 0)
             if particle_type == PARTICLE_TYPE_PHOTON:
                 return float(material_id)
@@ -380,7 +395,14 @@ class ForceDynamics(ForceContactDynamics):
         self.run_configuration = get_run_configuration(self.config)
         raw_segments = self.run_configuration.get("curve_wall_segments")
         rectangle_segments = self.run_configuration.get("rectangle_wall_segments")
-        if isinstance(raw_segments, AttrDict):
+        if (
+            isinstance(rectangle_segments, AttrDict)
+            and isinstance(raw_segments, AttrDict)
+            and not raw_segments
+        ):
+            self.run_configuration["curve_wall_segments"] = ()
+            self.config["curve_wall_segments"] = ()
+        elif isinstance(raw_segments, AttrDict):
             curve_segments, curve_errors = parse_keyed_curve_wall_segments(raw_segments)
             if curve_errors:
                 raise ValueError(
@@ -403,9 +425,13 @@ class ForceDynamics(ForceContactDynamics):
             self.particle_data = self.config.get("PARTICLE_DATA", {})
 
         self.particles = self.create_particle_array_from_cfg(self.particle_data)
+        self.configure_boundary_lighting_from_cfg()
         if self.config.pdata_from_file == False:
             self.add_function_boundary_markers_from_cfg()
             self.add_rectangle_boundary_markers_from_cfg()
+        if self.boundary_lighting_enabled:
+            self.infer_boundary_light_sources_from_particles()
+        self.InitializeBoundarySpaceLighting()
         self.ShaderFlags = self.create_shader_flags_from_cfg(self.run_configuration)
         self.wall_contact_offset = max(
             0.0,
@@ -435,7 +461,7 @@ class ForceDynamics(ForceContactDynamics):
         mobile_particles = [
             particle
             for particle in self.particles
-            if float(getattr(particle, "ptype", 0.0)) <= 0.5
+            if int(round(float(getattr(particle, "ptype", 0.0)))) != int(PTYPE_BOUNDARY)
             and int(getattr(particle, "pnum", 0)) != 0
         ]
         if not mobile_particles:
@@ -464,6 +490,325 @@ class ForceDynamics(ForceContactDynamics):
             )
             marker_count += 1
         return marker_count
+
+    def configure_boundary_lighting_from_cfg(self):
+        boundary_lighting_enabled = self.run_configuration.get(
+            "boundary_lighting_enabled",
+            False,
+        )
+        if not isinstance(boundary_lighting_enabled, bool):
+            raise ValueError("boundary_lighting_enabled must be a boolean")
+        self.boundary_lighting_enabled = boundary_lighting_enabled
+        if self.boundary_lighting_enabled:
+            self.boundary_lighting_model = parse_boundary_light_model(
+                self.run_configuration.get("boundary_lighting_model", "LightingBall")
+            )
+            if self.boundary_lighting_model != BOUNDARY_LIGHT_MODEL_LIGHTING_BALL:
+                raise ValueError(
+                    "boundary_lighting_model must be LightingBall when "
+                    "boundary_lighting_enabled is true"
+                )
+        else:
+            self.boundary_lighting_model = BOUNDARY_LIGHT_MODEL_NONE
+        self.boundary_light_initial_rgb = parse_boundary_light_rgb(
+            self.run_configuration.get("boundary_light_initial_rgb", (0.0, 0.0, 0.0))
+        )
+        self.boundary_light_source_metadata = {}
+        self.boundary_space_patch_angle = float(
+            self.run_configuration.get("boundary_space_patch_angle", 0.20)
+        )
+        if (
+            not math.isfinite(self.boundary_space_patch_angle)
+            or self.boundary_space_patch_angle <= 0.0
+        ):
+            raise ValueError("boundary_space_patch_angle must be positive and finite")
+        self.boundary_space_patch_radius = float(
+            self.run_configuration.get("boundary_space_patch_radius", 0.50)
+        )
+        if (
+            not math.isfinite(self.boundary_space_patch_radius)
+            or self.boundary_space_patch_radius <= 0.0
+        ):
+            raise ValueError("boundary_space_patch_radius must be positive and finite")
+        self.boundary_space_patch_falloff = str(
+            self.run_configuration.get("boundary_space_patch_falloff", "quadratic")
+        ).strip().lower()
+        if self.boundary_space_patch_falloff not in ("linear", "quadratic"):
+            raise ValueError("boundary_space_patch_falloff must be linear or quadratic")
+
+    def register_boundary_light_source(
+        self,
+        particle_id,
+        surface_type,
+        surface_id,
+        material_id,
+        normal,
+        area=1.0,
+    ):
+        self.boundary_light_source_metadata[int(particle_id)] = {
+            "surface_type": int(surface_type),
+            "surface_id": int(surface_id),
+            "material_id": int(material_id),
+            "normal": tuple(float(value) for value in normal),
+            "area": float(area),
+        }
+
+    def particle_position_tuple(self, particle):
+        return (
+            float(particle.PosLocA.x),
+            float(particle.PosLocA.y),
+            float(particle.PosLocA.z),
+        )
+
+    def infer_boundary_light_sources_from_particles(self):
+        if not self.boundary_lighting_enabled:
+            return 0
+
+        lighting_ball = self.run_configuration.get("Lighting_ball")
+        sphere_center = None
+        sphere_radius = None
+        sphere_material_id = None
+        sphere_wall_flag = 1000
+        if lighting_ball is not None and hasattr(lighting_ball, "get"):
+            sphere_center = (
+                float(lighting_ball.get("x")),
+                float(lighting_ball.get("y")),
+                float(lighting_ball.get("z")),
+            )
+            sphere_radius = float(lighting_ball.get("radius"))
+            sphere_material_id = int(lighting_ball.get("material_id", 0))
+            sphere_wall_flag = int(lighting_ball.get("wall_flag", 1000))
+
+        inferred_count = 0
+        for particle_id, particle in enumerate(self.particles):
+            if not self.IsBoundaryParticle(particle_id):
+                continue
+            position = self.particle_position_tuple(particle)
+            material_id = int(round(float(getattr(particle, "material_id", 0.0))))
+            if (
+                sphere_center is not None
+                and material_id == sphere_material_id
+                and sphere_radius is not None
+            ):
+                normal = (
+                    position[0] - sphere_center[0],
+                    position[1] - sphere_center[1],
+                    position[2] - sphere_center[2],
+                )
+                normal_length = math.sqrt(
+                    normal[0] * normal[0]
+                    + normal[1] * normal[1]
+                    + normal[2] * normal[2]
+                )
+                if normal_length > 1.0e-12:
+                    self.register_boundary_light_source(
+                        particle_id,
+                        BOUNDARY_LIGHT_SURFACE_SPHERE,
+                        sphere_wall_flag,
+                        material_id,
+                        (
+                            normal[0] / normal_length,
+                            normal[1] / normal_length,
+                            normal[2] / normal_length,
+                        ),
+                    )
+                    inferred_count += 1
+                    continue
+
+            rectangle_segments = self.run_configuration.get("rectangle_wall_segments")
+            if isinstance(rectangle_segments, AttrDict):
+                for _wall_name, wall_config in rectangle_segments.items():
+                    if material_id != int(wall_config.get("material_id", 0)):
+                        continue
+                    if not self.rectangle_wall_contains_point(wall_config, position):
+                        continue
+                    normal = self._vector3(wall_config.get("normal"), "normal")
+                    self.register_boundary_light_source(
+                        particle_id,
+                        BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL,
+                        int(wall_config.get("wall_flag", 0)),
+                        material_id,
+                        normal,
+                    )
+                    inferred_count += 1
+                    break
+        return inferred_count
+
+    def rectangle_wall_contains_point(self, wall_config, position):
+        origin = self._vector3(wall_config.get("origin"), "origin")
+        u_axis = self._axis_vector(wall_config.get("u_axis"))
+        v_axis = self._axis_vector(wall_config.get("v_axis"))
+        normal = self._vector3(wall_config.get("normal"), "normal")
+        u_length = float(wall_config.get("u_length", 0.0))
+        v_length = float(wall_config.get("v_length", 0.0))
+        rel = (
+            float(position[0]) - origin[0],
+            float(position[1]) - origin[1],
+            float(position[2]) - origin[2],
+        )
+        plane_distance = (
+            rel[0] * normal[0]
+            + rel[1] * normal[1]
+            + rel[2] * normal[2]
+        )
+        if abs(plane_distance) > 1.0e-6:
+            return False
+        u_value = rel[0] * u_axis[0] + rel[1] * u_axis[1] + rel[2] * u_axis[2]
+        v_value = rel[0] * v_axis[0] + rel[1] * v_axis[1] + rel[2] * v_axis[2]
+        return (
+            -1.0e-6 <= u_value <= u_length + 1.0e-6
+            and -1.0e-6 <= v_value <= v_length + 1.0e-6
+        )
+
+    def InitializeBoundarySpaceLighting(self):
+        for particle in self.particles:
+            particle.boundary_space_light_valid = 0
+            particle.boundary_space_light_r = float(self.boundary_light_initial_rgb[0])
+            particle.boundary_space_light_g = float(self.boundary_light_initial_rgb[1])
+            particle.boundary_space_light_b = float(self.boundary_light_initial_rgb[2])
+        return len(self.boundary_light_source_metadata)
+
+    def MaterialColorRGB(self, material_id):
+        material_id = int(round(float(material_id)))
+        for material in self.run_configuration.get("material_properties", ()) or ():
+            if int(material.get("material_id", 0)) == material_id:
+                color = material.get("color", (1.0, 1.0, 1.0, 1.0))
+                return tuple(
+                    max(0.0, min(1.0, float(color[index])))
+                    for index in range(3)
+                )
+        return 1.0, 1.0, 1.0
+
+    def DepositBoundaryLight(self, target_id, rgb):
+        if not self.boundary_lighting_enabled:
+            return False
+        target_id = int(target_id)
+        if target_id < 0 or target_id >= len(self.particles):
+            return False
+        if not self.IsBoundaryParticle(target_id):
+            return False
+        particle = self.particles[target_id]
+        particle.boundary_space_light_valid = 1
+        particle.boundary_space_light_r = max(0.0, min(1.0, float(rgb[0])))
+        particle.boundary_space_light_g = max(0.0, min(1.0, float(rgb[1])))
+        particle.boundary_space_light_b = max(0.0, min(1.0, float(rgb[2])))
+        return True
+
+    def DepositBoundaryLightForMaterial(self, target_id, material_id):
+        return self.DepositBoundaryLight(target_id, self.MaterialColorRGB(material_id))
+
+    def DepositBoundaryLightForSurface(
+        self,
+        surface_type,
+        surface_id,
+        material_id,
+        position,
+    ):
+        if not self.boundary_lighting_enabled:
+            return False
+        surface_type = int(surface_type)
+        surface_id = int(surface_id)
+        position = tuple(float(value) for value in position)
+        nearest_particle_id = None
+        nearest_distance2 = None
+        for particle_id, metadata in self.boundary_light_source_metadata.items():
+            if (
+                int(metadata["surface_type"]) == surface_type
+                and int(metadata["surface_id"]) == surface_id
+            ):
+                point = self.particle_position_tuple(self.particles[particle_id])
+                dx = point[0] - position[0]
+                dy = point[1] - position[1]
+                dz = point[2] - position[2]
+                distance2 = dx * dx + dy * dy + dz * dz
+                if nearest_distance2 is None or distance2 < nearest_distance2:
+                    nearest_distance2 = distance2
+                    nearest_particle_id = int(particle_id)
+        if nearest_particle_id is None:
+            return False
+        return self.DepositBoundaryLightForMaterial(
+            nearest_particle_id,
+            material_id,
+        )
+
+    def BoundaryLightFilteredRGB(self, particle_id):
+        particle_id = int(particle_id)
+        if (
+            not self.boundary_lighting_enabled
+            or particle_id < 0
+            or particle_id >= len(self.particles)
+        ):
+            return None
+        metadata = self.boundary_light_source_metadata.get(particle_id)
+        if metadata is None:
+            return None
+        particle = self.particles[particle_id]
+        if int(getattr(particle, "boundary_space_light_valid", 0)) == 1:
+            return (
+                float(particle.boundary_space_light_r),
+                float(particle.boundary_space_light_g),
+                float(particle.boundary_space_light_b),
+            )
+
+        source_position = self.particle_position_tuple(particle)
+        source_normal = metadata["normal"]
+        total_weight = 0.0
+        total_rgb = [0.0, 0.0, 0.0]
+        for other_id, other_metadata in self.boundary_light_source_metadata.items():
+            if (
+                int(other_metadata["surface_type"]) != int(metadata["surface_type"])
+                or int(other_metadata["surface_id"]) != int(metadata["surface_id"])
+            ):
+                continue
+            other = self.particles[other_id]
+            if int(getattr(other, "boundary_space_light_valid", 0)) != 1:
+                continue
+            weight = self.BoundarySpaceLightWeight(
+                metadata,
+                source_position,
+                source_normal,
+                other_metadata,
+                self.particle_position_tuple(other),
+            )
+            if weight <= 0.0:
+                continue
+            total_weight += weight
+            total_rgb[0] += float(other.boundary_space_light_r) * weight
+            total_rgb[1] += float(other.boundary_space_light_g) * weight
+            total_rgb[2] += float(other.boundary_space_light_b) * weight
+        if total_weight <= 0.0:
+            return None
+        return tuple(value / total_weight for value in total_rgb)
+
+    def BoundarySpaceLightWeight(
+        self,
+        metadata,
+        position,
+        normal,
+        other_metadata,
+        other_position,
+    ):
+        if int(metadata["surface_type"]) == BOUNDARY_LIGHT_SURFACE_SPHERE:
+            dot_value = (
+                float(normal[0]) * float(other_metadata["normal"][0])
+                + float(normal[1]) * float(other_metadata["normal"][1])
+                + float(normal[2]) * float(other_metadata["normal"][2])
+            )
+            value = 1.0 - (
+                math.acos(max(-1.0, min(1.0, dot_value)))
+                / self.boundary_space_patch_angle
+            )
+        else:
+            dx = float(position[0]) - float(other_position[0])
+            dy = float(position[1]) - float(other_position[1])
+            dz = float(position[2]) - float(other_position[2])
+            distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+            value = 1.0 - distance / self.boundary_space_patch_radius
+        if value <= 0.0:
+            return 0.0
+        if self.boundary_space_patch_falloff == "quadratic":
+            return value * value
+        return value
 
     def _axis_vector(self, axis_name):
         axis_key = str(axis_name).strip().upper()
@@ -522,7 +867,7 @@ class ForceDynamics(ForceContactDynamics):
                 int(round(float(particle.PosLocA.z))),
             )
             for particle in self.particles
-            if float(getattr(particle, "ptype", 0.0)) > 0.5
+            if int(round(float(getattr(particle, "ptype", 0.0)))) == int(PTYPE_BOUNDARY)
         }
         radius = float(self.run_configuration.get("radius", 0.0))
         marker_count = 0
@@ -537,9 +882,10 @@ class ForceDynamics(ForceContactDynamics):
                 if marker_cell in marker_cells:
                     continue
                 marker_cells.add(marker_cell)
+                particle_id = len(self.particles)
                 self.particles.append(
                     self.create_particle(
-                        pnum=len(self.particles),
+                        pnum=particle_id,
                         rx=point[0],
                         ry=point[1],
                         rz=point[2],
@@ -550,6 +896,13 @@ class ForceDynamics(ForceContactDynamics):
                         collision_stiffness_q=0.0,
                         state_flg=0.0,
                     )
+                )
+                self.register_boundary_light_source(
+                    particle_id,
+                    BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL,
+                    int(wall_config.get("wall_flag", 0)),
+                    material_id,
+                    self._vector3(wall_config.get("normal"), f"{wall_name}.normal"),
                 )
                 marker_count += 1
         return marker_count
@@ -888,6 +1241,19 @@ class ForceDynamics(ForceContactDynamics):
         shader_flags.frameNum = fields.get("frameNum", 0.0)
         shader_flags.actualFrame = fields.get("actualFrame", 0.0)
         shader_flags.positionBuffer = fields.get("positionBuffer", 0.0)
+        shader_flags.boundaryLightingEnabled = fields.get(
+            "boundaryLightingEnabled",
+            0.0,
+        )
+        shader_flags.boundaryLightingModel = fields.get("boundaryLightingModel", 0.0)
+        shader_flags.boundaryLightSampleCount = fields.get(
+            "boundaryLightSampleCount",
+            0.0,
+        )
+        shader_flags.boundaryLightFilterAlpha = fields.get(
+            "boundaryLightFilterAlpha",
+            0.0,
+        )
         return shader_flags
 
     def create_shader_flags_from_cfg(self, run_configuration):
@@ -899,6 +1265,10 @@ class ForceDynamics(ForceContactDynamics):
             Ptot=len(self.particles),
             dt=run_configuration.get("dt", 0.0),
             positionBuffer=run_configuration.get("positionBuffer", 0.0),
+            boundaryLightingEnabled=1.0 if self.boundary_lighting_enabled else 0.0,
+            boundaryLightingModel=float(self.boundary_lighting_model),
+            boundaryLightSampleCount=float(len(self.boundary_light_source_metadata)),
+            boundaryLightFilterAlpha=0.0,
         )
 
     def ValidateInitialGeometry(self):
@@ -991,6 +1361,7 @@ class ForceDynamics(ForceContactDynamics):
         for source_id in range(len(self.particles)):
             if not self.IsMobileParticleActiveForDynamics(source_id):
                 continue
+            source_is_photon = self.IsPhotonParticle(source_id)
             if not self.ProcessPistonCollision(
                 source_id,
                 total_forces[source_id],
@@ -1015,6 +1386,8 @@ class ForceDynamics(ForceContactDynamics):
                             target_id,
                         )
                     )
+                    continue
+                if source_is_photon:
                     continue
                 if not self.IsMobileParticleActiveForDynamics(target_id):
                     continue
@@ -1059,6 +1432,12 @@ class ForceDynamics(ForceContactDynamics):
                 if self.IsPhotonParticle(source_id):
                     self.particles[source_id].colFlg = 1
                     self.particles[source_id].material_id = self.ConfiguredWallMaterialID(wall_flag)
+                    self.DepositBoundaryLightForSurface(
+                        2,
+                        wall_flag,
+                        self.particles[source_id].material_id,
+                        self.particle_position_tuple(self.particles[source_id]),
+                    )
                     continue
                 if not self.ProcessFunctionWallCollision(
                     source_id,
@@ -1348,6 +1727,8 @@ class ForceDynamics(ForceContactDynamics):
             for target_id in range(source_id + 1, len(self.particles)):
                 if not self.IsMobileParticleActiveForDynamics(target_id):
                     continue
+                if self.ShouldSkipParticlePair(source_id, target_id):
+                    continue
                 target_position = self.GetParticlePosition(target_id)
                 dx = target_position.x - source_position.x
                 dy = target_position.y - source_position.y
@@ -1369,6 +1750,8 @@ class ForceDynamics(ForceContactDynamics):
             source_position = self.GetParticlePosition(source_id)
             for target_id in range(source_id + 1, len(self.particles)):
                 if not self.IsMobileParticleActiveForDynamics(target_id):
+                    continue
+                if self.ShouldSkipParticlePair(source_id, target_id):
                     continue
                 target_position = self.GetParticlePosition(target_id)
                 dx = target_position.x - source_position.x

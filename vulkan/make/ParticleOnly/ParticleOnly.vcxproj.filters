@@ -31,6 +31,9 @@
     <Filter Include="BoundaryOnly">
       <UniqueIdentifier>{151b1289-18e8-4ac1-963d-81092e464f55}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Lighting">
+      <UniqueIdentifier>{03e807f1-55c5-4eb0-b333-584222250fb8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\libconfig\grammar.h">
@@ -257,6 +260,27 @@
     </ClInclude>
     <ClInclude Include="..\..\src\VulkanObj\ExportObject.hpp">
       <Filter>vulkanobj</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleLighting\ParticleLighting.hpp">
+      <Filter>Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleLighting\CommandLightingGraphics.hpp">
+      <Filter>Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleLighting\PipelineComputeLighting.hpp">
+      <Filter>Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleLighting\PipelineGraphicsLighting.hpp">
+      <Filter>Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleLighting\DrawParticleLighting.hpp">
+      <Filter>Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleLighting\LightingStructs.hpp">
+      <Filter>Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleLighting\ResourceLighting.hpp">
+      <Filter>Lighting</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -499,6 +523,24 @@
     </ClCompile>
     <ClCompile Include="..\..\src\VulkanObj\ExportObject.cpp">
       <Filter>vulkanobj</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleLighting\ParticleLighting.cpp">
+      <Filter>Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleLighting\CommandLightingGraphics.cpp">
+      <Filter>Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleLighting\PipelineComputeLighting.cpp">
+      <Filter>Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleLighting\PipelineGraphicsLighting.cpp">
+      <Filter>Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleLighting\DrawParticleLighting.cpp">
+      <Filter>Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleLighting\ResourceLighting.cpp">
+      <Filter>Lighting</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

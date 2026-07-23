@@ -2901,7 +2901,7 @@ are:
     \item \texttt{ptype=-2}: photon mobile particle;
     \item \texttt{ptype=-1}: reserved null particle;
     \item \texttt{ptype=0}: regular mobile particle;
-    \item \texttt{ptype>0}: boundary marker.
+    \item \texttt{ptype=2}: boundary marker.
 \end{itemize}
 
 Material \texttt{particle\_type} still appears in configuration, but it is now
@@ -2933,3 +2933,56 @@ photons in \texttt{LUMENS} mode are transparent unless their base photon
 material has \texttt{debug\_visible=true}; contacted photons use the contacted
 surface material color.  This lets photon travel be debugged without changing
 the optical collision rule and without carrying a second hit-material slot.
+
+\subsection{Lighting Ball Returns To A Clean Baseline}
+
+\subsubsection{previous form}
+
+The lighting-ball bring-up accumulated several exploratory mechanisms at
+once.  The scene configuration carried eye-aligned camera fields, old
+eye-driven lighting terms, a boundary-light sample/state path, and a
+surface-cell lighting path.  These were useful probes, but they made it hard
+to tell whether a visible color came from the photon point, a boundary
+particle, a generated surface cell, a camera/eye calculation, or material
+debug rendering.
+
+\subsubsection{current form}
+
+The active \texttt{LightingBall\_Py.inc} and
+\texttt{LightingBall\_Vk.inc} files now return to a minimal scene contract:
+\begin{itemize}
+    \item the configured analytic \texttt{Lighting\_ball} sphere;
+    \item explicit cell dimensions, death bounds, \texttt{view\_center},
+          \texttt{zoom}, and \texttt{gl\_point\_size};
+    \item one dense, x-directed photon stream;
+    \item empty configured wall-marker sections;
+    \item radius, timestep, study flags, and output prefix.
+\end{itemize}
+
+The active includes intentionally omit \texttt{align\_with\_eye},
+\texttt{eye\_view\_distance}, \texttt{lighting\_eye\_*},
+\texttt{boundary\_lighting\_*}, \texttt{boundary\_space\_*},
+\texttt{surface\_light\_*}, \texttt{flow\_angle},
+\texttt{flow\_alignment}, and \texttt{particle\_plane\_z}.  The Python
+cleanup also removes the old \texttt{BoundaryLightSample},
+\texttt{BoundaryLightState}, and visible surface-cell lighting path from the
+active runtime/generator direction.
+
+\subsubsection{difference outcome}
+
+rendering and diagnostics
+
+\subsubsection{Analysis}
+
+This cleanup is not the final lighting model.  It is a deliberate return to a
+known baseline before adding surface lighting again.  The remaining visible
+photon behavior is a diagnostic tracer: photons carry runtime behavior in
+\texttt{ptype=-2}, contact state in \texttt{colFlg}, and temporary contacted
+surface color through \texttt{material\_id}.  Boundary markers use
+\texttt{ptype=2} and remain broad-phase locality records.
+
+The next implementation target is \texttt{boundarySpaceLighting}.  It should
+start from persistent color state on existing boundary proxies and render-time
+kernel spread.  It should not restore eye-driven brightness, additive
+current-frame buffers, temporal filtering, or visible surface-cell samples
+until the minimal proxy-color path is proven.

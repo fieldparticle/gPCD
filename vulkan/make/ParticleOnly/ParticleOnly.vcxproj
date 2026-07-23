@@ -226,6 +226,13 @@
     <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceUBOSphere.hpp" />
     <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceVertexCube.hpp" />
     <ClInclude Include="..\..\src_app\ParticleBoundary\ResourceVertexSphere.hpp" />
+    <ClInclude Include="..\..\src_app\ParticleLighting\CommandLightingGraphics.hpp" />
+    <ClInclude Include="..\..\src_app\ParticleLighting\DrawParticleLighting.hpp" />
+    <ClInclude Include="..\..\src_app\ParticleLighting\LightingStructs.hpp" />
+    <ClInclude Include="..\..\src_app\ParticleLighting\ParticleLighting.hpp" />
+    <ClInclude Include="..\..\src_app\ParticleLighting\PipelineComputeLighting.hpp" />
+    <ClInclude Include="..\..\src_app\ParticleLighting\PipelineGraphicsLighting.hpp" />
+    <ClInclude Include="..\..\src_app\ParticleLighting\ResourceLighting.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\CommandParticleCompute.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\CommandParticleGraphics.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\ContainerCompute.hpp" />
@@ -332,6 +339,12 @@
     <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceUBOSphere.cpp" />
     <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceVertexCube.cpp" />
     <ClCompile Include="..\..\src_app\ParticleBoundary\ResourceVertexSphere.cpp" />
+    <ClCompile Include="..\..\src_app\ParticleLighting\CommandLightingGraphics.cpp" />
+    <ClCompile Include="..\..\src_app\ParticleLighting\DrawParticleLighting.cpp" />
+    <ClCompile Include="..\..\src_app\ParticleLighting\ParticleLighting.cpp" />
+    <ClCompile Include="..\..\src_app\ParticleLighting\PipelineComputeLighting.cpp" />
+    <ClCompile Include="..\..\src_app\ParticleLighting\PipelineGraphicsLighting.cpp" />
+    <ClCompile Include="..\..\src_app\ParticleLighting\ResourceLighting.cpp" />
     <ClCompile Include="..\..\src_app\particleOnly\CommandParticleCompute.cpp" />
     <ClCompile Include="..\..\src_app\particleOnly\CommandParticleGraphics.cpp" />
     <ClCompile Include="..\..\src_app\particleOnly\ConfigGetSettings.cpp" />

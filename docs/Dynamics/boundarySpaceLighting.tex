@@ -1,0 +1,271 @@
+% !TeX root = main.tex
+\newpage
+\section{Boundary-Space Lighting}
+
+\subsection{Purpose}
+
+Boundary-space lighting is the revised direction for \texttt{LightingBall}
+surface illumination.  The goal is to light part of an analytic or implicit
+surface without adding triangles, visible surface-cell geometry, or dense
+boundary rendering particles.
+
+This is the next implementation target, not part of the current cleaned
+\texttt{LightingBall} baseline.  The active \texttt{LightingBall\_Py.inc} and
+\texttt{LightingBall\_Vk.inc} files intentionally omit boundary-space
+configuration until the minimal tracer scene is stable again.
+
+The important separation is:
+\begin{itemize}
+    \item photons transport color and discover surface contact;
+    \item boundary particles represent surface patches contained by spatial
+          cells;
+    \item the boundary particle stores the persistent color state for that
+          patch;
+    \item rendering spreads that stored color over nearby surface samples by
+          a kernel.
+\end{itemize}
+
+This keeps the renderer particle-based while allowing a finite region of a
+surface to remain lit after a photon contact.
+
+\subsection{Boundary Particle As Surface Proxy}
+
+A boundary particle is not an infinitesimal lit dot.  In this model it is the
+representative for the portion of surface contained in or discovered through
+its cell.  A photon may hit the analytic sphere or wall at a point, but the
+lighting state is stored on the boundary proxy associated with that local
+surface region.
+
+Conceptually:
+\begin{verbatim}
+cell contains a small surface patch
+boundary particle represents that patch
+photon hits anywhere in that patch
+boundary particle stores the patch color
+renderer samples nearby patch colors
+\end{verbatim}
+
+The boundary particle keeps its base material identity.  The stored light color
+is separate state:
+\begin{verbatim}
+material_id          = base surface material
+boundary_space_light_rgb    = persistent lit color
+boundary_space_light_valid  = whether the patch has received light
+\end{verbatim}
+
+The base material still answers what the surface is.  The boundary-space light
+state answers what color that surface patch is currently emitting or showing.
+
+\subsection{Photon Hit Rule}
+
+The first rule should be intentionally simple:
+\begin{verbatim}
+photon hits surface proxy
+proxy boundary_space_light_rgb = contacted material color
+proxy boundary_space_light_valid = true
+\end{verbatim}
+
+The color does not clear every compute frame.  It persists until another photon
+updates the same proxy.  This is a color-state rule, not an energy-accumulation
+rule.
+
+Because the first model sets color instead of adding energy, no atomic add is
+required.  If two photons write the same proxy in the same compute dispatch,
+the first implementation may accept last-writer-wins behavior.  If later work
+requires additive light transport, then atomic accumulation can be introduced
+as a separate, deliberate feature.
+
+\subsection{Surface Spread Without Triangles}
+
+The stored color spreads across the visible surface at sample/render time.  A
+boundary proxy contributes color to nearby surface points according to an
+influence radius and falloff kernel.
+
+For a sphere, the natural distance is angular.  Given a lit proxy at position
+\(\mathbf b\), a rendered surface point at \(\mathbf p\), and sphere center
+\(\mathbf c\):
+\[
+    \mathbf n_b =
+    \frac{\mathbf b-\mathbf c}{\lVert \mathbf b-\mathbf c\rVert},
+    \qquad
+    \mathbf n_p =
+    \frac{\mathbf p-\mathbf c}{\lVert \mathbf p-\mathbf c\rVert}.
+\]
+
+The angular separation is:
+\[
+    \theta =
+    \arccos(\mathrm{clamp}(\mathbf n_b \cdot \mathbf n_p,-1,1)).
+\]
+
+A simple linear kernel is:
+\[
+    w =
+    \max\left(0, 1 - \frac{\theta}{\theta_L}\right),
+\]
+where \(\theta_L\) is the configured lighting patch angle.  A smoother kernel
+can square the result:
+\[
+    w =
+    \max\left(0, 1 - \frac{\theta}{\theta_L}\right)^2.
+\]
+
+The rendered color at \(\mathbf p\) is then derived from the nearby valid
+boundary proxies:
+\[
+    \mathbf L(\mathbf p) =
+    \frac{\sum_i w_i \mathbf C_i}{\max(\sum_i w_i,\epsilon)}.
+\]
+
+This gives a continuous lit region without drawing triangles or surface-cell
+points.  The only visible geometry remains the existing particle/boundary
+rendering path.
+
+\subsection{Wall Spread}
+
+For a rectangle wall, the same idea uses local wall coordinates rather than
+spherical angle.  A wall has an origin, two surface axes, and dimensions.  A
+point on the wall is projected into local coordinates:
+\[
+    u = (\mathbf p-\mathbf o)\cdot \mathbf a_u,
+    \qquad
+    v = (\mathbf p-\mathbf o)\cdot \mathbf a_v.
+\]
+
+The distance from a lit boundary proxy to a rendered wall point is measured in
+the \((u,v)\) plane.  The same kernel form can be used:
+\[
+    w =
+    \max\left(0, 1 - \frac{r}{R_L}\right)^2.
+\]
+
+\subsection{No Per-Frame Clear}
+
+Boundary-space lighting is persistent.  It should not clear all light each
+compute frame.  The state only changes when a photon hit writes a new patch
+color, or when a later optional decay/filtering rule is enabled.
+
+The first lifecycle is:
+\begin{enumerate}
+    \item initialize every boundary proxy with no valid light;
+    \item photon contact writes the contacted material color into one boundary
+          proxy;
+    \item rendering samples nearby valid proxies and spreads their colors;
+    \item a later photon may overwrite the proxy color.
+\end{enumerate}
+
+This is different from the previous boundary-light-buffer idea, where
+\texttt{current} was cleared every frame and \texttt{filtered} was blended
+over time.
+
+\subsection{Future Configuration}
+
+The first useful configuration items, when this model is reintroduced, are:
+\begin{verbatim}
+boundary_space_lighting_enabled = true;
+boundary_space_patch_angle = 0.20;
+boundary_space_patch_radius = 0.50;
+boundary_space_patch_falloff = "quadratic";
+\end{verbatim}
+
+\texttt{boundary\_space\_patch\_angle} applies to spherical surfaces.
+\texttt{boundary\_space\_patch\_radius} applies to planar wall surfaces.
+Only the appropriate value is used for a given surface type.
+
+\subsection{Python First Implementation Target}
+
+Python can prove the model without changing the binary particle record.  Runtime
+fields can be attached to boundary particles:
+\begin{verbatim}
+particle.boundary_space_light_valid = True
+particle.boundary_space_light_rgb = (r, g, b)
+\end{verbatim}
+
+Photon contact handling should:
+\begin{enumerate}
+    \item identify the boundary proxy or analytic surface proxy;
+    \item read the contacted surface material color;
+    \item write that color into the proxy's persistent light state;
+    \item leave photon debug color behavior separate.
+\end{enumerate}
+
+Rendering should:
+\begin{enumerate}
+    \item keep drawing existing boundary particles or analytic surface markers;
+    \item for each rendered surface marker, gather nearby valid boundary-space
+          light proxies;
+    \item blend the material base color with the sampled boundary-space light;
+    \item avoid drawing invisible surface-cell grids.
+\end{enumerate}
+
+\subsection{Point-List Rendering}
+
+The Vulkan renderer currently uses:
+\begin{verbatim}
+inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+\end{verbatim}
+
+This topology does not interpolate color across a triangulated surface.  Each
+boundary particle is submitted as a point primitive.  The spread across a
+surface therefore has two separate parts:
+\begin{itemize}
+    \item surface-space color spread is computed by sampling nearby lit
+          boundary proxies;
+    \item screen-space patch shape is produced by rendering each point as a
+          soft point sprite.
+\end{itemize}
+
+The vertex shader should choose the boundary particle's color by applying the
+boundary-space kernel to nearby persistent proxy colors.  It should also set
+\texttt{gl\_PointSize} large enough for the proxy to represent its cell-local
+surface patch.
+
+The fragment shader should use \texttt{gl\_PointCoord} to shape that point
+primitive into a soft circular patch instead of a hard square:
+\begin{verbatim}
+vec2 p = gl_PointCoord * 2.0 - 1.0;
+float r2 = dot(p, p);
+if (r2 > 1.0) {
+    discard;
+}
+float alpha = pow(max(0.0, 1.0 - r2), patchFalloff);
+\end{verbatim}
+
+The final fragment color is the boundary-space lighting color multiplied by
+this alpha.  This does not create triangles and does not create a visible
+surface grid.  It lets a boundary particle behave as a finite soft surface
+patch while preserving the point-list pipeline.
+
+\subsection{Vulkan Implication}
+
+The Vulkan version does not need an additive SSBO for the first implementation.
+It needs persistent boundary-space light state associated with boundary
+particles or with a compact boundary-proxy table:
+\begin{verbatim}
+boundary_space_light_valid
+boundary_space_light_rgb
+surface_id
+surface_type
+normal or local surface coordinate
+\end{verbatim}
+
+Photon contact writes the proxy color.  Boundary rendering reads nearby proxy
+colors and applies the spread kernel.  The fragment shader then uses
+\texttt{gl\_PointCoord} to render each lit point as a soft circular patch.
+Atomics are not required unless a future model changes from last-writer-wins
+color state to additive energy accumulation.
+
+\subsection{Decision}
+
+The next lighting implementation should retire visible surface-cell rendering.
+The target is boundary-space lighting:
+\[
+    \textrm{photon hit}
+    \rightarrow
+    \textrm{persistent boundary proxy color}
+    \rightarrow
+    \textrm{kernel-spread surface sample color}.
+\]
+
+This preserves the useful lesson from surface cells--lighting must belong to
+surface space--without introducing triangles or a visible fake surface mesh.

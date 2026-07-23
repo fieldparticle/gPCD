@@ -59,6 +59,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 	m_Particles				= {};
 	m_BindPoint				= BindPoint;
 	m_SideLength			= 0;
+	m_NumBoundaryParticles  = 0;
 
 	CreateLayout();
 
@@ -153,7 +154,8 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 
 		if (part_pos.ptype > 0.5)
 			BoundaryParticleLimit++;
-
+		if (part_pos.ptype == 2.0)
+			m_NumBoundaryParticles++;
 		count++;
 
 		m_NumParticles++;

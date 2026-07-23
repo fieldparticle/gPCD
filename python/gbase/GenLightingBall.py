@@ -1,5 +1,6 @@
 import math
 
+from gbase.BoundaryLighting import BOUNDARY_LIGHT_SURFACE_SPHERE
 from gbase.GenStreaming import GenStreaming
 
 
@@ -40,6 +41,12 @@ class GenLightingBall(GenStreaming):
             return 0
 
         center, ball_radius, material_id = lighting_ball
+        raw_lighting_ball = self.itemcfg.get("Lighting_ball")
+        wall_flag = int(
+            raw_lighting_ball.get("wall_flag", 1000)
+            if hasattr(raw_lighting_ball, "get")
+            else self.itemcfg.get("lighting_ball_wall_flag", 1000)
+        )
         surface_spacing = 1.0
         theta_count = max(4, int(math.ceil(math.pi * ball_radius / surface_spacing)))
         marker_cells = set()
@@ -94,6 +101,13 @@ class GenLightingBall(GenStreaming):
                 particle.vx = normal_x / normal_length
                 particle.vy = normal_y / normal_length
                 particle.vz = normal_z / normal_length
+                self.register_boundary_light_source(
+                    particle.pnum,
+                    BOUNDARY_LIGHT_SURFACE_SPHERE,
+                    wall_flag,
+                    material_id,
+                    (particle.vx, particle.vy, particle.vz),
+                )
                 added_count += 1
 
         report_text = (

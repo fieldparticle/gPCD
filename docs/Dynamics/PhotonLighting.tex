@@ -1,0 +1,1067 @@
+
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    columns=fullflexible,
+    showstringspaces=false
+}
+
+\title{Photon-Particle Lighting Implementation}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Purpose}
+
+The current simulation represents light using photon particles emitted from a
+source. Each photon travels at a fixed speed, may pass through other photons,
+and interacts only with simulation boundaries.
+
+Rendering the photons directly does not produce satisfactory illumination
+because the photon distribution is too sparse. Individual photons appear as
+isolated points or streaks rather than producing a continuous illuminated
+surface.
+
+The lighting system should therefore separate the following two functions:
+
+\begin{enumerate}
+    \item Photon particles transport light through the simulation.
+    \item Boundary surfaces accumulate and display light received from photon
+    impacts.
+\end{enumerate}
+
+Photon visibility and boundary illumination must be treated as separate
+rendering calculations.
+
+\section{Required Lighting Model}
+
+The recommended system is based on boundary light deposition.
+
+The required sequence is:
+
+\begin{enumerate}
+    \item Emit photon particles from the light source.
+    \item Move each photon at its prescribed fixed speed.
+    \item Detect photon collisions with boundaries.
+    \item Determine the boundary position and boundary normal at the collision.
+    \item Calculate the amount of light deposited by the photon.
+    \item Spread the deposited light over a local boundary region.
+    \item Accumulate the light contribution in a boundary-light buffer.
+    \item Apply temporal persistence or averaging to reduce noise.
+    \item Render the boundary using the accumulated illumination.
+    \item Optionally render a subset of photon particles as visual tracers.
+\end{enumerate}
+
+The photon particles are therefore transport samples. They do not need to be
+dense enough to visually fill the illuminated region.
+
+\section{Separation of Photon Visibility and Surface Illumination}
+
+The existing photon brightness calculation is based on how closely the photon
+direction points toward the eye. This is appropriate only when deciding how
+visible a photon tracer should be.
+
+It is not the correct calculation for determining how much light the photon
+deposits onto a boundary.
+
+\subsection{Photon Tracer Visibility}
+
+For rendering an optional visible photon tracer, define
+
+\begin{equation}
+    \mathbf{v}_{e}
+    =
+    \frac{\mathbf{x}_{e}-\mathbf{x}_{p}}
+    {\left\|\mathbf{x}_{e}-\mathbf{x}_{p}\right\|},
+\end{equation}
+
+where
+
+\begin{itemize}
+    \item $\mathbf{x}_{e}$ is the eye or camera position,
+    \item $\mathbf{x}_{p}$ is the photon position,
+    \item $\mathbf{d}_{p}$ is the normalized photon travel direction.
+\end{itemize}
+
+The photon tracer brightness may be calculated as
+
+\begin{equation}
+    I_{\mathrm{tracer}}
+    =
+    I_{\min}
+    +
+    \left(1-I_{\min}\right)
+    \left[
+        \max\left(
+            \mathbf{d}_{p}\cdot\mathbf{v}_{e},
+            0
+        \right)
+    \right]^{q},
+\end{equation}
+
+where $q$ controls the angular concentration of the visible tracer.
+
+This value affects only the appearance of the photon particle itself.
+
+\subsection{Boundary Illumination}
+
+When the photon strikes a boundary, the deposited illumination should depend on
+the incidence angle between the incoming photon direction and the outward
+boundary normal.
+
+Let
+
+\begin{itemize}
+    \item $\mathbf{d}_{p}$ be the normalized photon direction of travel,
+    \item $\mathbf{n}_{b}$ be the outward boundary normal,
+    \item $E_{p}$ be the photon energy or intensity weight.
+\end{itemize}
+
+The incidence factor is
+
+\begin{equation}
+    C_{\mathrm{incidence}}
+    =
+    \max\left(
+        -\mathbf{d}_{p}\cdot\mathbf{n}_{b},
+        0
+    \right).
+\end{equation}
+
+The deposited light is then
+
+\begin{equation}
+    E_{\mathrm{deposit}}
+    =
+    E_{p}C_{\mathrm{incidence}}.
+\end{equation}
+
+This calculation is independent of the camera position.
+
+\section{Required Data Structures}
+
+\subsection{Photon Structure}
+
+Each photon requires at least the following state:
+
+\begin{lstlisting}[language=C++]
+struct PhotonParticle
+{
+    glm::vec4 position;      // xyz = world position
+    glm::vec4 direction;     // xyz = normalized travel direction
+    glm::vec4 colorEnergy;   // rgb = photon color, w = photon energy
+    uint32_t active;         // 1 = active, 0 = inactive
+    uint32_t emitterIndex;
+    uint32_t generation;
+    uint32_t padding;
+};
+\end{lstlisting}
+
+The direction should remain normalized. The photon velocity can be reconstructed
+using
+
+\begin{equation}
+    \mathbf{v}_{p}
+    =
+    c_{p}\mathbf{d}_{p},
+\end{equation}
+
+where $c_{p}$ is the fixed simulation photon speed.
+
+If every photon uses the same speed, the speed does not need to be stored in
+each photon structure.
+
+\subsection{Boundary-Light Structure}
+
+Each renderable boundary element requires a stored illumination value.
+
+A boundary element may be one of the following:
+
+\begin{itemize}
+    \item a boundary particle,
+    \item a boundary vertex,
+    \item a surface cell,
+    \item a triangle,
+    \item an analytic boundary sample.
+\end{itemize}
+
+A general boundary-light structure is:
+
+\begin{lstlisting}[language=C++]
+struct BoundaryLight
+{
+    glm::vec4 accumulatedLight; // rgb = accumulated illumination
+    glm::vec4 filteredLight;    // rgb = temporally filtered illumination
+};
+\end{lstlisting}
+
+If atomic floating-point vector operations are not available, the channels may
+be stored separately:
+
+\begin{lstlisting}[language=C++]
+struct BoundaryLightAtomic
+{
+    uint32_t red;
+    uint32_t green;
+    uint32_t blue;
+    uint32_t hitCount;
+};
+\end{lstlisting}
+
+The integer values may represent scaled fixed-point illumination.
+
+For example,
+
+\begin{equation}
+    I_{\mathrm{integer}}
+    =
+    \operatorname{round}
+    \left(
+        S_{\mathrm{light}}I_{\mathrm{float}}
+    \right),
+\end{equation}
+
+where $S_{\mathrm{light}}$ is a fixed scaling factor.
+
+\subsection{Photon-Collision Result}
+
+The photon-boundary collision stage should produce sufficient information for
+the deposition stage.
+
+\begin{lstlisting}[language=C++]
+struct PhotonBoundaryHit
+{
+    uint32_t photonIndex;
+    uint32_t boundaryIndex;
+
+    glm::vec4 hitPosition;     // xyz = world-space collision position
+    glm::vec4 boundaryNormal;  // xyz = outward normalized normal
+
+    float incidence;
+    float depositedEnergy;
+    uint32_t valid;
+    uint32_t padding;
+};
+\end{lstlisting}
+
+This structure may be stored explicitly, or the deposition may be performed
+immediately inside the collision shader.
+
+Immediate deposition avoids the need for an intermediate hit buffer, but an
+explicit hit buffer may be useful during debugging.
+
+\section{GPU Buffers}
+
+The implementation should provide the following GPU buffers.
+
+\begin{enumerate}
+    \item Photon particle buffer.
+    \item Boundary geometry or boundary-particle buffer.
+    \item Current-frame boundary-light deposition buffer.
+    \item Temporally filtered boundary-light buffer.
+    \item Optional photon-boundary hit buffer.
+    \item Optional debug counter buffer.
+\end{enumerate}
+
+A possible Vulkan buffer organization is:
+
+\begin{lstlisting}[language=C++]
+VkBuffer photonBuffer;
+VkBuffer boundaryBuffer;
+
+VkBuffer boundaryLightCurrentBuffer;
+VkBuffer boundaryLightFilteredBuffer;
+
+VkBuffer photonHitBuffer;       // optional
+VkBuffer photonDebugBuffer;     // optional
+\end{lstlisting}
+
+The current light buffer is cleared before each deposition pass. The filtered
+light buffer persists across frames.
+
+\section{Photon Motion}
+
+Photon motion should remain independent of lighting accumulation.
+
+For each active photon,
+
+\begin{equation}
+    \mathbf{x}_{p}^{n+1}
+    =
+    \mathbf{x}_{p}^{n}
+    +
+    c_{p}\mathbf{d}_{p}\Delta t.
+\end{equation}
+
+Photons may pass through other photons. Therefore, no photon-photon collision
+test is required.
+
+Only boundary intersections must be detected.
+
+Depending on the current simulation design, boundary collision detection may
+use:
+
+\begin{itemize}
+    \item boundary particles,
+    \item analytic boundary equations,
+    \item grid occupancy,
+    \item triangle intersections,
+    \item signed-distance functions.
+\end{itemize}
+
+The lighting implementation should use the same collision result already used
+to reflect, absorb, or terminate the photon.
+
+\section{Boundary Interaction}
+
+At a boundary collision, the implementation must determine the desired photon
+behavior.
+
+The supported behaviors may include:
+
+\begin{enumerate}
+    \item absorption,
+    \item reflection,
+    \item partial absorption and reflection,
+    \item photon termination,
+    \item photon rebirth at the emitter.
+\end{enumerate}
+
+A boundary material may contain:
+
+\begin{lstlisting}[language=C++]
+struct BoundaryOpticalMaterial
+{
+    glm::vec4 baseColor;   // rgb = surface color
+    float absorption;     // fraction absorbed
+    float reflection;     // fraction reflected
+    float roughness;
+    float padding;
+};
+\end{lstlisting}
+
+The deposited energy may be calculated as
+
+\begin{equation}
+    E_{\mathrm{deposit}}
+    =
+    E_{p}
+    C_{\mathrm{incidence}}
+    A_{b},
+\end{equation}
+
+where $A_{b}$ is the material absorption factor.
+
+For a fully absorbing boundary,
+
+\begin{equation}
+    A_{b}=1.
+\end{equation}
+
+For a partially reflective boundary,
+
+\begin{equation}
+    0 < A_{b} < 1.
+\end{equation}
+
+The remaining photon energy is
+
+\begin{equation}
+    E_{p}^{\mathrm{new}}
+    =
+    E_{p}
+    \left(
+        1-A_{b}
+    \right).
+\end{equation}
+
+\section{Spatial Light Deposition}
+
+Depositing the entire photon contribution into one boundary sample will produce
+visible speckling. Each photon hit should therefore distribute its energy over
+a neighborhood of boundary samples.
+
+Let $\mathbf{x}_{h}$ be the photon hit position and $\mathbf{x}_{j}$ be the
+position of neighboring boundary sample $j$.
+
+Define
+
+\begin{equation}
+    r_{j}
+    =
+    \left\|
+        \mathbf{x}_{j}
+        -
+        \mathbf{x}_{h}
+    \right\|.
+\end{equation}
+
+Only samples within an influence radius $R_{L}$ receive light.
+
+A compact quadratic kernel is recommended:
+
+\begin{equation}
+    q_{j}
+    =
+    \frac{r_{j}}{R_{L}},
+\end{equation}
+
+\begin{equation}
+    w_{j}
+    =
+    \begin{cases}
+        \left(1-q_{j}\right)^{2},
+        & q_{j}<1,\\
+        0,
+        & q_{j}\geq 1.
+    \end{cases}
+\end{equation}
+
+The light contribution to boundary sample $j$ is
+
+\begin{equation}
+    \Delta \mathbf{L}_{j}
+    =
+    w_{j}
+    E_{\mathrm{deposit}}
+    \mathbf{C}_{p},
+\end{equation}
+
+where $\mathbf{C}_{p}$ is the photon color.
+
+The weights should preferably be normalized:
+
+\begin{equation}
+    \widehat{w}_{j}
+    =
+    \frac{w_{j}}
+    {\sum_{k}w_{k}+\epsilon}.
+\end{equation}
+
+The normalized contribution becomes
+
+\begin{equation}
+    \Delta \mathbf{L}_{j}
+    =
+    \widehat{w}_{j}
+    E_{\mathrm{deposit}}
+    \mathbf{C}_{p}.
+\end{equation}
+
+Normalization prevents the total deposited light from increasing when more
+boundary samples are found inside the influence radius.
+
+\section{Finding Neighboring Boundary Samples}
+
+The implementation needs a method for finding boundary samples near the photon
+hit location.
+
+The preferred method is to reuse the existing spatial cell structure.
+
+The procedure is:
+
+\begin{enumerate}
+    \item Convert the photon hit position to a spatial cell index.
+    \item Inspect the hit cell and immediately adjacent cells.
+    \item Read the boundary samples stored in those cells.
+    \item Calculate the distance from each candidate boundary sample to the hit.
+    \item Apply the deposition kernel when the distance is less than $R_{L}$.
+\end{enumerate}
+
+Because the existing particle framework already uses grid-cell occupancy, the
+light-deposition system should avoid introducing an independent neighborhood
+search unless necessary.
+
+\section{Atomic Accumulation}
+
+Multiple photons may deposit light into the same boundary sample during one
+dispatch. The accumulation operation must therefore be atomic.
+
+Conceptually:
+
+\begin{lstlisting}[language=C++]
+atomicAdd(
+    boundaryLightCurrent[boundaryIndex].red,
+    depositedRed
+);
+
+atomicAdd(
+    boundaryLightCurrent[boundaryIndex].green,
+    depositedGreen
+);
+
+atomicAdd(
+    boundaryLightCurrent[boundaryIndex].blue,
+    depositedBlue
+);
+\end{lstlisting}
+
+If shader atomic floating-point operations are supported, floating-point
+accumulation may be used directly.
+
+Otherwise, use fixed-point integers:
+
+\begin{lstlisting}[language=C++]
+uint encodedRed =
+    uint(max(redContribution, 0.0) * LIGHT_SCALE);
+
+atomicAdd(
+    boundaryLightCurrent[boundaryIndex].red,
+    encodedRed
+);
+\end{lstlisting}
+
+The render or filtering pass converts the stored integer value back to a
+floating-point value.
+
+\section{Temporal Accumulation}
+
+Even with spatial spreading, sparse photon samples may cause frame-to-frame
+noise. The illumination should therefore be filtered over time.
+
+Let
+
+\begin{itemize}
+    \item $\mathbf{L}_{j}^{n}$ be the previous filtered light,
+    \item $\mathbf{D}_{j}^{n+1}$ be the current-frame deposited light,
+    \item $\alpha$ be the current-frame contribution factor.
+\end{itemize}
+
+Use
+
+\begin{equation}
+    \mathbf{L}_{j}^{n+1}
+    =
+    \left(1-\alpha\right)
+    \mathbf{L}_{j}^{n}
+    +
+    \alpha
+    \mathbf{D}_{j}^{n+1}.
+\end{equation}
+
+For strong smoothing, use a small $\alpha$, such as
+
+\begin{equation}
+    0.02 \leq \alpha \leq 0.10.
+\end{equation}
+
+An alternative persistence form is
+
+\begin{equation}
+    \mathbf{L}_{j}^{n+1}
+    =
+    \lambda
+    \mathbf{L}_{j}^{n}
+    +
+    \mathbf{D}_{j}^{n+1},
+\end{equation}
+
+where $\lambda$ is typically close to one.
+
+For example,
+
+\begin{equation}
+    0.90 \leq \lambda \leq 0.99.
+\end{equation}
+
+The normalized exponential-moving-average form is generally easier to control
+because the illumination does not grow indefinitely under constant lighting.
+
+\section{Light-Buffer Normalization}
+
+The current-frame deposited light depends on the number of emitted photon
+samples. Increasing the photon count should not automatically make the physical
+light source brighter unless explicitly intended.
+
+The deposited illumination should therefore be normalized by the photon
+sampling rate.
+
+If the emitter represents a total light intensity $P_{e}$ and emits $N_{p}$
+photons per sampling interval, assign each photon
+
+\begin{equation}
+    E_{p}
+    =
+    \frac{P_{e}}{N_{p}}.
+\end{equation}
+
+This allows the photon count to control sampling quality without changing total
+emitter intensity.
+
+\section{Boundary Rendering}
+
+The boundary fragment shader should read the filtered illumination value for the
+associated boundary sample.
+
+A basic rendering equation is
+
+\begin{equation}
+    \mathbf{C}_{\mathrm{final}}
+    =
+    \mathbf{C}_{\mathrm{base}}
+    \left(
+        A_{\mathrm{ambient}}
+        +
+        G\mathbf{L}_{\mathrm{filtered}}
+    \right),
+\end{equation}
+
+where
+
+\begin{itemize}
+    \item $\mathbf{C}_{\mathrm{base}}$ is the boundary base color,
+    \item $A_{\mathrm{ambient}}$ is a small ambient term,
+    \item $G$ is an exposure or gain factor,
+    \item $\mathbf{L}_{\mathrm{filtered}}$ is accumulated photon illumination.
+\end{itemize}
+
+In GLSL:
+
+\begin{lstlisting}[language=C++]
+vec3 baseColor = boundaryMaterial.baseColor.rgb;
+vec3 photonLight = boundaryLightFiltered[boundaryIndex].rgb;
+
+vec3 finalColor =
+    baseColor *
+    (ambientLevel + photonLight * lightExposure);
+
+outColor = vec4(finalColor, 1.0);
+\end{lstlisting}
+
+A tone-mapping operation may be applied when illumination values have a large
+range:
+
+\begin{equation}
+    \mathbf{C}_{\mathrm{mapped}}
+    =
+    \frac{\mathbf{C}}
+    {\mathbf{C}+\mathbf{1}}.
+\end{equation}
+
+In GLSL:
+
+\begin{lstlisting}[language=C++]
+finalColor = finalColor / (finalColor + vec3(1.0));
+\end{lstlisting}
+
+\section{Optional Directional Information}
+
+If desired, each boundary-light sample may also accumulate the incoming photon
+direction.
+
+Add the following values:
+
+\begin{lstlisting}[language=C++]
+struct BoundaryLightDirectional
+{
+    glm::vec4 accumulatedLight;
+    glm::vec4 accumulatedDirection;
+};
+\end{lstlisting}
+
+For each photon hit:
+
+\begin{equation}
+    \Delta \mathbf{D}_{j}
+    =
+    \widehat{w}_{j}
+    E_{\mathrm{deposit}}
+    \left(
+        -\mathbf{d}_{p}
+    \right).
+\end{equation}
+
+The average incoming-light direction is
+
+\begin{equation}
+    \overline{\mathbf{D}}_{j}
+    =
+    \frac{\mathbf{D}_{j}}
+    {\left\|\mathbf{D}_{j}\right\|+\epsilon}.
+\end{equation}
+
+This direction may be used for additional diffuse or specular surface shading.
+
+However, directional accumulation is optional. The first implementation should
+accumulate color and intensity only.
+
+\section{Optional Photon Tracers}
+
+Photon tracers may still be rendered to show the light transport paths.
+
+They should not be responsible for illuminating the surface.
+
+To reduce clutter and rendering cost, render only a subset of the simulated
+photons.
+
+For example:
+
+\begin{lstlisting}[language=C++]
+bool renderPhoton =
+    (photonIndex % tracerSamplingInterval) == 0;
+\end{lstlisting}
+
+The tracer color may use the eye-alignment equation described previously.
+
+A radial point-sprite falloff may be used:
+
+\begin{lstlisting}[language=C++]
+vec2 point = gl_PointCoord * 2.0 - 1.0;
+float radiusSquared = dot(point, point);
+
+if (radiusSquared > 1.0)
+{
+    discard;
+}
+
+float radialWeight = exp(-4.0 * radiusSquared);
+
+vec3 toEye =
+    normalize(cameraPosition - photonPosition);
+
+float alignment =
+    max(dot(photonDirection, toEye), 0.0);
+
+float angularWeight =
+    minimumTracerBrightness +
+    (1.0 - minimumTracerBrightness) *
+    pow(alignment, tracerExponent);
+
+float alpha = radialWeight * angularWeight;
+\end{lstlisting}
+
+Additive blending may be used for the optional photon tracers.
+
+\section{Recommended GPU Pass Order}
+
+The recommended frame sequence is:
+
+\begin{enumerate}
+    \item Clear the current-frame boundary-light buffer.
+    \item Update photon positions.
+    \item Detect photon-boundary collisions.
+    \item Deposit photon energy into nearby boundary samples.
+    \item Apply photon reflection, termination, or rebirth.
+    \item Insert a synchronization barrier.
+    \item Temporally filter the current boundary illumination.
+    \item Insert a synchronization barrier.
+    \item Render boundaries using the filtered illumination buffer.
+    \item Optionally render photon tracers.
+\end{enumerate}
+
+A conceptual pipeline is:
+
+\begin{lstlisting}
+Clear Current Light Buffer
+            |
+            v
+Update Photon Positions
+            |
+            v
+Detect Boundary Hits
+            |
+            v
+Deposit Light into Boundary Samples
+            |
+            v
+Temporal Filtering
+            |
+            v
+Render Illuminated Boundaries
+            |
+            v
+Render Optional Photon Tracers
+\end{lstlisting}
+
+\section{Synchronization Requirements}
+
+The deposition pass writes the current boundary-light buffer.
+
+The temporal filtering pass reads the current boundary-light buffer and writes
+the filtered-light buffer.
+
+The boundary rendering pass reads the filtered-light buffer.
+
+Required dependencies are therefore:
+
+\begin{enumerate}
+    \item Deposition shader writes must be visible to the filtering shader.
+    \item Filtering shader writes must be visible to the graphics shader.
+\end{enumerate}
+
+In Vulkan, appropriate compute-to-compute and compute-to-graphics barriers must
+be inserted.
+
+Conceptually:
+
+\begin{lstlisting}[language=C++]
+Photon deposition:
+    shader write -> boundaryLightCurrentBuffer
+
+Barrier:
+    compute shader write
+    to compute shader read
+
+Temporal filtering:
+    read boundaryLightCurrentBuffer
+    write boundaryLightFilteredBuffer
+
+Barrier:
+    compute shader write
+    to vertex/fragment shader read
+
+Boundary rendering:
+    read boundaryLightFilteredBuffer
+\end{lstlisting}
+
+The exact stage and access masks should match the shader stages that read and
+write each buffer.
+
+\section{Double Buffering}
+
+If the temporal filter reads and writes the same illumination array, a race may
+occur between workgroups.
+
+The preferred solution is to use two filtered-light buffers:
+
+\begin{lstlisting}[language=C++]
+VkBuffer boundaryLightFilteredPrevious;
+VkBuffer boundaryLightFilteredNext;
+\end{lstlisting}
+
+The temporal filter reads the previous buffer and writes the next buffer:
+
+\begin{equation}
+    \mathbf{L}_{\mathrm{next}}
+    =
+    \left(1-\alpha\right)
+    \mathbf{L}_{\mathrm{previous}}
+    +
+    \alpha
+    \mathbf{D}_{\mathrm{current}}.
+\end{equation}
+
+After the filtering dispatch, swap the two buffer handles.
+
+This avoids in-place read-write hazards.
+
+\section{Debugging Outputs}
+
+The first implementation should include optional debug counters.
+
+Recommended counters include:
+
+\begin{itemize}
+    \item number of active photons,
+    \item number of boundary collisions,
+    \item number of valid light deposits,
+    \item number of photons terminated,
+    \item number of photons reflected,
+    \item total deposited fixed-point energy,
+    \item maximum illumination value,
+    \item number of failed boundary-neighbor searches.
+\end{itemize}
+
+A possible structure is:
+
+\begin{lstlisting}[language=C++]
+struct PhotonLightingDebug
+{
+    uint32_t activePhotonCount;
+    uint32_t collisionCount;
+    uint32_t depositCount;
+    uint32_t terminatedCount;
+
+    uint32_t reflectedCount;
+    uint32_t failedNeighborSearchCount;
+    uint32_t maximumEncodedLight;
+    uint32_t padding;
+};
+\end{lstlisting}
+
+These counters should be reset before each debug frame.
+
+\section{Implementation Stages}
+
+The implementation should be completed incrementally.
+
+\subsection{Stage 1: Single-Sample Deposition}
+
+Implement:
+
+\begin{itemize}
+    \item photon-boundary hit detection,
+    \item incidence-angle calculation,
+    \item atomic deposit into the directly hit boundary sample,
+    \item boundary rendering using the light buffer.
+\end{itemize}
+
+Do not initially implement spatial smoothing or temporal filtering.
+
+This stage verifies that light is deposited on the correct boundary and that the
+direction sign is correct.
+
+\subsection{Stage 2: Temporal Filtering}
+
+Add:
+
+\begin{itemize}
+    \item previous and next filtered-light buffers,
+    \item exponential moving average,
+    \item filtered-light buffer swapping.
+\end{itemize}
+
+This stage should reduce frame-to-frame flicker.
+
+\subsection{Stage 3: Spatial Spreading}
+
+Add:
+
+\begin{itemize}
+    \item boundary-neighbor lookup,
+    \item influence radius,
+    \item compact smoothing kernel,
+    \item normalized kernel weights.
+\end{itemize}
+
+This stage should remove isolated bright boundary samples.
+
+\subsection{Stage 4: Material Response}
+
+Add:
+
+\begin{itemize}
+    \item absorption,
+    \item reflection,
+    \item photon energy reduction,
+    \item optional surface color filtering.
+\end{itemize}
+
+\subsection{Stage 5: Optional Photon Tracers}
+
+Add a separate rendering path for a sampled subset of photons.
+
+Tracer brightness may depend on eye alignment, but tracer brightness must not
+affect deposited surface illumination.
+
+\section{Initial Default Parameters}
+
+The following values are recommended as initial tuning values:
+
+\begin{lstlisting}[language=C++]
+float photonSpeed = ...;              // existing fixed photon speed
+float photonEnergy = 1.0f / photonCountPerEmitter;
+
+float lightInfluenceRadius = 1.5f;    // relative to boundary spacing
+float temporalAlpha = 0.05f;
+float ambientLevel = 0.03f;
+float lightExposure = 1.0f;
+
+float tracerMinimumBrightness = 0.03f;
+float tracerExponent = 3.0f;
+
+uint32_t tracerSamplingInterval = 10;
+\end{lstlisting}
+
+These values are starting points and should be exposed through the simulation
+configuration.
+
+\section{Configuration Items}
+
+The following configuration values should be added:
+
+\begin{lstlisting}
+photon_lighting_enabled = true;
+
+photon_energy_normalization = true;
+photon_light_exposure = 1.0;
+photon_light_ambient = 0.03;
+
+photon_light_temporal_filter = true;
+photon_light_temporal_alpha = 0.05;
+
+photon_light_spatial_filter = true;
+photon_light_influence_radius = 1.5;
+
+photon_tracers_enabled = true;
+photon_tracer_sampling_interval = 10;
+photon_tracer_minimum_brightness = 0.03;
+photon_tracer_exponent = 3.0;
+\end{lstlisting}
+
+Optional material properties are:
+
+\begin{lstlisting}
+boundary_light_absorption = 1.0;
+boundary_light_reflection = 0.0;
+boundary_light_roughness = 0.0;
+\end{lstlisting}
+
+\section{Acceptance Criteria}
+
+The implementation is considered successful when the following conditions are
+met:
+
+\begin{enumerate}
+    \item Boundary illumination is visible even when individual photons are
+    sparse.
+    \item The illuminated surface is significantly smoother than the rendered
+    photon distribution.
+    \item Boundary brightness depends on photon incidence angle, not camera
+    angle.
+    \item Camera movement does not change the amount of deposited boundary
+    light.
+    \item Camera movement may change only the visibility of optional photon
+    tracers.
+    \item Increasing the number of photons improves sampling quality without
+    proportionally increasing total light intensity.
+    \item Temporal filtering reduces flicker.
+    \item Spatial deposition reduces isolated bright boundary samples.
+    \item Multiple photons may safely update the same boundary-light sample.
+    \item Boundary rendering reads only the completed filtered-light buffer.
+\end{enumerate}
+
+\section{Summary of Required Code Changes}
+
+Codex should implement the following changes:
+
+\begin{enumerate}
+    \item Add per-photon color and energy values if they do not already exist.
+    \item Add current and filtered boundary-light storage buffers.
+    \item Clear the current light buffer at the start of each lighting update.
+    \item Extend photon-boundary collision handling to calculate the boundary
+    normal and photon incidence factor.
+    \item Deposit photon energy into the boundary-light buffer using atomic
+    operations.
+    \item Add spatial deposition over neighboring boundary samples.
+    \item Add a temporally filtered double-buffered lighting pass.
+    \item Add Vulkan barriers between deposition, filtering, and rendering.
+    \item Modify the boundary rendering shaders to read accumulated photon
+    illumination.
+    \item Keep the eye-alignment calculation only in the optional photon-tracer
+    rendering path.
+    \item Normalize photon energy by the number of emitted photon samples.
+    \item Add configuration controls and debug counters.
+\end{enumerate}
+
+The central design requirement is that photon particles transport and deposit
+light, while the boundaries display the accumulated illumination. Direct
+photon visibility is optional and must remain independent from surface lighting.
+
+\end{document}
+```

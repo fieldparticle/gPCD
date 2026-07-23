@@ -178,7 +178,7 @@ retired flat form.  Active streaming cfg files should use
 \texttt{particle\_streams}.
 
 Boundary markers are still generated from the configured wall segments and use
-\texttt{ptype=1}.  Streaming scenarios do not require piston configuration.
+\texttt{ptype=2}.  Streaming scenarios do not require piston configuration.
 
 \subsection{Lighting Release Inputs}
 
@@ -428,20 +428,20 @@ when that is the required downstream format.
 The generic generator uses these segments for validation, boundary-marker
 locality, Python wall response, generated GLSL metadata, and any visual wall
 object derived from the same samples.  Parametric boundary markers use
-\texttt{ptype=1}; they do not store a wall evaluator ID.
+\texttt{ptype=2}; they do not store a wall evaluator ID.
 
 \subsection{Generator-Owned Wall Behavior}
 
 The cfg does not select \texttt{wall\_type}, \texttt{walls\_on},
 \texttt{boundary\_particle\_function}, or a conduit axis.  The generator
-owns the geometry and emits generic boundary markers with \texttt{ptype=1}.
+owns the geometry and emits generic boundary markers with \texttt{ptype=2}.
 The current binary contains:
 
 \begin{itemize}
     \item one null particle with \texttt{pnum=0};
     \item regular mobile particles with \texttt{ptype=0};
     \item photon mobile particles with \texttt{ptype=-2};
-    \item boundary markers with \texttt{ptype=1}.
+    \item boundary markers with \texttt{ptype=2}.
 \end{itemize}
 
 The generator writes both \texttt{.bin} and \texttt{.tst}, including physical

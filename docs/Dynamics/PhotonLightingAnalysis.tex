@@ -1,0 +1,238 @@
+% !TeX root = main.tex
+\newpage
+\section{Photon Lighting Analysis}
+
+\subsection{Current LightingBall State}
+
+The current \texttt{LightingBall} implementation is still a photon-tracer and
+collision-color bring-up path, not a surface-lighting system.  Photon
+particles are generated as mobile runtime particles with photon \texttt{ptype}.
+They move through the same source-owned compute schedule as other mobile
+particles, but their optical rule is special:
+\begin{itemize}
+    \item photons ignore other photons;
+    \item regular particles ignore photon targets;
+    \item photon-source contacts with regular particles, walls, or the
+          lighting sphere are optical events rather than mechanical contact
+          resolution;
+    \item photon speed is preserved by reflecting the velocity direction;
+    \item \texttt{colFlg} marks the photon as in collision for the render
+          frame;
+    \item photon \texttt{material\_id} is temporarily changed to the contacted
+          surface material so \texttt{LUMENS} can draw the photon with the
+          surface color.
+\end{itemize}
+
+This is useful for debugging whether photons hit the correct surface and
+whether the material color source is being read correctly.  It does not yet
+make the sphere or walls look illuminated.  The visible light is still carried
+by the moving photon points themselves.
+
+\subsection{Why The Current Result Is Unsatisfying}
+
+Direct photon rendering makes sparse sampling visible.  A small number of
+photons produces isolated points, streaks, or momentary contact flashes.  Even
+with denser emission, the render result is tied to where the photon particles
+happen to be at the current frame rather than to accumulated light on the
+surface.
+
+The current \texttt{LUMENS} path also mixes two concepts that should be
+separate:
+\begin{itemize}
+    \item photon tracer visibility: whether and how a photon particle itself
+          should be drawn for debugging;
+    \item surface illumination: how much light a boundary receives and later
+          displays.
+\end{itemize}
+
+The eye-alignment brightness calculation belongs to the optional tracer path.
+It is not a surface-lighting equation because moving the camera or eye should
+not change how much light was deposited on a wall or sphere.
+
+\subsection{Target Direction From PhotonLighting.tex}
+
+\texttt{PhotonLighting.tex} describes the right target architecture:
+photons are transport samples, while renderable boundaries accumulate and
+display received light.  The intended pipeline is:
+\begin{enumerate}
+    \item move photon particles at fixed speed;
+    \item detect photon-boundary intersections;
+    \item compute hit position and boundary normal;
+    \item compute incidence-weighted deposited energy;
+    \item accumulate that energy into a boundary-light buffer;
+    \item optionally spread the deposit over nearby boundary samples;
+    \item temporally filter the boundary-light buffer;
+    \item render the boundary from sampled boundary-proxy color;
+    \item optionally render a sampled subset of photons as tracers.
+\end{enumerate}
+
+The important shift is that photons no longer need to be dense enough to fill
+the visible surface.  They only need to sample light transport well enough for
+the boundary-light buffer to converge to a usable illuminated image.
+
+\subsection{What We Already Have}
+
+Several pieces of the target system already exist in partial form:
+\begin{itemize}
+    \item photon generation through \texttt{particle\_streams};
+    \item stable photon behavior through runtime \texttt{ptype};
+    \item fixed-speed photon reflection;
+    \item photon-wall, photon-sphere, and photon-particle optical contact
+          detection;
+    \item surface material color lookup through \texttt{material\_id};
+    \item analytic sphere normals in the lighting-ball evaluator;
+    \item rectangle-wall normals from \texttt{rectangle\_wall\_segments};
+    \item material debug visibility and debug color for optional photon
+          tracers.
+\end{itemize}
+
+These pieces are enough to prove transport, contact, and material-source
+behavior.  They are not enough to produce smooth lighting because no boundary
+stores received illumination.
+
+\subsection{Missing Pieces}
+
+The missing architecture is boundary-owned light state.  The active
+\texttt{LightingBall} baseline now intentionally has no boundary-light buffer,
+no filtered-light buffer, no surface-cell table, and no deposition pass.
+Current rendering reads each particle's own material/color state.  It does
+not read a persistent illumination value attached to a surface proxy.
+
+The next target is the boundary-space proxy model.  To reach that model, the
+system needs:
+\begin{itemize}
+    \item persistent boundary-proxy color state;
+    \item a mapping from photon hit results to one existing boundary proxy;
+    \item render-time spatial spreading across neighboring boundary proxies;
+    \item render shaders that color boundaries from sampled proxy color;
+    \item debug counters for active photons, hits, and proxy writes.
+\end{itemize}
+Atomics, additive current-frame accumulation, and temporal filtering are not
+part of the first boundary-space implementation.  They remain possible later
+extensions after the persistent proxy-color path is proven.
+
+\subsection{Recommended Migration Path}
+
+The safest path is incremental and keeps the current photon tracer behavior as
+a diagnostic while surface lighting is built.
+
+\subsubsection{Stage 1: Single-Proxy Boundary Color}
+
+Use the existing photon-boundary contact events.  For each photon hit, compute:
+\[
+    C_{\mathrm{incidence}} =
+    \max(-\mathbf d_p \cdot \mathbf n_b, 0)
+\]
+and deposit:
+\[
+    E_{\mathrm{deposit}} =
+    E_p C_{\mathrm{incidence}} .
+\]
+
+Initially write exactly one boundary proxy: the nearest sphere marker, the hit
+wall marker, or the marker associated with the analytic contact.  The proxy
+stores the contacted material color until another photon overwrites it.  This
+verifies the sign of the normal, the material color, and whether writes occur
+on the expected object.
+
+\subsubsection{Stage 2: Render Boundary-Light Values}
+
+Add a boundary render path that reads accumulated light and applies it to the
+surface base color:
+\[
+    \mathbf C_{\mathrm{final}} =
+    \mathbf C_{\mathrm{base}}
+    \left(A_{\mathrm{ambient}} + G\mathbf L_{\mathrm{filtered}}\right).
+\]
+
+At this stage the result may be speckled.  That is acceptable.  The goal is to
+prove that the boundary, not the photon point, is emitting the visible light.
+
+\subsubsection{Stage 3: Spatial Boundary-Space Spread}
+
+Spread each rendered boundary point over neighboring valid proxies within an
+influence radius.  Use a compact kernel such as:
+\[
+    w_j =
+    \begin{cases}
+        (1-r_j/R_L)^2, & r_j < R_L,\\
+        0, & r_j \ge R_L.
+    \end{cases}
+\]
+
+Normalize the weights so increasing the number of nearby proxies does not
+increase brightness.  This turns sparse photon hits into a smooth surface
+response without introducing a visible surface-cell grid.
+
+\subsubsection{Stage 4: Optional Temporal Or Additive Light}
+
+Only after persistent proxy color and render-time spread are visible should
+the model consider current-frame additive accumulation, temporal filtering, or
+decay.  Those features require extra state and, in Vulkan, may require
+atomics or ping-pong buffers.  They are deliberately outside the first
+boundary-space implementation.
+
+\subsubsection{Stage 5: Material Optical Response}
+
+Add optical material controls after deposition is visible:
+\begin{itemize}
+    \item absorption;
+    \item reflection;
+    \item roughness;
+    \item photon energy reduction or termination.
+\end{itemize}
+
+Until this stage, boundaries can be treated as fully absorbing for deposition
+while still reflecting photons for transport debugging.
+
+\subsubsection{Deferred Directional Specular}
+
+Photon-direction specular lighting is a useful later extension.  A boundary
+sample could accumulate the incoming photon direction in addition to deposited
+energy, and a coherent set of incoming directions could produce a highlight
+from the photon simulation itself.  This is intentionally deferred until the
+first scalar path is proven:
+\[
+    \textrm{photon hit}
+    \rightarrow
+    \textrm{boundary sample energy}
+    \rightarrow
+    \textrm{filtered lit sector}.
+\]
+
+\subsection{Boundary Sample Choice}
+
+For \texttt{LightingBall}, the first practical boundary-space proxy is the
+existing generated sphere marker.  It already has a particle index, a material
+id, a position, and a nearby analytic sphere normal.  This makes it a good
+first color-state target even though the marker is not the physical collision
+surface.
+
+A separate surface-sample set is deferred.  The current direction is to learn
+from the existing boundary particles first, then decide whether a compact
+Vulkan-only proxy table is worth adding.
+
+\subsection{Effect On Current Debug Controls}
+
+\texttt{debug\_visible} and \texttt{debug\_color} should remain photon-tracer
+controls.  They answer whether uncontacted photons should be drawn so their
+travel can be inspected.  They should not affect deposited light.
+
+\texttt{gl\_point\_size} also remains a tracer/render diagnostic.  It changes
+the apparent size of photon points but should not change the boundary-light
+deposition radius.  The deposition radius belongs to a separate lighting
+configuration value such as \texttt{photon\_light\_influence\_radius}.
+
+\subsection{Near-Term Decision}
+
+The current decision is to start with existing boundary particles as
+persistent boundary-space proxies.  The cleaned scene removes the old
+boundary-light sample/state path and visible surface-cell path so the next
+implementation can prove one thing:
+\[
+    \textrm{photon hit}
+    \rightarrow
+    \textrm{persistent boundary proxy color}
+    \rightarrow
+    \textrm{kernel-spread surface color}.
+\]

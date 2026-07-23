@@ -90,189 +90,6 @@ def _lighting_eye_direction3(run_configuration):
     return math.cos(eye_angle), math.sin(eye_angle), 0.0
 
 
-def _reflect3(vector, normal):
-    dot_value = (
-        vector[0] * normal[0]
-        + vector[1] * normal[1]
-        + vector[2] * normal[2]
-    )
-    return (
-        vector[0] - 2.0 * dot_value * normal[0],
-        vector[1] - 2.0 * dot_value * normal[1],
-        vector[2] - 2.0 * dot_value * normal[2],
-    )
-
-
-def _lighting_surface_brightness3(
-    incoming_light,
-    surface_normal,
-    view_vector,
-    run_configuration,
-):
-    shininess = max(1.0, float(run_configuration.get("lighting_specular_shininess", 32.0)))
-    diffuse_strength = max(
-        0.0,
-        float(run_configuration.get("lighting_diffuse_strength", 0.20)),
-    )
-    specular_strength = max(
-        0.0,
-        float(run_configuration.get("lighting_specular_strength", 1.0)),
-    )
-
-    best = 0.0
-    inverted_normal = (
-        -surface_normal[0],
-        -surface_normal[1],
-        -surface_normal[2],
-    )
-    for normal in (surface_normal, inverted_normal):
-        surface_to_light = (
-            -incoming_light[0],
-            -incoming_light[1],
-            -incoming_light[2],
-        )
-        diffuse = max(
-            0.0,
-            normal[0] * surface_to_light[0]
-            + normal[1] * surface_to_light[1]
-            + normal[2] * surface_to_light[2],
-        )
-        reflected = _reflect3(incoming_light, normal)
-        specular_alignment = max(
-            0.0,
-            reflected[0] * view_vector[0]
-            + reflected[1] * view_vector[1]
-            + reflected[2] * view_vector[2],
-        )
-        specular = specular_alignment ** shininess
-        best = max(best, diffuse_strength * diffuse + specular_strength * specular)
-    return max(0.0, min(1.0, best))
-
-
-def _runtime_particle_velocity(particle_id, particle, dynamics):
-    if dynamics is not None and hasattr(dynamics, "GetCurrentParticleVelocity"):
-        return dynamics.GetCurrentParticleVelocity(particle_id)
-    return getattr(particle, "VelRad", None)
-
-
-def _unit_rgb_from_config(run_configuration, key, default):
-    raw_color = run_configuration.get(key, default)
-    if raw_color is None or len(raw_color) < 3:
-        raw_color = default
-    values = [float(raw_color[index]) for index in range(3)]
-    if max(values) > 1.0:
-        values = [value / 255.0 for value in values]
-    return [max(0.0, min(1.0, value)) for value in values]
-
-
-def _lighting_brightness(particle_id, particle, dynamics, run_configuration):
-    if int(getattr(particle, "report_contacts", 0)) <= 0:
-        return None
-
-    position = dynamics.GetCurrentParticlePosition(particle_id)
-    eye_x, eye_y, eye_z = _lighting_eye_position3(run_configuration)
-
-    to_eye_x = eye_x - float(position.x)
-    to_eye_y = eye_y - float(position.y)
-    to_eye_z = eye_z - float(position.z)
-    eye_distance = math.sqrt(
-        to_eye_x * to_eye_x + to_eye_y * to_eye_y + to_eye_z * to_eye_z
-    )
-    if eye_distance <= 1.0e-12:
-        return None
-
-    eye_look = _lighting_eye_direction3(run_configuration)
-    to_surface_x = -to_eye_x / eye_distance
-    to_surface_y = -to_eye_y / eye_distance
-    to_surface_z = -to_eye_z / eye_distance
-    direction_dot = max(
-        -1.0,
-        min(
-            1.0,
-            to_surface_x * eye_look[0]
-            + to_surface_y * eye_look[1]
-            + to_surface_z * eye_look[2],
-        ),
-    )
-    if direction_dot < 0.0:
-        return None
-
-    fov = math.radians(float(run_configuration.get("lighting_eye_fov_degrees", 90.0)))
-    half_fov = max(0.0, fov * 0.5)
-    angle_delta = math.acos(direction_dot)
-    if angle_delta > half_fov:
-        return None
-
-    if half_fov <= 1.0e-12:
-        angle_factor = 1.0
-    else:
-        angle_factor = 1.0 - angle_delta / half_fov
-
-    normal_x = float(getattr(particle, "report_normal_x", 0.0))
-    normal_y = float(getattr(particle, "report_normal_y", 0.0))
-    normal_z = float(getattr(particle, "report_normal_z", 0.0))
-    normal_length = math.sqrt(
-        normal_x * normal_x + normal_y * normal_y + normal_z * normal_z
-    )
-    if normal_length <= 1.0e-12:
-        return None
-
-    normal_x /= normal_length
-    normal_y /= normal_length
-    normal_z /= normal_length
-    eye_vector_x = to_eye_x / eye_distance
-    eye_vector_y = to_eye_y / eye_distance
-    eye_vector_z = to_eye_z / eye_distance
-    velocity = _runtime_particle_velocity(particle_id, particle, dynamics)
-    velocity_x = float(getattr(velocity, "x", 0.0))
-    velocity_y = float(getattr(velocity, "y", 0.0))
-    velocity_z = float(getattr(velocity, "z", 0.0))
-    velocity_length = math.sqrt(
-        velocity_x * velocity_x
-        + velocity_y * velocity_y
-        + velocity_z * velocity_z
-    )
-    if velocity_length <= 1.0e-12:
-        return None
-
-    incoming_light = (
-        velocity_x / velocity_length,
-        velocity_y / velocity_length,
-        velocity_z / velocity_length,
-    )
-    surface_normal = (normal_x, normal_y, normal_z)
-    view_vector = (eye_vector_x, eye_vector_y, eye_vector_z)
-    return angle_factor * _lighting_surface_brightness3(
-        incoming_light,
-        surface_normal,
-        view_vector,
-        run_configuration,
-    )
-
-
-def _lighting_color(particle_id, particle, dynamics, run_configuration):
-    material_id = int(round(float(getattr(particle, "material_id", 0.0))))
-    material = _material_property_by_id(material_id, run_configuration)
-    surface_color = (
-        _material_unit_color_by_id(material_id, run_configuration)
-        if material is not None
-        else _unit_rgb_from_config(
-            run_configuration,
-            "lighting_surface_color",
-            (1.0, 1.0, 1.0),
-        )
-    )
-    brightness = _lighting_brightness(
-        particle_id,
-        particle,
-        dynamics,
-        run_configuration,
-    )
-    if brightness is None:
-        return None
-    return [component * brightness for component in surface_color]
-
-
 def _material_property_by_id(material_id, run_configuration):
     material_id = int(material_id)
     try:
@@ -318,6 +135,37 @@ def _material_debug_color(particle, run_configuration):
     return [max(0.0, min(1.0, float(color[index]))) for index in range(3)]
 
 
+def _boundary_light_color(particle_id, particle, dynamics, run_configuration):
+    if dynamics is None or not bool(
+        run_configuration.get("boundary_lighting_enabled", False)
+    ):
+        return None
+    if not hasattr(dynamics, "BoundaryLightFilteredRGB"):
+        return None
+    filtered = dynamics.BoundaryLightFilteredRGB(particle_id)
+    if filtered is None:
+        return None
+    base_color = _material_unit_color(particle, run_configuration)
+    ambient = max(
+        0.0,
+        float(run_configuration.get("boundary_light_render_ambient", 0.05)),
+    )
+    gain = max(0.0, float(run_configuration.get("boundary_light_render_gain", 1.0)))
+    intensity = max(0.0, min(1.0, gain * max(float(value) for value in filtered)))
+    return [
+        max(
+            0.0,
+            min(
+                1.0,
+                base_color[index] * ambient
+                + intensity
+                * (base_color[index] * (1.0 - intensity) + intensity),
+            ),
+        )
+        for index in range(3)
+    ]
+
+
 def _is_photon_particle(particle):
     return int(round(float(getattr(particle, "ptype", 0.0)))) == int(PTYPE_PHOTON)
 
@@ -333,10 +181,12 @@ def _particle_color(particle_id, particle, dynamics, run_configuration):
     if color_mode == COLOR_MODE_SOLID:
         return _material_unit_color(particle, run_configuration)
     if color_mode == COLOR_MODE_LUMENS:
-        color = _lighting_color(particle_id, particle, dynamics, run_configuration)
-        if color is None:
-            return _material_debug_color(particle, run_configuration)
-        return color
+        if (
+            int(getattr(particle, "colFlg", 0)) == 1
+            or int(getattr(particle, "report_contacts", 0)) > 0
+        ):
+            return _material_unit_color(particle, run_configuration)
+        return _material_debug_color(particle, run_configuration)
     if color_mode == COLOR_MODE_COLLISION:
         return _unit_color((65, 125, 255))
     return _unit_color((65, 125, 255))
@@ -372,12 +222,19 @@ def _collect_particles(dynamics, run_configuration):
         position = dynamics.GetCurrentParticlePosition(particle_id)
         point = [float(position.x), float(position.y), float(position.z)]
         if dynamics.IsBoundaryParticle(particle_id):
-            color = _particle_color(
+            color = _boundary_light_color(
                 particle_id,
                 particle,
                 dynamics,
                 run_configuration,
             )
+            if color is None:
+                color = _particle_color(
+                    particle_id,
+                    particle,
+                    dynamics,
+                    run_configuration,
+                )
             if color is None:
                 continue
             boundary_points.append(point)

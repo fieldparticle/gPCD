@@ -1,0 +1,7 @@
+x_min = { origin = [3.0, 1.0, 1.0];  u_axis = "Y"; v_axis = "Z"; u_length = 8.0; v_length = 12.0; normal = [ 1.0,  0.0,  0.0]; wall_flag = 1; material_id = 2; };
+    x_max = { origin = [11.0, 1.0, 1.0]; u_axis = "Y"; v_axis = "Z"; u_length = 8.0; v_length = 12.0; normal = [-1.0,  0.0,  0.0]; wall_flag = 2; material_id = 2; };
+    y_min = { origin = [3.0, 1.0, 1.0];  u_axis = "X"; v_axis = "Z"; u_length = 8.0; v_length = 12.0; normal = [ 0.0,  1.0,  0.0]; wall_flag = 3; material_id = 2; };
+    y_max = { origin = [3.0, 9.0, 1.0];  u_axis = "X"; v_axis = "Z"; u_length = 8.0; v_length = 12.0; normal = [ 0.0, -1.0,  0.0]; wall_flag = 4; material_id = 2; };
+    z_min = { origin = [3.0, 1.0, 1.0];  u_axis = "X"; v_axis = "Y"; u_length = 8.0; v_length = 8.0;  normal = [ 0.0,  0.0,  1.0]; wall_flag = 5; material_id = 2; };
+    z_max = { origin = [3.0, 1.0, 13.0]; u_axis = "X"; v_axis = "Y"; u_length = 8.0; v_length = 8.0;  normal = [ 0.0,  0.0, -1.0]; wall_flag = 6; material_id = 2; };
+};

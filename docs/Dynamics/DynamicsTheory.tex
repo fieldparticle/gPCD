@@ -174,7 +174,7 @@ The configured orientation supplies the outward normal.  Contact distance and
 penetration are calculated from that analytic point and normal, never from the
 orientation of a marker particle.
 
-Boundary particles with positive \texttt{ptype} are broad-phase locality
+Boundary particles with \texttt{ptype=2} are broad-phase locality
 markers.  The generic simple model no longer stores a wall evaluator in
 \texttt{Data.z}; every stationary wall is described by
 \texttt{curve\_wall\_segments}.  If any marker is local to a source, all

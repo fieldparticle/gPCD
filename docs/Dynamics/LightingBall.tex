@@ -28,7 +28,7 @@ Lighting_ball = {
 
 The generator samples this sphere and inserts standard boundary particles at
 the sampled locations.  These particles remain ordinary boundary markers:
-they have positive boundary \texttt{ptype}, occupy cells for broad-phase
+they have boundary \texttt{ptype=2}, occupy cells for broad-phase
 locality, and are not mobile physical objects.
 
 The marker particles do not define the collision surface.  When a mobile
@@ -53,10 +53,13 @@ uses the shared streaming structure for the mobile particle stream.
 reflects a source from the configured sphere normal when the source is moving
 into the surface.
 
-Lighting display is contact-based.  A light particle illuminates only when it
-is in contact with a surface.  The displayed brightness is calculated from the
-surface contact normal and the configured eye vector; rendering color remains
-diagnostic display state and does not affect dynamics.
+Lighting display is currently reduced to the minimal photon tracer rule.  An
+uncontacted photon uses its material debug color only when
+\texttt{debug\_visible} is enabled.  A contacted photon uses the contacted
+surface material color while \texttt{colFlg} is set.  No eye position, field
+of view, diffuse term, specular term, boundary-light buffer, or
+boundary-space spread is active in the cleaned \texttt{LightingBall}
+configuration.
 
 \subsection{Vulkan Status}
 
@@ -82,7 +85,8 @@ records contain \texttt{color\_mode} and \texttt{color}.  The generated
 uses the old named solid color schemes.  In \texttt{LUMENS} mode, uncontacted
 photons are transparent unless their photon material has
 \texttt{debug\_visible=true}; contacted photons use the contacted surface
-material color until the full Python brightness calculation is ported.
+material color.  The retired eye, diffuse, and specular brightness controls
+are not part of the active \texttt{LightingBall} contract.
 
 Photon behavior is carried by runtime \texttt{ptype}, not by the current
 \texttt{material\_id}.  During generation a stream whose base material has
@@ -94,32 +98,32 @@ contacted surface material so rendering can use that material as the emitted
 color source.  No separate \texttt{hit\_material\_id} particle field is part
 of the active ABI.
 
-The render camera may be aligned with the configured lighting eye:
+The active \texttt{LightingBall\_Py.inc} and
+\texttt{LightingBall\_Vk.inc} files intentionally use only the ordinary
+viewer controls:
 \begin{verbatim}
-align_with_eye = true;
-eye_view_distance = 30.0;
-lighting_eye_position = [2.5, 7.0, 6.0];
-lighting_eye_direction = [0.810026, -0.424246, -0.404812];
-lighting_eye_fov_degrees = 90.0;
+view_center = [3.5, 2.5, 2.5];
+zoom = 1.25;
+gl_point_size = 2.0;
 \end{verbatim}
-When \texttt{align\_with\_eye} is true, Vulkan type-checks the eye settings
-from the generated test file.  The view target is the lighting eye position,
-and the render eye is moved backward along the negative lighting-eye direction
-by \texttt{eye\_view\_distance}.  This keeps the view aligned with the optical
-eye while allowing the whole scene to be framed.
+The eye-aligned camera keys were removed from the active scene because the
+eye no longer participates in lighting.  If that camera mode is needed later,
+it should be reintroduced as view/camera configuration rather than as part of
+the lighting model.
 
 \subsection{Next Export Work}
 
-The next porting step is to finish visual lighting parity rather than sphere
-collision export.  The remaining generated contract is:
+The next export step is no longer porting the old tracer brightness model or
+the removed eye-aligned view.  The remaining work is
+\texttt{boundarySpaceLighting}: persistent boundary-proxy color state and
+render-time spread over the visible surface:
 \begin{itemize}
-    \item carry or reconstruct the surface normal needed by
-          \texttt{COLOR\_MODE\_LUMENS};
-    \item port Python's lighting brightness calculation, including eye field
-          of view, diffuse strength, specular strength, and shininess;
+    \item keep photons as transport/debug particles;
+    \item map photon contacts to existing boundary proxies;
+    \item store persistent proxy color from the contacted surface material;
+    \item render boundaries from sampled proxy color instead of drawing light
+          only on the photon point;
     \item keep \texttt{color\_map.glsl} under exporter ownership so photon
           \texttt{ptype}, temporary photon \texttt{material\_id}, and material
-          display behavior cannot drift from the generated Vulkan contract;
-    \item validate the eye-aligned camera and backed-off
-          \texttt{eye\_view\_distance} in the live Vulkan scene.
+          display behavior cannot drift from the generated Vulkan contract.
 \end{itemize}

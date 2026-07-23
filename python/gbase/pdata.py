@@ -17,6 +17,7 @@ import ctypes
 PTYPE_NULL = -1.0
 PTYPE_MOBILE = 0.0
 PTYPE_PHOTON = -2.0
+PTYPE_BOUNDARY = 2.0
 BOUNDARY_EVALUATOR_NONE = PTYPE_MOBILE
 BOUNDARY_EVALUATOR_HORIZONTAL = 1.0
 BOUNDARY_EVALUATOR_VERTICAL = 2.0
@@ -46,11 +47,10 @@ class pdata(ctypes.Structure):
     - ``collision_stiffness_q`` becomes ``Data.y``.
     - ``ptype == -1`` identifies the reserved null particle at index zero.
     - ``ptype == 0`` identifies a regular mobile particle.
-      ``ptype == -2`` identifies a photon mobile particle. Positive ``ptype`` values
-      identify boundary markers. Generic function-wall and rectangle-wall
-      simulations use ``ptype == 1`` for all boundary markers; the simulation
-      wall model and configured wall segments determine how those markers are
-      evaluated.
+      ``ptype == -2`` identifies a photon mobile particle.
+      ``ptype == 2`` identifies a generic boundary marker. Older boundary
+      evaluator ids are still positive values, but new generated scenes should
+      use the named boundary value instead of overloading photon behavior.
     - ``material_id`` identifies the material/species used for rendering and
       heterogeneous dynamics. It is independent of boundary classification and
       wall-evaluator dispatch.
@@ -82,7 +82,7 @@ class pdata(ctypes.Structure):
         ("vx", ctypes.c_double),          # Initial x velocity.
         ("vy", ctypes.c_double),          # Initial y velocity.
         ("vz", ctypes.c_double),          # Initial z velocity.
-        ("ptype", ctypes.c_double),       # 0 regular mobile; -2 photon mobile; positive values identify boundary markers.
+        ("ptype", ctypes.c_double),       # 0 regular mobile; -2 photon mobile; 2 generic boundary marker.
         ("state_flg", ctypes.c_double),   # Runtime lifecycle copied to Data.w.
         ("molar_mass", ctypes.c_double),  # Particle mass; copied to Vulkan parms.x.
         ("material_id", ctypes.c_double),    # Material/species id; independent of boundary dispatch.

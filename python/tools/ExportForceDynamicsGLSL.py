@@ -647,7 +647,7 @@ GLSL_BODY_TEMPLATES = {
         "return AccumulateContactForce(SourceID, contact, totalForce);",
     ],
     "IsBoundaryParticle": [
-        "return P[ParticleID].ptype > 0.5;",
+        "return int(round(P[ParticleID].ptype)) == 2;",
     ],
     "BoundaryParticleWallFlag": [
         "if (!IsBoundaryParticle(BoundaryID)) {",
@@ -1142,7 +1142,7 @@ GLSL_BODY_TEMPLATES = {
         "return P[ParticleID].Data.w < 0.0;",
     ],
     "ApplyParticleDeathBounds": [
-        "if (P[ParticleID].ptype > 0.5) {",
+        "if (IsBoundaryParticle(ParticleID)) {",
         "    return true;",
         "}",
         "vec4 next_position = (uint(ShaderFlags.positionBuffer) == 0u)",

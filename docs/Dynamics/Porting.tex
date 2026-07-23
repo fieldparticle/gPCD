@@ -13,7 +13,7 @@ Python \texttt{base/ForceDynamics.py} is the export source for dynamics.
 
 The active Python wall source contains generic two-dimensional function walls
 and finite three-dimensional rectangle walls.  Boundary particles identify
-locality with positive \texttt{ptype}; they do not carry evaluator IDs in
+locality with \texttt{ptype=2}; they do not carry evaluator IDs in
 \texttt{Data.z}.  The canonical two-dimensional wall geometry is
 \texttt{curve\_wall\_segments}.  The canonical three-dimensional wall
 geometry is \texttt{rectangle\_wall\_segments}.  When
@@ -261,7 +261,7 @@ Lighting-ball scenarios additionally require generated sphere metadata when
 
 This metadata is consumed by
 \texttt{ForceDynamicsSimpleLightingBall.glsl}.  The sampled sphere particles
-remain positive-\texttt{ptype} boundary markers.  Their target IDs are
+remain \texttt{ptype=2} boundary markers.  Their target IDs are
 broad-phase locality records only; the shader must evaluate the analytic
 sphere from the generated metadata rather than treating the marker particle
 as the collision surface.
@@ -702,7 +702,7 @@ immediately, just as \texttt{ProcessWallCollision(...)} does for manual wall
 flags.
 
 The simple path has no marker-owned evaluator dispatcher.  Each boundary
-marker has \texttt{ptype=1} and exists only to make wall evaluation local.
+marker has \texttt{ptype=2} and exists only to make wall evaluation local.
 When such a target is discovered, the generated simple shader evaluates the
 active configured wall set, chooses the valid wall contact by physical
 \texttt{wallFlag}, and accumulates that force immediately.  If

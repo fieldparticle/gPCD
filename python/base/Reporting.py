@@ -2,6 +2,8 @@ import csv
 import math
 from pathlib import Path
 
+from gbase.pdata import PTYPE_BOUNDARY
+
 
 class Reporting:
     CAPTURE_FILE_SUFFIX = ".csv"
@@ -57,6 +59,10 @@ class Reporting:
 
     def should_report_frame(self, frame_number):
         return self.rpt_frames is None or frame_number in self.rpt_frames
+
+    @staticmethod
+    def is_boundary_particle(particle):
+        return int(round(float(getattr(particle, "ptype", 0.0)))) == int(PTYPE_BOUNDARY)
 
     def momentum_report_path(self):
         return self.output_dir / f"momentum{self.file_suffix}.csv"
@@ -385,7 +391,7 @@ class Reporting:
                 )
                 self.written_headers.add(csv_path)
 
-            active_by_source = self.active_contacts_by_source(particles)
+            active_by_source = self.active_contacts_by_source(particles, frame_number)
             total_overlap_by_source = {
                 source_index: sum(max(0.0, contact.geom.w) for _slot, contact in contacts)
                 for source_index, contacts in active_by_source.items()
@@ -394,8 +400,9 @@ class Reporting:
             for source_index, particle in enumerate(particles):
                 if (
                     int(getattr(particle, "pnum", -1)) == 0
-                    or float(getattr(particle, "ptype", 0.0)) > 0.5
+                    or self.is_boundary_particle(particle)
                     or float(getattr(getattr(particle, "Data", None), "w", 0.0)) < 0.0
+                    or self.is_pending_birth(particle, frame_number)
                 ):
                     continue
                 contacts = active_by_source.get(source_index, [])
@@ -525,13 +532,14 @@ class Reporting:
         self.written_contact_frames.add(frame_number)
 
     @staticmethod
-    def active_contacts_by_source(particles):
+    def active_contacts_by_source(particles, frame_number=None):
         active_by_source = {}
         for source_index, particle in enumerate(particles):
             if (
                 int(getattr(particle, "pnum", -1)) == 0
-                or float(getattr(particle, "ptype", 0.0)) > 0.5
+                or Reporting.is_boundary_particle(particle)
                 or float(getattr(getattr(particle, "Data", None), "w", 0.0)) < 0.0
+                or Reporting.is_pending_birth(particle, frame_number)
             ):
                 continue
             contacts = getattr(particle, "contacts", getattr(particle, "gcs", []))
@@ -544,6 +552,13 @@ class Reporting:
                     active_contacts.append((slot, contact))
             active_by_source[source_index] = active_contacts
         return active_by_source
+
+    @staticmethod
+    def is_pending_birth(particle, frame_number):
+        if frame_number is None:
+            return False
+        state_flag = float(getattr(getattr(particle, "Data", None), "w", 0.0))
+        return state_flag > 0.0 and float(frame_number) < state_flag
 
     @staticmethod
     def particle_number_for_index(particles, particle_index):

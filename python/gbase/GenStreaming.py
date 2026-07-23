@@ -74,7 +74,7 @@ class GenStreaming(GenericGenData):
                 dimensions.append(value)
 
         death_bounds = required_values("death_bounds", 6)
-        particle_plane_z = required_nonnegative_float("particle_plane_z")
+        particle_plane_z = None
 
         def stream_values(stream, context, name, count):
             values = stream.get(name)
@@ -455,6 +455,25 @@ class GenStreaming(GenericGenData):
             packing_bounds = ()
         else:
             packing_bounds = self.derive_packing_bounds(packing_curve_segments)
+
+        uses_single_z_plane = any(
+            not stream["emitter_mode"]
+            and not (
+                stream["patch_mode"]
+                and (
+                    stream["span_u_axis"] == "z"
+                    or stream["span_v_axis"] == "z"
+                )
+            )
+            for stream in streams
+        )
+        requires_particle_plane_z = bool(
+            curve_segments
+            or packing_curve_segments
+            or uses_single_z_plane
+        )
+        if requires_particle_plane_z or "particle_plane_z" in self.itemcfg:
+            particle_plane_z = required_nonnegative_float("particle_plane_z")
 
         particle_separation_distance = required_nonnegative_float(
             "particle_separation_distance"
@@ -855,10 +874,15 @@ class GenStreaming(GenericGenData):
             x_start, x_end, y_start, y_end = self.packing_bounds
         else:
             x_start = x_end = y_start = y_end = 0.0
+        plane_z_text = (
+            f"{self.particle_plane_z:g}"
+            if self.particle_plane_z is not None
+            else "stream-defined"
+        )
         report_lines = [
             "Streaming reservoir report:",
             f"  packing bounds: {self.packing_bounds}",
-            f"  particle plane z: {self.particle_plane_z:g}",
+            f"  particle plane z: {plane_z_text}",
             f"  radius: {radius:g}",
             f"  surface separation: {self.particle_separation_distance:g}",
             f"  center spacing: {center_spacing:g}",
@@ -1277,6 +1301,7 @@ class GenStreaming(GenericGenData):
             self.add_null_particle()
             self.add_streaming_mobile_particles()
             self.add_configured_wall_markers()
+            self.report_boundary_space_lighting()
             self.report_cell_occupancy_capacity()
             self.write_particle_bin()
             self.write_test_file()

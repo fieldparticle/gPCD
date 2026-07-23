@@ -43,7 +43,7 @@ into the active \texttt{ForceDynamics} Python path.  The distinction is:
 \end{itemize}
 
 Freestream boundary particles are the same generic function-wall locality
-markers used by the simple path.  They use positive \texttt{ptype} and do not
+markers used by the simple path.  They use \texttt{ptype=2} and do not
 store wall evaluator IDs in \texttt{Data.z}.
 
 \subsection{Lighting Release Generator}
@@ -70,7 +70,7 @@ comes from \texttt{material\_properties}.
 The active generic generator contract is:
 \begin{itemize}
     \item mobile particles are active at frame zero;
-    \item boundary particles use \texttt{ptype=1};
+    \item boundary particles use \texttt{ptype=2};
     \item \texttt{Data.z} is not used for wall evaluator selection;
     \item all stationary wall geometry is in
           \texttt{curve\_wall\_segments};

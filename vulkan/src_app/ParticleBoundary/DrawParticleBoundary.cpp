@@ -44,7 +44,7 @@ void DrawParticleBoundary::Create(CommandPoolObj* CPL,
 	m_SO = SO;
 	m_EO = EO;
 	m_ComputeCommandObj = m_CPL->GetCommandObjByName("CommandParticleCompute");
-	m_GraphicsCommandObj = m_CPL->GetCommandObjByName("CommandObjParticleGraphics");
+	m_GraphicsCommandObj = m_CPL->GetCommandObjByName("CommandLightingGraphics");
 	m_Graphicslst = m_GraphicsCommandObj->m_RCO->m_DRList;
 	m_Computelst = m_ComputeCommandObj->m_RCO->m_DRList;
 	

@@ -1,11 +1,12 @@
 Current status:
-	- Photon behavior now lives in runtime ptype instead of material_id lookup
-	- Photon material_id can temporarily carry contacted surface color for LUMENS
-	- Documentation updated for the new photon/material ABI contract
+	- LightingBall configs are reduced to the basic tracer/sphere scene.
+	- Eye-driven lighting and old boundary-light config are no longer active.
+	- Next lighting direction is boundarySpaceLighting.
 
 Code Changes:
-	- Added/recorded ptype=-2 photon convention in generator and docs
-	- Removed active hit_material_id dependency from Python/shader paths
-	- Regenerated simple GLSL common files from ExportForceDynamicsSimpleGLSL.py
+	- Updated dynamics docs to describe the cleaned LightingBall baseline.
+	- Documented persistent boundary proxy color as the next lighting model.
+	- Updated active docs to use boundary ptype=2.
+	- Added ProblemEvolution entry for the LightingBall cleanup.
 
-Next: Regenerate LightingBall data and validate photon surface-color behavior in Vulkan
+Next: Implement boundarySpaceLighting from the clean baseline.

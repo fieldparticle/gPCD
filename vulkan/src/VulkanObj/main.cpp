@@ -126,15 +126,23 @@ int main(int argc, const char* argv[]) try
 #endif
 		CfgTst->Create(testfile);
 
-		bool show_cell_boundary_cube = CfgApp->GetBool("application.show_cell_boundary_cube", true);
+		bool show_cell_boundary_cube	= CfgApp->GetBool("application.show_cell_boundary_cube", true);
 		bool show_wall_as_boundary_cube = CfgApp->GetBool("application.show_wall_as_boundary_cube", true);
-		bool particle_as_spheres = CfgApp->GetBool("application.particle_as_spheres", true);
-		bool show_boundary_as_obj = CfgApp->GetBool("application.boundary_as_obj", true);
+		bool particle_as_spheres		= CfgApp->GetBool("application.particle_as_spheres", true);
+		bool show_boundary_as_obj		= CfgApp->GetBool("application.boundary_as_obj", true);
+		bool is_lighting_app			= CfgApp->GetBool("application.use_lighting", true);
+		
+		if (is_lighting_app == true)
+		{
+			if (ParticleLighting(pf, nullptr, nullptr, false))
+			{
+				return 1;
+			}
 
-
+		}
 		// If this has both a boundary and spheres.
 		//if (particle_as_spheres == true && (show_cell_boundary_cube == true || show_wall_as_boundary_cube ==true))
-		if (show_cell_boundary_cube == true || show_wall_as_boundary_cube == true || show_boundary_as_obj == true	|| particle_as_spheres == true)
+		else if (show_cell_boundary_cube == true || show_wall_as_boundary_cube == true || show_boundary_as_obj == true	|| particle_as_spheres == true)
 		{
 			
 			if (ParticleBoundaryandSphere(pf, nullptr, nullptr, false))
