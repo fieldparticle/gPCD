@@ -30,16 +30,16 @@
 %*
 %******************************************************************/
 
-#ifndef PIPELINEGRAPHICSLIGHTING_HPP
-#define PIPELINEGRAPHICSLIGHTING_HPP
+#ifndef PipelineGraphicsLighting_HPP
+#define PipelineGraphicsLighting_HPP
 
 class PipelineGraphicsLighting : public PipelineObj
 {
     public:
 		
 	
-	PipelineGraphicsLighting(VulkanObj *App, std::string Name):
-		PipelineObj(App, Name, VBW_TYPE_GRAPHPIPE)
+	//void Create(SwapChainObj* SCO, ResourceContainerObj* RCO, RenderPassObj* RPO);
+	PipelineGraphicsLighting(VulkanObj *App, std::string Name): PipelineObj(App, Name, VBW_TYPE_GRAPHPIPE)
 	{
 		
 	};

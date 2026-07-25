@@ -1,12 +1,8 @@
 Current status:
-	- LightingBall boundary-space lighting now matches Python in Vulkan.
-	- FPM remains the clean base particle shader path.
-	- FPML owns photon lighting and BoundaryLightRecord access.
-
+	- LightingBall Vulkan now shows solid cell-owned boundary-space surface lighting.
+	- Spectral lighting is not working yet and is the next lighting task.
 Code Changes:
-	- Updated dynamics documentation for the active boundary-space lighting model.
-	- Documented the FPM/FPML split and Vulkan lighting resource contract.
-	- Updated velocity-angle naming references from VELOCITY to VELOCITY_ANGLE.
-	- Added a ProblemEvolution entry for the Python/Vulkan parity milestone.
-
-Next: Refine FPML fragment rendering with gl_PointCoord soft patches.
+	- Updated dynamics docs for cell-owned BoundaryLightRecord lighting.
+	- Added ProblemEvolution entry for proxy-kernel to cell-owned lighting transition.
+	- Updated LightingBall, PhotonLightingAnalysis, boundarySpaceLighting, and todo docs.
+Next: Define and implement the spectral lighting state on top of the cell-owned BoundaryLightRecord path.

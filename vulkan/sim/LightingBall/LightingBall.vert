@@ -17,6 +17,7 @@
 #include "..\common\util.glsl"
 #include "..\common\color_map.glsl"
 #include "boundary.glsl"
+#include "sphere.glsl"
 
 layout(binding = 1) uniform UniformBufferObject{
     mat4 model;
@@ -41,6 +42,8 @@ layout(location = 0) in vec4 inPosition;
 layout(location = 1) in vec4 inColor;
 
 layout(location = 0) out vec4 fragColor;
+layout(location = 1) out vec3 surfaceNormal;
+layout(location = 2) flat out uint surfaceCellId;
 
 mat4 BuildTranslation(vec3 delta)
 {
@@ -51,9 +54,9 @@ mat4 BuildTranslation(vec3 delta)
         vec4(delta, 1.0));
 }
 
-#include "..\common\Boundary.vert"
+#include "..\common\BoundaryLight.vert"
 
 void main()
 {
-	boundary_vert_main();
+	boundary_light_main();
 }

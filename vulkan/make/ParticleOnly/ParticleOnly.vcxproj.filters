@@ -264,10 +264,13 @@
     <ClInclude Include="..\..\src_app\ParticleLighting\ParticleLighting.hpp">
       <Filter>Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src_app\ParticleLighting\CommandLightingGraphics.hpp">
+    <ClInclude Include="..\..\src_app\ParticleLighting\LightingStructs.hpp">
       <Filter>Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src_app\ParticleLighting\PipelineComputeLighting.hpp">
+    <ClInclude Include="..\..\src_app\ParticleLighting\ResourceLighting.hpp">
+      <Filter>Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleLighting\CommandLightingGraphics.hpp">
       <Filter>Lighting</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src_app\ParticleLighting\PipelineGraphicsLighting.hpp">
@@ -276,10 +279,13 @@
     <ClInclude Include="..\..\src_app\ParticleLighting\DrawParticleLighting.hpp">
       <Filter>Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src_app\ParticleLighting\LightingStructs.hpp">
+    <ClInclude Include="..\..\src_app\ParticleLighting\PipelineComputeLighting.hpp">
       <Filter>Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src_app\ParticleLighting\ResourceLighting.hpp">
+    <ClInclude Include="..\..\src_app\ParticleLighting\ResourceLightingCube.hpp">
+      <Filter>Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleLighting\ResourceLightingSphere.hpp">
       <Filter>Lighting</Filter>
     </ClInclude>
   </ItemGroup>
@@ -527,10 +533,10 @@
     <ClCompile Include="..\..\src_app\ParticleLighting\ParticleLighting.cpp">
       <Filter>Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src_app\ParticleLighting\CommandLightingGraphics.cpp">
+    <ClCompile Include="..\..\src_app\ParticleLighting\ResourceLighting.cpp">
       <Filter>Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src_app\ParticleLighting\PipelineComputeLighting.cpp">
+    <ClCompile Include="..\..\src_app\ParticleLighting\CommandLightingGraphics.cpp">
       <Filter>Lighting</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src_app\ParticleLighting\PipelineGraphicsLighting.cpp">
@@ -539,7 +545,13 @@
     <ClCompile Include="..\..\src_app\ParticleLighting\DrawParticleLighting.cpp">
       <Filter>Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src_app\ParticleLighting\ResourceLighting.cpp">
+    <ClCompile Include="..\..\src_app\ParticleLighting\PipelineComputeLighting.cpp">
+      <Filter>Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleLighting\ResourceLightingCube.cpp">
+      <Filter>Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleLighting\ResourceLightingSphere.cpp">
       <Filter>Lighting</Filter>
     </ClCompile>
   </ItemGroup>

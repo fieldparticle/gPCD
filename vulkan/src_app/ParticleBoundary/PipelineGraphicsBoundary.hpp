@@ -30,8 +30,8 @@
 %*
 %******************************************************************/
 
-#ifndef PIPELINEBOUNDARY_HPP
-#define PIPELINEBOUNDARY_HPP
+#ifndef PipelineGraphicsBoundary_HPP
+#define PipelineGraphicsBoundary_HPP
 
 class PipelineGraphicsBoundary : public PipelineObj
 {

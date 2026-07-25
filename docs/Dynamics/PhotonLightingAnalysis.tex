@@ -4,8 +4,8 @@
 
 \subsection{Current LightingBall State}
 
-The current \texttt{LightingBall} implementation is still a photon-tracer and
-collision-color bring-up path, not a surface-lighting system.  Photon
+The current \texttt{LightingBall} implementation has crossed from
+photon-tracer bring-up into the first surface-lighting system.  Photon
 particles are generated as mobile runtime particles with photon \texttt{ptype}.
 They move through the same source-owned compute schedule as other mobile
 particles, but their optical rule is special:
@@ -19,15 +19,18 @@ particles, but their optical rule is special:
     \item \texttt{colFlg} marks the photon as in collision for the render
           frame;
     \item photon \texttt{material\_id} is temporarily changed to the contacted
-          surface material for diagnostics and future boundary lighting.
+          surface material for diagnostics and material-source checks.
 \end{itemize}
 
 This is useful for debugging whether photons hit the correct surface and
-whether the material color source is being read correctly.  The cleaned
-Python renderer treats \texttt{LUMENS} as debug photon visibility only, so it
-does not yet make the sphere or walls look illuminated.
+whether the material color source is being read correctly.  Surface lighting
+itself is now owned by \texttt{BoundaryLightRecord} state in the
+\texttt{ParticleLighting} Vulkan path.  For \texttt{LightingBall}, photon
+contact deposits the contacted material color into the spatial cell containing
+the analytic hit point, and the lighting surface fragment shader reads that
+cell-owned color.
 
-\subsection{Why The Current Result Is Unsatisfying}
+\subsection{Why Direct Photon Rendering Was Unsatisfying}
 
 Direct photon rendering makes sparse sampling visible.  A small number of
 photons produces isolated points, streaks, or momentary contact flashes.  Even
@@ -86,36 +89,36 @@ Several pieces of the target system already exist in partial form:
 \end{itemize}
 
 These pieces are enough to prove transport, contact, and material-source
-behavior.  They are not enough to produce smooth lighting because no boundary
-stores received illumination.
+behavior.  The current Vulkan \texttt{LightingBall} path adds the first
+persistent illumination owner by storing color in one lighting record per
+spatial cell.
 
-\subsection{Missing Pieces}
+\subsection{Remaining Missing Pieces}
 
-The missing architecture is boundary-owned light state.  The active
-\texttt{LightingBall} baseline now intentionally has no boundary-light buffer,
-no filtered-light buffer, no surface-cell table, and no deposition pass.
-Current rendering reads each particle's own material/color state.  It does
-not read a persistent illumination value attached to a surface proxy.
+The missing architecture is no longer the basic boundary-owned light state.
+That first color path is now present in Vulkan as cell-owned
+\texttt{BoundaryLightRecord} state.  The remaining gap is richer light
+response, especially spectral lighting.
 
-The next target is the boundary-space proxy model.  To reach that model, the
-system needs:
+The next target should answer what additional state is required beyond
+\texttt{rgb\_valid}.  Candidate additions include:
 \begin{itemize}
-    \item persistent boundary-proxy color state;
-    \item a mapping from photon hit results to one existing boundary proxy;
-    \item render-time spatial spreading across neighboring boundary proxies;
-    \item render shaders that color boundaries from sampled proxy color;
-    \item debug counters for active photons, hits, and proxy writes.
+    \item photon wavelength, band, or spectral bin;
+    \item material spectral response or absorption;
+    \item separate debug views for deposited color versus spectral state;
+    \item optional accumulated direction/coherence for later specular work;
+    \item debug counters for active photons, hits, and cell writes.
 \end{itemize}
 Atomics, additive current-frame accumulation, and temporal filtering are not
-part of the first boundary-space implementation.  They remain possible later
-extensions after the persistent proxy-color path is proven.
+part of the first cell-owned color implementation.  They remain possible later
+extensions after spectral requirements are defined.
 
 \subsection{Recommended Migration Path}
 
 The safest path is incremental and keeps the current photon tracer behavior as
 a diagnostic while surface lighting is built.
 
-\subsubsection{Stage 1: Single-Proxy Boundary Color}
+\subsubsection{Stage 1: Cell-Owned Boundary Color}
 
 Use the existing photon-boundary contact events.  For each photon hit, compute:
 \[
@@ -128,11 +131,14 @@ and deposit:
     E_p C_{\mathrm{incidence}} .
 \]
 
-Initially write exactly one boundary proxy: the nearest sphere marker, the hit
-wall marker, or the marker associated with the analytic contact.  The proxy
-stores the contacted material color until another photon overwrites it.  This
-verifies the sign of the normal, the material color, and whether writes occur
-on the expected object.
+The active Vulkan implementation writes exactly one spatial cell.  For the
+analytic sphere, the contact normal gives the hit point:
+\begin{verbatim}
+LIGHTING_BALL_CENTER + contactNormal * LIGHTING_BALL_RADIUS
+\end{verbatim}
+The cell containing that point stores the contacted material color until
+another photon overwrites it.  This verifies the sign of the normal, the
+material color, and whether writes occur on the expected object.
 
 \subsubsection{Stage 2: Render Boundary-Light Values}
 
@@ -149,8 +155,13 @@ prove that the boundary, not the photon point, is emitting the visible light.
 
 \subsubsection{Stage 3: Spatial Boundary-Space Spread}
 
-Spread each rendered boundary point over neighboring valid proxies within an
-influence radius.  Use a compact kernel such as:
+This earlier proxy-kernel stage is superseded for the current Vulkan
+\texttt{LightingBall} path.  The active renderer colors the analytic sphere
+from the owning cell id carried by the render vertex and read in the fragment
+shader.  A kernel may still be useful later for filtering or smoothing, but it
+is not the first visible surface-lighting rule.
+
+The retired proxy-kernel form was:
 \[
     w_j =
     \begin{cases}
@@ -160,16 +171,15 @@ influence radius.  Use a compact kernel such as:
 \]
 
 Normalize the weights so increasing the number of nearby proxies does not
-increase brightness.  This turns sparse photon hits into a smooth surface
-response without introducing a visible surface-cell grid.
+increase brightness.
 
 \subsubsection{Stage 4: Optional Temporal Or Additive Light}
 
-Only after persistent proxy color and render-time spread are visible should
-the model consider current-frame additive accumulation, temporal filtering, or
-decay.  Those features require extra state and, in Vulkan, may require
-atomics or ping-pong buffers.  They are deliberately outside the first
-boundary-space implementation.
+Only after persistent cell-owned color is stable should the model consider
+current-frame additive accumulation, temporal filtering, or decay.  Those
+features require extra state and, in Vulkan, may require atomics or ping-pong
+buffers.  They are deliberately outside the first boundary-space
+implementation.
 
 \subsubsection{Stage 5: Material Optical Response}
 
@@ -201,15 +211,14 @@ first scalar path is proven:
 
 \subsection{Boundary Sample Choice}
 
-For \texttt{LightingBall}, the first practical boundary-space proxy is the
-existing generated sphere marker.  It already has a particle index, a material
-id, a position, and a nearby analytic sphere normal.  This makes it a good
-first color-state target even though the marker is not the physical collision
-surface.
+For \texttt{LightingBall}, the first Vulkan lighting owner is the spatial cell
+that contains the analytic sphere hit point.  Existing generated sphere markers
+remain useful because they make nearby analytic sphere geometry discoverable,
+but they no longer own the final Vulkan surface color.
 
-A separate surface-sample set is deferred.  The current direction is to learn
-from the existing boundary particles first, then decide whether a compact
-Vulkan-only proxy table is worth adding.
+A separate spectral or energy sample set is deferred.  The current direction is
+to learn from the cell-owned color path first, then decide what extra Vulkan
+tables are required for spectral lighting.
 
 \subsection{Effect On Current Debug Controls}
 
@@ -224,14 +233,17 @@ configuration value such as \texttt{photon\_light\_influence\_radius}.
 
 \subsection{Near-Term Decision}
 
-The current decision is to start with existing boundary particles as
-persistent boundary-space proxies.  The cleaned scene removes the old
-boundary-light sample/state path and visible surface-cell path so the next
-implementation can prove one thing:
+The current decision is to use persistent cell-owned boundary-space color for
+Vulkan \texttt{LightingBall}.  The cleaned scene removes the old boundary-light
+sample/state path and visible surface-cell path, and the current Vulkan
+implementation proves:
 \[
     \textrm{photon hit}
     \rightarrow
-    \textrm{persistent boundary proxy color}
+    \textrm{persistent cell-owned surface color}
     \rightarrow
-    \textrm{kernel-spread surface color}.
+    \textrm{analytic surface fragment color}.
 \]
+
+The next decision is how spectral lighting should extend this cell-owned
+resource.

@@ -44,4 +44,5 @@ const RectangleWallSegment RECTANGLE_WALL_SEGMENTS[1] = RectangleWallSegment[1](
 );
 
 #define HAS_BOUNDARY
+#define HAS_SPHERE
 #endif

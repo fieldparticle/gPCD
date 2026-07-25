@@ -3,9 +3,9 @@
 %*******************************************************************
 % $Author: jb $
 %
-% $Date: 2023-06-12 16:17:58 -0400 (Mon, 12 Jun 2023) $
-% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src_app/mfpm/DrawObj.hpp $
-% $Id: DrawObj.hpp 31 2023-06-12 20:17:58Z jb $
+% $Date: 2023-05-03 15:30:42 -0400 (Wed, 03 May 2023) $
+% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src_app/mfpm/GraphicsPipeline.hpp $
+% $Id: GraphicsPipeline.hpp 28 2023-05-03 19:30:42Z jb $
 %*******************************************************************
 %***                         DESCRIPTION                         ***
 %*******************************************************************
@@ -25,41 +25,26 @@
 ********************************************************************
 %***                     SVN CHANGE RECORD                       ***
 %*******************************************************************
-%*$Revision: 31 $
+%*$Revision: 28 $
 %*
 %*
 %******************************************************************/
 
+#ifndef PIPELINEGRAPHICSLIGHTING_HPP
+#define PIPELINEGRAPHICSLIGHTING_HPP
 
-#ifndef DrawParticleLighting_HPP
-#define DrawParticleLighting_HPP
-
-class DrawParticleLighting : public DrawObj
+class PipelineGraphicsLighting : public PipelineObj
 {
     public:
-    
-		std::vector<Resource*> m_Graphicslst = {};
-		std::vector<Resource*> m_Computelst = {};
-		CommandObj* m_ComputeCommandObj = {};
-		CommandObj* m_GraphicsCommandObj = {};
-
-
-    virtual void DrawFrame(); 
-	void Create(CommandPoolObj* CPL,
-		SwapChainObj* SCO,
-		RenderPassObj* RPO,
-		FrameBufferObj* FBO,
-		SyncObj* SO,
-		ExportObject *EO);
-
-
+		
 	
-	DrawParticleLighting(VulkanObj* App, std::string Name) : DrawObj(Name,App ){};
-	uint32_t currentBuffer = 0;
-
-    void Cleanup(){
-       
-    };
+	PipelineGraphicsLighting(VulkanObj *App, std::string Name):
+		PipelineObj(App, Name, VBW_TYPE_GRAPHPIPE)
+	{
+		
+	};
+	
+	void CreatePipeline();
 	
 };
 #endif

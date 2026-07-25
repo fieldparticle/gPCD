@@ -4,244 +4,113 @@
 
 \subsection{Purpose}
 
-Boundary-space lighting is the revised direction for \texttt{LightingBall}
-surface illumination.  The goal is to light part of an analytic or implicit
-surface without adding triangles, visible surface-cell geometry, or dense
-boundary rendering particles.
+Boundary-space lighting is the active surface-lighting direction for
+\texttt{LightingBall}.  Its purpose is to let photons light part of an
+analytic or implicit surface without turning the moving photon point into the
+visible lighting result.
 
-This is now the active first lighting model for \texttt{LightingBall}.  The
-Python implementation is the reference behavior, and the Vulkan
-\texttt{ParticleLighting} application has been brought to the same visible
-result through the \texttt{FPML.*} shader family and the
-\texttt{BoundaryLightRecord} SSBO.
-
-The important separation is:
+The current model separates responsibilities:
 \begin{itemize}
-    \item photons transport color and discover surface contact;
-    \item boundary particles represent surface patches contained by spatial
-          cells;
-    \item the boundary particle stores the persistent color state for that
-          patch;
-    \item rendering spreads that stored color over nearby surface samples by
-          a kernel.
+    \item particles carry motion, identity, and collision/debug state;
+    \item materials provide source color and debug visibility settings;
+    \item boundary markers make analytic surface regions discoverable;
+    \item \texttt{BoundaryLightRecord} stores persistent surface color;
+    \item the renderer displays that persistent color on the surface.
 \end{itemize}
 
-This keeps the renderer particle-based while allowing a finite region of a
-surface to remain lit after a photon contact.
+This keeps photons as transport/debug particles while allowing a surface region
+to remain lit after contact.
 
-\subsection{Boundary Particle As Surface Proxy}
+\subsection{Cell-Owned Surface State}
 
-A boundary particle is not an infinitesimal lit dot.  In this model it is the
-representative for the portion of surface contained in or discovered through
-its cell.  A photon may hit the analytic sphere or wall at a point, but the
-lighting state is stored on the boundary proxy associated with that local
-surface region.
+The first Vulkan proxy-kernel implementation stored one lighting record per
+boundary particle.  That proved the contact-to-light path, but sparse boundary
+markers produced point-like circles, fan-out, and visible gaps.  The active
+Vulkan model now stores lighting by spatial cell instead.
 
 Conceptually:
 \begin{verbatim}
-cell contains a small surface patch
-boundary particle represents that patch
-photon hits anywhere in that patch
-boundary particle stores the patch color
-renderer samples nearby patch colors
+cell contains a small surface region
+photon hits anywhere in that region
+BoundaryLight[cell_id] stores the material color
+renderer colors the analytic surface from the owning cell
 \end{verbatim}
 
-The boundary particle keeps its base material identity.  The stored light color
-is separate state:
+The boundary marker keeps its base material identity and broad-phase locality
+role.  The visible light state is separate resource state:
 \begin{verbatim}
-material_id          = base surface material
-boundary_space_light_rgb    = persistent lit color
-boundary_space_light_valid  = whether the patch has received light
+material_id                         = base surface material
+BoundaryLight[cell_id].rgb_valid.rgb = persistent lit color
+BoundaryLight[cell_id].rgb_valid.w   = valid flag
 \end{verbatim}
-
-The base material still answers what the surface is.  The boundary-space light
-state answers what color that surface patch is currently emitting or showing.
 
 \subsection{Photon Hit Rule}
 
-The first rule should be intentionally simple:
+The first rule is intentionally simple:
 \begin{verbatim}
-photon hits surface proxy
-proxy boundary_space_light_rgb = contacted material color
-proxy boundary_space_light_valid = true
+photon hits surface
+cell_id = address of contacted surface point
+BoundaryLight[cell_id].rgb_valid = contacted material color, valid=true
 \end{verbatim}
 
 The color does not clear every compute frame.  It persists until another photon
-updates the same proxy.  This is a color-state rule, not an energy-accumulation
+updates the same cell.  This is a color-state rule, not an energy-accumulation
 rule.
 
 Because the first model sets color instead of adding energy, no atomic add is
-required.  If two photons write the same proxy in the same compute dispatch,
-the first implementation may accept last-writer-wins behavior.  If later work
-requires additive light transport, then atomic accumulation can be introduced
-as a separate, deliberate feature.
+required.  If two photons write the same cell in the same compute dispatch, the
+first implementation accepts last-writer-wins behavior.  If later work needs
+additive light transport, atomic accumulation can be introduced as a separate,
+deliberate feature.
 
-\subsection{Surface Spread Without Triangles}
+\subsection{Analytic Sphere Surface}
 
-The stored color spreads across the visible surface at sample/render time.  A
-boundary proxy contributes color to nearby surface points according to an
-influence radius and falloff kernel.
-
-For a sphere, the natural distance is angular.  Given a lit proxy at position
-\(\mathbf b\), a rendered surface point at \(\mathbf p\), and sphere center
-\(\mathbf c\):
-\[
-    \mathbf n_b =
-    \frac{\mathbf b-\mathbf c}{\lVert \mathbf b-\mathbf c\rVert},
-    \qquad
-    \mathbf n_p =
-    \frac{\mathbf p-\mathbf c}{\lVert \mathbf p-\mathbf c\rVert}.
-\]
-
-The angular separation is:
-\[
-    \theta =
-    \arccos(\mathrm{clamp}(\mathbf n_b \cdot \mathbf n_p,-1,1)).
-\]
-
-A simple linear kernel is:
-\[
-    w =
-    \max\left(0, 1 - \frac{\theta}{\theta_L}\right),
-\]
-where \(\theta_L\) is the configured lighting patch angle.  A smoother kernel
-can square the result:
-\[
-    w =
-    \max\left(0, 1 - \frac{\theta}{\theta_L}\right)^2.
-\]
-
-The rendered color at \(\mathbf p\) is then derived from the nearby valid
-boundary proxies:
-\[
-    \mathbf L(\mathbf p) =
-    \frac{\sum_i w_i \mathbf C_i}{\max(\sum_i w_i,\epsilon)}.
-\]
-
-This gives a continuous lit region without drawing triangles or surface-cell
-points.  The only visible geometry remains the existing particle/boundary
-rendering path.
-
-\subsection{Wall Spread}
-
-For a rectangle wall, the same idea uses local wall coordinates rather than
-spherical angle.  A wall has an origin, two surface axes, and dimensions.  A
-point on the wall is projected into local coordinates:
-\[
-    u = (\mathbf p-\mathbf o)\cdot \mathbf a_u,
-    \qquad
-    v = (\mathbf p-\mathbf o)\cdot \mathbf a_v.
-\]
-
-The distance from a lit boundary proxy to a rendered wall point is measured in
-the \((u,v)\) plane.  The same kernel form can be used:
-\[
-    w =
-    \max\left(0, 1 - \frac{r}{R_L}\right)^2.
-\]
-
-\subsection{No Per-Frame Clear}
-
-Boundary-space lighting is persistent.  It should not clear all light each
-compute frame.  The state only changes when a photon hit writes a new patch
-color, or when a later optional decay/filtering rule is enabled.
-
-The first lifecycle is:
-\begin{enumerate}
-    \item initialize every boundary proxy with no valid light;
-    \item photon contact writes the contacted material color into one boundary
-          proxy;
-    \item rendering samples nearby valid proxies and spreads their colors;
-    \item a later photon may overwrite the proxy color.
-\end{enumerate}
-
-This is different from the previous boundary-light-buffer idea, where
-\texttt{current} was cleared every frame and \texttt{filtered} was blended
-over time.
-
-\subsection{Configuration}
-
-The first active configuration items are:
+For \texttt{LightingBall}, photon contact is evaluated against the analytic
+sphere, not against the marker particles.  When a photon contacts the sphere,
+the compute shader writes the cell containing the analytic hit point:
 \begin{verbatim}
-boundary_space_lighting_enabled = true;
-boundary_space_patch_angle = 0.20;
-boundary_space_patch_radius = 0.50;
-boundary_space_patch_falloff = "quadratic";
+hitPoint = LIGHTING_BALL_CENTER + contactNormal * LIGHTING_BALL_RADIUS
+cell_id = CellAddress(hitPoint)
+BoundaryLight[cell_id].rgb_valid = materialColor, valid=true
 \end{verbatim}
 
-\texttt{boundary\_space\_patch\_angle} applies to spherical surfaces.
-\texttt{boundary\_space\_patch\_radius} applies to planar wall surfaces.
-Only the appropriate value is used for a given surface type.
-
-\subsection{Python Implementation}
-
-Python proves the model without changing the binary particle record.  Runtime
-fields are attached to boundary particles:
+The lighting sphere render resource uses the existing sphere mesh only as a
+canvas.  During \texttt{ResourceLightingSphere::Create}, each unit-sphere
+vertex is mapped to the configured world-space sphere and assigned an owning
+cell address:
 \begin{verbatim}
-particle.boundary_space_light_valid = True
-particle.boundary_space_light_rgb = (r, g, b)
+sphereNormal = normalize(unit sphere vertex)
+worldPos = LIGHTING_BALL_CENTER + sphereNormal * LIGHTING_BALL_RADIUS
+surfaceCellId = CellAddress(worldPos)
 \end{verbatim}
 
-Photon contact handling should:
-\begin{enumerate}
-    \item identify the boundary proxy or analytic surface proxy;
-    \item read the contacted surface material color;
-    \item write that color into the proxy's persistent light state;
-    \item leave photon debug color behavior separate.
-\end{enumerate}
+The vertex shader passes \texttt{surfaceCellId} to the fragment shader as a
+flat value.  The fragment shader reads:
+\begin{verbatim}
+BoundaryLightRecord record = BoundaryLight[surfaceCellId];
+\end{verbatim}
 
-Rendering should:
-\begin{enumerate}
-    \item keep drawing existing boundary particles or analytic surface markers;
-    \item for each rendered surface marker, gather nearby valid boundary-space
-          light proxies;
-    \item blend the material base color with the sampled boundary-space light;
-    \item avoid drawing invisible surface-cell grids.
-\end{enumerate}
+If the record is valid and belongs to the lighting-ball surface, the fragment
+uses the stored color at full alpha.  If it is invalid, the fragment is
+discarded.  This gives solid cell-owned surface regions without angular
+fan-out, point-sprite circles, or proxy-color averaging.
 
-\subsection{Point-List Rendering}
+\subsection{Point-List And Surface Rendering}
 
-The Vulkan renderer currently uses:
+The ordinary particle/debug pass still uses:
 \begin{verbatim}
 inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
 \end{verbatim}
 
-This topology does not interpolate color across a triangulated surface.  Each
-boundary particle is submitted as a point primitive.  The spread across a
-surface therefore has two separate parts:
-\begin{itemize}
-    \item surface-space color spread is computed by sampling nearby lit
-          boundary proxies;
-    \item screen-space patch shape is produced by rendering each point as a
-          soft point sprite.
-\end{itemize}
-
-The vertex shader should choose the boundary particle's color by applying the
-boundary-space kernel to nearby persistent proxy colors.  It should also set
-\texttt{gl\_PointSize} large enough for the proxy to represent its cell-local
-surface patch.
-
-The fragment shader should use \texttt{gl\_PointCoord} to shape that point
-primitive into a soft circular patch instead of a hard square:
-\begin{verbatim}
-vec2 p = gl_PointCoord * 2.0 - 1.0;
-float r2 = dot(p, p);
-if (r2 > 1.0) {
-    discard;
-}
-float alpha = pow(max(0.0, 1.0 - r2), patchFalloff);
-\end{verbatim}
-
-The final fragment color is the boundary-space lighting color multiplied by
-this alpha.  This does not create triangles and does not create a visible
-surface grid.  It lets a boundary particle behave as a finite soft surface
-patch while preserving the point-list pipeline.
+That pass remains useful for photons and particle diagnostics.  It is not the
+final surface canvas.  \texttt{ParticleLighting} now also has a
+lighting-specific surface pass for \texttt{LightingBall}.  The mesh used by
+that pass is render geometry only; collision remains analytic, and the
+generated boundary markers remain broad-phase locality records.
 
 \subsection{Vulkan Implementation}
 
-The Vulkan version does not use an additive SSBO for the first implementation.
-It uses a compact persistent boundary-proxy table with one record per
-boundary particle:
+The Vulkan version uses the existing record name:
 \begin{verbatim}
 struct BoundaryLightRecord {
     vec4 rgb_valid;
@@ -250,29 +119,49 @@ struct BoundaryLightRecord {
 };
 \end{verbatim}
 
-The buffer is owned by \texttt{ResourceLighting.cpp} and bound at descriptor
-binding 8 only for the \texttt{ParticleLighting} application.  Basic particle
+The buffer is owned by \texttt{ResourceLighting.cpp}, sized as
+\texttt{CellAryW * CellAryH * CellAryL}, and bound at descriptor binding 8
+only for the \texttt{ParticleLighting} application.  Basic particle
 applications remain on \texttt{FPM.*} and do not see this resource.
 
-Photon contact in \texttt{FPML.comp} writes the proxy color with
-last-writer-wins behavior.  Boundary rendering in \texttt{FPML.vert} reads
-nearby proxy colors and applies the spread kernel.  The fragment shader is
-still the simple lighting-specific pass; a later refinement should use
-\texttt{gl\_PointCoord} to render each lit point as a soft circular patch.
-Atomics are not required unless a future model changes from last-writer-wins
-color state to additive energy accumulation.
+\texttt{FPML.comp} is the lighting compute schedule.  It deposits contacted
+material color into \texttt{BoundaryLight[cell\_id]} with persistent
+last-writer-wins behavior.  \texttt{BoundaryLight.vert} passes the baked
+surface cell id to \texttt{BoundaryLight.frag}, and the fragment shader reads
+the cell-owned color directly.  Since the fragment shader reads the lighting
+SSBO, the \texttt{ParticleLighting} compute-finished wait includes the fragment
+shader stage.
+
+\subsection{Python Reference}
+
+Python remains the behavioral reference for photon contact and material color
+selection.  Its renderer may still use existing boundary markers as a coarse
+visual approximation, but the Vulkan target is cell-owned analytic surface
+color.  The Python model should not reintroduce the retired
+\texttt{BoundaryLightSample}/\texttt{BoundaryLightState} current/filter path or
+make the photon point itself the final visible surface lighting.
+
+\subsection{Deferred Spectral Lighting}
+
+Spectral lighting is not working in the current cell-owned Vulkan milestone.
+The next lighting work should decide what additional state is required beyond
+\texttt{rgb\_valid}.  Candidate future state includes photon wavelength or
+band, material spectral response, accumulated direction/coherence, or a
+separate debug view for spectral deposits.  That work should extend the
+cell-owned \texttt{BoundaryLightRecord} path deliberately rather than reviving
+the old proxy-kernel or per-frame filtered-light buffers.
 
 \subsection{Decision}
 
-The visible surface-cell path is retired.  The active target is
-boundary-space lighting:
+The active Vulkan path is:
 \[
     \textrm{photon hit}
     \rightarrow
-    \textrm{persistent boundary proxy color}
+    \textrm{persistent cell-owned surface color}
     \rightarrow
-    \textrm{kernel-spread surface sample color}.
+    \textrm{analytic surface fragment color}.
 \]
 
-This preserves the useful lesson from surface cells--lighting must belong to
-surface space--without introducing triangles or a visible fake surface mesh.
+This preserves the useful lesson from the earlier surface-cell idea: lighting
+must belong to surface space.  The current implementation achieves that without
+making the visible boundary particles carry the final surface color.

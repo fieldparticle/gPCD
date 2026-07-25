@@ -3034,7 +3034,7 @@ rendering and diagnostics
 
 \subsubsection{Analysis}
 
-This is the first useful proof of the lighting architecture:
+This was the first useful proof of the proxy-owned lighting architecture:
 \[
     \textrm{photon hit}
     \rightarrow
@@ -3049,8 +3049,61 @@ debug settings.  Boundary-space lighting state lives in the lighting resource.
 The renderer owns spread.  Photons remain transport/debug particles and do not
 carry final visible surface lighting.
 
-The next step is visual refinement of the point-list renderer.  Because
-Vulkan is still drawing point primitives, \texttt{FPML.frag} should use
-\texttt{gl\_PointCoord} to shape each lit boundary point into a soft patch.
-That can improve the rendered surface without introducing triangles or
-returning to visible surface-cell geometry.
+The immediate next experiment was visual refinement of the point-list
+renderer.  That experiment exposed the limit of sparse boundary particles as
+the final surface canvas and led to the cell-owned surface-lighting step
+recorded below.
+
+\subsection{Boundary-Space Lighting Becomes Cell-Owned}
+
+\subsubsection{previous form}
+
+The first Vulkan boundary-space implementation stored persistent color in one
+\texttt{BoundaryLightRecord} per boundary particle.  Photon contact deposited
+the contacted material color into the contacted boundary proxy, and rendering
+sampled nearby valid proxies by angular distance.  This proved the
+contact-to-light path, but the sparse sphere markers were too coarse to behave
+like a continuous surface.  The result could appear as point circles, fan-out,
+or unjoined patch regions rather than a solid surface-cell color.
+
+\subsubsection{current form}
+
+\texttt{ParticleLighting} now treats the lighting resource as cell-owned
+surface state.  \texttt{ResourceLighting.cpp} allocates one
+\texttt{BoundaryLightRecord} per spatial cell.  \texttt{FPML.comp} computes
+the analytic lighting-ball hit point,
+\begin{verbatim}
+LIGHTING_BALL_CENTER + contactNormal * LIGHTING_BALL_RADIUS
+\end{verbatim}
+maps that point to a cell address, and writes the contacted material color to
+\texttt{BoundaryLight[cellId].rgb\_valid}.  The lighting sphere render resource
+bakes each render vertex's owning cell id into the vertex data, passes it flat
+to \texttt{BoundaryLight.frag}, and the fragment shader reads
+\texttt{BoundaryLight[surfaceCellId]} directly.
+
+\subsubsection{difference outcome}
+
+rendering and diagnostics
+
+\subsubsection{Analysis}
+
+This changes the owner of visible surface lighting from sparse boundary
+particles to the spatial cells that contain the analytic surface.  Boundary
+particles remain broad-phase locality markers, photons remain transport/debug
+particles, and the sphere mesh remains render geometry only.  The shader no
+longer needs angular proxy spread, falloff, or weighted color averaging for
+the first \texttt{LightingBall} surface pass.
+
+The result is the first Vulkan form that matches the intended mental model:
+\[
+    \textrm{photon hit}
+    \rightarrow
+    \textrm{persistent cell-owned surface color}
+    \rightarrow
+    \textrm{analytic surface fragment color}.
+\]
+
+Spectral lighting is not yet working in this milestone.  It should be added
+as an extension of the cell-owned lighting resource rather than by restoring
+the retired proxy-kernel, per-frame current/filter buffers, or photon-owned
+surface color.

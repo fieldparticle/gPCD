@@ -3,9 +3,9 @@
 %*******************************************************************
 % $Author: jb $
 %
-% $Date: 2023-06-12 16:17:58 -0400 (Mon, 12 Jun 2023) $
-% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src_app/mfpm/DrawObj.hpp $
-% $Id: DrawObj.hpp 31 2023-06-12 20:17:58Z jb $
+% $Date: 2023-05-03 15:30:42 -0400 (Wed, 03 May 2023) $
+% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src/vulkan/ResourceVertex.hpp $
+% $Id: ResourceVertex.hpp 28 2023-05-03 19:30:42Z jb $
 %*******************************************************************
 %***                         DESCRIPTION                         ***
 %*******************************************************************
@@ -25,41 +25,32 @@
 ********************************************************************
 %***                     SVN CHANGE RECORD                       ***
 %*******************************************************************
-%*$Revision: 31 $
+%*$Revision: 28 $
 %*
 %*
 %******************************************************************/
-
-
-#ifndef DrawParticleLighting_HPP
-#define DrawParticleLighting_HPP
-
-class DrawParticleLighting : public DrawObj
+#ifndef ResourceLightingSphere_HPP
+#define ResourceLightingSphere_HPP
+class ResourceVertexParticle;
+class ResourceLightingSphere : public ResourceVertexObj
 {
     public:
-    
-		std::vector<Resource*> m_Graphicslst = {};
-		std::vector<Resource*> m_Computelst = {};
-		CommandObj* m_ComputeCommandObj = {};
-		CommandObj* m_GraphicsCommandObj = {};
+		
+		ResourceLightingSphere(VulkanObj* App, std::string Name) :
+			ResourceVertexObj(App, Name) {};
+		virtual void UpdateMem() {};
+		virtual void GetShaderMem() {};
+		virtual void CopyMem() {};
 
-
-    virtual void DrawFrame(); 
-	void Create(CommandPoolObj* CPL,
-		SwapChainObj* SCO,
-		RenderPassObj* RPO,
-		FrameBufferObj* FBO,
-		SyncObj* SO,
-		ExportObject *EO);
-
-
+		virtual void* GetBuffer(uint32_t bufNum,
+			uint32_t ImageIndex, unsigned long& size) {
+			return NULL;
+		};
+		virtual void AskObject(uint32_t AnyNumber) {};
+		virtual void Create(ResourceVertexParticle* PartVert);
+		
 	
-	DrawParticleLighting(VulkanObj* App, std::string Name) : DrawObj(Name,App ){};
-	uint32_t currentBuffer = 0;
-
-    void Cleanup(){
-       
-    };
 	
+
 };
 #endif

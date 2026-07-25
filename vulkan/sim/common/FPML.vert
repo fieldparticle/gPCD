@@ -296,8 +296,13 @@ void fpml_vert_main(){
 		
 	}
 	vec4 mappedColor = color_map(uint(index));
-	fragColor = BoundaryLightColor(uint(index), mappedColor);
+	if (IsBoundaryParticleForLighting(uint(index)))
+	{
+		gl_PointSize = 0.0;
+		fragColor = vec4(0.0);
+		return;
+	}
+	fragColor = mappedColor;
 	
 	
 }
-

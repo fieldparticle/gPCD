@@ -14,27 +14,27 @@ Lighting_ball = {
 // --------------------------------------------------------------------------
 // Boundary-space lighting
 // --------------------------------------------------------------------------
-boundary_space_lighting_enabled = true;
-boundary_space_patch_angle = 0.20;
-boundary_space_patch_radius = 0.50;
-boundary_space_patch_falloff = "quadratic";
+boundary_space_lighting_enabled 	= true;
+boundary_space_patch_angle 			= 0.50;
+boundary_space_patch_radius			= 0.50;
+boundary_space_patch_falloff 		= "quadratic";
 
 // --------------------------------------------------------------------------
 // Domain and view
 // --------------------------------------------------------------------------
-x_axis_lims = [0.0, 20.0];
-y_axis_lims = [0.0, 20.0];
-z_axis_lims = [0.0, 22.0];
+x_axis_lims 				= [0.0, 20.0];
+y_axis_lims 				= [0.0, 20.0];
+z_axis_lims 				= [0.0, 22.0];
 
-cell_array_width = 20;
-cell_array_height = 20;
-cell_array_depth = 22;
-death_bounds = [1, 19, 1, 19, 1, 21];
-cell_occupancy_list_size = 256;
+cell_array_width 			= 20;
+cell_array_height 			= 20;
+cell_array_depth 			= 22;
+death_bounds 				= [1, 19, 1, 19, 1, 21];
+cell_occupancy_list_size 	= 256;
 
-view_center = [3.5, 2.5, 2.5];
-zoom = 1.25;
-gl_point_size = 2.0;
+view_center 				= [3.5, 2.5, 2.5];
+zoom 						= 1.25;
+gl_point_size 				= 12.0;
 
 // --------------------------------------------------------------------------
 // Photon stream
@@ -76,13 +76,13 @@ rectangle_wall_segments = {};
 // --------------------------------------------------------------------------
 // Particle geometry and integration
 // --------------------------------------------------------------------------
-particle_separation_distance = 0.005;
-radius = 0.05;
-dt = 0.045;
+particle_separation_distance 	= 0.005;
+radius 							= 0.05;
+dt 								= 0.045;
 
 // --------------------------------------------------------------------------
 // Output
 // --------------------------------------------------------------------------
-study = false;
-num_studies = 0;
-output_file_prefix = "LightingBall_Vk";
+study 				= false;
+num_studies 		= 0;
+output_file_prefix 	= "LightingBall_Vk";

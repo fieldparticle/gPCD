@@ -21,18 +21,46 @@ vec4 boundary_light_material_color(uint materialID)
     return vec4(1.0, 1.0, 1.0, 1.0);
 }
 
+uint boundary_light_cell_coord(float value, uint maxValue)
+{
+    if (maxValue == 0u) {
+        return 0u;
+    }
+    if (value <= 0.0) {
+        return 0u;
+    }
+    uint lastValue = maxValue - 1u;
+    if (value >= float(lastValue)) {
+        return lastValue;
+    }
+    return uint(floor(value));
+}
+
+uint boundary_light_cell_address(vec3 worldPosition)
+{
+    return ArrayToIndex(uvec3(
+        boundary_light_cell_coord(worldPosition.x, WIDTH),
+        boundary_light_cell_coord(worldPosition.y, HEIGHT),
+        boundary_light_cell_coord(worldPosition.z, DEPTH)));
+}
+
+void DepositBoundaryLightAtCell(uint cellID, uint materialID)
+{
+    if (cellID == npos || cellID >= MAX_CELL_ARRAY_LOCATIONS) {
+        return;
+    }
+    BoundaryLight[cellID].rgb_valid =
+        vec4(boundary_light_material_color(materialID).rgb, 1.0);
+}
+
 void DepositBoundaryLight(uint targetParticleID, uint materialID)
 {
-    if (BOUNDARY_SPACE_PROXY_COUNT == 0u
-            || targetParticleID < BOUNDARY_SPACE_FIRST_PARTICLE_ID) {
+    if (targetParticleID >= uint(ShaderFlags.Ptot)) {
         return;
     }
-    uint boundaryIndex = targetParticleID - BOUNDARY_SPACE_FIRST_PARTICLE_ID;
-    if (boundaryIndex >= BOUNDARY_SPACE_PROXY_COUNT) {
-        return;
-    }
-    BoundaryLight[boundaryIndex].rgb_valid =
-        vec4(boundary_light_material_color(materialID).rgb, 1.0);
+    DepositBoundaryLightAtCell(
+        boundary_light_cell_address(GetParticlePosition(targetParticleID).xyz),
+        materialID);
 }
 
 void fpml_comp_main()
@@ -120,8 +148,11 @@ void fpml_comp_main()
                         if (lightingBallResult.handled) {
                             lightingBallContactProcessed = true;
                             if (photonSource) {
-                                DepositBoundaryLight(
-                                    TargetID,
+                                vec3 hitPoint = LIGHTING_BALL_CENTER
+                                    + lightingBallResult.segment.normal
+                                    * LIGHTING_BALL_RADIUS;
+                                DepositBoundaryLightAtCell(
+                                    boundary_light_cell_address(hitPoint),
                                     LIGHTING_BALL_MATERIAL_ID);
                                 photonVelocity = ReflectFixedSpeed(
                                     photonVelocity,

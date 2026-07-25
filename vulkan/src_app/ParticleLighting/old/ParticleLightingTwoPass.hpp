@@ -4,8 +4,8 @@
 % $Author: jb $
 %
 % $Date: 2023-06-12 16:17:58 -0400 (Mon, 12 Jun 2023) $
-% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src_app/mfpm/DrawObj.hpp $
-% $Id: DrawObj.hpp 31 2023-06-12 20:17:58Z jb $
+% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src/vulkan/VulkanObj.hpp $
+% $Id: VulkanObj.hpp 31 2023-06-12 20:17:58Z jb $
 %*******************************************************************
 %***                         DESCRIPTION                         ***
 %*******************************************************************
@@ -31,35 +31,4 @@
 %******************************************************************/
 
 
-#ifndef DrawParticleLighting_HPP
-#define DrawParticleLighting_HPP
 
-class DrawParticleLighting : public DrawObj
-{
-    public:
-    
-		std::vector<Resource*> m_Graphicslst = {};
-		std::vector<Resource*> m_Computelst = {};
-		CommandObj* m_ComputeCommandObj = {};
-		CommandObj* m_GraphicsCommandObj = {};
-
-
-    virtual void DrawFrame(); 
-	void Create(CommandPoolObj* CPL,
-		SwapChainObj* SCO,
-		RenderPassObj* RPO,
-		FrameBufferObj* FBO,
-		SyncObj* SO,
-		ExportObject *EO);
-
-
-	
-	DrawParticleLighting(VulkanObj* App, std::string Name) : DrawObj(Name,App ){};
-	uint32_t currentBuffer = 0;
-
-    void Cleanup(){
-       
-    };
-	
-};
-#endif

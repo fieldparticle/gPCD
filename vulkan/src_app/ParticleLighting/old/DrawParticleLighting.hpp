@@ -31,18 +31,32 @@
 %******************************************************************/
 
 
-#ifndef DrawParticleLighting_HPP
-#define DrawParticleLighting_HPP
+#ifndef DRAWPARTICLELIGHTING_HPP
+#define DRAWPARTICLELIGHTING_HPP
 
 class DrawParticleLighting : public DrawObj
 {
     public:
-    
-		std::vector<Resource*> m_Graphicslst = {};
-		std::vector<Resource*> m_Computelst = {};
-		CommandObj* m_ComputeCommandObj = {};
-		CommandObj* m_GraphicsCommandObj = {};
+		std::string m_ImageDir;
+		std::string m_ImagePrefix;
+	void flushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, VkCommandPool pool, bool free);
+	void flushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, bool free);
 
+	void insertImageMemoryBarrier(
+	VkCommandBuffer cmdbuffer,
+	VkImage image,
+	VkAccessFlags srcAccessMask,
+	VkAccessFlags dstAccessMask,
+	VkImageLayout oldImageLayout,
+	VkImageLayout newImageLayout,
+	VkPipelineStageFlags srcStageMask,
+	VkPipelineStageFlags dstStageMask,
+	VkImageSubresourceRange subresourceRange);
+	VkCommandBuffer createCommandBuffer(VkCommandBufferLevel level, VkCommandPool pool, bool begin=false);
+	VkCommandPool createCommandPool(uint32_t queueFamilyIndex, VkCommandPoolCreateFlags createFlags);
+	uint32_t getMemoryType(uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32 *memTypeFound = nullptr);
+	VkCommandBuffer createCommandBuffer(VkCommandBufferLevel level, bool begin);
+	void SaveImage(uint32_t ImgNum);
 
     virtual void DrawFrame(); 
 	void Create(CommandPoolObj* CPL,
@@ -50,7 +64,7 @@ class DrawParticleLighting : public DrawObj
 		RenderPassObj* RPO,
 		FrameBufferObj* FBO,
 		SyncObj* SO,
-		ExportObject *EO);
+		ExportObject* EO);
 
 
 	

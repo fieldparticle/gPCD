@@ -7,10 +7,9 @@
 \subsubsection{Schedule}
 
 The first boundary-space lighting milestone is complete for
-\texttt{LightingBall}.  Python deposits persistent color on existing boundary
-proxies, and Vulkan \texttt{ParticleLighting} uses the \texttt{FPML.*} shader
-family plus \texttt{BoundaryLightRecord} records to produce the same visible
-result.
+\texttt{LightingBall}.  Python proves photon contact and material color
+selection, and Vulkan \texttt{ParticleLighting} now stores persistent
+cell-owned surface color in \texttt{BoundaryLightRecord} records.
 
 \subsubsection{Validated Form}
 
@@ -18,23 +17,22 @@ The first implementation should prove:
 \[
     \textrm{photon hit}
     \rightarrow
-    \textrm{persistent boundary proxy color}
+    \textrm{persistent cell-owned surface color}
     \rightarrow
-    \textrm{kernel-spread surface color}.
+    \textrm{analytic surface fragment color}.
 \]
 
-This uses existing boundary particles as the first persistent proxies.  Do not
-restore the retired \texttt{BoundaryLightSample}/\texttt{BoundaryLightState}
-arrays, visible surface-cell grid, eye-driven brightness, or per-frame
-clear/filter path.
+This uses cells as the first persistent surface-light owners.  Do not restore
+the retired \texttt{BoundaryLightSample}/\texttt{BoundaryLightState} arrays,
+visible surface-cell grid, eye-driven brightness, proxy-kernel spread, or
+per-frame clear/filter path.
 
 \subsubsection{Deferred Work}
 
-The next Vulkan rendering refinement is to use \texttt{gl\_PointCoord} in the
-lighting fragment shader so each boundary point renders as a soft patch
-instead of a hard point.  Directional specular, additive energy accumulation,
-temporal filtering, decay, and a separate compact Vulkan proxy table remain
-deferred.
+The next active lighting task is spectral lighting.  Directional specular,
+additive energy accumulation, temporal filtering, decay, and separate compact
+material response tables remain deferred until the cell-owned color path is
+stable.
 
 \subsection{Vulkan Test-File View Defaults}
 

@@ -29,13 +29,23 @@
 %*
 %*
 %******************************************************************/
-#ifndef COMMANDLIGHTINGGRAPHICS_HPP
-#define COMMANDLIGHTINGGRAPHICS_HPP
+#ifndef CommandLightingGraphics_HPP
+#define CommandLightingGraphics_HPP
 
 class CommandLightingGraphics : public CommandObj
 {
 public:
-	virtual void RecordCommands( uint32_t imageIndex, uint32_t currentBuffer);
-	CommandLightingGraphics(VulkanObj* App, std::string Name) : CommandObj(App, Name) {};
+	virtual void Create(SwapChainObj* SCO,
+		FrameBufferObj* FBO,
+		RenderPassObj* RPO,
+		ResourceContainerObj* RCO,
+		std::vector<PipelineObj*> PLO);
+	uint32_t m_BoundarySubPass = 0;
+	uint32_t m_ParticleSubPass = 0;
+	virtual void RecordCommands(uint32_t currentBuffer,uint32_t imageIndex);
+	
+	CommandLightingGraphics(VulkanObj* App, std::string Name) : CommandObj(App, Name){};
+	void RecordSubPassCube(uint32_t imageindex, uint32_t currentBuffer);
+	void RecordSubPassParticle(uint32_t imageindex, uint32_t currentBuffer);
 };
 #endif

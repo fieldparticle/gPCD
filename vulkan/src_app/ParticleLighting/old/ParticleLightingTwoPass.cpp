@@ -30,24 +30,24 @@
 %*
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
-#include "TCPIP/TCPSObj.hpp"
 
 
-int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
+
+int ParticleBoundaryandSphere(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 {
 
-	VulkanObj* vulkanObj
+	VulkanObj* vulkanObj 
 		= new VulkanObj;
-	PhysDevObj* physDevObj
+	PhysDevObj* physDevObj 
 		= new PhysDevObj(vulkanObj, "PhysDevObj");
-	InstanceObj* instanceObject
+	InstanceObj* instanceObject 
 		= new InstanceObj(vulkanObj,"InstanceObject");
-	ShaderObj* shaderObj
+	ShaderObj* shaderObj 
 		= new ShaderObj(vulkanObj, "ShaderObj");
-	ResourceLightingSphere* resourceVertexSphere
-		= new ResourceLightingSphere(vulkanObj, "VertexSphere");
-	ResourceLightingCube* resourceVertexCube
-		= new ResourceLightingCube(vulkanObj, "VertexCube");
+	ResourceVertexSphere* resourceVertexSphere
+		= new ResourceVertexSphere(vulkanObj, "VertexSphere");
+	ResourceVertexCube* resourceVertexCube
+		= new ResourceVertexCube(vulkanObj, "VertexCube");
 	ResourceVertexParticle* resourceVertexParticle
 		= new ResourceVertexParticle(vulkanObj, "VertexParticle");
 	ResourceParticleUBO* resourceParticleUBO
@@ -64,8 +64,6 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 		= new ResourceParticlePush(vulkanObj, "PushConstants");
 	ResourceCollMatrix* resourceCollMatrix
 		= new ResourceCollMatrix(vulkanObj, "CollisionImage");
-	ResourceLighting* resourceLighting
-		= new ResourceLighting(vulkanObj, "LightingResources");
 	ResourceLockMatrix* resourceLockMatrix
 		= new ResourceLockMatrix(vulkanObj, "CollisionLockImage");
 	ResourceGraphicsContainer* resourceGraphicsContainer
@@ -76,36 +74,36 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 		= new SwapChain(vulkanObj, "SwapChain");
 	RenderPassSubs* renderPass
 		= new RenderPassSubs(vulkanObj, "RenderPassBoundary");
-	SubPassBoundary* subPassBoundary
+	SubPassBoundary* subPassBoundary 
 		= new SubPassBoundary(vulkanObj, "SubpassCube");
-	SubPassParticle* subPassParticle
+	SubPassParticle* subPassParticle 
 		= new SubPassParticle(vulkanObj, "SubpassParticle");
-	ImageDepth* imageDepth
+	ImageDepth* imageDepth 
 		= new ImageDepth(vulkanObj, "DepthImage");
 	ImageColor* imageColor
 		= new ImageColor(vulkanObj, "ColorImage");
 	CommandPoolObj* commandPool = new CommandPoolObj(vulkanObj, "CmdPool");
 	CommandObj* commandParticleCompute
 		= new  CommandParticleCompute(vulkanObj, "CommandParticleCompute");
-	CommandLightingGraphics* commandParticleGraphicsSub
-		= new  CommandLightingGraphics(vulkanObj, "CommandObjParticleGraphics");
-	PipelineGraphicsLighting* pipelineGraphicsLighting
-		= new PipelineGraphicsLighting(vulkanObj, "Graphics Pipeline Boundary");
+	CommandParticleBoundaryAndSpheres* commandParticleGraphicsSub
+		= new  CommandParticleBoundaryAndSpheres(vulkanObj, "CommandObjParticleGraphics");
+	PipelineGraphicsBoundary* pipelineGraphicsBoundary
+		= new PipelineGraphicsBoundary(vulkanObj, "Graphics Pipeline Boundary");
 	PipelineGraphicsParticleOnly* pipelineGraphicsParticle
 		= new PipelineGraphicsParticleOnly(vulkanObj, "Graphics Pipeline Particle");
-	PipelineComputeLighting* pipelineComputeParticle
-		= new PipelineComputeLighting(vulkanObj, "Compute Pipeline Lighting");
-	FrameBufferSubPass* frameBuffer
+	PipelineComputeParticle* pipelineComputeParticle
+		= new PipelineComputeParticle(vulkanObj, "Compute Pipeline Particle");
+	FrameBufferSubPass* frameBuffer 
 		= new FrameBufferSubPass(vulkanObj, "FrameBufferSubPass");
-	SyncObj* syncObjects
+	SyncObj* syncObjects 
 		= new SyncObj(vulkanObj, "cubeSyncObj");
 	DrawParticleBoundary* drawParticleBoundary
 		= new DrawParticleBoundary(vulkanObj, "Draw Instance Particle");
 	ExportObject* exportObject = new ExportObject(vulkanObj, "SSBO Export");
-
+	
 
 	//================================= Create =================================
-
+	
 	vulkanObj->Create(CfgApp, physDevObj);
 	instanceObject->Create();
 	physDevObj->Create(CfgApp);
@@ -125,9 +123,7 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	resourceVertexSphere->Create(resourceVertexParticle);
 	resourceVertexCube->Create(resourceVertexParticle);
 	resourceCollMatrix->Create(3, resourceVertexParticle);
-
 	resourceLockMatrix->Create(6, resourceVertexParticle);
-	resourceLighting->Create(8, resourceVertexParticle);
 	resourceParticlePush->Create(resourceVertexParticle);
 	resourceAtomicCompute->Create(5, perObj);
 	resourceAtomicG->Create(5,perObj);
@@ -145,46 +141,44 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 											resourceUBOSphere,
 											subPassParticle,
 											subPassBoundary,			//#####JMB## fix this
-											resourceLighting,
 											resourceCollMatrix,
 											resourceLockMatrix,
 											resourceAtomicG, });
 	resourceGraphicsContainer->ClearTempMemory();
 	resourceComputeContainer->Create({ 	resourceParticlePush,
-										resourceLighting,
 										resourceVertexParticle,
 										resourceAtomicCompute,
 										resourceLockMatrix,
 										resourceCollMatrix});
 	resourceComputeContainer->ClearTempMemory();
-	pipelineGraphicsLighting->Create(shaderObj, swapChain, resourceGraphicsContainer, renderPass);
+	pipelineGraphicsBoundary->Create(shaderObj, swapChain, resourceGraphicsContainer, renderPass);
 	pipelineGraphicsParticle->Create(shaderObj, swapChain, resourceGraphicsContainer, renderPass);
 	pipelineComputeParticle->Create(shaderObj, resourceComputeContainer);
-
+	
 	// Create coomand for grphics pipline
-	commandParticleGraphicsSub->Create(swapChain,
-										frameBuffer,
-										renderPass,
+	commandParticleGraphicsSub->Create(swapChain, 
+										frameBuffer, 
+										renderPass, 
 										resourceGraphicsContainer,
-										{ pipelineGraphicsLighting,pipelineGraphicsParticle }
+										{ pipelineGraphicsBoundary,pipelineGraphicsParticle }
 										);
 
-	commandParticleCompute->Create(swapChain,
+	commandParticleCompute->Create(swapChain, 
 									frameBuffer,
-									renderPass,
+									renderPass, 
 									resourceComputeContainer,
 									{ pipelineComputeParticle }
 									);
-
+	
 	commandPool->Create(physDevObj, swapChain, renderPass, frameBuffer,
 		{ commandParticleGraphicsSub,commandParticleCompute });
 	exportObject->Create(resourceVertexParticle);
-
+			
 	syncObjects->Create();
 	syncObjects->AddFence("inflightFence");
 	syncObjects->AddFence("computeInflightFence");
 	syncObjects->AddWaitSemaphore("imageAvailableSemaphore", VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-	syncObjects->AddWaitSemaphore("computeFinishedSemaphore", VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+	syncObjects->AddWaitSemaphore("computeFinishedSemaphore", VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
 	syncObjects->AddSignalImageSemaphore("renderFinishedSemaphore", swapChain->m_NumSwapImages);
 
 	MemStats(vulkanObj);
@@ -197,8 +191,8 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 
 	double		lastTime = glfwGetTime();
 	int			nbFrames = 0;
-
-
+	
+	
 
 	SetCallBacks(vulkanObj);
 	int ret = 0;
@@ -206,5 +200,5 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	vulkanObj->CleanAll();
 	vulkanObj->Cleanup();
 	return ret;
-
 }
+

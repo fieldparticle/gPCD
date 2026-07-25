@@ -34,7 +34,6 @@
 
 namespace
 {
-	constexpr float PTYPE_BOUNDARY = 2.0f;
 	constexpr uint32_t BOUNDARY_LIGHT_SURFACE_NONE = 0u;
 	constexpr uint32_t BOUNDARY_LIGHT_SURFACE_SPHERE = 1u;
 }
@@ -47,12 +46,15 @@ void ResourceLighting::Create(uint32_t BindPoint, ResourceVertexParticle* partic
 	m_BindPoint = BindPoint;
 	m_thisFramesBuffered = 1;
 	CreateLayout();
-	if (particle->m_NumBoundaryParticles == 0)
+
+	const uint32_t cellCount = m_CellW * m_CellH * m_CellL;
+	if (cellCount == 0u)
 	{
 		std::ostringstream  errtxt;
-		errtxt << m_Name << " ResourceLighting::Create no boundary light records." << std::ends;
+		errtxt << m_Name << " ResourceLighting::Create no boundary-space cells." << std::ends;
 		throw std::runtime_error(errtxt.str().c_str());
 	}
+
 	uint32_t surfaceType = BOUNDARY_LIGHT_SURFACE_NONE;
 	uint32_t surfaceID = 0u;
 	if (CfgTst->CheckKey("Lighting_ball"))
@@ -63,34 +65,18 @@ void ResourceLighting::Create(uint32_t BindPoint, ResourceVertexParticle* partic
 	}
 
 	std::vector<BoundaryLightRecord> lightRecords;
-	lightRecords.reserve(particle->m_NumBoundaryParticles);
-	for (uint32_t particleID = 0u; particleID < particle->m_Particles.size(); particleID++)
+	lightRecords.reserve(cellCount);
+	for (uint32_t cellID = 0u; cellID < cellCount; cellID++)
 	{
-		const Particle& src = particle->m_Particles[particleID];
-		if (src.ptype != PTYPE_BOUNDARY)
-			continue;
-
 		BoundaryLightRecord record{};
 		record.rgb_valid = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-		record.normal_material = glm::vec4(
-			src.VelRadA.x,
-			src.VelRadA.y,
-			src.VelRadA.z,
-			src.material_id);
+		record.normal_material = glm::vec4(0.0f);
 		record.ids = glm::uvec4(
-			particleID,
+			cellID,
 			surfaceType,
 			surfaceID,
 			0u);
 		lightRecords.push_back(record);
-	}
-	if (lightRecords.size() != particle->m_NumBoundaryParticles)
-	{
-		std::ostringstream  errtxt;
-		errtxt << m_Name << " ResourceLighting::Create boundary record count mismatch."
-			<< " expected:" << particle->m_NumBoundaryParticles
-			<< " actual:" << lightRecords.size() << std::ends;
-		throw std::runtime_error(errtxt.str().c_str());
 	}
 	m_BufSize = static_cast<uint64_t>(sizeof(BoundaryLightRecord))*lightRecords.size();
 	m_Buffers.resize(m_thisFramesBuffered);

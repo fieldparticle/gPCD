@@ -55,10 +55,10 @@ into the surface.
 
 Lighting display now uses the first boundary-space lighting rule.  Photons
 remain transport/debug particles.  When a photon contacts the analytic sphere
-or another boundary target, the contacted boundary proxy stores the surface
-material color in persistent boundary-space state.  The Python renderer then
-colors existing boundary markers by sampling nearby valid proxies on the same
-surface.  It does not create triangles or visible surface-cell geometry.
+or another boundary target, the contacted surface region stores the surface
+material color in persistent boundary-space state.  Python remains the
+behavioral reference for photon contact and material color selection; its
+current display can use existing boundary markers as a coarse approximation.
 
 The old \texttt{BoundaryLightSample}/\texttt{BoundaryLightState} current and
 filtered path remains retired.  Eye position, field of view, diffuse terms,
@@ -80,10 +80,11 @@ emits \texttt{ForceDynamicsSimpleLightingBall.glsl}.
 The basic particle applications use the clean \texttt{FPM.*} shader family.
 \texttt{FPM.*} contains ordinary dynamics and particle diagnostics only.  It
 does not include the lighting SSBO or photon lighting behavior.  The lighting
-application uses the \texttt{FPML.*} shader family.  \texttt{FPML.comp}
-contains the photon-aware compute schedule and deposits persistent surface
-color into the lighting resource.  \texttt{FPML.vert} samples that persistent
-state and spreads it over existing boundary particles.
+application uses the \texttt{FPML.*} shader family for photon-aware compute
+and particle/debug rendering.  The lighting surface itself uses
+\texttt{BoundaryLight.vert} and \texttt{BoundaryLight.frag}.  \texttt{FPML.comp}
+deposits persistent surface color into the lighting resource, and the
+lighting surface fragment shader reads that cell-owned state directly.
 
 Vulkan rendering also uses the material-owned color-mode contract.  Material
 records contain \texttt{color\_mode} and \texttt{color}.  The generated
@@ -128,17 +129,21 @@ the lighting model.
 and Vulkan:
 \begin{itemize}
     \item keep photons as transport/debug particles;
-    \item map photon contacts to existing boundary proxies;
-    \item store persistent proxy color from the contacted surface material;
-    \item render boundaries from sampled proxy color instead of drawing light
-          only on the photon point;
+    \item map photon contacts to analytic surface hit cells;
+    \item store persistent cell-owned color from the contacted surface
+          material;
+    \item render the analytic sphere surface from the owning cell color
+          instead of drawing light only on the photon point;
     \item keep \texttt{color\_map.glsl} under exporter ownership so photon
           \texttt{ptype}, temporary photon \texttt{material\_id}, and material
           display behavior cannot drift from the generated Vulkan contract.
 \end{itemize}
 
 The current Vulkan lighting resource stores one \texttt{BoundaryLightRecord}
-per boundary particle.  The resource is bound only in the \texttt{ParticleLighting}
-application and only consumed by the \texttt{FPML.*} shader family.  The
-validated state is that \texttt{LightingBall} in Vulkan runs and visually
-matches the Python simulation.
+per spatial cell.  \texttt{ResourceLighting.cpp} sizes the buffer as
+\texttt{CellAryW * CellAryH * CellAryL}.  The sphere render resource bakes the
+owning cell id for each sphere vertex into the vertex data, and the lighting
+fragment shader reads \texttt{BoundaryLight[surfaceCellId]}.  The validated
+state is that \texttt{LightingBall} in Vulkan runs and shows solid cell-owned
+surface lighting.  Spectral lighting is not yet working and is the next
+lighting feature to revisit.
