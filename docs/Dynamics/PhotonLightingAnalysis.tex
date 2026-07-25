@@ -26,9 +26,9 @@ This is useful for debugging whether photons hit the correct surface and
 whether the material color source is being read correctly.  Surface lighting
 itself is now owned by \texttt{BoundaryLightRecord} state in the
 \texttt{ParticleLighting} Vulkan path.  For \texttt{LightingBall}, photon
-contact deposits the contacted material color into the spatial cell containing
-the analytic hit point, and the lighting surface fragment shader reads that
-cell-owned color.
+contact deposits incidence-weighted RGB-band spectral color into the spatial
+cell containing the analytic hit point, and the lighting surface fragment
+shader reads that cell-owned color.
 
 \subsection{Why Direct Photon Rendering Was Unsatisfying}
 
@@ -81,7 +81,9 @@ Several pieces of the target system already exist in partial form:
     \item fixed-speed photon reflection;
     \item photon-wall, photon-sphere, and photon-particle optical contact
           detection;
-    \item surface material color lookup through \texttt{material\_id};
+    \item surface material lookup through \texttt{material\_id};
+    \item material spectral fields through \texttt{spectral\_response},
+          \texttt{spectral\_emission}, and \texttt{photon\_energy};
     \item analytic sphere normals in the lighting-ball evaluator;
     \item rectangle-wall normals from \texttt{rectangle\_wall\_segments};
     \item material debug visibility and debug color for optional photon
@@ -90,28 +92,28 @@ Several pieces of the target system already exist in partial form:
 
 These pieces are enough to prove transport, contact, and material-source
 behavior.  The current Vulkan \texttt{LightingBall} path adds the first
-persistent illumination owner by storing color in one lighting record per
-spatial cell.
+persistent illumination owner by storing visible spectral deposit color in one
+lighting record per spatial cell.
 
 \subsection{Remaining Missing Pieces}
 
-The missing architecture is no longer the basic boundary-owned light state.
-That first color path is now present in Vulkan as cell-owned
-\texttt{BoundaryLightRecord} state.  The remaining gap is richer light
-response, especially spectral lighting.
-
-The next target should answer what additional state is required beyond
-\texttt{rgb\_valid}.  Candidate additions include:
+The missing architecture is no longer the basic boundary-owned light state or
+the first spectral response.  Cell-owned \texttt{BoundaryLightRecord} state is
+active, and the first incidence-weighted RGB-band spectral deposit is active.
+The remaining gap is richer photon behavior:
 \begin{itemize}
-    \item photon wavelength, band, or spectral bin;
-    \item material spectral response or absorption;
+    \item a diffuse light stream that illuminates from a distribution of
+          directions;
+    \item absorbing surfaces that consume photons and make shadow regions;
+    \item reflective surfaces that redirect photons and carry spectral energy
+          onward;
     \item separate debug views for deposited color versus spectral state;
     \item optional accumulated direction/coherence for later specular work;
     \item debug counters for active photons, hits, and cell writes.
 \end{itemize}
 Atomics, additive current-frame accumulation, and temporal filtering are not
 part of the first cell-owned color implementation.  They remain possible later
-extensions after spectral requirements are defined.
+extensions after the transport behavior rules are defined.
 
 \subsection{Recommended Migration Path}
 
@@ -131,14 +133,22 @@ and deposit:
     E_p C_{\mathrm{incidence}} .
 \]
 
-The active Vulkan implementation writes exactly one spatial cell.  For the
+The active Vulkan implementation writes exactly one spatial cell per photon
+event.  For the
 analytic sphere, the contact normal gives the hit point:
 \begin{verbatim}
 LIGHTING_BALL_CENTER + contactNormal * LIGHTING_BALL_RADIUS
 \end{verbatim}
-The cell containing that point stores the contacted material color until
-another photon overwrites it.  This verifies the sign of the normal, the
-material color, and whether writes occur on the expected object.
+The cell containing that point stores:
+\[
+    E_p
+    \max \left(0, -\hat{\mathbf v}_{p} \cdot \hat{\mathbf n}_{s}\right)
+    \mathbf S_{\mathrm{photon}}
+    \mathbf R_{\mathrm{surface}}
+    \mathbf E_{\mathrm{surface}}
+\]
+until another photon overwrites it.  This verifies the sign of the normal,
+the material response, and whether writes occur on the expected object.
 
 \subsubsection{Stage 2: Render Boundary-Light Values}
 
@@ -157,9 +167,10 @@ prove that the boundary, not the photon point, is emitting the visible light.
 
 This earlier proxy-kernel stage is superseded for the current Vulkan
 \texttt{LightingBall} path.  The active renderer colors the analytic sphere
-from the owning cell id carried by the render vertex and read in the fragment
-shader.  A kernel may still be useful later for filtering or smoothing, but it
-is not the first visible surface-lighting rule.
+from the cell id computed from the fragment world position.  The fragment
+shader samples the current cell and six face-neighbor cells by distance to
+cell centers.  A wider kernel may still be useful later for filtering or
+smoothing, but it is not the first visible surface-lighting rule.
 
 The retired proxy-kernel form was:
 \[
@@ -183,7 +194,14 @@ implementation.
 
 \subsubsection{Stage 5: Material Optical Response}
 
-Add optical material controls after deposition is visible:
+The first material optical controls are active:
+\begin{itemize}
+    \item \texttt{spectral\_response};
+    \item \texttt{spectral\_emission};
+    \item \texttt{photon\_energy}.
+\end{itemize}
+
+The next optical behavior controls are:
 \begin{itemize}
     \item absorption;
     \item reflection;
@@ -191,8 +209,8 @@ Add optical material controls after deposition is visible:
     \item photon energy reduction or termination.
 \end{itemize}
 
-Until this stage, boundaries can be treated as fully absorbing for deposition
-while still reflecting photons for transport debugging.
+Until those behavior controls exist, boundaries can still deposit visible
+color while the current reflection rule remains a transport/debug behavior.
 
 \subsubsection{Deferred Directional Specular}
 
@@ -216,9 +234,10 @@ that contains the analytic sphere hit point.  Existing generated sphere markers
 remain useful because they make nearby analytic sphere geometry discoverable,
 but they no longer own the final Vulkan surface color.
 
-A separate spectral or energy sample set is deferred.  The current direction is
-to learn from the cell-owned color path first, then decide what extra Vulkan
-tables are required for spectral lighting.
+A separate spectral or energy sample set is still deferred.  The current
+direction is to keep \texttt{BoundaryLightRecord.rgb\_valid} as the final
+visible cell color while learning which transport behaviors require additional
+Vulkan tables.
 
 \subsection{Effect On Current Debug Controls}
 
@@ -240,10 +259,12 @@ implementation proves:
 \[
     \textrm{photon hit}
     \rightarrow
+    \textrm{incidence-weighted spectral deposit}
+    \rightarrow
     \textrm{persistent cell-owned surface color}
     \rightarrow
     \textrm{analytic surface fragment color}.
 \]
 
-The next decision is how spectral lighting should extend this cell-owned
-resource.
+The next decisions are, in order, diffuse light stream, absorbing shadow
+surface, and reflective surface.

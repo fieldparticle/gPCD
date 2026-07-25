@@ -1,8 +1,9 @@
 Current status:
-	- LightingBall Vulkan now shows solid cell-owned boundary-space surface lighting.
-	- Spectral lighting is not working yet and is the next lighting task.
+    - LightingBall uses cell-owned BoundaryLightRecord state with incidence-weighted RGB-band spectral deposit.
+    - Remaining bumpy appearance is documented as expected cell/sphere resolution behavior.
+
 Code Changes:
-	- Updated dynamics docs for cell-owned BoundaryLightRecord lighting.
-	- Added ProblemEvolution entry for proxy-kernel to cell-owned lighting transition.
-	- Updated LightingBall, PhotonLightingAnalysis, boundarySpaceLighting, and todo docs.
-Next: Define and implement the spectral lighting state on top of the cell-owned BoundaryLightRecord path.
+    - Updated Boundary-Space Lighting, LightingBall, Photon Lighting Analysis, Todo, and Problem Evolution docs.
+    - Recorded next lighting milestones: diffuse light stream, absorbing/shadow surface, reflective surface.
+
+Next: Implement diffuse light stream as the next LightingBall transport behavior.

@@ -3103,7 +3103,75 @@ The result is the first Vulkan form that matches the intended mental model:
     \textrm{analytic surface fragment color}.
 \]
 
-Spectral lighting is not yet working in this milestone.  It should be added
-as an extension of the cell-owned lighting resource rather than by restoring
-the retired proxy-kernel, per-frame current/filter buffers, or photon-owned
-surface color.
+At the close of this milestone, spectral lighting was still the next step.  It
+needed to be added as an extension of the cell-owned lighting resource rather
+than by restoring the retired proxy-kernel, per-frame current/filter buffers,
+or photon-owned surface color.  The following entry records that next step.
+
+\subsection{Incidence-Weighted Spectral Deposit Reaches Vulkan}
+
+\subsubsection{previous form}
+
+The cell-owned \texttt{LightingBall} milestone stored a persistent visible
+color in \texttt{BoundaryLightRecord.rgb\_valid}, but that color was still a
+simple contacted-material color.  The render pass could show that the surface
+owned the light, but it did not yet prove material spectral response or
+incidence-angle brightness.  Early render experiments also exposed triangle
+ownership artifacts when the sphere surface used a flat per-vertex cell id.
+
+\subsubsection{current form}
+
+\texttt{MaterialProperties} now carries RGB-band optical fields:
+\begin{verbatim}
+spectral_response = [r, g, b]
+spectral_emission = [r, g, b]
+photon_energy = value
+\end{verbatim}
+
+\texttt{ShaderObj} exports those fields to the generated Vulkan material
+record as \texttt{spectralResponseEnergy} and \texttt{spectralEmission}.
+\texttt{FPML.comp} computes the visible deposit from photon energy, photon
+spectrum, surface response, surface emission, and incidence:
+\[
+    \mathbf C_{\mathrm{visible}} =
+    E_p
+    \max \left(0, -\hat{\mathbf v}_{p} \cdot \hat{\mathbf n}_{s}\right)
+    \mathbf S_{\mathrm{photon}}
+    \mathbf R_{\mathrm{surface}}
+    \mathbf E_{\mathrm{surface}} .
+\]
+
+The result is still written into
+\texttt{BoundaryLight[cellId].rgb\_valid}.  The render-side contract remains
+simple: the fragment shader reads the final visible cell color.  To reduce
+visible triangle ownership artifacts, \texttt{BoundaryLight.frag} computes
+the cell id from the fragment world position and blends the current cell with
+the six face-neighbor cells by distance to cell center.  The lighting surface
+pass draws opaque color, so apparent transparency is not part of the active
+model.
+
+\subsubsection{difference outcome}
+
+rendering and diagnostics
+
+\subsubsection{Analysis}
+
+This is the first point where \texttt{LightingBall} has a Vulkan surface color
+that is owned by photon transport rather than by an analytic light or by the
+moving photon point.  The active chain is:
+\[
+    \textrm{photon hit}
+    \rightarrow
+    \textrm{incidence-weighted spectral deposit}
+    \rightarrow
+    \textrm{persistent cell-owned surface color}
+    \rightarrow
+    \textrm{analytic surface fragment color}.
+\]
+
+The current bumpy surface appearance is expected from the low-resolution
+cell/sphere field.  It is no longer the earlier point-sprite, proxy-circle, or
+triangle-flat-color failure.  The next model work should push transport
+behavior in order: diffuse light stream, absorbing shadow surface, and
+reflective surface.  Atomics, temporal filtering, additive accumulation, and
+directional specular storage remain later choices.

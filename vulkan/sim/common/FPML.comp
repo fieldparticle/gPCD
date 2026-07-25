@@ -21,6 +21,56 @@ vec4 boundary_light_material_color(uint materialID)
     return vec4(1.0, 1.0, 1.0, 1.0);
 }
 
+vec4 boundary_light_material_spectral_response_energy(uint materialID)
+{
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].spectralResponseEnergy;
+    }
+
+    return vec4(1.0, 1.0, 1.0, 1.0);
+}
+
+vec3 boundary_light_material_spectral_emission(uint materialID)
+{
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].spectralEmission.rgb;
+    }
+
+    return vec3(1.0, 1.0, 1.0);
+}
+
+vec3 boundary_light_spectral_deposit_rgb(
+    uint photonMaterialID,
+    uint surfaceMaterialID,
+    vec3 photonVelocity,
+    vec3 surfaceNormal)
+{
+    if (length(photonVelocity) <= EPSILON || length(surfaceNormal) <= EPSILON) {
+        return vec3(0.0);
+    }
+    vec3 photonDirection = normalize(photonVelocity);
+    vec3 normal = normalize(surfaceNormal);
+    float incidence = max(0.0, -dot(photonDirection, normal));
+
+    vec4 photonSpectrumEnergy =
+        boundary_light_material_spectral_response_energy(photonMaterialID);
+    vec3 photonSpectrum =
+        photonSpectrumEnergy.rgb * photonSpectrumEnergy.w;
+    vec3 surfaceResponse =
+        boundary_light_material_spectral_response_energy(surfaceMaterialID).rgb;
+    vec3 surfaceEmission =
+        boundary_light_material_spectral_emission(surfaceMaterialID);
+
+    return clamp(
+        photonSpectrum * surfaceResponse * surfaceEmission * incidence,
+        vec3(0.0),
+        vec3(1.0));
+}
+
 uint boundary_light_cell_coord(float value, uint maxValue)
 {
     if (maxValue == 0u) {
@@ -51,6 +101,25 @@ void DepositBoundaryLightAtCell(uint cellID, uint materialID)
     }
     BoundaryLight[cellID].rgb_valid =
         vec4(boundary_light_material_color(materialID).rgb, 1.0);
+}
+
+void DepositSpectralBoundaryLightAtCell(
+    uint cellID,
+    uint photonMaterialID,
+    uint surfaceMaterialID,
+    vec3 photonVelocity,
+    vec3 surfaceNormal)
+{
+    if (cellID == npos || cellID >= MAX_CELL_ARRAY_LOCATIONS) {
+        return;
+    }
+    BoundaryLight[cellID].rgb_valid = vec4(
+        boundary_light_spectral_deposit_rgb(
+            photonMaterialID,
+            surfaceMaterialID,
+            photonVelocity,
+            surfaceNormal),
+        1.0);
 }
 
 void DepositBoundaryLight(uint targetParticleID, uint materialID)
@@ -151,9 +220,12 @@ void fpml_comp_main()
                                 vec3 hitPoint = LIGHTING_BALL_CENTER
                                     + lightingBallResult.segment.normal
                                     * LIGHTING_BALL_RADIUS;
-                                DepositBoundaryLightAtCell(
+                                DepositSpectralBoundaryLightAtCell(
                                     boundary_light_cell_address(hitPoint),
-                                    LIGHTING_BALL_MATERIAL_ID);
+                                    PhotonBaseMaterialID(),
+                                    LIGHTING_BALL_MATERIAL_ID,
+                                    photonVelocity,
+                                    lightingBallResult.segment.normal);
                                 photonVelocity = ReflectFixedSpeed(
                                     photonVelocity,
                                     lightingBallResult.segment.normal);
@@ -192,9 +264,12 @@ void fpml_comp_main()
                         ReflectFixedSpeed(photonVelocity, segment.normal);
                     photonReflected = true;
                     P[SourceID].colFlg = 1u;
-                    DepositBoundaryLight(
-                        TargetID,
-                        uint(round(P[TargetID].material_id)));
+                    DepositSpectralBoundaryLightAtCell(
+                        boundary_light_cell_address(GetParticlePosition(TargetID).xyz),
+                        PhotonBaseMaterialID(),
+                        uint(round(P[TargetID].material_id)),
+                        photonVelocity,
+                        segment.normal);
                     continue;
                 }
                 if (!ProcessFunctionWallCollision(

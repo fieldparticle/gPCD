@@ -21,6 +21,7 @@ from gbase.MaterialProperties import (
     parse_debug_visible,
     parse_material_color,
     parse_particle_type,
+    parse_spectral_rgb,
     write_color_mode_defines,
     write_material_properties,
 )
@@ -319,6 +320,35 @@ class GenericGenData:
             except (TypeError, ValueError) as exc:
                 errors.append(f"{context}.debug_color is invalid: {exc}")
 
+            spectral_response = None
+            try:
+                spectral_response = parse_spectral_rgb(
+                    raw_material.get("spectral_response"),
+                    "spectral_response",
+                )
+            except (TypeError, ValueError) as exc:
+                errors.append(f"{context}.spectral_response is invalid: {exc}")
+
+            spectral_emission = None
+            try:
+                spectral_emission = parse_spectral_rgb(
+                    raw_material.get("spectral_emission"),
+                    "spectral_emission",
+                )
+            except (TypeError, ValueError) as exc:
+                errors.append(f"{context}.spectral_emission is invalid: {exc}")
+
+            try:
+                photon_energy = float(raw_material.get("photon_energy", 1.0))
+            except (TypeError, ValueError):
+                errors.append(f"{context}.photon_energy must be numeric")
+                photon_energy = None
+            if photon_energy is not None:
+                if not math.isfinite(photon_energy):
+                    errors.append(f"{context}.photon_energy must be finite")
+                elif photon_energy < 0.0:
+                    errors.append(f"{context}.photon_energy must not be negative")
+
             if (
                 material_id >= 0
                 and relative_mass is not None
@@ -329,6 +359,9 @@ class GenericGenData:
                 and particle_type is not None
                 and debug_visible is not None
                 and debug_color is not None
+                and spectral_response is not None
+                and spectral_emission is not None
+                and photon_energy is not None
             ):
                 materials.append(
                     {
@@ -341,6 +374,9 @@ class GenericGenData:
                         "color": color,
                         "debug_visible": debug_visible,
                         "debug_color": debug_color,
+                        "spectral_response": spectral_response,
+                        "spectral_emission": spectral_emission,
+                        "photon_energy": photon_energy,
                         "cell_density": cell_density,
                     }
                 )

@@ -55,9 +55,9 @@ into the surface.
 
 Lighting display now uses the first boundary-space lighting rule.  Photons
 remain transport/debug particles.  When a photon contacts the analytic sphere
-or another boundary target, the contacted surface region stores the surface
-material color in persistent boundary-space state.  Python remains the
-behavioral reference for photon contact and material color selection; its
+or another boundary target, the contacted surface region stores a visible
+spectral deposit in persistent boundary-space state.  Python remains the
+behavioral reference for photon contact and material-source selection; its
 current display can use existing boundary markers as a coarse approximation.
 
 The old \texttt{BoundaryLightSample}/\texttt{BoundaryLightState} current and
@@ -83,8 +83,8 @@ does not include the lighting SSBO or photon lighting behavior.  The lighting
 application uses the \texttt{FPML.*} shader family for photon-aware compute
 and particle/debug rendering.  The lighting surface itself uses
 \texttt{BoundaryLight.vert} and \texttt{BoundaryLight.frag}.  \texttt{FPML.comp}
-deposits persistent surface color into the lighting resource, and the
-lighting surface fragment shader reads that cell-owned state directly.
+deposits incidence-weighted spectral color into the lighting resource, and
+the lighting surface fragment shader reads that cell-owned state directly.
 
 Vulkan rendering also uses the material-owned color-mode contract.  Material
 records contain \texttt{color\_mode} and \texttt{color}.  The generated
@@ -130,8 +130,9 @@ and Vulkan:
 \begin{itemize}
     \item keep photons as transport/debug particles;
     \item map photon contacts to analytic surface hit cells;
-    \item store persistent cell-owned color from the contacted surface
-          material;
+    \item store persistent cell-owned visible color from the photon spectrum,
+          surface spectral response, surface spectral emission, and incidence
+          angle;
     \item render the analytic sphere surface from the owning cell color
           instead of drawing light only on the photon point;
     \item keep \texttt{color\_map.glsl} under exporter ownership so photon
@@ -141,9 +142,15 @@ and Vulkan:
 
 The current Vulkan lighting resource stores one \texttt{BoundaryLightRecord}
 per spatial cell.  \texttt{ResourceLighting.cpp} sizes the buffer as
-\texttt{CellAryW * CellAryH * CellAryL}.  The sphere render resource bakes the
-owning cell id for each sphere vertex into the vertex data, and the lighting
-fragment shader reads \texttt{BoundaryLight[surfaceCellId]}.  The validated
-state is that \texttt{LightingBall} in Vulkan runs and shows solid cell-owned
-surface lighting.  Spectral lighting is not yet working and is the next
-lighting feature to revisit.
+\texttt{CellAryW * CellAryH * CellAryL}.  The sphere render resource provides
+surface coordinates, and the lighting fragment shader computes the cell from
+the fragment world position before sampling \texttt{BoundaryLight}.  It also
+samples the current cell plus six face-neighbor cells to reduce hard cell and
+triangle boundaries.  The validated state is that \texttt{LightingBall} in
+Vulkan runs, shows cell-owned surface lighting, and uses the first
+incidence-weighted RGB-band spectral deposit.  The remaining bumpy appearance
+is the expected low-resolution cell/sphere field rather than photon-point
+rendering.
+
+The next lighting stages are a diffuse light stream, an absorbing shadow
+surface, and a reflective surface.

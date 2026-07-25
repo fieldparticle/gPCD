@@ -11,9 +11,12 @@ layout(location = 0) out vec4 outColor;
 layout(location = 0) in vec4 fragColor;
 layout(location = 1) in vec3 surfaceNormal;
 layout(location = 2) flat in uint surfaceCellId;
+layout(location = 3) in vec3 surfaceWorldPos;
 
 #include "params.glsl"
 #include "sphere.glsl"
+#include "..\common\constants.glsl"
+#include "..\common\util.glsl"
 #include "..\common\BoundaryLightRecord.glsl"
 
 #include "..\common\BoundaryLight.frag"

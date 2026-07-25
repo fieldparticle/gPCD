@@ -6,7 +6,7 @@ Lighting_ball = {
     x = 7.0;
     y = 5.0;
     z = 7.0;
-    radius = 2.0;
+    radius = 4.0;
     material_id = 1;
     wall_flag = 1000;
 };
@@ -49,21 +49,21 @@ particle_streams = (
 
     release_start_frame = 10;
     release_columns = 1;
-    particles_per_wave = 2025;
-    spacing_factor = 1.00;
+    particles_per_wave = 6400;
+    spacing_factor = 0.5;
 
     inlet_axis = "x";
-    inlet_value = 4.9;
+    inlet_value = 2.0;
 
     span_u_axis = "y";
-    span_u_min = 2.8;
-    span_u_max = 7.2;
-    span_u_count = 45;
+    span_u_min = 1.0;
+    span_u_max = 9.0;
+    span_u_count = 80;
 
     span_v_axis = "z";
-    span_v_min = 4.8;
-    span_v_max = 9.2;
-    span_v_count = 45;
+    span_v_min = 3.0;
+    span_v_max = 11.0;
+    span_v_count = 80;
   }
 );
 

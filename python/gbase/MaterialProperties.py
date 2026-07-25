@@ -67,6 +67,17 @@ def parse_material_color(raw_value, color_mode):
     return tuple(max(0.0, min(1.0, value)) for value in values)
 
 
+def parse_spectral_rgb(raw_value, name):
+    if raw_value is None:
+        return (1.0, 1.0, 1.0)
+    if len(raw_value) != 3:
+        raise ValueError(f"{name} must contain 3 values")
+    values = [float(raw_value[index]) for index in range(3)]
+    if not all(math.isfinite(value) for value in values):
+        raise ValueError(f"{name} values must be finite")
+    return tuple(max(0.0, min(1.0, value)) for value in values)
+
+
 def parse_debug_visible(raw_value):
     if isinstance(raw_value, bool):
         return raw_value
@@ -99,6 +110,9 @@ DEFAULT_MATERIAL_PROPERTIES = (
         "color": default_color_for_mode(COLOR_MODE_VELOCITY_ANGLE),
         "debug_visible": False,
         "debug_color": (1.0, 1.0, 1.0, 1.0),
+        "spectral_response": (1.0, 1.0, 1.0),
+        "spectral_emission": (1.0, 1.0, 1.0),
+        "photon_energy": 1.0,
         "cell_density": 0.0,
     },
 )
@@ -137,6 +151,15 @@ def normalized_material_properties(source=None):
             _material_get(raw_material, "debug_color", None),
             COLOR_MODE_SOLID,
         )
+        spectral_response = parse_spectral_rgb(
+            _material_get(raw_material, "spectral_response", None),
+            "spectral_response",
+        )
+        spectral_emission = parse_spectral_rgb(
+            _material_get(raw_material, "spectral_emission", None),
+            "spectral_emission",
+        )
+        photon_energy = float(_material_get(raw_material, "photon_energy", 1.0))
         cell_density = float(_material_get(raw_material, "cell_density", 0.0))
         name = str(_material_get(raw_material, "name", f"material_{material_id}"))
         particle_type = parse_particle_type(
@@ -145,9 +168,11 @@ def normalized_material_properties(source=None):
 
         if not all(
             math.isfinite(value)
-            for value in (relative_mass, thermal_velocity, cell_density)
+            for value in (relative_mass, thermal_velocity, photon_energy, cell_density)
         ):
             raise ValueError("material_properties values must be finite")
+        if photon_energy < 0.0:
+            raise ValueError("photon_energy must not be negative")
 
         materials.append(
             {
@@ -160,6 +185,9 @@ def normalized_material_properties(source=None):
                 "color": color,
                 "debug_visible": debug_visible,
                 "debug_color": debug_color,
+                "spectral_response": spectral_response,
+                "spectral_emission": spectral_emission,
+                "photon_energy": photon_energy,
                 "cell_density": cell_density,
             }
         )
@@ -215,6 +243,21 @@ def write_material_properties(output, source=None):
             f"{float(debug_color[2]):.9f}, "
             f"{float(debug_color[3]):.9f}];\n"
         )
+        spectral_response = material.get("spectral_response", (1.0, 1.0, 1.0))
+        output.write(
+            "        spectral_response = "
+            f"[{float(spectral_response[0]):.9f}, "
+            f"{float(spectral_response[1]):.9f}, "
+            f"{float(spectral_response[2]):.9f}];\n"
+        )
+        spectral_emission = material.get("spectral_emission", (1.0, 1.0, 1.0))
+        output.write(
+            "        spectral_emission = "
+            f"[{float(spectral_emission[0]):.9f}, "
+            f"{float(spectral_emission[1]):.9f}, "
+            f"{float(spectral_emission[2]):.9f}];\n"
+        )
+        output.write(f"        photon_energy = {float(material.get('photon_energy', 1.0)):.9f};\n")
         output.write(f"        cell_density = {float(material['cell_density']):.9f};\n")
         output.write(f"    }}{separator}\n")
     output.write(");\n")

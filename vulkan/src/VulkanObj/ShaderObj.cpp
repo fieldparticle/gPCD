@@ -80,6 +80,8 @@ void ShaderObj::WriteMaterials()
 	ostrm << "    vec4 color;\n";
 	ostrm << "    uint debugVisible;\n";
 	ostrm << "    vec4 debugColor;\n";
+	ostrm << "    vec4 spectralResponseEnergy;\n";
+	ostrm << "    vec4 spectralEmission;\n";
 	ostrm << "    float cellDensity;\n";
 	ostrm << "};\n\n";
 
@@ -93,7 +95,7 @@ void ShaderObj::WriteMaterials()
 	{
 		ostrm << "const uint MATERIAL_PROPERTY_COUNT = 1u;\n";
 		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](\n";
-		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0.000000000)\n";
+		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 0.000000000)\n";
 		ostrm << ");\n\n";
 	}
 	else
@@ -127,6 +129,13 @@ void ShaderObj::WriteMaterials()
 			double debugGreen = 1.0;
 			double debugBlue = 1.0;
 			double debugAlpha = 1.0;
+			double spectralResponseRed = 1.0;
+			double spectralResponseGreen = 1.0;
+			double spectralResponseBlue = 1.0;
+			double spectralEmissionRed = 1.0;
+			double spectralEmissionGreen = 1.0;
+			double spectralEmissionBlue = 1.0;
+			double photonEnergy = 1.0;
 
 			if (config_setting_lookup_int(material, "material_id", &materialID) == CONFIG_FALSE)
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].material_id missing");
@@ -188,6 +197,32 @@ void ShaderObj::WriteMaterials()
 					debugAlpha = config_setting_get_float_elem(debugColor, 3);
 			}
 
+			auto readSpectralRGB = [&](const char* key, double& red, double& green, double& blue)
+			{
+				config_setting_t* spectral = config_setting_lookup(material, key);
+				if (spectral == nullptr)
+					return;
+				int spectralLength = config_setting_length(spectral);
+				if (spectralLength != 3)
+					throw std::runtime_error("material_properties[" + std::to_string(index) + "]." + key + " must contain 3 values");
+				for (int spectralIndex = 0; spectralIndex < spectralLength; ++spectralIndex)
+				{
+					config_setting_t* element = config_setting_get_elem(spectral, spectralIndex);
+					if (element == nullptr || config_setting_type(element) != CONFIG_TYPE_FLOAT)
+						throw std::runtime_error("material_properties[" + std::to_string(index) + "]." + key + " values must be floats");
+				}
+				red = config_setting_get_float_elem(spectral, 0);
+				green = config_setting_get_float_elem(spectral, 1);
+				blue = config_setting_get_float_elem(spectral, 2);
+			};
+			readSpectralRGB("spectral_response", spectralResponseRed, spectralResponseGreen, spectralResponseBlue);
+			readSpectralRGB("spectral_emission", spectralEmissionRed, spectralEmissionGreen, spectralEmissionBlue);
+
+			if (config_setting_lookup_float(material, "photon_energy", &photonEnergy) == CONFIG_FALSE)
+				photonEnergy = 1.0;
+			if (photonEnergy < 0.0)
+				throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_energy must not be negative");
+
 			if (config_setting_lookup_float(material, "cell_density", &cellDensity) == CONFIG_FALSE)
 				cellDensity = 0.0;
 
@@ -208,6 +243,16 @@ void ShaderObj::WriteMaterials()
 				<< std::fixed << std::setprecision(9) << debugGreen << ", "
 				<< std::fixed << std::setprecision(9) << debugBlue << ", "
 				<< std::fixed << std::setprecision(9) << debugAlpha << "), "
+				<< "vec4("
+				<< std::fixed << std::setprecision(9) << spectralResponseRed << ", "
+				<< std::fixed << std::setprecision(9) << spectralResponseGreen << ", "
+				<< std::fixed << std::setprecision(9) << spectralResponseBlue << ", "
+				<< std::fixed << std::setprecision(9) << photonEnergy << "), "
+				<< "vec4("
+				<< std::fixed << std::setprecision(9) << spectralEmissionRed << ", "
+				<< std::fixed << std::setprecision(9) << spectralEmissionGreen << ", "
+				<< std::fixed << std::setprecision(9) << spectralEmissionBlue << ", "
+				<< "0.000000000), "
 				<< std::fixed << std::setprecision(9) << cellDensity << ")";
 
 			if (index + 1 < materialCount)

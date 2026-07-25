@@ -32,7 +32,7 @@ Conceptually:
 \begin{verbatim}
 cell contains a small surface region
 photon hits anywhere in that region
-BoundaryLight[cell_id] stores the material color
+BoundaryLight[cell_id] stores the visible deposited color
 renderer colors the analytic surface from the owning cell
 \end{verbatim}
 
@@ -50,12 +50,12 @@ The first rule is intentionally simple:
 \begin{verbatim}
 photon hits surface
 cell_id = address of contacted surface point
-BoundaryLight[cell_id].rgb_valid = contacted material color, valid=true
+BoundaryLight[cell_id].rgb_valid = visible deposited color, valid=true
 \end{verbatim}
 
 The color does not clear every compute frame.  It persists until another photon
-updates the same cell.  This is a color-state rule, not an energy-accumulation
-rule.
+updates the same cell.  This is still a color-state rule, not an additive
+energy-accumulation rule.
 
 Because the first model sets color instead of adding energy, no atomic add is
 required.  If two photons write the same cell in the same compute dispatch, the
@@ -71,7 +71,7 @@ the compute shader writes the cell containing the analytic hit point:
 \begin{verbatim}
 hitPoint = LIGHTING_BALL_CENTER + contactNormal * LIGHTING_BALL_RADIUS
 cell_id = CellAddress(hitPoint)
-BoundaryLight[cell_id].rgb_valid = materialColor, valid=true
+BoundaryLight[cell_id].rgb_valid = visibleDeposit, valid=true
 \end{verbatim}
 
 The lighting sphere render resource uses the existing sphere mesh only as a
@@ -84,16 +84,21 @@ worldPos = LIGHTING_BALL_CENTER + sphereNormal * LIGHTING_BALL_RADIUS
 surfaceCellId = CellAddress(worldPos)
 \end{verbatim}
 
-The vertex shader passes \texttt{surfaceCellId} to the fragment shader as a
-flat value.  The fragment shader reads:
+The initial version passed \texttt{surfaceCellId} to the fragment shader as a
+flat value.  That made triangle ownership visible.  The active version passes
+the fragment world position and computes the owning cell per fragment:
 \begin{verbatim}
+surfaceCellId = CellAddress(surfaceWorldPos);
 BoundaryLightRecord record = BoundaryLight[surfaceCellId];
 \end{verbatim}
 
 If the record is valid and belongs to the lighting-ball surface, the fragment
 uses the stored color at full alpha.  If it is invalid, the fragment is
-discarded.  This gives solid cell-owned surface regions without angular
-fan-out, point-sprite circles, or proxy-color averaging.
+discarded.  The fragment shader also samples the current cell and the six
+face-neighbor cells, weighting by distance to cell centers.  That removes most
+triangle-edge artifacts while preserving the cell-owned model.  A bumpy
+low-resolution look is expected when the cell field and sphere mesh are still
+coarse.
 
 \subsection{Point-List And Surface Rendering}
 
@@ -124,13 +129,13 @@ The buffer is owned by \texttt{ResourceLighting.cpp}, sized as
 only for the \texttt{ParticleLighting} application.  Basic particle
 applications remain on \texttt{FPM.*} and do not see this resource.
 
-\texttt{FPML.comp} is the lighting compute schedule.  It deposits contacted
-material color into \texttt{BoundaryLight[cell\_id]} with persistent
-last-writer-wins behavior.  \texttt{BoundaryLight.vert} passes the baked
-surface cell id to \texttt{BoundaryLight.frag}, and the fragment shader reads
-the cell-owned color directly.  Since the fragment shader reads the lighting
-SSBO, the \texttt{ParticleLighting} compute-finished wait includes the fragment
-shader stage.
+\texttt{FPML.comp} is the lighting compute schedule.  It deposits the visible
+spectral result into \texttt{BoundaryLight[cell\_id]} with persistent
+last-writer-wins behavior.  \texttt{BoundaryLight.vert} passes surface
+coordinates to \texttt{BoundaryLight.frag}, and the fragment shader computes
+the owning cell and nearby cell samples per fragment.  Since the fragment
+shader reads the lighting SSBO, the \texttt{ParticleLighting} compute-finished
+wait includes the fragment shader stage.
 
 \subsection{Python Reference}
 
@@ -141,21 +146,65 @@ color.  The Python model should not reintroduce the retired
 \texttt{BoundaryLightSample}/\texttt{BoundaryLightState} current/filter path or
 make the photon point itself the final visible surface lighting.
 
-\subsection{Deferred Spectral Lighting}
+\subsection{Incidence-Weighted Spectral Deposit}
 
-Spectral lighting is not working in the current cell-owned Vulkan milestone.
-The next lighting work should decide what additional state is required beyond
-\texttt{rgb\_valid}.  Candidate future state includes photon wavelength or
-band, material spectral response, accumulated direction/coherence, or a
-separate debug view for spectral deposits.  That work should extend the
-cell-owned \texttt{BoundaryLightRecord} path deliberately rather than reviving
-the old proxy-kernel or per-frame filtered-light buffers.
+The first spectral step is active on top of the cell-owned path.  Material
+configuration now exports:
+\begin{verbatim}
+spectral_response = [r, g, b];
+spectral_emission = [r, g, b];
+photon_energy = value;
+\end{verbatim}
+
+The generated Vulkan material record exposes this as:
+\begin{verbatim}
+vec4 spectralResponseEnergy;  // rgb + photon_energy
+vec4 spectralEmission;        // rgb + reserved
+\end{verbatim}
+
+During photon deposit, \texttt{FPML.comp} computes:
+\[
+    I =
+    \max \left(0, -\hat{\mathbf v}_{p} \cdot \hat{\mathbf n}_{s}\right)
+\]
+and writes:
+\[
+    \mathbf C_{\mathrm{visible}} =
+    E_p I
+    \mathbf S_{\mathrm{photon}}
+    \mathbf R_{\mathrm{surface}}
+    \mathbf E_{\mathrm{surface}} .
+\]
+
+The result is still stored in \texttt{BoundaryLight[cell\_id].rgb\_valid}.
+The render state does not need to know how the color was produced.  It only
+draws the current persistent visible color for each surface cell.
+
+\subsection{Next Lighting Behaviors}
+
+The next work should extend behavior in this order:
+\begin{enumerate}
+    \item Diffuse light stream: broaden the photon source into a distributed
+          direction field so the scene is illuminated by many incident
+          directions rather than a single structured beam.
+    \item Absorbing and shadow surface: add a material rule that consumes or
+          blocks photons, producing unlit cells behind the absorber without
+          reflecting the photon onward.
+    \item Reflective surface: add a material rule that redirects photons and
+          carries reflected spectral energy to later deposits.
+\end{enumerate}
+
+These behaviors should extend the current \texttt{BoundaryLightRecord}
+\texttt{rgb\_valid} path before introducing additive accumulation, temporal
+filtering, or directional specular storage.
 
 \subsection{Decision}
 
 The active Vulkan path is:
 \[
     \textrm{photon hit}
+    \rightarrow
+    \textrm{incidence-weighted spectral deposit}
     \rightarrow
     \textrm{persistent cell-owned surface color}
     \rightarrow

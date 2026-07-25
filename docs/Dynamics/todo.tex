@@ -7,15 +7,17 @@
 \subsubsection{Schedule}
 
 The first boundary-space lighting milestone is complete for
-\texttt{LightingBall}.  Python proves photon contact and material color
+\texttt{LightingBall}.  Python proves photon contact and material-source
 selection, and Vulkan \texttt{ParticleLighting} now stores persistent
-cell-owned surface color in \texttt{BoundaryLightRecord} records.
+cell-owned visible color in \texttt{BoundaryLightRecord} records.
 
 \subsubsection{Validated Form}
 
-The first implementation should prove:
+The validated implementation proves:
 \[
     \textrm{photon hit}
+    \rightarrow
+    \textrm{incidence-weighted spectral deposit}
     \rightarrow
     \textrm{persistent cell-owned surface color}
     \rightarrow
@@ -27,12 +29,40 @@ the retired \texttt{BoundaryLightSample}/\texttt{BoundaryLightState} arrays,
 visible surface-cell grid, eye-driven brightness, proxy-kernel spread, or
 per-frame clear/filter path.
 
-\subsubsection{Deferred Work}
+\subsubsection{Next Work}
 
-The next active lighting task is spectral lighting.  Directional specular,
-additive energy accumulation, temporal filtering, decay, and separate compact
-material response tables remain deferred until the cell-owned color path is
-stable.
+The next active lighting tasks are:
+\begin{enumerate}
+    \item diffuse light stream;
+    \item absorbing and shadow surface;
+    \item reflective surface.
+\end{enumerate}
+
+Directional specular, additive energy accumulation, temporal filtering, decay,
+and separate compact material response tables remain deferred until these
+transport behaviors are stable.
+
+\subsubsection{Diffuse Light Stream}
+
+Create a source mode that emits photons through a controlled distribution of
+directions instead of a single x-aligned beam.  The goal is to illuminate the
+sphere from a broader field and reduce structured banding that comes from a
+single ordered stream.
+
+\subsubsection{Absorbing And Shadow Surface}
+
+Add a material behavior that consumes or blocks photons.  A photon that hits an
+absorbing surface should deposit according to the current spectral/incidence
+rule and then stop or become inactive.  Surfaces behind the absorber should
+remain unlit except for photons that reach them through open paths.
+
+\subsubsection{Reflective Surface}
+
+Add a material behavior that redirects photons after contact.  The reflected
+photon should carry the remaining spectral energy so later surfaces can receive
+light from the reflection.  This should build on the existing fixed-speed
+reflection behavior without making the photon point own the final visible
+surface color.
 
 \subsection{Vulkan Test-File View Defaults}
 

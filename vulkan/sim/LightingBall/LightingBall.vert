@@ -44,6 +44,7 @@ layout(location = 1) in vec4 inColor;
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec3 surfaceNormal;
 layout(location = 2) flat out uint surfaceCellId;
+layout(location = 3) out vec3 surfaceWorldPos;
 
 mat4 BuildTranslation(vec3 delta)
 {
