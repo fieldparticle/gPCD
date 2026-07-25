@@ -6,11 +6,13 @@
 
 \subsubsection{Schedule}
 
-The next LightingBall work is boundary-space lighting.  The active scene has
-been reduced to the photon tracer, analytic sphere, ordinary view controls,
-and material color behavior.  Reintroduce lighting one small step at a time.
+The first boundary-space lighting milestone is complete for
+\texttt{LightingBall}.  Python deposits persistent color on existing boundary
+proxies, and Vulkan \texttt{ParticleLighting} uses the \texttt{FPML.*} shader
+family plus \texttt{BoundaryLightRecord} records to produce the same visible
+result.
 
-\subsubsection{Target Form}
+\subsubsection{Validated Form}
 
 The first implementation should prove:
 \[
@@ -21,16 +23,30 @@ The first implementation should prove:
     \textrm{kernel-spread surface color}.
 \]
 
-Use existing boundary particles as the first persistent proxies.  Do not
+This uses existing boundary particles as the first persistent proxies.  Do not
 restore the retired \texttt{BoundaryLightSample}/\texttt{BoundaryLightState}
 arrays, visible surface-cell grid, eye-driven brightness, or per-frame
 clear/filter path.
 
 \subsubsection{Deferred Work}
 
-Directional specular, additive energy accumulation, temporal filtering,
-decay, and a separate compact Vulkan proxy table are deferred until the
-minimal boundary-space proxy-color path is visible and stable.
+The next Vulkan rendering refinement is to use \texttt{gl\_PointCoord} in the
+lighting fragment shader so each boundary point renders as a soft patch
+instead of a hard point.  Directional specular, additive energy accumulation,
+temporal filtering, decay, and a separate compact Vulkan proxy table remain
+deferred.
+
+\subsection{Vulkan Test-File View Defaults}
+
+Move the Vulkan initial view defaults that are scene/data specific out of the
+application configuration and into the generated \texttt{.tst} file.  In
+particular, the current setting:
+\begin{verbatim}
+initial_view = { rRotZ = 0.0;rRotY=0.0;rRotX=0.0;zoom=0.1;};
+\end{verbatim}
+should be generated with the test data and read from the \texttt{.tst} file,
+not from the Vulkan app configuration file.  This keeps \texttt{view_center},
+point size, and initial zoom controlled by the same scene-specific data source.
 
 \subsection{Photon-Direction Specular Lighting}
 

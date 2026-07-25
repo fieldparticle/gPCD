@@ -1,12 +1,12 @@
 Current status:
-	- LightingBall configs are reduced to the basic tracer/sphere scene.
-	- Eye-driven lighting and old boundary-light config are no longer active.
-	- Next lighting direction is boundarySpaceLighting.
+	- LightingBall boundary-space lighting now matches Python in Vulkan.
+	- FPM remains the clean base particle shader path.
+	- FPML owns photon lighting and BoundaryLightRecord access.
 
 Code Changes:
-	- Updated dynamics docs to describe the cleaned LightingBall baseline.
-	- Documented persistent boundary proxy color as the next lighting model.
-	- Updated active docs to use boundary ptype=2.
-	- Added ProblemEvolution entry for the LightingBall cleanup.
+	- Updated dynamics documentation for the active boundary-space lighting model.
+	- Documented the FPM/FPML split and Vulkan lighting resource contract.
+	- Updated velocity-angle naming references from VELOCITY to VELOCITY_ANGLE.
+	- Added a ProblemEvolution entry for the Python/Vulkan parity milestone.
 
-Next: Implement boundarySpaceLighting from the clean baseline.
+Next: Refine FPML fragment rendering with gl_PointCoord soft patches.

@@ -1,6 +1,6 @@
 import math
 
-from gbase.BoundaryLighting import BOUNDARY_LIGHT_SURFACE_SPHERE
+from gbase.BoundarySpaceLighting import BOUNDARY_SPACE_SURFACE_SPHERE
 from gbase.GenStreaming import GenStreaming
 
 
@@ -101,9 +101,9 @@ class GenLightingBall(GenStreaming):
                 particle.vx = normal_x / normal_length
                 particle.vy = normal_y / normal_length
                 particle.vz = normal_z / normal_length
-                self.register_boundary_light_source(
+                self.register_boundary_space_proxy(
                     particle.pnum,
-                    BOUNDARY_LIGHT_SURFACE_SPHERE,
+                    BOUNDARY_SPACE_SURFACE_SPHERE,
                     wall_flag,
                     material_id,
                     (particle.vx, particle.vy, particle.vz),

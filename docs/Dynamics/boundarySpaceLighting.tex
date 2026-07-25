@@ -9,10 +9,11 @@ surface illumination.  The goal is to light part of an analytic or implicit
 surface without adding triangles, visible surface-cell geometry, or dense
 boundary rendering particles.
 
-This is the next implementation target, not part of the current cleaned
-\texttt{LightingBall} baseline.  The active \texttt{LightingBall\_Py.inc} and
-\texttt{LightingBall\_Vk.inc} files intentionally omit boundary-space
-configuration until the minimal tracer scene is stable again.
+This is now the active first lighting model for \texttt{LightingBall}.  The
+Python implementation is the reference behavior, and the Vulkan
+\texttt{ParticleLighting} application has been brought to the same visible
+result through the \texttt{FPML.*} shader family and the
+\texttt{BoundaryLightRecord} SSBO.
 
 The important separation is:
 \begin{itemize}
@@ -158,9 +159,9 @@ This is different from the previous boundary-light-buffer idea, where
 \texttt{current} was cleared every frame and \texttt{filtered} was blended
 over time.
 
-\subsection{Future Configuration}
+\subsection{Configuration}
 
-The first useful configuration items, when this model is reintroduced, are:
+The first active configuration items are:
 \begin{verbatim}
 boundary_space_lighting_enabled = true;
 boundary_space_patch_angle = 0.20;
@@ -172,10 +173,10 @@ boundary_space_patch_falloff = "quadratic";
 \texttt{boundary\_space\_patch\_radius} applies to planar wall surfaces.
 Only the appropriate value is used for a given surface type.
 
-\subsection{Python First Implementation Target}
+\subsection{Python Implementation}
 
-Python can prove the model without changing the binary particle record.  Runtime
-fields can be attached to boundary particles:
+Python proves the model without changing the binary particle record.  Runtime
+fields are attached to boundary particles:
 \begin{verbatim}
 particle.boundary_space_light_valid = True
 particle.boundary_space_light_rgb = (r, g, b)
@@ -236,29 +237,35 @@ this alpha.  This does not create triangles and does not create a visible
 surface grid.  It lets a boundary particle behave as a finite soft surface
 patch while preserving the point-list pipeline.
 
-\subsection{Vulkan Implication}
+\subsection{Vulkan Implementation}
 
-The Vulkan version does not need an additive SSBO for the first implementation.
-It needs persistent boundary-space light state associated with boundary
-particles or with a compact boundary-proxy table:
+The Vulkan version does not use an additive SSBO for the first implementation.
+It uses a compact persistent boundary-proxy table with one record per
+boundary particle:
 \begin{verbatim}
-boundary_space_light_valid
-boundary_space_light_rgb
-surface_id
-surface_type
-normal or local surface coordinate
+struct BoundaryLightRecord {
+    vec4 rgb_valid;
+    vec4 normal_material;
+    uvec4 ids;
+};
 \end{verbatim}
 
-Photon contact writes the proxy color.  Boundary rendering reads nearby proxy
-colors and applies the spread kernel.  The fragment shader then uses
+The buffer is owned by \texttt{ResourceLighting.cpp} and bound at descriptor
+binding 8 only for the \texttt{ParticleLighting} application.  Basic particle
+applications remain on \texttt{FPM.*} and do not see this resource.
+
+Photon contact in \texttt{FPML.comp} writes the proxy color with
+last-writer-wins behavior.  Boundary rendering in \texttt{FPML.vert} reads
+nearby proxy colors and applies the spread kernel.  The fragment shader is
+still the simple lighting-specific pass; a later refinement should use
 \texttt{gl\_PointCoord} to render each lit point as a soft circular patch.
 Atomics are not required unless a future model changes from last-writer-wins
 color state to additive energy accumulation.
 
 \subsection{Decision}
 
-The next lighting implementation should retire visible surface-cell rendering.
-The target is boundary-space lighting:
+The visible surface-cell path is retired.  The active target is
+boundary-space lighting:
 \[
     \textrm{photon hit}
     \rightarrow

@@ -60,7 +60,7 @@ class ResourceVertexParticle : public ResourceVertexObj
 	
 	void PullMem(uint32_t currentBuffer) {};
 	virtual void PushMem(uint32_t currentBuffer){};
-	
+	virtual void ClearTempMemory();
 	void Cleanup()
 	{
 

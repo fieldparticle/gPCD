@@ -32,11 +32,14 @@
 
 struct BoundaryLightRecord
 {
-    vec4 pos_area;
+    // xyz = persistent boundary-space light RGB, w = valid flag
+    vec4 rgb_valid;
+
+    // xyz = surface normal, w = material_id
     vec4 normal_material;
+
+    // x = particle_id, y = surface_type, z = surface_id, w = reserved
     uvec4 ids;
-    vec4 current;
-    vec4 filtered;
 };
 
 layout(std430, binding = 8)

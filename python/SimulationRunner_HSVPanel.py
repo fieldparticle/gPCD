@@ -19,7 +19,7 @@ from gbase.MaterialProperties import (
     COLOR_MODE_COLLISION,
     COLOR_MODE_LUMENS,
     COLOR_MODE_SOLID,
-    COLOR_MODE_VELOCITY,
+    COLOR_MODE_VELOCITY_ANGLE,
     normalized_material_properties,
 )
 from gbase.pdata import PTYPE_BOUNDARY, PTYPE_PHOTON
@@ -581,7 +581,7 @@ def _material_color_mode(particle, run_configuration):
     material = _material_property(particle, run_configuration)
     if material is not None:
         return int(material["color_mode"])
-    return COLOR_MODE_VELOCITY
+    return COLOR_MODE_VELOCITY_ANGLE
 
 
 def _material_rgb255(particle, run_configuration):
@@ -611,23 +611,35 @@ def _material_debug_rgb255(particle, run_configuration):
     )
 
 
-def _boundary_light_rgb255(particle_index, particle, dynamics, run_configuration):
+def _material_debug_rgb255_by_id(material_id, run_configuration):
+    material = _material_property_by_id(material_id, run_configuration)
+    if material is None or not bool(material.get("debug_visible", False)):
+        return None
+    color = material.get("debug_color", (1.0, 1.0, 1.0, 1.0))
+    return tuple(
+        int(round(max(0.0, min(1.0, float(color[index]))) * 255.0))
+        for index in range(3)
+    )
+
+
+def _photon_debug_rgb255(particle_index, particle, dynamics, run_configuration):
+    if dynamics is not None and hasattr(dynamics, "BasePhotonMaterialID"):
+        material_id = dynamics.BasePhotonMaterialID(particle_index)
+        return _material_debug_rgb255_by_id(material_id, run_configuration)
+    return _material_debug_rgb255(particle, run_configuration)
+
+
+def _boundary_space_light_rgb255(particle_index, particle, dynamics, run_configuration):
+    """Approximate Vulkan point-list lighting by coloring boundary particles only."""
     if dynamics is None or not bool(
-        run_configuration.get("boundary_lighting_enabled", False)
+        run_configuration.get("boundary_space_lighting_enabled", False)
     ):
         return None
-    if not hasattr(dynamics, "BoundaryLightFilteredRGB"):
+    if not hasattr(dynamics, "BoundarySpaceLightRGB"):
         return None
-    filtered = dynamics.BoundaryLightFilteredRGB(particle_index)
-    if filtered is None:
+    boundary_rgb = dynamics.BoundarySpaceLightRGB(particle_index)
+    if boundary_rgb is None:
         return None
-    base_color = _material_rgb255(particle, run_configuration)
-    ambient = max(
-        0.0,
-        float(run_configuration.get("boundary_light_render_ambient", 0.05)),
-    )
-    gain = max(0.0, float(run_configuration.get("boundary_light_render_gain", 1.0)))
-    intensity = max(0.0, min(1.0, gain * max(float(value) for value in filtered)))
     return tuple(
         int(
             round(
@@ -635,12 +647,7 @@ def _boundary_light_rgb255(particle_index, particle, dynamics, run_configuration
                     0.0,
                     min(
                         255.0,
-                        base_color[index] * ambient
-                        + intensity
-                        * (
-                            base_color[index] * (1.0 - intensity)
-                            + 255.0 * intensity
-                        ),
+                        float(boundary_rgb[index]) * 255.0,
                     ),
                 )
             )
@@ -663,30 +670,36 @@ def _particle_colors(
 ):
     color_mode = _material_color_mode(particle, run_configuration)
     if _is_boundary_particle(particle_index, particle, dynamics):
-        color = _boundary_light_rgb255(
+        color = _boundary_space_light_rgb255(
             particle_index,
             particle,
             dynamics,
             run_configuration,
         )
+        if (
+            color is None
+            and bool(run_configuration.get("boundary_space_lighting_enabled", False))
+        ):
+            return None, None
         if color is not None:
             return color, color
     if _is_photon_particle(particle):
         color_mode = COLOR_MODE_LUMENS
     if color_mode == COLOR_MODE_LUMENS:
-        if (
-            int(getattr(particle, "colFlg", 0)) == 1
-            or int(getattr(particle, "report_contacts", 0)) > 0
-            or _has_active_wall_contact(particle)
-            or _particle_contact_target_ids(particle_index, particle, dynamics)
-        ):
-            color = _material_rgb255(particle, run_configuration)
-            return color, color
-        color = _material_debug_rgb255(particle, run_configuration)
+        color = (
+            _photon_debug_rgb255(
+                particle_index,
+                particle,
+                dynamics,
+                run_configuration,
+            )
+            if _is_photon_particle(particle)
+            else _material_debug_rgb255(particle, run_configuration)
+        )
         if color is None:
             return None, None
         return color, color
-    if color_mode == COLOR_MODE_VELOCITY:
+    if color_mode == COLOR_MODE_VELOCITY_ANGLE:
         color = hsv_angle(particle.VelRad.w, hsv_val, hsv_sat)
         return color, color
     if color_mode == COLOR_MODE_SOLID:
@@ -1189,7 +1202,17 @@ def _draw_particles(
                 screen_height,
             )
             if _is_boundary_particle(index, particle, dynamics):
-                pygame.draw.circle(screen, (60, 220, 90), center, 1)
+                fill, _edge = _particle_colors(
+                    index,
+                    particle,
+                    dynamics,
+                    run_configuration,
+                    hsv_sat,
+                    hsv_val,
+                )
+                if fill is None:
+                    continue
+                pygame.draw.circle(screen, fill, center, 1)
             elif _particle_contact_target_ids(index, particle, dynamics):
                 pygame.draw.circle(screen, (255, 80, 80), center, radius)
             else:

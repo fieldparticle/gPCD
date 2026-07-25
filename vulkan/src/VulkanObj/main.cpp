@@ -130,8 +130,11 @@ int main(int argc, const char* argv[]) try
 		bool show_wall_as_boundary_cube = CfgApp->GetBool("application.show_wall_as_boundary_cube", true);
 		bool particle_as_spheres		= CfgApp->GetBool("application.particle_as_spheres", true);
 		bool show_boundary_as_obj		= CfgApp->GetBool("application.boundary_as_obj", true);
-		bool is_lighting_app			= CfgApp->GetBool("application.use_lighting", true);
-		
+		bool is_lighting_app			= false;
+		if (CfgApp->CheckKey("application.use_lighting"))
+		{
+			is_lighting_app = CfgApp->GetBool("application.use_lighting", true);
+		}
 		if (is_lighting_app == true)
 		{
 			if (ParticleLighting(pf, nullptr, nullptr, false))

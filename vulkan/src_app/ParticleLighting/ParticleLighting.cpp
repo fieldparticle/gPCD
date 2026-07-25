@@ -124,6 +124,7 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 										resourceLockMatrix,
 										resourceLighting,
 										resourceAtomicG });
+	resourceGraphicsContainer->ClearTempMemory();
 	// Store all resources for compute pipline
 	resourceComputeContainer->Create({ 	resourceParticlePush,
 										resourceUBO,
@@ -132,6 +133,8 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 										resourceLockMatrix,
 										resourceLighting,
 										resourceCollMatrix});
+
+	resourceComputeContainer->ClearTempMemory();
 
 	// Create graphics pipeline which needs swap chain, resource container, and render pass.
 	pipelineGraphicsParticle->Create(shaderObj,swapChain, resourceGraphicsContainer, renderPass);
@@ -158,7 +161,7 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	syncObjects->AddFence("inflightFence");
 	syncObjects->AddFence("computeInflightFence");
 	syncObjects->AddWaitSemaphore("imageAvailableSemaphore", VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-	syncObjects->AddWaitSemaphore("computeFinishedSemaphore", VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
+	syncObjects->AddWaitSemaphore("computeFinishedSemaphore", VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
 	syncObjects->AddSignalImageSemaphore("renderFinishedSemaphore", swapChain->m_NumSwapImages);
 
 	MemStats(vulkanObj);

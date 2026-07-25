@@ -49,7 +49,6 @@ void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, Res
 
 void ShaderObj::WriteMaterials()
 {
-	bool usesVelocityColor = false;
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
 	std::string filename = fildir + "/material.glsl";
 
@@ -64,11 +63,12 @@ void ShaderObj::WriteMaterials()
 	ostrm << "#define MATERIAL_GLSL\n\n";
 
 	ostrm << "const uint COLOR_MODE_COLLISION = 0u;\n";
-	ostrm << "const uint COLOR_MODE_VELOCITY = 1u;\n";
+	ostrm << "const uint COLOR_MODE_VELOCITY_ANGLE = 1u;\n";
 	ostrm << "const uint COLOR_MODE_SOLID = 2u;\n";
 	ostrm << "const uint COLOR_MODE_LUMENS = 3u;\n\n";
 	ostrm << "const uint PARTICLE_TYPE_REGULAR = 0u;\n";
 	ostrm << "const uint PARTICLE_TYPE_PHOTON = 1u;\n\n";
+	ostrm << "const uint PARTICLE_TYPE_BOUNDARY = 2u;\n\n";
 
 	ostrm << "struct MaterialProperty\n";
 	ostrm << "{\n";
@@ -93,9 +93,8 @@ void ShaderObj::WriteMaterials()
 	{
 		ostrm << "const uint MATERIAL_PROPERTY_COUNT = 1u;\n";
 		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](\n";
-		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0.000000000)\n";
+		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0.000000000)\n";
 		ostrm << ");\n\n";
-		usesVelocityColor = true;
 	}
 	else
 	{
@@ -189,10 +188,6 @@ void ShaderObj::WriteMaterials()
 					debugAlpha = config_setting_get_float_elem(debugColor, 3);
 			}
 
-			if (static_cast<uint32_t>(colorMode) == 1u)
-				usesVelocityColor = true;
-
-
 			if (config_setting_lookup_float(material, "cell_density", &cellDensity) == CONFIG_FALSE)
 				cellDensity = 0.0;
 
@@ -235,23 +230,13 @@ void ShaderObj::WriteMaterials()
 	float ncol_blue = CfgApp->GetFloat("application.ncol_color.blue", true);
 	float ncol_alpha = CfgApp->GetFloat("application.ncol_color.alpha", true);
 
-	std::ostringstream hsv_color_on;
-	std::ostringstream hsv_sat;
-	std::ostringstream hsv_val;
-	
-	if (usesVelocityColor == true)
-	{
-		hsv_color_on << "const uint HSV_ON = 1u;\n";
-		hsv_sat << "const float HSV_SAT = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_sat", true) << ";\n";
-		hsv_val << "const float HSV_VAL = " << std::fixed << std::setprecision(2) << CfgApp->GetFloat("application.hsv_val", true) << ";\n";
-	}
-	else
-	{
-		hsv_color_on << "const uint HSV_ON = 0u;\n";
-		hsv_sat << "const float HSV_SAT = 0.000f" << ";\n";
-		hsv_val << "const float HSV_VAL = 0.000f" << ";\n";
-	}
-	ostrm << hsv_color_on.str() << hsv_sat.str() << hsv_val.str();
+	ostrm
+		<< "const float VELOCITY_ANGLE_COLOR_SAT = "
+		<< std::fixed << std::setprecision(2)
+		<< CfgApp->GetFloat("application.hsv_sat", true) << ";\n"
+		<< "const float VELOCITY_ANGLE_COLOR_VAL = "
+		<< std::fixed << std::setprecision(2)
+		<< CfgApp->GetFloat("application.hsv_val", true) << ";\n";
 	
 
 	std::ostringstream col_color;
@@ -414,10 +399,6 @@ void ShaderObj::Piston()
 }
 void ShaderObj::WriteSphere()
 {
-	if (!CfgTst->CheckKey("Lighting_ball"))
-		return;
-
-
 	std::string fildir = CfgApp->GetString("application.gen_glsl_dir", true);
 	std::string filename = fildir + "/sphere.glsl";
 
@@ -755,6 +736,34 @@ void  ShaderObj::WriteShaderHeader()
 				<< m_VPO->BoundaryParticleLimit << ";\n"
 			<< "const float point_size = "
 				<< std::fixed << std::setprecision(2) << CfgTst->GetFloat("gl_point_size", true) << ";\n"
+			// Boundary-space shader access stays disabled until binding 8 is
+			// proven present in both compute and graphics descriptor sets.
+			<< "const uint BOUNDARY_SPACE_PROXY_COUNT = "
+				<< (CfgTst->CheckKey("boundary_space_lighting_enabled") &&
+						CfgTst->GetBool("boundary_space_lighting_enabled", true)
+					? CfgTst->GetUInt("boundary_space_proxy_count", true)
+					: 0u) << ";\n"
+			<< "const uint BOUNDARY_SPACE_FIRST_PARTICLE_ID = "
+				<< (CfgTst->CheckKey("boundary_space_lighting_enabled") &&
+						CfgTst->GetBool("boundary_space_lighting_enabled", true)
+					? CfgTst->GetUInt("boundary_space_first_particle_id", true)
+					: 0u) << ";\n"
+			<< "const float BOUNDARY_SPACE_PATCH_ANGLE = "
+				<< (CfgTst->CheckKey("boundary_space_lighting_enabled") &&
+						CfgTst->GetBool("boundary_space_lighting_enabled", true)
+					? CfgTst->GetFloat("boundary_space_patch_angle", true)
+					: 0.0f) << ";\n"
+			<< "const float BOUNDARY_SPACE_PATCH_RADIUS = "
+				<< (CfgTst->CheckKey("boundary_space_lighting_enabled") &&
+						CfgTst->GetBool("boundary_space_lighting_enabled", true)
+					? CfgTst->GetFloat("boundary_space_patch_radius", true)
+					: 0.0f) << ";\n"
+			<< "const uint BOUNDARY_SPACE_PATCH_FALLOFF_QUADRATIC = "
+				<< (CfgTst->CheckKey("boundary_space_lighting_enabled") &&
+						CfgTst->GetBool("boundary_space_lighting_enabled", true) &&
+						std::string(CfgTst->GetString("boundary_space_patch_falloff", true)) == "quadratic"
+					? 1u
+					: 0u) << ";\n"
 			<< "#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN "
 				<< std::setprecision(9) << CfgTst->GetFloat("compression_stiffness_gain", true) << "\n"
 			<< "#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER " <<

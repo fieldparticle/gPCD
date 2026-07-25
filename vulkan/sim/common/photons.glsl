@@ -11,6 +11,9 @@ uint GetParticleType(uint particleID)
     if (int(round(P[particleID].ptype)) == int(PTYPE_PHOTON)) {
         return PARTICLE_TYPE_PHOTON;
     }
+    if (int(round(P[particleID].ptype)) == int(PTYPE_BOUNDARY)) {
+        return PARTICLE_TYPE_BOUNDARY;
+    }
     return PARTICLE_TYPE_REGULAR;
 }
 

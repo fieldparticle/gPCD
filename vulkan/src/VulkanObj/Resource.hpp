@@ -125,7 +125,7 @@ public:
 	virtual void PushMem(uint32_t currentBuffer) = 0;
 	// Copy meme copies memory to the device
 	virtual void PullMem(uint32_t currentBuffer) = 0;
-
+	virtual void ClearTempMemory() = 0;
 	void GeneralViewing(uint32_t CurrentBuffer);
 	void GeneralViewingEye(uint32_t CurrentBuffer);
 

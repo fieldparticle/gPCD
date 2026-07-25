@@ -32,37 +32,37 @@
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
 #include "Input.hpp"
-float PanX = 0.0;
-float PanY = 0.0;
-bool PanOn = false;
+float PanX				= 0.0;
+float PanY				= 0.0;
+bool PanOn				= false;
 
-bool QuitEvent=false;
-float ZoomX = 1.0;
-float ZoomY = 1.0;
-float ZoomZ = 1.0;
-bool G_ExportFrame = false;
-float ColorMap = 0.0;
-bool G_Boundary = true;
-float G_OrthoMin =-100.0f;
-float G_OrthoMax = 350.0f;
-float TranslateX=0.0;
-float TranslateY=0.0;
-float TranslateZ=0.0;
-bool G_Stop = false;
-float RotateX=0.0;
-float RotateY=0.0;
-float RotateZ=0.0;
-float rRotX = 0.0;
-float rRotY = 0.0;
-float rRotZ = 0.0;
-float VIEW_XY = 1;
-float VIEW_ZY = 2;
-float VIEW_XZ = 3;
-float rCoordView = VIEW_XY;
+bool QuitEvent			= false;
+float ZoomX				= 1.0;
+float ZoomY				= 1.0;
+float ZoomZ				= 1.0;
+bool G_ExportFrame		= false;
+float ColorMap			= 0.0;
+bool G_Boundary			= true;
+float G_OrthoMin		=-100.0f;
+float G_OrthoMax		= 350.0f;
+float TranslateX		= 0.0;
+float TranslateY		= 0.0;
+float TranslateZ		= 0.0;
+bool G_Stop				= true;
+float RotateX			= 0.0;
+float RotateY			= 0.0;
+float RotateZ			= 0.0;
+float rRotX				= 0.0;
+float rRotY				= 0.0;
+float rRotZ				= 0.0;
+float VIEW_XY			= 1;
+float VIEW_ZY			= 2;
+float VIEW_XZ			= 3;
+float rCoordView		= VIEW_XY;
 
-float ox = -1;
-float oy = -1;
-bool rightMouse = false;
+float ox				= -1;
+float oy				= -1;
+bool rightMouse			= false;
 
 void GLFWError(int err, const char* err_str)
 {

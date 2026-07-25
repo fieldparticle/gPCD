@@ -90,6 +90,7 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 	m_Particles.push_back(part0);
 	m_NumParticles = 1;
 #endif
+	
 	m_NumParticles = 0;
 	if (m_App->m_dt == 0.0)
 	{
@@ -97,11 +98,13 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		m_App->m_dt = CalcSpeedLimit(0.5200f, m_Radius);
 	}
 	
-	uint32_t count = 0;
-	std::string pipe_reservoir_entry = CfgTst->GetString("flow_type", false);
-	bool flow_modeling = false;
+	uint32_t count						= 0;
+	std::string pipe_reservoir_entry	= CfgTst->GetString("flow_type", false);
+	bool flow_modeling					= false;
+
 	if (pipe_reservoir_entry.compare("pipe_reservoir_entry") == 0)
 		flow_modeling = true;
+
 	while (input_file.peek() != EOF)
 	{
 		input_file.read((char*)&part_pos, sizeof(part_pos));
@@ -124,11 +127,10 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 				}
 			}
 		}
-		//if (m_NumParticles > 1000)
-			//mout << "here" << ende;
+
 		
-		float particleType = static_cast<float>(part_pos.ptype);
-		float evaluatorID = particleType > 0.5f ? particleType : 0.0f;
+		float particleType	= static_cast<float>(part_pos.ptype);
+		float evaluatorID	= particleType > 0.5f ? particleType : 0.0f;
 		
 		part.PosLocA		= glm::vec4(part_pos.rx, part_pos.ry,part_pos.rz, 0.0);
 		part.PosLocB		= glm::vec4(part_pos.rx, part_pos.ry, part_pos.rz, 0.0);
@@ -142,20 +144,18 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		part.material_id	= static_cast<float>(part_pos.material_id);
 		part.contactCount	= 0;
 		
-		
-#if 0
-		for (size_t nn = 0; nn < MAX_CONTACTS; nn++)
-		{
-			part.contacts[nn].ids = glm::uvec4(0, 0, 0, 0);
-			part.contacts[nn].geom = glm::vec4(0.0, 0.0, 0.0, 0.0);
-			part.contacts[nn].aux = glm::vec4(0.0, 0.0, 0.0, 0.0);
-		}
-#endif
 
 		if (part_pos.ptype > 0.5)
 			BoundaryParticleLimit++;
+
 		if (part_pos.ptype == 2.0)
+		{
+
+
+
 			m_NumBoundaryParticles++;
+		}
+
 		count++;
 
 		m_NumParticles++;
@@ -163,22 +163,12 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 	}
 	
 	mout << "====== Read " << m_NumParticles << " From Binary. Boundary:" << BoundaryParticleLimit << "=====================" << ende;
-	uint32_t sidelen = CfgTst->GetUInt("CellAryL", true);
-	m_SideLength = static_cast<float>(sidelen);
-	/*
-	* ##JMB How can they match you just add one ot it
-	if(cfg->m_CfgSidelen != m_SideLength)
-	{
-		std::ostringstream  objtxt;
-		objtxt << m_Name << "ResourceVertexParticle::Side length mismatch - cfg:"
-			<< cfg->m_CfgSidelen << " calculated:" << m_SideLength  << std::ends;
-
-		//throw std::runtime_error(objtxt.str().c_str());
-	}*/
-
+	uint32_t sidelen	= CfgTst->GetUInt("CellAryL", true);
+	m_SideLength		= static_cast<float>(sidelen);
+	
 	m_App->m_SideLength = static_cast<uint32_t>(m_SideLength);
-	size_t styrsz = sizeof(Particle);
-	size_t spdata = sizeof(pdata);
+	size_t styrsz		= sizeof(Particle);
+	size_t spdata		= sizeof(pdata);
 	
 
 	uint32_t sizeParta = sizeof(Particle);
@@ -289,12 +279,15 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 
 	vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, m_Particles.data(), m_Allocation[0],
 		0, m_BufSize);
+	
+    
+}
+void ResourceVertexParticle::ClearTempMemory()
+{
 	m_Particles.clear();
 	std::vector<Particle> empty;
 	m_Particles.swap(empty);
-    
 }
-
 
 void ResourceVertexParticle::CreateLayout()
 {

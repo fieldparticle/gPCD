@@ -222,11 +222,11 @@ void DrawParticleOnly::DrawFrame()
 			throw std::runtime_error(objtxt.str().c_str());
 		};
 	
-		//Push constants
-		m_Graphicslst[1]->PushMem(currentBuffer);
-		m_Graphicslst[2]->PushMem(currentBuffer);
-		//Atomic graphics
-		m_Graphicslst[5]->PushMem(currentBuffer);
+	for (size_t ii = 0; ii < m_Graphicslst.size(); ii++)
+		{
+			// Dont update push constants twice. already done in compute
+			m_Graphicslst[ii]->PushMem(currentBuffer);
+		};
 
 		// Record a new command buffer for the current frame and associate with swap chain image.
 		m_GraphicsCommandObj->RecordCommands(imageIndex,currentBuffer );

@@ -26,9 +26,9 @@ layout(location = 1) in vec2 parms;
 
 layout(location = 0) out vec4 outColor;
 
-#include "..\common\FPM.frag"
+#include "..\common\FPML.frag"
 
 void main()
 {
-	fpm_frag_main();
+	fpml_frag_main();
 }

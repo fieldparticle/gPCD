@@ -37,26 +37,19 @@
 
 struct BoundaryLightRecord
 {
-    alignas(16) glm::vec4 pos_area;
-    // xyz = boundary sample position
-    // w   = sample area/weight
+    alignas(16) glm::vec4 rgb_valid;
+    // xyz = persistent boundary-space light RGB
+    // w   = valid flag
 
     alignas(16) glm::vec4 normal_material;
     // xyz = normal
     // w   = material_id as float
 
     alignas(16) glm::uvec4 ids;
-    // x = sample_id
-    // y = particle_id
-    // z = surface_type
-    // w = surface_id / wall_flag
+    // x = particle_id
+    // y = surface_type
+    // z = surface_id / wall_flag
+    // w = reserved
 
-    alignas(16) glm::vec4 current;
-    // xyz = current-frame deposited RGB
-    // w   = hit_count or debug
-
-    alignas(16) glm::vec4 filtered;
-    // xyz = filtered RGB for rendering
-    // w   = flags/reserved
 };
 #endif

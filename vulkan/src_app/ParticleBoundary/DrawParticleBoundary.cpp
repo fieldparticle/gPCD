@@ -44,7 +44,7 @@ void DrawParticleBoundary::Create(CommandPoolObj* CPL,
 	m_SO = SO;
 	m_EO = EO;
 	m_ComputeCommandObj = m_CPL->GetCommandObjByName("CommandParticleCompute");
-	m_GraphicsCommandObj = m_CPL->GetCommandObjByName("CommandLightingGraphics");
+	m_GraphicsCommandObj = m_CPL->GetCommandObjByName("CommandObjParticleGraphics");
 	m_Graphicslst = m_GraphicsCommandObj->m_RCO->m_DRList;
 	m_Computelst = m_ComputeCommandObj->m_RCO->m_DRList;
 	
@@ -220,7 +220,6 @@ void DrawParticleBoundary::DrawFrame()
 		for (size_t ii = 0; ii < m_Graphicslst.size(); ii++)
 		{
 			// Dont update push constants twice. already done in compute
-			if (ii != 3)
 				m_Graphicslst[ii]->PushMem(currentBuffer);
 		}
 		

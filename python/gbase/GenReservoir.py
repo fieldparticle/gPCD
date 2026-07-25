@@ -638,6 +638,10 @@ class GenReservoir(GenericGenData):
             self.report_cell_occupancy_capacity()
             self.write_particle_bin()
             self.write_test_file()
+            if self.itemcfg.get("write_function_wall_obj", False) or self.itemcfg.get(
+                "obj_file_name"
+            ):
+                self.write_function_wall_obj()
             self.report_generated_bounds()
         except (OSError, RuntimeError, TypeError, ValueError) as error:
             self.close_bin_file()

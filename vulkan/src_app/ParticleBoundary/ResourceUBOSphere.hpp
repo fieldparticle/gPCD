@@ -53,6 +53,7 @@ public:
 		m_VkType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		
 	};
+	void ClearTempMemory() {};
 	virtual void GetShaderMem() {};
 	void Create(uint32_t BindPoint, SwapChainObj* SCO, ResourceVertexParticle* particle);
 	void Create(uint32_t BindPoint, SwapChainObj* SCO);

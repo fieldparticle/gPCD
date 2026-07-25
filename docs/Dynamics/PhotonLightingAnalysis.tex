@@ -19,14 +19,13 @@ particles, but their optical rule is special:
     \item \texttt{colFlg} marks the photon as in collision for the render
           frame;
     \item photon \texttt{material\_id} is temporarily changed to the contacted
-          surface material so \texttt{LUMENS} can draw the photon with the
-          surface color.
+          surface material for diagnostics and future boundary lighting.
 \end{itemize}
 
 This is useful for debugging whether photons hit the correct surface and
-whether the material color source is being read correctly.  It does not yet
-make the sphere or walls look illuminated.  The visible light is still carried
-by the moving photon points themselves.
+whether the material color source is being read correctly.  The cleaned
+Python renderer treats \texttt{LUMENS} as debug photon visibility only, so it
+does not yet make the sphere or walls look illuminated.
 
 \subsection{Why The Current Result Is Unsatisfying}
 

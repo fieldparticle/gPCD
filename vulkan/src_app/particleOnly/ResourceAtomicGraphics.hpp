@@ -59,7 +59,7 @@ public:
 	{
 		m_VkType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	};
-		
+	void ClearTempMemory() {};
 	void Create(uint32_t BindPoint,PerfObj *perfObj);
 	virtual void AskObject(uint32_t AnyNumber);
 		

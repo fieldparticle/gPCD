@@ -134,8 +134,7 @@ radius 					= 0.05;
 
 // Simulation timestep used by both dynamics integration and wave-frame spacing.
 dt 							= 0.045;
-target_penetration_fraction = 0.5;
-hard_penetration_fraction 	= 0.75;
+
 
 // --------------------------------------------------------------------------
 // Front-end study and output selection

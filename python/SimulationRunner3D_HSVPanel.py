@@ -9,7 +9,7 @@ from gbase.MaterialProperties import (
     COLOR_MODE_COLLISION,
     COLOR_MODE_LUMENS,
     COLOR_MODE_SOLID,
-    COLOR_MODE_VELOCITY,
+    COLOR_MODE_VELOCITY_ANGLE,
     normalized_material_properties,
 )
 from gbase.pdata import PTYPE_PHOTON
@@ -111,7 +111,7 @@ def _material_color_mode(particle, run_configuration):
     material = _material_property(particle, run_configuration)
     if material is not None:
         return int(material["color_mode"])
-    return COLOR_MODE_VELOCITY
+    return COLOR_MODE_VELOCITY_ANGLE
 
 
 def _material_unit_color(particle, run_configuration):
@@ -135,33 +135,34 @@ def _material_debug_color(particle, run_configuration):
     return [max(0.0, min(1.0, float(color[index]))) for index in range(3)]
 
 
-def _boundary_light_color(particle_id, particle, dynamics, run_configuration):
+def _material_debug_color_by_id(material_id, run_configuration):
+    material = _material_property_by_id(material_id, run_configuration)
+    if material is None or not bool(material.get("debug_visible", False)):
+        return None
+    color = material.get("debug_color", (1.0, 1.0, 1.0, 1.0))
+    return [max(0.0, min(1.0, float(color[index]))) for index in range(3)]
+
+
+def _photon_debug_color(particle_id, particle, dynamics, run_configuration):
+    if dynamics is not None and hasattr(dynamics, "BasePhotonMaterialID"):
+        material_id = dynamics.BasePhotonMaterialID(particle_id)
+        return _material_debug_color_by_id(material_id, run_configuration)
+    return _material_debug_color(particle, run_configuration)
+
+
+def _boundary_space_light_color(particle_id, particle, dynamics, run_configuration):
+    """Approximate Vulkan point-list lighting by coloring boundary particles only."""
     if dynamics is None or not bool(
-        run_configuration.get("boundary_lighting_enabled", False)
+        run_configuration.get("boundary_space_lighting_enabled", False)
     ):
         return None
-    if not hasattr(dynamics, "BoundaryLightFilteredRGB"):
+    if not hasattr(dynamics, "BoundarySpaceLightRGB"):
         return None
-    filtered = dynamics.BoundaryLightFilteredRGB(particle_id)
-    if filtered is None:
+    boundary_rgb = dynamics.BoundarySpaceLightRGB(particle_id)
+    if boundary_rgb is None:
         return None
-    base_color = _material_unit_color(particle, run_configuration)
-    ambient = max(
-        0.0,
-        float(run_configuration.get("boundary_light_render_ambient", 0.05)),
-    )
-    gain = max(0.0, float(run_configuration.get("boundary_light_render_gain", 1.0)))
-    intensity = max(0.0, min(1.0, gain * max(float(value) for value in filtered)))
     return [
-        max(
-            0.0,
-            min(
-                1.0,
-                base_color[index] * ambient
-                + intensity
-                * (base_color[index] * (1.0 - intensity) + intensity),
-            ),
-        )
+        max(0.0, min(1.0, float(boundary_rgb[index])))
         for index in range(3)
     ]
 
@@ -174,18 +175,20 @@ def _particle_color(particle_id, particle, dynamics, run_configuration):
     color_mode = _material_color_mode(particle, run_configuration)
     if _is_photon_particle(particle):
         color_mode = COLOR_MODE_LUMENS
-    if color_mode == COLOR_MODE_VELOCITY:
+    if color_mode == COLOR_MODE_VELOCITY_ANGLE:
         hsv_sat = float(run_configuration.get("hsv_sat", 0.707))
         hsv_val = float(run_configuration.get("hsv_val", 1.0))
         return _unit_color(hsv_angle(float(particle.VelRad.w), hsv_val, hsv_sat))
     if color_mode == COLOR_MODE_SOLID:
         return _material_unit_color(particle, run_configuration)
     if color_mode == COLOR_MODE_LUMENS:
-        if (
-            int(getattr(particle, "colFlg", 0)) == 1
-            or int(getattr(particle, "report_contacts", 0)) > 0
-        ):
-            return _material_unit_color(particle, run_configuration)
+        if _is_photon_particle(particle):
+            return _photon_debug_color(
+                particle_id,
+                particle,
+                dynamics,
+                run_configuration,
+            )
         return _material_debug_color(particle, run_configuration)
     if color_mode == COLOR_MODE_COLLISION:
         return _unit_color((65, 125, 255))
@@ -222,13 +225,16 @@ def _collect_particles(dynamics, run_configuration):
         position = dynamics.GetCurrentParticlePosition(particle_id)
         point = [float(position.x), float(position.y), float(position.z)]
         if dynamics.IsBoundaryParticle(particle_id):
-            color = _boundary_light_color(
+            color = _boundary_space_light_color(
                 particle_id,
                 particle,
                 dynamics,
                 run_configuration,
             )
-            if color is None:
+            if (
+                color is None
+                and not bool(run_configuration.get("boundary_space_lighting_enabled", False))
+            ):
                 color = _particle_color(
                     particle_id,
                     particle,
@@ -553,6 +559,11 @@ class SimulationRunner3DApp:
         self.boundary_as_particles = bool(
             self.run_configuration.get("boundary_as_particles", True)
         )
+        self.boundary_space_lighting_enabled = bool(
+            self.run_configuration.get("boundary_space_lighting_enabled", False)
+        )
+        if self.boundary_space_lighting_enabled:
+            self.boundary_as_particles = True
         self.show_boundaries = bool(self.run_configuration.get("open3d_show_boundaries", True))
         self.frame = 0
         self.paused = False
@@ -890,7 +901,7 @@ class SimulationRunner3DApp:
                     line_material,
                 )
         lighting_ball = _lighting_ball_config(self.run_configuration)
-        if lighting_ball is not None:
+        if lighting_ball is not None and not self.boundary_space_lighting_enabled:
             center, radius = lighting_ball
             ball_mesh = self.o3d.geometry.TriangleMesh.create_sphere(
                 radius=radius,

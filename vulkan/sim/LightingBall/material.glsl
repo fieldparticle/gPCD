@@ -2,12 +2,14 @@
 #define MATERIAL_GLSL
 
 const uint COLOR_MODE_COLLISION = 0u;
-const uint COLOR_MODE_VELOCITY = 1u;
+const uint COLOR_MODE_VELOCITY_ANGLE = 1u;
 const uint COLOR_MODE_SOLID = 2u;
 const uint COLOR_MODE_LUMENS = 3u;
 
 const uint PARTICLE_TYPE_REGULAR = 0u;
 const uint PARTICLE_TYPE_PHOTON = 1u;
+
+const uint PARTICLE_TYPE_BOUNDARY = 2u;
 
 struct MaterialProperty
 {
@@ -24,14 +26,13 @@ struct MaterialProperty
 
 const uint MATERIAL_PROPERTY_COUNT = 3u;
 const MaterialProperty MATERIAL_PROPERTIES[3] = MaterialProperty[3](
-    MaterialProperty(0u, 1u, 1.000000000, 0.000000000, 3u, vec4(0.500000000, 0.500000000, 1.000000000, 1.000000000), 0u, vec4(0.000000000, 0.000000000, 1.000000000, 1.000000000), 0.000000000),
+    MaterialProperty(0u, 1u, 1.000000000, 0.000000000, 3u, vec4(0.500000000, 0.500000000, 1.000000000, 1.000000000), 1u, vec4(0.000000000, 0.000000000, 1.000000000, 1.000000000), 0.000000000),
     MaterialProperty(1u, 0u, 1.000000000, 0.000000000, 2u, vec4(1.000000000, 1.000000000, 0.000000000, 1.000000000), 0u, vec4(0.000000000, 0.000000000, 0.000000000, 0.000000000), 0.000000000),
     MaterialProperty(2u, 0u, 1.000000000, 0.000000000, 2u, vec4(0.000000000, 0.000000000, 0.000000000, 0.000000000), 0u, vec4(0.000000000, 0.000000000, 0.000000000, 0.000000000), 0.000000000)
 );
 
-const uint HSV_ON = 0u;
-const float HSV_SAT = 0.000f;
-const float HSV_VAL = 0.000f;
+const float VELOCITY_ANGLE_COLOR_SAT = 1.00;
+const float VELOCITY_ANGLE_COLOR_VAL = 1.00;
 vec3 ncolcolor = vec3(0.0f,1.0f,0.0f);
 vec3 colcolor = vec3(1.0f,0.0f,0.0f);
 #endif

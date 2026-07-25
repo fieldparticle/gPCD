@@ -32,9 +32,6 @@ particle_separation_distance 	= 0.0005;
 // Required: binary particle file consumed by the Python runner.
 output_file_prefix 				= "CDNozzle_Vk";
 
-// Temporary upper bound that includes the chamber packing and wall markers.
-particle_range 					= [1,500];
-
 // Required: Python viewer zoom.
 zoom							= 1.5;
 
@@ -230,9 +227,7 @@ curve_wall_segments = {
 // Required: tells ForceDynamicsBase to load particles from bin_file.
 pdata_from_file 		= true;
 
-// Required: enables or disables study/batch generation mode.
-study					= false;
+
 
 // Required when study is true; otherwise kept at zero.
 num_studies 			= 0;
-

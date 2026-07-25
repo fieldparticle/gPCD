@@ -144,11 +144,13 @@ int ParticleBoundaryandSphere(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool
 											resourceCollMatrix,
 											resourceLockMatrix,
 											resourceAtomicG, });
+	resourceGraphicsContainer->ClearTempMemory();
 	resourceComputeContainer->Create({ 	resourceParticlePush,
 										resourceVertexParticle,
 										resourceAtomicCompute,
 										resourceLockMatrix,
 										resourceCollMatrix});
+	resourceComputeContainer->ClearTempMemory();
 	pipelineGraphicsBoundary->Create(shaderObj, swapChain, resourceGraphicsContainer, renderPass);
 	pipelineGraphicsParticle->Create(shaderObj, swapChain, resourceGraphicsContainer, renderPass);
 	pipelineComputeParticle->Create(shaderObj, resourceComputeContainer);

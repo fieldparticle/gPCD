@@ -40,17 +40,17 @@ class ResourceVertexObj : public Resource
 {
     public:
 
-		std::vector<CartVert> m_Axes;
-		std::string m_FileName;
-		std::vector<glm::vec3> m_vtemp;
+		std::vector<CartVert>	m_Axes;
+		std::string				m_FileName;
+		std::vector<glm::vec3>	m_vtemp;
 		
 		virtual void GetShaderMem() {};
 		//vcb::Mesh                                m_Model;
 		ResourceVertexParticle* m_ParticleVert{};
-		std::vector<CartVert> m_Verts{};
-		std::vector<uint32_t> m_CubeIndices;
-		std::vector<glm::vec2> m_UVS{};
-		std::vector<glm::vec3> m_Normals{};
+		std::vector<CartVert>	m_Verts{};
+		std::vector<uint32_t>	m_CubeIndices;
+		std::vector<glm::vec2>	 m_UVS{};
+		std::vector<glm::vec3>	m_Normals{};
 		ResourceVertexObj(VulkanObj *App, std::string Name):
 					Resource(App, Name,VBW_TYPE_VERTEX_BUFFER)
 				{
@@ -68,6 +68,7 @@ class ResourceVertexObj : public Resource
 
 	void PullMem(uint32_t currentBuffer) {};
 	virtual void PushMem(uint32_t currentBuffer) {};
+	virtual void ClearTempMemory() {};
 	void Cleanup() {
 
 		vmaDestroyBuffer(m_App->m_vmaAllocator, m_Buffers[0], m_Allocation[0]);

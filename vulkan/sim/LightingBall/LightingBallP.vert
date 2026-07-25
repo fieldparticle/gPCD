@@ -17,6 +17,7 @@
 #include "../common/Lockimage.glsl"
 #include "../common/particle.glsl"
 #include "../common/color_map.glsl"
+#include "../common/BoundaryLightRecord.glsl"
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -69,9 +70,9 @@ uint addUniqueCell(uint index, uint CornerLocation, uint Count)
     return 1;
 }
 
-#include "..\common\FPM.vert"
+#include "..\common\FPML.vert"
 
 void main()
 {
-	fpm_vert_main();
+	fpml_vert_main();
 }

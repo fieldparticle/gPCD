@@ -1,14 +1,12 @@
 import os
 
-from gbase.BoundaryLighting import (
-    BOUNDARY_LIGHT_MODEL_LIGHTING_BALL,
-    BOUNDARY_LIGHT_MODEL_NONE,
-    BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL,
-    BOUNDARY_LIGHT_SURFACE_SPHERE,
-    parse_boundary_light_model,
-    parse_boundary_light_rgb,
+from gbase.BoundarySpaceLighting import (
+    BOUNDARY_SPACE_SURFACE_RECTANGLE_WALL,
+    BOUNDARY_SPACE_SURFACE_SPHERE,
+    RETIRED_BOUNDARY_LIGHTING_CONFIG_KEYS,
 )
 from gbase.FunctionWall import bounds as wall_bounds
+from gbase.FunctionWall import evaluate_wall_at_point
 from gbase.FunctionWall import parse_keyed_curve_wall_segments
 from gbase.FunctionWall import sample_points
 from gbase.MaterialProperties import (
@@ -16,7 +14,7 @@ from gbase.MaterialProperties import (
     COLOR_MODE_LUMENS,
     COLOR_MODE_NAMES,
     COLOR_MODE_SOLID,
-    COLOR_MODE_VELOCITY,
+    COLOR_MODE_VELOCITY_ANGLE,
     DEFAULT_MATERIAL_PROPERTIES,
     PARTICLE_TYPE_BOUNDARY,
     PARTICLE_TYPE_PHOTON,
@@ -146,7 +144,7 @@ class GenericGenData:
 
     BOUNDARY_PARTICLE_PTYPE = PTYPE_BOUNDARY
     COLOR_MODE_COLLISION = COLOR_MODE_COLLISION
-    COLOR_MODE_VELOCITY = COLOR_MODE_VELOCITY
+    COLOR_MODE_VELOCITY_ANGLE = COLOR_MODE_VELOCITY_ANGLE
     COLOR_MODE_SOLID = COLOR_MODE_SOLID
     COLOR_MODE_LUMENS = COLOR_MODE_LUMENS
     COLOR_MODE_NAMES = COLOR_MODE_NAMES
@@ -165,13 +163,11 @@ class GenericGenData:
         self.number_particles = 0
         self.number_active_particles = 0
         self.number_boundary_particles = 0
-        self.boundary_lighting_enabled = False
-        self.boundary_lighting_model = BOUNDARY_LIGHT_MODEL_NONE
-        self.boundary_light_initial_rgb = (0.0, 0.0, 0.0)
+        self.boundary_space_lighting_enabled = False
         self.boundary_space_patch_angle = 0.20
         self.boundary_space_patch_radius = 0.50
         self.boundary_space_patch_falloff = "quadratic"
-        self.boundary_light_source_metadata = {}
+        self.boundary_space_proxy_metadata = {}
         self.material_properties = [dict(item) for item in self.DEFAULT_MATERIAL_PROPERTIES]
         self.material_properties_by_id = {
             int(item["material_id"]): dict(item)
@@ -292,7 +288,7 @@ class GenericGenData:
             color_mode = self.parse_color_mode(
                 raw_material.get(
                     "color_mode",
-                    self.COLOR_MODE_VELOCITY,
+                    self.COLOR_MODE_VELOCITY_ANGLE,
                 ),
                 errors,
                 context,
@@ -593,42 +589,28 @@ class GenericGenData:
                     )
 
         self.validate_material_properties(errors)
+        for retired_key in RETIRED_BOUNDARY_LIGHTING_CONFIG_KEYS:
+            if retired_key in self.itemcfg:
+                errors.append(
+                    f"{retired_key} is retired; use boundary_space_lighting_enabled "
+                    "and boundary_space_patch_*"
+                )
         try:
-            boundary_lighting_enabled = self.itemcfg.get(
-                "boundary_lighting_enabled",
+            boundary_space_lighting_enabled = self.itemcfg.get(
+                "boundary_space_lighting_enabled",
                 False,
             )
-            if not isinstance(boundary_lighting_enabled, bool):
-                errors.append("boundary_lighting_enabled must be a boolean")
+            if not isinstance(boundary_space_lighting_enabled, bool):
+                errors.append("boundary_space_lighting_enabled must be a boolean")
         except (TypeError, ValueError):
-            boundary_lighting_enabled = False
-            errors.append("boundary_lighting_enabled must be a boolean")
+            boundary_space_lighting_enabled = False
+            errors.append("boundary_space_lighting_enabled must be a boolean")
 
-        boundary_lighting_model = BOUNDARY_LIGHT_MODEL_NONE
-        if boundary_lighting_enabled:
-            try:
-                boundary_lighting_model = parse_boundary_light_model(
-                    self.itemcfg.get("boundary_lighting_model", "LightingBall")
-                )
-            except (TypeError, ValueError) as exc:
-                errors.append(str(exc))
-            if boundary_lighting_model != BOUNDARY_LIGHT_MODEL_LIGHTING_BALL:
-                errors.append(
-                    "boundary_lighting_model must be LightingBall when "
-                    "boundary_lighting_enabled is true"
-                )
+        if boundary_space_lighting_enabled:
             if self.itemcfg.get("Lighting_ball") is None:
                 errors.append(
-                    "Lighting_ball is required when boundary_lighting_enabled is true"
+                    "Lighting_ball is required when boundary_space_lighting_enabled is true"
                 )
-
-        try:
-            boundary_light_initial_rgb = parse_boundary_light_rgb(
-                self.itemcfg.get("boundary_light_initial_rgb", (0.0, 0.0, 0.0))
-            )
-        except (TypeError, ValueError) as exc:
-            boundary_light_initial_rgb = (0.0, 0.0, 0.0)
-            errors.append(str(exc))
 
         try:
             boundary_space_patch_angle = float(
@@ -697,9 +679,7 @@ class GenericGenData:
         self.wall_contact_offset = float(self.itemcfg.wall_contact_offset)
         self.dt = float(self.itemcfg.dt)
         self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
-        self.boundary_lighting_enabled = bool(boundary_lighting_enabled)
-        self.boundary_lighting_model = int(boundary_lighting_model)
-        self.boundary_light_initial_rgb = boundary_light_initial_rgb
+        self.boundary_space_lighting_enabled = bool(boundary_space_lighting_enabled)
         self.boundary_space_patch_angle = float(boundary_space_patch_angle)
         self.boundary_space_patch_radius = float(boundary_space_patch_radius)
         self.boundary_space_patch_falloff = boundary_space_patch_falloff
@@ -986,7 +966,7 @@ class GenericGenData:
         self.number_particles = 0
         self.number_active_particles = 0
         self.number_boundary_particles = 0
-        self.boundary_light_source_metadata = {}
+        self.boundary_space_proxy_metadata = {}
 
         output_prefix = str(
             self.itemcfg.get("output_file_prefix", self.itemcfg.STUDY_NAME)
@@ -1043,22 +1023,53 @@ class GenericGenData:
         self.p_list.append(particle)
         return particle
 
-    def register_boundary_light_source(
+    def register_boundary_space_proxy(
         self,
         particle_id,
         surface_type,
         surface_id,
         material_id,
         normal,
-        area=1.0,
     ):
-        self.boundary_light_source_metadata[int(particle_id)] = {
+        self.boundary_space_proxy_metadata[int(particle_id)] = {
             "surface_type": int(surface_type),
             "surface_id": int(surface_id),
             "material_id": int(material_id),
             "normal": tuple(float(value) for value in normal),
-            "area": float(area),
         }
+
+    def boundary_space_first_particle_id(self):
+        if not self.boundary_space_proxy_metadata:
+            return 0
+        return min(int(particle_id) for particle_id in self.boundary_space_proxy_metadata)
+
+    def boundary_space_last_particle_id(self):
+        if not self.boundary_space_proxy_metadata:
+            return 0
+        return max(int(particle_id) for particle_id in self.boundary_space_proxy_metadata)
+
+    def boundary_space_proxy_count(self):
+        return len(self.boundary_space_proxy_metadata)
+
+    def boundary_space_proxy_ids_are_contiguous(self):
+        proxy_count = self.boundary_space_proxy_count()
+        if proxy_count <= 0:
+            return True
+        return (
+            self.boundary_space_last_particle_id()
+            - self.boundary_space_first_particle_id()
+            + 1
+            == proxy_count
+        )
+
+    def validate_boundary_space_proxy_packing(self):
+        if not self.boundary_space_lighting_enabled:
+            return
+        if not self.boundary_space_proxy_ids_are_contiguous():
+            raise ValueError(
+                "boundary-space proxy particle ids must be contiguous for Vulkan "
+                "subtraction indexing"
+            )
 
     def add_mobile_particle(
         self,
@@ -1161,6 +1172,10 @@ class GenericGenData:
             points = self.curve_marker_points(segment)
             added_for_segment = 0
             for marker_x, marker_y in points:
+                evaluation = evaluate_wall_at_point(segment, (marker_x, marker_y))
+                if evaluation is None:
+                    continue
+                normal_x, normal_y = evaluation["normal"]
                 cell_x = round(marker_x)
                 cell_y = round(marker_y)
                 cell_z = int(math.floor(self.particle_plane_z))
@@ -1177,12 +1192,12 @@ class GenericGenData:
                     (float(cell_x), float(cell_y), float(cell_z)),
                     material_id=material_id,
                 )
-                self.register_boundary_light_source(
+                self.register_boundary_space_proxy(
                     particle.pnum,
-                    BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL,
+                    BOUNDARY_SPACE_SURFACE_RECTANGLE_WALL,
                     wall_flag,
                     material_id,
-                    segment["normal"],
+                    (normal_x, normal_y, 0.0),
                 )
                 added_for_segment += 1
             segment_marker_counts.append(added_for_segment)
@@ -1272,31 +1287,33 @@ class GenericGenData:
     def report_boundary_space_lighting(self):
         report_text = (
             "Boundary-space lighting report:\n"
-            f"  enabled: {self.boundary_lighting_enabled}\n"
-            f"  model: {self.boundary_lighting_model}\n"
-            f"  proxies: {len(self.boundary_light_source_metadata)}\n"
+            f"  enabled: {self.boundary_space_lighting_enabled}\n"
+            f"  proxies: {self.boundary_space_proxy_count()}\n"
+            f"  first particle id: {self.boundary_space_first_particle_id()}\n"
+            f"  last particle id: {self.boundary_space_last_particle_id()}\n"
+            f"  contiguous ids: {self.boundary_space_proxy_ids_are_contiguous()}\n"
             f"  patch angle: {self.boundary_space_patch_angle:g}\n"
             f"  patch radius: {self.boundary_space_patch_radius:g}\n"
             f"  patch falloff: {self.boundary_space_patch_falloff}"
         )
         print(report_text)
         self.write_validation_log(report_text)
-        return len(self.boundary_light_source_metadata)
+        return self.boundary_space_proxy_count()
 
     def write_boundary_space_lighting(self, output):
+        self.validate_boundary_space_proxy_packing()
         output.write(
-            "boundary_lighting_enabled = "
-            f"{'true' if self.boundary_lighting_enabled else 'false'};\n"
+            "boundary_space_lighting_enabled = "
+            f"{'true' if self.boundary_space_lighting_enabled else 'false'};\n"
         )
-        output.write(f"boundary_lighting_model = {self.boundary_lighting_model};\n")
+        if not self.boundary_space_lighting_enabled:
+            return
         output.write(
-            "boundary_light_initial_rgb = ["
-            f"{self.boundary_light_initial_rgb[0]:.9f}, "
-            f"{self.boundary_light_initial_rgb[1]:.9f}, "
-            f"{self.boundary_light_initial_rgb[2]:.9f}];\n"
+            f"boundary_space_proxy_count = {self.boundary_space_proxy_count()};\n"
         )
         output.write(
-            f"boundary_space_proxy_count = {len(self.boundary_light_source_metadata)};\n"
+            "boundary_space_first_particle_id = "
+            f"{self.boundary_space_first_particle_id()};\n"
         )
         output.write(
             f"boundary_space_patch_angle = {self.boundary_space_patch_angle:.9f};\n"

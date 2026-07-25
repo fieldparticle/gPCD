@@ -59,7 +59,7 @@ class ResourceLighting : public Resource
 	
 	void PullMem(uint32_t currentBuffer) {};
 	virtual void PushMem(uint32_t currentBuffer){};
-	
+	void ClearTempMemory() {};
 	void Cleanup()
 	{
 

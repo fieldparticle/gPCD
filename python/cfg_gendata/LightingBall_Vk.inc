@@ -12,6 +12,14 @@ Lighting_ball = {
 };
 
 // --------------------------------------------------------------------------
+// Boundary-space lighting
+// --------------------------------------------------------------------------
+boundary_space_lighting_enabled = true;
+boundary_space_patch_angle = 0.20;
+boundary_space_patch_radius = 0.50;
+boundary_space_patch_falloff = "quadratic";
+
+// --------------------------------------------------------------------------
 // Domain and view
 // --------------------------------------------------------------------------
 x_axis_lims = [0.0, 20.0];

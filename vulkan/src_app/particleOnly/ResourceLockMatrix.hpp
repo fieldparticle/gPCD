@@ -76,6 +76,7 @@ public:
 	void Create(uint32_t BindPoint, ResourceVertexParticle* particle);
 	void PullMem(uint32_t currentBuffer){};
 	void createLayout();
+	void ClearTempMemory();
 	void Cleanup()
 	{
 

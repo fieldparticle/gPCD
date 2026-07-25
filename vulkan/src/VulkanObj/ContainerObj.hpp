@@ -88,6 +88,11 @@ public:
 		return m_DRList;
 	}
 
+	void ClearTempMemory()
+	{
+		for (int ii = 0; ii < m_DRList.size(); ii++)
+			m_DRList[ii]->ClearTempMemory();
+	}
 	VkDescriptorSet* GetResourceSets(uint32_t currentBuffer)
 	{
 

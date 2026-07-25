@@ -37,7 +37,7 @@ class ResourceParticleUBO : public Resource
 {
 
 public:
-	ResourceVertexParticle* m_Particle;
+	ResourceVertexParticle* m_Particle={};
 	
 	UniformBufferObject m_UBO={};
 	bool m_done = false;
@@ -51,7 +51,7 @@ public:
 		m_VkType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	};
 	virtual void AskObject(uint32_t AnyNumber) {};
-	
+	void ClearTempMemory() {};
 	void Create(uint32_t BindPoint, SwapChainObj* SCO, ResourceVertexParticle* particle);
 	void Create(uint32_t BindPoint, SwapChainObj* SCO);
 	void createLayout();

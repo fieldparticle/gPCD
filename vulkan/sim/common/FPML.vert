@@ -1,5 +1,75 @@
 
-void fpm_vert_main(){
+bool IsBoundaryParticleForLighting(uint particleID)
+{
+	return int(round(P[particleID].ptype)) == 2;
+}
+
+vec3 BoundaryLightRecordPosition(BoundaryLightRecord record)
+{
+	uint particleID = record.ids.x;
+	return ShaderFlags.positionBuffer == 0u
+		? P[particleID].PosLocA.xyz
+		: P[particleID].PosLocB.xyz;
+}
+
+float BoundaryLightWeight(BoundaryLightRecord source, BoundaryLightRecord other)
+{
+	if (source.ids.y != other.ids.y || source.ids.z != other.ids.z)
+		return 0.0;
+
+	float value = 0.0;
+	if (source.ids.y == 1u)
+	{
+		vec3 sourceNormal = normalize(source.normal_material.xyz);
+		vec3 otherNormal = normalize(other.normal_material.xyz);
+		float angle = acos(clamp(dot(sourceNormal, otherNormal), -1.0, 1.0));
+		value = 1.0 - angle / BOUNDARY_SPACE_PATCH_ANGLE;
+	}
+	else if (source.ids.y == 2u)
+	{
+		float distance = length(
+			BoundaryLightRecordPosition(source) - BoundaryLightRecordPosition(other));
+		value = 1.0 - distance / BOUNDARY_SPACE_PATCH_RADIUS;
+	}
+
+	if (value <= 0.0)
+		return 0.0;
+	if (BOUNDARY_SPACE_PATCH_FALLOFF_QUADRATIC == 1u)
+		value *= value;
+	return value;
+}
+
+vec4 BoundaryLightColor(uint particleID, vec4 fallbackColor)
+{
+	if (!IsBoundaryParticleForLighting(particleID)
+			|| BOUNDARY_SPACE_PROXY_COUNT == 0u
+			|| particleID < BOUNDARY_SPACE_FIRST_PARTICLE_ID)
+		return fallbackColor;
+
+	uint boundaryIndex = particleID - BOUNDARY_SPACE_FIRST_PARTICLE_ID;
+	if (boundaryIndex >= BOUNDARY_SPACE_PROXY_COUNT)
+		return fallbackColor;
+
+	BoundaryLightRecord source = BoundaryLight[boundaryIndex];
+	vec3 weightedRgb = vec3(0.0);
+	float totalWeight = 0.0;
+	for (uint ii = 0u; ii < BOUNDARY_SPACE_PROXY_COUNT; ++ii)
+	{
+		BoundaryLightRecord other = BoundaryLight[ii];
+		if (other.rgb_valid.w < 0.5)
+			continue;
+		float weight = BoundaryLightWeight(source, other);
+		if (weight <= 0.0)
+			continue;
+		weightedRgb += other.rgb_valid.rgb * weight;
+		totalWeight += weight;
+	}
+	if (totalWeight <= 0.0)
+		return vec4(0.0, 0.0, 0.0, 0.0);
+	return vec4(clamp(weightedRgb, vec3(0.0), vec3(1.0)), 1.0);
+}
+
+void fpml_vert_main(){
 	
 	int index 		= gl_VertexIndex;
 	
@@ -225,7 +295,8 @@ void fpm_vert_main(){
 	#endif
 		
 	}
-	fragColor = color_map(uint(index));
+	vec4 mappedColor = color_map(uint(index));
+	fragColor = BoundaryLightColor(uint(index), mappedColor);
 	
 	
 }

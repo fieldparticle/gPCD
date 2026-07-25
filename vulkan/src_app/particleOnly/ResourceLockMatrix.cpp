@@ -137,10 +137,14 @@ void ResourceLockMatrix::CreateBuffers()
     }
    // vmaCopyMemoryToAllocation(m_App->m_vmaAllocator, m_RptVec.data(), m_Allocation[0],
     //    0, m_BufSize);
-    m_RptVec.clear();
+    
 }
 
+void ResourceLockMatrix::ClearTempMemory()
+{
+    m_RptVec.clear();
 
+}
 
 void ResourceLockMatrix::PushMem(uint32_t currentBuffer)
 {

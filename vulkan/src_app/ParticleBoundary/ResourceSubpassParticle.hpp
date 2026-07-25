@@ -56,6 +56,7 @@ public:
 	VkVertexInputBindingDescription* GetBindingDescription() {
 		return {};
 	};
+	void ClearTempMemory() {};
 	void PushMem(uint32_t currentBuffer) {};
 	void PullMem(uint32_t currentBuffer) {};
 	virtual void Cleanup() {}; // avoid deleting allocator memory

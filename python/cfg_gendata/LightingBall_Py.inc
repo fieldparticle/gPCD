@@ -12,6 +12,14 @@ Lighting_ball = {
 };
 
 // --------------------------------------------------------------------------
+// Boundary-space lighting
+// --------------------------------------------------------------------------
+boundary_space_lighting_enabled = true;
+boundary_space_patch_angle = 0.20;
+boundary_space_patch_radius = 0.50;
+boundary_space_patch_falloff = "quadratic";
+
+// --------------------------------------------------------------------------
 // Domain and view
 // --------------------------------------------------------------------------
 x_axis_lims = [0.0, 20.0];
@@ -41,7 +49,7 @@ particle_streams = (
 
     release_start_frame = 10;
     release_columns = 1;
-    particles_per_wave = 2025;
+    particles_per_wave = 64;
     spacing_factor = 1.00;
 
     inlet_axis = "x";
@@ -50,12 +58,12 @@ particle_streams = (
     span_u_axis = "y";
     span_u_min = 2.8;
     span_u_max = 7.2;
-    span_u_count = 45;
+    span_u_count = 8;
 
     span_v_axis = "z";
     span_v_min = 4.8;
     span_v_max = 9.2;
-    span_v_count = 45;
+    span_v_count = 8;
   }
 );
 

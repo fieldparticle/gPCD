@@ -34,16 +34,26 @@ excludes reservoir behavior.  Reservoir wrappers may include the optional
 
 \subsection{Stable Shader Wrapper}
 
-The shared compute schedule currently lives in
-\texttt{vulkan/sim/common/FPM.comp}.  Scenario compute shaders are generated
-as thin wrappers around that common file.  They include generated scenario
-metadata, generated simple helper GLSL, optional piston helpers, and then call
-\texttt{fpm\_comp\_main()} from the common FPM file.
+The base shared compute schedule lives in
+\texttt{vulkan/sim/common/FPM.comp}.  Scenario compute shaders for ordinary
+particle applications are thin wrappers around that common file.  They
+include generated scenario metadata, generated simple helper GLSL, optional
+piston helpers, and then call \texttt{fpm\_comp\_main()} from the common FPM
+file.
+
+\texttt{FPM.*} is the clean base particle family.  It contains ordinary
+dynamics, cell occupancy, collision diagnostics, and material color modes.  It
+must not include the lighting SSBO or photon lighting behavior.  Lighting
+scenarios use the separate \texttt{FPML.*} family.  \texttt{FPML.*} may
+include photon helpers, \texttt{BoundaryLightRecord.glsl}, and lighting
+resource access, and calls \texttt{fpml\_comp\_main()},
+\texttt{fpml\_vert\_main()}, and \texttt{fpml\_frag\_main()}.
 
 Generated GLSL may be regenerated, but the wrapper generator must not emit a
-second inline copy of the FPM loop.  Keeping one common compute schedule avoids
-regenerating stale duplicate-list logic, stale photon filtering, or stale
-configured-wall dispatch into individual scenario wrappers.  Existing
+second inline copy of either shared loop.  Keeping one common base compute
+schedule and one lighting compute schedule avoids regenerating stale
+duplicate-list logic or stale configured-wall dispatch into individual
+scenario wrappers.  Existing
 contact-query helpers such as \texttt{isParticleContact.glsl} remain
 hand-maintained shader infrastructure and are not rewritten by the
 ForceDynamics export.
@@ -63,8 +73,12 @@ walls.
 
 The new simple generated files are:
 \begin{itemize}
-    \item \texttt{photons.glsl};
     \item \texttt{FPM.comp};
+    \item \texttt{FPML.comp};
+    \item \texttt{FPML.vert};
+    \item \texttt{FPML.frag};
+    \item \texttt{photons.glsl};
+    \item \texttt{BoundaryLightRecord.glsl};
     \item \texttt{ForceDynamicsSimple.glsl};
     \item \texttt{ForceDynamicsSimpleBoundaryParticle.glsl};
     \item \texttt{ForceDynamicsSimpleFunctionWall.glsl};
@@ -74,33 +88,30 @@ The new simple generated files are:
     \item \texttt{TestPythonBoundarySpheresP.comp}.
 \end{itemize}
 
-Generated scenario wrappers must include the material metadata before photon
+Lighting scenario wrappers must include the material metadata before photon
 helpers:
 \begin{verbatim}
 #include "material.glsl"
 #include "../common/photons.glsl"
 \end{verbatim}
-Any scenario wrapper that includes \texttt{photons.glsl} requires a
+Any lighting wrapper that includes \texttt{photons.glsl} requires a
 \texttt{material.glsl} file with \texttt{PARTICLE\_TYPE\_REGULAR},
 \texttt{PARTICLE\_TYPE\_PHOTON}, and a \texttt{MaterialProperty.particleType}
 field.  Material \texttt{particleType} seeds generated particle
 \texttt{ptype}; it is not the runtime photon lookup after generation.
 
-\texttt{photons.glsl} owns optical photon helpers.  Runtime photon identity is
-encoded in \texttt{P[particle].ptype}; the current
+\texttt{photons.glsl} owns optical photon helpers for lighting wrappers.
+Runtime photon identity is encoded in \texttt{P[particle].ptype}; the current
 \texttt{P[particle].material\_id} may temporarily identify the contacted
-surface material for render color.  In the simple path a
-photon-source/dust-target event is not an ordinary mechanical particle
-collision.  The generated helper performs swept particle crossing,
-fixed-speed reflection, and reflected end-of-frame position calculation.
-\texttt{FPM.comp} consumes that event before the ordinary particle collision
-processor and skips the mechanical force/contact path for that pair.  This
-keeps photons from allocating contact slots or accumulating internal contact
-momentum while preserving ordinary dust-dust and wall response.
+surface material for diagnostics.  In the lighting path a photon-source event
+is not an ordinary mechanical particle collision.  \texttt{FPML.comp} handles
+photon contact before the ordinary particle collision processor and skips the
+mechanical force/contact path for photon pairs.  Photons do not allocate
+contact slots, accumulate internal contact momentum, or interact mechanically
+with other photons.
 
-\texttt{ForceDynamicsSimpleLightingBall.glsl} is the next required parity
-helper for \texttt{LightingBall}.  It must export the Python analytic sphere
-behavior from \texttt{EvaluateLightingBallContact} and
+\texttt{ForceDynamicsSimpleLightingBall.glsl} exports the Python analytic
+sphere behavior from \texttt{EvaluateLightingBallContact} and
 \texttt{ProcessLightingBallCollision}: boundary particles remain locality
 markers, while the physical collision normal and penetration come from the
 configured \texttt{Lighting\_ball} sphere equation.
@@ -377,19 +388,20 @@ This keeps the rendered radius tied to the particle ABI rather than to a
 separate scenario configuration radius or OBJ-file diameter.
 
 Velocity-angle rendering is selected with material
-\texttt{color\_mode = "VELOCITY"}.  The shared HSV utility
+\texttt{color\_mode = "VELOCITY\_ANGLE"}.  The shared velocity-angle utility
 \texttt{colorizeVelocity(angle, sat, val)} expects \texttt{angle} in radians
 from the velocity buffer selected with \texttt{ShaderFlags.positionBuffer};
-\texttt{hsv\_sat} and \texttt{hsv\_val} remain scalar tuning values for that
-mode.
+\texttt{velocity\_angle\_color\_sat} and
+\texttt{velocity\_angle\_color\_val} are the scalar tuning values for that
+mode.  Legacy configuration aliases \texttt{VELOCITY} and \texttt{HSV} are
+read compatibility names only and should not be written by active cfg files.
 
-Photon rendering is selected by photon \texttt{ptype}, not by looking up the
-current material's \texttt{particleType}.  This is necessary because a photon
-uses its \texttt{material\_id} as the contacted surface material while
-\texttt{colFlg=1}.  In \texttt{LUMENS} display, uncontacted photons are
-transparent unless the photon material has \texttt{debug\_visible=true};
-contacted photons use the current \texttt{material\_id} color as the emitted
-surface color.
+Photon debug rendering is selected by photon \texttt{ptype}, not by looking
+up the current material's \texttt{particleType}.  In \texttt{LUMENS} display,
+uncontacted photons are transparent unless the photon material has
+\texttt{debug\_visible=true}.  Surface illumination is not drawn from the
+moving photon point; it is drawn from persistent boundary-space state in the
+lighting path.
 
 \subsection{Known Translation Rules}
 

@@ -62,6 +62,7 @@ public:
 		
 		m_VkType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	};
+	void ClearTempMemory() {};
 	virtual void AskObject(uint32_t AnyNumber) {};
 	void Create(uint32_t BindPoint, ResourceVertexParticle* particle);
 	void PullMem(uint32_t currentBuffer){};

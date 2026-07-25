@@ -49,6 +49,7 @@ public:
 		return &m_Buffers[ImageIndex];
 
 	}
+	void ClearTempMemory() {};
 	virtual void AskObject(uint32_t AnyNumber) {};
 	std::vector<VkVertexInputAttributeDescription>* GetAttributeDescriptions() { return {}; };
 	VkVertexInputBindingDescription* GetBindingDescription() { return {}; };

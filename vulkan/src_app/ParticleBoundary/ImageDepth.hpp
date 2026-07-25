@@ -41,5 +41,6 @@ public:
 	void createImageResources();
 	void Create(SwapChainObj* SCO);
 	virtual void AskObject(uint32_t AnyNumber) {};
+	void ClearTempMemory() {};
 };
 #endif

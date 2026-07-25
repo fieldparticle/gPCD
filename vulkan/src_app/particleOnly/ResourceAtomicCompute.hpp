@@ -60,7 +60,7 @@ public:
 		
 		m_VkType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	};
-		
+	void ClearTempMemory() {};
 	void createBuffers();
 	void Create(uint32_t BindPoint, PerfObj* perfObj);
 

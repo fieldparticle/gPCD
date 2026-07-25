@@ -134,11 +134,6 @@ class ForceContactDynamics:
             hit_z + reflected_velocity[2] * remaining_dt - normal_z * exit_epsilon,
         )
         self.particles[SourceID].colFlg = 1
-        self.particles[SourceID].material_id = getattr(
-            self.particles[TargetID],
-            "material_id",
-            self.particles[SourceID].material_id,
-        )
 
     def TryPhotonParticleReflection(self, SourceID, TargetID):
         """Handle photon-dust overlap or swept crossing without mechanical force."""
@@ -680,20 +675,30 @@ class ForceContactDynamics:
         normal = contact[:3]
         source.colFlg = 1
         if self.IsPhotonParticle(SourceID):
-            source.material_id = float(self.run_configuration.get(
-                "lighting_ball_material_id",
-                getattr(source, "material_id", 0.0),
-            ))
+            center, ball_radius = self.LightingBallConfig()
+            hit_point = (
+                center[0] + normal[0] * ball_radius,
+                center[1] + normal[1] * ball_radius,
+                center[2] + normal[2] * ball_radius,
+            )
+            sphere_material_id = int(
+                round(
+                    float(
+                        self.run_configuration.get(
+                            "lighting_ball_material_id",
+                            getattr(source, "material_id", 0.0),
+                        )
+                    )
+                )
+            )
             lighting_ball = self.run_configuration.get("Lighting_ball")
             if hasattr(lighting_ball, "get"):
-                source.material_id = float(
-                    lighting_ball.get("material_id", source.material_id)
-                )
-            self.DepositBoundaryLightForSurface(
+                sphere_material_id = int(round(float(lighting_ball.get("material_id"))))
+            self.DepositBoundarySpaceLightForSurface(
                 1,
                 int(contact[-1]),
-                source.material_id,
-                self.particle_position_tuple(source),
+                sphere_material_id,
+                hit_point,
             )
         source.report_contacts = max(int(getattr(source, "report_contacts", 0)), 1)
         source.report_target = int(contact[-1])
@@ -940,14 +945,12 @@ class ForceContactDynamics:
         )
         source.colFlg = 1
         if self.IsPhotonParticle(SourceID):
-            source.material_id = float(
-                getattr(
-                    self.particles[BoundaryID],
-                    "material_id",
-                    source.material_id,
-                )
+            boundary_material_id = getattr(
+                self.particles[BoundaryID],
+                "material_id",
+                source.material_id,
             )
-            self.DepositBoundaryLightForMaterial(BoundaryID, source.material_id)
+            self.DepositBoundarySpaceLightForMaterial(BoundaryID, boundary_material_id)
         source.report_contacts = max(int(getattr(source, "report_contacts", 0)), 1)
         source.report_target = BoundaryID
         source.report_normal_x = normal[0]

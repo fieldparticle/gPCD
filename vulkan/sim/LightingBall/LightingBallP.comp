@@ -21,6 +21,7 @@
 #include "../common/CollimageIndex.glsl"
 #include "../common/particle.glsl"
 #include "../common/photons.glsl"
+#include "../common/BoundaryLightRecord.glsl"
 #include "workgroups.glsl"
 
 #include "../common/ForceDynamicsSimple.glsl"
@@ -45,9 +46,9 @@ BoundaryWallSegment EvaluateConfiguredWallSegment(uint SourceID, uint BoundaryID
     return EvaluateFunctionWallSegment(SourceID, BoundaryID);
 }
 
-#include "../common/FPM.comp"
+#include "../common/FPML.comp"
 
 void main()
 {
-    fpm_comp_main();
+    fpml_comp_main();
 }

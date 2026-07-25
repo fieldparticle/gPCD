@@ -120,6 +120,7 @@ int ParticleOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 										resourceCollMatrix,
 										resourceLockMatrix,
 										resourceAtomicG });
+	resourceGraphicsContainer->ClearTempMemory();
 	// Store all resources for compute pipline
 	resourceComputeContainer->Create({ 	resourceParticlePush,
 										resourceUBO,
@@ -127,7 +128,7 @@ int ParticleOnly(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 										resourceAtomic,
 										resourceLockMatrix,
 										resourceCollMatrix});
-
+	resourceComputeContainer->ClearTempMemory();
 	// Create graphics pipeline which needs swap chain, resource container, and render pass.
 	pipelineGraphicsParticle->Create(shaderObj,swapChain, resourceGraphicsContainer, renderPass);
 	// Create compute pipeline which needs compute resource container.

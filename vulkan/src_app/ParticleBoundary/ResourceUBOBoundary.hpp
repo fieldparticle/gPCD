@@ -64,6 +64,7 @@ public:
 	void Create(uint32_t BindPoint, SwapChainObj* SCO);
 	void createLayout();
 	void createBuffers();
+	void ClearTempMemory() {};
 	
 	void Cleanup()
 	{

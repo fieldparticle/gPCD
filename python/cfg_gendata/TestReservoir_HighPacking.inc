@@ -21,8 +21,7 @@ radius 		= 0.05;
 
 // Simulation timestep used by both dynamics integration and wave-frame spacing.
 dt 			= 0.045;
-target_penetration_fraction = 0.5;
-hard_penetration_fraction = 0.75;
+
 // Required: cell occupancy list capacity written to the .tst file.
 cell_occupancy_list_size		= 256;
 
@@ -31,8 +30,11 @@ cell_array_width 				= 33;
 cell_array_height 				= 13;
 cell_array_depth 				= 5;
 
-view_center = [ 15,4,2];
-
+// Center Vulkan/Python viewing on the generated reservoir packing footprint.
+view_center = [20.0, 5.0, 1.5];
+gl_point_size = 1.0;
+// Required: Python viewer zoom.
+zoom		= 0.1;
 // Frame when the piston begins moving.
 piston_start_frame = 20;
 

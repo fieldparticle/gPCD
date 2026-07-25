@@ -32,6 +32,12 @@
 #include "VulkanObj/VulkanApp.hpp"
 #include "ParticleLighting/LightingStructs.hpp"
 
+namespace
+{
+	constexpr float PTYPE_BOUNDARY = 2.0f;
+	constexpr uint32_t BOUNDARY_LIGHT_SURFACE_NONE = 0u;
+	constexpr uint32_t BOUNDARY_LIGHT_SURFACE_SPHERE = 1u;
+}
 
 void ResourceLighting::Create(uint32_t BindPoint, ResourceVertexParticle* particle)
 {
@@ -39,20 +45,60 @@ void ResourceLighting::Create(uint32_t BindPoint, ResourceVertexParticle* partic
 	std::ostringstream  objtxt;
 	
 	m_BindPoint = BindPoint;
+	m_thisFramesBuffered = 1;
+	CreateLayout();
 	if (particle->m_NumBoundaryParticles == 0)
 	{
 		std::ostringstream  errtxt;
 		errtxt << m_Name << " ResourceLighting::Create no boundary light records." << std::ends;
 		throw std::runtime_error(errtxt.str().c_str());
 	}
-	std::vector<BoundaryLightRecord> lightRecords(particle->m_NumBoundaryParticles);
+	uint32_t surfaceType = BOUNDARY_LIGHT_SURFACE_NONE;
+	uint32_t surfaceID = 0u;
+	if (CfgTst->CheckKey("Lighting_ball"))
+	{
+		surfaceType = BOUNDARY_LIGHT_SURFACE_SPHERE;
+		if (CfgTst->CheckKey("Lighting_ball.wall_flag"))
+			surfaceID = static_cast<uint32_t>(CfgTst->GetInt("Lighting_ball.wall_flag", false));
+	}
+
+	std::vector<BoundaryLightRecord> lightRecords;
+	lightRecords.reserve(particle->m_NumBoundaryParticles);
+	for (uint32_t particleID = 0u; particleID < particle->m_Particles.size(); particleID++)
+	{
+		const Particle& src = particle->m_Particles[particleID];
+		if (src.ptype != PTYPE_BOUNDARY)
+			continue;
+
+		BoundaryLightRecord record{};
+		record.rgb_valid = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+		record.normal_material = glm::vec4(
+			src.VelRadA.x,
+			src.VelRadA.y,
+			src.VelRadA.z,
+			src.material_id);
+		record.ids = glm::uvec4(
+			particleID,
+			surfaceType,
+			surfaceID,
+			0u);
+		lightRecords.push_back(record);
+	}
+	if (lightRecords.size() != particle->m_NumBoundaryParticles)
+	{
+		std::ostringstream  errtxt;
+		errtxt << m_Name << " ResourceLighting::Create boundary record count mismatch."
+			<< " expected:" << particle->m_NumBoundaryParticles
+			<< " actual:" << lightRecords.size() << std::ends;
+		throw std::runtime_error(errtxt.str().c_str());
+	}
 	m_BufSize = static_cast<uint64_t>(sizeof(BoundaryLightRecord))*lightRecords.size();
-	m_Buffers.resize(1);
-	m_BuffersMemory.resize(1);
-	m_BuffersMapped.resize(1);
-	m_BufferInfo.resize(1);
-	m_DescriptorWrite.resize(1);
-	m_Allocation.resize(1);
+	m_Buffers.resize(m_thisFramesBuffered);
+	m_BuffersMemory.resize(m_thisFramesBuffered);
+	m_BuffersMapped.resize(m_thisFramesBuffered);
+	m_BufferInfo.resize(m_thisFramesBuffered);
+	m_DescriptorWrite.resize(m_thisFramesBuffered);
+	m_Allocation.resize(m_thisFramesBuffered);
 	VkBuffer buf = {};
 
 	objtxt << m_Name << " Number:" << 0 << std::ends;

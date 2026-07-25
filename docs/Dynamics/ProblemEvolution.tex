@@ -2293,7 +2293,7 @@ simulation frame.
 \subsubsection{current form}
 
 Color selection belongs to \texttt{material\_properties.color\_mode}.  The
-active material modes are \texttt{COLLISION}, \texttt{VELOCITY},
+active material modes are \texttt{COLLISION}, \texttt{VELOCITY\_ANGLE},
 \texttt{SOLID}, and \texttt{LUMENS}; solid display color is stored in the
 separate \texttt{color} field.  The \texttt{LUMENS} mode is Python-only in
 this pass.
@@ -2912,8 +2912,9 @@ For photons, \texttt{material\_id} is allowed to be a temporary render color
 source.  At the start of the compute frame it is reset to the base photon
 material.  When the photon contacts the lighting sphere, a wall, or a regular
 particle target, the collision path sets \texttt{material\_id} to the
-contacted target material.  \texttt{LUMENS} rendering then uses that current
-material color while \texttt{colFlg=1}.  The separate
+contacted target material.  The cleaned Python renderer no longer uses that
+temporary material as the visible \texttt{LUMENS} color; it remains diagnostic
+state for the next boundary-space lighting step.  The separate
 \texttt{hit\_material\_id} field is not part of the active particle ABI.
 
 \subsubsection{difference outcome}
@@ -2930,9 +2931,10 @@ may change for photons during the contact-render window.
 
 The change also makes the intended debug behavior explicit.  Uncontacted
 photons in \texttt{LUMENS} mode are transparent unless their base photon
-material has \texttt{debug\_visible=true}; contacted photons use the contacted
-surface material color.  This lets photon travel be debugged without changing
-the optical collision rule and without carrying a second hit-material slot.
+material has \texttt{debug\_visible=true}; contacted photons keep using the
+base photon debug color.  This lets photon travel be debugged without turning
+the moving photon point into the lighting result and without carrying a
+second hit-material slot.
 
 \subsection{Lighting Ball Returns To A Clean Baseline}
 
@@ -2978,11 +2980,77 @@ This cleanup is not the final lighting model.  It is a deliberate return to a
 known baseline before adding surface lighting again.  The remaining visible
 photon behavior is a diagnostic tracer: photons carry runtime behavior in
 \texttt{ptype=-2}, contact state in \texttt{colFlg}, and temporary contacted
-surface color through \texttt{material\_id}.  Boundary markers use
-\texttt{ptype=2} and remain broad-phase locality records.
+surface material state through \texttt{material\_id}.  Python
+\texttt{LUMENS} rendering uses the base photon debug material, not the
+temporary contacted material.  Boundary markers use \texttt{ptype=2} and
+remain broad-phase locality records.
 
-The next implementation target is \texttt{boundarySpaceLighting}.  It should
-start from persistent color state on existing boundary proxies and render-time
-kernel spread.  It should not restore eye-driven brightness, additive
-current-frame buffers, temporal filtering, or visible surface-cell samples
-until the minimal proxy-color path is proven.
+At that point, the next implementation target was
+\texttt{boundarySpaceLighting}: persistent color state on existing boundary
+proxies and render-time kernel spread, without restoring eye-driven
+brightness, additive current-frame buffers, temporal filtering, or visible
+surface-cell samples before the minimal proxy-color path was proven.
+
+\subsection{Boundary-Space Lighting Reaches Python/Vulkan Parity}
+
+\subsubsection{previous form}
+
+After the clean baseline, lighting still existed only as a direction.  Python
+could show photon travel and sphere contact, but visible surface illumination
+was either absent or mixed with older ideas: photon-point color, retired
+\texttt{BoundaryLightSample}/\texttt{BoundaryLightState} buffers, visible
+surface-cell samples, and eye-driven brightness.  The first Vulkan attempt
+also added lighting SSBO access into the shared particle shader path, which
+blurred the boundary between ordinary particle rendering and the lighting
+application.
+
+\subsubsection{current form}
+
+The active model is now split cleanly:
+\begin{itemize}
+    \item \texttt{FPM.*} is the base particle shader family for ordinary
+          particle applications;
+    \item \texttt{FPML.*} is the lighting shader family for
+          \texttt{ParticleLighting};
+    \item \texttt{BoundaryLightRecord} stores persistent boundary-space color
+          and proxy metadata, one record per boundary particle;
+    \item photon contact deposits the contacted surface material color into
+          the boundary proxy;
+    \item rendering spreads valid proxy colors over existing boundary
+          particles on the same surface.
+\end{itemize}
+
+The Vulkan crash was traced to the lighting resource path rather than the
+boundary-space model.  \texttt{ResourceLighting::Create} now registers its
+descriptor layout and declares a single shared resource frame.  The
+\texttt{ParticleLighting} graphics submit also waits for compute completion
+through the vertex shader stage because \texttt{FPML.vert} reads the lighting
+SSBO.  With that fixed, \texttt{LightingBall} runs in Vulkan and visually
+matches the Python simulation.
+
+\subsubsection{difference outcome}
+
+rendering and diagnostics
+
+\subsubsection{Analysis}
+
+This is the first useful proof of the lighting architecture:
+\[
+    \textrm{photon hit}
+    \rightarrow
+    \textrm{persistent boundary proxy color}
+    \rightarrow
+    \textrm{kernel-spread surface color}.
+\]
+
+The important outcome is not high visual quality yet; it is ownership.  Motion
+and identity remain in the particle record.  Material owns source color and
+debug settings.  Boundary-space lighting state lives in the lighting resource.
+The renderer owns spread.  Photons remain transport/debug particles and do not
+carry final visible surface lighting.
+
+The next step is visual refinement of the point-list renderer.  Because
+Vulkan is still drawing point primitives, \texttt{FPML.frag} should use
+\texttt{gl\_PointCoord} to shape each lit boundary point into a soft patch.
+That can improve the rendered surface without introducing triangles or
+returning to visible surface-cell geometry.

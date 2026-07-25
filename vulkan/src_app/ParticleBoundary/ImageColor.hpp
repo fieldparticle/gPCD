@@ -40,6 +40,7 @@ public:
 	ImageColor(VulkanObj* App, std::string Name) : ImageObject(App, Name) {};
 	void createImageResources();
 	void Create(SwapChainObj* SCO);
+	void ClearTempMemory() {};
 	
 };
 #endif

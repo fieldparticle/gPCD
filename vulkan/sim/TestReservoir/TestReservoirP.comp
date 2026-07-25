@@ -20,7 +20,6 @@
 #include "../common/atomic.glsl"
 #include "../common/CollimageIndex.glsl"
 #include "../common/particle.glsl"
-#include "../common/photons.glsl"
 #include "workgroups.glsl"
 
 #include "piston.glsl"

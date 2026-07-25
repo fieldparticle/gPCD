@@ -18,7 +18,12 @@ const uint ColAryLen=125;
 const uint LockAryLen=125;
 const uint MAX_CELL_ARRAY_LOCATIONS =125;
 const uint bbound =16;
-const float point_size = 1.00;
+const float point_size = 3.00;
+const uint BOUNDARY_SPACE_PROXY_COUNT = 0;
+const uint BOUNDARY_SPACE_FIRST_PARTICLE_ID = 0;
+const float BOUNDARY_SPACE_PATCH_ANGLE = 0.00;
+const float BOUNDARY_SPACE_PATCH_RADIUS = 0.00;
+const uint BOUNDARY_SPACE_PATCH_FALLOFF_QUADRATIC = 0;
 #define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN 8.000000000
 #define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER 2.000000000
 const uint DUP_LIST_SIZE = 32;

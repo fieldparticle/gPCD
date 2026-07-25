@@ -52,7 +52,7 @@ class ResourceParticlePush : public Resource
 		float positionBuffer;
 	} m_ShaderFlags;
 
-
+	uint32_t m_LastAdvancedAppFrame = UINT32_MAX;
 	float m_numParts = 0.0;
 	void Create(ResourceVertexParticle* vertP);
 	ResourceVertexParticle* m_VertP{};
@@ -62,6 +62,7 @@ class ResourceParticlePush : public Resource
 	{
 		m_ShaderFlags.StopFlg = 1.0f;
 	}
+	void ClearTempMemory() {};
 	std::vector<VkVertexInputAttributeDescription>* GetAttributeDescriptions() { return {}; };
 	VkVertexInputBindingDescription* GetBindingDescription() { return {}; };
 	virtual void AskObject(uint32_t AnyNumber) {};

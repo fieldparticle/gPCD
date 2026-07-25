@@ -2,24 +2,27 @@ import math
 
 
 COLOR_MODE_COLLISION = 0
-COLOR_MODE_VELOCITY = 1
+COLOR_MODE_VELOCITY_ANGLE = 1
 COLOR_MODE_SOLID = 2
 COLOR_MODE_LUMENS = 3
 
 COLOR_MODE_NAMES = {
     "COLLISION": COLOR_MODE_COLLISION,
-    "VELOCITY": COLOR_MODE_VELOCITY,
+    "VELOCITY_ANGLE": COLOR_MODE_VELOCITY_ANGLE,
     "SOLID": COLOR_MODE_SOLID,
     "LUMENS": COLOR_MODE_LUMENS,
     "COLOR_MODE_COLLISION": COLOR_MODE_COLLISION,
-    "COLOR_MODE_VELOCITY": COLOR_MODE_VELOCITY,
+    "COLOR_MODE_VELOCITY_ANGLE": COLOR_MODE_VELOCITY_ANGLE,
     "COLOR_MODE_SOLID": COLOR_MODE_SOLID,
     "COLOR_MODE_LUMENS": COLOR_MODE_LUMENS,
+    "VELOCITY": COLOR_MODE_VELOCITY_ANGLE,
+    "HSV": COLOR_MODE_VELOCITY_ANGLE,
+    "COLOR_MODE_VELOCITY": COLOR_MODE_VELOCITY_ANGLE,
 }
 
 DEFAULT_COLOR_BY_MODE = {
     COLOR_MODE_COLLISION: (0.0, 1.0, 0.0, 1.0),
-    COLOR_MODE_VELOCITY: (1.0, 1.0, 1.0, 1.0),
+    COLOR_MODE_VELOCITY_ANGLE: (1.0, 1.0, 1.0, 1.0),
     COLOR_MODE_SOLID: (1.0, 1.0, 1.0, 1.0),
     COLOR_MODE_LUMENS: (1.0, 1.0, 1.0, 1.0),
 }
@@ -92,8 +95,8 @@ DEFAULT_MATERIAL_PROPERTIES = (
         "particle_type": PARTICLE_TYPE_REGULAR,
         "relative_mass": 1.0,
         "thermal_velocity": 0.0,
-        "color_mode": COLOR_MODE_VELOCITY,
-        "color": default_color_for_mode(COLOR_MODE_VELOCITY),
+        "color_mode": COLOR_MODE_VELOCITY_ANGLE,
+        "color": default_color_for_mode(COLOR_MODE_VELOCITY_ANGLE),
         "debug_visible": False,
         "debug_color": (1.0, 1.0, 1.0, 1.0),
         "cell_density": 0.0,
@@ -123,7 +126,7 @@ def normalized_material_properties(source=None):
             _material_get(
                 raw_material,
                 "color_mode",
-                COLOR_MODE_VELOCITY,
+                COLOR_MODE_VELOCITY_ANGLE,
             )
         )
         color = parse_material_color(_material_get(raw_material, "color", None), color_mode)
@@ -166,7 +169,7 @@ def normalized_material_properties(source=None):
 
 def write_color_mode_defines(output):
     output.write(f"COLOR_MODE_COLLISION = {COLOR_MODE_COLLISION};\n")
-    output.write(f"COLOR_MODE_VELOCITY = {COLOR_MODE_VELOCITY};\n")
+    output.write(f"COLOR_MODE_VELOCITY_ANGLE = {COLOR_MODE_VELOCITY_ANGLE};\n")
     output.write(f"COLOR_MODE_SOLID = {COLOR_MODE_SOLID};\n")
     output.write(f"COLOR_MODE_LUMENS = {COLOR_MODE_LUMENS};\n")
 

@@ -90,12 +90,19 @@ vec4 lumens_color(uint index, vec4 baseColor)
 
 vec4 color_from_mode(uint index, uint colorMode, vec4 baseColor)
 {
-    if (colorMode == COLOR_MODE_VELOCITY)
+    if (colorMode == COLOR_MODE_VELOCITY_ANGLE)
     {
         float velocityAngle = ShaderFlags.positionBuffer == 0u
             ? P[index].VelRadA.w
             : P[index].VelRadB.w;
-        return vec4(colorizeVelocity(velocityAngle, HSV_SAT, HSV_VAL), baseColor.a);
+        return vec4(
+            colorizeVelocity(
+                velocityAngle,
+                VELOCITY_ANGLE_COLOR_SAT,
+                VELOCITY_ANGLE_COLOR_VAL
+            ),
+            baseColor.a
+        );
     }
 
     if (colorMode == COLOR_MODE_COLLISION)
