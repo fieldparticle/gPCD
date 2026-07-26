@@ -47,7 +47,7 @@ class ResourceLightingSphere : public ResourceVertexObj
 			return NULL;
 		};
 		virtual void AskObject(uint32_t AnyNumber) {};
-		virtual void Create(ResourceVertexParticle* PartVert);
+		virtual void Create(Resource* PartVert);
 		
 	
 	

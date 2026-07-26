@@ -38,7 +38,7 @@ class ResourceBoundaryUBO : public Resource
 
 public:
 
-	ResourceVertexParticle* m_Particle = {};
+	Resource* m_Particle = {};
 	UniformBufferObject m_UBO={};
 	VkDeviceSize m_bufferSize=0;
 	float m_RotX = 0.0;
@@ -60,7 +60,7 @@ public:
 	};
 	virtual void AskObject(uint32_t AnyNumber) {};
 	virtual void GetShaderMem() {};
-	void Create(uint32_t BindPoint, SwapChainObj* SCO, ResourceVertexParticle* particle);
+	void Create(uint32_t BindPoint, SwapChainObj* SCO, Resource* particle);
 	void Create(uint32_t BindPoint, SwapChainObj* SCO);
 	void createLayout();
 	void createBuffers();

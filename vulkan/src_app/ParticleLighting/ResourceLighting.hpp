@@ -36,11 +36,9 @@ class ResourceLighting : public Resource
 {
     public:
 		uint64_t				m_MaxColls = 0;
-		float					m_SideLength = 0;
 		float					m_Radius = 0.2f;
-		uint64_t				BoundaryParticleLimit = 0;
 		std::vector<Particle>	m_Particles;
-		uint64_t				m_NumParticles = 0;
+		
 
 		ResourceLighting(VulkanObj *App, std::string Name):
 				Resource(App, Name, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
@@ -49,7 +47,7 @@ class ResourceLighting : public Resource
 				};
 		virtual void AskObject(uint32_t AnyNumber) {};
 		float CalcSpeedLimit(float max_vel, float radius);
-	virtual void Create(uint32_t BindPoint, ResourceVertexParticle* particle);
+	virtual void Create(uint32_t BindPoint, Resource* particle);
 	uint32_t CalcSideLength(size_t PartPerCell);
 	void CreateLayout();
 	

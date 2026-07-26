@@ -349,6 +349,34 @@ class GenericGenData:
                 elif photon_energy < 0.0:
                     errors.append(f"{context}.photon_energy must not be negative")
 
+            try:
+                photon_coupling = float(raw_material.get("photon_coupling", 1.0))
+            except (TypeError, ValueError):
+                errors.append(f"{context}.photon_coupling must be numeric")
+                photon_coupling = None
+            if photon_coupling is not None:
+                if not math.isfinite(photon_coupling):
+                    errors.append(f"{context}.photon_coupling must be finite")
+                elif photon_coupling < 0.0 or photon_coupling > 1.0:
+                    errors.append(
+                        f"{context}.photon_coupling must be between 0.0 and 1.0"
+                    )
+
+            try:
+                photon_min_relative_mass = float(
+                    raw_material.get("photon_min_relative_mass", 0.001)
+                )
+            except (TypeError, ValueError):
+                errors.append(f"{context}.photon_min_relative_mass must be numeric")
+                photon_min_relative_mass = None
+            if photon_min_relative_mass is not None:
+                if not math.isfinite(photon_min_relative_mass):
+                    errors.append(f"{context}.photon_min_relative_mass must be finite")
+                elif photon_min_relative_mass < 0.0:
+                    errors.append(
+                        f"{context}.photon_min_relative_mass must not be negative"
+                    )
+
             if (
                 material_id >= 0
                 and relative_mass is not None
@@ -362,6 +390,8 @@ class GenericGenData:
                 and spectral_response is not None
                 and spectral_emission is not None
                 and photon_energy is not None
+                and photon_coupling is not None
+                and photon_min_relative_mass is not None
             ):
                 materials.append(
                     {
@@ -377,6 +407,8 @@ class GenericGenData:
                         "spectral_response": spectral_response,
                         "spectral_emission": spectral_emission,
                         "photon_energy": photon_energy,
+                        "photon_coupling": photon_coupling,
+                        "photon_min_relative_mass": photon_min_relative_mass,
                         "cell_density": cell_density,
                     }
                 )
@@ -641,6 +673,16 @@ class GenericGenData:
         except (TypeError, ValueError):
             boundary_space_lighting_enabled = False
             errors.append("boundary_space_lighting_enabled must be a boolean")
+
+        try:
+            photon_periodic_recycle_enabled = self.itemcfg.get(
+                "photon_periodic_recycle_enabled",
+                False,
+            )
+            if not isinstance(photon_periodic_recycle_enabled, bool):
+                errors.append("photon_periodic_recycle_enabled must be a boolean")
+        except (TypeError, ValueError):
+            errors.append("photon_periodic_recycle_enabled must be a boolean")
 
         if boundary_space_lighting_enabled:
             if self.itemcfg.get("Lighting_ball") is None:
@@ -1669,6 +1711,21 @@ class GenericGenData:
                 0.5 * self.cell_array_depth,
             ),
         )
+        view = self.itemcfg.get("view", (0.0, 0.0, 0.0))
+        if len(view) != 3:
+            raise ValueError("view must contain exactly 3 values")
+        view = tuple(float(value) for value in view)
+        if not all(math.isfinite(value) for value in view):
+            raise ValueError("view values must be finite")
+        zoom = float(self.itemcfg.get("zoom", 1.0))
+        if not math.isfinite(zoom) or zoom <= 0.0:
+            raise ValueError("zoom must be a positive finite number")
+        view_pan = self.itemcfg.get("view_pan", (0.0, 0.0))
+        if len(view_pan) != 2:
+            raise ValueError("view_pan must contain exactly 2 values")
+        view_pan = tuple(float(value) for value in view_pan)
+        if not all(math.isfinite(value) for value in view_pan):
+            raise ValueError("view_pan values must be finite")
         (
             death_x_min,
             death_x_max,
@@ -1687,6 +1744,18 @@ class GenericGenData:
 
         with output:
             output.write("index = 0;\n")
+            python_dynamics_class = self.itemcfg.get("python_dynamics_class")
+            if not python_dynamics_class:
+                python_dynamics_class = (
+                    "ForceDynamicsLighting"
+                    if self.itemcfg.get("photon_periodic_recycle_enabled", False)
+                    or self.itemcfg.get("boundary_space_lighting_enabled", False)
+                    else "ForceDynamics"
+                )
+            output.write(
+                "python_dynamics_class = "
+                f'"{python_dynamics_class}";\n'
+            )
             output.write(f"CellAryW = {self.cell_array_width};\n")
             output.write(f"CellAryH = {self.cell_array_height};\n")
             output.write(f"CellAryL = {self.cell_array_depth};\n")
@@ -1695,6 +1764,18 @@ class GenericGenData:
                 f"{float(view_center[0]):.9f}, "
                 f"{float(view_center[1]):.9f}, "
                 f"{float(view_center[2]):.9f}];\n"
+            )
+            output.write(
+                "view = ["
+                f"{view[0]:.9f}, "
+                f"{view[1]:.9f}, "
+                f"{view[2]:.9f}];\n"
+            )
+            output.write(f"zoom = {zoom:.9f};\n")
+            output.write(
+                "view_pan = ["
+                f"{view_pan[0]:.9f}, "
+                f"{view_pan[1]:.9f}];\n"
             )
             gl_point_size = float(self.itemcfg.get("gl_point_size", 3.0))
             if not math.isfinite(gl_point_size) or gl_point_size <= 0.0:
@@ -1795,6 +1876,16 @@ class GenericGenData:
             output.write(f"death_y_max = {death_y_max:.9f};\n")
             output.write(f"death_z_min = {death_z_min:.9f};\n")
             output.write(f"death_z_max = {death_z_max:.9f};\n")
+            photon_periodic_recycle_enabled = self.itemcfg.get(
+                "photon_periodic_recycle_enabled",
+                False,
+            )
+            if not isinstance(photon_periodic_recycle_enabled, bool):
+                raise ValueError("photon_periodic_recycle_enabled must be a boolean")
+            output.write(
+                "photon_periodic_recycle_enabled = "
+                f"{'true' if photon_periodic_recycle_enabled else 'false'};\n"
+            )
 
             rectangle_wall_segments = getattr(self, "rectangle_wall_segments", ())
             active_curve_wall_segments = (

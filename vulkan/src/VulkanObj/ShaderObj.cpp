@@ -30,7 +30,7 @@
 %*
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
-void ShaderObj::Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, ResourceLockMatrix* LMO, SwapChain* SCO)
+void ShaderObj::Create(Resource* VPO, ResourceCollMatrix* CMO, ResourceLockMatrix* LMO, SwapChain* SCO)
 {
 		m_VPO = VPO;
 		m_CMO = CMO;
@@ -781,6 +781,11 @@ void  ShaderObj::WriteShaderHeader()
 				<< m_VPO->BoundaryParticleLimit << ";\n"
 			<< "const float point_size = "
 				<< std::fixed << std::setprecision(2) << CfgTst->GetFloat("gl_point_size", true) << ";\n"
+			<< "#define PHOTON_PERIODIC_RECYCLE_ENABLED "
+				<< (CfgTst->CheckKey("photon_periodic_recycle_enabled") &&
+						CfgTst->GetBool("photon_periodic_recycle_enabled", true)
+					? "1u"
+					: "0u") << "\n"
 			// Boundary-space shader access stays disabled until binding 8 is
 			// proven present in both compute and graphics descriptor sets.
 			<< "const uint BOUNDARY_SPACE_PROXY_COUNT = "

@@ -44,9 +44,12 @@ void InstanceObj::Create()
 
 void InstanceObj::InitWindow()
 {
+	int requestedX = MpsApp->GetInt("window.size.x", true);
+	int requestedY = MpsApp->GetInt("window.size.y", true);
 	int requestedWidth = MpsApp->GetInt("window.size.w", true);
 	int requestedHeight = MpsApp->GetInt("window.size.h", true);
 	int monitorIndex = MpsApp->GetInt("window.monitor", true);
+	bool useDefault = MpsApp->GetBool("window.usedefault", true);
 	glfwSetErrorCallback(GLFWError);
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -74,12 +77,10 @@ void InstanceObj::InitWindow()
 		&workWidth,
 		&workHeight);
 
-	// Keep the requested window inside the monitor.
-	const int windowWidth =
-		std::min(requestedWidth, workWidth);
-
-	const int windowHeight =
-		std::min(requestedHeight, workHeight);
+	const int windowX = useDefault ? workX : workX + requestedX;
+	const int windowY = useDefault ? workY : workY + requestedY;
+	const int windowWidth = useDefault ? workWidth : requestedWidth;
+	const int windowHeight = useDefault ? workHeight : requestedHeight;
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
@@ -95,22 +96,25 @@ void InstanceObj::InitWindow()
 	if (!m_App->m_Window)
 		throw std::runtime_error("Failed to create GLFW window");
 
-	// Center the window within the selected monitor's work area.
-	const int windowX =
-		workX + (workWidth - windowWidth) / 2;
-
-	const int windowY =
-		workY + (workHeight - windowHeight) / 2;
-
 	glfwSetWindowPos(m_App->m_Window, windowX, windowY);
 	glfwShowWindow(m_App->m_Window);
+
+	int framebufferWidth = 0;
+	int framebufferHeight = 0;
+	glfwGetFramebufferSize(
+		m_App->m_Window,
+		&framebufferWidth,
+		&framebufferHeight);
 
 	std::cout
 		<< "Monitor: " << glfwGetMonitorName(monitor) << '\n'
 		<< "Work area: "
 		<< workWidth << " x " << workHeight << '\n'
 		<< "Window: "
-		<< windowWidth << " x " << windowHeight << '\n';
+		<< windowWidth << " x " << windowHeight
+		<< " at " << windowX << ", " << windowY << '\n'
+		<< "Framebuffer: "
+		<< framebufferWidth << " x " << framebufferHeight << '\n';
 
 	glfwSetWindowUserPointer(m_App->m_Window, this);
 	glfwSetFramebufferSizeCallback(m_App->m_Window, m_App->FramebufferResizeCallback);

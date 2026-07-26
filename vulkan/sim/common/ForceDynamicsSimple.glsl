@@ -66,19 +66,19 @@ uint maximumDepthConstraintCount = 0u;
 vec3 maximumDepthConstraintNormals[MAX_SOURCE_DEPTH_CONSTRAINTS];
 float maximumDepthConstraintLimits[MAX_SOURCE_DEPTH_CONSTRAINTS];
 
-// Python source: ForceDynamics.py:25
+// Python source: ForceDynamics.py:24
 float VelocityAngle(float vx, float vy)
 {
     return (vx != 0.0 || vy != 0.0) ? atan(vy, vx) : 0.0;
 }
 
-// Python source: ForceDynamics.py:224
+// Python source: ForceDynamics.py:84
 vec4 particle_position(uint ParticleID, uint positionBuffer)
 {
     return (positionBuffer == 0u) ? P[ParticleID].PosLocA : P[ParticleID].PosLocB;
 }
 
-// Python source: ForceDynamics.py:231
+// Python source: ForceDynamics.py:91
 float particle_overlap_area(float sourceRadius, float targetRadius, float centerDistance)
 {
     if (centerDistance <= 0.0) {
@@ -110,7 +110,7 @@ float particle_overlap_area(float sourceRadius, float targetRadius, float center
     return sourceArea + targetArea - triangleArea;
 }
 
-// Python source: ForceDynamics.py:1070
+// Python source: ForceDynamics.py:930
 float ParticlePenetrationDepth(float sourceRadius, float targetRadius, float centerDistance)
 {
     return sourceRadius + targetRadius - centerDistance;

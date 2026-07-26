@@ -19,7 +19,7 @@
 #include "../common/push.glsl"
 #include "../common/atomic.glsl"
 #include "../common/CollimageIndex.glsl"
-#include "../common/particle.glsl"
+#include "../common/lighting_particle.glsl"
 #include "../common/photons.glsl"
 #include "../common/BoundaryLightRecord.glsl"
 #include "workgroups.glsl"

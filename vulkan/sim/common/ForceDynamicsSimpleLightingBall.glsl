@@ -29,7 +29,7 @@ LightingBallCollisionResult NoLightingBallCollision()
         BoundaryWallSegment(vec3(0.0), 0.0, 0.0, LIGHTING_BALL_WALL_FLAG, false));
 }
 
-// Python source: ForceDynamics.py:629
+// Python source: ForceDynamics.py:489
 BoundaryWallSegment EvaluateLightingBallContact(uint SourceID)
 {
     if (LIGHTING_BALL_ENABLED == 0u || LIGHTING_BALL_RADIUS <= 0.0) {
@@ -84,7 +84,7 @@ BoundaryWallSegment EvaluateLightingBallContact(uint SourceID)
         true);
 }
 
-// Python source: ForceDynamics.py:668
+// Python source: ForceDynamics.py:528
 LightingBallCollisionResult ProcessLightingBallCollision(
     uint SourceID,
     inout vec3 totalForce)

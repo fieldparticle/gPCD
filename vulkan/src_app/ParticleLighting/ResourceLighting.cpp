@@ -38,7 +38,7 @@ namespace
 	constexpr uint32_t BOUNDARY_LIGHT_SURFACE_SPHERE = 1u;
 }
 
-void ResourceLighting::Create(uint32_t BindPoint, ResourceVertexParticle* particle)
+void ResourceLighting::Create(uint32_t BindPoint, Resource* particle)
 {
 	
 	std::ostringstream  objtxt;

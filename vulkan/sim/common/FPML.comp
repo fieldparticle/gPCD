@@ -132,6 +132,50 @@ void DepositBoundaryLight(uint targetParticleID, uint materialID)
         materialID);
 }
 
+bool PhotonPeriodicRecycleEnabled()
+{
+#if defined(PHOTON_PERIODIC_RECYCLE_ENABLED)
+    return PHOTON_PERIODIC_RECYCLE_ENABLED != 0u;
+#else
+    return false;
+#endif
+}
+
+bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
+{
+#if defined(LIGHTING_PARTICLE_STRUCT_AVAILABLE)
+    if (!PhotonPeriodicRecycleEnabled() || !IsPhotonParticle(SourceID)) {
+        return false;
+    }
+    if (P[SourceID].Data.w >= 0.0) {
+        return false;
+    }
+
+    float currentFrame = float(ShaderFlags.frameNum);
+    float livedFrames = max(1.0, currentFrame - previousBirthFrame);
+    float nextBirthFrame = currentFrame + 1.0;
+
+    vec4 initialPos = P[SourceID].initial_pos_birth;
+    vec4 initialVelEnergy = P[SourceID].initial_vel_energy;
+    P[SourceID].PosLocA.xyz = initialPos.xyz;
+    P[SourceID].PosLocB.xyz = initialPos.xyz;
+    P[SourceID].VelRadA = vec4(
+        initialVelEnergy.xyz,
+        VelocityAngle(initialVelEnergy.x, initialVelEnergy.y));
+    P[SourceID].VelRadB = P[SourceID].VelRadA;
+    P[SourceID].Data.w = nextBirthFrame;
+    P[SourceID].colFlg = 0u;
+    P[SourceID].contactCount = 0u;
+    P[SourceID].material_id = float(PhotonBaseMaterialID());
+    P[SourceID].photon_transport.x = livedFrames;
+    P[SourceID].photon_transport.y += 1.0;
+    P[SourceID].photon_transport.z = 1.0;
+    return true;
+#else
+    return false;
+#endif
+}
+
 void fpml_comp_main()
 {
     uint SourceID = gl_GlobalInvocationID.x;
@@ -153,6 +197,7 @@ void fpml_comp_main()
     }
 
     if (!IsMobileParticleActiveForDynamics(SourceID)) {
+        RecycleLightingPhotonIfDead(SourceID, P[SourceID].Data.w);
         return;
     }
 
@@ -166,6 +211,7 @@ void fpml_comp_main()
     if (photonSource) {
         P[SourceID].material_id = float(PhotonBaseMaterialID());
     }
+    float previousBirthFrame = P[SourceID].Data.w;
     vec3 totalForce = vec3(0.0);
     bool photonReflected = false;
     bool photonPositionOverride = false;
@@ -497,6 +543,9 @@ void fpml_comp_main()
     }
 
     if (!photonPositionOverride && !CalcPosition(SourceID)) {
-        return;
+        if (!RecycleLightingPhotonIfDead(SourceID, previousBirthFrame)) {
+            return;
+        }
     }
+    RecycleLightingPhotonIfDead(SourceID, previousBirthFrame);
 }

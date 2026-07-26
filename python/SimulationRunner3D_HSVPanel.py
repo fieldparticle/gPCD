@@ -4,7 +4,7 @@ from pathlib import Path
 import math
 import time
 
-from base.ForceDynamicsBase import ForceDynamics
+from base.DynamicsFactory import create_dynamics_for_cfg
 from gbase.MaterialProperties import (
     COLOR_MODE_COLLISION,
     COLOR_MODE_LUMENS,
@@ -547,7 +547,7 @@ class SimulationRunner3DApp:
     def __init__(self, cfg_file, batch_mode=False, end_frame=None):
         self.o3d, self.gui, self.rendering = _require_open3d()
         self.cfg_file = cfg_file
-        self.dynamics = ForceDynamics()
+        self.dynamics = create_dynamics_for_cfg(cfg_file)
         self.dynamics.load_cfg_file(cfg_file)
         self.run_configuration = self.dynamics.run_configuration
         if batch_mode:
@@ -753,6 +753,46 @@ class SimulationRunner3DApp:
         ]
         return eye, [0.0, 0.0, 1.0]
 
+    def _apply_view_pan(self, eye, target, up):
+        view_pan = self.run_configuration.get("view_pan", (0.0, 0.0))
+        if len(view_pan) != 2:
+            raise ValueError("view_pan must contain exactly 2 values")
+        pan_right = float(view_pan[0])
+        pan_up = float(view_pan[1])
+        if not math.isfinite(pan_right) or not math.isfinite(pan_up):
+            raise ValueError("view_pan values must be finite")
+        if abs(pan_right) <= 1.0e-12 and abs(pan_up) <= 1.0e-12:
+            return eye, target
+
+        view_dir = [
+            float(target[0]) - float(eye[0]),
+            float(target[1]) - float(eye[1]),
+            float(target[2]) - float(eye[2]),
+        ]
+        view_len = math.sqrt(sum(value * value for value in view_dir))
+        up_len = math.sqrt(sum(float(value) * float(value) for value in up))
+        if view_len <= 1.0e-12 or up_len <= 1.0e-12:
+            return eye, target
+        view_dir = [value / view_len for value in view_dir]
+        up_unit = [float(value) / up_len for value in up]
+        screen_right = [
+            up_unit[1] * view_dir[2] - up_unit[2] * view_dir[1],
+            up_unit[2] * view_dir[0] - up_unit[0] * view_dir[2],
+            up_unit[0] * view_dir[1] - up_unit[1] * view_dir[0],
+        ]
+        right_len = math.sqrt(sum(value * value for value in screen_right))
+        if right_len <= 1.0e-12:
+            return eye, target
+        screen_right = [value / right_len for value in screen_right]
+        pan = [
+            pan_right * screen_right[index] + pan_up * up_unit[index]
+            for index in range(3)
+        ]
+        return (
+            [float(eye[index]) + pan[index] for index in range(3)],
+            [float(target[index]) + pan[index] for index in range(3)],
+        )
+
     def _camera_aspect_ratio(self):
         frame = self.scene_widget.frame
         if frame.height > 0:
@@ -764,6 +804,7 @@ class SimulationRunner3DApp:
         bounds = self._scene_bounds()
         target = self._camera_target()
         eye, up = self._camera_eye_up(target)
+        eye, target = self._apply_view_pan(eye, target, up)
         projection = str(
             self.run_configuration.get("camera_projection", "orthographic")
         ).strip().lower()
@@ -1042,6 +1083,11 @@ class SimulationRunner3DApp:
     def run(self):
         self._update_info()
         print("SimulationRunner3D controls: mouse orbit/pan/zoom, SPACE pause, ESC quit")
+        print(
+            "SimulationRunner3D view hint: "
+            f"view={self.run_configuration.get('view')}, "
+            f"zoom={self.run_configuration.get('zoom', 1.0)}"
+        )
         self.gui.Application.instance.run()
         return self.last_particles
 

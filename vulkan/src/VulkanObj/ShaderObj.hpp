@@ -39,7 +39,7 @@ class BaseObj;
 class ShaderObj : public BaseObj
 {
 public:
-	ResourceVertexParticle* m_VPO = {};
+	Resource* m_VPO = {};
 	ResourceCollMatrix* m_CMO = {};
 	SwapChain* m_SCO = {};
 	ResourceLockMatrix* m_LMO = {};
@@ -67,7 +67,7 @@ public:
 		std::string ShaderFileName,
 		std::vector<char>& SPVBuffer,
 		uint32_t type);
-	void Create(ResourceVertexParticle* VPO, ResourceCollMatrix* CMO, ResourceLockMatrix* LMO,SwapChain* SCO);
+	void Create(Resource* VPO, ResourceCollMatrix* CMO, ResourceLockMatrix* LMO,SwapChain* SCO);
 	void Cleanup() {};
 
 };

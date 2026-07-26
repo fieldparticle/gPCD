@@ -84,6 +84,24 @@ namespace
 		return true;
 	}
 
+	bool LookupOptionalVec2Strict(ConfigObj* config, const char* key, glm::vec2& value)
+	{
+		if (config->CheckKey(key) == nullptr)
+			return false;
+		config_setting_t* setting = LookupStrict(config, key);
+		if (config_setting_length(setting) != 2)
+			throw std::runtime_error(std::string(key) + " must contain exactly two values");
+
+		for (int axis = 0; axis < 2; ++axis)
+		{
+			config_setting_t* element = config_setting_get_elem(setting, axis);
+			if (element == nullptr || config_setting_type(element) != CONFIG_TYPE_FLOAT)
+				throw std::runtime_error(std::string(key) + " values must be floats");
+			value[axis] = static_cast<float>(config_setting_get_float(element));
+		}
+		return true;
+	}
+
 	glm::vec3 EyeUpVector(glm::vec3 direction)
 	{
 		glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
@@ -125,6 +143,9 @@ void Resource::GeneralViewing(uint32_t CurrentBuffer)
     );
 
 	LookupOptionalVec3Strict(CfgTst, "view_center", center);
+	const bool hasPythonView =
+		CfgTst->CheckKey("view") &&
+		CfgTst->CheckKey("zoom");
 
     float cellWidth = static_cast<float>(m_CellW);
     float cellHeight = static_cast<float>(m_CellH);
@@ -132,6 +153,82 @@ void Resource::GeneralViewing(uint32_t CurrentBuffer)
     float maxExtent = glm::max(cellWidth, glm::max(cellHeight, cellDepth));
 
     m_UBO = {};
+
+	if (hasPythonView)
+	{
+		glm::vec3 pythonView = LookupVec3Strict(CfgTst, "view");
+		float pythonZoom = LookupFloatStrict(CfgTst, "zoom");
+		if (pythonZoom <= 0.0f)
+			throw std::runtime_error("zoom must be greater than zero");
+		glm::vec2 viewPan(0.0f);
+		LookupOptionalVec2Strict(CfgTst, "view_pan", viewPan);
+
+		glm::mat4 cameraRotation(1.0f);
+		cameraRotation = glm::rotate(
+			cameraRotation,
+			glm::radians(pythonView.z),
+			glm::vec3(0.0f, 0.0f, 1.0f)
+		);
+		cameraRotation = glm::rotate(
+			cameraRotation,
+			glm::radians(pythonView.y),
+			glm::vec3(0.0f, 1.0f, 0.0f)
+		);
+		cameraRotation = glm::rotate(
+			cameraRotation,
+			glm::radians(pythonView.x),
+			glm::vec3(1.0f, 0.0f, 0.0f)
+		);
+
+		float dist = maxExtent * 2.5f;
+		glm::vec3 eyeOffset = glm::vec3(
+			cameraRotation * glm::vec4(0.0f, 0.0f, dist, 0.0f)
+		);
+		glm::vec3 up = glm::vec3(
+			cameraRotation * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f)
+		);
+
+		glm::vec3 viewDir = glm::normalize(-eyeOffset);
+		glm::vec3 screenRight = glm::normalize(glm::cross(up, viewDir));
+		glm::vec3 pan =
+			((viewPan.x + PanX) * screenRight) +
+			((viewPan.y + PanY) * up);
+		glm::vec3 target = center + pan;
+		glm::vec3 eye = center + eyeOffset + pan;
+
+		m_UBO.model = glm::mat4(1.0f);
+		m_UBO.view = glm::lookAt(
+			eye,
+			target,
+			up
+		);
+
+		float viewWidth = static_cast<float>(m_SCO->m_SwapChainExtent.width);
+		float viewHeight = static_cast<float>(m_SCO->m_SwapChainExtent.height);
+		float aspect = viewWidth / viewHeight;
+		// PyVista camera.parallel_scale is the orthographic half-height.
+		float halfHeight = (maxExtent * 1.15f) / pythonZoom;
+		float halfWidth = halfHeight * aspect;
+
+		m_UBO.proj = glm::ortho(
+			-halfWidth,
+			halfWidth,
+			-halfHeight,
+			halfHeight,
+			0.1f,
+			maxExtent * 10.0f
+		);
+		m_UBO.proj[1][1] *= -1.0f;
+
+		vmaCopyMemoryToAllocation(
+			m_App->m_vmaAllocator,
+			&m_UBO,
+			m_Allocation[CurrentBuffer],
+			0,
+			sizeof(m_UBO)
+		);
+		return;
+	}
 
     // ============================================================
     // Model

@@ -44,7 +44,7 @@ public:
 	uint32_t m_MaxCollArray = 0;
 	uint32_t m_MaxLoc = 0;
 	uint32_t m_CellArrayMax=0;
-	ResourceVertexParticle* m_particle = {};
+	Resource* m_particle = {};
 	
 	
 	
@@ -64,7 +64,7 @@ public:
 	};
 	void ClearTempMemory() {};
 	virtual void AskObject(uint32_t AnyNumber) {};
-	void Create(uint32_t BindPoint, ResourceVertexParticle* particle);
+	virtual void Create(uint32_t BindPoint, Resource* particle);
 	void PullMem(uint32_t currentBuffer){};
 	void createLayout();
 	void createBuffers();

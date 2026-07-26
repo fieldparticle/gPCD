@@ -47,7 +47,7 @@ public:
 		glm::uvec3 LocationArry;
 	};
 
-	ResourceVertexParticle* m_particle = {};
+	Resource* m_particle = {};
 	uint32_t cc=800;
 	uint32_t rr=800;
 	uint32_t m_MaxLoc=0;
@@ -73,7 +73,7 @@ public:
 		m_VkType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	};
 	
-	void Create(uint32_t BindPoint, ResourceVertexParticle* particle);
+	void Create(uint32_t BindPoint, Resource* particle);
 	void PullMem(uint32_t currentBuffer){};
 	void createLayout();
 	void ClearTempMemory();

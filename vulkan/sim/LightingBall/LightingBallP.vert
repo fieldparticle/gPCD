@@ -15,7 +15,7 @@
 #include "../common/atomicg.glsl"
 #include "../common/CollimageIndex.glsl"
 #include "../common/Lockimage.glsl"
-#include "../common/particle.glsl"
+#include "../common/lighting_particle.glsl"
 #include "../common/color_map.glsl"
 #include "../common/BoundaryLightRecord.glsl"
 

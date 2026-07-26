@@ -40,7 +40,7 @@ const float PI = (float)3.14159265359;
 // 		auto bindingDescription 	= dvo->getBindingDescription();
 //		auto attributeDescriptions 	= dvo->getAttributeDescriptions();
 
-void ResourceParticleUBO::Create(uint32_t BindPoint, SwapChainObj* SCO, ResourceVertexParticle* particle)
+void ResourceParticleUBO::Create(uint32_t BindPoint, SwapChainObj* SCO, Resource* particle)
 {
 	m_Particle = particle;
 	m_NumElements = 0;// m_Particle->m_NumParticles;

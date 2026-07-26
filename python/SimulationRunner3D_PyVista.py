@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 
-from base.ForceDynamicsBase import ForceDynamics
+from base.DynamicsFactory import create_dynamics_for_cfg
 from base.Reporting import Reporting
 from gbase.MonitorSelection import preferred_window_position
 from gbase.utilities import get_cell_dimensions
@@ -215,7 +215,7 @@ class SimulationRunner3DPyVistaApp:
     def __init__(self, cfg_file, batch_mode=False, end_frame=None):
         self.np, self.pv = _require_pyvista()
         self.cfg_file = cfg_file
-        self.dynamics = ForceDynamics()
+        self.dynamics = create_dynamics_for_cfg(cfg_file)
         self.dynamics.load_cfg_file(cfg_file)
         self.run_configuration = self.dynamics.run_configuration
         if batch_mode:
@@ -307,6 +307,46 @@ class SimulationRunner3DPyVistaApp:
         ]
         return eye, [0.0, 0.0, 1.0]
 
+    def _apply_view_pan(self, eye, target, up):
+        view_pan = self.run_configuration.get("view_pan", (0.0, 0.0))
+        if len(view_pan) != 2:
+            raise ValueError("view_pan must contain exactly 2 values")
+        pan_right = float(view_pan[0])
+        pan_up = float(view_pan[1])
+        if not math.isfinite(pan_right) or not math.isfinite(pan_up):
+            raise ValueError("view_pan values must be finite")
+        if abs(pan_right) <= 1.0e-12 and abs(pan_up) <= 1.0e-12:
+            return eye, target
+
+        view_dir = [
+            float(target[0]) - float(eye[0]),
+            float(target[1]) - float(eye[1]),
+            float(target[2]) - float(eye[2]),
+        ]
+        view_len = math.sqrt(sum(value * value for value in view_dir))
+        up_len = math.sqrt(sum(float(value) * float(value) for value in up))
+        if view_len <= 1.0e-12 or up_len <= 1.0e-12:
+            return eye, target
+        view_dir = [value / view_len for value in view_dir]
+        up_unit = [float(value) / up_len for value in up]
+        screen_right = [
+            up_unit[1] * view_dir[2] - up_unit[2] * view_dir[1],
+            up_unit[2] * view_dir[0] - up_unit[0] * view_dir[2],
+            up_unit[0] * view_dir[1] - up_unit[1] * view_dir[0],
+        ]
+        right_len = math.sqrt(sum(value * value for value in screen_right))
+        if right_len <= 1.0e-12:
+            return eye, target
+        screen_right = [value / right_len for value in screen_right]
+        pan = [
+            pan_right * screen_right[index] + pan_up * up_unit[index]
+            for index in range(3)
+        ]
+        return (
+            [float(eye[index]) + pan[index] for index in range(3)],
+            [float(target[index]) + pan[index] for index in range(3)],
+        )
+
     def _camera_scale(self):
         extent = max(float(self.width), float(self.height), float(self.depth))
         zoom = float(self.run_configuration.get("zoom", 1.0))
@@ -318,9 +358,77 @@ class SimulationRunner3DPyVistaApp:
     def _setup_camera(self):
         target = self._camera_target()
         eye, up = self._camera_eye_up(target)
+        eye, target = self._apply_view_pan(eye, target, up)
         self.plotter.camera_position = (eye, target, up)
         self.plotter.enable_parallel_projection()
         self.plotter.camera.parallel_scale = self._camera_scale()
+
+    def _current_camera_view_zoom_hint(self):
+        if self.plotter is None:
+            return (
+                f"view={self.run_configuration.get('view')}, "
+                f"zoom={self.run_configuration.get('zoom', 1.0)}"
+            )
+        camera = self.plotter.camera
+        eye = camera.position
+        target = camera.focal_point
+        up = camera.up
+        offset = (
+            float(eye[0]) - float(target[0]),
+            float(eye[1]) - float(target[1]),
+            float(eye[2]) - float(target[2]),
+        )
+        offset_len = math.sqrt(
+            offset[0] * offset[0]
+            + offset[1] * offset[1]
+            + offset[2] * offset[2]
+        )
+        up_len = math.sqrt(
+            float(up[0]) * float(up[0])
+            + float(up[1]) * float(up[1])
+            + float(up[2]) * float(up[2])
+        )
+        view_text = str(self.run_configuration.get("view"))
+        if offset_len > 1.0e-12 and up_len > 1.0e-12:
+            z_axis = tuple(value / offset_len for value in offset)
+            y_axis = tuple(float(value) / up_len for value in up)
+            x_axis = (
+                y_axis[1] * z_axis[2] - y_axis[2] * z_axis[1],
+                y_axis[2] * z_axis[0] - y_axis[0] * z_axis[2],
+                y_axis[0] * z_axis[1] - y_axis[1] * z_axis[0],
+            )
+            x_len = math.sqrt(
+                x_axis[0] * x_axis[0]
+                + x_axis[1] * x_axis[1]
+                + x_axis[2] * x_axis[2]
+            )
+            if x_len > 1.0e-12:
+                x_axis = tuple(value / x_len for value in x_axis)
+                # Rotation matrix columns are x_axis, y_axis, z_axis. This
+                # inverts the same Rz * Ry * Rx order used by Python view.
+                r20 = x_axis[2]
+                r20 = max(-1.0, min(1.0, r20))
+                rot_y = math.asin(-r20)
+                cos_y = math.cos(rot_y)
+                if abs(cos_y) > 1.0e-8:
+                    rot_x = math.atan2(y_axis[2], z_axis[2])
+                    rot_z = math.atan2(x_axis[1], x_axis[0])
+                else:
+                    rot_x = 0.0
+                    rot_z = math.atan2(-y_axis[0], y_axis[1])
+                view_text = (
+                    f"[{math.degrees(rot_x):.1f}, "
+                    f"{math.degrees(rot_y):.1f}, "
+                    f"{math.degrees(rot_z):.1f}]"
+                )
+
+        extent = max(float(self.width), float(self.height), float(self.depth))
+        base_scale = float(
+            self.run_configuration.get("camera_ortho_scale", extent * 1.15)
+        )
+        parallel_scale = max(1.0e-12, float(camera.parallel_scale))
+        zoom = base_scale / parallel_scale
+        return f"view={view_text}   zoom={zoom:.3f}"
 
     def _build_plotter(self):
         window_width, window_height = _window_size(self.run_configuration)
@@ -576,9 +684,9 @@ class SimulationRunner3DPyVistaApp:
             return
         self._render_static_geometry()
         self._render_particles()
-        self._update_status()
         if reset_camera:
             self._setup_camera()
+        self._update_status()
 
     def _update_status(self):
         if self.closing:
@@ -606,7 +714,8 @@ class SimulationRunner3DPyVistaApp:
         text = (
             f"Frame: {self.frame}   Time: {self.frame * dt:.6f}   "
             f"Mobile: {mobile_count}   Boundary: {boundary_count}   "
-            f"{state}   Error: {error_text}"
+            f"{state}   Error: {error_text}\n"
+            f"{self._current_camera_view_zoom_hint()}"
         )
         try:
             self.status_actor = self.plotter.add_text(
@@ -653,6 +762,11 @@ class SimulationRunner3DPyVistaApp:
     def run(self):
         self._build_plotter()
         print("SimulationRunner3D PyVista controls: mouse orbit/pan/zoom, SPACE pause, ESC quit")
+        print(
+            "SimulationRunner3D PyVista view hint: "
+            f"view={self.run_configuration.get('view')}, "
+            f"zoom={self.run_configuration.get('zoom', 1.0)}"
+        )
         try:
             self._install_close_observers()
             self.plotter.show(interactive_update=True, auto_close=False)
@@ -665,6 +779,8 @@ class SimulationRunner3DPyVistaApp:
                 self._step()
                 if self._is_plotter_closed():
                     break
+                if self.paused:
+                    self._update_status()
                 try:
                     self.plotter.update(stime=1, force_redraw=True)
                 except TypeError:

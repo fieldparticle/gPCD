@@ -4,8 +4,8 @@
 % $Author: jb $
 %
 % $Date: 2023-05-03 15:30:42 -0400 (Wed, 03 May 2023) $
-% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src/vulkan/DescriptorSSBO.hpp $
-% $Id: DescriptorSSBO.hpp 28 2023-05-03 19:30:42Z jb $
+% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src/vulkan/ResourceVertex.hpp $
+% $Id: ResourceVertex.hpp 28 2023-05-03 19:30:42Z jb $
 %*******************************************************************
 %***                         DESCRIPTION                         ***
 %*******************************************************************
@@ -29,45 +29,42 @@
 %*
 %*
 %******************************************************************/
-#ifndef RESOURCEPARTICLEUBO_HPP
-#define RESOURCEPARTICLEUBO_HPP
+#ifndef ResourceLightingParticle_HPP
+#define ResourceLightingParticle_HPP
 
-class ResourceVertexParticle;
-class ResourceParticleUBO : public Resource
+class ResourceLightingParticle : public ResourceVertexObj
 {
-
-public:
-	Resource* m_Particle={};
+    public:
+				
+		float					m_Radius = 0.2f;
+		uint64_t				BoundaryParticleLimit = 0;
+		std::vector<LightingParticle>	m_Particles;
+		
+		ResourceLightingParticle(VulkanObj *App, std::string Name):
+					ResourceVertexObj(App, Name)
+				{
+					m_VkType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				};
+		virtual void AskObject(uint32_t AnyNumber) {};
+		float CalcSpeedLimit(float max_vel, float radius);
+	virtual void Create(uint32_t BindPoint);
+	uint32_t CalcSideLength(size_t PartPerCell);
+	void CreateLayout();
 	
-	UniformBufferObject m_UBO={};
-	bool m_done = false;
-	float width = 800.0;
-	float height = 800.0;
-
-	bool InitFlag = false;
-	ResourceParticleUBO(VulkanObj* App, std::string Name) : 
-		Resource(App, Name, VBW_TYPE_UNIFORM_BUFFER)
-	{
-		m_VkType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	};
-	virtual void AskObject(uint32_t AnyNumber) {};
-	void ClearTempMemory() {};
-	void Create(uint32_t BindPoint, SwapChainObj* SCO, Resource* particle);
-	void Create(uint32_t BindPoint, SwapChainObj* SCO);
-	void createLayout();
-	void createBuffers();
-	void PushMem(uint32_t currentBuffer);
-	virtual void PullMem(uint32_t currentBuffer){};
+	//============================================================
+	std::vector<VkVertexInputAttributeDescription>* GetAttributeDescriptions();
+	VkVertexInputBindingDescription* GetBindingDescription();
+	
+	void PullMem(uint32_t currentBuffer) {};
+	virtual void PushMem(uint32_t currentBuffer){};
+	virtual void ClearTempMemory();
 	void Cleanup()
 	{
+
 		for (size_t ii = 0; ii < m_Allocation.size(); ii++)
 			vmaDestroyBuffer(m_App->m_vmaAllocator, m_Buffers[ii], m_Allocation[ii]);
 	}
-	std::vector<VkVertexInputAttributeDescription>* GetAttributeDescriptions() { return {}; };
-	VkVertexInputBindingDescription* GetBindingDescription() { return {}; };
-	void* GetBuffer(uint32_t bufNum, uint32_t ImageIndex, unsigned long& size);
+	
 
 };
-
-
 #endif

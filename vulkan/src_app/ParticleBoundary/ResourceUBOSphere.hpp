@@ -41,7 +41,7 @@ class ResourceUBOSphere : public Resource
 public:
 
 	
-	ResourceVertexParticle* m_Particle = {};
+	Resource* m_Particle = {};
 	
 	VkDeviceSize m_bufferSize=0;
 	
@@ -55,7 +55,7 @@ public:
 	};
 	void ClearTempMemory() {};
 	virtual void GetShaderMem() {};
-	void Create(uint32_t BindPoint, SwapChainObj* SCO, ResourceVertexParticle* particle);
+	void Create(uint32_t BindPoint, SwapChainObj* SCO, Resource* particle);
 	void Create(uint32_t BindPoint, SwapChainObj* SCO);
 	void createLayout();
 	void createBuffers();

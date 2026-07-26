@@ -112,16 +112,27 @@ particle field is part of the active ABI.
 
 The active \texttt{LightingBall\_Py.inc} and
 \texttt{LightingBall\_Vk.inc} files intentionally use only the ordinary
-viewer controls:
+viewer controls.  The source cfg exports these fields into the generated
+\texttt{.tst} file so Python and Vulkan read the same scene view:
 \begin{verbatim}
-view_center = [3.5, 2.5, 2.5];
+view_center = [1.5, 1.0, 2.5];
+view = [-10.8, -52.4, -1.25];
 zoom = 1.25;
+view_pan = [-5.0, 4.0];
 gl_point_size = 2.0;
 \end{verbatim}
 The eye-aligned camera keys were removed from the active scene because the
 eye no longer participates in lighting.  If that camera mode is needed later,
 it should be reintroduced as view/camera configuration rather than as part of
 the lighting model.
+
+Vulkan treats the generated \texttt{view} and \texttt{zoom} fields as a
+Python-camera mode.  In that mode the Vulkan model matrix remains identity,
+the camera orientation is built from the Python view angles, and
+\texttt{zoom} maps to the same orthographic half-height convention used by
+PyVista \texttt{camera.parallel\_scale}.  The Vulkan application window still
+comes from \texttt{mps.cfg}; matching Python framing requires the Vulkan
+window aspect to match the Python \texttt{window\_size} aspect.
 
 \subsection{Current Boundary-Space Contract}
 

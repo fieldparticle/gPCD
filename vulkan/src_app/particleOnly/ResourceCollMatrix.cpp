@@ -33,7 +33,7 @@
 #include "VulkanObj/VulkanApp.hpp"
 // Create the layouts for the decriptors which are esentially descriptor definitions.
 // Shader Uniform struct->binding point->UniformBuffersMemory
-void ResourceCollMatrix::Create(uint32_t BindPoint, ResourceVertexParticle* particle)
+void ResourceCollMatrix::Create(uint32_t BindPoint, Resource* particle)
 {
 
     m_thisFramesBuffered = 1;

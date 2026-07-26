@@ -30,7 +30,7 @@
 %*
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
-void ResourceLightingCube::Create(ResourceVertexParticle* PartVert)
+void ResourceLightingCube::Create(Resource* PartVert)
 {
 
 	bool show_boundary_as_obj = CfgApp->GetBool("application.boundary_as_obj", true);

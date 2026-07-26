@@ -3175,3 +3175,61 @@ triangle-flat-color failure.  The next model work should push transport
 behavior in order: diffuse light stream, absorbing shadow surface, and
 reflective surface.  Atomics, temporal filtering, additive accumulation, and
 directional specular storage remain later choices.
+
+\subsection{Python And Vulkan Share Scene View Configuration}
+
+\subsubsection{previous form}
+
+Python and Vulkan used different presentation contracts for the same
+\texttt{LightingBall} data.  Python read \texttt{view\_center},
+\texttt{view}, \texttt{zoom}, and viewer window size from the Python
+configuration.  Vulkan primarily used the application
+\texttt{initial\_view} model-rotation block and a separate window definition
+from \texttt{mps.cfg}.  Even when the generated \texttt{.tst} file carried
+\texttt{view\_center}, the two renderers could disagree because rotation,
+zoom scale, screen pan, and window aspect came from different places.
+
+\subsubsection{current form}
+
+The Python generator now exports the ordinary viewer controls into the
+generated \texttt{.tst} file:
+\begin{verbatim}
+view_center = [...];
+view = [...];
+zoom = ...;
+view_pan = [...];
+\end{verbatim}
+
+When Vulkan sees \texttt{view} and \texttt{zoom} in the test file, it enters
+Python-camera mode.  In that mode the model matrix remains identity, the view
+matrix is built from the same view-angle convention as Python, and
+\texttt{zoom} uses the PyVista orthographic half-height convention rather
+than the older Vulkan model-rotation scale.  The Vulkan window is still
+created from the \texttt{mps.cfg} window block:
+\begin{verbatim}
+window.size.x/y/w/h
+window.monitor
+window.usedefault
+\end{verbatim}
+so the application can control monitor placement while the scene data controls
+camera framing.
+
+\subsubsection{difference outcome}
+
+rendering and diagnostics
+
+\subsubsection{Analysis}
+
+This change makes Python the practical scene-review view for
+\texttt{LightingBall}: the same generated data now carries the physical target
+point, view orientation, zoom, and screen pan that Vulkan should use.  The
+remaining difference is not lighting or dynamics.  It is presentation aspect:
+Vulkan's swapchain extent comes from the \texttt{mps.cfg} window and monitor,
+while Python uses \texttt{window\_size}.  If those aspect ratios differ, a
+matched camera will still show a different horizontal span.
+
+The fix also removes the older ambiguity between camera orientation and model
+orientation for lighting inspection.  Photon direction, sphere position,
+death bounds, and cell addresses remain in world space.  View controls only
+change how the world is framed for review; they do not affect photon
+transport, material response, boundary-space deposit, or surface rendering.

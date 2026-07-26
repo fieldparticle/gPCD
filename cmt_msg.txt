@@ -1,9 +1,11 @@
 Current status:
-    - LightingBall uses cell-owned BoundaryLightRecord state with incidence-weighted RGB-band spectral deposit.
-    - Remaining bumpy appearance is documented as expected cell/sphere resolution behavior.
+	- Python and Vulkan LightingBall view controls now share generated scene-view fields.
+	- Vulkan uses Python-camera mode when view and zoom are present in the tst file.
+	- Documentation records that remaining view mismatch is mostly window/swapchain aspect tuning.
 
 Code Changes:
-    - Updated Boundary-Space Lighting, LightingBall, Photon Lighting Analysis, Todo, and Problem Evolution docs.
-    - Recorded next lighting milestones: diffuse light stream, absorbing/shadow surface, reflective surface.
+	- Updated LightingBall docs for view_center, view, zoom, view_pan, and mps.cfg window ownership.
+	- Replaced the old Vulkan initial_view TODO with Python/Vulkan view parity validation notes.
+	- Added a ProblemEvolution entry for the Python/Vulkan scene-view coordination milestone.
 
-Next: Implement diffuse light stream as the next LightingBall transport behavior.
+Next: Validate Vulkan framing with an mps.cfg window aspect matching Python window_size.

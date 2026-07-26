@@ -34,7 +34,7 @@
 
 const float PI = (float)3.14159265359;
 
-void ResourceBoundaryUBO::Create(uint32_t BindPoint, SwapChainObj* SCO, ResourceVertexParticle* particle)
+void ResourceBoundaryUBO::Create(uint32_t BindPoint, SwapChainObj* SCO, Resource* particle)
 {
 	m_Particle = particle;
 	Create(BindPoint, SCO);

@@ -18,7 +18,7 @@
 #include "../common/push.glsl"
 #include "../common/CollimageIndex.glsl"
 #include "../common/Lockimage.glsl"
-#include "../common/particle.glsl"
+#include "../common/lighting_particle.glsl"
 #include "../common/util.glsl"
 
 layout(location = 0) in vec4 fragColor;

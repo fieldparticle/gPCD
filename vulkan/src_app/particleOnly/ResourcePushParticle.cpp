@@ -31,7 +31,7 @@
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
 
-void ResourceParticlePush::Create(ResourceVertexParticle* vertP)
+void ResourceParticlePush::Create(Resource* vertP)
 {
 	m_VertP = vertP;
 	m_numParts = static_cast<float>(m_VertP->m_NumParticles);

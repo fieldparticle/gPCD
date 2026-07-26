@@ -42,11 +42,13 @@ void ExportObject::Cleanup()
 
 bool ExportObject::ExportBuffer(const std::string& outputFile)
 {
+    if (m_RO->m_BufSize == 0)
+        return false;
+
     if (m_RO->m_Buffers[0] == VK_NULL_HANDLE)
         return false;
 
-    if (m_RO->m_BufSize == 0)
-        return false;
+   
 
     VkBuffer stagingBuffer = VK_NULL_HANDLE;
     VmaAllocation stagingAllocation = VK_NULL_HANDLE;

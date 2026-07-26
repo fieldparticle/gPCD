@@ -48,8 +48,8 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 		= new ResourceLightingSphere(vulkanObj, "VertexSphere");
 	ResourceLightingCube* resourceVertexCube
 		= new ResourceLightingCube(vulkanObj, "VertexCube");
-	ResourceVertexParticle* resourceVertexParticle
-		= new ResourceVertexParticle(vulkanObj, "VertexParticle");
+	ResourceLightingParticle* resourceLightingParticle
+		= new ResourceLightingParticle(vulkanObj, "VertexParticle");
 	ResourceParticleUBO* resourceParticleUBO
 		= new ResourceParticleUBO(vulkanObj, "ParticleUBO");
 	ResourceBoundaryUBO* resourceBoundaryUBO
@@ -121,24 +121,24 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	subPassBoundary->Create(swapChain, { imageColor,imageDepth }, 0, 0, 2);
 	renderPass->Create(swapChain, { imageColor,imageDepth }, { subPassParticle,subPassBoundary });
 	frameBuffer->Create(renderPass, swapChain);
-	resourceVertexParticle->Create(4);
-	resourceVertexSphere->Create(resourceVertexParticle);
-	resourceVertexCube->Create(resourceVertexParticle);
-	resourceCollMatrix->Create(3, resourceVertexParticle);
+	resourceLightingParticle->Create(4);
+	resourceVertexSphere->Create(resourceLightingParticle);
+	resourceVertexCube->Create(resourceLightingParticle);
+	resourceCollMatrix->Create(3, resourceLightingParticle);
 
-	resourceLockMatrix->Create(6, resourceVertexParticle);
-	resourceLighting->Create(8, resourceVertexParticle);
-	resourceParticlePush->Create(resourceVertexParticle);
+	resourceLockMatrix->Create(6, resourceLightingParticle);
+	resourceLighting->Create(8, resourceLightingParticle);
+	resourceParticlePush->Create(resourceLightingParticle);
 	resourceAtomicCompute->Create(5, perObj);
 	resourceAtomicG->Create(5,perObj);
-	resourceParticleUBO->Create(2, swapChain, resourceVertexParticle);
-	resourceBoundaryUBO->Create(1, swapChain, resourceVertexParticle);
-	resourceUBOSphere->Create(7, swapChain, resourceVertexParticle);
-	shaderObj->Create(resourceVertexParticle, resourceCollMatrix, resourceLockMatrix,swapChain);
+	resourceParticleUBO->Create(2, swapChain, resourceLightingParticle);
+	resourceBoundaryUBO->Create(1, swapChain, resourceLightingParticle);
+	resourceUBOSphere->Create(7, swapChain, resourceLightingParticle);
+	shaderObj->Create(resourceLightingParticle, resourceCollMatrix, resourceLockMatrix,swapChain);
 
 	resourceGraphicsContainer->Create({ resourceVertexCube,
 											resourceVertexSphere,
-											resourceVertexParticle,
+											resourceLightingParticle,
 											resourceParticlePush,
 											resourceParticleUBO,
 											resourceBoundaryUBO,
@@ -152,7 +152,7 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	resourceGraphicsContainer->ClearTempMemory();
 	resourceComputeContainer->Create({ 	resourceParticlePush,
 										resourceLighting,
-										resourceVertexParticle,
+										resourceLightingParticle,
 										resourceAtomicCompute,
 										resourceLockMatrix,
 										resourceCollMatrix});
@@ -178,7 +178,7 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 
 	commandPool->Create(physDevObj, swapChain, renderPass, frameBuffer,
 		{ commandParticleGraphicsSub,commandParticleCompute });
-	exportObject->Create(resourceVertexParticle);
+	exportObject->Create(resourceLightingParticle);
 
 	syncObjects->Create();
 	syncObjects->AddFence("inflightFence");

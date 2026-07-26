@@ -13,7 +13,7 @@
 #include "..\common\push.glsl"
 #include "..\common\CollimageIndex.glsl"
 #include "..\common\Lockimage.glsl"
-#include "..\common\particle.glsl"
+#include "..\common\lighting_particle.glsl"
 #include "..\common\util.glsl"
 #include "..\common\color_map.glsl"
 #include "boundary.glsl"

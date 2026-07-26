@@ -56,7 +56,7 @@ uint32_t LightingCellAddress(const glm::vec3& worldPosition, uint32_t width, uin
 }
 }
 
-void ResourceLightingSphere::Create(ResourceVertexParticle* PartVert)
+void ResourceLightingSphere::Create(Resource* PartVert)
 {
 	ConfigObj* cfg = CfgApp;
 	//float nside = (float)CfgTst->GetInt("application.boundary_side_length", true);

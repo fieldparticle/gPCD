@@ -34,7 +34,7 @@
 #include <iostream>
 
 
-void ResourceVertexObj::Create(uint32_t BindPoint, ResourceVertexParticle* PartVert)
+void ResourceVertexObj::Create(uint32_t BindPoint, Resource* PartVert)
 {
 	
 	m_ParticleVert = PartVert;

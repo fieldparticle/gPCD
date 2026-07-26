@@ -34,7 +34,7 @@
 
 // Create the layouts for the decriptors which are esentially descriptor definitions.
 // Shader Uniform struct->binding point->UniformBuffersMemory
-void ResourceLockMatrix::Create(uint32_t BindPoint, ResourceVertexParticle* particle)
+void ResourceLockMatrix::Create(uint32_t BindPoint, Resource* particle)
 {
 
     

@@ -6,6 +6,7 @@ import importlib.util
 from types import SimpleNamespace
 from gbase.HSVWheelPyGame import *
 from base.ForceDynamicsBase import ForceDynamics
+from base.ForceDynamicsLighting import ForceDynamicsLighting
 from base.VerAForceDynamicsBase import ForceDynamics as VerAForceDynamics
 from base.Reporting import Reporting
 from base.InLineTest import InLineTest
@@ -27,6 +28,7 @@ from gbase.pdata import PTYPE_BOUNDARY, PTYPE_PHOTON
 
 BASE_CLASS_REGISTRY = {
     "ForceDynamics": ForceDynamics,
+    "ForceDynamicsLighting": ForceDynamicsLighting,
     "VerAForceDynamics": VerAForceDynamics,
 }
 

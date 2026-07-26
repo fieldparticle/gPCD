@@ -78,7 +78,7 @@ RectangleWallSegment SelectRectangleWallSegment(uint SourceID, uint BoundaryID)
     return selected;
 }
 
-// Python source: ForceDynamics.py:502
+// Python source: ForceDynamics.py:362
 BoundaryWallSegment EvaluateRectangleWallSegment(uint SourceID, uint BoundaryID)
 {
     RectangleWallSegment selected = SelectRectangleWallSegment(SourceID, BoundaryID);

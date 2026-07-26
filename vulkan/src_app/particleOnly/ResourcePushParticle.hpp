@@ -54,8 +54,8 @@ class ResourceParticlePush : public Resource
 
 	uint32_t m_LastAdvancedAppFrame = UINT32_MAX;
 	float m_numParts = 0.0;
-	void Create(ResourceVertexParticle* vertP);
-	ResourceVertexParticle* m_VertP{};
+	void Create(Resource* vertP);
+	Resource* m_VertP{};
 	ResourceParticlePush(VulkanObj* App, std::string Name)
 		: Resource(App, Name, VBW_DESCRIPTOR_TYPE_PUSH_CONSTANT),
 		m_ShaderFlags{}

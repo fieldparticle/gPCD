@@ -15,8 +15,7 @@ import re
 from pathlib import Path
 from gbase.libconf import AttrDict
 from gbase.FunctionWall import parse_keyed_curve_wall_segments, wall_marker_records
-from gbase.MaterialProperties import PARTICLE_TYPE_PHOTON, parse_particle_type
-from gbase.pdata import PTYPE_BOUNDARY, PTYPE_NULL
+from gbase.pdata import PTYPE_BOUNDARY, PTYPE_NULL, PTYPE_PHOTON
 AXIS_VECTOR = {
     "X": (1.0, 0.0, 0.0),
     "Y": (0.0, 1.0, 0.0),
@@ -136,8 +135,6 @@ class ForceDynamics(ForceContactDynamics):
         source = self.particles[SourceID]
         source.contactCount = 0
         source.colFlg = 0
-        if self.IsPhotonParticle(SourceID):
-            source.material_id = self.BasePhotonMaterialID(SourceID)
         if (
             hasattr(self, "IsMobileParticleActiveForDynamics")
             and self.IsMobileParticleActiveForDynamics(SourceID)
@@ -146,24 +143,6 @@ class ForceDynamics(ForceContactDynamics):
         source.total_overlap_area = 0.0
         for contact_state in self.GetContactSlots(SourceID):
             self.ClearContactSlot(contact_state)
-
-    def BasePhotonMaterialID(self, SourceID):
-        """Return the configured photon material id used between contacts."""
-        materials = ()
-        if getattr(self, "run_configuration", None) is not None:
-            materials = self.run_configuration.get("material_properties", ())
-        for material in materials or ():
-            if hasattr(material, "get"):
-                particle_type = parse_particle_type(material.get("particle_type", 0))
-                material_id = material.get("material_id", 0)
-            else:
-                particle_type = parse_particle_type(
-                    getattr(material, "particle_type", 0)
-                )
-                material_id = getattr(material, "material_id", 0)
-            if particle_type == PARTICLE_TYPE_PHOTON:
-                return float(material_id)
-        return float(getattr(self.particles[SourceID], "material_id", 0.0))
 
     def GetContactSlots(self, SourceID):
         """Return contact slots while preserving legacy Python structures."""
@@ -420,6 +399,7 @@ class ForceDynamics(ForceContactDynamics):
             self.particle_data = self.config.get("PARTICLE_DATA", {})
 
         self.particles = self.create_particle_array_from_cfg(self.particle_data)
+        self.validate_particle_types_for_dynamics()
         self.configure_boundary_space_lighting_from_cfg()
         if self.config.pdata_from_file == False:
             self.add_function_boundary_markers_from_cfg()
@@ -446,6 +426,28 @@ class ForceDynamics(ForceContactDynamics):
             self.inline_test_flag = False
         # If there is a 
         return self.particles
+
+    def AllowsPhotonParticles(self):
+        """Base FPM rejects photon particles; FPML overrides this."""
+        return False
+
+    def validate_particle_types_for_dynamics(self):
+        """Reject photon particles in non-lighting dynamics."""
+        if self.AllowsPhotonParticles():
+            return
+        photon_ids = [
+            particle_id
+            for particle_id, particle in enumerate(self.particles)
+            if int(round(float(getattr(particle, "ptype", 0.0)))) == int(PTYPE_PHOTON)
+        ]
+        if photon_ids:
+            sample = ", ".join(str(particle_id) for particle_id in photon_ids[:8])
+            suffix = "..." if len(photon_ids) > 8 else ""
+            raise ValueError(
+                "ForceDynamics does not support photon particles; use "
+                "ForceDynamicsLighting for photon cfg/tst files. "
+                f"Photon particle ids: {sample}{suffix}"
+            )
 
     def add_function_boundary_markers_from_cfg(self):
         """Build runtime wall markers when mobile particles come from cfg data."""
@@ -716,6 +718,7 @@ class ForceDynamics(ForceContactDynamics):
         surface_id,
         material_id,
         position,
+        rgb=None,
     ):
         if not self.boundary_space_lighting_enabled:
             return False
@@ -739,6 +742,11 @@ class ForceDynamics(ForceContactDynamics):
                     nearest_particle_id = int(particle_id)
         if nearest_particle_id is None:
             return False
+        if rgb is not None:
+            return self.DepositBoundarySpaceLight(
+                nearest_particle_id,
+                rgb,
+            )
         return self.DepositBoundarySpaceLightForMaterial(
             nearest_particle_id,
             material_id,
@@ -1396,9 +1404,17 @@ class ForceDynamics(ForceContactDynamics):
         """Scan Python particles and process each source-owned contact."""
         self.photon_reflected_velocity = {}
         self.photon_reflected_position = {}
-        for source_id in range(len(self.particles)):
-            if not self.IsMobileParticleActiveForDynamics(source_id):
-                continue
+        active_mobile_ids = [
+            particle_id
+            for particle_id in range(len(self.particles))
+            if self.IsMobileParticleActiveForDynamics(particle_id)
+        ]
+        boundary_ids = [
+            particle_id
+            for particle_id in range(len(self.particles))
+            if self.IsBoundaryParticle(particle_id)
+        ]
+        for source_id in active_mobile_ids:
             source_is_photon = self.IsPhotonParticle(source_id)
             if not self.ProcessPistonCollision(
                 source_id,
@@ -1407,47 +1423,52 @@ class ForceDynamics(ForceContactDynamics):
                 return False
             has_local_boundary_marker = False
             has_local_lighting_ball_marker = False
-            for target_id in range(len(self.particles)):
-                if source_id == target_id:
-                    continue
-                if self.IsBoundaryParticle(target_id):
-                    if self.BoundaryParticleNormal(target_id) is not None:
-                        has_local_lighting_ball_marker = (
-                            has_local_lighting_ball_marker
-                            or self.BoundaryMarkerApplies(source_id, target_id)
-                        )
-                        continue
-                    has_local_boundary_marker = (
-                        has_local_boundary_marker
-                        or self.BoundaryMarkerApplies(
-                            source_id,
-                            target_id,
-                        )
+            for target_id in boundary_ids:
+                if self.BoundaryParticleNormal(target_id) is not None:
+                    has_local_lighting_ball_marker = (
+                        has_local_lighting_ball_marker
+                        or self.BoundaryMarkerApplies(source_id, target_id)
                     )
                     continue
-                if source_is_photon:
-                    continue
-                if not self.IsMobileParticleActiveForDynamics(target_id):
-                    continue
-                if self.ShouldSkipParticlePair(source_id, target_id):
-                    continue
-                if self.TryPhotonParticleReflection(source_id, target_id):
-                    continue
-                geometry = self.GetPhysicalParticleContact(source_id, target_id)
-                if geometry is not None:
-                    self.RecordPhotonReflection(source_id, geometry[:3])
-                    if self.IsPhotonParticle(source_id):
-                        self.particles[source_id].colFlg = 1
-                        continue
-                    if not self.ProcessParticleCollision(
-                        target_id,
+                has_local_boundary_marker = (
+                    has_local_boundary_marker
+                    or self.BoundaryMarkerApplies(
                         source_id,
-                        total_forces[source_id],
-                        geometry,
-                    ):
+                        target_id,
+                    )
+                )
+
+            if source_is_photon:
+                for target_id in active_mobile_ids:
+                    if source_id == target_id or self.IsPhotonParticle(target_id):
+                        continue
+                    if self.TryPhotonParticleReflection(source_id, target_id):
+                        continue
+                    if self.collIn.ErrorReturn != self.constants.ERROR_NONE:
                         return False
-                if self.collIn.ErrorReturn != self.constants.ERROR_NONE:
-                    return False
+            else:
+                for target_id in active_mobile_ids:
+                    if source_id == target_id:
+                        continue
+                    if self.ShouldSkipParticlePair(source_id, target_id):
+                        continue
+                    if self.TryPhotonParticleReflection(source_id, target_id):
+                        continue
+                    geometry = self.GetPhysicalParticleContact(source_id, target_id)
+                    if geometry is not None:
+                        self.RecordPhotonReflection(source_id, geometry[:3])
+                        if self.IsPhotonParticle(source_id):
+                            self.particles[source_id].colFlg = 1
+                            continue
+                        if not self.ProcessParticleCollision(
+                            target_id,
+                            source_id,
+                            total_forces[source_id],
+                            geometry,
+                        ):
+                            return False
+                    if self.collIn.ErrorReturn != self.constants.ERROR_NONE:
+                        return False
             if has_local_lighting_ball_marker:
                 if not self.ProcessLightingBallCollision(
                     source_id,
@@ -1461,7 +1482,6 @@ class ForceDynamics(ForceContactDynamics):
             boundary_contacts = self.EvaluateConfiguredWallContacts(source_id)
             for wall_flag in sorted(boundary_contacts):
                 _penetration_depth, contact = boundary_contacts[wall_flag]
-                self.RecordPhotonReflection(source_id, contact[:3])
                 if self.IsPhotonParticle(source_id):
                     source = self.particles[source_id]
                     normal = contact[:3]
@@ -1475,12 +1495,22 @@ class ForceDynamics(ForceContactDynamics):
                     )
                     wall_material_id = self.ConfiguredWallMaterialID(wall_flag)
                     self.particles[source_id].colFlg = 1
+                    _deposit_fraction, deposit_rgb, remaining_mass = (
+                        self.TransferPhotonStrengthToSurface(
+                            source_id,
+                            normal,
+                            wall_material_id,
+                        )
+                    )
                     self.DepositBoundarySpaceLightForSurface(
                         2,
                         wall_flag,
                         wall_material_id,
                         hit_point,
+                        rgb=deposit_rgb,
                     )
+                    if remaining_mass > self.PhotonMinRelativeMass(source_id):
+                        self.RecordPhotonReflection(source_id, normal)
                     continue
                 if not self.ProcessFunctionWallCollision(
                     source_id,

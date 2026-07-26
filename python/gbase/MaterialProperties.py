@@ -113,6 +113,8 @@ DEFAULT_MATERIAL_PROPERTIES = (
         "spectral_response": (1.0, 1.0, 1.0),
         "spectral_emission": (1.0, 1.0, 1.0),
         "photon_energy": 1.0,
+        "photon_coupling": 1.0,
+        "photon_min_relative_mass": 0.001,
         "cell_density": 0.0,
     },
 )
@@ -160,6 +162,10 @@ def normalized_material_properties(source=None):
             "spectral_emission",
         )
         photon_energy = float(_material_get(raw_material, "photon_energy", 1.0))
+        photon_coupling = float(_material_get(raw_material, "photon_coupling", 1.0))
+        photon_min_relative_mass = float(
+            _material_get(raw_material, "photon_min_relative_mass", 0.001)
+        )
         cell_density = float(_material_get(raw_material, "cell_density", 0.0))
         name = str(_material_get(raw_material, "name", f"material_{material_id}"))
         particle_type = parse_particle_type(
@@ -168,11 +174,22 @@ def normalized_material_properties(source=None):
 
         if not all(
             math.isfinite(value)
-            for value in (relative_mass, thermal_velocity, photon_energy, cell_density)
+            for value in (
+                relative_mass,
+                thermal_velocity,
+                photon_energy,
+                photon_coupling,
+                photon_min_relative_mass,
+                cell_density,
+            )
         ):
             raise ValueError("material_properties values must be finite")
         if photon_energy < 0.0:
             raise ValueError("photon_energy must not be negative")
+        if photon_coupling < 0.0 or photon_coupling > 1.0:
+            raise ValueError("photon_coupling must be between 0.0 and 1.0")
+        if photon_min_relative_mass < 0.0:
+            raise ValueError("photon_min_relative_mass must not be negative")
 
         materials.append(
             {
@@ -188,6 +205,8 @@ def normalized_material_properties(source=None):
                 "spectral_response": spectral_response,
                 "spectral_emission": spectral_emission,
                 "photon_energy": photon_energy,
+                "photon_coupling": photon_coupling,
+                "photon_min_relative_mass": photon_min_relative_mass,
                 "cell_density": cell_density,
             }
         )
@@ -258,6 +277,14 @@ def write_material_properties(output, source=None):
             f"{float(spectral_emission[2]):.9f}];\n"
         )
         output.write(f"        photon_energy = {float(material.get('photon_energy', 1.0)):.9f};\n")
+        output.write(
+            "        photon_coupling = "
+            f"{float(material.get('photon_coupling', 1.0)):.9f};\n"
+        )
+        output.write(
+            "        photon_min_relative_mass = "
+            f"{float(material.get('photon_min_relative_mass', 0.001)):.9f};\n"
+        )
         output.write(f"        cell_density = {float(material['cell_density']):.9f};\n")
         output.write(f"    }}{separator}\n")
     output.write(");\n")

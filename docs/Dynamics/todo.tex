@@ -33,6 +33,7 @@ per-frame clear/filter path.
 
 The next active lighting tasks are:
 \begin{enumerate}
+    \item complete the lighting-specific particle transport fields;
     \item diffuse light stream;
     \item absorbing and shadow surface;
     \item reflective surface.
@@ -41,6 +42,30 @@ The next active lighting tasks are:
 Directional specular, additive energy accumulation, temporal filtering, decay,
 and separate compact material response tables remain deferred until these
 transport behaviors are stable.
+
+\subsubsection{Lighting Particle Transport Fields}
+
+\texttt{ParticleLighting} now has a separate particle resource direction:
+\texttt{ResourceLightingParticle} and a lighting-specific particle structure.
+The lighting particle structure should keep the existing particle field names
+for basic dynamics, then append lighting-only transport state.  This keeps the
+ordinary particle apps on the base particle ABI while allowing photon lighting
+to carry the state it needs.
+
+The next lighting-particle state should support periodic photon reuse:
+\begin{itemize}
+    \item original emitter-slot position;
+    \item original velocity direction and magnitude;
+    \item original release frame;
+    \item current photon transport strength;
+    \item recycle or cycle count for diagnostics.
+\end{itemize}
+
+Photon velocity magnitude must remain fixed.  If a material interaction reduces
+photon momentum, the model should reduce the photon's relative mass or
+transport strength, not its speed.  Recycled photons should restore their
+original emitter-slot position, original velocity, base photon material/debug
+state, and initial relative mass before waiting for the next release frame.
 
 \subsubsection{Diffuse Light Stream}
 
@@ -64,17 +89,22 @@ light from the reflection.  This should build on the existing fixed-speed
 reflection behavior without making the photon point own the final visible
 surface color.
 
-\subsection{Vulkan Test-File View Defaults}
+\subsection{Python/Vulkan View Parity}
 
-Move the Vulkan initial view defaults that are scene/data specific out of the
-application configuration and into the generated \texttt{.tst} file.  In
-particular, the current setting:
+The generated \texttt{.tst} file now carries scene-specific view controls:
 \begin{verbatim}
-initial_view = { rRotZ = 0.0;rRotY=0.0;rRotX=0.0;zoom=0.1;};
+view_center = [...];
+view = [...];
+zoom = ...;
+view_pan = [...];
 \end{verbatim}
-should be generated with the test data and read from the \texttt{.tst} file,
-not from the Vulkan app configuration file.  This keeps \texttt{view_center},
-point size, and initial zoom controlled by the same scene-specific data source.
+
+The remaining view-parity work is validation and tuning rather than moving
+\texttt{initial\_view}.  Vulkan should use the generated Python-camera fields
+when present and fall back to the application \texttt{initial\_view} only for
+older scenarios.  The Vulkan app window size and monitor placement still come
+from \texttt{mps.cfg}; for matched framing, its aspect ratio should match the
+Python \texttt{window\_size} aspect ratio.
 
 \subsection{Photon-Direction Specular Lighting}
 

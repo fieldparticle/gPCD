@@ -288,6 +288,9 @@
     <ClInclude Include="..\..\src_app\ParticleLighting\ResourceLightingSphere.hpp">
       <Filter>Lighting</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src_app\ParticleLighting\ResourceLightingParticle.hpp">
+      <Filter>Lighting</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\libconfig\scanctx.c">
@@ -552,6 +555,9 @@
       <Filter>Lighting</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src_app\ParticleLighting\ResourceLightingSphere.cpp">
+      <Filter>Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\ParticleLighting\ResourceLightingParticle.cpp">
       <Filter>Lighting</Filter>
     </ClCompile>
   </ItemGroup>

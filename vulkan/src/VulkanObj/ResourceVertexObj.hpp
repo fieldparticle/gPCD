@@ -46,7 +46,7 @@ class ResourceVertexObj : public Resource
 		
 		virtual void GetShaderMem() {};
 		//vcb::Mesh                                m_Model;
-		ResourceVertexParticle* m_ParticleVert{};
+		Resource* m_ParticleVert{};
 		std::vector<CartVert>	m_Verts{};
 		std::vector<uint32_t>	m_CubeIndices;
 		std::vector<glm::vec2>	 m_UVS{};
@@ -58,7 +58,7 @@ class ResourceVertexObj : public Resource
 				};
 		
 	
-	virtual void Create(uint32_t BindPoint, ResourceVertexParticle* PartVert);
+	virtual void Create(uint32_t BindPoint, Resource* PartVert);
 	virtual void Create(uint32_t BindPoint);
 	
 	//============================================================

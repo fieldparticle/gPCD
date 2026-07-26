@@ -55,6 +55,7 @@
 #include "ParticleLighting/PipelineGraphicsLighting.hpp"
 #include "ParticleLighting/ResourceLighting.hpp"
 #include "particleOnly/ResourceVertexParticle.hpp"
+#include "ParticleLighting/ResourceLightingParticle.hpp"
 #include "particleOnly/ResourceCollMatrix.hpp"
 #include "particleOnly/ResourceLockMatrix.hpp"
 #include "particleOnly/SyncObjParticleOnly.hpp"

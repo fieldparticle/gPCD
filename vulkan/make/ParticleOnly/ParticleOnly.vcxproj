@@ -234,6 +234,7 @@
     <ClInclude Include="..\..\src_app\ParticleLighting\PipelineGraphicsLighting.hpp" />
     <ClInclude Include="..\..\src_app\ParticleLighting\ResourceLighting.hpp" />
     <ClInclude Include="..\..\src_app\ParticleLighting\ResourceLightingCube.hpp" />
+    <ClInclude Include="..\..\src_app\ParticleLighting\ResourceLightingParticle.hpp" />
     <ClInclude Include="..\..\src_app\ParticleLighting\ResourceLightingSphere.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\CommandParticleCompute.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\CommandParticleGraphics.hpp" />
@@ -348,6 +349,7 @@
     <ClCompile Include="..\..\src_app\ParticleLighting\PipelineGraphicsLighting.cpp" />
     <ClCompile Include="..\..\src_app\ParticleLighting\ResourceLighting.cpp" />
     <ClCompile Include="..\..\src_app\ParticleLighting\ResourceLightingCube.cpp" />
+    <ClCompile Include="..\..\src_app\ParticleLighting\ResourceLightingParticle.cpp" />
     <ClCompile Include="..\..\src_app\ParticleLighting\ResourceLightingSphere.cpp" />
     <ClCompile Include="..\..\src_app\particleOnly\CommandParticleCompute.cpp" />
     <ClCompile Include="..\..\src_app\particleOnly\CommandParticleGraphics.cpp" />

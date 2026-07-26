@@ -49,7 +49,7 @@ class ResourceLightingCube : public ResourceVertexObj
 			uint32_t ImageIndex, unsigned long& size) {
 			return nullptr;
 		};
-		virtual void Create(ResourceVertexParticle* PartVert);
+		virtual void Create(Resource* PartVert);
 	
 	
 
