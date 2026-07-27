@@ -3284,3 +3284,55 @@ real lighting canvas rather than only a collision/death target or debug
 boundary.  This is the required base for the next absorbing-shadow step:
 photons can deposit grayscale light into wall-owned cells, and the wall pass
 can display those cells without reusing the sphere-only render path.
+
+\subsection{Vulkan Material Coupling Joins The Lighting Contract}
+
+\subsubsection{previous form}
+
+Python treated \texttt{photon\_coupling} as the surface brightness and
+strength-transfer knob for photon contact.  The generated Python material
+table validated and carried the value, and the Python absorbing-wall path used
+it when computing grayscale deposit:
+\[
+    \mathrm{deposit}
+    =
+    \mathrm{normal\_alignment}
+    \times
+    \texttt{photon\_coupling}
+    \times
+    \mathrm{relative\_mass}.
+\]
+The Vulkan \texttt{FPML.comp} path, however, still returned a hardcoded
+\texttt{1.0} from its photon-coupling helper.  Lowering
+\texttt{photon\_coupling} in \texttt{LightingBall.cfg} therefore changed
+Python behavior but did not change Vulkan brightness or mass-transfer
+behavior.
+
+\subsubsection{current form}
+
+The generated Vulkan \texttt{MaterialProperty} table now includes:
+\begin{verbatim}
+float photonCoupling;
+float photonMinRelativeMass;
+\end{verbatim}
+These fields are generated from the cfg names
+\texttt{photon\_coupling} and \texttt{photon\_min\_relative\_mass}, with the
+same basic validity constraints used by the Python material path.
+\texttt{FPML.comp} reads those fields through material lookup helpers instead
+of hardcoding lighting constants.
+
+\subsubsection{difference outcome}
+
+full solution
+
+\subsubsection{Analysis}
+
+This closes an important Python/Vulkan contract gap.  Surface optical
+behavior now belongs to material configuration in both implementations:
+\texttt{SURFACE\_COLOR}, \texttt{ABSORB}, and future \texttt{REFLECT}
+behavior can all use the same material-owned strength controls.  For the
+absorbing shadow wall, material \texttt{color} and \texttt{debug\_color}
+remain display/debug fields; \texttt{photon\_coupling} is the active
+brightness and momentum-transfer control.  The lighting compute shader must
+continue to be regenerated from \texttt{ExportForceDynamicsSimpleGLSL.py} so
+this material lookup remains durable across shader updates.

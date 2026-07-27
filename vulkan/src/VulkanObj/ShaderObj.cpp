@@ -86,6 +86,8 @@ void ShaderObj::WriteMaterials()
 	ostrm << "    vec4 debugColor;\n";
 	ostrm << "    vec4 spectralResponseEnergy;\n";
 	ostrm << "    vec4 spectralEmission;\n";
+	ostrm << "    float photonCoupling;\n";
+	ostrm << "    float photonMinRelativeMass;\n";
 	ostrm << "    uint photonSurfaceBehavior;\n";
 	ostrm << "    float cellDensity;\n";
 	ostrm << "};\n\n";
@@ -100,7 +102,7 @@ void ShaderObj::WriteMaterials()
 	{
 		ostrm << "const uint MATERIAL_PROPERTY_COUNT = 1u;\n";
 		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](\n";
-		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), PHOTON_SURFACE_BEHAVIOR_NONE, 0.000000000)\n";
+		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, PHOTON_SURFACE_BEHAVIOR_NONE, 0.000000000)\n";
 		ostrm << ");\n\n";
 	}
 	else
@@ -141,6 +143,8 @@ void ShaderObj::WriteMaterials()
 			double spectralEmissionGreen = 1.0;
 			double spectralEmissionBlue = 1.0;
 			double photonEnergy = 1.0;
+			double photonCoupling = 1.0;
+			double photonMinRelativeMass = 0.001;
 			int photonSurfaceBehavior = 0;
 
 			if (config_setting_lookup_int(material, "material_id", &materialID) == CONFIG_FALSE)
@@ -229,6 +233,16 @@ void ShaderObj::WriteMaterials()
 			if (photonEnergy < 0.0)
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_energy must not be negative");
 
+			if (config_setting_lookup_float(material, "photon_coupling", &photonCoupling) == CONFIG_FALSE)
+				photonCoupling = 1.0;
+			if (photonCoupling < 0.0 || photonCoupling > 1.0)
+				throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_coupling must be between 0.0 and 1.0");
+
+			if (config_setting_lookup_float(material, "photon_min_relative_mass", &photonMinRelativeMass) == CONFIG_FALSE)
+				photonMinRelativeMass = 0.001;
+			if (photonMinRelativeMass < 0.0)
+				throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_min_relative_mass must not be negative");
+
 			if (config_setting_lookup_int(material, "photon_surface_behavior", &photonSurfaceBehavior) == CONFIG_FALSE)
 				photonSurfaceBehavior = 0;
 			if (photonSurfaceBehavior < 0 || photonSurfaceBehavior > 3)
@@ -264,6 +278,8 @@ void ShaderObj::WriteMaterials()
 				<< std::fixed << std::setprecision(9) << spectralEmissionGreen << ", "
 				<< std::fixed << std::setprecision(9) << spectralEmissionBlue << ", "
 				<< "0.000000000), "
+				<< std::fixed << std::setprecision(9) << photonCoupling << ", "
+				<< std::fixed << std::setprecision(9) << photonMinRelativeMass << ", "
 				<< photonSurfaceBehavior << "u, "
 				<< std::fixed << std::setprecision(9) << cellDensity << ")";
 
@@ -799,34 +815,6 @@ void  ShaderObj::WriteShaderHeader()
 						CfgTst->GetBool("photon_periodic_recycle_enabled", true)
 					? "1u"
 					: "0u") << "\n"
-			// Boundary-space shader access stays disabled until binding 8 is
-			// proven present in both compute and graphics descriptor sets.
-			<< "const uint BOUNDARY_SPACE_PROXY_COUNT = "
-				<< (CfgTst->CheckKey("boundary_space_lighting_enabled") &&
-						CfgTst->GetBool("boundary_space_lighting_enabled", true)
-					? CfgTst->GetUInt("boundary_space_proxy_count", true)
-					: 0u) << ";\n"
-			<< "const uint BOUNDARY_SPACE_FIRST_PARTICLE_ID = "
-				<< (CfgTst->CheckKey("boundary_space_lighting_enabled") &&
-						CfgTst->GetBool("boundary_space_lighting_enabled", true)
-					? CfgTst->GetUInt("boundary_space_first_particle_id", true)
-					: 0u) << ";\n"
-			<< "const float BOUNDARY_SPACE_PATCH_ANGLE = "
-				<< (CfgTst->CheckKey("boundary_space_lighting_enabled") &&
-						CfgTst->GetBool("boundary_space_lighting_enabled", true)
-					? CfgTst->GetFloat("boundary_space_patch_angle", true)
-					: 0.0f) << ";\n"
-			<< "const float BOUNDARY_SPACE_PATCH_RADIUS = "
-				<< (CfgTst->CheckKey("boundary_space_lighting_enabled") &&
-						CfgTst->GetBool("boundary_space_lighting_enabled", true)
-					? CfgTst->GetFloat("boundary_space_patch_radius", true)
-					: 0.0f) << ";\n"
-			<< "const uint BOUNDARY_SPACE_PATCH_FALLOFF_QUADRATIC = "
-				<< (CfgTst->CheckKey("boundary_space_lighting_enabled") &&
-						CfgTst->GetBool("boundary_space_lighting_enabled", true) &&
-						std::string(CfgTst->GetString("boundary_space_patch_falloff", true)) == "quadratic"
-					? 1u
-					: 0u) << ";\n"
 			<< "#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN "
 				<< std::setprecision(9) << CfgTst->GetFloat("compression_stiffness_gain", true) << "\n"
 			<< "#define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER " <<

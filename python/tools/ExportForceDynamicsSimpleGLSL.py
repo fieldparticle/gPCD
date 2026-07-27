@@ -2574,13 +2574,23 @@ uint boundary_light_material_surface_behavior(uint materialID)
 
 float boundary_light_material_photon_coupling(uint materialID)
 {
-    // TODO: read from MaterialProperty once ShaderObj.cpp exports photonCoupling.
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].photonCoupling;
+    }
+
     return 1.0;
 }
 
 float boundary_light_material_photon_min_relative_mass(uint materialID)
 {
-    // TODO: read from MaterialProperty once ShaderObj.cpp exports photonMinRelativeMass.
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].photonMinRelativeMass;
+    }
+
     return 0.001;
 }
 

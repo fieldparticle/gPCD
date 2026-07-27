@@ -1,7 +1,9 @@
 Current status:
-	- Boundary-space lighting now uses surface identity for sphere and rectangle-wall rendering.
-	- Rectangle walls are documented as real lighting canvases, not only debug/collision targets.
+	- Boundary-space lighting uses cell-owned surface records for the LightingBall sphere and rectangle-wall surface pass.
+	- Vulkan material export now carries photon_coupling and photon_min_relative_mass, matching the Python absorbing-wall strength model.
+	- LightingBall material documentation identifies photon_coupling as the active brightness/momentum-transfer control for the shadow wall.
 Code Changes:
-	- Updated Dynamics docs for BoundaryLightRecord surface typing and parameterized render sampling.
-	- Added ProblemEvolution entry for rectangle wall surface ownership and render pass wiring.
-Next: Validate LightingBall Vulkan sphere and rectangle-wall surface lighting, then continue absorbing/shadow behavior.
+	- Added photonCoupling and photonMinRelativeMass to generated Vulkan MaterialProperty data.
+	- Updated generated FPML lighting compute helpers to read coupling and death threshold from MATERIAL_PROPERTIES instead of hardcoded values.
+	- Documented the Vulkan material-coupling bridge in boundary-space lighting and ProblemEvolution.
+Next: Regenerate and run LightingBall Vulkan with different shadow_wall photon_coupling values to confirm wall brightness and photon death behavior match Python.

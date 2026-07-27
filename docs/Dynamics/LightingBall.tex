@@ -170,3 +170,188 @@ than photon-point rendering.
 
 The next lighting stages are a diffuse light stream, an absorbing shadow
 surface, and a reflective surface.
+
+\subsection{LightingBall Configuration Reference}
+
+The active \texttt{LightingBall.cfg} file is a scene contract, not just a
+viewer preset.  The following notes define the fields that are easy to forget
+because they affect different parts of Python, Vulkan compute, and Vulkan
+rendering.
+
+\subsubsection{Scene And App Selection}
+
+\begin{description}
+    \item[\texttt{module\_class = "GenLightingBall.py"}] Selects the
+    generator that creates the analytic sphere markers, rectangle wall
+    markers, and timed photon stream.
+    \item[\texttt{python\_dynamics\_class = "ForceDynamicsLighting"}]
+    Selects the Python lighting dynamics layer.  Photon behavior belongs to
+    the lighting model, not to the ordinary \texttt{ForceDynamics} path.
+    \item[\texttt{photon\_periodic\_recycle\_enabled}] When true, dead photons
+    return to their original emitter slots after their lifecycle/death rule
+    fires.  This keeps the stream populated without runtime birth admission.
+    \item[\texttt{include\_file}] Selects the Python or Vulkan scale include.
+    \texttt{LightingBall\_Py.inc} is the smaller Python inspection profile;
+    \texttt{LightingBall\_Vk.inc} is the denser Vulkan profile.
+\end{description}
+
+\subsubsection{Viewer Fields}
+
+\begin{description}
+    \item[\texttt{view\_center}] Physical target point used to frame the
+    scene.
+    \item[\texttt{view}] Python-style camera orientation exported to the
+    generated \texttt{.tst}.  Vulkan uses this when Python-camera mode is
+    available.
+    \item[\texttt{zoom}] Orthographic scale used for Python/Vulkan visual
+    parity.
+    \item[\texttt{view\_pan}] Screen-space framing adjustment.  This moves the
+    rendered view without changing any physical particle, wall, or cell
+    coordinate.
+    \item[\texttt{gl\_point\_size}] Particle/debug point size.  This affects
+    photon tracer visibility, not surface-light deposit size.
+\end{description}
+
+View fields never affect photon transport, collision, cell ownership,
+material response, or deposited lighting.
+
+\subsubsection{Domain And Geometry}
+
+\begin{description}
+    \item[\texttt{Lighting\_ball}] Defines the analytic sphere center,
+    radius, material id, and wall flag.  Boundary particles are only locality
+    markers; collision and surface lighting use the analytic sphere.
+    \item[\texttt{rectangle\_wall\_segments}] Defines finite rectangle walls.
+    Each wall supplies origin, \(u/v\) axes and extents, inward normal,
+    \texttt{wall\_flag}, and \texttt{material\_id}.  Vulkan uses this both for
+    wall contact metadata and for the wall-surface render triangles.
+    \item[\texttt{cell\_array\_width/height/depth}] Defines the spatial cell
+    domain.  Boundary-space lighting allocates one \texttt{BoundaryLightRecord}
+    per cell.
+    \item[\texttt{death\_bounds}] Defines permanent mobile-particle death
+    planes.  Photons can recycle from this death event when periodic recycle
+    is enabled.
+    \item[\texttt{cell\_occupancy\_list\_size}] Maximum occupancy-list slots
+    per cell.  Dense photon streams and boundary markers require this to be
+    large enough to avoid overflow.
+\end{description}
+
+\subsubsection{Photon Stream}
+
+\begin{description}
+    \item[\texttt{particle\_streams.material\_id}] Selects the base material
+    for generated photons.  A material whose
+    \texttt{particle\_type="photon"} generates photon \texttt{ptype}; photon
+    behavior is carried by \texttt{ptype}, not by later color state.
+    \item[\texttt{initial\_particle\_velocity}] Initial photon velocity.
+    Photon speed is intended to remain fixed; momentum/strength changes are
+    represented by relative mass or transport strength, not by changing speed.
+    \item[\texttt{release\_start\_frame}] First frame at which the stream is
+    active.
+    \item[\texttt{release\_columns}] Number of release waves.  With periodic
+    recycle this controls the number of original emitter slots.
+    \item[\texttt{particles\_per\_wave}] Number of photons in one wave.  For
+    the plane-patch form it must equal
+    \(\texttt{span\_u\_count}\times\texttt{span\_v\_count}\).
+    \item[\texttt{inlet\_axis}, \texttt{inlet\_value}] Fixed coordinate plane
+    for the emitter.
+    \item[\texttt{span\_u\_*}, \texttt{span\_v\_*}] The two varying axes,
+    extents, and counts across the emitter plane.
+\end{description}
+
+\subsubsection{Material Fields}
+
+The material table has two separate ideas: display/debug color and optical
+surface behavior.  These must not be treated as one knob.
+
+\begin{description}
+    \item[\texttt{particle\_type}] Generation-time particle class.  Use
+    \texttt{"photon"} for the photon material and \texttt{"regular"} for
+    ordinary surface materials.
+    \item[\texttt{relative\_mass}] Initial particle mass/strength for generated
+    particles using this material.  Photon transport strength currently starts
+    from this value.
+    \item[\texttt{color\_mode}] Particle/debug rendering mode.  Active values
+    are \texttt{"COLLISION"}, \texttt{"VELOCITY\_ANGLE"},
+    \texttt{"SOLID"}, and \texttt{"LUMENS"}.
+    \item[\texttt{color}] Solid/debug base color for the material.  For
+    absorbing wall lighting, this is not the brightness control.
+    \item[\texttt{debug\_visible}] When true, normally hidden debug particles
+    or boundary markers may be drawn.
+    \item[\texttt{debug\_color}] Debug draw color used when
+    \texttt{debug\_visible=true}.  This does not control deposited light.
+    \item[\texttt{spectral\_response}] RGB-band response.  For ordinary
+    spectral surface deposit, this multiplies the incoming photon spectrum.
+    \item[\texttt{spectral\_emission}] RGB-band visible emission/gain for
+    ordinary spectral surface deposit.
+    \item[\texttt{photon\_energy}] Photon material energy multiplier used by
+    spectral deposit in Vulkan.
+    \item[\texttt{photon\_coupling}] Fraction of normal-aligned photon
+    momentum/light accepted by the surface.  This is the current brightness
+    control for an absorbing shadow wall.
+    \item[\texttt{photon\_min\_relative\_mass}] Photon death threshold after a
+    surface transfers strength out of the photon.
+    \item[\texttt{photon\_surface\_behavior}] Optical behavior selected by
+    the contacted surface material.  Current values are described below.
+\end{description}
+
+\subsubsection{Photon Surface Behavior}
+
+\begin{description}
+    \item[\texttt{"NONE"}] No optical surface action.  Use this for the photon
+    material itself; photons should not light or mechanically resolve other
+    photons.
+    \item[\texttt{"SURFACE\_COLOR"}] Deposit ordinary spectral/material color
+    on the contacted surface.  This is the current sphere behavior.
+    \item[\texttt{"ABSORB"}] Deposit grayscale light on the contacted wall and
+    retire the photon.  The gray value is currently based on
+    \[
+        \mathrm{gray}
+        = \mathrm{normal\_alignment}
+          \times \texttt{photon\_coupling}
+          \times \mathrm{photon\_relative\_mass}.
+    \]
+    A head-on photon with \texttt{photon\_coupling=1.0} and full relative mass
+    can therefore make the wall white.  Lower \texttt{photon\_coupling} to
+    make \texttt{name="shadow\_wall"} darker:
+    \begin{verbatim}
+    photon_coupling = 0.25;  // darker absorbing wall
+    \end{verbatim}
+    The wall material \texttt{color}, \texttt{debug\_color},
+    \texttt{spectral\_response}, and \texttt{spectral\_emission} do not
+    currently lower the absorbing grayscale brightness.
+    \item[\texttt{"REFLECT"}] Deposit light, reduce photon strength, and
+    reflect the photon when enough strength remains.  This is a planned
+    next-stage behavior and should stay separate from the current absorbing
+    wall proof.
+\end{description}
+
+\subsubsection{Retired Lighting Fields}
+
+Do not add these fields to active \texttt{LightingBall} cfg files:
+\begin{verbatim}
+boundary_lighting_enabled
+boundary_lighting_model
+boundary_light_initial_rgb
+boundary_light_render_ambient
+boundary_light_render_gain
+boundary_space_patch_angle
+boundary_space_patch_radius
+boundary_space_patch_falloff
+lumens_debug_always_visible
+lumens_debug_color
+\end{verbatim}
+
+\texttt{boundary\_space\_patch\_*} belonged to the retired proxy-spread model.
+The active Vulkan surface path is cell-owned:
+\[
+    \textrm{fragment world position}
+    \rightarrow
+    \textrm{cell id}
+    \rightarrow
+    \texttt{BoundaryLight[cell id]}.
+\]
+
+Debug photon visibility belongs to material
+\texttt{debug\_visible}/\texttt{debug\_color}, not to the old flat
+\texttt{lumens\_*} debug fields.

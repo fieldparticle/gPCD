@@ -168,9 +168,6 @@ class GenericGenData:
         self.number_active_particles = 0
         self.number_boundary_particles = 0
         self.boundary_space_lighting_enabled = False
-        self.boundary_space_patch_angle = 0.20
-        self.boundary_space_patch_radius = 0.50
-        self.boundary_space_patch_falloff = "quadratic"
         self.boundary_space_proxy_metadata = {}
         self.material_properties = [dict(item) for item in self.DEFAULT_MATERIAL_PROPERTIES]
         self.material_properties_by_id = {
@@ -681,8 +678,7 @@ class GenericGenData:
         for retired_key in RETIRED_BOUNDARY_LIGHTING_CONFIG_KEYS:
             if retired_key in self.itemcfg:
                 errors.append(
-                    f"{retired_key} is retired; use boundary_space_lighting_enabled "
-                    "and boundary_space_patch_*"
+                    f"{retired_key} is retired; use boundary_space_lighting_enabled"
                 )
         try:
             boundary_space_lighting_enabled = self.itemcfg.get(
@@ -710,38 +706,6 @@ class GenericGenData:
                 errors.append(
                     "Lighting_ball is required when boundary_space_lighting_enabled is true"
                 )
-
-        try:
-            boundary_space_patch_angle = float(
-                self.itemcfg.get("boundary_space_patch_angle", 0.20)
-            )
-        except (TypeError, ValueError):
-            boundary_space_patch_angle = None
-            errors.append("boundary_space_patch_angle must be numeric")
-        if boundary_space_patch_angle is not None:
-            if not math.isfinite(boundary_space_patch_angle):
-                errors.append("boundary_space_patch_angle must be finite")
-            elif boundary_space_patch_angle <= 0.0:
-                errors.append("boundary_space_patch_angle must be positive")
-
-        try:
-            boundary_space_patch_radius = float(
-                self.itemcfg.get("boundary_space_patch_radius", 0.50)
-            )
-        except (TypeError, ValueError):
-            boundary_space_patch_radius = None
-            errors.append("boundary_space_patch_radius must be numeric")
-        if boundary_space_patch_radius is not None:
-            if not math.isfinite(boundary_space_patch_radius):
-                errors.append("boundary_space_patch_radius must be finite")
-            elif boundary_space_patch_radius <= 0.0:
-                errors.append("boundary_space_patch_radius must be positive")
-
-        boundary_space_patch_falloff = str(
-            self.itemcfg.get("boundary_space_patch_falloff", "quadratic")
-        ).strip().lower()
-        if boundary_space_patch_falloff not in ("linear", "quadratic"):
-            errors.append("boundary_space_patch_falloff must be linear or quadratic")
 
         known_material_ids = set(self.material_properties_by_id)
         for segment in rectangle_wall_segments:
@@ -779,9 +743,6 @@ class GenericGenData:
         self.dt = float(self.itemcfg.dt)
         self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
         self.boundary_space_lighting_enabled = bool(boundary_space_lighting_enabled)
-        self.boundary_space_patch_angle = float(boundary_space_patch_angle)
-        self.boundary_space_patch_radius = float(boundary_space_patch_radius)
-        self.boundary_space_patch_falloff = boundary_space_patch_falloff
         return True
 
     def report_collision_feasibility(self):
@@ -1390,10 +1351,7 @@ class GenericGenData:
             f"  proxies: {self.boundary_space_proxy_count()}\n"
             f"  first particle id: {self.boundary_space_first_particle_id()}\n"
             f"  last particle id: {self.boundary_space_last_particle_id()}\n"
-            f"  contiguous ids: {self.boundary_space_proxy_ids_are_contiguous()}\n"
-            f"  patch angle: {self.boundary_space_patch_angle:g}\n"
-            f"  patch radius: {self.boundary_space_patch_radius:g}\n"
-            f"  patch falloff: {self.boundary_space_patch_falloff}"
+            f"  contiguous ids: {self.boundary_space_proxy_ids_are_contiguous()}"
         )
         print(report_text)
         self.write_validation_log(report_text)
@@ -1413,15 +1371,6 @@ class GenericGenData:
         output.write(
             "boundary_space_first_particle_id = "
             f"{self.boundary_space_first_particle_id()};\n"
-        )
-        output.write(
-            f"boundary_space_patch_angle = {self.boundary_space_patch_angle:.9f};\n"
-        )
-        output.write(
-            f"boundary_space_patch_radius = {self.boundary_space_patch_radius:.9f};\n"
-        )
-        output.write(
-            f'boundary_space_patch_falloff = "{self.boundary_space_patch_falloff}";\n'
         )
 
     def write_function_wall_obj(self):

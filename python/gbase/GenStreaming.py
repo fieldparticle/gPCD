@@ -621,8 +621,7 @@ class GenStreaming(GenericGenData):
         for retired_key in RETIRED_BOUNDARY_LIGHTING_CONFIG_KEYS:
             if retired_key in self.itemcfg:
                 errors.append(
-                    f"{retired_key} is retired; use boundary_space_lighting_enabled "
-                    "and boundary_space_patch_*"
+                    f"{retired_key} is retired; use boundary_space_lighting_enabled"
                 )
         known_material_ids = set(getattr(self, "material_properties_by_id", {}))
         for segment in rectangle_wall_segments:
@@ -651,38 +650,6 @@ class GenStreaming(GenericGenData):
                     "Lighting_ball is required when boundary_space_lighting_enabled is true"
                 )
 
-        try:
-            boundary_space_patch_angle = float(
-                self.itemcfg.get("boundary_space_patch_angle", 0.20)
-            )
-        except (TypeError, ValueError):
-            boundary_space_patch_angle = None
-            errors.append("boundary_space_patch_angle must be numeric")
-        if boundary_space_patch_angle is not None:
-            if not math.isfinite(boundary_space_patch_angle):
-                errors.append("boundary_space_patch_angle must be finite")
-            elif boundary_space_patch_angle <= 0.0:
-                errors.append("boundary_space_patch_angle must be positive")
-
-        try:
-            boundary_space_patch_radius = float(
-                self.itemcfg.get("boundary_space_patch_radius", 0.50)
-            )
-        except (TypeError, ValueError):
-            boundary_space_patch_radius = None
-            errors.append("boundary_space_patch_radius must be numeric")
-        if boundary_space_patch_radius is not None:
-            if not math.isfinite(boundary_space_patch_radius):
-                errors.append("boundary_space_patch_radius must be finite")
-            elif boundary_space_patch_radius <= 0.0:
-                errors.append("boundary_space_patch_radius must be positive")
-
-        boundary_space_patch_falloff = str(
-            self.itemcfg.get("boundary_space_patch_falloff", "quadratic")
-        ).strip().lower()
-        if boundary_space_patch_falloff not in ("linear", "quadratic"):
-            errors.append("boundary_space_patch_falloff must be linear or quadratic")
-
         if errors:
             raise ValueError(
                 "Streaming configuration error(s):\n  - "
@@ -705,9 +672,6 @@ class GenStreaming(GenericGenData):
         self.dt = float(self.itemcfg.dt)
         self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
         self.boundary_space_lighting_enabled = bool(boundary_space_lighting_enabled)
-        self.boundary_space_patch_angle = float(boundary_space_patch_angle)
-        self.boundary_space_patch_radius = float(boundary_space_patch_radius)
-        self.boundary_space_patch_falloff = boundary_space_patch_falloff
         self.calculate_streaming_layout()
         return True
 

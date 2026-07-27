@@ -3,6 +3,7 @@
 // ============================================================================
 
 Lighting_ball = {
+    // Analytic sphere surface. Boundary particles are locality markers only.
     x = 9.0;
     y = 8.0;
     z = 14.0;
@@ -11,13 +12,9 @@ Lighting_ball = {
     wall_flag = 1000;
 };
 
-// --------------------------------------------------------------------------
-// Boundary-space lighting
-// --------------------------------------------------------------------------
+// Enables persistent boundary-space lighting. Retired boundary_space_patch_*
+// keys must not be used; lighting is now cell-owned.
 boundary_space_lighting_enabled 	= true;
-boundary_space_patch_angle 			= 0.50;
-boundary_space_patch_radius			= 0.50;
-boundary_space_patch_falloff 		= "quadratic";
 
 // --------------------------------------------------------------------------
 // Domain and view
@@ -29,9 +26,12 @@ z_axis_lims 				= [0.0, 22.0];
 cell_array_width 			= 20;
 cell_array_height 			= 20;
 cell_array_depth 			= 22;
+// Mobile particles die/recycle before they can drift outside the legal scene.
 death_bounds 				= [1, 19, 1, 19, 1, 21];
+// Must be large enough for dense photons plus boundary markers in one cell.
 cell_occupancy_list_size 	= 256;
 
+// Debug particle point size only. Does not affect surface-light deposit size.
 gl_point_size 				= 1.5;
 
 // --------------------------------------------------------------------------
@@ -43,6 +43,7 @@ particle_streams = (
     material_id = 0;
 
     // Dense x-directed beam centered on the Lighting_ball y/z cross-section.
+    // Vulkan profile is dense: 80 x 80 = 6400 photons per wave.
     initial_particle_velocity = [0.209968, 0.0, 0.0];
 
     release_start_frame = 10;
@@ -68,16 +69,20 @@ particle_streams = (
 // --------------------------------------------------------------------------
 // Boundary markers
 // --------------------------------------------------------------------------
+// Rectangle walls are active here; empty curve_wall_segments is intentional.
 curve_wall_segments = {};
 rectangle_wall_segments = {
     wall_xmax = {
+        // 14 x 14 rectangle on x=16, spanning y=2..16 and z=2..16.
         origin = [16.0, 2.0, 2.0];
         u_axis = "y";
         u_length = 14.0;
         v_axis = "z";
         v_length = 14.0;
+        // Normal points inward, toward the photon stream and sphere.
         normal = [-1.0, 0.0, 0.0];
         wall_flag = 2000;
+        // material_id 2 is shadow_wall in LightingBall.cfg.
         material_id = 2;
     };
 };

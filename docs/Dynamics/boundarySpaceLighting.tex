@@ -153,13 +153,22 @@ applications remain on \texttt{FPM.*} and do not see this resource.
 
 \texttt{FPML.comp} is the lighting compute schedule.  It deposits the visible
 spectral result into \texttt{BoundaryLight[cell\_id]} with persistent
-last-writer-wins behavior.  \texttt{ResourceLighting.cpp} initializes one
-record per cell and marks whether that cell is owned by no surface, the
-lighting sphere, or a configured rectangle wall.  Sphere ownership is
-assigned by testing distance from the cell center to the configured sphere
-radius.  Rectangle wall ownership is assigned by projecting the cell center
-onto the wall plane, checking the distance to the plane, and then checking
-the projected point against the wall's \(u/v\) extents.
+last-writer-wins behavior.  The lighting compute path reads material optical
+fields from the generated \texttt{MaterialProperty} table.  In particular,
+\texttt{photonCoupling} controls the fraction of normal-aligned photon
+strength accepted by a surface, and \texttt{photonMinRelativeMass} controls
+the remaining-strength death threshold.  These GLSL fields are generated from
+the cfg names \texttt{photon\_coupling} and
+\texttt{photon\_min\_relative\_mass}; they must not be hardcoded in
+\texttt{FPML.comp}.
+
+\texttt{ResourceLighting.cpp} initializes one record per cell and marks
+whether that cell is owned by no surface, the lighting sphere, or a
+configured rectangle wall.  Sphere ownership is assigned by testing distance
+from the cell center to the configured sphere radius.  Rectangle wall
+ownership is assigned by projecting the cell center onto the wall plane,
+checking the distance to the plane, and then checking the projected point
+against the wall's \(u/v\) extents.
 
 \texttt{BoundaryLight.vert} passes surface coordinates and the active render
 surface identity to \texttt{BoundaryLight.frag}.  The sphere surface comes

@@ -88,9 +88,6 @@ class ForceDynamics(ForceContactDynamics):
         self.photon_reflected_velocity = {}
         self.photon_reflected_position = {}
         self.boundary_space_lighting_enabled = False
-        self.boundary_space_patch_angle = 0.20
-        self.boundary_space_patch_radius = 0.50
-        self.boundary_space_patch_falloff = "quadratic"
         self.boundary_space_proxy_metadata = {}
 
     def ClearContactDiagnostics(self, contact_state):
@@ -498,8 +495,7 @@ class ForceDynamics(ForceContactDynamics):
         for retired_key in RETIRED_BOUNDARY_LIGHTING_CONFIG_KEYS:
             if retired_key in self.run_configuration:
                 raise ValueError(
-                    f"{retired_key} is retired; use boundary_space_lighting_enabled "
-                    "and boundary_space_patch_*"
+                    f"{retired_key} is retired; use boundary_space_lighting_enabled"
                 )
         boundary_space_lighting_enabled = self.run_configuration.get(
             "boundary_space_lighting_enabled",
@@ -509,27 +505,6 @@ class ForceDynamics(ForceContactDynamics):
             raise ValueError("boundary_space_lighting_enabled must be a boolean")
         self.boundary_space_lighting_enabled = boundary_space_lighting_enabled
         self.boundary_space_proxy_metadata = {}
-        self.boundary_space_patch_angle = float(
-            self.run_configuration.get("boundary_space_patch_angle", 0.20)
-        )
-        if (
-            not math.isfinite(self.boundary_space_patch_angle)
-            or self.boundary_space_patch_angle <= 0.0
-        ):
-            raise ValueError("boundary_space_patch_angle must be positive and finite")
-        self.boundary_space_patch_radius = float(
-            self.run_configuration.get("boundary_space_patch_radius", 0.50)
-        )
-        if (
-            not math.isfinite(self.boundary_space_patch_radius)
-            or self.boundary_space_patch_radius <= 0.0
-        ):
-            raise ValueError("boundary_space_patch_radius must be positive and finite")
-        self.boundary_space_patch_falloff = str(
-            self.run_configuration.get("boundary_space_patch_falloff", "quadratic")
-        ).strip().lower()
-        if self.boundary_space_patch_falloff not in ("linear", "quadratic"):
-            raise ValueError("boundary_space_patch_falloff must be linear or quadratic")
 
     def register_boundary_space_proxy(
         self,
@@ -759,7 +734,7 @@ class ForceDynamics(ForceContactDynamics):
         )
 
     def BoundarySpaceLightRGB(self, particle_id):
-        """Return spread boundary-space light for an existing boundary particle."""
+        """Return direct boundary-space light for an existing boundary particle."""
         particle_id = int(particle_id)
         if (
             not self.boundary_space_lighting_enabled
@@ -770,35 +745,14 @@ class ForceDynamics(ForceContactDynamics):
         metadata = self.boundary_space_proxy_metadata.get(particle_id)
         if metadata is None:
             return None
-        source_position = self.particle_position_tuple(self.particles[particle_id])
-        source_normal = metadata["normal"]
-        total_weight = 0.0
-        total_rgb = [0.0, 0.0, 0.0]
-        for other_id, other_metadata in self.boundary_space_proxy_metadata.items():
-            if (
-                int(other_metadata["surface_type"]) != int(metadata["surface_type"])
-                or int(other_metadata["surface_id"]) != int(metadata["surface_id"])
-            ):
-                continue
-            other = self.particles[other_id]
-            if int(getattr(other, "boundary_space_light_valid", 0)) != 1:
-                continue
-            weight = self.BoundarySpaceLightWeight(
-                metadata,
-                source_position,
-                source_normal,
-                other_metadata,
-                self.particle_position_tuple(other),
-            )
-            if weight <= 0.0:
-                continue
-            total_weight += weight
-            total_rgb[0] += float(other.boundary_space_light_r) * weight
-            total_rgb[1] += float(other.boundary_space_light_g) * weight
-            total_rgb[2] += float(other.boundary_space_light_b) * weight
-        if total_weight <= 0.0:
+        particle = self.particles[particle_id]
+        if int(getattr(particle, "boundary_space_light_valid", 0)) != 1:
             return None
-        return tuple(value / total_weight for value in total_rgb)
+        return (
+            float(getattr(particle, "boundary_space_light_r", 0.0)),
+            float(getattr(particle, "boundary_space_light_g", 0.0)),
+            float(getattr(particle, "boundary_space_light_b", 0.0)),
+        )
 
     def rectangle_wall_config_for_surface(self, surface_id):
         segments = self.run_configuration.get("rectangle_wall_segments")
@@ -809,65 +763,6 @@ class ForceDynamics(ForceContactDynamics):
             if int(wall_config.get("wall_flag", 0)) == surface_id:
                 return wall_config
         return None
-
-    def rectangle_wall_uv(self, surface_id, position):
-        wall_config = self.rectangle_wall_config_for_surface(surface_id)
-        if wall_config is None:
-            return None
-        origin = self._vector3(wall_config.get("origin"), "origin")
-        u_axis = self._axis_vector(wall_config.get("u_axis"))
-        v_axis = self._axis_vector(wall_config.get("v_axis"))
-        rel = (
-            float(position[0]) - origin[0],
-            float(position[1]) - origin[1],
-            float(position[2]) - origin[2],
-        )
-        return (
-            rel[0] * u_axis[0] + rel[1] * u_axis[1] + rel[2] * u_axis[2],
-            rel[0] * v_axis[0] + rel[1] * v_axis[1] + rel[2] * v_axis[2],
-        )
-
-    def BoundarySpaceLightWeight(
-        self,
-        metadata,
-        position,
-        normal,
-        other_metadata,
-        other_position,
-    ):
-        if int(metadata["surface_type"]) == BOUNDARY_SPACE_SURFACE_SPHERE:
-            dot_value = (
-                float(normal[0]) * float(other_metadata["normal"][0])
-                + float(normal[1]) * float(other_metadata["normal"][1])
-                + float(normal[2]) * float(other_metadata["normal"][2])
-            )
-            value = 1.0 - (
-                math.acos(max(-1.0, min(1.0, dot_value)))
-                / self.boundary_space_patch_angle
-            )
-        elif int(metadata["surface_type"]) == BOUNDARY_SPACE_SURFACE_RECTANGLE_WALL:
-            uv = self.rectangle_wall_uv(metadata["surface_id"], position)
-            other_uv = self.rectangle_wall_uv(
-                other_metadata["surface_id"],
-                other_position,
-            )
-            if uv is None or other_uv is None:
-                dx = float(position[0]) - float(other_position[0])
-                dy = float(position[1]) - float(other_position[1])
-                dz = float(position[2]) - float(other_position[2])
-                distance = math.sqrt(dx * dx + dy * dy + dz * dz)
-            else:
-                du = uv[0] - other_uv[0]
-                dv = uv[1] - other_uv[1]
-                distance = math.sqrt(du * du + dv * dv)
-            value = 1.0 - distance / self.boundary_space_patch_radius
-        else:
-            return 0.0
-        if value <= 0.0:
-            return 0.0
-        if self.boundary_space_patch_falloff == "quadratic":
-            return value * value
-        return value
 
     def _axis_vector(self, axis_name):
         axis_key = str(axis_name).strip().upper()

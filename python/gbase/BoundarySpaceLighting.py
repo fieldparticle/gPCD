@@ -11,4 +11,9 @@ RETIRED_BOUNDARY_LIGHTING_CONFIG_KEYS = (
     "boundary_light_initial_rgb",
     "boundary_light_render_ambient",
     "boundary_light_render_gain",
+    "boundary_space_patch_angle",
+    "boundary_space_patch_radius",
+    "boundary_space_patch_falloff",
+    "lumens_debug_always_visible",
+    "lumens_debug_color",
 )
