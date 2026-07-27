@@ -30,6 +30,7 @@
 %*
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
+#include <cmath>
 void ShaderObj::Create(Resource* VPO, ResourceCollMatrix* CMO, ResourceLockMatrix* LMO, SwapChain* SCO)
 {
 		m_VPO = VPO;
@@ -611,8 +612,27 @@ std::ostringstream ShaderObj::RectangleWalls()
 		<< "    uint wallFlag;\n"
 		<< "};\n\n";
 
+	wall_str
+		<< "struct LightingSurfaceWallMetadata\n"
+		<< "{\n"
+		<< "    vec3 origin;\n"
+		<< "    vec3 uAxis;\n"
+		<< "    vec3 vAxis;\n"
+		<< "    float uLength;\n"
+		<< "    float vLength;\n"
+		<< "    uint uStepCount;\n"
+		<< "    uint vStepCount;\n"
+		<< "    uint vertexOffset;\n"
+		<< "    uint wallFlag;\n"
+		<< "};\n\n";
+
 	int segmentCount = 0;
 	config_setting_t* segmentList = nullptr;
+	uint32_t subdivisionsPerCell = CfgTst->CheckKey("boundary_light_wall_subdivisions_per_cell")
+		? CfgTst->GetUInt("boundary_light_wall_subdivisions_per_cell", true)
+		: 1u;
+	if (subdivisionsPerCell == 0u)
+		throw std::runtime_error("boundary_light_wall_subdivisions_per_cell must be positive");
 
 	if (CfgTst->CheckKey("rectangle_wall_segments"))
 		segmentList = CfgTst->StartStructure("rectangle_wall_segments", segmentCount);
@@ -630,6 +650,16 @@ std::ostringstream ShaderObj::RectangleWalls()
 			<< "0.000000000, 0.000000000, "
 			<< "vec3(0.000000000, 0.000000000, 1.000000000), "
 			<< "0u)\n"
+			<< ");\n\n"
+			<< "const uint LIGHTING_SURFACE_WALL_COUNT = 0u;\n"
+			<< "const LightingSurfaceWallMetadata LIGHTING_SURFACE_WALLS[1] = "
+			<< "LightingSurfaceWallMetadata[1](\n"
+			<< "    LightingSurfaceWallMetadata("
+			<< "vec3(0.000000000), "
+			<< "vec3(1.000000000, 0.000000000, 0.000000000), "
+			<< "vec3(0.000000000, 1.000000000, 0.000000000), "
+			<< "0.000000000, 0.000000000, "
+			<< "1u, 1u, 0u, 0u)\n"
 			<< ");\n\n";
 		return wall_str;
 	}
@@ -641,6 +671,16 @@ std::ostringstream ShaderObj::RectangleWalls()
 		<< segmentCount << "] = RectangleWallSegment["
 		<< segmentCount << "](\n";
 
+	std::ostringstream surface_wall_str;
+	surface_wall_str << std::fixed << std::setprecision(9);
+	surface_wall_str
+		<< "const uint LIGHTING_SURFACE_WALL_COUNT = "
+		<< segmentCount << "u;\n"
+		<< "const LightingSurfaceWallMetadata LIGHTING_SURFACE_WALLS["
+		<< segmentCount << "] = LightingSurfaceWallMetadata["
+		<< segmentCount << "](\n";
+
+	uint32_t vertexOffset = 0u;
 	for (int index = 0; index < segmentCount; ++index)
 	{
 		config_setting_t* segment = CfgTst->GetSubStructAddress(segmentList, index);
@@ -676,6 +716,12 @@ std::ostringstream ShaderObj::RectangleWalls()
 		uint32_t wallFlag = static_cast<uint32_t>(
 			config_setting_get_float_elem(segment, 14)
 			);
+		uint32_t uStepCount = static_cast<uint32_t>(
+			std::ceil(std::max(1.0, uLength))
+			) * subdivisionsPerCell;
+		uint32_t vStepCount = static_cast<uint32_t>(
+			std::ceil(std::max(1.0, vLength))
+			) * subdivisionsPerCell;
 
 		wall_str
 			<< "    RectangleWallSegment("
@@ -691,9 +737,29 @@ std::ostringstream ShaderObj::RectangleWalls()
 			wall_str << ",";
 
 		wall_str << "\n";
+
+		surface_wall_str
+			<< "    LightingSurfaceWallMetadata("
+			<< "vec3(" << originX << ", " << originY << ", " << originZ << "), "
+			<< "vec3(" << uAxisX << ", " << uAxisY << ", " << uAxisZ << "), "
+			<< "vec3(" << vAxisX << ", " << vAxisY << ", " << vAxisZ << "), "
+			<< uLength << ", "
+			<< vLength << ", "
+			<< uStepCount << "u, "
+			<< vStepCount << "u, "
+			<< vertexOffset << "u, "
+			<< wallFlag << "u)";
+
+		if (index + 1 < segmentCount)
+			surface_wall_str << ",";
+
+		surface_wall_str << "\n";
+		vertexOffset += uStepCount * vStepCount * 6u;
 	}
 
 	wall_str << ");\n\n";
+	surface_wall_str << ");\n\n";
+	wall_str << surface_wall_str.str();
 	return wall_str;
 }
 void ShaderObj::GenWorkGroups()
@@ -810,6 +876,10 @@ void  ShaderObj::WriteShaderHeader()
 				<< m_VPO->BoundaryParticleLimit << ";\n"
 			<< "const float point_size = "
 				<< std::fixed << std::setprecision(2) << CfgTst->GetFloat("gl_point_size", true) << ";\n"
+			<< "const uint BOUNDARY_LIGHT_WALL_SUBDIVISIONS_PER_CELL = "
+				<< (CfgTst->CheckKey("boundary_light_wall_subdivisions_per_cell")
+					? CfgTst->GetUInt("boundary_light_wall_subdivisions_per_cell", true)
+					: 1u) << "u;\n"
 			<< "#define PHOTON_PERIODIC_RECYCLE_ENABLED "
 				<< (CfgTst->CheckKey("photon_periodic_recycle_enabled") &&
 						CfgTst->GetBool("photon_periodic_recycle_enabled", true)

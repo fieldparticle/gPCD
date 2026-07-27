@@ -4,12 +4,12 @@ void boundary_light_main()
 	{
 		vec3 worldPosition = inPosition.xyz;
 		gl_Position = ubo.proj * ubo.view * ubo.model * vec4(worldPosition, 1.0);
-		surfaceNormal = normalize(inColor.xyz);
-		surfaceCellId = 0u;
+		surfaceNormal = normalize(inNormalFlag.xyz);
+		surfaceCellId = uint(inMeta.z + 0.5);
 		surfaceWorldPos = worldPosition;
 		renderSurfaceType = BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL;
-		renderSurfaceID = uint(inColor.w + 0.5);
-		fragColor = vec4(1.0);
+		renderSurfaceID = uint(inPosition.w + 0.5);
+		fragColor = inLight;
 		return;
 	}
 
@@ -29,7 +29,7 @@ void boundary_light_main()
 	vec3 worldPosition = LIGHTING_BALL_CENTER + sphereNormal * LIGHTING_BALL_RADIUS;
 	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(worldPosition, 1.0);
 	surfaceNormal = sphereNormal;
-	surfaceCellId = uint(inColor.w + 0.5);
+	surfaceCellId = uint(inMeta.z + 0.5);
 	surfaceWorldPos = worldPosition;
 	renderSurfaceType = BOUNDARY_LIGHT_SURFACE_SPHERE;
 	renderSurfaceID = LIGHTING_BALL_WALL_FLAG;

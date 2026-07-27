@@ -15,6 +15,9 @@ Lighting_ball = {
 // Enables persistent boundary-space lighting. Retired boundary_space_patch_*
 // keys must not be used; lighting is now cell-owned.
 boundary_space_lighting_enabled 	= true;
+// Wall surface mesh density for later per-vertex wall lighting.
+// triangles_per_cell = subdivisions_per_cell * subdivisions_per_cell * 2.
+boundary_light_wall_subdivisions_per_cell = 1;
 
 // --------------------------------------------------------------------------
 // Domain and view

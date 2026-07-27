@@ -38,6 +38,12 @@
 constexpr uint32_t BOUNDARY_LIGHT_SURFACE_NONE = 0u;
 constexpr uint32_t BOUNDARY_LIGHT_SURFACE_SPHERE = 1u;
 constexpr uint32_t BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL = 2u;
+struct LightingSurfaceVertex {
+    glm::vec4 pos;          // xyz world position, w object_id
+    glm::vec4 normal_flag;  // xyz normal, w material_id or surface_flag
+    glm::vec4 light;        // rgb, valid; compute writes this
+    glm::vec4 meta;         // local_u, local_v, vertex_id, reserved
+};
 
 struct BoundaryLightRecord
 {

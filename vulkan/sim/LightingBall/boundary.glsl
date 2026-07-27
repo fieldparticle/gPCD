@@ -38,9 +38,27 @@ struct RectangleWallSegment
     uint wallFlag;
 };
 
+struct LightingSurfaceWallMetadata
+{
+    vec3 origin;
+    vec3 uAxis;
+    vec3 vAxis;
+    float uLength;
+    float vLength;
+    uint uStepCount;
+    uint vStepCount;
+    uint vertexOffset;
+    uint wallFlag;
+};
+
 const uint RECTANGLE_WALL_SEGMENT_COUNT = 1u;
 const RectangleWallSegment RECTANGLE_WALL_SEGMENTS[1] = RectangleWallSegment[1](
     RectangleWallSegment(vec3(16.000000000, 2.000000000, 2.000000000), vec3(0.000000000, 1.000000000, 0.000000000), vec3(0.000000000, 0.000000000, 1.000000000), 14.000000000, 14.000000000, normalize(vec3(-1.000000000, 0.000000000, 0.000000000)), 2000u)
+);
+
+const uint LIGHTING_SURFACE_WALL_COUNT = 1u;
+const LightingSurfaceWallMetadata LIGHTING_SURFACE_WALLS[1] = LightingSurfaceWallMetadata[1](
+    LightingSurfaceWallMetadata(vec3(16.000000000, 2.000000000, 2.000000000), vec3(0.000000000, 1.000000000, 0.000000000), vec3(0.000000000, 0.000000000, 1.000000000), 14.000000000, 14.000000000, 14u, 14u, 0u, 2000u)
 );
 
 #define HAS_BOUNDARY

@@ -69,8 +69,8 @@ void PipelineGraphicsLighting::CreatePipeline()
 
         VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-	    // Get binding and attribute descriptions for the lighting sphere surface.
-        Resource* dvo = (m_RCO->GetResourceName("VertexSphere"));
+	    // Get binding and attribute descriptions for the wall-only lighting surface.
+        Resource* dvo = (m_RCO->GetResourceName("LightingSurfaces"));
         VkVertexInputBindingDescription* bindingDescription = dvo->GetBindingDescription();
 
         std::vector<VkVertexInputAttributeDescription>* attributeDescriptions 	=

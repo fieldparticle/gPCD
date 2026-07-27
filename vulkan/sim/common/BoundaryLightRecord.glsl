@@ -34,6 +34,26 @@ const uint BOUNDARY_LIGHT_SURFACE_NONE = 0u;
 const uint BOUNDARY_LIGHT_SURFACE_SPHERE = 1u;
 const uint BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL = 2u;
 
+struct LightingSurfaceVertex
+{
+    // xyz = world position, w = object_id
+    vec4 pos;
+
+    // xyz = normal, w = material_id or surface_flag
+    vec4 normal_flag;
+
+    // xyz = dynamic light RGB, w = valid flag
+    vec4 light;
+
+    // x = local_u, y = local_v, z = vertex_id, w = reserved
+    vec4 meta;
+};
+
+layout(std430, binding = 9)
+buffer LightingSurfaceSSBO {
+    LightingSurfaceVertex LightingSurface[];
+};
+
 struct BoundaryLightRecord
 {
     // xyz = persistent boundary-space light RGB, w = valid flag

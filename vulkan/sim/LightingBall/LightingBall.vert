@@ -40,7 +40,9 @@ out gl_PerVertex {
 };
 
 layout(location = 0) in vec4 inPosition;
-layout(location = 1) in vec4 inColor;
+layout(location = 1) in vec4 inNormalFlag;
+layout(location = 2) in vec4 inLight;
+layout(location = 3) in vec4 inMeta;
 
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec3 surfaceNormal;

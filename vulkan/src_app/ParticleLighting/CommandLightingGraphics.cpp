@@ -171,25 +171,9 @@ void CommandLightingGraphics::RecordSubPassCube(uint32_t imageindex, uint32_t cu
 	ResourceParticlePush* pco		= (ResourceParticlePush*)(m_RCO->GetResourceName("PushConstants"));
 	unsigned long pcosize			= sizeof(pco->m_ShaderFlags);
 	void* sfl						= &pco->m_ShaderFlags;
-	pco->m_ShaderFlags.DrawInstance = 1.0;
 	uint32_t upcosize				= static_cast<uint32_t>(pcosize);
 
-	// Bind push constants to command buffer.
-	vkCmdPushConstants(m_CommandBuffers[currentBuffer],
-		m_PLO[m_BoundarySubPass]->m_PipelineLayout,
-		VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-		0,
-		upcosize,
-		sfl);
-
-	Resource* dvo = (m_RCO->GetResourceName("VertexSphere"));
-	VkBuffer* vertexBuffers = static_cast<VkBuffer*>(&dvo->m_Buffers[0]);
 	VkDeviceSize offsets[] = { 0 };
-	vkCmdBindVertexBuffers(m_CommandBuffers[currentBuffer], 0, 1, vertexBuffers, offsets);
-
-	uint32_t vnum = dvo->m_NumElements;
-	vkCmdDraw(m_CommandBuffers[currentBuffer], vnum, 1, 0, 0);
-
 	pco->m_ShaderFlags.DrawInstance = 2.0;
 	vkCmdPushConstants(m_CommandBuffers[currentBuffer],
 		m_PLO[m_BoundarySubPass]->m_PipelineLayout,
@@ -198,7 +182,7 @@ void CommandLightingGraphics::RecordSubPassCube(uint32_t imageindex, uint32_t cu
 		upcosize,
 		sfl);
 
-	Resource* wallSurface = (m_RCO->GetResourceName("VertexCube"));
+	Resource* wallSurface = (m_RCO->GetResourceName("LightingSurfaces"));
 	if (wallSurface->m_NumElements > 0)
 	{
 		VkBuffer* wallVertexBuffers = static_cast<VkBuffer*>(&wallSurface->m_Buffers[0]);

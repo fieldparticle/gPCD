@@ -701,6 +701,20 @@ class GenericGenData:
         except (TypeError, ValueError):
             errors.append("photon_periodic_recycle_enabled must be a boolean")
 
+        try:
+            boundary_light_wall_subdivisions_per_cell = int(
+                self.itemcfg.get("boundary_light_wall_subdivisions_per_cell", 1)
+            )
+            if boundary_light_wall_subdivisions_per_cell <= 0:
+                errors.append(
+                    "boundary_light_wall_subdivisions_per_cell must be positive"
+                )
+        except (TypeError, ValueError):
+            boundary_light_wall_subdivisions_per_cell = 1
+            errors.append(
+                "boundary_light_wall_subdivisions_per_cell must be an integer"
+            )
+
         if boundary_space_lighting_enabled:
             if self.itemcfg.get("Lighting_ball") is None:
                 errors.append(
@@ -743,6 +757,9 @@ class GenericGenData:
         self.dt = float(self.itemcfg.dt)
         self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
         self.boundary_space_lighting_enabled = bool(boundary_space_lighting_enabled)
+        self.boundary_light_wall_subdivisions_per_cell = (
+            boundary_light_wall_subdivisions_per_cell
+        )
         return True
 
     def report_collision_feasibility(self):
@@ -1751,6 +1768,21 @@ class GenericGenData:
             if not math.isfinite(gl_point_size) or gl_point_size <= 0.0:
                 raise ValueError("gl_point_size must be a positive finite number")
             output.write(f"gl_point_size = {gl_point_size:.9f};\n")
+            boundary_light_wall_subdivisions_per_cell = int(
+                getattr(
+                    self,
+                    "boundary_light_wall_subdivisions_per_cell",
+                    self.itemcfg.get("boundary_light_wall_subdivisions_per_cell", 1),
+                )
+            )
+            if boundary_light_wall_subdivisions_per_cell <= 0:
+                raise ValueError(
+                    "boundary_light_wall_subdivisions_per_cell must be positive"
+                )
+            output.write(
+                "boundary_light_wall_subdivisions_per_cell = "
+                f"{boundary_light_wall_subdivisions_per_cell};\n"
+            )
             align_with_eye = self.itemcfg.get("align_with_eye", False)
             if not isinstance(align_with_eye, bool):
                 raise ValueError("align_with_eye must be a boolean")

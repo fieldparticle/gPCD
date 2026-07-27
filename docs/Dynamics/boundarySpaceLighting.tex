@@ -172,12 +172,55 @@ against the wall's \(u/v\) extents.
 
 \texttt{BoundaryLight.vert} passes surface coordinates and the active render
 surface identity to \texttt{BoundaryLight.frag}.  The sphere surface comes
-from \texttt{ResourceLightingSphere}.  Rectangle wall surfaces come from
-\texttt{ResourceLightingCube}, which now emits two triangles for each
-\texttt{rectangle\_wall\_segments} entry instead of drawing the full cell-box
-debug outline.  Since the fragment shader reads the lighting SSBO, the
-\texttt{ParticleLighting} compute-finished wait includes the fragment shader
-stage.
+from \texttt{ResourceLightingSphere}.  Rectangle wall surfaces now come from
+\texttt{ResourceLightingSurface}, a lighting-only resource that builds a
+subdivided triangle mesh from \texttt{rectangle\_wall\_segments}.  The wall
+surface buffer uses:
+\begin{verbatim}
+struct LightingSurfaceVertex {
+    vec4 pos;          // xyz world position, w object_id / wall_flag
+    vec4 normal_flag;  // xyz normal, w material_id
+    vec4 light;        // rgb, valid; compute writes this
+    vec4 meta;         // local_u, local_v, vertex_id, reserved
+};
+\end{verbatim}
+and is bound as both a graphics vertex buffer and compute-visible storage
+buffer for the \texttt{ParticleLighting} application.  The wall render path
+reads interpolated vertex light from this buffer.  The sphere render path
+continues to sample \texttt{BoundaryLightRecord} cells directly.  Since
+compute can update both lighting buffers, the \texttt{ParticleLighting}
+compute-finished wait includes vertex input, vertex shader, and fragment
+shader stages.
+
+\subsection{Rectangle Wall Vertex Lighting}
+
+The absorbing rectangle wall exposed a limitation of pure cell-owned render
+color: a circular photon stream looked square because the visible result was
+snapped to cell boxes.  The active wall experiment keeps
+\texttt{BoundaryLightRecord} as the stable fallback/debug deposit, but also
+writes the wall hit into the \texttt{LightingSurfaceVertex.light} field.
+
+For an absorbing wall hit, \texttt{FPML.comp} now:
+\begin{enumerate}
+    \item computes the grayscale deposited light from incidence,
+          \texttt{photon\_coupling}, and current photon relative mass;
+    \item writes the owning cell in \texttt{BoundaryLight[cell\_id]} so the
+          cell-owned path remains inspectable;
+    \item projects the hit point into the wall's local \(u/v\) coordinates;
+    \item writes a small weighted splat into nearby wall mesh vertices; and
+    \item retires the photon for \texttt{ABSORB} material behavior.
+\end{enumerate}
+
+The wall fragment shader then draws \texttt{fragColor} from the interpolated
+vertex light.  This lets the wall surface use ordinary triangle interpolation
+to soften the shadow footprint without changing photon collision or cell
+ownership.  Because the first wall mesh is non-indexed, vertices are
+duplicated per triangle; the compute deposit therefore writes neighboring
+quad vertices rather than one abstract shared grid vertex.
+
+This wall path is still a bring-up path.  If it remains useful, the later
+clean version should make the wall mesh, Blender inspection mesh, and Vulkan
+surface resource share one Python-generated source of truth.
 
 \subsection{Python Reference}
 
@@ -187,6 +230,26 @@ visual approximation, but the Vulkan target is cell-owned analytic surface
 color.  The Python model should not reintroduce the retired
 \texttt{BoundaryLightSample}/\texttt{BoundaryLightState} current/filter path or
 make the photon point itself the final visible surface lighting.
+
+Python should also generate debug surface meshes for \texttt{LightingBall}.
+The immediate target is to write OBJ files for the configured lighting sphere
+and rectangle wall surfaces.  Those OBJ files are inspection artifacts, not
+runtime particle data.  They should be generated from the same cfg values used
+for Vulkan:
+\begin{itemize}
+    \item \texttt{Lighting\_ball} center, radius, material id, and wall flag;
+    \item \texttt{rectangle\_wall\_segments} origin, axes, extents, normal,
+          wall flag, and material id;
+    \item \texttt{boundary\_light\_wall\_subdivisions\_per\_cell}.
+\end{itemize}
+This gives a direct debugging loop:
+\begin{verbatim}
+Python cfg -> .tst/.bin -> Vulkan runtime
+Python cfg -> .obj      -> Blender inspection
+\end{verbatim}
+If Blender shows the intended surface mesh but Vulkan does not, the defect is
+in Vulkan resource binding, shader layout, or draw order.  If the OBJ is
+wrong, the defect is in generation or configuration.
 
 \subsection{Incidence-Weighted Spectral Deposit}
 

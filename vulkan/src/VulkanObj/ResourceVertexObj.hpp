@@ -34,6 +34,7 @@
 struct CartVert {
 	glm::vec4 pos;
 	glm::vec4 color;
+	glm::vec4 extra;
 };
 class ResourceVertexParticle;
 class ResourceVertexObj : public Resource

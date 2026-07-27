@@ -3336,3 +3336,57 @@ remain display/debug fields; \texttt{photon\_coupling} is the active
 brightness and momentum-transfer control.  The lighting compute shader must
 continue to be regenerated from \texttt{ExportForceDynamicsSimpleGLSL.py} so
 this material lookup remains durable across shader updates.
+
+\subsection{Rectangle Wall Lighting Moves Toward Surface Vertices}
+
+\subsubsection{previous form}
+
+The rectangle wall initially displayed absorbing-photon hits through the same
+cell-owned render rule used by the analytic sphere:
+\begin{verbatim}
+fragment world position -> cell id -> BoundaryLight[cell id]
+\end{verbatim}
+That restored correct wall interaction and made the absorbing wall visible,
+but it also made a circular photon wave look square and blocky.  The visible
+shadow was quantized by simulation-cell ownership rather than by the wall
+surface mesh.
+
+\subsubsection{current form}
+
+\texttt{ParticleLighting} now has an experimental wall-specific surface
+resource, \texttt{ResourceLightingSurface}.  It builds a subdivided rectangle
+wall mesh from \texttt{rectangle\_wall\_segments} and stores each vertex as:
+\begin{verbatim}
+struct LightingSurfaceVertex {
+    vec4 pos;
+    vec4 normal_flag;
+    vec4 light;
+    vec4 meta;
+};
+\end{verbatim}
+The buffer is bound as a graphics vertex buffer and as a compute storage
+buffer.  When an absorbing photon hits the wall, \texttt{FPML.comp} still
+writes \texttt{BoundaryLight[cell\_id]} for fallback/debug behavior, but it
+also projects the hit point into wall \(u/v\) coordinates and writes a small
+weighted splat into nearby wall mesh vertices.  The wall fragment shader
+draws the interpolated vertex light, while the sphere remains on the stable
+cell-owned \texttt{BoundaryLightRecord} path.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+This is a practical split between stable lighting state and smoother wall
+presentation.  \texttt{BoundaryLightRecord} remains the known-good persistent
+surface-light owner and fallback diagnostic.  The wall vertex-light path uses
+ordinary triangle interpolation to reduce square cell artifacts without
+changing photon contact, material coupling, or photon death behavior.
+
+The next debugging step is to make Python export the configured sphere and
+rectangle wall surfaces as OBJ files.  Blender can then inspect the exact
+surface geometry that the Vulkan lighting pass is expected to draw.  If the
+OBJ matches the intended scene but Vulkan does not, the issue is in resource
+binding, shader layout, or draw order.  If the OBJ is wrong, the issue is in
+generation or configuration.

@@ -33,8 +33,10 @@ per-frame clear/filter path.
 
 The next active lighting tasks are:
 \begin{enumerate}
-    \item validate the parameterized Vulkan surface render path for both the
-          sphere and rectangle wall;
+    \item generate \texttt{LightingBall} sphere and rectangle-wall OBJ
+          inspection meshes from Python configuration;
+    \item validate the experimental Vulkan wall vertex-light path against the
+          generated OBJ surface;
     \item complete the lighting-specific particle transport fields;
     \item diffuse light stream;
     \item absorbing and shadow surface;
@@ -90,6 +92,21 @@ photon should carry the remaining spectral energy so later surfaces can receive
 light from the reflection.  This should build on the existing fixed-speed
 reflection behavior without making the photon point own the final visible
 surface color.
+
+\subsubsection{Lighting Surface OBJ Export}
+
+Add a Python generator-side export for renderable lighting surfaces:
+\begin{verbatim}
+LightingBall_sphere.obj
+LightingBall_wall.obj
+LightingBall_surfaces.obj
+\end{verbatim}
+
+The OBJ files should be generated from the same cfg fields used by Vulkan,
+especially \texttt{Lighting\_ball}, \texttt{rectangle\_wall\_segments}, and
+\texttt{boundary\_light\_wall\_subdivisions\_per\_cell}.  These files are for
+Blender inspection and geometry debugging only.  They should not include
+photon particles or boundary marker particles.
 
 \subsection{Python/Vulkan View Parity}
 

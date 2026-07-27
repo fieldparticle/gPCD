@@ -46,8 +46,8 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 		= new ShaderObj(vulkanObj, "ShaderObj");
 	ResourceLightingSphere* resourceVertexSphere
 		= new ResourceLightingSphere(vulkanObj, "VertexSphere");
-	ResourceLightingCube* resourceVertexCube
-		= new ResourceLightingCube(vulkanObj, "VertexCube");
+	//ResourceLightingCube* resourceVertexCube
+		//= new ResourceLightingCube(vulkanObj, "VertexCube");
 	ResourceLightingParticle* resourceLightingParticle
 		= new ResourceLightingParticle(vulkanObj, "VertexParticle");
 	ResourceParticleUBO* resourceParticleUBO
@@ -66,6 +66,8 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 		= new ResourceCollMatrix(vulkanObj, "CollisionImage");
 	ResourceLighting* resourceLighting
 		= new ResourceLighting(vulkanObj, "LightingResources");
+	ResourceLightingSurface* resourceLightingSurface
+		= new ResourceLightingSurface(vulkanObj, "LightingSurfaces");
 	ResourceLockMatrix* resourceLockMatrix
 		= new ResourceLockMatrix(vulkanObj, "CollisionLockImage");
 	ResourceGraphicsContainer* resourceGraphicsContainer
@@ -123,8 +125,9 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	frameBuffer->Create(renderPass, swapChain);
 	resourceLightingParticle->Create(4);
 	resourceVertexSphere->Create(resourceLightingParticle);
-	resourceVertexCube->Create(resourceLightingParticle);
+	//resourceVertexCube->Create(resourceLightingParticle);
 	resourceCollMatrix->Create(3, resourceLightingParticle);
+	resourceLightingSurface->Create(9, resourceLightingParticle);
 
 	resourceLockMatrix->Create(6, resourceLightingParticle);
 	resourceLighting->Create(8, resourceLightingParticle);
@@ -136,8 +139,7 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	resourceUBOSphere->Create(7, swapChain, resourceLightingParticle);
 	shaderObj->Create(resourceLightingParticle, resourceCollMatrix, resourceLockMatrix,swapChain);
 
-	resourceGraphicsContainer->Create({ resourceVertexCube,
-											resourceVertexSphere,
+	resourceGraphicsContainer->Create({ 	resourceVertexSphere,
 											resourceLightingParticle,
 											resourceParticlePush,
 											resourceParticleUBO,
@@ -148,14 +150,16 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 											resourceLighting,
 											resourceCollMatrix,
 											resourceLockMatrix,
-											resourceAtomicG, });
+											resourceLightingSurface,
+											resourceAtomicG});
 	resourceGraphicsContainer->ClearTempMemory();
 	resourceComputeContainer->Create({ 	resourceParticlePush,
 										resourceLighting,
 										resourceLightingParticle,
 										resourceAtomicCompute,
 										resourceLockMatrix,
-										resourceCollMatrix});
+										resourceCollMatrix,
+										resourceLightingSurface });
 	resourceComputeContainer->ClearTempMemory();
 	pipelineGraphicsLighting->Create(shaderObj, swapChain, resourceGraphicsContainer, renderPass);
 	pipelineGraphicsParticle->Create(shaderObj, swapChain, resourceGraphicsContainer, renderPass);

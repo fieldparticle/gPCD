@@ -1,9 +1,10 @@
 Current status:
-	- Boundary-space lighting uses cell-owned surface records for the LightingBall sphere and rectangle-wall surface pass.
-	- Vulkan material export now carries photon_coupling and photon_min_relative_mass, matching the Python absorbing-wall strength model.
-	- LightingBall material documentation identifies photon_coupling as the active brightness/momentum-transfer control for the shadow wall.
+	- Boundary-space lighting docs updated for current LightingBall wall/sphere split
+	- Wall lighting now documented as experimental vertex-lit surface with BoundaryLight fallback
+	- Python OBJ surface export recorded as next geometry debugging step
+
 Code Changes:
-	- Added photonCoupling and photonMinRelativeMass to generated Vulkan MaterialProperty data.
-	- Updated generated FPML lighting compute helpers to read coupling and death threshold from MATERIAL_PROPERTIES instead of hardcoded values.
-	- Documented the Vulkan material-coupling bridge in boundary-space lighting and ProblemEvolution.
-Next: Regenerate and run LightingBall Vulkan with different shadow_wall photon_coupling values to confirm wall brightness and photon death behavior match Python.
+	- Documentation only
+	- Updated LightingBall, boundarySpaceLighting, Todo, and ProblemEvolution docs
+
+Next: Generate LightingBall sphere and rectangle wall OBJ files from Python config for Blender inspection

@@ -83,6 +83,7 @@ void ResourceLightingSphere::Create(Resource* PartVert)
 		const uint32_t cellAddress = LightingCellAddress(worldPosition, m_CellW, m_CellH, m_CellL);
 		tmp.color = glm::vec4(1.0, 0.0, 0.0, 1.0);
 		tmp.color.w = static_cast<float>(cellAddress);
+		tmp.extra = glm::vec4(static_cast<float>(cellAddress), 0.0f, 0.0f, 0.0f);
 		m_Verts.push_back(tmp);
 	}
 

@@ -68,6 +68,7 @@ VkVertexInputBindingDescription*
 }
 std::vector<VkVertexInputAttributeDescription>* ResourceVertexObj::GetAttributeDescriptions()
 {
+		m_AttributeDescriptions.clear();
 
 		VkVertexInputAttributeDescription ad{};
 		ad.binding = 0;
@@ -82,6 +83,11 @@ std::vector<VkVertexInputAttributeDescription>* ResourceVertexObj::GetAttributeD
 		ad.offset = offsetof(CartVert, color);;
 		m_AttributeDescriptions.push_back(ad);
 		
+		ad.binding = 0;
+		ad.location = 2;
+		ad.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		ad.offset = offsetof(CartVert, extra);;
+		m_AttributeDescriptions.push_back(ad);
 		
 	
 	return &m_AttributeDescriptions;

@@ -158,15 +158,30 @@ surface type and surface id so render passes can distinguish sphere cells from
 rectangle-wall cells.  The sphere render resource provides analytic sphere
 surface coordinates.  The rectangle wall render resource emits wall-surface
 triangles from \texttt{rectangle\_wall\_segments}; it is not the full cell-box
-debug boundary.  The lighting fragment shader computes the cell from the
-fragment world position before sampling \texttt{BoundaryLight}, and it accepts
-only records whose stored surface type and id match the active surface pass.
-It also samples the current cell plus six face-neighbor cells to reduce hard
-cell and triangle boundaries.  The validated state is that
-\texttt{LightingBall} in Vulkan runs, shows cell-owned surface lighting, and
-uses the first incidence-weighted RGB-band spectral deposit.  The remaining
-bumpy appearance is the expected low-resolution cell/surface field rather
-than photon-point rendering.
+debug boundary.
+
+The sphere surface remains cell-owned at render time.  Its fragment shader
+computes the cell from the fragment world position before sampling
+\texttt{BoundaryLight}, and it accepts only records whose stored surface type
+and id match the active sphere pass.  It also samples the current cell plus
+six face-neighbor cells to reduce hard cell and triangle boundaries.
+
+The rectangle shadow wall now has an experimental vertex-lit surface path.
+\texttt{ResourceLightingSurface} builds a subdivided wall mesh whose vertex
+records contain world position, normal/material metadata, persistent vertex
+light, and local \(u/v\) metadata.  Absorbing wall photon hits still update
+\texttt{BoundaryLight[cell\_id]} for fallback/debug visibility, but they also
+project the hit into wall \(u/v\) space and write a weighted splat into nearby
+wall vertices.  The wall fragment shader then draws ordinary interpolated
+vertex color.  This is why the wall can become smoother and more circular
+than the square cell-owned shadow while the sphere remains on the stable
+cell-owned path.
+
+The validated state is that \texttt{LightingBall} in Vulkan runs, shows
+cell-owned sphere lighting, shows absorbing-wall response, and uses the first
+incidence-weighted RGB-band spectral deposit.  The wall vertex-light path is
+the current smoothing experiment; the stable fallback remains the
+\texttt{BoundaryLightRecord} deposit.
 
 The next lighting stages are a diffuse light stream, an absorbing shadow
 surface, and a reflective surface.
@@ -225,6 +240,11 @@ material response, or deposited lighting.
     Each wall supplies origin, \(u/v\) axes and extents, inward normal,
     \texttt{wall\_flag}, and \texttt{material\_id}.  Vulkan uses this both for
     wall contact metadata and for the wall-surface render triangles.
+    \item[\texttt{boundary\_light\_wall\_subdivisions\_per\_cell}] Controls
+    the density of the generated wall lighting mesh.  A value of \(1\)
+    produces one quad per cell-sized wall tile, or two triangles per tile.
+    A value of \(2\) produces a \(2\times2\) subdivision inside each tile, or
+    eight triangles per tile.
     \item[\texttt{cell\_array\_width/height/depth}] Defines the spatial cell
     domain.  Boundary-space lighting allocates one \texttt{BoundaryLightRecord}
     per cell.
@@ -355,3 +375,25 @@ The active Vulkan surface path is cell-owned:
 Debug photon visibility belongs to material
 \texttt{debug\_visible}/\texttt{debug\_color}, not to the old flat
 \texttt{lumens\_*} debug fields.
+
+\subsection{Surface OBJ Debug Export}
+
+The next Python-side debugging artifact should be a generated OBJ surface
+export for \texttt{LightingBall}.  The OBJ files should describe renderable
+surfaces only, not photons or boundary marker particles.  The first useful
+set is:
+\begin{verbatim}
+LightingBall_sphere.obj
+LightingBall_wall.obj
+LightingBall_surfaces.obj
+\end{verbatim}
+
+The sphere OBJ should be generated from \texttt{Lighting\_ball}.  The wall
+OBJ should be generated from \texttt{rectangle\_wall\_segments} and
+\texttt{boundary\_light\_wall\_subdivisions\_per\_cell}.  The wall mesh should
+match the layout built by \texttt{ResourceLightingSurface}, so Blender can be
+used to verify the same geometry that Vulkan is expected to draw.
+
+This export is an inspection tool.  Runtime collision still uses the analytic
+sphere and rectangle-wall equations, and the particle/bin data should not be
+mixed into the surface OBJ.

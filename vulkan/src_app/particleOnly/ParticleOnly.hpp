@@ -47,6 +47,7 @@
 #include "ParticleLighting/CommandLightingGraphics.hpp"
 #include "particleOnly/DrawParticleOnly.hpp"
 #include "particleLighting/DrawParticleLighting.hpp"
+#include "particleLighting/ResourceLightingSurface.hpp"
 #include "particleOnly/PipelineComputeParticle.hpp"
 #include "ParticleLighting/PipelineComputeLighting.hpp"
 #include "particleOnly/ContainerGraphics.hpp"
