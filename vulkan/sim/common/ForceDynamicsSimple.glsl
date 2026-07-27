@@ -110,7 +110,7 @@ float particle_overlap_area(float sourceRadius, float targetRadius, float center
     return sourceArea + targetArea - triangleArea;
 }
 
-// Python source: ForceDynamics.py:930
+// Python source: ForceDynamics.py:945
 float ParticlePenetrationDepth(float sourceRadius, float targetRadius, float centerDistance)
 {
     return sourceRadius + targetRadius - centerDistance;
@@ -813,6 +813,13 @@ bool CalcPosition(uint SourceID)
     vec4 velocity = GetNextParticleVelocity(SourceID);
     vec3 nextPosition = position.xyz + velocity.xyz * dt;
 
+    if (nextPosition.x < death_x_min || nextPosition.x > death_x_max
+            || nextPosition.y < death_y_min || nextPosition.y > death_y_max
+            || nextPosition.z < death_z_min || nextPosition.z > death_z_max) {
+        P[SourceID].Data.w = -1.0;
+        return true;
+    }
+
     if (nextPosition.x < 0.0 || nextPosition.x >= float(WIDTH)
             || nextPosition.y < 0.0 || nextPosition.y >= float(HEIGHT)
             || nextPosition.z < 0.0 || nextPosition.z >= float(DEPTH)) {
@@ -825,12 +832,6 @@ bool CalcPosition(uint SourceID)
     } else {
         P[SourceID].PosLocA = vec4(nextPosition, 0.0);
         P[SourceID].PosLocB.w = 1.0;
-    }
-
-    if (nextPosition.x < death_x_min || nextPosition.x > death_x_max
-            || nextPosition.y < death_y_min || nextPosition.y > death_y_max
-            || nextPosition.z < death_z_min || nextPosition.z > death_z_max) {
-        P[SourceID].Data.w = -1.0;
     }
     return true;
 }

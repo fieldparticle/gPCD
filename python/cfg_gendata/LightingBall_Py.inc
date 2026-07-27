@@ -43,7 +43,7 @@ particle_streams = (
     material_id = 0;
 
     // Dense x-directed beam centered on the Lighting_ball y/z cross-section.
-    initial_particle_velocity = [0.609968, 0.0, 0.0];
+    initial_particle_velocity = [0.909968, 0.0, 0.0];
 
     release_start_frame = 10;
     release_columns = 1;
@@ -69,7 +69,18 @@ particle_streams = (
 // Boundary markers
 // --------------------------------------------------------------------------
 curve_wall_segments = {};
-rectangle_wall_segments = {};
+rectangle_wall_segments = {
+    wall_xmax = {
+        origin = [16.0, 2.0, 2.0];
+        u_axis = "y";
+        u_length = 14.0;
+        v_axis = "z";
+        v_length = 14.0;
+        normal = [-1.0, 0.0, 0.0];
+        wall_flag = 2000;
+        material_id = 2;
+    };
+};
 
 // --------------------------------------------------------------------------
 // Particle geometry and integration

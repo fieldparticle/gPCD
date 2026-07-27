@@ -29,10 +29,10 @@ z_axis_lims 				= [0.0, 22.0];
 cell_array_width 			= 20;
 cell_array_height 			= 20;
 cell_array_depth 			= 22;
-death_bounds 				= [1, 15, 1, 15, 1, 15];
+death_bounds 				= [1, 19, 1, 19, 1, 21];
 cell_occupancy_list_size 	= 256;
 
-gl_point_size 				= 0.5;
+gl_point_size 				= 1.5;
 
 // --------------------------------------------------------------------------
 // Photon stream
@@ -69,7 +69,18 @@ particle_streams = (
 // Boundary markers
 // --------------------------------------------------------------------------
 curve_wall_segments = {};
-rectangle_wall_segments = {};
+rectangle_wall_segments = {
+    wall_xmax = {
+        origin = [16.0, 2.0, 2.0];
+        u_axis = "y";
+        u_length = 14.0;
+        v_axis = "z";
+        v_length = 14.0;
+        normal = [-1.0, 0.0, 0.0];
+        wall_flag = 2000;
+        material_id = 2;
+    };
+};
 
 // --------------------------------------------------------------------------
 // Particle geometry and integration

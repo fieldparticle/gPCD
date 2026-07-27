@@ -1006,6 +1006,13 @@ bool CalcPosition(uint SourceID)
     vec4 velocity = GetNextParticleVelocity(SourceID);
     vec3 nextPosition = position.xyz + velocity.xyz * dt;
 
+    if (nextPosition.x < death_x_min || nextPosition.x > death_x_max
+            || nextPosition.y < death_y_min || nextPosition.y > death_y_max
+            || nextPosition.z < death_z_min || nextPosition.z > death_z_max) {{
+        P[SourceID].Data.w = -1.0;
+        return true;
+    }}
+
     if (nextPosition.x < 0.0 || nextPosition.x >= float(WIDTH)
             || nextPosition.y < 0.0 || nextPosition.y >= float(HEIGHT)
             || nextPosition.z < 0.0 || nextPosition.z >= float(DEPTH)) {{
@@ -1018,12 +1025,6 @@ bool CalcPosition(uint SourceID)
     }} else {{
         P[SourceID].PosLocA = vec4(nextPosition, 0.0);
         P[SourceID].PosLocB.w = 1.0;
-    }}
-
-    if (nextPosition.x < death_x_min || nextPosition.x > death_x_max
-            || nextPosition.y < death_y_min || nextPosition.y > death_y_max
-            || nextPosition.z < death_z_min || nextPosition.z > death_z_max) {{
-        P[SourceID].Data.w = -1.0;
     }}
     return true;
 }}
@@ -2560,18 +2561,89 @@ vec3 boundary_light_material_spectral_emission(uint materialID)
     return vec3(1.0, 1.0, 1.0);
 }
 
+uint boundary_light_material_surface_behavior(uint materialID)
+{
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].photonSurfaceBehavior;
+    }
+
+    return PHOTON_SURFACE_BEHAVIOR_NONE;
+}
+
+float boundary_light_material_photon_coupling(uint materialID)
+{
+    // TODO: read from MaterialProperty once ShaderObj.cpp exports photonCoupling.
+    return 1.0;
+}
+
+float boundary_light_material_photon_min_relative_mass(uint materialID)
+{
+    // TODO: read from MaterialProperty once ShaderObj.cpp exports photonMinRelativeMass.
+    return 0.001;
+}
+
+float photon_deposit_fraction(
+    vec3 photonVelocity,
+    vec3 surfaceNormal,
+    uint surfaceMaterialID)
+{
+    if (length(photonVelocity) <= EPSILON || length(surfaceNormal) <= EPSILON) {
+        return 0.0;
+    }
+    float incidence = max(0.0, -dot(normalize(photonVelocity), normalize(surfaceNormal)));
+    return clamp(
+        incidence * boundary_light_material_photon_coupling(surfaceMaterialID),
+        0.0,
+        1.0);
+}
+
+float photon_relative_mass(uint SourceID)
+{
+    return max(0.0, P[SourceID].parms.x);
+}
+
+float reduce_photon_mass_by_deposit_fraction(uint SourceID, float depositFraction)
+{
+    float fraction = clamp(depositFraction, 0.0, 1.0);
+    P[SourceID].parms.x = max(0.0, P[SourceID].parms.x * (1.0 - fraction));
+    return P[SourceID].parms.x;
+}
+
+void retire_photon(uint SourceID)
+{
+    P[SourceID].Data.w = -1.0;
+}
+
+vec3 photon_deposit_energy_gray_rgb(float depositFraction, float relativeMass)
+{
+    float gray = clamp(depositFraction * relativeMass, 0.0, 1.0);
+    return vec3(gray);
+}
+
+vec3 boundary_light_wall_incidence_normal(uint SourceID, uint BoundaryID, vec3 fallbackNormal)
+{
+#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
+    RectangleWallSegment selected = SelectRectangleWallSegment(SourceID, BoundaryID);
+    if (length(selected.inwardNormal) > EPSILON) {
+        return normalize(selected.inwardNormal);
+    }
+#endif
+    return fallbackNormal;
+}
+
 vec3 boundary_light_spectral_deposit_rgb(
     uint photonMaterialID,
     uint surfaceMaterialID,
     vec3 photonVelocity,
     vec3 surfaceNormal)
 {
-    if (length(photonVelocity) <= EPSILON || length(surfaceNormal) <= EPSILON) {
-        return vec3(0.0);
-    }
-    vec3 photonDirection = normalize(photonVelocity);
-    vec3 normal = normalize(surfaceNormal);
-    float incidence = max(0.0, -dot(photonDirection, normal));
+    float incidence = photon_deposit_fraction(
+        photonVelocity,
+        surfaceNormal,
+        surfaceMaterialID);
+    if (incidence <= 0.0) { return vec3(0.0); }
 
     vec4 photonSpectrumEnergy =
         boundary_light_material_spectral_response_energy(photonMaterialID);
@@ -2727,16 +2799,77 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                     continue;
                 }""",
         """                if (photonSource) {
-                    photonVelocity =
-                        ReflectFixedSpeed(photonVelocity, segment.normal);
-                    photonReflected = true;
+                    uint surfaceMaterialID = uint(round(P[TargetID].material_id));
+                    uint surfaceBehavior =
+                        boundary_light_material_surface_behavior(surfaceMaterialID);
                     P[SourceID].colFlg = 1u;
-                    DepositSpectralBoundaryLightAtCell(
-                        boundary_light_cell_address(GetParticlePosition(TargetID).xyz),
-                        PhotonBaseMaterialID(),
-                        uint(round(P[TargetID].material_id)),
-                        photonVelocity,
+                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_NONE) {
+                        continue;
+                    }
+
+                    vec3 incidenceNormal = boundary_light_wall_incidence_normal(
+                        SourceID,
+                        TargetID,
                         segment.normal);
+                    float depositFraction = photon_deposit_fraction(
+                        photonVelocity,
+                        incidenceNormal,
+                        surfaceMaterialID);
+                    float preTransferMass = photon_relative_mass(SourceID);
+                    float remainingMass =
+                        reduce_photon_mass_by_deposit_fraction(
+                            SourceID,
+                            depositFraction);
+                    uint cellID = boundary_light_cell_address(
+                        GetParticlePosition(TargetID).xyz);
+
+                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_ABSORB) {
+                        if (cellID != npos && cellID < MAX_CELL_ARRAY_LOCATIONS) {
+                            BoundaryLight[cellID].rgb_valid = vec4(
+                                photon_deposit_energy_gray_rgb(
+                                    depositFraction,
+                                    preTransferMass),
+                                1.0);
+                        }
+                        retire_photon(SourceID);
+                        continue;
+                    }
+
+                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR) {
+                        DepositSpectralBoundaryLightAtCell(
+                            cellID,
+                            PhotonBaseMaterialID(),
+                            surfaceMaterialID,
+                            photonVelocity,
+                            incidenceNormal);
+                        if (remainingMass >
+                                boundary_light_material_photon_min_relative_mass(
+                                    PhotonBaseMaterialID())) {
+                            photonVelocity =
+                                ReflectFixedSpeed(photonVelocity, segment.normal);
+                            photonReflected = true;
+                        }
+                        continue;
+                    }
+
+                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_REFLECT) {
+                        DepositSpectralBoundaryLightAtCell(
+                            cellID,
+                            PhotonBaseMaterialID(),
+                            surfaceMaterialID,
+                            photonVelocity,
+                            incidenceNormal);
+                        if (remainingMass >
+                                boundary_light_material_photon_min_relative_mass(
+                                    PhotonBaseMaterialID())) {
+                            photonVelocity =
+                                ReflectFixedSpeed(photonVelocity, segment.normal);
+                            photonReflected = true;
+                        } else {
+                            retire_photon(SourceID);
+                        }
+                        continue;
+                    }
                     continue;
                 }""",
     )

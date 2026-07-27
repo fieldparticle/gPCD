@@ -153,15 +153,20 @@ and Vulkan:
 
 The current Vulkan lighting resource stores one \texttt{BoundaryLightRecord}
 per spatial cell.  \texttt{ResourceLighting.cpp} sizes the buffer as
-\texttt{CellAryW * CellAryH * CellAryL}.  The sphere render resource provides
-surface coordinates, and the lighting fragment shader computes the cell from
-the fragment world position before sampling \texttt{BoundaryLight}.  It also
-samples the current cell plus six face-neighbor cells to reduce hard cell and
-triangle boundaries.  The validated state is that \texttt{LightingBall} in
-Vulkan runs, shows cell-owned surface lighting, and uses the first
-incidence-weighted RGB-band spectral deposit.  The remaining bumpy appearance
-is the expected low-resolution cell/sphere field rather than photon-point
-rendering.
+\texttt{CellAryW * CellAryH * CellAryL}.  Each record is initialized with a
+surface type and surface id so render passes can distinguish sphere cells from
+rectangle-wall cells.  The sphere render resource provides analytic sphere
+surface coordinates.  The rectangle wall render resource emits wall-surface
+triangles from \texttt{rectangle\_wall\_segments}; it is not the full cell-box
+debug boundary.  The lighting fragment shader computes the cell from the
+fragment world position before sampling \texttt{BoundaryLight}, and it accepts
+only records whose stored surface type and id match the active surface pass.
+It also samples the current cell plus six face-neighbor cells to reduce hard
+cell and triangle boundaries.  The validated state is that
+\texttt{LightingBall} in Vulkan runs, shows cell-owned surface lighting, and
+uses the first incidence-weighted RGB-band spectral deposit.  The remaining
+bumpy appearance is the expected low-resolution cell/surface field rather
+than photon-point rendering.
 
 The next lighting stages are a diffuse light stream, an absorbing shadow
 surface, and a reflective surface.

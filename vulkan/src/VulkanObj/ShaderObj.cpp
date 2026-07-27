@@ -69,6 +69,10 @@ void ShaderObj::WriteMaterials()
 	ostrm << "const uint PARTICLE_TYPE_REGULAR = 0u;\n";
 	ostrm << "const uint PARTICLE_TYPE_PHOTON = 1u;\n\n";
 	ostrm << "const uint PARTICLE_TYPE_BOUNDARY = 2u;\n\n";
+	ostrm << "const uint PHOTON_SURFACE_BEHAVIOR_NONE = 0u;\n";
+	ostrm << "const uint PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR = 1u;\n";
+	ostrm << "const uint PHOTON_SURFACE_BEHAVIOR_ABSORB = 2u;\n";
+	ostrm << "const uint PHOTON_SURFACE_BEHAVIOR_REFLECT = 3u;\n\n";
 
 	ostrm << "struct MaterialProperty\n";
 	ostrm << "{\n";
@@ -82,6 +86,7 @@ void ShaderObj::WriteMaterials()
 	ostrm << "    vec4 debugColor;\n";
 	ostrm << "    vec4 spectralResponseEnergy;\n";
 	ostrm << "    vec4 spectralEmission;\n";
+	ostrm << "    uint photonSurfaceBehavior;\n";
 	ostrm << "    float cellDensity;\n";
 	ostrm << "};\n\n";
 
@@ -95,7 +100,7 @@ void ShaderObj::WriteMaterials()
 	{
 		ostrm << "const uint MATERIAL_PROPERTY_COUNT = 1u;\n";
 		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](\n";
-		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 0.000000000)\n";
+		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), PHOTON_SURFACE_BEHAVIOR_NONE, 0.000000000)\n";
 		ostrm << ");\n\n";
 	}
 	else
@@ -136,6 +141,7 @@ void ShaderObj::WriteMaterials()
 			double spectralEmissionGreen = 1.0;
 			double spectralEmissionBlue = 1.0;
 			double photonEnergy = 1.0;
+			int photonSurfaceBehavior = 0;
 
 			if (config_setting_lookup_int(material, "material_id", &materialID) == CONFIG_FALSE)
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].material_id missing");
@@ -223,6 +229,11 @@ void ShaderObj::WriteMaterials()
 			if (photonEnergy < 0.0)
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_energy must not be negative");
 
+			if (config_setting_lookup_int(material, "photon_surface_behavior", &photonSurfaceBehavior) == CONFIG_FALSE)
+				photonSurfaceBehavior = 0;
+			if (photonSurfaceBehavior < 0 || photonSurfaceBehavior > 3)
+				throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_surface_behavior is outside the valid range");
+
 			if (config_setting_lookup_float(material, "cell_density", &cellDensity) == CONFIG_FALSE)
 				cellDensity = 0.0;
 
@@ -253,6 +264,7 @@ void ShaderObj::WriteMaterials()
 				<< std::fixed << std::setprecision(9) << spectralEmissionGreen << ", "
 				<< std::fixed << std::setprecision(9) << spectralEmissionBlue << ", "
 				<< "0.000000000), "
+				<< photonSurfaceBehavior << "u, "
 				<< std::fixed << std::setprecision(9) << cellDensity << ")";
 
 			if (index + 1 < materialCount)
@@ -617,11 +629,12 @@ std::ostringstream ShaderObj::RectangleWalls()
 	{
 		config_setting_t* segment = CfgTst->GetSubStructAddress(segmentList, index);
 
-		if (segment == nullptr || config_setting_length(segment) != 15)
+		int segmentLength = segment == nullptr ? 0 : config_setting_length(segment);
+		if (segment == nullptr || (segmentLength != 15 && segmentLength != 16))
 		{
 			throw std::runtime_error(
 				"rectangle_wall_segments[" + std::to_string(index) +
-				"] must contain fifteen values"
+				"] must contain fifteen or sixteen values"
 			);
 		}
 

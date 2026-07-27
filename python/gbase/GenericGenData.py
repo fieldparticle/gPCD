@@ -18,9 +18,12 @@ from gbase.MaterialProperties import (
     DEFAULT_MATERIAL_PROPERTIES,
     PARTICLE_TYPE_BOUNDARY,
     PARTICLE_TYPE_PHOTON,
+    PHOTON_SURFACE_BEHAVIOR_NONE,
+    PHOTON_SURFACE_BEHAVIOR_REFLECT,
     parse_debug_visible,
     parse_material_color,
     parse_particle_type,
+    parse_photon_surface_behavior,
     parse_spectral_rgb,
     write_color_mode_defines,
     write_material_properties,
@@ -377,6 +380,22 @@ class GenericGenData:
                         f"{context}.photon_min_relative_mass must not be negative"
                     )
 
+            try:
+                photon_surface_behavior = parse_photon_surface_behavior(
+                    raw_material.get(
+                        "photon_surface_behavior",
+                        PHOTON_SURFACE_BEHAVIOR_NONE,
+                    )
+                )
+            except (TypeError, ValueError):
+                errors.append(f"{context}.photon_surface_behavior is unknown")
+                photon_surface_behavior = None
+            if photon_surface_behavior is not None and (
+                photon_surface_behavior < PHOTON_SURFACE_BEHAVIOR_NONE
+                or photon_surface_behavior > PHOTON_SURFACE_BEHAVIOR_REFLECT
+            ):
+                errors.append(f"{context}.photon_surface_behavior is outside the valid range")
+
             if (
                 material_id >= 0
                 and relative_mass is not None
@@ -392,6 +411,7 @@ class GenericGenData:
                 and photon_energy is not None
                 and photon_coupling is not None
                 and photon_min_relative_mass is not None
+                and photon_surface_behavior is not None
             ):
                 materials.append(
                     {
@@ -409,6 +429,7 @@ class GenericGenData:
                         "photon_energy": photon_energy,
                         "photon_coupling": photon_coupling,
                         "photon_min_relative_mass": photon_min_relative_mass,
+                        "photon_surface_behavior": photon_surface_behavior,
                         "cell_density": cell_density,
                     }
                 )
@@ -1915,6 +1936,7 @@ class GenericGenData:
                     segment["v_length"],
                     *segment["normal"],
                     float(segment["wall_flag"]),
+                    float(segment.get("material_id", 0)),
                 )
                 output.write(
                     "    ["

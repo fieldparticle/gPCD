@@ -35,6 +35,10 @@
 #ifndef LIGHTINGRECORDS_HPP
 #define LIGHTINGRECORDS_HPP
 
+constexpr uint32_t BOUNDARY_LIGHT_SURFACE_NONE = 0u;
+constexpr uint32_t BOUNDARY_LIGHT_SURFACE_SPHERE = 1u;
+constexpr uint32_t BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL = 2u;
+
 struct BoundaryLightRecord
 {
     alignas(16) glm::vec4 rgb_valid;

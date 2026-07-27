@@ -3233,3 +3233,54 @@ orientation for lighting inspection.  Photon direction, sphere position,
 death bounds, and cell addresses remain in world space.  View controls only
 change how the world is framed for review; they do not affect photon
 transport, material response, boundary-space deposit, or surface rendering.
+
+\subsection{Boundary-Space Rendering Adds Surface Identity And Rectangle Walls}
+
+\subsubsection{previous form}
+
+The first cell-owned Vulkan lighting renderer was sphere-specific.  The
+fragment shader rejected every lighting record except the hardcoded
+\texttt{SPHERE/LIGHTING\_BALL\_WALL\_FLAG} surface, and the surface draw only
+submitted the lighting sphere mesh.  Rectangle-wall photons could participate
+in transport and death behavior, but the wall did not yet have a matching
+surface canvas that could display its deposited cell-owned light.
+
+\subsubsection{current form}
+
+\texttt{BoundaryLightRecord.ids} now acts as the render-surface selector:
+\begin{verbatim}
+ids.x = cell_id
+ids.y = surface_type
+ids.z = surface_id / wall_flag
+\end{verbatim}
+\texttt{ResourceLighting.cpp} initializes every cell as
+\texttt{surface\_type=NONE}, then marks cells near the lighting sphere as
+\texttt{SPHERE/LIGHTING\_BALL\_WALL\_FLAG} and cells near configured
+rectangle walls as \texttt{RECTANGLE\_WALL/wall\_flag}.  Rectangle wall cell
+ownership is determined by projecting the cell center onto the wall plane,
+checking plane distance tolerance, and checking the projected point against
+the wall's \(u/v\) extents.
+
+The render shader is parameterized by the active pass.  The vertex shader
+passes \texttt{renderSurfaceType} and \texttt{renderSurfaceID} flat to the
+fragment shader, and \texttt{BoundaryLight.frag} samples only matching
+records.  The sphere pass emits \texttt{SPHERE/LIGHTING\_BALL\_WALL\_FLAG}.
+The wall pass emits \texttt{RECTANGLE\_WALL/wall\_flag}.  The wall surface
+comes from \texttt{ResourceLightingCube}, which now builds two triangles for
+each \texttt{rectangle\_wall\_segments} entry instead of drawing the full
+cell-array box.
+
+\subsubsection{difference outcome}
+
+rendering and diagnostics
+
+\subsubsection{Analysis}
+
+This separates surface identity from shader specialization.  One
+\texttt{BoundaryLightRecord} buffer can store lighting for multiple surface
+classes, and one fragment sampler can display those records as long as the
+draw pass tells it which surface it represents.  The rectangle wall is now a
+real lighting canvas rather than only a collision/death target or debug
+boundary.  This is the required base for the next absorbing-shadow step:
+photons can deposit grayscale light into wall-owned cells, and the wall pass
+can display those cells without reusing the sphere-only render path.

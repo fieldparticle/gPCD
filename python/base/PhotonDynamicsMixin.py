@@ -6,7 +6,10 @@ from gbase.MaterialProperties import (
     PARTICLE_TYPE_BOUNDARY,
     PARTICLE_TYPE_PHOTON,
     PARTICLE_TYPE_REGULAR,
+    PHOTON_SURFACE_BEHAVIOR_NONE,
+    PHOTON_SURFACE_BEHAVIOR_REFLECT,
     parse_particle_type,
+    parse_photon_surface_behavior,
 )
 from gbase.pdata import PTYPE_BOUNDARY, PTYPE_PHOTON
 
@@ -123,6 +126,36 @@ class PhotonDynamicsMixin:
                 return max(0.0, float(material.get("photon_min_relative_mass", 0.001)))
         return 0.001
 
+    def MaterialPhotonSurfaceBehavior(self, material_id):
+        """Return the configured photon/surface behavior for a material."""
+        material_id = int(round(float(material_id)))
+        materials = ()
+        if getattr(self, "run_configuration", None) is not None:
+            materials = self.run_configuration.get("material_properties", ())
+        for material in materials or ():
+            if hasattr(material, "get"):
+                current_material_id = int(material.get("material_id", -1))
+                raw_behavior = material.get(
+                    "photon_surface_behavior",
+                    PHOTON_SURFACE_BEHAVIOR_NONE,
+                )
+            else:
+                current_material_id = int(getattr(material, "material_id", -1))
+                raw_behavior = getattr(
+                    material,
+                    "photon_surface_behavior",
+                    PHOTON_SURFACE_BEHAVIOR_NONE,
+                )
+            if current_material_id != material_id:
+                continue
+            behavior = parse_photon_surface_behavior(raw_behavior)
+            if behavior < PHOTON_SURFACE_BEHAVIOR_NONE:
+                return PHOTON_SURFACE_BEHAVIOR_NONE
+            if behavior > PHOTON_SURFACE_BEHAVIOR_REFLECT:
+                return PHOTON_SURFACE_BEHAVIOR_NONE
+            return behavior
+        return PHOTON_SURFACE_BEHAVIOR_NONE
+
     def PhotonMinRelativeMass(self, SourceID):
         """Return the photon death threshold for the source photon material."""
         return self.MaterialPhotonMinRelativeMass(self.BasePhotonMaterialID(SourceID))
@@ -147,6 +180,21 @@ class PhotonDynamicsMixin:
         )
         payload = self.PhotonPayloadRGB(SourceID) if payload_rgb is None else payload_rgb
         return tuple(float(payload[index]) * scale for index in range(3))
+
+    def PhotonDepositGrayRGB(self, SourceID, deposit_fraction, payload_rgb=None):
+        """Return deposited photon light as luminance-only grayscale."""
+        rgb = self.PhotonDepositRGB(SourceID, deposit_fraction, payload_rgb=payload_rgb)
+        return self.RGBToGrayRGB(rgb)
+
+    def RGBToGrayRGB(self, rgb):
+        """Return an RGB tuple converted to luminance-only grayscale."""
+        gray = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+        return gray, gray, gray
+
+    def PhotonDepositEnergyGrayRGB(self, deposit_fraction, relative_mass):
+        """Return scalar photon deposit strength as grayscale light."""
+        gray = max(0.0, min(1.0, float(deposit_fraction) * float(relative_mass)))
+        return gray, gray, gray
 
     def ReducePhotonMassByDepositFraction(self, SourceID, deposit_fraction):
         """Reduce photon mass while preserving velocity magnitude."""

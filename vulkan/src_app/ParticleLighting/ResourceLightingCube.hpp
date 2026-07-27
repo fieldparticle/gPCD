@@ -43,6 +43,7 @@ class ResourceLightingCube : public ResourceVertexObj
 		virtual void GetShaderMem() {};
 		virtual void CopyMem() {};
 		void MakeAxes(uint32_t sidelen);
+		void MakeRectangleWalls();
 ;
 
 		virtual void* GetBuffer(uint32_t bufNum,

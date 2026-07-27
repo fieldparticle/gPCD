@@ -44,6 +44,20 @@ BoundaryLight[cell_id].rgb_valid.rgb = persistent lit color
 BoundaryLight[cell_id].rgb_valid.w   = valid flag
 \end{verbatim}
 
+Each cell record also carries surface ownership metadata:
+\begin{verbatim}
+BoundaryLight[cell_id].normal_material.xyz = surface normal
+BoundaryLight[cell_id].normal_material.w   = material_id
+BoundaryLight[cell_id].ids.x               = cell_id
+BoundaryLight[cell_id].ids.y               = surface_type
+BoundaryLight[cell_id].ids.z               = surface_id / wall_flag
+\end{verbatim}
+Cells that do not contain a known renderable surface use
+\texttt{surface\_type=NONE}.  Cells near the configured lighting sphere use
+\texttt{SPHERE/LIGHTING\_BALL\_WALL\_FLAG}.  Cells near a finite rectangle
+wall use \texttt{RECTANGLE\_WALL/wall\_flag}.  This lets the renderer sample
+only the records that belong to the surface pass currently being drawn.
+
 \subsection{Photon Hit Rule}
 
 The first rule is intentionally simple:
@@ -113,6 +127,14 @@ lighting-specific surface pass for \texttt{LightingBall}.  The mesh used by
 that pass is render geometry only; collision remains analytic, and the
 generated boundary markers remain broad-phase locality records.
 
+The lighting surface pass is parameterized by surface identity.  A sphere draw
+passes \texttt{SPHERE/LIGHTING\_BALL\_WALL\_FLAG} to the fragment shader.  A
+rectangle wall draw passes \texttt{RECTANGLE\_WALL/wall\_flag}.  The fragment
+shader then samples \texttt{BoundaryLightRecord} entries only when their
+stored \texttt{surface\_type} and \texttt{surface\_id} match the active pass.
+This keeps one shared lighting sampler while allowing multiple analytic or
+generated surfaces to share the same cell-owned lighting buffer.
+
 \subsection{Vulkan Implementation}
 
 The Vulkan version uses the existing record name:
@@ -131,11 +153,22 @@ applications remain on \texttt{FPM.*} and do not see this resource.
 
 \texttt{FPML.comp} is the lighting compute schedule.  It deposits the visible
 spectral result into \texttt{BoundaryLight[cell\_id]} with persistent
-last-writer-wins behavior.  \texttt{BoundaryLight.vert} passes surface
-coordinates to \texttt{BoundaryLight.frag}, and the fragment shader computes
-the owning cell and nearby cell samples per fragment.  Since the fragment
-shader reads the lighting SSBO, the \texttt{ParticleLighting} compute-finished
-wait includes the fragment shader stage.
+last-writer-wins behavior.  \texttt{ResourceLighting.cpp} initializes one
+record per cell and marks whether that cell is owned by no surface, the
+lighting sphere, or a configured rectangle wall.  Sphere ownership is
+assigned by testing distance from the cell center to the configured sphere
+radius.  Rectangle wall ownership is assigned by projecting the cell center
+onto the wall plane, checking the distance to the plane, and then checking
+the projected point against the wall's \(u/v\) extents.
+
+\texttt{BoundaryLight.vert} passes surface coordinates and the active render
+surface identity to \texttt{BoundaryLight.frag}.  The sphere surface comes
+from \texttt{ResourceLightingSphere}.  Rectangle wall surfaces come from
+\texttt{ResourceLightingCube}, which now emits two triangles for each
+\texttt{rectangle\_wall\_segments} entry instead of drawing the full cell-box
+debug outline.  Since the fragment shader reads the lighting SSBO, the
+\texttt{ParticleLighting} compute-finished wait includes the fragment shader
+stage.
 
 \subsection{Python Reference}
 

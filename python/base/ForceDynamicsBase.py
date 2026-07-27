@@ -9,6 +9,12 @@ from gbase.BoundarySpaceLighting import (
     BOUNDARY_SPACE_SURFACE_SPHERE,
     RETIRED_BOUNDARY_LIGHTING_CONFIG_KEYS,
 )
+from gbase.MaterialProperties import (
+    PHOTON_SURFACE_BEHAVIOR_ABSORB,
+    PHOTON_SURFACE_BEHAVIOR_NONE,
+    PHOTON_SURFACE_BEHAVIOR_REFLECT,
+    PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR,
+)
 from gbase.utilities import get_cell_dimensions, get_run_configuration
 import math
 import re
@@ -974,6 +980,21 @@ class ForceDynamics(ForceContactDynamics):
                 return float(segment[10])
         return 0.0
 
+    def ConfiguredWallPhotonSurfaceNormal(self, wall_flag, fallback_normal):
+        """Return the surface normal used for photon incidence/strength."""
+        wall_flag = int(wall_flag)
+        rectangle_segments = self.run_configuration.get("rectangle_wall_segments")
+        if isinstance(rectangle_segments, AttrDict):
+            for wall_name, wall_config in rectangle_segments.items():
+                if int(wall_config.get("wall_flag", 0)) != wall_flag:
+                    continue
+                normal = self._vector3(wall_config.get("normal"), f"{wall_name}.normal")
+                normal_length = math.sqrt(sum(component * component for component in normal))
+                if normal_length <= self.EPSILON:
+                    return fallback_normal
+                return tuple(component / normal_length for component in normal)
+        return fallback_normal
+
     def load_constants(self, constants_file_name=None):
         if constants_file_name is None:
             constants_file_name = Path(__file__).resolve().parents[1] / "constants.glsl"
@@ -1494,14 +1515,43 @@ class ForceDynamics(ForceContactDynamics):
                         float(source_position.z) + normal[2] * signed_surface_distance,
                     )
                     wall_material_id = self.ConfiguredWallMaterialID(wall_flag)
+                    wall_surface_behavior = self.MaterialPhotonSurfaceBehavior(
+                        wall_material_id
+                    )
                     self.particles[source_id].colFlg = 1
+                    if wall_surface_behavior == PHOTON_SURFACE_BEHAVIOR_NONE:
+                        continue
+                    payload_rgb = None
+                    if wall_surface_behavior == PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR:
+                        payload_rgb = self.MaterialColorRGB(wall_material_id)
+                    pre_transfer_relative_mass = self.PhotonRelativeMass(source_id)
+                    incidence_normal = self.ConfiguredWallPhotonSurfaceNormal(
+                        wall_flag,
+                        normal,
+                    )
                     _deposit_fraction, deposit_rgb, remaining_mass = (
                         self.TransferPhotonStrengthToSurface(
                             source_id,
-                            normal,
+                            incidence_normal,
                             wall_material_id,
+                            payload_rgb=payload_rgb,
                         )
                     )
+                    if wall_surface_behavior == PHOTON_SURFACE_BEHAVIOR_ABSORB:
+                        deposit_rgb = self.PhotonDepositEnergyGrayRGB(
+                            _deposit_fraction,
+                            pre_transfer_relative_mass,
+                        )
+                        self.DepositBoundarySpaceLightForSurface(
+                            2,
+                            wall_flag,
+                            wall_material_id,
+                            hit_point,
+                            rgb=deposit_rgb,
+                        )
+                        source.Data.w = -1.0
+                        source.state_flg = -1.0
+                        continue
                     self.DepositBoundarySpaceLightForSurface(
                         2,
                         wall_flag,
@@ -1509,7 +1559,18 @@ class ForceDynamics(ForceContactDynamics):
                         hit_point,
                         rgb=deposit_rgb,
                     )
-                    if remaining_mass > self.PhotonMinRelativeMass(source_id):
+                    if wall_surface_behavior == PHOTON_SURFACE_BEHAVIOR_REFLECT:
+                        if remaining_mass > self.PhotonMinRelativeMass(source_id):
+                            self.RecordPhotonReflection(source_id, normal)
+                        else:
+                            source.Data.w = -1.0
+                            source.state_flg = -1.0
+                        continue
+                    if (
+                        wall_surface_behavior
+                        == PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR
+                        and remaining_mass > self.PhotonMinRelativeMass(source_id)
+                    ):
                         self.RecordPhotonReflection(source_id, normal)
                     continue
                 if not self.ProcessFunctionWallCollision(

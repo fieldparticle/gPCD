@@ -233,14 +233,16 @@ def _collect_particles(dynamics, run_configuration):
             )
             if (
                 color is None
-                and not bool(run_configuration.get("boundary_space_lighting_enabled", False))
             ):
-                color = _particle_color(
-                    particle_id,
-                    particle,
-                    dynamics,
-                    run_configuration,
-                )
+                if bool(run_configuration.get("boundary_space_lighting_enabled", False)):
+                    color = _material_debug_color(particle, run_configuration)
+                else:
+                    color = _particle_color(
+                        particle_id,
+                        particle,
+                        dynamics,
+                        run_configuration,
+                    )
             if color is None:
                 continue
             boundary_points.append(point)

@@ -40,6 +40,22 @@ PARTICLE_TYPE_NAMES = {
     "PARTICLE_TYPE_BOUNDARY": PARTICLE_TYPE_BOUNDARY,
 }
 
+PHOTON_SURFACE_BEHAVIOR_NONE = 0
+PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR = 1
+PHOTON_SURFACE_BEHAVIOR_ABSORB = 2
+PHOTON_SURFACE_BEHAVIOR_REFLECT = 3
+
+PHOTON_SURFACE_BEHAVIOR_NAMES = {
+    "NONE": PHOTON_SURFACE_BEHAVIOR_NONE,
+    "SURFACE_COLOR": PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR,
+    "ABSORB": PHOTON_SURFACE_BEHAVIOR_ABSORB,
+    "REFLECT": PHOTON_SURFACE_BEHAVIOR_REFLECT,
+    "PHOTON_SURFACE_BEHAVIOR_NONE": PHOTON_SURFACE_BEHAVIOR_NONE,
+    "PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR": PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR,
+    "PHOTON_SURFACE_BEHAVIOR_ABSORB": PHOTON_SURFACE_BEHAVIOR_ABSORB,
+    "PHOTON_SURFACE_BEHAVIOR_REFLECT": PHOTON_SURFACE_BEHAVIOR_REFLECT,
+}
+
 
 def parse_color_mode(raw_value):
     if isinstance(raw_value, str):
@@ -99,6 +115,15 @@ def parse_particle_type(raw_value):
     return int(raw_value)
 
 
+def parse_photon_surface_behavior(raw_value):
+    if isinstance(raw_value, str):
+        behavior = PHOTON_SURFACE_BEHAVIOR_NAMES.get(raw_value.strip().upper())
+        if behavior is None:
+            raise ValueError(f"unknown photon_surface_behavior: {raw_value}")
+        return behavior
+    return int(raw_value)
+
+
 DEFAULT_MATERIAL_PROPERTIES = (
     {
         "material_id": 0,
@@ -115,6 +140,7 @@ DEFAULT_MATERIAL_PROPERTIES = (
         "photon_energy": 1.0,
         "photon_coupling": 1.0,
         "photon_min_relative_mass": 0.001,
+        "photon_surface_behavior": PHOTON_SURFACE_BEHAVIOR_NONE,
         "cell_density": 0.0,
     },
 )
@@ -171,6 +197,13 @@ def normalized_material_properties(source=None):
         particle_type = parse_particle_type(
             _material_get(raw_material, "particle_type", PARTICLE_TYPE_REGULAR)
         )
+        photon_surface_behavior = parse_photon_surface_behavior(
+            _material_get(
+                raw_material,
+                "photon_surface_behavior",
+                PHOTON_SURFACE_BEHAVIOR_NONE,
+            )
+        )
 
         if not all(
             math.isfinite(value)
@@ -190,6 +223,11 @@ def normalized_material_properties(source=None):
             raise ValueError("photon_coupling must be between 0.0 and 1.0")
         if photon_min_relative_mass < 0.0:
             raise ValueError("photon_min_relative_mass must not be negative")
+        if (
+            photon_surface_behavior < PHOTON_SURFACE_BEHAVIOR_NONE
+            or photon_surface_behavior > PHOTON_SURFACE_BEHAVIOR_REFLECT
+        ):
+            raise ValueError("photon_surface_behavior is outside the valid range")
 
         materials.append(
             {
@@ -207,6 +245,7 @@ def normalized_material_properties(source=None):
                 "photon_energy": photon_energy,
                 "photon_coupling": photon_coupling,
                 "photon_min_relative_mass": photon_min_relative_mass,
+                "photon_surface_behavior": photon_surface_behavior,
                 "cell_density": cell_density,
             }
         )
@@ -227,9 +266,20 @@ def write_particle_type_defines(output):
     output.write(f"PARTICLE_TYPE_BOUNDARY = {PARTICLE_TYPE_BOUNDARY};\n")
 
 
+def write_photon_surface_behavior_defines(output):
+    output.write(f"PHOTON_SURFACE_BEHAVIOR_NONE = {PHOTON_SURFACE_BEHAVIOR_NONE};\n")
+    output.write(
+        "PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR = "
+        f"{PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR};\n"
+    )
+    output.write(f"PHOTON_SURFACE_BEHAVIOR_ABSORB = {PHOTON_SURFACE_BEHAVIOR_ABSORB};\n")
+    output.write(f"PHOTON_SURFACE_BEHAVIOR_REFLECT = {PHOTON_SURFACE_BEHAVIOR_REFLECT};\n")
+
+
 def write_material_properties(output, source=None):
     materials = normalized_material_properties(source)
     write_particle_type_defines(output)
+    write_photon_surface_behavior_defines(output)
     output.write(f"num_material_properties = {len(materials)};\n")
     output.write("material_properties = (\n")
     for material_index, material in enumerate(materials):
@@ -284,6 +334,10 @@ def write_material_properties(output, source=None):
         output.write(
             "        photon_min_relative_mass = "
             f"{float(material.get('photon_min_relative_mass', 0.001)):.9f};\n"
+        )
+        output.write(
+            "        photon_surface_behavior = "
+            f"{int(material.get('photon_surface_behavior', PHOTON_SURFACE_BEHAVIOR_NONE))};\n"
         )
         output.write(f"        cell_density = {float(material['cell_density']):.9f};\n")
         output.write(f"    }}{separator}\n")

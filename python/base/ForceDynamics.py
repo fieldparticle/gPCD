@@ -1425,6 +1425,20 @@ class ForceContactDynamics:
             particle.PosLocB.w = 1.0
             output_position = particle.PosLocA
 
+        death_bounds = self.run_configuration.get("death_bounds")
+        if death_bounds is not None and len(death_bounds) == 6:
+            if (
+                output_position.x < float(death_bounds[0])
+                or output_position.x > float(death_bounds[1])
+                or output_position.y < float(death_bounds[2])
+                or output_position.y > float(death_bounds[3])
+                or output_position.z < float(death_bounds[4])
+                or output_position.z > float(death_bounds[5])
+            ):
+                particle.Data.w = -1.0
+                particle.state_flg = -1.0
+                return True
+
         if (
             output_position.x < 0.0
             or output_position.x >= float(self.ShaderFlags.CellAryW)
@@ -1438,19 +1452,6 @@ class ForceContactDynamics:
                 error_kind="cell-boundary",
                 source_id=SourceID,
             )
-
-        death_bounds = self.run_configuration.get("death_bounds")
-        if death_bounds is not None and len(death_bounds) == 6:
-            if (
-                output_position.x < float(death_bounds[0])
-                or output_position.x > float(death_bounds[1])
-                or output_position.y < float(death_bounds[2])
-                or output_position.y > float(death_bounds[3])
-                or output_position.z < float(death_bounds[4])
-                or output_position.z > float(death_bounds[5])
-            ):
-                particle.Data.w = -1.0
-                particle.state_flg = -1.0
         return True
 
     def GetPhysicalParticleContact(self, SourceID, TargetID):

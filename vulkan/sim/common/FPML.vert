@@ -18,14 +18,14 @@ float BoundaryLightWeight(BoundaryLightRecord source, BoundaryLightRecord other)
 		return 0.0;
 
 	float value = 0.0;
-	if (source.ids.y == 1u)
+	if (source.ids.y == BOUNDARY_LIGHT_SURFACE_SPHERE)
 	{
 		vec3 sourceNormal = normalize(source.normal_material.xyz);
 		vec3 otherNormal = normalize(other.normal_material.xyz);
 		float angle = acos(clamp(dot(sourceNormal, otherNormal), -1.0, 1.0));
 		value = 1.0 - angle / BOUNDARY_SPACE_PATCH_ANGLE;
 	}
-	else if (source.ids.y == 2u)
+	else if (source.ids.y == BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL)
 	{
 		float distance = length(
 			BoundaryLightRecordPosition(source) - BoundaryLightRecordPosition(other));
@@ -298,8 +298,14 @@ void fpml_vert_main(){
 	vec4 mappedColor = color_map(uint(index));
 	if (IsBoundaryParticleForLighting(uint(index)))
 	{
-		gl_PointSize = 0.0;
-		fragColor = vec4(0.0);
+		uint materialID = uint(round(P[index].material_id));
+		if (material_debug_visible(materialID) != 1u)
+		{
+			gl_PointSize = 0.0;
+			fragColor = vec4(0.0);
+			return;
+		}
+		fragColor = material_debug_color(materialID);
 		return;
 	}
 	fragColor = mappedColor;

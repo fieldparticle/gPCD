@@ -1,11 +1,7 @@
 Current status:
-	- Python and Vulkan LightingBall view controls now share generated scene-view fields.
-	- Vulkan uses Python-camera mode when view and zoom are present in the tst file.
-	- Documentation records that remaining view mismatch is mostly window/swapchain aspect tuning.
-
+	- Boundary-space lighting now uses surface identity for sphere and rectangle-wall rendering.
+	- Rectangle walls are documented as real lighting canvases, not only debug/collision targets.
 Code Changes:
-	- Updated LightingBall docs for view_center, view, zoom, view_pan, and mps.cfg window ownership.
-	- Replaced the old Vulkan initial_view TODO with Python/Vulkan view parity validation notes.
-	- Added a ProblemEvolution entry for the Python/Vulkan scene-view coordination milestone.
-
-Next: Validate Vulkan framing with an mps.cfg window aspect matching Python window_size.
+	- Updated Dynamics docs for BoundaryLightRecord surface typing and parameterized render sampling.
+	- Added ProblemEvolution entry for rectangle wall surface ownership and render pass wiring.
+Next: Validate LightingBall Vulkan sphere and rectangle-wall surface lighting, then continue absorbing/shadow behavior.

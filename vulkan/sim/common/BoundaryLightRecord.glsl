@@ -30,6 +30,10 @@
 %*
 %******************************************************************/
 
+const uint BOUNDARY_LIGHT_SURFACE_NONE = 0u;
+const uint BOUNDARY_LIGHT_SURFACE_SPHERE = 1u;
+const uint BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL = 2u;
+
 struct BoundaryLightRecord
 {
     // xyz = persistent boundary-space light RGB, w = valid flag

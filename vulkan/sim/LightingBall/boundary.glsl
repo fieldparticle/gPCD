@@ -3,11 +3,11 @@
 const uint BOUNDARY_ENABLED = 1u;
 const float wall_contact_offset = 0.062500000;
 const float death_x_min = 1.000000000;
-const float death_x_max = 15.000000000;
+const float death_x_max = 19.000000000;
 const float death_y_min = 1.000000000;
-const float death_y_max = 15.000000000;
+const float death_y_max = 19.000000000;
 const float death_z_min = 1.000000000;
-const float death_z_max = 15.000000000;
+const float death_z_max = 21.000000000;
 struct FunctionWallSegment
 {
     uint boundaryKind;
@@ -38,9 +38,9 @@ struct RectangleWallSegment
     uint wallFlag;
 };
 
-const uint RECTANGLE_WALL_SEGMENT_COUNT = 0u;
+const uint RECTANGLE_WALL_SEGMENT_COUNT = 1u;
 const RectangleWallSegment RECTANGLE_WALL_SEGMENTS[1] = RectangleWallSegment[1](
-    RectangleWallSegment(vec3(0.000000000), vec3(1.000000000, 0.000000000, 0.000000000), vec3(0.000000000, 1.000000000, 0.000000000), 0.000000000, 0.000000000, vec3(0.000000000, 0.000000000, 1.000000000), 0u)
+    RectangleWallSegment(vec3(16.000000000, 2.000000000, 2.000000000), vec3(0.000000000, 1.000000000, 0.000000000), vec3(0.000000000, 0.000000000, 1.000000000), 14.000000000, 14.000000000, normalize(vec3(-1.000000000, 0.000000000, 0.000000000)), 2000u)
 );
 
 #define HAS_BOUNDARY

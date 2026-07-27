@@ -157,6 +157,9 @@ void Resource::GeneralViewing(uint32_t CurrentBuffer)
 	if (hasPythonView)
 	{
 		glm::vec3 pythonView = LookupVec3Strict(CfgTst, "view");
+		pythonView.x += rRotX;
+		pythonView.y += rRotY;
+		pythonView.z += rRotZ;
 		float pythonZoom = LookupFloatStrict(CfgTst, "zoom");
 		if (pythonZoom <= 0.0f)
 			throw std::runtime_error("zoom must be greater than zero");

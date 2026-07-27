@@ -16,6 +16,7 @@
 #include "..\common\lighting_particle.glsl"
 #include "..\common\util.glsl"
 #include "..\common\color_map.glsl"
+#include "..\common\BoundaryLightRecord.glsl"
 #include "boundary.glsl"
 #include "sphere.glsl"
 
@@ -45,6 +46,8 @@ layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec3 surfaceNormal;
 layout(location = 2) flat out uint surfaceCellId;
 layout(location = 3) out vec3 surfaceWorldPos;
+layout(location = 4) flat out uint renderSurfaceType;
+layout(location = 5) flat out uint renderSurfaceID;
 
 mat4 BuildTranslation(vec3 delta)
 {
