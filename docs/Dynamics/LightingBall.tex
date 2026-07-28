@@ -83,8 +83,9 @@ does not include the lighting SSBO or photon lighting behavior.  The lighting
 application uses the \texttt{FPML.*} shader family for photon-aware compute
 and particle/debug rendering.  The lighting surface itself uses
 \texttt{BoundaryLight.vert} and \texttt{BoundaryLight.frag}.  \texttt{FPML.comp}
-deposits incidence-weighted spectral color into the lighting resource, and
-the lighting surface fragment shader reads that cell-owned state directly.
+deposits incidence-weighted spectral color into the OBJ-backed
+\texttt{LightingSurfaceVertex.light} resource, and the lighting surface
+fragment shader draws ordinary interpolated vertex color.
 
 Vulkan rendering also uses the material-owned color-mode contract.  Material
 records contain \texttt{color\_mode} and \texttt{color}.  The generated
@@ -225,18 +226,36 @@ material response, or deposited lighting.
 \subsubsection{Domain And Geometry}
 
 \begin{description}
+    \item[\texttt{scene\_model}] Authored object-library geometry for
+    \texttt{LightingBall}.  The generator derives the compatibility
+    \texttt{Lighting\_ball}, \texttt{rectangle\_wall\_segments},
+    \texttt{curve\_wall\_segments}, and \texttt{lighting\_surface\_objects}
+    data from this block.  Engineering particle simulations may continue to
+    author wall-segment geometry directly; the lighting app uses
+    \texttt{scene\_model} to keep collision geometry and graphics surfaces
+    coordinated.
+    \item[\texttt{scene\_model.objects[].roles}] Selects each object's use:
+    \texttt{"collision"}, \texttt{"boundary\_markers"}, and/or
+    \texttt{"lighting\_surface"}.
+    \item[\texttt{rectangle\_u\_segments},
+    \texttt{rectangle\_v\_segments}] Optional rectangle-object render mesh
+    resolution.  These are positive integers on a
+    \texttt{type="rectangle"} scene object.  Missing values default to
+    \(\lceil u\_length\rceil\) and \(\lceil v\_length\rceil\).
+    \item[\texttt{sphere\_lat\_segments},
+    \texttt{sphere\_lon\_segments}] Optional sphere-object render mesh
+    resolution.  These are positive integers on a \texttt{type="sphere"}
+    scene object.  Missing values default to \(32\) latitude segments and
+    \(64\) longitude segments.
     \item[\texttt{Lighting\_ball}] Defines the analytic sphere center,
-    radius, material id, and wall flag.  Boundary particles are only locality
-    markers; collision and surface lighting use the analytic sphere.
+    radius, material id, and wall flag after \texttt{scene\_model}
+    derivation.  Boundary particles are only locality markers; collision and
+    surface lighting use the analytic sphere.
     \item[\texttt{rectangle\_wall\_segments}] Defines finite rectangle walls.
     Each wall supplies origin, \(u/v\) axes and extents, inward normal,
-    \texttt{wall\_flag}, and \texttt{material\_id}.  Vulkan uses this both for
-    wall contact metadata and for the wall-surface render triangles.
-    \item[\texttt{boundary\_light\_wall\_subdivisions\_per\_cell}] Controls
-    the density of the generated wall lighting mesh.  A value of \(1\)
-    produces one quad per cell-sized wall tile, or two triangles per tile.
-    A value of \(2\) produces a \(2\times2\) subdivision inside each tile, or
-    eight triangles per tile.
+    \texttt{wall\_flag}, and \texttt{material\_id}.  Vulkan uses this for
+    wall contact and deposit projection.  The visible wall surface comes from
+    the OBJ-backed \texttt{lighting\_surface\_objects} path.
     \item[\texttt{cell\_array\_width/height/depth}] Defines the spatial cell
     domain.  Boundary-space lighting allocates one \texttt{BoundaryLightRecord}
     per cell.
@@ -282,7 +301,9 @@ surface behavior.  These must not be treated as one knob.
     ordinary surface materials.
     \item[\texttt{relative\_mass}] Initial particle mass/strength for generated
     particles using this material.  Photon transport strength currently starts
-    from this value.
+    from this value.  For photons, \texttt{parms.x} is the active
+    relative-mass strength and is reduced by surface deposit while velocity
+    magnitude remains fixed.
     \item[\texttt{color\_mode}] Particle/debug rendering mode.  Active values
     are \texttt{"COLLISION"}, \texttt{"VELOCITY\_ANGLE"},
     \texttt{"SOLID"}, and \texttt{"LUMENS"}.
@@ -296,8 +317,6 @@ surface behavior.  These must not be treated as one knob.
     spectral surface deposit, this multiplies the incoming photon spectrum.
     \item[\texttt{spectral\_emission}] RGB-band visible emission/gain for
     ordinary spectral surface deposit.
-    \item[\texttt{photon\_energy}] Photon material energy multiplier used by
-    spectral deposit in Vulkan.
     \item[\texttt{photon\_coupling}] Fraction of normal-aligned photon
     momentum/light accepted by the surface.  This is the current brightness
     control for an absorbing shadow wall.
@@ -350,41 +369,48 @@ boundary_light_render_gain
 boundary_space_patch_angle
 boundary_space_patch_radius
 boundary_space_patch_falloff
+boundary_light_wall_subdivisions_per_cell
+photon_energy
 lumens_debug_always_visible
 lumens_debug_color
 \end{verbatim}
 
 \texttt{boundary\_space\_patch\_*} belonged to the retired proxy-spread model.
-The active Vulkan surface path is cell-owned:
+The active Vulkan visible surface path is OBJ-backed:
 \[
-    \textrm{fragment world position}
+    \textrm{photon contact}
     \rightarrow
-    \textrm{cell id}
+    \textrm{surface object span}
     \rightarrow
-    \texttt{BoundaryLight[cell id]}.
+    \texttt{LightingSurfaceVertex.light}.
 \]
+\texttt{boundary\_light\_wall\_subdivisions\_per\_cell} was replaced by
+per-object rectangle mesh fields in \texttt{scene\_model}.  Photon strength is
+now the photon's relative mass, so \texttt{photon\_energy} is retired from
+active cfg authoring.
 
 Debug photon visibility belongs to material
 \texttt{debug\_visible}/\texttt{debug\_color}, not to the old flat
 \texttt{lumens\_*} debug fields.
 
-\subsection{Surface OBJ Debug Export}
+\subsection{Surface OBJ Export}
 
-The next Python-side debugging artifact should be a generated OBJ surface
-export for \texttt{LightingBall}.  The OBJ files should describe renderable
-surfaces only, not photons or boundary marker particles.  The first useful
-set is:
+Python now generates OBJ-backed render surfaces for \texttt{LightingBall}.
+The OBJ files describe renderable surfaces only, not photons or boundary
+marker particles.  The generated set is:
 \begin{verbatim}
 LightingBall_sphere.obj
 LightingBall_wall.obj
 LightingBall_surfaces.obj
 \end{verbatim}
 
-The sphere OBJ should be generated from \texttt{Lighting\_ball}.  The wall
-OBJ should be generated from \texttt{rectangle\_wall\_segments} and
-\texttt{boundary\_light\_wall\_subdivisions\_per\_cell}.  The wall mesh should
-match the layout built by \texttt{ResourceLightingSurface}, so Blender can be
-used to verify the same geometry that Vulkan is expected to draw.
+The sphere and wall OBJs are generated from the derived
+\texttt{scene\_model}/\texttt{lighting\_surface\_objects} data.  Rectangle
+mesh density comes from \texttt{rectangle\_u\_segments} and
+\texttt{rectangle\_v\_segments}; sphere mesh density comes from
+\texttt{sphere\_lat\_segments} and \texttt{sphere\_lon\_segments}.  The same
+OBJ files are loaded by \texttt{ResourceLightingSurface}, so Blender can
+inspect the same graphics surface that Vulkan draws.
 
 This export is an inspection tool.  Runtime collision still uses the analytic
 sphere and rectangle-wall equations, and the particle/bin data should not be

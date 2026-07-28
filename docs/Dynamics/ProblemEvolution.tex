@@ -3450,3 +3450,65 @@ simulations still use \texttt{curve\_wall\_segments} and
 application is a computer-graphics application layered on top of that
 geometry: photons transport strength, materials choose behavior, and
 \texttt{LightingSurfaceVertex.light} owns the visible surface result.
+
+\subsection{Lighting Scene Mesh Resolution Moves Into Scene Objects}
+
+\subsubsection{previous form}
+
+The first generated rectangle-wall lighting mesh used the global configuration
+item:
+\begin{verbatim}
+boundary_light_wall_subdivisions_per_cell
+\end{verbatim}
+That name exposed the earlier cell-owned implementation detail to the scene
+author.  It also only made sense for rectangle walls, even though the lighting
+application now uses a common object-library direction for spheres and
+rectangles.  At the same time, photon strength was split between
+\texttt{relative\_mass}/\texttt{parms.x} and the material field
+\texttt{photon\_energy}, which made the lighting model harder to reason about.
+
+\subsubsection{current form}
+
+\texttt{scene\_model.objects} now owns render mesh resolution with
+type-specific fields:
+\begin{verbatim}
+rectangle_u_segments
+rectangle_v_segments
+sphere_lat_segments
+sphere_lon_segments
+\end{verbatim}
+The rectangle fields are optional positive integers that default to
+\(\lceil u\_length\rceil\) and \(\lceil v\_length\rceil\).  The sphere fields
+are optional positive integers that default to \(32\) latitude segments and
+\(64\) longitude segments.  Python carries these values into
+\texttt{lighting\_surface\_objects}; OBJ export uses them directly, and Vulkan
+wall-deposit metadata derives its wall vertex-grid step counts from the same
+surface-object metadata.  The global
+\texttt{boundary\_light\_wall\_subdivisions\_per\_cell} is no longer generated
+or read by active code.
+
+Photon strength is now the photon's relative mass stored in
+\texttt{parms.x}.  Surface deposit reduces that relative mass while preserving
+velocity magnitude.  Periodic photon reuse restores the original relative
+mass.  The active cfg model no longer writes \texttt{photon\_energy}; the
+transitional GLSL material ABI name \texttt{spectralResponseEnergy} remains,
+but its \texttt{.w} component is ignored by the lighting compute path.
+
+\subsubsection{difference outcome}
+
+full solution
+
+\subsubsection{Analysis}
+
+This moves graphics resolution to the object that owns the graphics surface.
+Rectangles and spheres can now use different names because their tessellation
+meanings are different: planar \(u/v\) segments for rectangles and angular
+latitude/longitude segments for spheres.  The simulation cell array remains a
+lighting/deposit acceleration and debug structure; it is no longer the user
+interface for render mesh density.
+
+Collapsing photon strength onto relative mass also matches the current photon
+transport rule.  Photons keep fixed velocity magnitude, so losing momentum or
+lighting strength means reducing relative mass.  Removing
+\texttt{photon\_energy} prevents a second strength knob from fighting that
+model.

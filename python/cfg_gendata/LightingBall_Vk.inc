@@ -7,7 +7,7 @@ scene_model = {
     {
       name = "lighting_sphere";
       type = "sphere";
-      center = [9.0, 8.0, 14.0];
+      center = [9.0, 8.0, 10.0];
       radius = 4.0;
       material_id = 1;
       surface_id = 1000;
@@ -25,6 +25,8 @@ scene_model = {
       material_id = 2;
       surface_id = 2000;
       roles = ["collision", "boundary_markers", "lighting_surface"];
+      rectangle_u_segments = 80;
+      rectangle_v_segments = 80;
     }
   );
 };
@@ -32,9 +34,6 @@ scene_model = {
 // Enables persistent boundary-space lighting. Retired boundary_space_patch_*
 // keys must not be used; lighting is now cell-owned.
 boundary_space_lighting_enabled 	= true;
-// Wall surface mesh density for later per-vertex wall lighting.
-// triangles_per_cell = subdivisions_per_cell * subdivisions_per_cell * 2.
-boundary_light_wall_subdivisions_per_cell = 1;
 
 // --------------------------------------------------------------------------
 // Domain and view
@@ -62,7 +61,7 @@ particle_streams = (
     name = "photon_beam";
     material_id = 0;
 
-    // Dense x-directed beam centered on the Lighting_ball y/z cross-section.
+    // Dense x-directed beam matched to the shadow_wall y/z face.
     // Vulkan profile is dense: 80 x 80 = 6400 photons per wave.
     initial_particle_velocity = [0.209968, 0.0, 0.0];
 
@@ -75,13 +74,13 @@ particle_streams = (
     inlet_value = 4.0;
 
     span_u_axis = "y";
-    span_u_min = 4.0;
-    span_u_max = 12.0;
+    span_u_min = 2.0;
+    span_u_max = 16.0;
     span_u_count = 80;
 
     span_v_axis = "z";
-    span_v_min = 10.0;
-    span_v_max = 18.0;
+    span_v_min = 2.0;
+    span_v_max = 16.0;
     span_v_count = 80;
   }
 );

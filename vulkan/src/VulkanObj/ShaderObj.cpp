@@ -144,6 +144,8 @@ namespace
 		uint32_t materialID = 0u;
 		uint32_t vertexOffset = 0u;
 		uint32_t vertexCount = 0u;
+		uint32_t rectangleUSegments = 0u;
+		uint32_t rectangleVSegments = 0u;
 	};
 
 	std::vector<LightingSurfaceObjectInfo> LightingSurfaceObjectOffsets(ConfigObj* cfg)
@@ -195,12 +197,42 @@ namespace
 				info.materialID = static_cast<uint32_t>(materialID);
 				info.vertexOffset = vertexOffset;
 				info.vertexCount = CountObjFaceVertices(objFile);
+				if (surfaceType == 2u)
+				{
+					int rectangleUSegments = 0;
+					int rectangleVSegments = 0;
+					if (config_setting_lookup_int(object, "rectangle_u_segments", &rectangleUSegments) == CONFIG_TRUE)
+					{
+						if (rectangleUSegments <= 0)
+							throw std::runtime_error("lighting_surface_objects[" + std::to_string(index) + "].rectangle_u_segments must be positive");
+						info.rectangleUSegments = static_cast<uint32_t>(rectangleUSegments);
+					}
+					if (config_setting_lookup_int(object, "rectangle_v_segments", &rectangleVSegments) == CONFIG_TRUE)
+					{
+						if (rectangleVSegments <= 0)
+							throw std::runtime_error("lighting_surface_objects[" + std::to_string(index) + "].rectangle_v_segments must be positive");
+						info.rectangleVSegments = static_cast<uint32_t>(rectangleVSegments);
+					}
+				}
 				objects.push_back(info);
 				vertexOffset += info.vertexCount;
 			}
 		}
 
 		return objects;
+	}
+
+	const LightingSurfaceObjectInfo* FindLightingSurfaceObject(
+		const std::vector<LightingSurfaceObjectInfo>& objects,
+		uint32_t surfaceType,
+		uint32_t surfaceID)
+	{
+		for (const LightingSurfaceObjectInfo& object : objects)
+		{
+			if (object.surfaceType == surfaceType && object.surfaceID == surfaceID)
+				return &object;
+		}
+		return nullptr;
 	}
 
 }
@@ -807,12 +839,6 @@ std::ostringstream ShaderObj::RectangleWalls()
 
 	int segmentCount = 0;
 	config_setting_t* segmentList = nullptr;
-	uint32_t subdivisionsPerCell = CfgTst->CheckKey("boundary_light_wall_subdivisions_per_cell")
-		? CfgTst->GetUInt("boundary_light_wall_subdivisions_per_cell", true)
-		: 1u;
-	if (subdivisionsPerCell == 0u)
-		throw std::runtime_error("boundary_light_wall_subdivisions_per_cell must be positive");
-
 	if (CfgTst->CheckKey("rectangle_wall_segments"))
 		segmentList = CfgTst->StartStructure("rectangle_wall_segments", segmentCount);
 
@@ -931,12 +957,21 @@ std::ostringstream ShaderObj::RectangleWalls()
 		uint32_t wallFlag = static_cast<uint32_t>(
 			config_setting_get_float_elem(segment, 14)
 			);
+		const LightingSurfaceObjectInfo* surfaceObject =
+			FindLightingSurfaceObject(surfaceObjects, 2u, wallFlag);
 		uint32_t uStepCount = static_cast<uint32_t>(
 			std::ceil(std::max(1.0, uLength))
-			) * subdivisionsPerCell;
+			);
 		uint32_t vStepCount = static_cast<uint32_t>(
 			std::ceil(std::max(1.0, vLength))
-			) * subdivisionsPerCell;
+			);
+		if (surfaceObject != nullptr)
+		{
+			if (surfaceObject->rectangleUSegments > 0u)
+				uStepCount = surfaceObject->rectangleUSegments;
+			if (surfaceObject->rectangleVSegments > 0u)
+				vStepCount = surfaceObject->rectangleVSegments;
+		}
 
 		wall_str
 			<< "    RectangleWallSegment("
@@ -1089,10 +1124,6 @@ void  ShaderObj::WriteShaderHeader()
 				<< m_VPO->BoundaryParticleLimit << ";\n"
 			<< "const float point_size = "
 				<< std::fixed << std::setprecision(2) << CfgTst->GetFloat("gl_point_size", true) << ";\n"
-			<< "const uint BOUNDARY_LIGHT_WALL_SUBDIVISIONS_PER_CELL = "
-				<< (CfgTst->CheckKey("boundary_light_wall_subdivisions_per_cell")
-					? CfgTst->GetUInt("boundary_light_wall_subdivisions_per_cell", true)
-					: 1u) << "u;\n"
 			<< "#define PHOTON_PERIODIC_RECYCLE_ENABLED "
 				<< (CfgTst->CheckKey("photon_periodic_recycle_enabled") &&
 						CfgTst->GetBool("photon_periodic_recycle_enabled", true)

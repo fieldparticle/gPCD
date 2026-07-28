@@ -77,6 +77,18 @@ def _as_positive_int(raw_value, errors, context):
     return value
 
 
+def _as_optional_positive_int(raw_value, default_value, errors, context):
+    if raw_value is None:
+        return int(default_value)
+    if type(raw_value) is not int:
+        errors.append(f"{context} must be an integer")
+        return None
+    if raw_value <= 0:
+        errors.append(f"{context} must be positive")
+        return None
+    return raw_value
+
+
 def _as_nonnegative_int(raw_value, errors, context):
     if type(raw_value) is not int:
         errors.append(f"{context} is required and must be an integer")
@@ -181,6 +193,18 @@ def _rectangle_wall_config(name, obj, errors, context):
         errors.append(f"{context}.u_axis and v_axis must differ")
     if normal is not None and math.sqrt(sum(value * value for value in normal)) <= 1.0e-12:
         errors.append(f"{context}.normal must not be zero")
+    rectangle_u_segments = _as_optional_positive_int(
+        obj.get("rectangle_u_segments"),
+        max(1, math.ceil(u_length)) if u_length is not None else 1,
+        errors,
+        f"{context}.rectangle_u_segments",
+    )
+    rectangle_v_segments = _as_optional_positive_int(
+        obj.get("rectangle_v_segments"),
+        max(1, math.ceil(v_length)) if v_length is not None else 1,
+        errors,
+        f"{context}.rectangle_v_segments",
+    )
     if (
         origin is None
         or normal is None
@@ -188,6 +212,8 @@ def _rectangle_wall_config(name, obj, errors, context):
         or v_length is None
         or surface_id is None
         or material_id is None
+        or rectangle_u_segments is None
+        or rectangle_v_segments is None
         or u_axis not in {"x", "y", "z"}
         or v_axis not in {"x", "y", "z"}
         or u_axis == v_axis
@@ -203,6 +229,8 @@ def _rectangle_wall_config(name, obj, errors, context):
             "normal": normal,
             "wall_flag": surface_id,
             "material_id": material_id,
+            "rectangle_u_segments": rectangle_u_segments,
+            "rectangle_v_segments": rectangle_v_segments,
         }
     )
 
@@ -216,11 +244,25 @@ def _lighting_ball_config(obj, errors, context):
         errors,
         f"{context}.material_id",
     )
+    sphere_lat_segments = _as_optional_positive_int(
+        obj.get("sphere_lat_segments"),
+        32,
+        errors,
+        f"{context}.sphere_lat_segments",
+    )
+    sphere_lon_segments = _as_optional_positive_int(
+        obj.get("sphere_lon_segments"),
+        64,
+        errors,
+        f"{context}.sphere_lon_segments",
+    )
     if (
         center is None
         or radius is None
         or surface_id is None
         or material_id is None
+        or sphere_lat_segments is None
+        or sphere_lon_segments is None
     ):
         return None
     return AttrDict(
@@ -231,6 +273,8 @@ def _lighting_ball_config(obj, errors, context):
             "radius": radius,
             "material_id": material_id,
             "wall_flag": surface_id,
+            "sphere_lat_segments": sphere_lat_segments,
+            "sphere_lon_segments": sphere_lon_segments,
         }
     )
 
@@ -300,8 +344,8 @@ def _curve_wall_config(obj, errors, context):
     )
 
 
-def _lighting_surface_object(name, object_type, surface_id, material_id):
-    return AttrDict(
+def _lighting_surface_object(name, object_type, surface_id, material_id, **metadata):
+    surface_object = AttrDict(
         {
             "name": name,
             "source": "scene_model",
@@ -310,6 +354,9 @@ def _lighting_surface_object(name, object_type, surface_id, material_id):
             "material_id": material_id,
         }
     )
+    for key, value in metadata.items():
+        surface_object[key] = value
+    return surface_object
 
 
 def apply_scene_model(config):
@@ -372,6 +419,8 @@ def apply_scene_model(config):
                         "sphere",
                         int(sphere_config["wall_flag"]),
                         int(sphere_config["material_id"]),
+                        sphere_lat_segments=int(sphere_config["sphere_lat_segments"]),
+                        sphere_lon_segments=int(sphere_config["sphere_lon_segments"]),
                     )
                 )
         elif object_type == "rectangle":
@@ -387,6 +436,12 @@ def apply_scene_model(config):
                         "rectangle_wall",
                         int(rectangle_config["wall_flag"]),
                         int(rectangle_config["material_id"]),
+                        rectangle_u_segments=int(
+                            rectangle_config["rectangle_u_segments"]
+                        ),
+                        rectangle_v_segments=int(
+                            rectangle_config["rectangle_v_segments"]
+                        ),
                     )
                 )
         elif object_type == "curve":

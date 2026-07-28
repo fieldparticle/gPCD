@@ -23,12 +23,12 @@ particles, but their optical rule is special:
 \end{itemize}
 
 This is useful for debugging whether photons hit the correct surface and
-whether the material color source is being read correctly.  Surface lighting
-itself is now owned by \texttt{BoundaryLightRecord} state in the
-\texttt{ParticleLighting} Vulkan path.  For \texttt{LightingBall}, photon
-contact deposits incidence-weighted RGB-band spectral color into the spatial
-cell containing the analytic hit point, and the lighting surface fragment
-shader reads that cell-owned color.
+whether the material color source is being read correctly.  Visible surface
+lighting itself is now owned by \texttt{LightingSurfaceVertex.light} state in
+the \texttt{ParticleLighting} Vulkan path.  For \texttt{LightingBall}, photon
+contact deposits incidence-weighted RGB-band spectral color into the
+OBJ-backed surface vertices near the analytic hit point, and the lighting
+surface fragment shader draws the interpolated vertex color.
 
 \subsection{Why Direct Photon Rendering Was Unsatisfying}
 
@@ -229,15 +229,16 @@ first scalar path is proven:
 
 \subsection{Boundary Sample Choice}
 
-For \texttt{LightingBall}, the first Vulkan lighting owner is the spatial cell
-that contains the analytic sphere hit point.  Existing generated sphere markers
-remain useful because they make nearby analytic sphere geometry discoverable,
-but they no longer own the final Vulkan surface color.
+For \texttt{LightingBall}, the first durable Vulkan lighting owner is the
+OBJ-backed surface vertex near the analytic hit point.  Existing generated
+sphere markers remain useful because they make nearby analytic sphere geometry
+discoverable, but they no longer own the final Vulkan surface color.
 
 A separate spectral or energy sample set is still deferred.  The current
-direction is to keep \texttt{BoundaryLightRecord.rgb\_valid} as the final
-visible cell color while learning which transport behaviors require additional
-Vulkan tables.
+direction is to keep \texttt{LightingSurfaceVertex.light} as the final visible
+surface color while learning which transport behaviors require additional
+Vulkan tables.  \texttt{BoundaryLightRecord} remains useful for cell ownership
+and debug inspection.
 
 \subsection{Effect On Current Debug Controls}
 
@@ -252,19 +253,20 @@ configuration value such as \texttt{photon\_light\_influence\_radius}.
 
 \subsection{Near-Term Decision}
 
-The current decision is to use persistent cell-owned boundary-space color for
-Vulkan \texttt{LightingBall}.  The cleaned scene removes the old boundary-light
-sample/state path and visible surface-cell path, and the current Vulkan
-implementation proves:
+The current decision is to use persistent OBJ-backed surface-vertex color for
+Vulkan \texttt{LightingBall}.  The cleaned scene removes the old
+boundary-light sample/state path, the visible surface-cell path, and the
+moving-photon-as-surface-color path.  The current Vulkan implementation
+proves:
 \[
     \textrm{photon hit}
     \rightarrow
     \textrm{incidence-weighted spectral deposit}
     \rightarrow
-    \textrm{persistent cell-owned surface color}
+    \textrm{persistent OBJ surface-vertex color}
     \rightarrow
-    \textrm{analytic surface fragment color}.
+    \textrm{ordinary interpolated surface color}.
 \]
 
 The next decisions are, in order, diffuse light stream, absorbing shadow
-surface, and reflective surface.
+surface refinement, and reflective surface transport.

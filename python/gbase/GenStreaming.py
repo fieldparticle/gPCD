@@ -644,20 +644,6 @@ class GenStreaming(GenericGenData):
             boundary_space_lighting_enabled = False
             errors.append("boundary_space_lighting_enabled must be a boolean")
 
-        try:
-            boundary_light_wall_subdivisions_per_cell = int(
-                self.itemcfg.get("boundary_light_wall_subdivisions_per_cell", 1)
-            )
-            if boundary_light_wall_subdivisions_per_cell <= 0:
-                errors.append(
-                    "boundary_light_wall_subdivisions_per_cell must be positive"
-                )
-        except (TypeError, ValueError):
-            boundary_light_wall_subdivisions_per_cell = 1
-            errors.append(
-                "boundary_light_wall_subdivisions_per_cell must be an integer"
-            )
-
         if boundary_space_lighting_enabled:
             if self.itemcfg.get("Lighting_ball") is None:
                 errors.append(
@@ -686,9 +672,6 @@ class GenStreaming(GenericGenData):
         self.dt = float(self.itemcfg.dt)
         self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
         self.boundary_space_lighting_enabled = bool(boundary_space_lighting_enabled)
-        self.boundary_light_wall_subdivisions_per_cell = (
-            boundary_light_wall_subdivisions_per_cell
-        )
         self.calculate_streaming_layout()
         return True
 

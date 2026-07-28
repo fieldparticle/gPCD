@@ -1,20 +1,13 @@
-Right, local convention wants the full structured message. Better version:
-
-```text
 Current status:
-	- LightingBall now uses scene_model as the authored geometry source.
-	- Python derives compatibility collision blocks and exports OBJ-backed lighting_surface_objects.
-	- Vulkan ParticleLighting loads OBJ-backed sphere and wall surfaces into LightingSurfaceVertex.
-	- Photon deposits now drive visible surface-vertex light while BoundaryLightRecord remains cell ownership/debug state.
-	- Vulkan material surface behavior now tracks NONE, SURFACE_COLOR, ABSORB, and REFLECT.
+	- LightingBall now uses scene_model object mesh controls for render surface resolution.
+	- OBJ-backed sphere and wall lighting are documented as the active visible surface path.
+	- Photon strength is simplified to relative_mass/parms.x; photon_energy is retired from active cfg authoring.
+	- BoundaryLightRecord is documented as ownership/debug state, not the final visible surface color.
 
 Code Changes:
-	- Added scene_model parsing, validation, derived runtime geometry, and OBJ surface export.
-	- Updated LightingBall Py/Vk configs for scene_model and lighting surface object output.
-	- Updated ShaderObj export for lighting surface object metadata and material photon behavior.
-	- Updated FPML lighting compute to deposit into OBJ-backed surface vertices for sphere and wall hits.
-	- Updated ParticleLighting surface resources and shaders for shared LightingSurfaceVertex rendering.
-	- Updated dynamics docs, todo, porting notes, and problem evolution for the OBJ-backed boundary-space milestone.
+	- Updated LightingBall, boundary-space lighting, photon-lighting analysis, porting, Python cfg, todo, and problem-evolution docs.
+	- Documented rectangle_u_segments/rectangle_v_segments and sphere_lat_segments/sphere_lon_segments.
+	- Removed stale docs for boundary_light_wall_subdivisions_per_cell as an active render-density control.
+	- Added a ProblemEvolution entry for scene-object mesh resolution and photon strength cleanup.
 
-Next: Validate longer Vulkan captures for material behaviors, then work on diffuse light stream, absorbing shadow refinement, and reflective surface transport.
-```
+Next: Validate regenerated LightingBall Py/Vk data, then add the diffuse back-light photon stream.

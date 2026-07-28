@@ -294,6 +294,15 @@ This metadata is generated from \texttt{lighting\_surface\_objects}, not from
 the analytic wall blocks.  Rectangle wall analytic records remain collision
 and deposit-projection geometry.  OBJ-backed surface records identify where
 compute may write visible light in \texttt{LightingSurfaceVertex.light}.
+The generated \texttt{.tst} surface-object records may also carry render mesh
+resolution fields such as \texttt{rectangle\_u\_segments},
+\texttt{rectangle\_v\_segments}, \texttt{sphere\_lat\_segments}, and
+\texttt{sphere\_lon\_segments}.  The rectangle counts are consumed while
+generating \texttt{LightingSurfaceWallMetadata.uStepCount/vStepCount}; sphere
+counts are consumed by Python OBJ generation.
+The retired global
+\texttt{boundary\_light\_wall\_subdivisions\_per\_cell} must not be generated
+or read by active lighting code.
 
 When \texttt{RECTANGLE\_WALL\_SEGMENT\_COUNT} is nonzero, the simple wall
 path must evaluate rectangle walls and must not also evaluate

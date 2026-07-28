@@ -2396,7 +2396,7 @@ struct Particle {
     float material_id;         // material/color source
 
     vec4 initial_pos_birth;    // xyz=original slot position, w=original release frame
-    vec4 initial_vel_energy;   // xyz=original photon velocity, w=photon energy
+    vec4 initial_vel_energy;   // xyz=original photon velocity, w=reserved
     vec4 photon_transport;     // x=lived frames, y=cycle count, z=flags, w=reserved
 };
 
@@ -2539,15 +2539,15 @@ vec4 boundary_light_material_color(uint materialID)
     return vec4(1.0, 1.0, 1.0, 1.0);
 }
 
-vec4 boundary_light_material_spectral_response_energy(uint materialID)
+vec3 boundary_light_material_spectral_response(uint materialID)
 {
     for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
     {
         if (MATERIAL_PROPERTIES[ii].materialID == materialID)
-            return MATERIAL_PROPERTIES[ii].spectralResponseEnergy;
+            return MATERIAL_PROPERTIES[ii].spectralResponseEnergy.rgb;
     }
 
-    return vec4(1.0, 1.0, 1.0, 1.0);
+    return vec3(1.0, 1.0, 1.0);
 }
 
 vec3 boundary_light_material_spectral_emission(uint materialID)
@@ -2918,7 +2918,8 @@ vec3 boundary_light_spectral_deposit_rgb(
     uint photonMaterialID,
     uint surfaceMaterialID,
     vec3 photonVelocity,
-    vec3 surfaceNormal)
+    vec3 surfaceNormal,
+    float relativeMass)
 {
     float incidence = photon_deposit_fraction(
         photonVelocity,
@@ -2926,12 +2927,11 @@ vec3 boundary_light_spectral_deposit_rgb(
         surfaceMaterialID);
     if (incidence <= 0.0) { return vec3(0.0); }
 
-    vec4 photonSpectrumEnergy =
-        boundary_light_material_spectral_response_energy(photonMaterialID);
     vec3 photonSpectrum =
-        photonSpectrumEnergy.rgb * photonSpectrumEnergy.w;
+        boundary_light_material_spectral_response(photonMaterialID) *
+        max(relativeMass, 0.0);
     vec3 surfaceResponse =
-        boundary_light_material_spectral_response_energy(surfaceMaterialID).rgb;
+        boundary_light_material_spectral_response(surfaceMaterialID);
     vec3 surfaceEmission =
         boundary_light_material_spectral_emission(surfaceMaterialID);
 
@@ -2978,7 +2978,8 @@ void DepositSpectralBoundaryLightAtCell(
     uint photonMaterialID,
     uint surfaceMaterialID,
     vec3 photonVelocity,
-    vec3 surfaceNormal)
+    vec3 surfaceNormal,
+    float relativeMass)
 {
     if (cellID == npos || cellID >= MAX_CELL_ARRAY_LOCATIONS) {
         return;
@@ -2988,7 +2989,8 @@ void DepositSpectralBoundaryLightAtCell(
             photonMaterialID,
             surfaceMaterialID,
             photonVelocity,
-            surfaceNormal),
+            surfaceNormal,
+            relativeMass),
         1.0);
 }
 

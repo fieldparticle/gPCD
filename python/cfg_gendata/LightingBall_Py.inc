@@ -7,7 +7,7 @@ scene_model = {
     {
       name = "lighting_sphere";
       type = "sphere";
-      center = [9.0, 8.0, 14.0];
+      center = [9.0, 8.0, 10.0];
       radius = 4.0;
       material_id = 1;
       surface_id = 1000;
@@ -25,6 +25,8 @@ scene_model = {
       material_id = 2;
       surface_id = 2000;
       roles = ["collision", "boundary_markers", "lighting_surface"];
+      rectangle_u_segments = 80;
+      rectangle_v_segments = 80;
     }
   );
 };
@@ -32,9 +34,6 @@ scene_model = {
 // Enables persistent boundary-space lighting. Retired boundary_space_patch_*
 // keys must not be used; lighting is now cell-owned.
 boundary_space_lighting_enabled 	= true;
-// Wall surface mesh density for later per-vertex wall lighting.
-// triangles_per_cell = subdivisions_per_cell * subdivisions_per_cell * 2.
-boundary_light_wall_subdivisions_per_cell = 1;
 
 // --------------------------------------------------------------------------
 // Domain and view

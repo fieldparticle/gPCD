@@ -86,38 +86,29 @@ feature.
 
 For \texttt{LightingBall}, photon contact is evaluated against the analytic
 sphere, not against the marker particles.  When a photon contacts the sphere,
-the compute shader writes the cell containing the analytic hit point:
+the compute shader uses the analytic contact normal to find nearby vertices in
+the matching OBJ-backed sphere surface:
 \begin{verbatim}
 hitPoint = LIGHTING_BALL_CENTER + contactNormal * LIGHTING_BALL_RADIUS
-cell_id = CellAddress(hitPoint)
-BoundaryLight[cell_id].rgb_valid = visibleDeposit, valid=true
+surfaceObject = lookup(SPHERE, LIGHTING_BALL_WALL_FLAG)
+nearby sphere vertices receive visibleDeposit
 \end{verbatim}
 
-The lighting sphere render resource uses the existing sphere mesh only as a
-canvas.  During \texttt{ResourceLightingSphere::Create}, each unit-sphere
-vertex is mapped to the configured world-space sphere and assigned an owning
-cell address:
+The lighting sphere mesh is render geometry only.  Python generates the OBJ
+surface from the configured \texttt{scene\_model} sphere and
+\texttt{ResourceLightingSurface} loads it into the shared
+\texttt{LightingSurfaceVertex} buffer:
 \begin{verbatim}
-sphereNormal = normalize(unit sphere vertex)
-worldPos = LIGHTING_BALL_CENTER + sphereNormal * LIGHTING_BALL_RADIUS
-surfaceCellId = CellAddress(worldPos)
+LightingSurfaceVertex.pos.xyz = sphere world position
+LightingSurfaceVertex.normal_flag.xyz = sphere normal
+LightingSurfaceVertex.light = persistent visible light
 \end{verbatim}
 
-The initial version passed \texttt{surfaceCellId} to the fragment shader as a
-flat value.  That made triangle ownership visible.  The active version passes
-the fragment world position and computes the owning cell per fragment:
-\begin{verbatim}
-surfaceCellId = CellAddress(surfaceWorldPos);
-BoundaryLightRecord record = BoundaryLight[surfaceCellId];
-\end{verbatim}
-
-If the record is valid and belongs to the lighting-ball surface, the fragment
-uses the stored color at full alpha.  If it is invalid, the fragment is
-discarded.  The fragment shader also samples the current cell and the six
-face-neighbor cells, weighting by distance to cell centers.  That removes most
-triangle-edge artifacts while preserving the cell-owned model.  A bumpy
-low-resolution look is expected when the cell field and sphere mesh are still
-coarse.
+Earlier Vulkan versions colored the sphere by looking up
+\texttt{BoundaryLightRecord} cells from each fragment.  That path is retained
+only as ownership/debug state.  The active visible sphere path draws
+interpolated \texttt{LightingSurfaceVertex.light}, matching the wall surface
+path.
 
 \subsection{Point-List And Surface Rendering}
 
@@ -132,13 +123,12 @@ lighting-specific surface pass for \texttt{LightingBall}.  The mesh used by
 that pass is render geometry only; collision remains analytic, and the
 generated boundary markers remain broad-phase locality records.
 
-The lighting surface pass is parameterized by surface identity.  A sphere draw
-passes \texttt{SPHERE/LIGHTING\_BALL\_WALL\_FLAG} to the fragment shader.  A
-rectangle wall draw passes \texttt{RECTANGLE\_WALL/wall\_flag}.  The fragment
-shader then samples \texttt{BoundaryLightRecord} entries only when their
-stored \texttt{surface\_type} and \texttt{surface\_id} match the active pass.
-This keeps one shared lighting sampler while allowing multiple analytic or
-generated surfaces to share the same cell-owned lighting buffer.
+The lighting surface pass is parameterized by surface identity through the
+loaded \texttt{LightingSurfaceVertex} metadata.  A sphere surface carries
+\texttt{SPHERE/surface\_id}; a rectangle wall surface carries
+\texttt{RECTANGLE\_WALL/surface\_id}.  The fragment shader draws the
+interpolated vertex light already selected by the vertex input rather than
+resampling the cell-owned debug buffer.
 
 \subsection{Vulkan Implementation}
 
@@ -266,10 +256,12 @@ Python generates debug surface meshes for \texttt{LightingBall}.  The OBJ
 files are inspection artifacts and Vulkan lighting-surface input, not runtime
 particle data.  They are generated from the same cfg values used for Vulkan:
 \begin{itemize}
-    \item \texttt{Lighting\_ball} center, radius, material id, and wall flag;
-    \item \texttt{rectangle\_wall\_segments} origin, axes, extents, normal,
-          wall flag, and material id;
-    \item \texttt{boundary\_light\_wall\_subdivisions\_per\_cell}.
+    \item \texttt{scene\_model} sphere center, radius, material id, surface
+          id, and optional \texttt{sphere\_lat\_segments}/
+          \texttt{sphere\_lon\_segments};
+    \item \texttt{scene\_model} rectangle origin, axes, extents, normal,
+          material id, surface id, and optional
+          \texttt{rectangle\_u\_segments}/\texttt{rectangle\_v\_segments}.
 \end{itemize}
 This gives a direct debugging loop:
 \begin{verbatim}
@@ -280,21 +272,23 @@ If Blender shows the intended surface mesh but Vulkan does not, the defect is
 in Vulkan resource binding, shader layout, or draw order.  If the OBJ is
 wrong, the defect is in generation or configuration.
 
-\subsection{Incidence-Weighted Spectral Deposit}
+\subsection{Incidence-Weighted Deposit}
 
-The first spectral step is active on top of the cell-owned path.  Material
+The first spectral step is active on top of the surface-vertex path.  Material
 configuration now exports:
 \begin{verbatim}
 spectral_response = [r, g, b];
 spectral_emission = [r, g, b];
-photon_energy = value;
 \end{verbatim}
 
-The generated Vulkan material record exposes this as:
+The generated Vulkan material record still uses the transitional ABI name:
 \begin{verbatim}
-vec4 spectralResponseEnergy;  // rgb + photon_energy
+vec4 spectralResponseEnergy;  // rgb + reserved/ignored
 vec4 spectralEmission;        // rgb + reserved
 \end{verbatim}
+Only \texttt{spectralResponseEnergy.rgb} is active.  The old
+\texttt{photon\_energy} cfg field is retired; photon strength is the current
+relative mass stored in \texttt{P[SourceID].parms.x}.
 
 During photon deposit, \texttt{FPML.comp} computes:
 \[
@@ -304,11 +298,12 @@ During photon deposit, \texttt{FPML.comp} computes:
 and writes:
 \[
     \mathbf C_{\mathrm{visible}} =
-    E_p I
+    m_p I
     \mathbf S_{\mathrm{photon}}
     \mathbf R_{\mathrm{surface}}
     \mathbf E_{\mathrm{surface}} .
 \]
+Here \(m_p\) is the photon's current relative mass/strength.
 
 The behavior-specific result is written to
 \texttt{LightingSurfaceVertex.light} for visible OBJ-backed surfaces.
@@ -325,16 +320,17 @@ The next work should extend behavior in this order:
     \item Diffuse light stream: broaden the photon source into a distributed
           direction field so the scene is illuminated by many incident
           directions rather than a single structured beam.
-    \item Absorbing and shadow surface: add a material rule that consumes or
-          blocks photons, producing unlit cells behind the absorber without
-          reflecting the photon onward.
-    \item Reflective surface: add a material rule that redirects photons and
-          carries reflected spectral energy to later deposits.
+    \item Absorbing and shadow surface refinement: tune the existing
+          \texttt{ABSORB} material rule so it produces the intended shadow
+          field and grayscale response on OBJ-backed surfaces.
+    \item Reflective surface: extend the \texttt{REFLECT} material rule so
+          redirected photons carry remaining spectral strength to later
+          deposits.
 \end{enumerate}
 
-These behaviors should extend the current \texttt{BoundaryLightRecord}
-\texttt{rgb\_valid} path before introducing additive accumulation, temporal
-filtering, or directional specular storage.
+These behaviors should extend the current
+\texttt{LightingSurfaceVertex.light} path before introducing additive
+accumulation, temporal filtering, or directional specular storage.
 
 \subsection{Decision}
 

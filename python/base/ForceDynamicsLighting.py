@@ -49,7 +49,7 @@ class ForceDynamicsLighting(PhotonDynamicsMixin, BaseForceDynamics):
                 float(particle.VelRad.x),
                 float(particle.VelRad.y),
                 float(particle.VelRad.z),
-                self.PhotonEnergy(SourceID=particle_id),
+                0.0,
             )
             particle.photon_transport = self.create_vec4(
                 0.0,  # last lived frame count
@@ -60,17 +60,6 @@ class ForceDynamicsLighting(PhotonDynamicsMixin, BaseForceDynamics):
             if self.IsPhotonParticle(particle_id):
                 initialized += 1
         return initialized
-
-    def PhotonEnergy(self, SourceID):
-        """Return configured photon energy for the particle's material."""
-        material_id = int(
-            round(float(getattr(self.particles[SourceID], "material_id", 0.0)))
-        )
-        materials = getattr(self, "run_configuration", {}).get("material_properties", ())
-        for material in materials or ():
-            if int(material.get("material_id", -1)) == material_id:
-                return float(material.get("photon_energy", 1.0))
-        return 1.0
 
     def ResetPhotonToInitialSlot(self, SourceID, next_birth_frame, lived_frames):
         """Recycle a photon to its original emitter slot and pending birth."""

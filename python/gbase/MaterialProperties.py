@@ -137,7 +137,6 @@ DEFAULT_MATERIAL_PROPERTIES = (
         "debug_color": (1.0, 1.0, 1.0, 1.0),
         "spectral_response": (1.0, 1.0, 1.0),
         "spectral_emission": (1.0, 1.0, 1.0),
-        "photon_energy": 1.0,
         "photon_coupling": 1.0,
         "photon_min_relative_mass": 0.001,
         "photon_surface_behavior": PHOTON_SURFACE_BEHAVIOR_NONE,
@@ -187,7 +186,6 @@ def normalized_material_properties(source=None):
             _material_get(raw_material, "spectral_emission", None),
             "spectral_emission",
         )
-        photon_energy = float(_material_get(raw_material, "photon_energy", 1.0))
         photon_coupling = float(_material_get(raw_material, "photon_coupling", 1.0))
         photon_min_relative_mass = float(
             _material_get(raw_material, "photon_min_relative_mass", 0.001)
@@ -210,15 +208,12 @@ def normalized_material_properties(source=None):
             for value in (
                 relative_mass,
                 thermal_velocity,
-                photon_energy,
                 photon_coupling,
                 photon_min_relative_mass,
                 cell_density,
             )
         ):
             raise ValueError("material_properties values must be finite")
-        if photon_energy < 0.0:
-            raise ValueError("photon_energy must not be negative")
         if photon_coupling < 0.0 or photon_coupling > 1.0:
             raise ValueError("photon_coupling must be between 0.0 and 1.0")
         if photon_min_relative_mass < 0.0:
@@ -242,7 +237,6 @@ def normalized_material_properties(source=None):
                 "debug_color": debug_color,
                 "spectral_response": spectral_response,
                 "spectral_emission": spectral_emission,
-                "photon_energy": photon_energy,
                 "photon_coupling": photon_coupling,
                 "photon_min_relative_mass": photon_min_relative_mass,
                 "photon_surface_behavior": photon_surface_behavior,
@@ -326,7 +320,6 @@ def write_material_properties(output, source=None):
             f"{float(spectral_emission[1]):.9f}, "
             f"{float(spectral_emission[2]):.9f}];\n"
         )
-        output.write(f"        photon_energy = {float(material.get('photon_energy', 1.0)):.9f};\n")
         output.write(
             "        photon_coupling = "
             f"{float(material.get('photon_coupling', 1.0)):.9f};\n"

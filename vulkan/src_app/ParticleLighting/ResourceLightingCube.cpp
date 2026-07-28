@@ -116,11 +116,6 @@ void ResourceLightingCube::MakeRectangleWalls()
 {
 	m_Verts.clear();
 
-	uint32_t subdivisionsPerCell = 1;
-	if (CfgTst->CheckKey("boundary_light_wall_subdivisions_per_cell"))
-		subdivisionsPerCell = CfgTst->GetUInt("boundary_light_wall_subdivisions_per_cell", true);
-	if (subdivisionsPerCell == 0)
-		throw std::runtime_error("boundary_light_wall_subdivisions_per_cell must be positive");
 	uint32_t cellWidth = CfgTst->GetUInt("CellAryW", true);
 	uint32_t cellHeight = CfgTst->GetUInt("CellAryH", true);
 	uint32_t cellDepth = CfgTst->GetUInt("CellAryL", true);
@@ -194,8 +189,8 @@ void ResourceLightingCube::MakeRectangleWalls()
 
 		uint32_t uCellCount = static_cast<uint32_t>(std::max(1.0f, std::ceil(uLength)));
 		uint32_t vCellCount = static_cast<uint32_t>(std::max(1.0f, std::ceil(vLength)));
-		uint32_t uStepCount = uCellCount * subdivisionsPerCell;
-		uint32_t vStepCount = vCellCount * subdivisionsPerCell;
+		uint32_t uStepCount = uCellCount;
+		uint32_t vStepCount = vCellCount;
 
 		for (uint32_t uIndex = 0; uIndex < uStepCount; ++uIndex)
 		{

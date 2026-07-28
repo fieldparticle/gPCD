@@ -73,6 +73,9 @@ photon momentum, the model should reduce the photon's relative mass or
 transport strength, not its speed.  Recycled photons should restore their
 original emitter-slot position, original velocity, base photon material/debug
 state, and initial relative mass before waiting for the next release frame.
+The older \texttt{photon\_energy} material field is retired from active
+cfg authoring; \texttt{relative\_mass}/\texttt{parms.x} is the single photon
+strength value.
 
 \subsubsection{Diffuse Light Stream}
 
@@ -98,18 +101,20 @@ surface color.
 
 \subsubsection{Lighting Surface OBJ Export}
 
-Add a Python generator-side export for renderable lighting surfaces:
+Python now exports renderable lighting surfaces:
 \begin{verbatim}
 LightingBall_sphere.obj
 LightingBall_wall.obj
 LightingBall_surfaces.obj
 \end{verbatim}
 
-The OBJ files should be generated from the same cfg fields used by Vulkan,
-especially \texttt{Lighting\_ball}, \texttt{rectangle\_wall\_segments}, and
-\texttt{boundary\_light\_wall\_subdivisions\_per\_cell}.  These files are for
-Blender inspection and geometry debugging only.  They should not include
-photon particles or boundary marker particles.
+The OBJ files are generated from \texttt{scene\_model} and its derived
+\texttt{lighting\_surface\_objects}.  Rectangle render density is controlled
+per object by \texttt{rectangle\_u\_segments} and
+\texttt{rectangle\_v\_segments}; sphere render density is controlled by
+\texttt{sphere\_lat\_segments} and \texttt{sphere\_lon\_segments}.  These
+files are for Blender inspection and Vulkan lighting-surface rendering.  They
+must not include photon particles or boundary marker particles.
 
 \subsection{Python/Vulkan View Parity}
 

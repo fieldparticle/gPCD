@@ -61,8 +61,8 @@ struct LightingSurfaceWallMetadata
 
 const uint LIGHTING_SURFACE_OBJECT_COUNT = 2u;
 const LightingSurfaceObjectMetadata LIGHTING_SURFACE_OBJECTS[2] = LightingSurfaceObjectMetadata[2](
-    LightingSurfaceObjectMetadata(2u, 2000u, 2u, 0u, 1176u),
-    LightingSurfaceObjectMetadata(1u, 1000u, 1u, 1176u, 11904u)
+    LightingSurfaceObjectMetadata(2u, 2000u, 2u, 0u, 38400u),
+    LightingSurfaceObjectMetadata(1u, 1000u, 1u, 38400u, 11904u)
 );
 
 const uint RECTANGLE_WALL_SEGMENT_COUNT = 1u;
@@ -72,7 +72,7 @@ const RectangleWallSegment RECTANGLE_WALL_SEGMENTS[1] = RectangleWallSegment[1](
 
 const uint LIGHTING_SURFACE_WALL_COUNT = 1u;
 const LightingSurfaceWallMetadata LIGHTING_SURFACE_WALLS[1] = LightingSurfaceWallMetadata[1](
-    LightingSurfaceWallMetadata(vec3(16.000000000, 2.000000000, 2.000000000), vec3(0.000000000, 1.000000000, 0.000000000), vec3(0.000000000, 0.000000000, 1.000000000), 14.000000000, 14.000000000, 14u, 14u, 2000u)
+    LightingSurfaceWallMetadata(vec3(16.000000000, 2.000000000, 2.000000000), vec3(0.000000000, 1.000000000, 0.000000000), vec3(0.000000000, 0.000000000, 1.000000000), 14.000000000, 14.000000000, 80u, 80u, 2000u)
 );
 
 #define HAS_BOUNDARY

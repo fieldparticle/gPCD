@@ -341,17 +341,6 @@ class GenericGenData:
                 errors.append(f"{context}.spectral_emission is invalid: {exc}")
 
             try:
-                photon_energy = float(raw_material.get("photon_energy", 1.0))
-            except (TypeError, ValueError):
-                errors.append(f"{context}.photon_energy must be numeric")
-                photon_energy = None
-            if photon_energy is not None:
-                if not math.isfinite(photon_energy):
-                    errors.append(f"{context}.photon_energy must be finite")
-                elif photon_energy < 0.0:
-                    errors.append(f"{context}.photon_energy must not be negative")
-
-            try:
                 photon_coupling = float(raw_material.get("photon_coupling", 1.0))
             except (TypeError, ValueError):
                 errors.append(f"{context}.photon_coupling must be numeric")
@@ -407,7 +396,6 @@ class GenericGenData:
                 and debug_color is not None
                 and spectral_response is not None
                 and spectral_emission is not None
-                and photon_energy is not None
                 and photon_coupling is not None
                 and photon_min_relative_mass is not None
                 and photon_surface_behavior is not None
@@ -425,7 +413,6 @@ class GenericGenData:
                         "debug_color": debug_color,
                         "spectral_response": spectral_response,
                         "spectral_emission": spectral_emission,
-                        "photon_energy": photon_energy,
                         "photon_coupling": photon_coupling,
                         "photon_min_relative_mass": photon_min_relative_mass,
                         "photon_surface_behavior": photon_surface_behavior,
@@ -703,20 +690,6 @@ class GenericGenData:
         except (TypeError, ValueError):
             errors.append("photon_periodic_recycle_enabled must be a boolean")
 
-        try:
-            boundary_light_wall_subdivisions_per_cell = int(
-                self.itemcfg.get("boundary_light_wall_subdivisions_per_cell", 1)
-            )
-            if boundary_light_wall_subdivisions_per_cell <= 0:
-                errors.append(
-                    "boundary_light_wall_subdivisions_per_cell must be positive"
-                )
-        except (TypeError, ValueError):
-            boundary_light_wall_subdivisions_per_cell = 1
-            errors.append(
-                "boundary_light_wall_subdivisions_per_cell must be an integer"
-            )
-
         if boundary_space_lighting_enabled:
             if self.itemcfg.get("Lighting_ball") is None:
                 errors.append(
@@ -759,9 +732,6 @@ class GenericGenData:
         self.dt = float(self.itemcfg.dt)
         self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
         self.boundary_space_lighting_enabled = bool(boundary_space_lighting_enabled)
-        self.boundary_light_wall_subdivisions_per_cell = (
-            boundary_light_wall_subdivisions_per_cell
-        )
         return True
 
     def report_collision_feasibility(self):
@@ -1523,6 +1493,17 @@ class GenericGenData:
         obj_data["texcoords"].append(texcoord)
         return len(obj_data["vertices"])
 
+    def _lighting_surface_object_by_type_and_id(self, surface_type, surface_id):
+        requested_type = str(surface_type).upper()
+        requested_id = int(surface_id)
+        for surface_object in self.itemcfg.get("lighting_surface_objects", ()):
+            if (
+                str(surface_object.get("surface_type", "")).upper() == requested_type
+                and int(surface_object.get("surface_id", -1)) == requested_id
+            ):
+                return surface_object
+        return None
+
     def _build_lighting_sphere_obj_data(self):
         lighting_ball = self._lighting_ball_values()
         if lighting_ball is None:
@@ -1532,12 +1513,24 @@ class GenericGenData:
         if radius <= 0.0:
             raise ValueError("Lighting_ball.radius must be greater than zero")
 
-        segments = int(self.itemcfg.get("boundary_light_sphere_segments", 64))
-        rings = int(self.itemcfg.get("boundary_light_sphere_rings", 32))
+        surface_object = self._lighting_surface_object_by_type_and_id(
+            "SPHERE",
+            lighting_ball["surface_id"],
+        )
+        segments = int(
+            surface_object.get("sphere_lon_segments", 64)
+            if surface_object is not None
+            else self.itemcfg.get("boundary_light_sphere_segments", 64)
+        )
+        rings = int(
+            surface_object.get("sphere_lat_segments", 32)
+            if surface_object is not None
+            else self.itemcfg.get("boundary_light_sphere_rings", 32)
+        )
         if segments < 3:
-            raise ValueError("boundary_light_sphere_segments must be at least 3")
+            raise ValueError("sphere_lon_segments must be at least 3")
         if rings < 2:
-            raise ValueError("boundary_light_sphere_rings must be at least 2")
+            raise ValueError("sphere_lat_segments must be at least 2")
 
         obj_data = {
             "objects": [
@@ -1604,16 +1597,6 @@ class GenericGenData:
         if not rectangle_wall_segments:
             return None
 
-        subdivisions_per_cell = int(
-            getattr(
-                self,
-                "boundary_light_wall_subdivisions_per_cell",
-                self.itemcfg.get("boundary_light_wall_subdivisions_per_cell", 1),
-            )
-        )
-        if subdivisions_per_cell <= 0:
-            raise ValueError("boundary_light_wall_subdivisions_per_cell must be positive")
-
         obj_data = {
             "objects": [],
             "vertices": [],
@@ -1634,10 +1617,30 @@ class GenericGenData:
             normal = segment["normal"]
             u_length = float(segment["u_length"])
             v_length = float(segment["v_length"])
-            u_cell_count = max(1, int(math.ceil(u_length)))
-            v_cell_count = max(1, int(math.ceil(v_length)))
-            u_step_count = u_cell_count * subdivisions_per_cell
-            v_step_count = v_cell_count * subdivisions_per_cell
+            lighting_surface = self._lighting_surface_object_by_type_and_id(
+                "RECTANGLE_WALL",
+                int(segment["wall_flag"]),
+            )
+            u_step_count = int(
+                lighting_surface.get(
+                    "rectangle_u_segments",
+                    max(1, math.ceil(u_length)),
+                )
+                if lighting_surface is not None
+                else max(1, math.ceil(u_length))
+            )
+            v_step_count = int(
+                lighting_surface.get(
+                    "rectangle_v_segments",
+                    max(1, math.ceil(v_length)),
+                )
+                if lighting_surface is not None
+                else max(1, math.ceil(v_length))
+            )
+            if u_step_count <= 0:
+                raise ValueError("rectangle_u_segments must be positive")
+            if v_step_count <= 0:
+                raise ValueError("rectangle_v_segments must be positive")
 
             def point(local_u, local_v):
                 return (
@@ -2072,21 +2075,6 @@ class GenericGenData:
             if not math.isfinite(gl_point_size) or gl_point_size <= 0.0:
                 raise ValueError("gl_point_size must be a positive finite number")
             output.write(f"gl_point_size = {gl_point_size:.9f};\n")
-            boundary_light_wall_subdivisions_per_cell = int(
-                getattr(
-                    self,
-                    "boundary_light_wall_subdivisions_per_cell",
-                    self.itemcfg.get("boundary_light_wall_subdivisions_per_cell", 1),
-                )
-            )
-            if boundary_light_wall_subdivisions_per_cell <= 0:
-                raise ValueError(
-                    "boundary_light_wall_subdivisions_per_cell must be positive"
-                )
-            output.write(
-                "boundary_light_wall_subdivisions_per_cell = "
-                f"{boundary_light_wall_subdivisions_per_cell};\n"
-            )
             align_with_eye = self.itemcfg.get("align_with_eye", False)
             if not isinstance(align_with_eye, bool):
                 raise ValueError("align_with_eye must be a boolean")
@@ -2284,6 +2272,26 @@ class GenericGenData:
                 )
                 output.write(f'        surface_id = {int(surface_object["surface_id"])};\n')
                 output.write(f'        material_id = {int(surface_object["material_id"])};\n')
+                if "rectangle_u_segments" in surface_object:
+                    output.write(
+                        "        rectangle_u_segments = "
+                        f"{int(surface_object['rectangle_u_segments'])};\n"
+                    )
+                if "rectangle_v_segments" in surface_object:
+                    output.write(
+                        "        rectangle_v_segments = "
+                        f"{int(surface_object['rectangle_v_segments'])};\n"
+                    )
+                if "sphere_lat_segments" in surface_object:
+                    output.write(
+                        "        sphere_lat_segments = "
+                        f"{int(surface_object['sphere_lat_segments'])};\n"
+                    )
+                if "sphere_lon_segments" in surface_object:
+                    output.write(
+                        "        sphere_lon_segments = "
+                        f"{int(surface_object['sphere_lon_segments'])};\n"
+                    )
                 output.write(f"    }}{separator}\n")
             output.write(");\n")
 
