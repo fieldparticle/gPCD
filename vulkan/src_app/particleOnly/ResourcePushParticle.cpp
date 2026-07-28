@@ -59,8 +59,9 @@ void ResourceParticlePush::PushMem(uint32_t currentBuffer)
             m_ShaderFlags.positionBuffer = 1.0f;
         else
             m_ShaderFlags.positionBuffer = 0.0f;
-
+        
         m_ShaderFlags.frameNum += 1.0f;
+        m_App->m_ActualFrame = m_ShaderFlags.frameNum;
     }
 
     m_ShaderFlags.StopFlg = stopped ? 1.0f : 0.0f;

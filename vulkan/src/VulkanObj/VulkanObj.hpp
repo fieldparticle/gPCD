@@ -52,6 +52,7 @@ class VulkanObj
 		uint32_t			m_CurrentBuffer = 0;
 		uint32_t			m_FramesBuffered = 1;
 		uint32_t			m_FrameNumber = 0;
+		uint32_t			m_ActualFrame = 0;
 		bool				m_FramebufferResized = false;
 		uint64_t			m_Numparticles=0;
 		bool				m_DeviceTimersOn = true;

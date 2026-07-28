@@ -111,6 +111,62 @@ namespace
 		throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_surface_behavior must be a string or integer");
 	}
 
+	uint32_t ContactIlluminationID(const std::string& mode)
+	{
+		std::string normalized = mode;
+		normalized.erase(
+			normalized.begin(),
+			std::find_if(
+				normalized.begin(),
+				normalized.end(),
+				[](unsigned char value) { return !std::isspace(value); }));
+		normalized.erase(
+			std::find_if(
+				normalized.rbegin(),
+				normalized.rend(),
+				[](unsigned char value) { return !std::isspace(value); }).base(),
+			normalized.end());
+		std::transform(
+			normalized.begin(),
+			normalized.end(),
+			normalized.begin(),
+			[](unsigned char value) { return static_cast<char>(std::toupper(value)); });
+
+		if (normalized == "MAX" || normalized == "CONTACT_ILLUMINATION_MAX")
+			return 0u;
+		if (normalized == "MIN" || normalized == "CONTACT_ILLUMINATION_MIN")
+			return 1u;
+		if (normalized == "CURRENT" || normalized == "CONTACT_ILLUMINATION_CURRENT")
+			return 2u;
+		if (normalized == "FIRST" || normalized == "CONTACT_ILLUMINATION_FIRST")
+			return 3u;
+
+		std::ostringstream errtxt;
+		errtxt << "Unknown contact_illumination: " << mode << std::ends;
+		throw std::runtime_error(errtxt.str().c_str());
+	}
+
+	uint32_t MaterialContactIllumination(config_setting_t* material, int index)
+	{
+		config_setting_t* modeSetting =
+			config_setting_lookup(material, "contact_illumination");
+		if (modeSetting == nullptr)
+			return 0u;
+
+		int settingType = config_setting_type(modeSetting);
+		if (settingType == CONFIG_TYPE_STRING)
+			return ContactIlluminationID(config_setting_get_string(modeSetting));
+		if (settingType == CONFIG_TYPE_INT)
+		{
+			int mode = config_setting_get_int(modeSetting);
+			if (mode < 0 || mode > 3)
+				throw std::runtime_error("material_properties[" + std::to_string(index) + "].contact_illumination is outside the valid range");
+			return static_cast<uint32_t>(mode);
+		}
+
+		throw std::runtime_error("material_properties[" + std::to_string(index) + "].contact_illumination must be a string or integer");
+	}
+
 	uint32_t CountObjFaceVertices(const std::string& objFile)
 	{
 		std::ifstream input(objFile);
@@ -279,6 +335,10 @@ void ShaderObj::WriteMaterials()
 	ostrm << "const uint PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR = 1u;\n";
 	ostrm << "const uint PHOTON_SURFACE_BEHAVIOR_ABSORB = 2u;\n";
 	ostrm << "const uint PHOTON_SURFACE_BEHAVIOR_REFLECT = 3u;\n\n";
+	ostrm << "const uint CONTACT_ILLUMINATION_MAX = 0u;\n";
+	ostrm << "const uint CONTACT_ILLUMINATION_MIN = 1u;\n";
+	ostrm << "const uint CONTACT_ILLUMINATION_CURRENT = 2u;\n";
+	ostrm << "const uint CONTACT_ILLUMINATION_FIRST = 3u;\n\n";
 
 	ostrm << "struct MaterialProperty\n";
 	ostrm << "{\n";
@@ -295,6 +355,7 @@ void ShaderObj::WriteMaterials()
 	ostrm << "    float photonCoupling;\n";
 	ostrm << "    float photonMinRelativeMass;\n";
 	ostrm << "    uint photonSurfaceBehavior;\n";
+	ostrm << "    uint contactIllumination;\n";
 	ostrm << "    float cellDensity;\n";
 	ostrm << "};\n\n";
 
@@ -308,7 +369,7 @@ void ShaderObj::WriteMaterials()
 	{
 		ostrm << "const uint MATERIAL_PROPERTY_COUNT = 1u;\n";
 		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](\n";
-		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, PHOTON_SURFACE_BEHAVIOR_NONE, 0.000000000)\n";
+		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, PHOTON_SURFACE_BEHAVIOR_NONE, CONTACT_ILLUMINATION_MAX, 0.000000000)\n";
 		ostrm << ");\n\n";
 	}
 	else
@@ -352,6 +413,7 @@ void ShaderObj::WriteMaterials()
 			double photonCoupling = 1.0;
 			double photonMinRelativeMass = 0.001;
 			uint32_t photonSurfaceBehavior = 0u;
+			uint32_t contactIllumination = 0u;
 
 			if (config_setting_lookup_int(material, "material_id", &materialID) == CONFIG_FALSE)
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].material_id missing");
@@ -450,6 +512,7 @@ void ShaderObj::WriteMaterials()
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_min_relative_mass must not be negative");
 
 			photonSurfaceBehavior = MaterialPhotonSurfaceBehavior(material, index);
+			contactIllumination = MaterialContactIllumination(material, index);
 
 			if (config_setting_lookup_float(material, "cell_density", &cellDensity) == CONFIG_FALSE)
 				cellDensity = 0.0;
@@ -484,6 +547,7 @@ void ShaderObj::WriteMaterials()
 				<< std::fixed << std::setprecision(9) << photonCoupling << ", "
 				<< std::fixed << std::setprecision(9) << photonMinRelativeMass << ", "
 				<< photonSurfaceBehavior << "u, "
+				<< contactIllumination << "u, "
 				<< std::fixed << std::setprecision(9) << cellDensity << ")";
 
 			if (index + 1 < materialCount)

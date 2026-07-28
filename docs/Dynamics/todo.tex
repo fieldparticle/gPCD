@@ -38,6 +38,14 @@ The next active lighting tasks are:
     \item validate \texttt{SURFACE\_COLOR}, \texttt{ABSORB},
           \texttt{REFLECT}, and \texttt{NONE} material behavior over longer
           Vulkan captures;
+    \item update capture/debug readers so \texttt{ParticleLighting}/
+          \texttt{FPML} captures use the \(256\)-byte
+          \texttt{LightingParticle} layout instead of the ordinary particle
+          layout;
+    \item retire or fully repurpose stream \texttt{spacing\_factor}; active
+          no-overlap timing now comes from per-stream
+          \texttt{radius} plus
+          \texttt{particle\_separation\_distance};
     \item move engineering rendering to the scene/surface model so simulation
           geometry and graphics geometry have one authored source of truth;
     \item diffuse light stream;

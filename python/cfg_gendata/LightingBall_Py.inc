@@ -60,6 +60,8 @@ particle_streams = (
   {
     name = "photon_beam";
     material_id = 0;
+    radius = 0.025;
+    particle_separation_distance = 0.005;
 
     // Dense x-directed beam centered on the Lighting_ball y/z cross-section.
     // Python profile is intentionally sparse enough to inspect interactively.
@@ -86,10 +88,8 @@ particle_streams = (
 );
 
 // --------------------------------------------------------------------------
-// Particle geometry and integration
+// Integration
 // --------------------------------------------------------------------------
-particle_separation_distance 	= 0.005;
-radius 							= 0.05;
 dt 								= 0.045;
 
 // --------------------------------------------------------------------------

@@ -175,6 +175,18 @@ the photon should emit.  The active particle ABI does not contain
 \texttt{hit\_material\_id}; do not add shader logic that depends on that
 field.
 
+\texttt{ParticleLighting}/\texttt{FPML} uses the lighting particle ABI, not
+the ordinary \texttt{particle.glsl} ABI alone.  The lighting wrapper includes
+\texttt{lighting\_particle.glsl}, and the C++ lighting resource uses
+\texttt{LightingParticle}, which appends lighting transport fields such as
+\texttt{initial\_pos\_birth}, \texttt{initial\_vel\_energy}, and
+\texttt{photon\_transport}.  Current \texttt{LightingBall} capture files
+therefore have a \(256\)-byte particle stride.  Decoding those captures with
+the ordinary \(208\)-byte particle layout will produce a wrong record count
+and invalid values.  Capture tools should either select the
+\texttt{LightingParticle} layout for FPML scenarios or auto-detect the stride
+from the generated run type.
+
 \subsection{Push-Constant Frame Clocks}
 
 The shared particle push constants expose both render/application time and

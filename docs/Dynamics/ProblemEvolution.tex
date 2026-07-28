@@ -3512,3 +3512,63 @@ transport rule.  Photons keep fixed velocity magnitude, so losing momentum or
 lighting strength means reducing relative mass.  Removing
 \texttt{photon\_energy} prevents a second strength knob from fighting that
 model.
+
+\subsection{Photon Streams Own Radius And No-Overlap Timing}
+
+\subsubsection{previous form}
+
+Streaming generation inherited \texttt{radius} and
+\texttt{particle\_separation\_distance} from top-level generator fields.  The
+frame gap between release waves was based on \texttt{spacing\_factor} applied
+to particle diameter.  That was workable for older sparse emitters, but it
+was not explicit enough for dense photon beams where each stream can have a
+different strength, size, spacing, and direction.  It also allowed stale
+configuration to look valid when \texttt{particle\_streams} was the real
+authoring model.
+
+\subsubsection{current form}
+
+Every \texttt{particle\_streams} entry now owns its generated particle radius
+and separation:
+\begin{verbatim}
+radius = 0.025;
+particle_separation_distance = 0.005;
+\end{verbatim}
+When \texttt{particle\_streams} is present, top-level
+\texttt{radius} and \texttt{particle\_separation\_distance} are retired and
+cause configuration validation errors.  The generator computes required
+center spacing as
+\[
+    \ell = 2r + s
+\]
+and derives
+\[
+    \texttt{frames\_per\_wave}
+    =
+    \left\lceil
+      \frac{\ell}{|\vec{v}_{normal}|\Delta t}
+    \right\rceil .
+\]
+It reports stream radius, separation, required center spacing, span spacing,
+travel spacing, and \texttt{frames\_per\_wave}.  It also checks generated
+same-birth stream particles for initial overlap before accepting the output.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+This makes stream packing a physical promise instead of a tuning accident.
+The front \texttt{LightingBall\_Vk} beam and diffuse back beam can now use the
+same speed with different \texttt{relative\_mass} and still recycle with their
+own original strength.  The generated Vulkan capture was verified with the
+lighting-particle \(256\)-byte stride: the front beam and back beam positions
+at frame 150 matched the expected birth-frame travel distance, and the
+generated overlap report was clean.
+
+The remaining cleanup is tooling.  Old capture readers that assume the
+ordinary particle stride can misdecode \texttt{FPML} captures.  Debug tools
+should select the \texttt{LightingParticle} layout for
+\texttt{ParticleLighting} scenarios or detect the stride from the generated
+run type.

@@ -277,6 +277,14 @@ material response, or deposited lighting.
     \item[\texttt{initial\_particle\_velocity}] Initial photon velocity.
     Photon speed is intended to remain fixed; momentum/strength changes are
     represented by relative mass or transport strength, not by changing speed.
+    \item[\texttt{radius}] Required per-stream photon radius.  The
+    \texttt{LightingBall} stream definitions own their generated particle
+    size; a top-level stream radius is no longer accepted when
+    \texttt{particle\_streams} is present.
+    \item[\texttt{particle\_separation\_distance}] Required per-stream
+    surface-to-surface spacing.  The generator uses
+    \(2r+\texttt{particle\_separation\_distance}\) as the minimum center
+    spacing in every generated direction.
     \item[\texttt{release\_start\_frame}] First frame at which the stream is
     active.
     \item[\texttt{release\_columns}] Number of release waves.  With periodic
@@ -289,6 +297,21 @@ material response, or deposited lighting.
     \item[\texttt{span\_u\_*}, \texttt{span\_v\_*}] The two varying axes,
     extents, and counts across the emitter plane.
 \end{description}
+
+\texttt{LightingBall} now derives the wave-to-wave frame gap from physical
+stream spacing.  For stream radius \(r\), requested surface separation \(s\),
+normal stream speed \(v_n\), and timestep \(\Delta t\),
+\[
+    \texttt{frames\_per\_wave}
+    =
+    \left\lceil
+      \frac{2r+s}{v_n\Delta t}
+    \right\rceil .
+\]
+This guarantees that adjacent release waves start at least one required
+center spacing apart along the travel direction.  The older
+\texttt{spacing\_factor} field is retained only as transitional stream
+metadata; it is not the active no-overlap rule.
 
 \subsubsection{Material Fields}
 
@@ -324,6 +347,10 @@ surface behavior.  These must not be treated as one knob.
     surface transfers strength out of the photon.
     \item[\texttt{photon\_surface\_behavior}] Optical behavior selected by
     the contacted surface material.  Current values are described below.
+    \item[\texttt{contact\_illumination}] Exported surface update policy for
+    contact lighting.  Valid values are \texttt{"max"}, \texttt{"min"},
+    \texttt{"current"}, and \texttt{"first"}; these map to generated
+    \texttt{CONTACT\_ILLUMINATION\_*} constants for the lighting shaders.
 \end{description}
 
 \subsubsection{Photon Surface Behavior}
@@ -415,3 +442,29 @@ inspect the same graphics surface that Vulkan draws.
 This export is an inspection tool.  Runtime collision still uses the analytic
 sphere and rectangle-wall equations, and the particle/bin data should not be
 mixed into the surface OBJ.
+
+\subsection{Current Vulkan Beam Verification}
+
+On 2026-07-28, \texttt{LightingBall\_Vk} captures
+\texttt{LightingBall\_Vk\_121.cap} through
+\texttt{LightingBall\_Vk\_150.cap} were checked against the generated stream
+layout.  The generated photon streams were:
+\begin{itemize}
+    \item front beam: \(90 \times 90 = 8100\) photons, radius \(0.025\),
+          separation \(0.005\), required center spacing \(0.055\), span
+          spacing \(0.156706\), \texttt{frames\_per\_wave}=6, travel spacing
+          \(0.0566914\);
+    \item diffuse back beam: \(80 \times 80 = 6400\) photons, radius
+          \(0.025\), separation \(0.005\), required center spacing \(0.055\),
+          span spacing \(0.176543\), \texttt{frames\_per\_wave}=6, travel
+          spacing \(0.0566914\).
+\end{itemize}
+
+The overlap validator reported \(14500\) generated stream particles, no
+same-birth overlap, and no cell-array out-of-bounds occupancy.  The capture
+files decode as \(14908\) records at the lighting-particle stride of
+\(256\) bytes.  At frame 150, unhit front photons were at \(x=5.332242\),
+matching the expected \(x=5.332247\), and diffuse-back photons were at
+\(x=14.167690\), matching the expected \(x=14.167753\).  Front photons that
+had reached the sphere surface were already showing contact/reflection state,
+which is expected because the sphere begins at \(x=5\).

@@ -241,6 +241,12 @@ class GenStreaming(GenericGenData):
 
         def parse_stream(stream, index, context):
             stream_name = str(stream.get("name", f"stream{index}"))
+            radius = stream_positive_float(stream, context, "radius")
+            particle_separation_distance = stream_nonnegative_float(
+                stream,
+                context,
+                "particle_separation_distance",
+            )
             initial_particle_velocity = stream_values(
                 stream, context, "initial_particle_velocity", 3
             )
@@ -270,6 +276,9 @@ class GenStreaming(GenericGenData):
             except (TypeError, ValueError):
                 errors.append(f"{context}.material_id must be an integer")
                 material_id = 0
+            relative_mass = optional_stream_float(stream, context, "relative_mass")
+            if relative_mass is not None and relative_mass <= 0.0:
+                errors.append(f"{context}.relative_mass must be positive")
             span_min = stream.get("span_min")
             span_max = stream.get("span_max")
             if (span_min is None) != (span_max is None):
@@ -337,6 +346,8 @@ class GenStreaming(GenericGenData):
 
             return {
                 "name": stream_name,
+                "radius": radius,
+                "particle_separation_distance": particle_separation_distance,
                 "initial_particle_velocity": initial_particle_velocity,
                 "release_start_frame": release_start_frame,
                 "release_columns": release_columns,
@@ -345,6 +356,7 @@ class GenStreaming(GenericGenData):
                 "inlet_axis": inlet_axis,
                 "inlet_value": inlet_value,
                 "material_id": material_id,
+                "relative_mass": relative_mass,
                 "span_min": span_min,
                 "span_max": span_max,
                 "patch_mode": patch_mode,
@@ -362,6 +374,13 @@ class GenStreaming(GenericGenData):
 
         raw_streams = self.itemcfg.get("particle_streams")
         if raw_streams is not None:
+            if "radius" in self.itemcfg:
+                errors.append("radius is retired for particle_streams; set particle_streams[].radius")
+            if "particle_separation_distance" in self.itemcfg:
+                errors.append(
+                    "particle_separation_distance is retired for particle_streams; "
+                    "set particle_streams[].particle_separation_distance"
+                )
             if len(raw_streams) == 0:
                 errors.append("particle_streams must contain at least one stream")
             streams = [
@@ -382,6 +401,10 @@ class GenStreaming(GenericGenData):
                     "streaming_particles_per_wave"
                 ),
                 "spacing_factor": self.itemcfg.get("streaming_spacing_factor"),
+                "radius": self.itemcfg.get("radius"),
+                "particle_separation_distance": self.itemcfg.get(
+                    "particle_separation_distance"
+                ),
                 "material_id": 0,
             }
             inlet_x = self.optional_axis_value("streaming_inlet_x", errors)
@@ -476,9 +499,11 @@ class GenStreaming(GenericGenData):
         if requires_particle_plane_z or "particle_plane_z" in self.itemcfg:
             particle_plane_z = required_nonnegative_float("particle_plane_z")
 
-        particle_separation_distance = required_nonnegative_float(
-            "particle_separation_distance"
-        )
+        particle_separation_distance = None
+        if raw_streams is None:
+            particle_separation_distance = required_nonnegative_float(
+                "particle_separation_distance"
+            )
         if death_bounds:
             for axis, minimum, maximum in (
                 ("x", death_bounds[0], death_bounds[1]),
@@ -490,17 +515,12 @@ class GenStreaming(GenericGenData):
                         f"death_bounds {axis}_min must be less than {axis}_max"
                     )
 
-        try:
-            radius = float(self.itemcfg.radius)
-        except (AttributeError, TypeError, ValueError):
-            errors.append("radius is required and must be numeric")
-            radius = None
-
-        if radius is not None:
-            if not math.isfinite(radius):
-                errors.append("radius must be finite")
-            elif radius <= 0.0:
-                errors.append("radius must be positive")
+        stream_radii = [
+            stream["radius"]
+            for stream in streams
+            if stream.get("radius") is not None
+        ]
+        max_stream_radius = max(stream_radii) if stream_radii else None
 
         if particle_plane_z is not None and len(dimensions) == 3:
             width, height, depth = dimensions
@@ -512,9 +532,9 @@ class GenStreaming(GenericGenData):
                 errors.append("particle_plane_z must fit inside cell array")
             if abs((particle_plane_z - math.floor(particle_plane_z)) - 0.5) > 1.0e-9:
                 errors.append("particle_plane_z must be centered in a cell")
-            if radius is not None and (
-                particle_plane_z - radius < 0.0
-                or particle_plane_z + radius > depth
+            if max_stream_radius is not None and (
+                particle_plane_z - max_stream_radius < 0.0
+                or particle_plane_z + max_stream_radius > depth
             ):
                 errors.append("particle_plane_z particle radius must fit inside cell array")
             if death_bounds and packing_bounds and (
@@ -522,8 +542,8 @@ class GenStreaming(GenericGenData):
                     or x_max > death_bounds[1]
                     or y_min < death_bounds[2]
                     or y_max > death_bounds[3]
-                    or particle_plane_z - (radius or 0.0) < death_bounds[4]
-                    or particle_plane_z + (radius or 0.0) > death_bounds[5]
+                    or particle_plane_z - (max_stream_radius or 0.0) < death_bounds[4]
+                    or particle_plane_z + (max_stream_radius or 0.0) > death_bounds[5]
             ):
                 errors.append("streaming packing bounds must fit inside death_bounds")
 
@@ -663,11 +683,15 @@ class GenStreaming(GenericGenData):
         self.packing_curve_segments = packing_curve_segments
         self.packing_bounds = packing_bounds
         self.particle_plane_z = particle_plane_z
-        self.particle_separation_distance = particle_separation_distance
+        self.particle_separation_distance = (
+            streams[0]["particle_separation_distance"]
+            if streams
+            else particle_separation_distance
+        )
         self.streaming_streams = streams
         self.number_configured_particles = 0
         self.explicit_particles = []
-        self.radius = radius
+        self.radius = max_stream_radius
         self.wall_contact_offset = float(self.itemcfg.wall_contact_offset)
         self.dt = float(self.itemcfg.dt)
         self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
@@ -863,7 +887,10 @@ class GenStreaming(GenericGenData):
         velocity = self.stream_normal_speed(stream)
         if velocity <= 0.0:
             raise ValueError("initial_particle_velocity must move away from inlet")
-        clearance_distance = stream["spacing_factor"] * 2.0 * self.radius
+        clearance_distance = (
+            2.0 * stream["radius"]
+            + stream["particle_separation_distance"]
+        )
         distance_per_frame = velocity * self.dt
         return int(math.ceil(clearance_distance / distance_per_frame))
 
@@ -891,9 +918,6 @@ class GenStreaming(GenericGenData):
         return tuple(lower + index * step for index in range(count))
 
     def calculate_streaming_layout(self):
-        radius = self.radius
-        center_spacing = 2.0 * radius + self.particle_separation_distance
-        boundary_clearance = radius * (1.0 + self.wall_contact_offset) + 1.0e-9
         if self.packing_bounds:
             x_start, x_end, y_start, y_end = self.packing_bounds
         else:
@@ -907,18 +931,33 @@ class GenStreaming(GenericGenData):
             "Streaming reservoir report:",
             f"  packing bounds: {self.packing_bounds}",
             f"  particle plane z: {plane_z_text}",
-            f"  radius: {radius:g}",
-            f"  surface separation: {self.particle_separation_distance:g}",
-            f"  center spacing: {center_spacing:g}",
-            f"  boundary clearance: {boundary_clearance:g}",
         ]
         total_particle_count = 0
-        self.particle_center_spacing = center_spacing
+        max_boundary_clearance = 0.0
 
         for stream in self.streaming_streams:
+            radius = stream["radius"]
+            particle_separation_distance = stream["particle_separation_distance"]
+            center_spacing = 2.0 * radius + particle_separation_distance
+            boundary_clearance = radius * (1.0 + self.wall_contact_offset) + 1.0e-9
+            frames_per_wave = self.frames_between_waves(stream)
+            travel_spacing = (
+                frames_per_wave
+                * self.stream_normal_speed(stream)
+                * self.dt
+            )
+            max_boundary_clearance = max(max_boundary_clearance, boundary_clearance)
+            stream.update(
+                {
+                    "center_spacing": center_spacing,
+                    "boundary_clearance": boundary_clearance,
+                    "frames_per_wave": frames_per_wave,
+                    "travel_spacing": travel_spacing,
+                }
+            )
             if stream["emitter_mode"]:
                 emitter = stream["emitter"]
-                stream_center_spacing = 2.0 * radius * stream["spacing_factor"]
+                stream_center_spacing = center_spacing
                 curve_length = self.stream_curve_length(emitter)
                 occupied_curve_length = (
                     (emitter["length_count"] - 1) * stream_center_spacing
@@ -949,12 +988,17 @@ class GenStreaming(GenericGenData):
                     stream_center_spacing,
                 )
                 width_axis = self.normalize_vector(emitter["width_axis"])
-                frames_per_wave = self.frames_between_waves(stream)
                 particle_count = stream["release_columns"] * stream["particles_per_wave"]
                 material = self.material_properties_by_id[stream["material_id"]]
+                particle_mass = (
+                    float(stream["relative_mass"])
+                    if stream["relative_mass"] is not None
+                    else float(material["relative_mass"])
+                )
                 stream.update(
                     {
                         "particle_type": material.get("particle_type", "regular"),
+                        "particle_mass": particle_mass,
                         "layout_mode": "curve",
                         "length_centers": length_centers,
                         "width_centers": width_centers,
@@ -976,11 +1020,16 @@ class GenStreaming(GenericGenData):
                         f"    length count: {emitter['length_count']}",
                         f"    width: {emitter['width']:g}",
                         f"    width count: {emitter['width_count']}",
+                        f"    radius: {radius:g}",
+                        f"    surface separation: {particle_separation_distance:g}",
+                        f"    required center spacing: {center_spacing:g}",
                         f"    center spacing: {stream_center_spacing:g}",
+                        f"    travel spacing: {travel_spacing:g}",
                         f"    curve length: {curve_length:g}",
                         f"    occupied curve length: {occupied_curve_length:g}",
                         f"    occupied width: {occupied_width:g}",
                         f"    material_id: {stream['material_id']}",
+                        f"    relative mass: {stream['particle_mass']:g}",
                         f"    particle type: {stream['particle_type']}",
                         f"    release start frame: {stream['release_start_frame']:g}",
                         f"    release columns/waves: {stream['release_columns']}",
@@ -1006,16 +1055,40 @@ class GenStreaming(GenericGenData):
                     stream["span_v_count"],
                     boundary_clearance,
                 )
-                frames_per_wave = self.frames_between_waves(stream)
+                u_spacing = (
+                    u_centers[1] - u_centers[0]
+                    if len(u_centers) > 1
+                    else float("inf")
+                )
+                v_spacing = (
+                    v_centers[1] - v_centers[0]
+                    if len(v_centers) > 1
+                    else float("inf")
+                )
+                if u_spacing + 1.0e-12 < center_spacing:
+                    raise ValueError(
+                        f"{stream['name']} particles overlap on span u: "
+                        f"spacing {u_spacing:g}, required {center_spacing:g}"
+                    )
+                if v_spacing + 1.0e-12 < center_spacing:
+                    raise ValueError(
+                        f"{stream['name']} particles overlap on span v: "
+                        f"spacing {v_spacing:g}, required {center_spacing:g}"
+                    )
                 particle_count = stream["release_columns"] * stream["particles_per_wave"]
                 material = self.material_properties_by_id[stream["material_id"]]
+                particle_mass = (
+                    float(stream["relative_mass"])
+                    if stream["relative_mass"] is not None
+                    else float(material["relative_mass"])
+                )
                 stream.update(
                     {
                         "particle_type": material.get("particle_type", "regular"),
+                        "particle_mass": particle_mass,
                         "layout_mode": "patch",
                         "span_u_centers": u_centers,
                         "span_v_centers": v_centers,
-                        "frames_per_wave": frames_per_wave,
                         "particle_count": particle_count,
                     }
                 )
@@ -1032,7 +1105,14 @@ class GenStreaming(GenericGenData):
                         f"    span v: {stream['span_v_axis']} "
                         f"[{stream['span_v_min']:g}, {stream['span_v_max']:g}] "
                         f"count {stream['span_v_count']}",
+                        f"    radius: {radius:g}",
+                        f"    surface separation: {particle_separation_distance:g}",
+                        f"    required center spacing: {center_spacing:g}",
+                        f"    span u center spacing: {u_spacing:g}",
+                        f"    span v center spacing: {v_spacing:g}",
+                        f"    travel spacing: {travel_spacing:g}",
                         f"    material_id: {stream['material_id']}",
+                        f"    relative mass: {stream['particle_mass']:g}",
                         f"    particle type: {stream['particle_type']}",
                         f"    release start frame: {stream['release_start_frame']:g}",
                         f"    release columns/waves: {stream['release_columns']}",
@@ -1072,16 +1152,21 @@ class GenStreaming(GenericGenData):
 
             occupied_span = (stream["particles_per_wave"] - 1) * center_spacing
             first_span_center = span_min + 0.5 * (usable_span - occupied_span)
-            frames_per_wave = self.frames_between_waves(stream)
             particle_count = stream["release_columns"] * stream["particles_per_wave"]
             material = self.material_properties_by_id[stream["material_id"]]
+            particle_mass = (
+                float(stream["relative_mass"])
+                if stream["relative_mass"] is not None
+                else float(material["relative_mass"])
+            )
             stream.update(
                 {
                     "particle_type": material.get("particle_type", "regular"),
+                    "particle_mass": particle_mass,
                     "layout_mode": "line",
                     "first_span_center": first_span_center,
                     "last_span_center": first_span_center + occupied_span,
-                    "frames_per_wave": frames_per_wave,
+                    "center_spacing": center_spacing,
                     "particle_count": particle_count,
                 }
             )
@@ -1092,7 +1177,12 @@ class GenStreaming(GenericGenData):
                     f"    layout mode: line",
                     f"    inlet axis: {stream['inlet_axis']}",
                     f"    inlet value: {stream['inlet_value']:g}",
+                    f"    radius: {radius:g}",
+                    f"    surface separation: {particle_separation_distance:g}",
+                    f"    required center spacing: {center_spacing:g}",
+                    f"    travel spacing: {travel_spacing:g}",
                     f"    material_id: {stream['material_id']}",
+                    f"    relative mass: {stream['particle_mass']:g}",
                     f"    particle type: {stream['particle_type']}",
                     f"    release start frame: {stream['release_start_frame']:g}",
                     f"    release columns/waves: {stream['release_columns']}",
@@ -1104,7 +1194,7 @@ class GenStreaming(GenericGenData):
                 )
             )
 
-        self.boundary_particle_clearance = boundary_clearance
+        self.boundary_particle_clearance = max_boundary_clearance
         self.streaming_particle_count = total_particle_count
         self.streaming_report_text = "\n".join(report_lines)
 
@@ -1120,6 +1210,7 @@ class GenStreaming(GenericGenData):
         self.streaming_particle_type = first_stream["particle_type"]
         self.streaming_material_id = first_stream["material_id"]
         self.frames_per_wave = first_stream["frames_per_wave"]
+        self.particle_center_spacing = first_stream["center_spacing"]
         self.streaming_first_span_center = first_stream.get("first_span_center", 0.0)
         self.streaming_last_span_center = first_stream.get("last_span_center", 0.0)
         return self.streaming_particle_count
@@ -1151,6 +1242,7 @@ class GenStreaming(GenericGenData):
 
     def add_streaming_mobile_particles(self):
         reports = []
+        initial_particle_records = []
         first_particle = self.number_active_particles + 1
         for stream in self.streaming_streams:
             velocity = stream["initial_particle_velocity"]
@@ -1171,13 +1263,23 @@ class GenStreaming(GenericGenData):
                             particle = self.add_mobile_particle(
                                 position,
                                 velocity,
-                                radius=self.radius,
+                                radius=stream["radius"],
+                                mass=stream["particle_mass"],
                                 material_id=stream["material_id"],
                                 collision_stiffness_q=float(
                                     self.itemcfg.get("collision_stiffness_q", 0.0)
                                 ),
                             )
                             particle.state_flg = float(birth_frame)
+                            initial_particle_records.append(
+                                (
+                                    int(particle.pnum),
+                                    float(birth_frame),
+                                    (particle.rx, particle.ry, particle.rz),
+                                    float(stream["radius"]),
+                                    float(stream["particle_separation_distance"]),
+                                )
+                            )
                 elif stream["layout_mode"] == "curve":
                     for width_center in stream["width_centers"]:
                         for length_center in stream["length_centers"]:
@@ -1189,17 +1291,27 @@ class GenStreaming(GenericGenData):
                             particle = self.add_mobile_particle(
                                 position,
                                 velocity,
-                                radius=self.radius,
+                                radius=stream["radius"],
+                                mass=stream["particle_mass"],
                                 material_id=stream["material_id"],
                                 collision_stiffness_q=float(
                                     self.itemcfg.get("collision_stiffness_q", 0.0)
                                 ),
                             )
                             particle.state_flg = float(birth_frame)
+                            initial_particle_records.append(
+                                (
+                                    int(particle.pnum),
+                                    float(birth_frame),
+                                    (particle.rx, particle.ry, particle.rz),
+                                    float(stream["radius"]),
+                                    float(stream["particle_separation_distance"]),
+                                )
+                            )
                 else:
                     first_center = stream["first_span_center"]
                     for row in range(stream["particles_per_wave"]):
-                        span_center = first_center + row * self.particle_center_spacing
+                        span_center = first_center + row * stream["center_spacing"]
                         position = self.stream_position(
                             stream,
                             span_center=span_center,
@@ -1207,13 +1319,23 @@ class GenStreaming(GenericGenData):
                         particle = self.add_mobile_particle(
                             position,
                             velocity,
-                            radius=self.radius,
+                            radius=stream["radius"],
+                            mass=stream["particle_mass"],
                             material_id=stream["material_id"],
                             collision_stiffness_q=float(
                                 self.itemcfg.get("collision_stiffness_q", 0.0)
                             ),
                         )
                         particle.state_flg = float(birth_frame)
+                        initial_particle_records.append(
+                            (
+                                int(particle.pnum),
+                                float(birth_frame),
+                                (particle.rx, particle.ry, particle.rz),
+                                float(stream["radius"]),
+                                float(stream["particle_separation_distance"]),
+                            )
+                        )
 
             stream_last_particle = self.number_active_particles
             stream["first_particle_number"] = stream_first_particle
@@ -1222,7 +1344,13 @@ class GenStreaming(GenericGenData):
                 "Streaming mobile-particle stream:\n"
                 f"  stream: {stream['name']}\n"
                 f"  mobile particles: {stream['particle_count']}\n"
+                f"  radius: {stream['radius']:g}\n"
+                "  particle separation distance: "
+                f"{stream['particle_separation_distance']:g}\n"
+                f"  center spacing: {stream['center_spacing']:g}\n"
+                f"  travel spacing: {stream['travel_spacing']:g}\n"
                 f"  material_id: {stream['material_id']}\n"
+                f"  relative mass: {stream['particle_mass']:g}\n"
                 f"  particle type: {stream['particle_type']}\n"
                 f"  first release frame: {stream['release_start_frame']:g}\n"
                 f"  last release frame: "
@@ -1234,6 +1362,10 @@ class GenStreaming(GenericGenData):
                 f"  last particle number: {stream_last_particle}"
             )
 
+        overlap_report = self.validate_initial_stream_particle_overlap(
+            initial_particle_records
+        )
+        reports.append(overlap_report)
         report_text = (
             "Streaming mobile-particle report:\n"
             f"  mobile particles: {self.number_active_particles}\n"
@@ -1246,6 +1378,58 @@ class GenStreaming(GenericGenData):
         print(report_text)
         self.write_validation_log(report_text)
         return self.number_active_particles
+
+    def validate_initial_stream_particle_overlap(self, records):
+        if not records:
+            return "Streaming initial-overlap report:\n  status: OK"
+
+        max_required_spacing = max(
+            2.0 * radius + separation
+            for _, _, _, radius, separation in records
+        )
+        hash_size = max(max_required_spacing, 1.0e-12)
+        buckets = {}
+
+        def cell_key(position):
+            return tuple(int(math.floor(component / hash_size)) for component in position)
+
+        def neighbor_keys(key):
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for dz in (-1, 0, 1):
+                        yield (key[0] + dx, key[1] + dy, key[2] + dz)
+
+        checked_pairs = 0
+        for record in records:
+            pnum, birth_frame, position, radius, separation = record
+            key = cell_key(position)
+            frame_buckets = buckets.setdefault(birth_frame, {})
+            for neighbor_key in neighbor_keys(key):
+                for other in frame_buckets.get(neighbor_key, ()):
+                    other_pnum, _, other_position, other_radius, other_separation = other
+                    required_spacing = radius + other_radius + max(
+                        separation,
+                        other_separation,
+                    )
+                    dx = position[0] - other_position[0]
+                    dy = position[1] - other_position[1]
+                    dz = position[2] - other_position[2]
+                    distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+                    checked_pairs += 1
+                    if distance + 1.0e-12 < required_spacing:
+                        raise RuntimeError(
+                            "stream particles begin life overlapping: "
+                            f"p{other_pnum} and p{pnum}, birth frame {birth_frame:g}, "
+                            f"distance {distance:g}, required {required_spacing:g}"
+                        )
+            frame_buckets.setdefault(key, []).append(record)
+
+        return (
+            "Streaming initial-overlap report:\n"
+            f"  generated stream particles checked: {len(records)}\n"
+            f"  nearby same-birth pairs checked: {checked_pairs}\n"
+            "  status: OK"
+        )
 
     def report_collision_feasibility(self):
         min_compression_frames = float(

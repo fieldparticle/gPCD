@@ -13,8 +13,6 @@ x_axis_lims 					= [0.0,20.0];
 y_axis_lims 					= [0.0,20.0];
 z_axis_lims 					= [0.0,20.0];
 
-//  Distance between particle perimiters
-particle_separation_distance 	= 0.005;
 // Required: explicit cell counts for the cell-array domain.
 cell_array_width 				= 20;
 cell_array_height 				= 20;
@@ -82,6 +80,8 @@ particle_streams = (
   {
     name 						= "photon_beam";
     material_id 				= 0;
+    radius 						= 0.05;
+    particle_separation_distance = 0.005;
 
     // material_properties seeds the generated pdata.ptype behavior.
     //initial_particle_velocity 	= [ 0.048296, -0.012941, 0.0 ];
@@ -138,10 +138,8 @@ curve_wall_segments = {
 
 
 // --------------------------------------------------------------------------
-// Particle geometry and integration
+// Integration
 // --------------------------------------------------------------------------
-radius 					= 0.05;
-
 // Simulation timestep used by both dynamics integration and wave-frame spacing.
 dt 							= 0.045;
 // --------------------------------------------------------------------------

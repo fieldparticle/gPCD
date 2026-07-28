@@ -521,8 +521,7 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
     P[SourceID].colFlg = 0u;
     P[SourceID].contactCount = 0u;
     P[SourceID].material_id = float(PhotonBaseMaterialID());
-    P[SourceID].parms.x =
-        boundary_light_material_relative_mass(PhotonBaseMaterialID());
+    P[SourceID].parms.x = max(0.0, P[SourceID].photon_transport.w);
     P[SourceID].photon_transport.x = livedFrames;
     P[SourceID].photon_transport.y += 1.0;
     P[SourceID].photon_transport.z = 1.0;

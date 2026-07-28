@@ -145,8 +145,13 @@ void ResourceLightingParticle::Create(uint32_t BindPoint)
 		part.contactCount	= 0;
 		
 		part.initial_pos_birth	= glm::vec4(part_pos.rx, part_pos.ry, part_pos.rz, part_pos.state_flg);
-		part.initial_vel_energy = glm::vec4(part_pos.vx, part_pos.vy, part_pos.vz, 1.0);
-		part.photon_transport	= glm::vec4(0.0, 0.0, 0.0, 0.0);
+		part.initial_vel_energy = glm::vec4(part_pos.vx, part_pos.vy, part_pos.vz, 0.0);
+		bool isPhoton = part_pos.ptype == -2.0;
+		part.photon_transport	= glm::vec4(
+			0.0f,
+			0.0f,
+			isPhoton ? 1.0f : 0.0f,
+			isPhoton ? static_cast<float>(part_pos.molar_mass) : 0.0f);
 		if (part_pos.ptype > 0.5)
 			BoundaryParticleLimit++;
 

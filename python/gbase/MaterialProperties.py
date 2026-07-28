@@ -56,6 +56,22 @@ PHOTON_SURFACE_BEHAVIOR_NAMES = {
     "PHOTON_SURFACE_BEHAVIOR_REFLECT": PHOTON_SURFACE_BEHAVIOR_REFLECT,
 }
 
+CONTACT_ILLUMINATION_MAX = 0
+CONTACT_ILLUMINATION_MIN = 1
+CONTACT_ILLUMINATION_CURRENT = 2
+CONTACT_ILLUMINATION_FIRST = 3
+
+CONTACT_ILLUMINATION_NAMES = {
+    "MAX": CONTACT_ILLUMINATION_MAX,
+    "MIN": CONTACT_ILLUMINATION_MIN,
+    "CURRENT": CONTACT_ILLUMINATION_CURRENT,
+    "FIRST": CONTACT_ILLUMINATION_FIRST,
+    "CONTACT_ILLUMINATION_MAX": CONTACT_ILLUMINATION_MAX,
+    "CONTACT_ILLUMINATION_MIN": CONTACT_ILLUMINATION_MIN,
+    "CONTACT_ILLUMINATION_CURRENT": CONTACT_ILLUMINATION_CURRENT,
+    "CONTACT_ILLUMINATION_FIRST": CONTACT_ILLUMINATION_FIRST,
+}
+
 
 def parse_color_mode(raw_value):
     if isinstance(raw_value, str):
@@ -124,6 +140,15 @@ def parse_photon_surface_behavior(raw_value):
     return int(raw_value)
 
 
+def parse_contact_illumination(raw_value):
+    if isinstance(raw_value, str):
+        contact_illumination = CONTACT_ILLUMINATION_NAMES.get(raw_value.strip().upper())
+        if contact_illumination is None:
+            raise ValueError(f"unknown contact_illumination: {raw_value}")
+        return contact_illumination
+    return int(raw_value)
+
+
 DEFAULT_MATERIAL_PROPERTIES = (
     {
         "material_id": 0,
@@ -140,6 +165,7 @@ DEFAULT_MATERIAL_PROPERTIES = (
         "photon_coupling": 1.0,
         "photon_min_relative_mass": 0.001,
         "photon_surface_behavior": PHOTON_SURFACE_BEHAVIOR_NONE,
+        "contact_illumination": CONTACT_ILLUMINATION_MAX,
         "cell_density": 0.0,
     },
 )
@@ -202,6 +228,13 @@ def normalized_material_properties(source=None):
                 PHOTON_SURFACE_BEHAVIOR_NONE,
             )
         )
+        contact_illumination = parse_contact_illumination(
+            _material_get(
+                raw_material,
+                "contact_illumination",
+                CONTACT_ILLUMINATION_MAX,
+            )
+        )
 
         if not all(
             math.isfinite(value)
@@ -223,6 +256,11 @@ def normalized_material_properties(source=None):
             or photon_surface_behavior > PHOTON_SURFACE_BEHAVIOR_REFLECT
         ):
             raise ValueError("photon_surface_behavior is outside the valid range")
+        if (
+            contact_illumination < CONTACT_ILLUMINATION_MAX
+            or contact_illumination > CONTACT_ILLUMINATION_FIRST
+        ):
+            raise ValueError("contact_illumination is outside the valid range")
 
         materials.append(
             {
@@ -240,6 +278,7 @@ def normalized_material_properties(source=None):
                 "photon_coupling": photon_coupling,
                 "photon_min_relative_mass": photon_min_relative_mass,
                 "photon_surface_behavior": photon_surface_behavior,
+                "contact_illumination": contact_illumination,
                 "cell_density": cell_density,
             }
         )
@@ -270,10 +309,18 @@ def write_photon_surface_behavior_defines(output):
     output.write(f"PHOTON_SURFACE_BEHAVIOR_REFLECT = {PHOTON_SURFACE_BEHAVIOR_REFLECT};\n")
 
 
+def write_contact_illumination_defines(output):
+    output.write(f"CONTACT_ILLUMINATION_MAX = {CONTACT_ILLUMINATION_MAX};\n")
+    output.write(f"CONTACT_ILLUMINATION_MIN = {CONTACT_ILLUMINATION_MIN};\n")
+    output.write(f"CONTACT_ILLUMINATION_CURRENT = {CONTACT_ILLUMINATION_CURRENT};\n")
+    output.write(f"CONTACT_ILLUMINATION_FIRST = {CONTACT_ILLUMINATION_FIRST};\n")
+
+
 def write_material_properties(output, source=None):
     materials = normalized_material_properties(source)
     write_particle_type_defines(output)
     write_photon_surface_behavior_defines(output)
+    write_contact_illumination_defines(output)
     output.write(f"num_material_properties = {len(materials)};\n")
     output.write("material_properties = (\n")
     for material_index, material in enumerate(materials):
@@ -331,6 +378,10 @@ def write_material_properties(output, source=None):
         output.write(
             "        photon_surface_behavior = "
             f"{int(material.get('photon_surface_behavior', PHOTON_SURFACE_BEHAVIOR_NONE))};\n"
+        )
+        output.write(
+            "        contact_illumination = "
+            f"{int(material.get('contact_illumination', CONTACT_ILLUMINATION_MAX))};\n"
         )
         output.write(f"        cell_density = {float(material['cell_density']):.9f};\n")
         output.write(f"    }}{separator}\n")

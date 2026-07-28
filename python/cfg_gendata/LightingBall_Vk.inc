@@ -5,28 +5,28 @@
 scene_model = {
   objects = (
     {
-      name = "lighting_sphere";
-      type = "sphere";
-      center = [9.0, 8.0, 10.0];
-      radius = 4.0;
-      material_id = 1;
-      surface_id = 1000;
-      roles = ["collision", "boundary_markers", "lighting_surface"];
+      name 				= "lighting_sphere";
+      type 				= "sphere";
+      center 			= [9.0, 8.0, 10.0];
+      radius 			= 4.0;
+      material_id 		= 1;
+      surface_id 		= 1000;
+      roles 			= ["collision", "boundary_markers", "lighting_surface"];
     },
     {
-      name = "shadow_wall";
-      type = "rectangle";
-      origin = [16.0, 2.0, 2.0];
-      u_axis = "y";
-      u_length = 14.0;
-      v_axis = "z";
-      v_length = 14.0;
-      normal = [-1.0, 0.0, 0.0];
-      material_id = 2;
-      surface_id = 2000;
-      roles = ["collision", "boundary_markers", "lighting_surface"];
-      rectangle_u_segments = 80;
-      rectangle_v_segments = 80;
+      name 					= "shadow_wall";
+      type 					= "rectangle";
+      origin 				= [16.0, 2.0, 2.0];
+      u_axis 				= "y";
+      u_length 				= 14.0;
+      v_axis 				= "z";
+      v_length 				= 14.0;
+      normal 				= [-1.0, 0.0, 0.0];
+      material_id 			= 2;
+      surface_id 			= 2000;
+      roles 				= ["collision", "boundary_markers", "lighting_surface"];
+      rectangle_u_segments 	= 80;
+      rectangle_v_segments 	= 80;
     }
   );
 };
@@ -58,38 +58,65 @@ gl_point_size 				= 1.5;
 // --------------------------------------------------------------------------
 particle_streams = (
   {
-    name = "photon_beam";
-    material_id = 0;
+    name 							= "photon_beam";
+    material_id 					= 0;
+    radius 							= 0.025;
+    particle_separation_distance 	= 0.005;
 
     // Dense x-directed beam matched to the shadow_wall y/z face.
     // Vulkan profile is dense: 80 x 80 = 6400 photons per wave.
-    initial_particle_velocity = [0.209968, 0.0, 0.0];
+    initial_particle_velocity 		= [0.209968, 0.0, 0.0];
 
-    release_start_frame = 10;
-    release_columns = 1;
-    particles_per_wave = 6400;
-    spacing_factor = 0.5;
+    release_start_frame 			= 10;
+    release_columns 				= 1;
+    particles_per_wave 				= 8100;
+    spacing_factor 					= 1.05;
 
-    inlet_axis = "x";
-    inlet_value = 4.0;
+    inlet_axis 						= "x";
+    inlet_value 					= 4.0;
 
-    span_u_axis = "y";
-    span_u_min = 2.0;
-    span_u_max = 16.0;
-    span_u_count = 80;
+    span_u_axis 					= "y";
+    span_u_min 						= 2.0;
+    span_u_max 						= 16.0;
+    span_u_count 					= 90;
 
-    span_v_axis = "z";
-    span_v_min = 2.0;
-    span_v_max = 16.0;
-    span_v_count = 80;
+    span_v_axis 					= "z";
+    span_v_min 						= 2.0;
+    span_v_max 						= 16.0;
+    span_v_count 					= 90;
+  },
+  {
+    name 							= "diffuse_back_light";
+    material_id 					= 0;
+    radius 							= 0.025;
+    particle_separation_distance 	= 0.005;
+    relative_mass 					= 0.05;
+
+    initial_particle_velocity 		= [-0.209968, 0.0, 0.0];
+
+    release_start_frame 			= 10;
+    release_columns 				= 1;
+    particles_per_wave 				= 6400;
+    spacing_factor 					= 1.05;
+
+    inlet_axis 						= "x";
+    inlet_value 					= 15.5;
+
+    span_u_axis 					= "y";
+    span_u_min 						= 2.0;
+    span_u_max 						= 16.0;
+    span_u_count 					= 80;
+
+    span_v_axis 					= "z";
+    span_v_min 						= 2.0;
+    span_v_max 						= 16.0;
+    span_v_count 					= 80;
   }
 );
 
 // --------------------------------------------------------------------------
-// Particle geometry and integration
+// Integration
 // --------------------------------------------------------------------------
-particle_separation_distance 	= 0.005;
-radius 							= 0.05;
 dt 								= 0.045;
 
 // --------------------------------------------------------------------------

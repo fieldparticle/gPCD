@@ -20,7 +20,10 @@ from gbase.MaterialProperties import (
     PARTICLE_TYPE_PHOTON,
     PHOTON_SURFACE_BEHAVIOR_NONE,
     PHOTON_SURFACE_BEHAVIOR_REFLECT,
+    CONTACT_ILLUMINATION_MAX,
+    CONTACT_ILLUMINATION_FIRST,
     parse_debug_visible,
+    parse_contact_illumination,
     parse_material_color,
     parse_particle_type,
     parse_photon_surface_behavior,
@@ -384,6 +387,22 @@ class GenericGenData:
             ):
                 errors.append(f"{context}.photon_surface_behavior is outside the valid range")
 
+            try:
+                contact_illumination = parse_contact_illumination(
+                    raw_material.get(
+                        "contact_illumination",
+                        CONTACT_ILLUMINATION_MAX,
+                    )
+                )
+            except (TypeError, ValueError):
+                errors.append(f"{context}.contact_illumination is unknown")
+                contact_illumination = None
+            if contact_illumination is not None and (
+                contact_illumination < CONTACT_ILLUMINATION_MAX
+                or contact_illumination > CONTACT_ILLUMINATION_FIRST
+            ):
+                errors.append(f"{context}.contact_illumination is outside the valid range")
+
             if (
                 material_id >= 0
                 and relative_mass is not None
@@ -399,6 +418,7 @@ class GenericGenData:
                 and photon_coupling is not None
                 and photon_min_relative_mass is not None
                 and photon_surface_behavior is not None
+                and contact_illumination is not None
             ):
                 materials.append(
                     {
@@ -416,6 +436,7 @@ class GenericGenData:
                         "photon_coupling": photon_coupling,
                         "photon_min_relative_mass": photon_min_relative_mass,
                         "photon_surface_behavior": photon_surface_behavior,
+                        "contact_illumination": contact_illumination,
                         "cell_density": cell_density,
                     }
                 )
@@ -1929,6 +1950,10 @@ class GenericGenData:
         report_text = (
             "Cell occupancy capacity report:\n"
             f"  configured cell_occupancy_list_size: {configured_size}\n"
+            f"  initial max particles per center cell: {max_center_count}"
+            f" at loc {max_center_location}\n"
+            f"  initial max particles per occupied corner cell: {max_corner_count}"
+            f" at loc {max_corner_location}\n"
             f"  initial max center occupancy: {max_center_count}"
             f" at loc {max_center_location}\n"
             f"  initial max corner occupancy: {max_corner_count}"

@@ -164,16 +164,16 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 			{
 				G_ExportFrame = false;
 				std::ostringstream out_file;
-				out_file << cap_prfx.str() << "_" << VulkanWin->m_FrameNumber << ".cap";
+				out_file << cap_prfx.str() << "_" << VulkanWin->m_ActualFrame << ".cap";
 				DrawInstance->CaptureFrame(out_file.str());
 			}
 			else if (auto_cap_frames == true)
 			{
 				
-				if (cap_frames.find(VulkanWin->m_FrameNumber) != cap_frames.end())
+				if (cap_frames.find(VulkanWin->m_ActualFrame) != cap_frames.end())
 				{
 					std::ostringstream out_file;
-					out_file << cap_prfx.str() << "_" << VulkanWin->m_FrameNumber << ".cap";
+					out_file << cap_prfx.str() << "_" << VulkanWin->m_ActualFrame << ".cap";
 					DrawInstance->CaptureFrame(out_file.str());
 				}
 			}
