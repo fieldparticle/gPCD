@@ -30,7 +30,180 @@
 %*
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
+#include <algorithm>
+#include <cctype>
+#include <cstdint>
 #include <cmath>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+namespace
+{
+	uint32_t LightingSurfaceTypeID(const std::string& surfaceType)
+	{
+		if (surfaceType == "SPHERE")
+			return 1u;
+		if (surfaceType == "RECTANGLE_WALL")
+			return 2u;
+		if (surfaceType == "NONE")
+			return 0u;
+
+		std::ostringstream errtxt;
+		errtxt << "Unknown lighting surface_type: " << surfaceType << std::ends;
+		throw std::runtime_error(errtxt.str().c_str());
+	}
+
+	uint32_t PhotonSurfaceBehaviorID(const std::string& behavior)
+	{
+		std::string normalized = behavior;
+		normalized.erase(
+			normalized.begin(),
+			std::find_if(
+				normalized.begin(),
+				normalized.end(),
+				[](unsigned char value) { return !std::isspace(value); }));
+		normalized.erase(
+			std::find_if(
+				normalized.rbegin(),
+				normalized.rend(),
+				[](unsigned char value) { return !std::isspace(value); }).base(),
+			normalized.end());
+		std::transform(
+			normalized.begin(),
+			normalized.end(),
+			normalized.begin(),
+			[](unsigned char value) { return static_cast<char>(std::toupper(value)); });
+
+		if (normalized == "NONE" || normalized == "PHOTON_SURFACE_BEHAVIOR_NONE")
+			return 0u;
+		if (normalized == "SURFACE_COLOR" || normalized == "PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR")
+			return 1u;
+		if (normalized == "ABSORB" || normalized == "PHOTON_SURFACE_BEHAVIOR_ABSORB")
+			return 2u;
+		if (normalized == "REFLECT" || normalized == "PHOTON_SURFACE_BEHAVIOR_REFLECT")
+			return 3u;
+
+		std::ostringstream errtxt;
+		errtxt << "Unknown photon_surface_behavior: " << behavior << std::ends;
+		throw std::runtime_error(errtxt.str().c_str());
+	}
+
+	uint32_t MaterialPhotonSurfaceBehavior(config_setting_t* material, int index)
+	{
+		config_setting_t* behaviorSetting =
+			config_setting_lookup(material, "photon_surface_behavior");
+		if (behaviorSetting == nullptr)
+			return 0u;
+
+		int settingType = config_setting_type(behaviorSetting);
+		if (settingType == CONFIG_TYPE_STRING)
+			return PhotonSurfaceBehaviorID(config_setting_get_string(behaviorSetting));
+		if (settingType == CONFIG_TYPE_INT)
+		{
+			int behavior = config_setting_get_int(behaviorSetting);
+			if (behavior < 0 || behavior > 3)
+				throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_surface_behavior is outside the valid range");
+			return static_cast<uint32_t>(behavior);
+		}
+
+		throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_surface_behavior must be a string or integer");
+	}
+
+	uint32_t CountObjFaceVertices(const std::string& objFile)
+	{
+		std::ifstream input(objFile);
+		if (!input.is_open())
+		{
+			std::ostringstream errtxt;
+			errtxt << "Unable to open lighting surface OBJ: " << objFile << std::ends;
+			throw std::runtime_error(errtxt.str().c_str());
+		}
+
+		uint32_t vertexCount = 0u;
+		std::string line;
+		while (std::getline(input, line))
+		{
+			if (line.size() < 2u || line[0] != 'f' || line[1] != ' ')
+				continue;
+
+			std::istringstream face(line.substr(2u));
+			std::string token;
+			while (face >> token)
+				vertexCount++;
+		}
+
+		return vertexCount;
+	}
+
+	struct LightingSurfaceObjectInfo
+	{
+		uint32_t surfaceType = 0u;
+		uint32_t surfaceID = 0u;
+		uint32_t materialID = 0u;
+		uint32_t vertexOffset = 0u;
+		uint32_t vertexCount = 0u;
+	};
+
+	std::vector<LightingSurfaceObjectInfo> LightingSurfaceObjectOffsets(ConfigObj* cfg)
+	{
+		std::vector<LightingSurfaceObjectInfo> objects;
+
+		int objectCount = 0;
+		config_setting_t* objectList = nullptr;
+		if (cfg->CheckKey("lighting_surface_objects"))
+			objectList = cfg->StartStructure("lighting_surface_objects", objectCount);
+		if (objectList == nullptr || objectCount == 0)
+			return objects;
+
+		uint32_t vertexOffset = 0u;
+		for (uint32_t pass = 0u; pass < 2u; ++pass)
+		{
+			for (int index = 0; index < objectCount; ++index)
+			{
+				config_setting_t* object = cfg->GetSubStructAddress(objectList, index);
+				if (object == nullptr)
+					throw std::runtime_error("lighting_surface_objects contains an invalid object");
+
+				const char* source = nullptr;
+				const char* objFile = nullptr;
+				const char* surfaceTypeText = nullptr;
+				int surfaceID = 0;
+				int materialID = 0;
+
+				if (config_setting_lookup_string(object, "source", &source) != CONFIG_TRUE ||
+					std::string(source) != "obj" ||
+					config_setting_lookup_string(object, "obj_file", &objFile) != CONFIG_TRUE ||
+					config_setting_lookup_string(object, "surface_type", &surfaceTypeText) != CONFIG_TRUE ||
+					config_setting_lookup_int(object, "surface_id", &surfaceID) != CONFIG_TRUE ||
+					config_setting_lookup_int(object, "material_id", &materialID) != CONFIG_TRUE)
+				{
+					std::ostringstream errtxt;
+					errtxt << "lighting_surface_objects[" << index << "] must contain OBJ metadata" << std::ends;
+					throw std::runtime_error(errtxt.str().c_str());
+				}
+
+				uint32_t surfaceType = LightingSurfaceTypeID(surfaceTypeText);
+				bool wallPass = surfaceType == 2u;
+				if ((pass == 0u && !wallPass) || (pass == 1u && wallPass))
+					continue;
+
+				LightingSurfaceObjectInfo info{};
+				info.surfaceType = surfaceType;
+				info.surfaceID = static_cast<uint32_t>(surfaceID);
+				info.materialID = static_cast<uint32_t>(materialID);
+				info.vertexOffset = vertexOffset;
+				info.vertexCount = CountObjFaceVertices(objFile);
+				objects.push_back(info);
+				vertexOffset += info.vertexCount;
+			}
+		}
+
+		return objects;
+	}
+
+}
 void ShaderObj::Create(Resource* VPO, ResourceCollMatrix* CMO, ResourceLockMatrix* LMO, SwapChain* SCO)
 {
 		m_VPO = VPO;
@@ -146,7 +319,7 @@ void ShaderObj::WriteMaterials()
 			double photonEnergy = 1.0;
 			double photonCoupling = 1.0;
 			double photonMinRelativeMass = 0.001;
-			int photonSurfaceBehavior = 0;
+			uint32_t photonSurfaceBehavior = 0u;
 
 			if (config_setting_lookup_int(material, "material_id", &materialID) == CONFIG_FALSE)
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].material_id missing");
@@ -244,10 +417,7 @@ void ShaderObj::WriteMaterials()
 			if (photonMinRelativeMass < 0.0)
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_min_relative_mass must not be negative");
 
-			if (config_setting_lookup_int(material, "photon_surface_behavior", &photonSurfaceBehavior) == CONFIG_FALSE)
-				photonSurfaceBehavior = 0;
-			if (photonSurfaceBehavior < 0 || photonSurfaceBehavior > 3)
-				throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_surface_behavior is outside the valid range");
+			photonSurfaceBehavior = MaterialPhotonSurfaceBehavior(material, index);
 
 			if (config_setting_lookup_float(material, "cell_density", &cellDensity) == CONFIG_FALSE)
 				cellDensity = 0.0;
@@ -613,6 +783,16 @@ std::ostringstream ShaderObj::RectangleWalls()
 		<< "};\n\n";
 
 	wall_str
+		<< "struct LightingSurfaceObjectMetadata\n"
+		<< "{\n"
+		<< "    uint surfaceType;\n"
+		<< "    uint surfaceID;\n"
+		<< "    uint materialID;\n"
+		<< "    uint vertexOffset;\n"
+		<< "    uint vertexCount;\n"
+		<< "};\n\n";
+
+	wall_str
 		<< "struct LightingSurfaceWallMetadata\n"
 		<< "{\n"
 		<< "    vec3 origin;\n"
@@ -622,7 +802,6 @@ std::ostringstream ShaderObj::RectangleWalls()
 		<< "    float vLength;\n"
 		<< "    uint uStepCount;\n"
 		<< "    uint vStepCount;\n"
-		<< "    uint vertexOffset;\n"
 		<< "    uint wallFlag;\n"
 		<< "};\n\n";
 
@@ -636,6 +815,43 @@ std::ostringstream ShaderObj::RectangleWalls()
 
 	if (CfgTst->CheckKey("rectangle_wall_segments"))
 		segmentList = CfgTst->StartStructure("rectangle_wall_segments", segmentCount);
+
+	std::vector<LightingSurfaceObjectInfo> surfaceObjects =
+		LightingSurfaceObjectOffsets(CfgTst);
+
+	wall_str
+		<< "const uint LIGHTING_SURFACE_OBJECT_COUNT = "
+		<< surfaceObjects.size() << "u;\n";
+	if (surfaceObjects.empty())
+	{
+		wall_str
+			<< "const LightingSurfaceObjectMetadata LIGHTING_SURFACE_OBJECTS[1] = "
+			<< "LightingSurfaceObjectMetadata[1](\n"
+			<< "    LightingSurfaceObjectMetadata(0u, 0u, 0u, 0u, 0u)\n"
+			<< ");\n\n";
+	}
+	else
+	{
+		wall_str
+			<< "const LightingSurfaceObjectMetadata LIGHTING_SURFACE_OBJECTS["
+			<< surfaceObjects.size() << "] = LightingSurfaceObjectMetadata["
+			<< surfaceObjects.size() << "](\n";
+		for (size_t objectIndex = 0; objectIndex < surfaceObjects.size(); ++objectIndex)
+		{
+			const LightingSurfaceObjectInfo& object = surfaceObjects[objectIndex];
+			wall_str
+				<< "    LightingSurfaceObjectMetadata("
+				<< object.surfaceType << "u, "
+				<< object.surfaceID << "u, "
+				<< object.materialID << "u, "
+				<< object.vertexOffset << "u, "
+				<< object.vertexCount << "u)";
+			if (objectIndex + 1u < surfaceObjects.size())
+				wall_str << ",";
+			wall_str << "\n";
+		}
+		wall_str << ");\n\n";
+	}
 
 	if (segmentList == nullptr || segmentCount <= 0)
 	{
@@ -659,7 +875,7 @@ std::ostringstream ShaderObj::RectangleWalls()
 			<< "vec3(1.000000000, 0.000000000, 0.000000000), "
 			<< "vec3(0.000000000, 1.000000000, 0.000000000), "
 			<< "0.000000000, 0.000000000, "
-			<< "1u, 1u, 0u, 0u)\n"
+			<< "1u, 1u, 0u)\n"
 			<< ");\n\n";
 		return wall_str;
 	}
@@ -680,7 +896,6 @@ std::ostringstream ShaderObj::RectangleWalls()
 		<< segmentCount << "] = LightingSurfaceWallMetadata["
 		<< segmentCount << "](\n";
 
-	uint32_t vertexOffset = 0u;
 	for (int index = 0; index < segmentCount; ++index)
 	{
 		config_setting_t* segment = CfgTst->GetSubStructAddress(segmentList, index);
@@ -747,14 +962,12 @@ std::ostringstream ShaderObj::RectangleWalls()
 			<< vLength << ", "
 			<< uStepCount << "u, "
 			<< vStepCount << "u, "
-			<< vertexOffset << "u, "
 			<< wallFlag << "u)";
 
 		if (index + 1 < segmentCount)
 			surface_wall_str << ",";
 
 		surface_wall_str << "\n";
-		vertexOffset += uStepCount * vStepCount * 6u;
 	}
 
 	wall_str << ");\n\n";

@@ -45,7 +45,7 @@ struct LightingSurfaceVertex
     // xyz = dynamic light RGB, w = valid flag
     vec4 light;
 
-    // x = local_u, y = local_v, z = vertex_id, w = reserved
+    // x = local_u, y = local_v, z = vertex_id, w = surface_type
     vec4 meta;
 };
 

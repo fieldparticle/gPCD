@@ -2,10 +2,12 @@
 %***      C PROPRIETARY SOURCE FILE IDENTIFICATION               ***
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
+#include "VulkanObj/ObjLoader.hpp"
 
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 namespace
 {
@@ -25,7 +27,7 @@ void ResourceLightingSurface::Create(uint32_t BindPoint, Resource* particle)
 	m_BindPoint = BindPoint;
 	m_thisFramesBuffered = 1;
 	CreateLayout();
-	MakeRectangleWalls();
+	LoadLightingSurfaceObjects();
 
 	m_NumElements = static_cast<uint64_t>(m_SurfaceVertices.size());
 	if (m_SurfaceVertices.empty())
@@ -90,101 +92,149 @@ void ResourceLightingSurface::CreateLayout()
 	m_LayoutBinding[0].stageFlags = VK_SHADER_STAGE_ALL;
 }
 
-void ResourceLightingSurface::MakeRectangleWalls()
+uint32_t ResourceLightingSurface::SurfaceTypeID(const std::string& surfaceType)
+{
+	if (surfaceType == "SPHERE")
+		return BOUNDARY_LIGHT_SURFACE_SPHERE;
+	if (surfaceType == "RECTANGLE_WALL")
+		return BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL;
+	if (surfaceType == "NONE")
+		return BOUNDARY_LIGHT_SURFACE_NONE;
+
+	std::ostringstream errtxt;
+	errtxt << "Unknown lighting surface_type: " << surfaceType << std::ends;
+	throw std::runtime_error(errtxt.str().c_str());
+}
+
+void ResourceLightingSurface::LoadObjSurface(
+	const std::string& objFile,
+	uint32_t surfaceType,
+	uint32_t surfaceID,
+	uint32_t materialID,
+	uint32_t& emittedVertexID)
+{
+	std::vector<glm::vec3> positions;
+	std::vector<glm::vec2> uvs;
+	std::vector<glm::vec3> normals;
+
+	if (!loadOBJ(objFile.c_str(), positions, uvs, normals))
+	{
+		std::ostringstream errtxt;
+		errtxt << "Unable to load lighting surface OBJ: " << objFile << std::ends;
+		throw std::runtime_error(errtxt.str().c_str());
+	}
+
+	if (positions.empty())
+	{
+		std::ostringstream errtxt;
+		errtxt << "Lighting surface OBJ has no vertices: " << objFile << std::ends;
+		throw std::runtime_error(errtxt.str().c_str());
+	}
+
+	for (size_t index = 0; index < positions.size(); ++index)
+	{
+		glm::vec3 normal(0.0f);
+		if (index < normals.size())
+			normal = SafeNormalize(normals[index]);
+
+		if (glm::length(normal) <= 1.0e-6f && (index / 3u) * 3u + 2u < positions.size())
+		{
+			size_t base = (index / 3u) * 3u;
+			normal = SafeNormalize(glm::cross(
+				positions[base + 1u] - positions[base],
+				positions[base + 2u] - positions[base]));
+		}
+
+		glm::vec2 uv(0.0f);
+		if (index < uvs.size())
+			uv = uvs[index];
+
+		LightingSurfaceVertex vertex{};
+		vertex.pos = glm::vec4(positions[index], static_cast<float>(surfaceID));
+		vertex.normal_flag = glm::vec4(normal, static_cast<float>(materialID));
+		vertex.light = glm::vec4(0.0f);
+		vertex.meta = glm::vec4(
+			uv.x,
+			uv.y,
+			static_cast<float>(emittedVertexID),
+			static_cast<float>(surfaceType));
+
+		m_SurfaceVertices.push_back(vertex);
+		emittedVertexID++;
+	}
+}
+
+void ResourceLightingSurface::LoadLightingSurfaceObjects()
 {
 	m_SurfaceVertices.clear();
 
-	uint32_t subdivisionsPerCell = 1;
-	if (CfgTst->CheckKey("boundary_light_wall_subdivisions_per_cell"))
-		subdivisionsPerCell = CfgTst->GetUInt("boundary_light_wall_subdivisions_per_cell", true);
-	if (subdivisionsPerCell == 0)
-		throw std::runtime_error("boundary_light_wall_subdivisions_per_cell must be positive");
+	int objectCount = 0;
+	config_setting_t* objectList = nullptr;
+	if (CfgTst->CheckKey("lighting_surface_objects"))
+		objectList = CfgTst->StartStructure("lighting_surface_objects", objectCount);
 
-	int segmentCount = 0;
-	config_setting_t* segmentList = nullptr;
-	if (CfgTst->CheckKey("rectangle_wall_segments"))
-		segmentList = CfgTst->StartStructure("rectangle_wall_segments", segmentCount);
+	if (objectList == nullptr || objectCount == 0)
+		throw std::runtime_error("lighting_surface_objects is required and must not be empty for ParticleLighting");
 
 	uint32_t emittedVertexID = 0u;
-	for (int index = 0; segmentList != nullptr && index < segmentCount; ++index)
+
+	for (uint32_t pass = 0u; pass < 2u; ++pass)
 	{
-		config_setting_t* segment = CfgTst->GetSubStructAddress(segmentList, index);
-		int segmentLength = segment == nullptr ? 0 : config_setting_length(segment);
-		if (segment == nullptr || (segmentLength != 15 && segmentLength != 16))
+		for (int index = 0; index < objectCount; ++index)
 		{
-			std::ostringstream errtxt;
-			errtxt << "rectangle_wall_segments[" << index << "] must contain fifteen or sixteen values" << std::ends;
-			throw std::runtime_error(errtxt.str().c_str());
-		}
+			config_setting_t* object = CfgTst->GetSubStructAddress(objectList, index);
+			if (object == nullptr)
+				throw std::runtime_error("lighting_surface_objects contains an invalid object");
 
-		glm::vec3 origin(
-			static_cast<float>(config_setting_get_float_elem(segment, 0)),
-			static_cast<float>(config_setting_get_float_elem(segment, 1)),
-			static_cast<float>(config_setting_get_float_elem(segment, 2)));
-		glm::vec3 uAxis = SafeNormalize(glm::vec3(
-			static_cast<float>(config_setting_get_float_elem(segment, 3)),
-			static_cast<float>(config_setting_get_float_elem(segment, 4)),
-			static_cast<float>(config_setting_get_float_elem(segment, 5))));
-		glm::vec3 vAxis = SafeNormalize(glm::vec3(
-			static_cast<float>(config_setting_get_float_elem(segment, 6)),
-			static_cast<float>(config_setting_get_float_elem(segment, 7)),
-			static_cast<float>(config_setting_get_float_elem(segment, 8))));
-		float uLength = static_cast<float>(config_setting_get_float_elem(segment, 9));
-		float vLength = static_cast<float>(config_setting_get_float_elem(segment, 10));
-		glm::vec3 normal = SafeNormalize(glm::vec3(
-			static_cast<float>(config_setting_get_float_elem(segment, 11)),
-			static_cast<float>(config_setting_get_float_elem(segment, 12)),
-			static_cast<float>(config_setting_get_float_elem(segment, 13))));
-		float wallFlag = static_cast<float>(config_setting_get_float_elem(segment, 14));
-		float materialID = segmentLength >= 16
-			? static_cast<float>(config_setting_get_float_elem(segment, 15))
-			: 0.0f;
+			const char* source = nullptr;
+			const char* objFile = nullptr;
+			const char* surfaceTypeText = nullptr;
+			int surfaceID = 0;
+			int materialID = 0;
 
-		auto emitVertex = [&](const glm::vec3& position, float localU, float localV)
-		{
-			LightingSurfaceVertex vertex{};
-			vertex.pos = glm::vec4(position, wallFlag);
-			vertex.normal_flag = glm::vec4(normal, materialID);
-			vertex.light = glm::vec4(0.0f);
-			vertex.meta = glm::vec4(
-				localU,
-				localV,
-				static_cast<float>(emittedVertexID),
-				0.0f);
-			m_SurfaceVertices.push_back(vertex);
-			emittedVertexID++;
-		};
-
-		auto emitQuad = [&](float u0, float u1, float v0, float v1)
-		{
-			glm::vec3 p00 = origin + uAxis * u0 + vAxis * v0;
-			glm::vec3 p10 = origin + uAxis * u1 + vAxis * v0;
-			glm::vec3 p01 = origin + uAxis * u0 + vAxis * v1;
-			glm::vec3 p11 = origin + uAxis * u1 + vAxis * v1;
-
-			emitVertex(p00, u0, v0);
-			emitVertex(p10, u1, v0);
-			emitVertex(p11, u1, v1);
-			emitVertex(p00, u0, v0);
-			emitVertex(p11, u1, v1);
-			emitVertex(p01, u0, v1);
-		};
-
-		uint32_t uCellCount = static_cast<uint32_t>(std::max(1.0f, std::ceil(uLength)));
-		uint32_t vCellCount = static_cast<uint32_t>(std::max(1.0f, std::ceil(vLength)));
-		uint32_t uStepCount = uCellCount * subdivisionsPerCell;
-		uint32_t vStepCount = vCellCount * subdivisionsPerCell;
-
-		for (uint32_t uIndex = 0; uIndex < uStepCount; ++uIndex)
-		{
-			float u0 = uLength * static_cast<float>(uIndex) / static_cast<float>(uStepCount);
-			float u1 = uLength * static_cast<float>(uIndex + 1) / static_cast<float>(uStepCount);
-			for (uint32_t vIndex = 0; vIndex < vStepCount; ++vIndex)
+			if (config_setting_lookup_string(object, "source", &source) != CONFIG_TRUE ||
+				std::string(source) != "obj")
 			{
-				float v0 = vLength * static_cast<float>(vIndex) / static_cast<float>(vStepCount);
-				float v1 = vLength * static_cast<float>(vIndex + 1) / static_cast<float>(vStepCount);
-				emitQuad(u0, u1, v0, v1);
+				std::ostringstream errtxt;
+				errtxt << "lighting_surface_objects[" << index << "].source must be \"obj\"" << std::ends;
+				throw std::runtime_error(errtxt.str().c_str());
 			}
+			if (config_setting_lookup_string(object, "obj_file", &objFile) != CONFIG_TRUE)
+			{
+				std::ostringstream errtxt;
+				errtxt << "lighting_surface_objects[" << index << "].obj_file is required" << std::ends;
+				throw std::runtime_error(errtxt.str().c_str());
+			}
+			if (config_setting_lookup_string(object, "surface_type", &surfaceTypeText) != CONFIG_TRUE)
+			{
+				std::ostringstream errtxt;
+				errtxt << "lighting_surface_objects[" << index << "].surface_type is required" << std::ends;
+				throw std::runtime_error(errtxt.str().c_str());
+			}
+			if (config_setting_lookup_int(object, "surface_id", &surfaceID) != CONFIG_TRUE)
+			{
+				std::ostringstream errtxt;
+				errtxt << "lighting_surface_objects[" << index << "].surface_id is required" << std::ends;
+				throw std::runtime_error(errtxt.str().c_str());
+			}
+			if (config_setting_lookup_int(object, "material_id", &materialID) != CONFIG_TRUE)
+			{
+				std::ostringstream errtxt;
+				errtxt << "lighting_surface_objects[" << index << "].material_id is required" << std::ends;
+				throw std::runtime_error(errtxt.str().c_str());
+			}
+
+			uint32_t surfaceType = SurfaceTypeID(surfaceTypeText);
+			bool wallPass = surfaceType == BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL;
+			if ((pass == 0u && !wallPass) || (pass == 1u && wallPass))
+				continue;
+
+			LoadObjSurface(
+				objFile,
+				surfaceType,
+				static_cast<uint32_t>(surfaceID),
+				static_cast<uint32_t>(materialID),
+				emittedVertexID);
 		}
 	}
 }

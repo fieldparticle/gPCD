@@ -7,7 +7,7 @@ void boundary_light_main()
 		surfaceNormal = normalize(inNormalFlag.xyz);
 		surfaceCellId = uint(inMeta.z + 0.5);
 		surfaceWorldPos = worldPosition;
-		renderSurfaceType = BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL;
+		renderSurfaceType = uint(inMeta.w + 0.5);
 		renderSurfaceID = uint(inPosition.w + 0.5);
 		fragColor = inLight;
 		return;
@@ -33,5 +33,5 @@ void boundary_light_main()
 	surfaceWorldPos = worldPosition;
 	renderSurfaceType = BOUNDARY_LIGHT_SURFACE_SPHERE;
 	renderSurfaceID = LIGHTING_BALL_WALL_FLAG;
-	fragColor = vec4(1.0);
+	fragColor = vec4(0.0);
 }

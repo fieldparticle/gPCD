@@ -18,7 +18,7 @@ public:
 	virtual void AskObject(uint32_t AnyNumber) {};
 	virtual void Create(uint32_t BindPoint, Resource* particle);
 	void CreateLayout();
-	void MakeRectangleWalls();
+	void LoadLightingSurfaceObjects();
 
 	std::vector<VkVertexInputAttributeDescription>* GetAttributeDescriptions();
 	VkVertexInputBindingDescription* GetBindingDescription();
@@ -33,6 +33,14 @@ public:
 	}
 
 private:
+	uint32_t SurfaceTypeID(const std::string& surfaceType);
+	void LoadObjSurface(
+		const std::string& objFile,
+		uint32_t surfaceType,
+		uint32_t surfaceID,
+		uint32_t materialID,
+		uint32_t& emittedVertexID);
+
 	std::vector<LightingSurfaceVertex> m_SurfaceVertices;
 };
 

@@ -6,10 +6,11 @@
 
 \subsubsection{Schedule}
 
-The first boundary-space lighting milestone is complete for
+The current boundary-space lighting milestone is complete for
 \texttt{LightingBall}.  Python proves photon contact and material-source
-selection, and Vulkan \texttt{ParticleLighting} now stores persistent
-cell-owned visible color in \texttt{BoundaryLightRecord} records.
+selection, and Vulkan \texttt{ParticleLighting} now renders the configured
+sphere and shadow wall from generated OBJ-backed
+\texttt{LightingSurfaceVertex} buffers.
 
 \subsubsection{Validated Form}
 
@@ -19,28 +20,30 @@ The validated implementation proves:
     \rightarrow
     \textrm{incidence-weighted spectral deposit}
     \rightarrow
-    \textrm{persistent cell-owned surface color}
+    \textrm{persistent OBJ surface-vertex color}
     \rightarrow
-    \textrm{analytic surface fragment color}.
+    \textrm{ordinary interpolated surface color}.
 \]
 
-This uses cells as the first persistent surface-light owners.  Do not restore
-the retired \texttt{BoundaryLightSample}/\texttt{BoundaryLightState} arrays,
-visible surface-cell grid, eye-driven brightness, proxy-kernel spread, or
-per-frame clear/filter path.
+The older cell-owned \texttt{BoundaryLightRecord} path remains useful as
+surface ownership/debug state, but visible \texttt{LightingBall} wall and
+sphere color now comes from loaded lighting surfaces.  Do not restore the
+retired \texttt{BoundaryLightSample}/\texttt{BoundaryLightState} arrays,
+eye-driven brightness, proxy-kernel spread, or per-frame clear/filter path.
 
 \subsubsection{Next Work}
 
 The next active lighting tasks are:
 \begin{enumerate}
-    \item generate \texttt{LightingBall} sphere and rectangle-wall OBJ
-          inspection meshes from Python configuration;
-    \item validate the experimental Vulkan wall vertex-light path against the
-          generated OBJ surface;
-    \item complete the lighting-specific particle transport fields;
+    \item validate \texttt{SURFACE\_COLOR}, \texttt{ABSORB},
+          \texttt{REFLECT}, and \texttt{NONE} material behavior over longer
+          Vulkan captures;
+    \item move engineering rendering to the scene/surface model so simulation
+          geometry and graphics geometry have one authored source of truth;
     \item diffuse light stream;
-    \item absorbing and shadow surface;
-    \item reflective surface.
+    \item absorbing and shadow surface refinement;
+    \item reflective surface transport;
+    \item complete any remaining lighting-specific particle transport fields.
 \end{enumerate}
 
 Directional specular, additive energy accumulation, temporal filtering, decay,

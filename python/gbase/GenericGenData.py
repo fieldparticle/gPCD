@@ -28,6 +28,7 @@ from gbase.MaterialProperties import (
     write_color_mode_defines,
     write_material_properties,
 )
+from gbase.SceneModel import apply_scene_model
 from gbase.pdata import PTYPE_BOUNDARY, PTYPE_MOBILE, PTYPE_NULL, PTYPE_PHOTON, pdata
 import math
 
@@ -181,6 +182,7 @@ class GenericGenData:
         self.cfg = self.bobj.cfg.config
         self.log = self.bobj.log
         self.itemcfg = itemcfg
+        apply_scene_model(self.itemcfg)
 
     def openSelectionsFile(self):
         """This generator does not use a selections file."""
@@ -1068,6 +1070,18 @@ class GenericGenData:
                 output_directory,
                 f"{output_prefix}.obj",
             )
+        self.surface_sphere_obj_name = os.path.join(
+            output_directory,
+            f"{output_prefix}_sphere.obj",
+        )
+        self.surface_wall_obj_name = os.path.join(
+            output_directory,
+            f"{output_prefix}_wall.obj",
+        )
+        self.surface_combined_obj_name = os.path.join(
+            output_directory,
+            f"{output_prefix}_surfaces.obj",
+        )
 
     def delete_stale_generated_outputs(self):
         removed_paths = []
@@ -1472,6 +1486,296 @@ class GenericGenData:
         print(report_text)
         self.write_validation_log(report_text)
         return self.obj_file_name
+
+    def _lighting_ball_values(self):
+        lighting_ball = self.itemcfg.get("Lighting_ball")
+        if lighting_ball is None:
+            return None
+        if not hasattr(lighting_ball, "get"):
+            if len(lighting_ball) < 4:
+                raise ValueError("Lighting_ball must contain x, y, z, and radius")
+            return {
+                "name": "lighting_sphere",
+                "center": (
+                    float(lighting_ball[0]),
+                    float(lighting_ball[1]),
+                    float(lighting_ball[2]),
+                ),
+                "radius": float(lighting_ball[3]),
+                "material_id": int(lighting_ball[4]) if len(lighting_ball) >= 5 else 0,
+                "surface_id": int(self.itemcfg.get("lighting_ball_wall_flag", 1000)),
+            }
+        return {
+            "name": "lighting_sphere",
+            "center": (
+                float(lighting_ball.get("x")),
+                float(lighting_ball.get("y")),
+                float(lighting_ball.get("z")),
+            ),
+            "radius": float(lighting_ball.get("radius")),
+            "material_id": int(lighting_ball.get("material_id", 0)),
+            "surface_id": int(lighting_ball.get("wall_flag", 1000)),
+        }
+
+    def _surface_obj_add_vertex(self, obj_data, position, normal, texcoord):
+        obj_data["vertices"].append(position)
+        obj_data["normals"].append(normal)
+        obj_data["texcoords"].append(texcoord)
+        return len(obj_data["vertices"])
+
+    def _build_lighting_sphere_obj_data(self):
+        lighting_ball = self._lighting_ball_values()
+        if lighting_ball is None:
+            return None
+        center = lighting_ball["center"]
+        radius = lighting_ball["radius"]
+        if radius <= 0.0:
+            raise ValueError("Lighting_ball.radius must be greater than zero")
+
+        segments = int(self.itemcfg.get("boundary_light_sphere_segments", 64))
+        rings = int(self.itemcfg.get("boundary_light_sphere_rings", 32))
+        if segments < 3:
+            raise ValueError("boundary_light_sphere_segments must be at least 3")
+        if rings < 2:
+            raise ValueError("boundary_light_sphere_rings must be at least 2")
+
+        obj_data = {
+            "objects": [
+                {
+                    "name": "lighting_sphere",
+                    "material_id": lighting_ball["material_id"],
+                    "surface_id": lighting_ball["surface_id"],
+                    "faces": [],
+                }
+            ],
+            "vertices": [],
+            "normals": [],
+            "texcoords": [],
+        }
+        vertex_ids = []
+        for ring_index in range(rings + 1):
+            theta = math.pi * ring_index / rings
+            sin_theta = math.sin(theta)
+            cos_theta = math.cos(theta)
+            row = []
+            for segment_index in range(segments):
+                phi = 2.0 * math.pi * segment_index / segments
+                normal = (
+                    sin_theta * math.cos(phi),
+                    sin_theta * math.sin(phi),
+                    cos_theta,
+                )
+                position = (
+                    center[0] + radius * normal[0],
+                    center[1] + radius * normal[1],
+                    center[2] + radius * normal[2],
+                )
+                vertex_id = self._surface_obj_add_vertex(
+                    obj_data,
+                    position,
+                    normal,
+                    (
+                        segment_index / segments,
+                        ring_index / rings,
+                    ),
+                )
+                row.append(vertex_id)
+            vertex_ids.append(row)
+
+        faces = obj_data["objects"][0]["faces"]
+        for ring_index in range(rings):
+            for segment_index in range(segments):
+                next_segment = (segment_index + 1) % segments
+                v00 = vertex_ids[ring_index][segment_index]
+                v10 = vertex_ids[ring_index][next_segment]
+                v01 = vertex_ids[ring_index + 1][segment_index]
+                v11 = vertex_ids[ring_index + 1][next_segment]
+                if ring_index == 0:
+                    faces.append((v00, v11, v01))
+                elif ring_index + 1 == rings:
+                    faces.append((v00, v10, v01))
+                else:
+                    faces.append((v00, v10, v11))
+                    faces.append((v00, v11, v01))
+        return obj_data
+
+    def _build_lighting_wall_obj_data(self):
+        rectangle_wall_segments = getattr(self, "rectangle_wall_segments", ())
+        if not rectangle_wall_segments:
+            return None
+
+        subdivisions_per_cell = int(
+            getattr(
+                self,
+                "boundary_light_wall_subdivisions_per_cell",
+                self.itemcfg.get("boundary_light_wall_subdivisions_per_cell", 1),
+            )
+        )
+        if subdivisions_per_cell <= 0:
+            raise ValueError("boundary_light_wall_subdivisions_per_cell must be positive")
+
+        obj_data = {
+            "objects": [],
+            "vertices": [],
+            "normals": [],
+            "texcoords": [],
+        }
+        for segment in rectangle_wall_segments:
+            surface_object = {
+                "name": str(segment["name"]),
+                "material_id": int(segment.get("material_id", 0)),
+                "surface_id": int(segment["wall_flag"]),
+                "faces": [],
+            }
+            obj_data["objects"].append(surface_object)
+            origin = segment["origin"]
+            u_axis = segment["u_axis"]
+            v_axis = segment["v_axis"]
+            normal = segment["normal"]
+            u_length = float(segment["u_length"])
+            v_length = float(segment["v_length"])
+            u_cell_count = max(1, int(math.ceil(u_length)))
+            v_cell_count = max(1, int(math.ceil(v_length)))
+            u_step_count = u_cell_count * subdivisions_per_cell
+            v_step_count = v_cell_count * subdivisions_per_cell
+
+            def point(local_u, local_v):
+                return (
+                    origin[0] + u_axis[0] * local_u + v_axis[0] * local_v,
+                    origin[1] + u_axis[1] * local_u + v_axis[1] * local_v,
+                    origin[2] + u_axis[2] * local_u + v_axis[2] * local_v,
+                )
+
+            def emit(local_u, local_v):
+                return self._surface_obj_add_vertex(
+                    obj_data,
+                    point(local_u, local_v),
+                    normal,
+                    (
+                        0.0 if u_length <= 0.0 else local_u / u_length,
+                        0.0 if v_length <= 0.0 else local_v / v_length,
+                    ),
+                )
+
+            for u_index in range(u_step_count):
+                u0 = u_length * u_index / u_step_count
+                u1 = u_length * (u_index + 1) / u_step_count
+                for v_index in range(v_step_count):
+                    v0 = v_length * v_index / v_step_count
+                    v1 = v_length * (v_index + 1) / v_step_count
+                    p00 = emit(u0, v0)
+                    p10 = emit(u1, v0)
+                    p11 = emit(u1, v1)
+                    p00b = emit(u0, v0)
+                    p11b = emit(u1, v1)
+                    p01 = emit(u0, v1)
+                    surface_object["faces"].append((p00, p10, p11))
+                    surface_object["faces"].append((p00b, p11b, p01))
+        return obj_data
+
+    def _merge_obj_data(self, obj_data_items):
+        merged = {
+            "objects": [],
+            "vertices": [],
+            "normals": [],
+            "texcoords": [],
+        }
+        vertex_offset = 0
+        for obj_data in obj_data_items:
+            if obj_data is None:
+                continue
+            merged["vertices"].extend(obj_data["vertices"])
+            merged["normals"].extend(obj_data["normals"])
+            merged["texcoords"].extend(obj_data["texcoords"])
+            for surface_object in obj_data["objects"]:
+                merged["objects"].append(
+                    {
+                        "name": surface_object["name"],
+                        "material_id": surface_object["material_id"],
+                        "surface_id": surface_object["surface_id"],
+                        "faces": tuple(
+                            tuple(vertex_id + vertex_offset for vertex_id in face)
+                            for face in surface_object["faces"]
+                        ),
+                    }
+                )
+            vertex_offset += len(obj_data["vertices"])
+        return merged
+
+    def _write_surface_obj(self, path, obj_data, description):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="ascii", newline="\n") as output:
+            output.write(f"# {description}\n")
+            output.write("# Generated surface geometry only; no particles.\n")
+            output.write("# Dynamics contact remains analytic/configured.\n")
+            for vertex_x, vertex_y, vertex_z in obj_data["vertices"]:
+                output.write(f"v {vertex_x:.9f} {vertex_y:.9f} {vertex_z:.9f}\n")
+            for tex_u, tex_v in obj_data["texcoords"]:
+                output.write(f"vt {tex_u:.9f} {tex_v:.9f}\n")
+            for normal_x, normal_y, normal_z in obj_data["normals"]:
+                output.write(f"vn {normal_x:.9f} {normal_y:.9f} {normal_z:.9f}\n")
+            for surface_object in obj_data["objects"]:
+                output.write(f"o {surface_object['name']}\n")
+                output.write(f"# surface_id: {surface_object['surface_id']}\n")
+                output.write(f"# material_id: {surface_object['material_id']}\n")
+                for first, second, third in surface_object["faces"]:
+                    output.write(
+                        f"f {first}/{first}/{first} "
+                        f"{second}/{second}/{second} "
+                        f"{third}/{third}/{third}\n"
+                    )
+        return path
+
+    def write_lighting_surface_objs(self):
+        """Write render-surface OBJ files for LightingBall inspection."""
+        if self.itemcfg.get("scene_model") is None:
+            return ()
+
+        sphere_obj = self._build_lighting_sphere_obj_data()
+        wall_obj = self._build_lighting_wall_obj_data()
+        written_paths = []
+        if sphere_obj is not None:
+            written_paths.append(
+                self._write_surface_obj(
+                    self.surface_sphere_obj_name,
+                    sphere_obj,
+                    "Generated LightingBall sphere surface",
+                )
+            )
+        if wall_obj is not None:
+            written_paths.append(
+                self._write_surface_obj(
+                    self.surface_wall_obj_name,
+                    wall_obj,
+                    "Generated LightingBall rectangle wall surface",
+                )
+            )
+        combined_obj = self._merge_obj_data((sphere_obj, wall_obj))
+        if combined_obj["vertices"]:
+            written_paths.append(
+                self._write_surface_obj(
+                    self.surface_combined_obj_name,
+                    combined_obj,
+                    "Generated LightingBall combined lighting surfaces",
+                )
+            )
+
+        if written_paths:
+            report_text = (
+                "Lighting surface OBJ report:\n"
+                + "\n".join(f"  file: {path}" for path in written_paths)
+            )
+            print(report_text)
+            self.write_validation_log(report_text)
+        return tuple(written_paths)
+
+    def lighting_surface_obj_file_for_export(self, surface_object):
+        surface_type = str(surface_object["surface_type"]).upper()
+        if surface_type == "SPHERE":
+            return self.surface_sphere_obj_name.replace("\\", "/")
+        if surface_type == "RECTANGLE_WALL":
+            return self.surface_wall_obj_name.replace("\\", "/")
+        return self.surface_combined_obj_name.replace("\\", "/")
 
     def report_generated_bounds(self):
         """Report generated mobile-particle center and perimeter bounds."""
@@ -1889,43 +2193,6 @@ class GenericGenData:
                 f"{'true' if photon_periodic_recycle_enabled else 'false'};\n"
             )
 
-            rectangle_wall_segments = getattr(self, "rectangle_wall_segments", ())
-            active_curve_wall_segments = (
-                () if rectangle_wall_segments else self.curve_wall_segments
-            )
-            output.write("curve_wall_segments = (\n")
-            for segment_index, segment in enumerate(active_curve_wall_segments):
-                separator = (
-                    "," if segment_index + 1 < len(active_curve_wall_segments) else ""
-                )
-                values = ", ".join(f"{float(value):.9f}" for value in segment[:10])
-                output.write(f"    [{values}]{separator}\n")
-            output.write(");\n")
-
-            output.write("rectangle_wall_segments = (\n")
-            for segment_index, segment in enumerate(rectangle_wall_segments):
-                separator = (
-                    ","
-                    if segment_index + 1 < len(rectangle_wall_segments)
-                    else ""
-                )
-                values = (
-                    *segment["origin"],
-                    *segment["u_axis"],
-                    *segment["v_axis"],
-                    segment["u_length"],
-                    segment["v_length"],
-                    *segment["normal"],
-                    float(segment["wall_flag"]),
-                    float(segment.get("material_id", 0)),
-                )
-                output.write(
-                    "    ["
-                    + ", ".join(f"{float(value):.9f}" for value in values)
-                    + f"]{separator}\n"
-                )
-            output.write(");\n")
-
             lighting_ball = self.itemcfg.get("Lighting_ball")
             if lighting_ball is not None:
                 if hasattr(lighting_ball, "get"):
@@ -1958,6 +2225,67 @@ class GenericGenData:
                 output.write(f"    material_id = {ball_material_id};\n")
                 output.write(f"    wall_flag = {ball_wall_flag};\n")
                 output.write("};\n")
+
+            rectangle_wall_segments = getattr(self, "rectangle_wall_segments", ())
+            output.write("rectangle_wall_segments = (\n")
+            for segment_index, segment in enumerate(rectangle_wall_segments):
+                separator = (
+                    ","
+                    if segment_index + 1 < len(rectangle_wall_segments)
+                    else ""
+                )
+                values = (
+                    *segment["origin"],
+                    *segment["u_axis"],
+                    *segment["v_axis"],
+                    segment["u_length"],
+                    segment["v_length"],
+                    *segment["normal"],
+                    float(segment["wall_flag"]),
+                    float(segment.get("material_id", 0)),
+                )
+                output.write(
+                    "    ["
+                    + ", ".join(f"{float(value):.9f}" for value in values)
+                    + f"]{separator}\n"
+                )
+            output.write(");\n")
+
+            active_curve_wall_segments = (
+                () if rectangle_wall_segments else self.curve_wall_segments
+            )
+            output.write("curve_wall_segments = (\n")
+            for segment_index, segment in enumerate(active_curve_wall_segments):
+                separator = (
+                    "," if segment_index + 1 < len(active_curve_wall_segments) else ""
+                )
+                values = ", ".join(f"{float(value):.9f}" for value in segment[:10])
+                output.write(f"    [{values}]{separator}\n")
+            output.write(");\n")
+
+            lighting_surface_objects = self.itemcfg.get(
+                "lighting_surface_objects",
+                (),
+            )
+            output.write("lighting_surface_objects = (\n")
+            for object_index, surface_object in enumerate(lighting_surface_objects):
+                separator = (
+                    "," if object_index + 1 < len(lighting_surface_objects) else ""
+                )
+                output.write("    {\n")
+                output.write(f'        name = "{surface_object["name"]}";\n')
+                output.write('        source = "obj";\n')
+                output.write(
+                    "        obj_file = "
+                    f'"{self.lighting_surface_obj_file_for_export(surface_object)}";\n'
+                )
+                output.write(
+                    f'        surface_type = "{surface_object["surface_type"]}";\n'
+                )
+                output.write(f'        surface_id = {int(surface_object["surface_id"])};\n')
+                output.write(f'        material_id = {int(surface_object["material_id"])};\n')
+                output.write(f"    }}{separator}\n")
+            output.write(");\n")
 
             output.write(f"wall_contact_offset = {self.wall_contact_offset:.9f};\n")
             output.write(
@@ -2026,6 +2354,7 @@ class GenericGenData:
             self.report_cell_occupancy_capacity()
             self.write_particle_bin()
             self.write_test_file()
+            self.write_lighting_surface_objs()
             self.report_generated_bounds()
         except (OSError, RuntimeError, TypeError, ValueError) as error:
             self.close_bin_file()

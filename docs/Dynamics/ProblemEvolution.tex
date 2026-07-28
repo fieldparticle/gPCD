@@ -3390,3 +3390,63 @@ surface geometry that the Vulkan lighting pass is expected to draw.  If the
 OBJ matches the intended scene but Vulkan does not, the issue is in resource
 binding, shader layout, or draw order.  If the OBJ is wrong, the issue is in
 generation or configuration.
+
+\subsection{Lighting Surfaces Become OBJ-Backed Runtime Geometry}
+
+\subsubsection{previous form}
+
+The wall vertex-light experiment still generated rectangle wall render
+vertices inside \texttt{ResourceLightingSurface}, while the lighting sphere
+remained on a separate render path.  The Python generator could describe the
+scene and export inspection OBJ files, but Vulkan did not yet treat those OBJ
+surfaces as the runtime lighting canvas.  Wall deposits also still carried
+some cell-owned visible-light behavior from the earlier
+\texttt{BoundaryLightRecord} path.
+
+\subsubsection{current form}
+
+\texttt{scene\_model} is now the authored geometry source for
+\texttt{LightingBall}.  Python derives the compatibility collision blocks
+from it and exports \texttt{lighting\_surface\_objects} with OBJ file paths.
+\texttt{ResourceLightingSurface} reads that list, loads all configured OBJ
+geometry, and fills one combined \texttt{LightingSurfaceVertex} buffer for
+the lighting application.  Each vertex carries world position, surface id,
+normal, material id, dynamic light, vertex id, and surface type.
+
+\texttt{ShaderObj.cpp} generates \texttt{LIGHTING\_SURFACE\_OBJECTS}
+metadata from the same object list:
+\begin{verbatim}
+surfaceType, surfaceID, materialID, vertexOffset, vertexCount
+\end{verbatim}
+The analytic rectangle-wall records remain collision and deposit-projection
+geometry only.  Compute uses analytic walls to find the hit point and uses
+the OBJ metadata to write only inside the matching surface-vertex span.
+
+Both the shadow wall and the lighting sphere now render from
+\texttt{LightingSurfaceVertex.light}.  The absorbing wall path deposits
+grayscale energy directly into nearby wall vertices and retires the photon.
+The sphere path maps the analytic contact normal to nearby sphere OBJ
+vertices.  Material surface behavior is explicit in Vulkan and matches
+Python:
+\texttt{NONE}, \texttt{SURFACE\_COLOR}, \texttt{ABSORB}, and
+\texttt{REFLECT}.
+
+\subsubsection{difference outcome}
+
+rendering and diagnostics
+
+\subsubsection{Analysis}
+
+This is the first lighting version where Python-authored graphics geometry,
+Blender inspection geometry, Vulkan render geometry, and compute-visible
+surface light share one surface-object contract.  The old distinction between
+``sphere path'' and ``wall path'' is reduced to contact mapping: collision can
+remain analytic, but visible lighting lands on the same kind of OBJ-backed
+surface vertex state.
+
+This does not make OBJ geometry the collision model.  Engineering particle
+simulations still use \texttt{curve\_wall\_segments} and
+\texttt{rectangle\_wall\_segments} as simulation geometry.  The lighting
+application is a computer-graphics application layered on top of that
+geometry: photons transport strength, materials choose behavior, and
+\texttt{LightingSurfaceVertex.light} owns the visible surface result.

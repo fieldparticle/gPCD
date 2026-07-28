@@ -2,14 +2,31 @@
 // LightingBall: Cathedral Lighting
 // ============================================================================
 
-Lighting_ball = {
-    // Analytic sphere surface. Boundary particles are locality markers only.
-    x = 9.0;
-    y = 8.0;
-    z = 14.0;
-    radius = 4.0;
-    material_id = 1;
-    wall_flag = 1000;
+scene_model = {
+  objects = (
+    {
+      name = "lighting_sphere";
+      type = "sphere";
+      center = [9.0, 8.0, 14.0];
+      radius = 4.0;
+      material_id = 1;
+      surface_id = 1000;
+      roles = ["collision", "boundary_markers", "lighting_surface"];
+    },
+    {
+      name = "shadow_wall";
+      type = "rectangle";
+      origin = [16.0, 2.0, 2.0];
+      u_axis = "y";
+      u_length = 14.0;
+      v_axis = "z";
+      v_length = 14.0;
+      normal = [-1.0, 0.0, 0.0];
+      material_id = 2;
+      surface_id = 2000;
+      roles = ["collision", "boundary_markers", "lighting_surface"];
+    }
+  );
 };
 
 // Enables persistent boundary-space lighting. Retired boundary_space_patch_*
@@ -68,27 +85,6 @@ particle_streams = (
     span_v_count = 80;
   }
 );
-
-// --------------------------------------------------------------------------
-// Boundary markers
-// --------------------------------------------------------------------------
-// Rectangle walls are active here; empty curve_wall_segments is intentional.
-curve_wall_segments = {};
-rectangle_wall_segments = {
-    wall_xmax = {
-        // 14 x 14 rectangle on x=16, spanning y=2..16 and z=2..16.
-        origin = [16.0, 2.0, 2.0];
-        u_axis = "y";
-        u_length = 14.0;
-        v_axis = "z";
-        v_length = 14.0;
-        // Normal points inward, toward the photon stream and sphere.
-        normal = [-1.0, 0.0, 0.0];
-        wall_flag = 2000;
-        // material_id 2 is shadow_wall in LightingBall.cfg.
-        material_id = 2;
-    };
-};
 
 // --------------------------------------------------------------------------
 // Particle geometry and integration

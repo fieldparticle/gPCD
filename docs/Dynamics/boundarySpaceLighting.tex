@@ -14,34 +14,37 @@ The current model separates responsibilities:
     \item particles carry motion, identity, and collision/debug state;
     \item materials provide source color and debug visibility settings;
     \item boundary markers make analytic surface regions discoverable;
-    \item \texttt{BoundaryLightRecord} stores persistent surface color;
-    \item the renderer displays that persistent color on the surface.
+    \item \texttt{BoundaryLightRecord} stores persistent cell/surface
+          ownership and debug color;
+    \item \texttt{LightingSurfaceVertex.light} stores visible surface color;
+    \item the renderer displays interpolated lighting-surface vertex color.
 \end{itemize}
 
 This keeps photons as transport/debug particles while allowing a surface region
 to remain lit after contact.
 
-\subsection{Cell-Owned Surface State}
+\subsection{Cell-Owned To Surface-Vertex State}
 
 The first Vulkan proxy-kernel implementation stored one lighting record per
 boundary particle.  That proved the contact-to-light path, but sparse boundary
-markers produced point-like circles, fan-out, and visible gaps.  The active
-Vulkan model now stores lighting by spatial cell instead.
+markers produced point-like circles, fan-out, and visible gaps.  The next
+Vulkan model stored lighting by spatial cell.  That proved surface ownership,
+but rectangle-wall shadows were visibly quantized by cell boxes.
 
-Conceptually:
+The active visible model is now:
 \begin{verbatim}
-cell contains a small surface region
-photon hits anywhere in that region
-BoundaryLight[cell_id] stores the visible deposited color
-renderer colors the analytic surface from the owning cell
+photon hits analytic surface
+analytic contact maps to surface space
+LightingSurface[vertex_id].light stores visible deposited color
+renderer interpolates that color across OBJ triangles
 \end{verbatim}
 
 The boundary marker keeps its base material identity and broad-phase locality
 role.  The visible light state is separate resource state:
 \begin{verbatim}
-material_id                         = base surface material
-BoundaryLight[cell_id].rgb_valid.rgb = persistent lit color
-BoundaryLight[cell_id].rgb_valid.w   = valid flag
+material_id                      = base surface material
+LightingSurface[vertex].light.rgb = persistent visible light
+LightingSurface[vertex].light.w   = valid flag
 \end{verbatim}
 
 Each cell record also carries surface ownership metadata:
@@ -55,27 +58,29 @@ BoundaryLight[cell_id].ids.z               = surface_id / wall_flag
 Cells that do not contain a known renderable surface use
 \texttt{surface\_type=NONE}.  Cells near the configured lighting sphere use
 \texttt{SPHERE/LIGHTING\_BALL\_WALL\_FLAG}.  Cells near a finite rectangle
-wall use \texttt{RECTANGLE\_WALL/wall\_flag}.  This lets the renderer sample
-only the records that belong to the surface pass currently being drawn.
+wall use \texttt{RECTANGLE\_WALL/wall\_flag}.  This remains useful for
+surface ownership and debug inspection, while the active visible wall and
+sphere surfaces render from \texttt{LightingSurfaceVertex.light}.
 
 \subsection{Photon Hit Rule}
 
 The first rule is intentionally simple:
 \begin{verbatim}
 photon hits surface
-cell_id = address of contacted surface point
-BoundaryLight[cell_id].rgb_valid = visible deposited color, valid=true
+surface vertex span = lookup(surface_type, surface_id)
+nearby surface vertices receive visible deposited color
 \end{verbatim}
 
 The color does not clear every compute frame.  It persists until another photon
-updates the same cell.  This is still a color-state rule, not an additive
+updates the same surface vertices.  This is still a color-state rule, not an additive
 energy-accumulation rule.
 
 Because the first model sets color instead of adding energy, no atomic add is
-required.  If two photons write the same cell in the same compute dispatch, the
-first implementation accepts last-writer-wins behavior.  If later work needs
-additive light transport, atomic accumulation can be introduced as a separate,
-deliberate feature.
+required.  If two photons write the same surface vertex in the same compute
+dispatch, the first implementation accepts last-writer-wins or current
+component-wise maximum behavior.  If later work needs additive light
+transport, atomic accumulation can be introduced as a separate, deliberate
+feature.
 
 \subsection{Analytic Sphere Surface}
 
@@ -151,15 +156,18 @@ The buffer is owned by \texttt{ResourceLighting.cpp}, sized as
 only for the \texttt{ParticleLighting} application.  Basic particle
 applications remain on \texttt{FPM.*} and do not see this resource.
 
-\texttt{FPML.comp} is the lighting compute schedule.  It deposits the visible
-spectral result into \texttt{BoundaryLight[cell\_id]} with persistent
-last-writer-wins behavior.  The lighting compute path reads material optical
-fields from the generated \texttt{MaterialProperty} table.  In particular,
+\texttt{FPML.comp} is the lighting compute schedule.  The current visible
+surface path deposits into \texttt{LightingSurfaceVertex.light} records, with
+\texttt{BoundaryLight[cell\_id]} retained as surface ownership and debug
+state.  The lighting compute path reads material optical fields from the
+generated \texttt{MaterialProperty} table.  In particular,
 \texttt{photonCoupling} controls the fraction of normal-aligned photon
-strength accepted by a surface, and \texttt{photonMinRelativeMass} controls
-the remaining-strength death threshold.  These GLSL fields are generated from
-the cfg names \texttt{photon\_coupling} and
-\texttt{photon\_min\_relative\_mass}; they must not be hardcoded in
+strength accepted by a surface, \texttt{photonMinRelativeMass} controls the
+remaining-strength death threshold, and \texttt{photonSurfaceBehavior}
+selects the photon/surface rule.  These GLSL fields are generated from the
+cfg names \texttt{photon\_coupling},
+\texttt{photon\_min\_relative\_mass}, and
+\texttt{photon\_surface\_behavior}; they must not be hardcoded in
 \texttt{FPML.comp}.
 
 \texttt{ResourceLighting.cpp} initializes one record per cell and marks
@@ -171,71 +179,92 @@ checking the distance to the plane, and then checking the projected point
 against the wall's \(u/v\) extents.
 
 \texttt{BoundaryLight.vert} passes surface coordinates and the active render
-surface identity to \texttt{BoundaryLight.frag}.  The sphere surface comes
-from \texttt{ResourceLightingSphere}.  Rectangle wall surfaces now come from
-\texttt{ResourceLightingSurface}, a lighting-only resource that builds a
-subdivided triangle mesh from \texttt{rectangle\_wall\_segments}.  The wall
-surface buffer uses:
+surface identity to \texttt{BoundaryLight.frag}.  Sphere and rectangle wall
+surfaces now come from \texttt{ResourceLightingSurface}, a lighting-only
+resource that reads \texttt{lighting\_surface\_objects}, loads the configured
+OBJ files, and fills one combined surface-vertex buffer.  The surface buffer
+uses:
 \begin{verbatim}
 struct LightingSurfaceVertex {
-    vec4 pos;          // xyz world position, w object_id / wall_flag
+    vec4 pos;          // xyz world position, w surface_id
     vec4 normal_flag;  // xyz normal, w material_id
     vec4 light;        // rgb, valid; compute writes this
-    vec4 meta;         // local_u, local_v, vertex_id, reserved
+    vec4 meta;         // local_u, local_v, vertex_id, surface_type
 };
 \end{verbatim}
 and is bound as both a graphics vertex buffer and compute-visible storage
 buffer for the \texttt{ParticleLighting} application.  The wall render path
-reads interpolated vertex light from this buffer.  The sphere render path
-continues to sample \texttt{BoundaryLightRecord} cells directly.  Since
-compute can update both lighting buffers, the \texttt{ParticleLighting}
-compute-finished wait includes vertex input, vertex shader, and fragment
-shader stages.
+and the sphere render path both read interpolated vertex light from this
+buffer.  \texttt{ShaderObj.cpp} also generates
+\texttt{LIGHTING\_SURFACE\_OBJECTS} metadata from
+\texttt{lighting\_surface\_objects}; each entry carries
+\texttt{surfaceType}, \texttt{surfaceID}, \texttt{materialID},
+\texttt{vertexOffset}, and \texttt{vertexCount}.  Rectangle-wall analytic
+geometry remains separate and is used only for collision/deposit projection.
+Since compute updates lighting surfaces that graphics reads as vertex input,
+the \texttt{ParticleLighting} compute-finished wait includes vertex input,
+vertex shader, and fragment shader stages.
 
-\subsection{Rectangle Wall Vertex Lighting}
+\subsection{OBJ-Backed Surface Vertex Lighting}
 
 The absorbing rectangle wall exposed a limitation of pure cell-owned render
 color: a circular photon stream looked square because the visible result was
-snapped to cell boxes.  The active wall experiment keeps
-\texttt{BoundaryLightRecord} as the stable fallback/debug deposit, but also
-writes the wall hit into the \texttt{LightingSurfaceVertex.light} field.
+snapped to cell boxes.  The active implementation keeps
+\texttt{BoundaryLightRecord} as the stable surface ownership/debug deposit,
+but writes visible wall and sphere color into the
+\texttt{LightingSurfaceVertex.light} field.
 
 For an absorbing wall hit, \texttt{FPML.comp} now:
 \begin{enumerate}
     \item computes the grayscale deposited light from incidence,
           \texttt{photon\_coupling}, and current photon relative mass;
-    \item writes the owning cell in \texttt{BoundaryLight[cell\_id]} so the
-          cell-owned path remains inspectable;
     \item projects the hit point into the wall's local \(u/v\) coordinates;
+    \item finds nearby vertices inside the matching OBJ-backed wall surface;
     \item writes a small weighted splat into nearby wall mesh vertices; and
     \item retires the photon for \texttt{ABSORB} material behavior.
 \end{enumerate}
 
-The wall fragment shader then draws \texttt{fragColor} from the interpolated
-vertex light.  This lets the wall surface use ordinary triangle interpolation
-to soften the shadow footprint without changing photon collision or cell
-ownership.  Because the first wall mesh is non-indexed, vertices are
-duplicated per triangle; the compute deposit therefore writes neighboring
-quad vertices rather than one abstract shared grid vertex.
+For a lighting-ball sphere hit, \texttt{FPML.comp} maps the analytic contact
+normal to nearby vertices in the OBJ-backed sphere surface and writes
+\texttt{LightingSurfaceVertex.light}.  The sphere and wall fragment paths
+therefore draw the same kind of interpolated vertex light.  This lets the
+surfaces use ordinary triangle interpolation to soften the footprint without
+making the moving photon point the final visible lighting result.  Because
+the first generated meshes are non-indexed, vertices are duplicated per
+triangle; compute deposits write local surface spans rather than one abstract
+shared grid vertex.
 
-This wall path is still a bring-up path.  If it remains useful, the later
-clean version should make the wall mesh, Blender inspection mesh, and Vulkan
-surface resource share one Python-generated source of truth.
+\subsection{Material Surface Behaviors}
+
+Vulkan material behavior now matches the Python photon-contact model:
+\begin{itemize}
+    \item \texttt{NONE}: no light deposit and no photon reflection;
+    \item \texttt{SURFACE\_COLOR}: deposit the hit surface material color,
+          reduce photon mass, and reflect the photon if it survives;
+    \item \texttt{ABSORB}: deposit grayscale energy and retire the photon;
+    \item \texttt{REFLECT}: deposit the photon's current payload color,
+          reduce photon mass, and reflect the photon if it survives.
+\end{itemize}
+
+The configuration item is:
+\begin{verbatim}
+photon_surface_behavior = "SURFACE_COLOR";
+\end{verbatim}
+and the generated Vulkan material exporter also accepts numeric values for
+compatibility.  Active cfg files should use the string names.
 
 \subsection{Python Reference}
 
 Python remains the behavioral reference for photon contact and material color
 selection.  Its renderer may still use existing boundary markers as a coarse
-visual approximation, but the Vulkan target is cell-owned analytic surface
-color.  The Python model should not reintroduce the retired
+visual approximation, but the Vulkan target is OBJ-backed surface-vertex
+lighting.  The Python model should not reintroduce the retired
 \texttt{BoundaryLightSample}/\texttt{BoundaryLightState} current/filter path or
 make the photon point itself the final visible surface lighting.
 
-Python should also generate debug surface meshes for \texttt{LightingBall}.
-The immediate target is to write OBJ files for the configured lighting sphere
-and rectangle wall surfaces.  Those OBJ files are inspection artifacts, not
-runtime particle data.  They should be generated from the same cfg values used
-for Vulkan:
+Python generates debug surface meshes for \texttt{LightingBall}.  The OBJ
+files are inspection artifacts and Vulkan lighting-surface input, not runtime
+particle data.  They are generated from the same cfg values used for Vulkan:
 \begin{itemize}
     \item \texttt{Lighting\_ball} center, radius, material id, and wall flag;
     \item \texttt{rectangle\_wall\_segments} origin, axes, extents, normal,
@@ -281,9 +310,13 @@ and writes:
     \mathbf E_{\mathrm{surface}} .
 \]
 
-The result is still stored in \texttt{BoundaryLight[cell\_id].rgb\_valid}.
+The behavior-specific result is written to
+\texttt{LightingSurfaceVertex.light} for visible OBJ-backed surfaces.
+\texttt{BoundaryLight[cell\_id].rgb\_valid} may still be updated as
+ownership/debug state, but it is no longer the primary visible surface result.
 The render state does not need to know how the color was produced.  It only
-draws the current persistent visible color for each surface cell.
+draws the current persistent visible color for each lighting-surface vertex and
+relies on ordinary triangle interpolation between those vertices.
 
 \subsection{Next Lighting Behaviors}
 
@@ -311,9 +344,9 @@ The active Vulkan path is:
     \rightarrow
     \textrm{incidence-weighted spectral deposit}
     \rightarrow
-    \textrm{persistent cell-owned surface color}
+    \textrm{persistent OBJ surface-vertex color}
     \rightarrow
-    \textrm{analytic surface fragment color}.
+    \textrm{ordinary interpolated surface color}.
 \]
 
 This preserves the useful lesson from the earlier surface-cell idea: lighting

@@ -20,6 +20,7 @@ import math
 import re
 from pathlib import Path
 from gbase.libconf import AttrDict
+from gbase.SceneModel import apply_scene_model
 from gbase.FunctionWall import parse_keyed_curve_wall_segments, wall_marker_records
 from gbase.pdata import PTYPE_BOUNDARY, PTYPE_NULL, PTYPE_PHOTON
 AXIS_VECTOR = {
@@ -366,6 +367,7 @@ class ForceDynamics(ForceContactDynamics):
         if 'include_file' in self.config:
                 self.load_include()
 
+        apply_scene_model(self.config)
 
         self.config_error_return = None
         self.initial_geometry_validated = False

@@ -140,48 +140,40 @@ window aspect to match the Python \texttt{window\_size} aspect.
 and Vulkan:
 \begin{itemize}
     \item keep photons as transport/debug particles;
-    \item map photon contacts to analytic surface hit cells;
-    \item store persistent cell-owned visible color from the photon spectrum,
-          surface spectral response, surface spectral emission, and incidence
-          angle;
-    \item render the analytic sphere surface from the owning cell color
-          instead of drawing light only on the photon point;
+    \item map photon contacts to analytic surface space;
+    \item store persistent visible surface-vertex color from the photon
+          spectrum, surface spectral response, surface spectral emission, and
+          incidence angle;
+    \item render the OBJ-backed sphere and wall surfaces from interpolated
+          lighting-surface vertex color instead of drawing light only on the
+          photon point;
     \item keep \texttt{color\_map.glsl} under exporter ownership so photon
           \texttt{ptype}, temporary photon \texttt{material\_id}, and material
           display behavior cannot drift from the generated Vulkan contract.
 \end{itemize}
 
-The current Vulkan lighting resource stores one \texttt{BoundaryLightRecord}
-per spatial cell.  \texttt{ResourceLighting.cpp} sizes the buffer as
-\texttt{CellAryW * CellAryH * CellAryL}.  Each record is initialized with a
-surface type and surface id so render passes can distinguish sphere cells from
-rectangle-wall cells.  The sphere render resource provides analytic sphere
-surface coordinates.  The rectangle wall render resource emits wall-surface
-triangles from \texttt{rectangle\_wall\_segments}; it is not the full cell-box
-debug boundary.
+The current Vulkan lighting resource still stores one
+\texttt{BoundaryLightRecord} per spatial cell.  \texttt{ResourceLighting.cpp}
+sizes the buffer as \texttt{CellAryW * CellAryH * CellAryL}.  Each record is
+initialized with a surface type and surface id so compute can preserve
+surface ownership and debug state.  Visible surface lighting now lives in the
+OBJ-backed \texttt{LightingSurfaceVertex.light} buffer.
 
-The sphere surface remains cell-owned at render time.  Its fragment shader
-computes the cell from the fragment world position before sampling
-\texttt{BoundaryLight}, and it accepts only records whose stored surface type
-and id match the active sphere pass.  It also samples the current cell plus
-six face-neighbor cells to reduce hard cell and triangle boundaries.
-
-The rectangle shadow wall now has an experimental vertex-lit surface path.
-\texttt{ResourceLightingSurface} builds a subdivided wall mesh whose vertex
-records contain world position, normal/material metadata, persistent vertex
-light, and local \(u/v\) metadata.  Absorbing wall photon hits still update
-\texttt{BoundaryLight[cell\_id]} for fallback/debug visibility, but they also
-project the hit into wall \(u/v\) space and write a weighted splat into nearby
-wall vertices.  The wall fragment shader then draws ordinary interpolated
-vertex color.  This is why the wall can become smoother and more circular
-than the square cell-owned shadow while the sphere remains on the stable
-cell-owned path.
+\texttt{ResourceLightingSurface} reads the generated
+\texttt{lighting\_surface\_objects} table and loads the configured OBJ files
+for the sphere and wall into one combined lighting-surface vertex buffer.  A
+surface vertex record contains world position, normal/material metadata,
+persistent vertex light, local \(u/v\) metadata, and surface type.  Photon
+hits project analytic contacts into the matching surface object and write
+weighted splats into nearby OBJ vertices.  The lighting surface fragment path
+then draws ordinary interpolated vertex color.
 
 The validated state is that \texttt{LightingBall} in Vulkan runs, shows
-cell-owned sphere lighting, shows absorbing-wall response, and uses the first
-incidence-weighted RGB-band spectral deposit.  The wall vertex-light path is
-the current smoothing experiment; the stable fallback remains the
-\texttt{BoundaryLightRecord} deposit.
+OBJ-backed sphere lighting, shows absorbing-wall response, and uses the first
+incidence-weighted RGB-band spectral deposit.  The stable visible path is now
+\texttt{LightingSurfaceVertex.light}; \texttt{BoundaryLightRecord} remains
+useful for ownership/debug state and compatibility while the lighting app
+keeps moving toward renderable surface geometry.
 
 The next lighting stages are a diffuse light stream, an absorbing shadow
 surface, and a reflective surface.

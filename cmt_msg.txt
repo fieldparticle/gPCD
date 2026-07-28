@@ -1,10 +1,20 @@
+Right, local convention wants the full structured message. Better version:
+
+```text
 Current status:
-	- Boundary-space lighting docs updated for current LightingBall wall/sphere split
-	- Wall lighting now documented as experimental vertex-lit surface with BoundaryLight fallback
-	- Python OBJ surface export recorded as next geometry debugging step
+	- LightingBall now uses scene_model as the authored geometry source.
+	- Python derives compatibility collision blocks and exports OBJ-backed lighting_surface_objects.
+	- Vulkan ParticleLighting loads OBJ-backed sphere and wall surfaces into LightingSurfaceVertex.
+	- Photon deposits now drive visible surface-vertex light while BoundaryLightRecord remains cell ownership/debug state.
+	- Vulkan material surface behavior now tracks NONE, SURFACE_COLOR, ABSORB, and REFLECT.
 
 Code Changes:
-	- Documentation only
-	- Updated LightingBall, boundarySpaceLighting, Todo, and ProblemEvolution docs
+	- Added scene_model parsing, validation, derived runtime geometry, and OBJ surface export.
+	- Updated LightingBall Py/Vk configs for scene_model and lighting surface object output.
+	- Updated ShaderObj export for lighting surface object metadata and material photon behavior.
+	- Updated FPML lighting compute to deposit into OBJ-backed surface vertices for sphere and wall hits.
+	- Updated ParticleLighting surface resources and shaders for shared LightingSurfaceVertex rendering.
+	- Updated dynamics docs, todo, porting notes, and problem evolution for the OBJ-backed boundary-space milestone.
 
-Next: Generate LightingBall sphere and rectangle wall OBJ files from Python config for Blender inspection
+Next: Validate longer Vulkan captures for material behaviors, then work on diffuse light stream, absorbing shadow refinement, and reflective surface transport.
+```

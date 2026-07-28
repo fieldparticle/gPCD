@@ -277,6 +277,24 @@ broad-phase locality records only; the shader must evaluate the analytic
 sphere from the generated metadata rather than treating the marker particle
 as the collision surface.
 
+Lighting scenarios that use OBJ-backed render surfaces additionally require
+generated \texttt{lighting\_surface\_objects} metadata in
+\texttt{boundary.glsl}:
+\begin{itemize}
+    \item \texttt{LightingSurfaceObjectMetadata};
+    \item \texttt{LIGHTING\_SURFACE\_OBJECT\_COUNT};
+    \item \texttt{LIGHTING\_SURFACE\_OBJECTS};
+    \item \texttt{surfaceType};
+    \item \texttt{surfaceID};
+    \item \texttt{materialID};
+    \item \texttt{vertexOffset};
+    \item \texttt{vertexCount}.
+\end{itemize}
+This metadata is generated from \texttt{lighting\_surface\_objects}, not from
+the analytic wall blocks.  Rectangle wall analytic records remain collision
+and deposit-projection geometry.  OBJ-backed surface records identify where
+compute may write visible light in \texttt{LightingSurfaceVertex.light}.
+
 When \texttt{RECTANGLE\_WALL\_SEGMENT\_COUNT} is nonzero, the simple wall
 path must evaluate rectangle walls and must not also evaluate
 \texttt{CURVE\_WALL\_SEGMENTS} for the same source.  This mirrors Python's

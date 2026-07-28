@@ -318,6 +318,16 @@ void boundary_light_main()
 		return;
 	}
 
+	if (renderSurfaceType == BOUNDARY_LIGHT_SURFACE_SPHERE)
+	{
+		outColor = fragColor;
+		if (outColor.a <= 0.0)
+		{
+			discard;
+		}
+		return;
+	}
+
 	vec4 surfaceColor = boundary_light_sample_surface(
 		renderSurfaceType,
 		renderSurfaceID);
