@@ -110,6 +110,10 @@ particle_streams = (
 \begin{description}
     \item[\texttt{name}] Human-readable stream name used for diagnostics.
     Names should be unique within one configuration.
+    \item[\texttt{enabled}] Optional stream switch.  Missing values default
+    to true.  A disabled stream is skipped before layout validation and
+    generates no particles.  The generator report lists skipped streams so
+    Vulkan isolation tests can confirm which emitters are actually present.
     \item[\texttt{material\_id}] Base material id assigned to every particle
     emitted by this stream.  During generation, the selected material's
     \texttt{particle\_type} seeds the particle's runtime \texttt{ptype}.
@@ -162,7 +166,8 @@ particle_streams = (
     \item[\texttt{emitter}] Optional generalized source geometry.  When this
     block is present, it replaces the axis-aligned
     \texttt{inlet\_axis}/\texttt{span\_u}/\texttt{span\_v} fields.
-    The current supported form is \texttt{type="curve"}.
+    The current supported forms are \texttt{type="curve"} and
+    \texttt{type="environment\_sphere"}.
     \item[\texttt{emitter.length\_count}] Number of samples along the curve.
     Samples include both curve ends when the count is greater than one.
     \item[\texttt{emitter.width\_axis}] Three-value direction for the finite
@@ -178,6 +183,29 @@ particle_streams = (
     polyline.
     \item[\texttt{emitter.curve.p0}--\texttt{p3}] For
     \texttt{"cubic\_bezier"}, four three-value control points.
+    \item[\texttt{emitter.bounds}] For \texttt{"environment\_sphere"}, this
+    must currently be \texttt{"death\_bounds"}.
+    \item[\texttt{emitter.radius\_mode}] For
+    \texttt{"environment\_sphere"}, this must currently be
+    \texttt{"inscribed"}.  The emitter sphere is centered in
+    \texttt{death\_bounds}, and its diameter is based on the shortest death
+    bounds side.
+    \item[\texttt{emitter.bounds\_margin}] Nonnegative margin subtracted from
+    the inscribed emitter radius.  This keeps photons from being born exactly
+    on a death plane.
+    \item[\texttt{emitter.point\_count}] Number of Fibonacci-sampled points
+    on the environment sphere.  It must equal
+    \texttt{particles\_per\_wave}.
+    \item[\texttt{emitter.direction\_mode}] Direction rule for the generated
+    velocity.  Supported values are \texttt{"radial\_outward"},
+    \texttt{"radial\_inward"}, \texttt{"toward\_point"}, and
+    \texttt{"diffuse\_toward\_point"}.
+    \item[\texttt{emitter.target}] Required for \texttt{"toward\_point"} and
+    \texttt{"diffuse\_toward\_point"}.  The generator points each photon from
+    its sampled sphere position toward this target before optional jitter.
+    \item[\texttt{emitter.angular\_jitter\_degrees}] Optional nonnegative
+    angular spread for \texttt{"diffuse\_toward\_point"}.  The jitter is
+    deterministic so regenerated data is repeatable.
 \end{description}
 
 For each stream, the generator derives the required center spacing
@@ -207,10 +235,23 @@ center spacing, span spacing, travel spacing, and
 \texttt{frames\_per\_wave}.  It also validates generated stream particles for
 same-birth overlap before writing usable output.
 
-Emitter-plane and curve-emitter fields are consumed by Python during
-generation.  They are not written as stream-shape metadata to \texttt{.tst}
-or generated GLSL files.  The generated particle records carry the resulting
-positions, velocities, materials, and release frames.
+Emitter-plane, curve-emitter, and environment-sphere fields are consumed by
+Python during generation.  They are not written as stream-shape metadata to
+\texttt{.tst} or generated GLSL files.  The generated particle records carry
+the resulting positions, velocities, materials, and release frames.
+
+For \texttt{environment\_sphere}, the configured
+\texttt{initial\_particle\_velocity} supplies speed only.  The generator
+creates deterministic Fibonacci points on the derived sphere and generates a
+separate velocity direction for each point.  For
+\texttt{"diffuse\_toward\_point"}, the base direction is
+\[
+    \widehat{\mathbf v} =
+    \frac{\mathbf x_{\mathrm{target}}-\mathbf x_{\mathrm{sample}}}
+         {\lVert\mathbf x_{\mathrm{target}}-\mathbf x_{\mathrm{sample}}\rVert}
+\]
+with deterministic angular jitter applied before multiplying by the
+configured speed.
 
 The older single-stream fields
 \texttt{streaming\_release\_start\_frame},

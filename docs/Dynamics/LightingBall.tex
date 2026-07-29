@@ -237,6 +237,12 @@ material response, or deposited lighting.
     \item[\texttt{scene\_model.objects[].roles}] Selects each object's use:
     \texttt{"collision"}, \texttt{"boundary\_markers"}, and/or
     \texttt{"lighting\_surface"}.
+    \item[\texttt{scene\_model.objects[].enabled}] Optional object switch.
+    Missing values default to true.  A disabled object derives no collision
+    block, no boundary markers, no lighting surface object, and no OBJ-backed
+    runtime surface.  This is the preferred way to isolate sphere, shadow
+    wall, and reflecting wall behavior without leaving stale geometry visible
+    in Vulkan.
     \item[\texttt{rectangle\_u\_segments},
     \texttt{rectangle\_v\_segments}] Optional rectangle-object render mesh
     resolution.  These are positive integers on a
@@ -274,6 +280,10 @@ material response, or deposited lighting.
     for generated photons.  A material whose
     \texttt{particle\_type="photon"} generates photon \texttt{ptype}; photon
     behavior is carried by \texttt{ptype}, not by later color state.
+    \item[\texttt{particle\_streams.enabled}] Optional stream switch.  Missing
+    values default to true.  A disabled stream generates no particles and is
+    reported as skipped by the generator.  If Vulkan does not see the stream
+    in the generated \texttt{.bin}/\texttt{.tst}, the stream is not present.
     \item[\texttt{initial\_particle\_velocity}] Initial photon velocity.
     Photon speed is intended to remain fixed; momentum/strength changes are
     represented by relative mass or transport strength, not by changing speed.
@@ -312,6 +322,73 @@ This guarantees that adjacent release waves start at least one required
 center spacing apart along the travel direction.  The older
 \texttt{spacing\_factor} field is retained only as transitional stream
 metadata; it is not the active no-overlap rule.
+
+\subsubsection{Diffuse Environment Stream}
+
+\texttt{LightingBall} can use an environment-sphere stream for weak diffuse
+illumination.  This is still a \texttt{particle\_streams} entry using the
+photon material; it is not a new material type and does not require Vulkan to
+create photons at runtime.  Python pre-generates the particle records.
+
+\begin{verbatim}
+{
+  name = "diffuse_environment";
+  material_id = 0;
+  relative_mass = 0.05;
+  radius = 0.025;
+  particle_separation_distance = 0.005;
+  initial_particle_velocity = [0.209968, 0.0, 0.0];
+  release_start_frame = 16;
+  release_columns = 1;
+  particles_per_wave = 6400;
+  spacing_factor = 1.05;
+
+  emitter = {
+    type = "environment_sphere";
+    bounds = "death_bounds";
+    radius_mode = "inscribed";
+    bounds_margin = 1.0;
+    point_count = 6400;
+    direction_mode = "diffuse_toward_point";
+    target = [20.0, 20.0, 10.0];
+    angular_jitter_degrees = 10.0;
+  };
+}
+\end{verbatim}
+
+For this emitter, \texttt{initial\_particle\_velocity} supplies only the
+speed.  The generator derives the emitter center from
+\texttt{death\_bounds}, sets the radius to half the shortest death-bounds side
+minus \texttt{bounds\_margin}, samples points with a deterministic Fibonacci
+sphere, and then generates each photon direction from the sampled position.
+For \texttt{"diffuse\_toward\_point"}, each base direction points toward the
+configured target, then receives deterministic angular jitter.
+
+The diffuse environment stream should be born on a different frame from any
+dense front beam if the generated sphere intersects the front beam's inlet
+patch.  The generator checks same-birth overlaps across all streams, so a
+failed overlap report usually means the configured streams share too much
+birth-frame space rather than that the environment sphere itself is invalid.
+
+\subsubsection{NoEnv/Env Vulkan Comparisons}
+
+\texttt{LightingBall\_NoEnv\_Vk.inc} and
+\texttt{LightingBall\_Env\_Vk.inc} are useful A/B include files, but they must
+keep the front \texttt{photon\_beam} geometry identical when testing only the
+environment contribution.  A changed \texttt{span\_v\_min/max} can move the
+beam away from the sphere and make it appear that the environment stream
+disabled the beam.
+
+The environment target must also follow the active scene.  If the sphere is at
+\([20,20,10]\), then a diffuse-toward-point environment should target that
+position, not an older sphere center such as \([9,8,14]\).
+
+Both includes currently write \texttt{output\_file\_prefix =
+"LightingBall\_Vk"} when used as the active include.  That is convenient for
+running the existing Vulkan app, but it also means the last generated variant
+overwrites the same \texttt{.bin}, \texttt{.tst}, \texttt{.log}, and OBJ
+files.  When doing visual comparisons, either regenerate only the variant
+being run or give the variants separate temporary output prefixes.
 
 \subsubsection{Material Fields}
 
@@ -378,10 +455,13 @@ surface behavior.  These must not be treated as one knob.
     The wall material \texttt{color}, \texttt{debug\_color},
     \texttt{spectral\_response}, and \texttt{spectral\_emission} do not
     currently lower the absorbing grayscale brightness.
-    \item[\texttt{"REFLECT"}] Deposit light, reduce photon strength, and
-    reflect the photon when enough strength remains.  This is a planned
-    next-stage behavior and should stay separate from the current absorbing
-    wall proof.
+    \item[\texttt{"REFLECT"}] Reflection-surface behavior for reflection
+    photons.  A reflection photon first picks up visible color from the
+    sphere or another \texttt{SURFACE\_COLOR} surface, reverses direction
+    while preserving speed, then deposits its carried payload onto the
+    reflecting wall and retires.  The reflecting wall is a surface-light
+    destination, not a source of final visible color carried by ordinary
+    particles.
 \end{description}
 
 \subsubsection{Retired Lighting Fields}
@@ -424,20 +504,27 @@ Debug photon visibility belongs to material
 
 Python now generates OBJ-backed render surfaces for \texttt{LightingBall}.
 The OBJ files describe renderable surfaces only, not photons or boundary
-marker particles.  The generated set is:
+marker particles.  Vulkan loads object-specific OBJ files from
+\texttt{lighting\_surface\_objects}; the shared sphere, wall, and combined
+files are retained for Blender inspection.  A typical generated set is:
 \begin{verbatim}
 LightingBall_sphere.obj
 LightingBall_wall.obj
 LightingBall_surfaces.obj
+LightingBall_lighting_sphere_1000.obj
+LightingBall_shadow_wall_2000.obj
+LightingBall_reflecting_wall_3000.obj
 \end{verbatim}
 
 The sphere and wall OBJs are generated from the derived
 \texttt{scene\_model}/\texttt{lighting\_surface\_objects} data.  Rectangle
 mesh density comes from \texttt{rectangle\_u\_segments} and
 \texttt{rectangle\_v\_segments}; sphere mesh density comes from
-\texttt{sphere\_lat\_segments} and \texttt{sphere\_lon\_segments}.  The same
-OBJ files are loaded by \texttt{ResourceLightingSurface}, so Blender can
-inspect the same graphics surface that Vulkan draws.
+\texttt{sphere\_lat\_segments} and \texttt{sphere\_lon\_segments}.  The
+object-specific OBJ files are loaded by \texttt{ResourceLightingSurface}, so
+each Vulkan surface entry receives only its own vertices.  The combined OBJ
+is for inspection only; loading it for every surface object would duplicate
+and mistag geometry when more than one wall is enabled.
 
 This export is an inspection tool.  Runtime collision still uses the analytic
 sphere and rectangle-wall equations, and the particle/bin data should not be
@@ -448,6 +535,7 @@ mixed into the surface OBJ.
 On 2026-07-28, \texttt{LightingBall\_Vk} captures
 \texttt{LightingBall\_Vk\_121.cap} through
 \texttt{LightingBall\_Vk\_150.cap} were checked against the generated stream
+layout.  This verification was for the earlier flat diffuse-back stream
 layout.  The generated photon streams were:
 \begin{itemize}
     \item front beam: \(90 \times 90 = 8100\) photons, radius \(0.025\),

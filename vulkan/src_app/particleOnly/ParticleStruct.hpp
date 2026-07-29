@@ -56,7 +56,8 @@ struct LightingParticle {
 	float material_id;        // material/species id; independent of ptype boundary role
 	// Lighting-only extension fields.
 	glm::vec4 initial_pos_birth;   // x,y,z, original release frame
-	glm::vec4 initial_vel_energy;  // vx,vy,vz, photon energy
-	glm::vec4 photon_transport;    // lived_frames, cycle_count, flags, reserved
+	glm::vec4 initial_vel_energy;  // vx,vy,vz, reserved
+	glm::vec4 photon_transport;    // lived_frames, cycle_count, flags, initial_relative_mass
+	glm::vec4 photon_payload;      // r,g,b, valid; reflection photon carried light
 };
 #endif

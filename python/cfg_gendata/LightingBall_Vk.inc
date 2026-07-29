@@ -6,8 +6,9 @@ scene_model = {
   objects = (
     {
       name 				= "lighting_sphere";
+      enabled 			= true;
       type 				= "sphere";
-      center 			= [9.0, 8.0, 10.0];
+      center 			= [20.0, 20.0, 20.0];
       radius 			= 4.0;
       material_id 		= 1;
       surface_id 		= 1000;
@@ -15,8 +16,9 @@ scene_model = {
     },
     {
       name 					= "shadow_wall";
+      enabled 				= true;
       type 					= "rectangle";
-      origin 				= [16.0, 2.0, 2.0];
+      origin 				= [27.0, 14.0, 14.0];
       u_axis 				= "y";
       u_length 				= 14.0;
       v_axis 				= "z";
@@ -27,8 +29,25 @@ scene_model = {
       roles 				= ["collision", "boundary_markers", "lighting_surface"];
       rectangle_u_segments 	= 80;
       rectangle_v_segments 	= 80;
+    },
+    {
+      name 					= "reflecting_wall";
+      enabled 				= true;
+      type 					= "rectangle";
+      origin 				= [13.0, 14.0, 5.0];
+      u_axis 				= "x";
+      u_length 				= 14.0;
+      v_axis 				= "y";
+      v_length 				= 14.0;
+      normal 				= [0.0, 0.0, 1.0];
+      material_id 			= 3;
+      surface_id 			= 3000;
+      roles 				= ["collision", "boundary_markers", "lighting_surface"];
+      rectangle_u_segments 	= 80;
+      rectangle_v_segments 	= 80;
     }
   );
+  
 };
 
 // Enables persistent boundary-space lighting. Retired boundary_space_patch_*
@@ -38,15 +57,15 @@ boundary_space_lighting_enabled 	= true;
 // --------------------------------------------------------------------------
 // Domain and view
 // --------------------------------------------------------------------------
-x_axis_lims 				= [0.0, 20.0];
-y_axis_lims 				= [0.0, 20.0];
-z_axis_lims 				= [0.0, 22.0];
+x_axis_lims 				= [0.0, 40.0];
+y_axis_lims 				= [0.0, 40.0];
+z_axis_lims 				= [0.0, 42.0];
 
-cell_array_width 			= 20;
-cell_array_height 			= 20;
-cell_array_depth 			= 22;
+cell_array_width 			= 40;
+cell_array_height 			= 40;
+cell_array_depth 			= 40;
 // Mobile particles die/recycle before they can drift outside the legal scene.
-death_bounds 				= [1, 19, 1, 19, 1, 21];
+death_bounds 				= [1, 38, 1, 38, 1, 38];
 // Must be large enough for dense photons plus boundary markers in one cell.
 cell_occupancy_list_size 	= 256;
 
@@ -59,10 +78,70 @@ gl_point_size 				= 1.5;
 particle_streams = (
   {
     name 							= "photon_beam";
+    enabled 						= true;
     material_id 					= 0;
     radius 							= 0.025;
     particle_separation_distance 	= 0.005;
 
+    // Dense x-directed beam matched to the shadow_wall y/z face.
+    // Vulkan profile is dense: 80 x 80 = 6400 photons per wave.
+    initial_particle_velocity 		= [0.209968, 0.0, 0.0];
+	
+
+    release_start_frame 			= 10;
+    release_columns 				= 1;
+    particles_per_wave 				= 8100;
+    spacing_factor 					= 1.05;
+
+    inlet_axis 						= "x";
+    inlet_value 					= 15.0;
+
+    span_u_axis 					= "y";
+    span_u_min 						= 14.0;
+    span_u_max 						= 28.0;
+    span_u_count 					= 90;
+
+    span_v_axis 					= "z";
+    span_v_min 						= 14.0;
+    span_v_max 						= 28.0;
+    span_v_count 					= 90;
+  },
+  {
+    name 							= "diffuse_beam_sphere";
+    enabled 						= true;
+    material_id 					= 4;
+    radius 							= 0.025;
+    particle_separation_distance 	= 0.005;
+	relative_mass 					= 0.25;
+    // Dense x-directed beam matched to the shadow_wall y/z face.
+    // Vulkan profile is dense: 80 x 80 = 6400 photons per wave.
+    initial_particle_velocity 		= [-0.209968, 0.0, 0.0];
+
+    release_start_frame 			= 10;
+    release_columns 				= 1;
+    particles_per_wave 				= 8100;
+    spacing_factor 					= 1.05;
+
+    inlet_axis 						= "x";
+    inlet_value 					= 24.0;
+
+    span_u_axis 					= "y";
+    span_u_min 						= 14.0;
+    span_u_max 						= 28.0;
+    span_u_count 					= 90;
+
+    span_v_axis 					= "z";
+    span_v_min 						= 14.0;
+    span_v_max 						= 28.0;
+    span_v_count 					= 90;
+  },
+  {
+    name 							= "diffuse_beam_wall";
+    enabled 						= true;
+    material_id 					= 4;
+    radius 							= 0.025;
+    particle_separation_distance 	= 0.005;
+	relative_mass 					= 0.25;
     // Dense x-directed beam matched to the shadow_wall y/z face.
     // Vulkan profile is dense: 80 x 80 = 6400 photons per wave.
     initial_particle_velocity 		= [0.209968, 0.0, 0.0];
@@ -73,44 +152,75 @@ particle_streams = (
     spacing_factor 					= 1.05;
 
     inlet_axis 						= "x";
-    inlet_value 					= 4.0;
+    inlet_value 					= 26.0;
 
     span_u_axis 					= "y";
-    span_u_min 						= 2.0;
-    span_u_max 						= 16.0;
+    span_u_min 						= 14.0;
+    span_u_max 						= 28.0;
     span_u_count 					= 90;
 
     span_v_axis 					= "z";
-    span_v_min 						= 2.0;
-    span_v_max 						= 16.0;
+    span_v_min 						= 14.0;
+    span_v_max 						= 28.0;
     span_v_count 					= 90;
   },
   {
-    name 							= "diffuse_back_light";
-    material_id 					= 0;
+    name 							= "reflection_beam";
+    enabled 						= true;
+    material_id 					= 5;
+    radius 							= 0.025;
+    particle_separation_distance 	= 0.005;
+	relative_mass 					= 0.25;
+
+    // Reflection test beam starts just above the reflecting_wall and moves
+    // toward the sphere. Later it will carry sphere color back to the wall.
+    initial_particle_velocity 		= [0.0, 0.0, 0.209968];
+
+    release_start_frame 			= 10;
+    release_columns 				= 1;
+    particles_per_wave 				= 8100;
+    spacing_factor 					= 1.05;
+
+    inlet_axis 						= "z";
+    inlet_value 					= 6.0;
+
+    span_u_axis 					= "x";
+    span_u_min 						= 13.0;
+    span_u_max 						= 27.0;
+    span_u_count 					= 90;
+
+    span_v_axis 					= "y";
+    span_v_min 						= 14.0;
+    span_v_max 						= 28.0;
+    span_v_count 					= 90;
+  },
+  {
+    name 							= "diffuse_environment";
+    enabled 						= false;
+    material_id 					= 4;
     radius 							= 0.025;
     particle_separation_distance 	= 0.005;
     relative_mass 					= 0.05;
 
-    initial_particle_velocity 		= [-0.209968, 0.0, 0.0];
+    // Environment-sphere emitters use the magnitude of this velocity. The
+    // per-particle direction is generated from the emitter direction mode.
+    initial_particle_velocity 		= [0.209968, 0.0, 0.0];
 
-    release_start_frame 			= 10;
+    release_start_frame 			= 16;
     release_columns 				= 1;
     particles_per_wave 				= 6400;
     spacing_factor 					= 1.05;
 
-    inlet_axis 						= "x";
-    inlet_value 					= 15.5;
-
-    span_u_axis 					= "y";
-    span_u_min 						= 2.0;
-    span_u_max 						= 16.0;
-    span_u_count 					= 80;
-
-    span_v_axis 					= "z";
-    span_v_min 						= 2.0;
-    span_v_max 						= 16.0;
-    span_v_count 					= 80;
+    emitter = {
+      type 							= "environment_sphere";
+      bounds 						= "death_bounds";
+      radius_mode 					= "inscribed";
+      bounds_margin 				= 1.0;
+      point_count 					= 6400;
+      direction_mode 				= "diffuse_toward_point";
+      target 						= [20.0, 20.0, 20.0];
+      angular_jitter_degrees 		= 10.0;
+    };
   }
 );
 

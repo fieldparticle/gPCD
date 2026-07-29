@@ -5,13 +5,14 @@ import math
 from gbase.MaterialProperties import (
     PARTICLE_TYPE_BOUNDARY,
     PARTICLE_TYPE_PHOTON,
+    PARTICLE_TYPE_REFLECTION_PHOTON,
     PARTICLE_TYPE_REGULAR,
     PHOTON_SURFACE_BEHAVIOR_NONE,
     PHOTON_SURFACE_BEHAVIOR_REFLECT,
     parse_particle_type,
     parse_photon_surface_behavior,
 )
-from gbase.pdata import PTYPE_BOUNDARY, PTYPE_PHOTON
+from gbase.pdata import PTYPE_BOUNDARY, PTYPE_PHOTON, PTYPE_REFLECTION_PHOTON
 
 
 class PhotonDynamicsMixin:
@@ -22,13 +23,18 @@ class PhotonDynamicsMixin:
         ptype = int(round(float(getattr(self.particles[ParticleID], "ptype", 0.0))))
         if ptype == int(PTYPE_PHOTON):
             return PARTICLE_TYPE_PHOTON
+        if ptype == int(PTYPE_REFLECTION_PHOTON):
+            return PARTICLE_TYPE_REFLECTION_PHOTON
         if ptype == int(PTYPE_BOUNDARY):
             return PARTICLE_TYPE_BOUNDARY
         return PARTICLE_TYPE_REGULAR
 
     def IsPhotonParticle(self, ParticleID):
         """Return true when a particle's runtime type marks it as a photon."""
-        return self.GetParticleType(ParticleID) == PARTICLE_TYPE_PHOTON
+        return self.GetParticleType(ParticleID) in (
+            PARTICLE_TYPE_PHOTON,
+            PARTICLE_TYPE_REFLECTION_PHOTON,
+        )
 
     def ShouldSkipParticlePair(self, SourceID, TargetID):
         """Photons ignore photons; non-photons ignore photon targets."""
@@ -40,6 +46,9 @@ class PhotonDynamicsMixin:
 
     def BasePhotonMaterialID(self, SourceID):
         """Return the configured photon material id used between contacts."""
+        original_material_id = self.OriginalPhotonMaterialID(SourceID)
+        if original_material_id is not None:
+            return original_material_id
         materials = ()
         if getattr(self, "run_configuration", None) is not None:
             materials = self.run_configuration.get("material_properties", ())
@@ -52,9 +61,20 @@ class PhotonDynamicsMixin:
                     getattr(material, "particle_type", 0)
                 )
                 material_id = getattr(material, "material_id", 0)
-            if particle_type == PARTICLE_TYPE_PHOTON:
+            if particle_type in (
+                PARTICLE_TYPE_PHOTON,
+                PARTICLE_TYPE_REFLECTION_PHOTON,
+            ):
                 return float(material_id)
         return float(getattr(self.particles[SourceID], "material_id", 0.0))
+
+    def OriginalPhotonMaterialID(self, SourceID):
+        """Return the material id assigned to this photon at birth."""
+        particle = self.particles[SourceID]
+        initial_vel_energy = getattr(particle, "initial_vel_energy", None)
+        if initial_vel_energy is None:
+            return None
+        return float(getattr(initial_vel_energy, "w", getattr(particle, "material_id", 0.0)))
 
     def PhotonVelocityMagnitude(self, SourceID):
         """Return the current photon speed used in strength calculations."""

@@ -9,8 +9,8 @@
 The current boundary-space lighting milestone is complete for
 \texttt{LightingBall}.  Python proves photon contact and material-source
 selection, and Vulkan \texttt{ParticleLighting} now renders the configured
-sphere and shadow wall from generated OBJ-backed
-\texttt{LightingSurfaceVertex} buffers.
+sphere, shadow wall, and reflecting wall from generated object-specific
+OBJ-backed \texttt{LightingSurfaceVertex} buffers.
 
 \subsubsection{Validated Form}
 
@@ -38,6 +38,10 @@ The next active lighting tasks are:
     \item validate \texttt{SURFACE\_COLOR}, \texttt{ABSORB},
           \texttt{REFLECT}, and \texttt{NONE} material behavior over longer
           Vulkan captures;
+    \item smooth the OBJ-backed surface-vertex lighting footprint; the
+          current behavior is correct but not yet visually smooth;
+    \item profile the surface-hit slowdown in \texttt{FPML.comp}, especially
+          dense photon contact and vertex splat writes;
     \item update capture/debug readers so \texttt{ParticleLighting}/
           \texttt{FPML} captures use the \(256\)-byte
           \texttt{LightingParticle} layout instead of the ordinary particle
@@ -46,11 +50,16 @@ The next active lighting tasks are:
           no-overlap timing now comes from per-stream
           \texttt{radius} plus
           \texttt{particle\_separation\_distance};
+    \item validate \texttt{LightingBall\_NoEnv\_Vk.inc} and
+          \texttt{LightingBall\_Env\_Vk.inc} as a strict A/B pair: the front
+          \texttt{photon\_beam} geometry should match, the environment target
+          should match the active sphere center, and generated output prefixes
+          should not accidentally hide which variant was last generated;
     \item move engineering rendering to the scene/surface model so simulation
           geometry and graphics geometry have one authored source of truth;
-    \item diffuse light stream;
+    \item diffuse light stream refinement;
     \item absorbing and shadow surface refinement;
-    \item reflective surface transport;
+    \item reflective surface transport refinement;
     \item complete any remaining lighting-specific particle transport fields.
 \end{enumerate}
 
@@ -114,6 +123,9 @@ Python now exports renderable lighting surfaces:
 LightingBall_sphere.obj
 LightingBall_wall.obj
 LightingBall_surfaces.obj
+LightingBall_lighting_sphere_1000.obj
+LightingBall_shadow_wall_2000.obj
+LightingBall_reflecting_wall_3000.obj
 \end{verbatim}
 
 The OBJ files are generated from \texttt{scene\_model} and its derived
@@ -121,8 +133,9 @@ The OBJ files are generated from \texttt{scene\_model} and its derived
 per object by \texttt{rectangle\_u\_segments} and
 \texttt{rectangle\_v\_segments}; sphere render density is controlled by
 \texttt{sphere\_lat\_segments} and \texttt{sphere\_lon\_segments}.  These
-files are for Blender inspection and Vulkan lighting-surface rendering.  They
-must not include photon particles or boundary marker particles.
+files must not include photon particles or boundary marker particles.  Vulkan
+runtime entries should use the object-specific OBJ files, while the combined
+OBJ remains an inspection convenience for Blender.
 
 \subsection{Python/Vulkan View Parity}
 

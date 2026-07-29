@@ -17,6 +17,7 @@ import ctypes
 PTYPE_NULL = -1.0
 PTYPE_MOBILE = 0.0
 PTYPE_PHOTON = -2.0
+PTYPE_REFLECTION_PHOTON = -3.0
 PTYPE_BOUNDARY = 2.0
 BOUNDARY_EVALUATOR_NONE = PTYPE_MOBILE
 BOUNDARY_EVALUATOR_HORIZONTAL = 1.0
@@ -48,6 +49,7 @@ class pdata(ctypes.Structure):
     - ``ptype == -1`` identifies the reserved null particle at index zero.
     - ``ptype == 0`` identifies a regular mobile particle.
       ``ptype == -2`` identifies a photon mobile particle.
+      ``ptype == -3`` identifies a reflection-photon mobile particle.
       ``ptype == 2`` identifies a generic boundary marker. Older boundary
       evaluator ids are still positive values, but new generated scenes should
       use the named boundary value instead of overloading photon behavior.
@@ -82,7 +84,7 @@ class pdata(ctypes.Structure):
         ("vx", ctypes.c_double),          # Initial x velocity.
         ("vy", ctypes.c_double),          # Initial y velocity.
         ("vz", ctypes.c_double),          # Initial z velocity.
-        ("ptype", ctypes.c_double),       # 0 regular mobile; -2 photon mobile; 2 generic boundary marker.
+        ("ptype", ctypes.c_double),       # 0 regular mobile; -2 photon; -3 reflection photon; 2 boundary marker.
         ("state_flg", ctypes.c_double),   # Runtime lifecycle copied to Data.w.
         ("molar_mass", ctypes.c_double),  # Particle mass; copied to Vulkan parms.x.
         ("material_id", ctypes.c_double),    # Material/species id; independent of boundary dispatch.

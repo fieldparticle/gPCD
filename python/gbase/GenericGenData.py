@@ -1,4 +1,5 @@
 import os
+import re
 
 from gbase.BoundarySpaceLighting import (
     BOUNDARY_SPACE_SURFACE_RECTANGLE_WALL,
@@ -18,6 +19,7 @@ from gbase.MaterialProperties import (
     DEFAULT_MATERIAL_PROPERTIES,
     PARTICLE_TYPE_BOUNDARY,
     PARTICLE_TYPE_PHOTON,
+    PARTICLE_TYPE_REFLECTION_PHOTON,
     PHOTON_SURFACE_BEHAVIOR_NONE,
     PHOTON_SURFACE_BEHAVIOR_REFLECT,
     CONTACT_ILLUMINATION_MAX,
@@ -32,7 +34,14 @@ from gbase.MaterialProperties import (
     write_material_properties,
 )
 from gbase.SceneModel import apply_scene_model
-from gbase.pdata import PTYPE_BOUNDARY, PTYPE_MOBILE, PTYPE_NULL, PTYPE_PHOTON, pdata
+from gbase.pdata import (
+    PTYPE_BOUNDARY,
+    PTYPE_MOBILE,
+    PTYPE_NULL,
+    PTYPE_PHOTON,
+    PTYPE_REFLECTION_PHOTON,
+    pdata,
+)
 import math
 
 
@@ -217,6 +226,7 @@ class GenericGenData:
         return color_mode
 
     def validate_material_properties(self, errors):
+        initial_error_count = len(errors)
         raw_materials = self.itemcfg.get("material_properties")
         if raw_materials is None:
             materials = [dict(item) for item in self.DEFAULT_MATERIAL_PROPERTIES]
@@ -446,7 +456,7 @@ class GenericGenData:
         if 0 not in material_ids:
             errors.append("material_properties must define material_id 0")
 
-        if not errors:
+        if len(errors) == initial_error_count:
             self.set_material_properties(materials)
         return materials
 
@@ -1073,6 +1083,17 @@ class GenericGenData:
             output_directory,
             f"{output_prefix}_surfaces.obj",
         )
+        self.surface_object_obj_names = {}
+        for surface_object in self.itemcfg.get("lighting_surface_objects", ()):
+            object_name = str(surface_object.get("name", "surface"))
+            object_slug = re.sub(r"[^A-Za-z0-9_]+", "_", object_name).strip("_")
+            if not object_slug:
+                object_slug = "surface"
+            surface_id = int(surface_object.get("surface_id", 0))
+            self.surface_object_obj_names[object_name] = os.path.join(
+                output_directory,
+                f"{output_prefix}_{object_slug}_{surface_id}.obj",
+            )
 
     def delete_stale_generated_outputs(self):
         removed_paths = []
@@ -1172,13 +1193,7 @@ class GenericGenData:
             material_particle_type = int(
                 self.material_properties_by_id[material_id].get("particle_type", 0)
             )
-            ptype = (
-                PTYPE_PHOTON
-                if material_particle_type == PARTICLE_TYPE_PHOTON
-                else PTYPE_BOUNDARY
-                if material_particle_type == PARTICLE_TYPE_BOUNDARY
-                else PTYPE_MOBILE
-            )
+            ptype = self.pdata_ptype_for_particle_type(material_particle_type)
         particle = pdata()
         self.number_particles += 1
         self.number_active_particles += 1
@@ -1197,6 +1212,17 @@ class GenericGenData:
         )
         self.p_list.append(particle)
         return particle
+
+    @staticmethod
+    def pdata_ptype_for_particle_type(particle_type):
+        particle_type = int(particle_type)
+        if particle_type == PARTICLE_TYPE_PHOTON:
+            return PTYPE_PHOTON
+        if particle_type == PARTICLE_TYPE_REFLECTION_PHOTON:
+            return PTYPE_REFLECTION_PHOTON
+        if particle_type == PARTICLE_TYPE_BOUNDARY:
+            return PTYPE_BOUNDARY
+        return PTYPE_MOBILE
 
     def add_explicit_mobile_particles(self):
         """Create the mobile particles declared by PARTICLE_DATA."""
@@ -1378,6 +1404,26 @@ class GenericGenData:
         print(report_text)
         self.write_validation_log(report_text)
         return self.boundary_space_proxy_count()
+
+    def report_scene_model_toggles(self):
+        disabled_objects = tuple(
+            self.itemcfg.get("_scene_model_disabled_objects", ())
+        )
+        if not disabled_objects:
+            return 0
+        report_lines = ["Scene model toggle report:"]
+        for object_name in disabled_objects:
+            report_lines.extend(
+                (
+                    f"  object: {object_name}",
+                    "    status: disabled",
+                    "    derived geometry: none",
+                )
+            )
+        report_text = "\n".join(report_lines)
+        print(report_text)
+        self.write_validation_log(report_text)
+        return len(disabled_objects)
 
     def write_boundary_space_lighting(self, output):
         self.validate_boundary_space_proxy_packing()
@@ -1726,6 +1772,52 @@ class GenericGenData:
             vertex_offset += len(obj_data["vertices"])
         return merged
 
+    def _single_surface_obj_data(self, obj_data, object_name):
+        for surface_object in obj_data["objects"]:
+            if surface_object["name"] != object_name:
+                continue
+
+            referenced_vertices = []
+            seen_vertices = set()
+            for face in surface_object["faces"]:
+                for vertex_id in face:
+                    if vertex_id in seen_vertices:
+                        continue
+                    seen_vertices.add(vertex_id)
+                    referenced_vertices.append(vertex_id)
+
+            vertex_map = {
+                old_vertex_id: new_vertex_id
+                for new_vertex_id, old_vertex_id in enumerate(referenced_vertices, start=1)
+            }
+            return {
+                "objects": [
+                    {
+                        "name": surface_object["name"],
+                        "material_id": surface_object["material_id"],
+                        "surface_id": surface_object["surface_id"],
+                        "faces": tuple(
+                            tuple(vertex_map[vertex_id] for vertex_id in face)
+                            for face in surface_object["faces"]
+                        ),
+                    }
+                ],
+                "vertices": [
+                    obj_data["vertices"][vertex_id - 1]
+                    for vertex_id in referenced_vertices
+                ],
+                "normals": [
+                    obj_data["normals"][vertex_id - 1]
+                    for vertex_id in referenced_vertices
+                ],
+                "texcoords": [
+                    obj_data["texcoords"][vertex_id - 1]
+                    for vertex_id in referenced_vertices
+                ],
+            }
+
+        return None
+
     def _write_surface_obj(self, path, obj_data, description):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="ascii", newline="\n") as output:
@@ -1766,6 +1858,20 @@ class GenericGenData:
                     "Generated LightingBall sphere surface",
                 )
             )
+            for surface_object in sphere_obj["objects"]:
+                object_path = self.surface_object_obj_names.get(surface_object["name"])
+                object_obj = self._single_surface_obj_data(
+                    sphere_obj,
+                    surface_object["name"],
+                )
+                if object_path is not None and object_obj is not None:
+                    written_paths.append(
+                        self._write_surface_obj(
+                            object_path,
+                            object_obj,
+                            f"Generated LightingBall surface {surface_object['name']}",
+                        )
+                    )
         if wall_obj is not None:
             written_paths.append(
                 self._write_surface_obj(
@@ -1774,6 +1880,20 @@ class GenericGenData:
                     "Generated LightingBall rectangle wall surface",
                 )
             )
+            for surface_object in wall_obj["objects"]:
+                object_path = self.surface_object_obj_names.get(surface_object["name"])
+                object_obj = self._single_surface_obj_data(
+                    wall_obj,
+                    surface_object["name"],
+                )
+                if object_path is not None and object_obj is not None:
+                    written_paths.append(
+                        self._write_surface_obj(
+                            object_path,
+                            object_obj,
+                            f"Generated LightingBall surface {surface_object['name']}",
+                        )
+                    )
         combined_obj = self._merge_obj_data((sphere_obj, wall_obj))
         if combined_obj["vertices"]:
             written_paths.append(
@@ -1794,6 +1914,9 @@ class GenericGenData:
         return tuple(written_paths)
 
     def lighting_surface_obj_file_for_export(self, surface_object):
+        object_path = self.surface_object_obj_names.get(str(surface_object["name"]))
+        if object_path is not None:
+            return object_path.replace("\\", "/")
         surface_type = str(surface_object["surface_type"]).upper()
         if surface_type == "SPHERE":
             return self.surface_sphere_obj_name.replace("\\", "/")
@@ -2379,6 +2502,7 @@ class GenericGenData:
 
         self.initialize_generation()
         try:
+            self.report_scene_model_toggles()
             self.report_collision_feasibility()
             self.add_null_particle()
             self.add_explicit_mobile_particles()

@@ -54,6 +54,24 @@ uint boundary_light_material_surface_behavior(uint materialID)
     return PHOTON_SURFACE_BEHAVIOR_NONE;
 }
 
+uint boundary_light_surface_material_id(
+    uint surfaceType,
+    uint surfaceID,
+    uint fallbackMaterialID)
+{
+    for (uint index = 0u; index < LIGHTING_SURFACE_OBJECT_COUNT; ++index)
+    {
+        LightingSurfaceObjectMetadata surfaceObject = LIGHTING_SURFACE_OBJECTS[index];
+        if (surfaceObject.surfaceType == surfaceType &&
+            surfaceObject.surfaceID == surfaceID)
+        {
+            return surfaceObject.materialID;
+        }
+    }
+
+    return fallbackMaterialID;
+}
+
 float boundary_light_material_relative_mass(uint materialID)
 {
     for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
@@ -107,18 +125,6 @@ float photon_relative_mass(uint SourceID)
     return max(0.0, P[SourceID].parms.x);
 }
 
-float reduce_photon_mass_by_deposit_fraction(uint SourceID, float depositFraction)
-{
-    float fraction = clamp(depositFraction, 0.0, 1.0);
-    P[SourceID].parms.x = max(0.0, P[SourceID].parms.x * (1.0 - fraction));
-    return P[SourceID].parms.x;
-}
-
-void retire_photon(uint SourceID)
-{
-    P[SourceID].Data.w = -1.0;
-}
-
 vec3 photon_deposit_energy_gray_rgb(float depositFraction, float relativeMass)
 {
     float gray = clamp(depositFraction * relativeMass, 0.0, 1.0);
@@ -147,6 +153,53 @@ vec3 photon_deposit_payload_rgb(
         depositFraction,
         relativeMass,
         payloadMaterialID);
+}
+
+bool photon_payload_valid(uint SourceID)
+{
+    return P[SourceID].photon_payload.w > 0.5;
+}
+
+vec3 photon_carried_payload_rgb(uint SourceID)
+{
+    if (!photon_payload_valid(SourceID)) {
+        return vec3(0.0);
+    }
+    return clamp(P[SourceID].photon_payload.rgb, vec3(0.0), vec3(1.0));
+}
+
+void photon_clear_payload(uint SourceID)
+{
+    P[SourceID].photon_payload = vec4(0.0);
+}
+
+void photon_set_payload_rgb(uint SourceID, vec3 rgb)
+{
+    vec3 clampedRgb = clamp(rgb, vec3(0.0), vec3(1.0));
+    P[SourceID].photon_payload = vec4(
+        clampedRgb,
+        max(max(clampedRgb.r, clampedRgb.g), clampedRgb.b) > 0.0 ? 1.0 : 0.0);
+}
+
+vec3 photon_pickup_material_rgb(uint SourceID, uint materialID)
+{
+    return clamp(
+        boundary_light_material_color(materialID).rgb * photon_relative_mass(SourceID),
+        vec3(0.0),
+        vec3(1.0));
+}
+
+float reduce_photon_mass_by_deposit_fraction(uint SourceID, float depositFraction)
+{
+    float fraction = clamp(depositFraction, 0.0, 1.0);
+    P[SourceID].parms.x = max(0.0, P[SourceID].parms.x * (1.0 - fraction));
+    return P[SourceID].parms.x;
+}
+
+void retire_photon(uint SourceID)
+{
+    P[SourceID].Data.w = -1.0;
+    photon_clear_payload(SourceID);
 }
 
 LightingSurfaceObjectMetadata boundary_light_surface_object_metadata(
@@ -520,11 +573,12 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
     P[SourceID].Data.w = nextBirthFrame;
     P[SourceID].colFlg = 0u;
     P[SourceID].contactCount = 0u;
-    P[SourceID].material_id = float(PhotonBaseMaterialID());
+    P[SourceID].material_id = initialVelEnergy.w;
     P[SourceID].parms.x = max(0.0, P[SourceID].photon_transport.w);
     P[SourceID].photon_transport.x = livedFrames;
     P[SourceID].photon_transport.y += 1.0;
     P[SourceID].photon_transport.z = 1.0;
+    photon_clear_payload(SourceID);
     return true;
 #else
     return false;
@@ -564,7 +618,7 @@ void fpml_comp_main()
     P[SourceID].colFlg = 0u;
     bool photonSource = IsPhotonParticle(SourceID);
     if (photonSource) {
-        P[SourceID].material_id = float(PhotonBaseMaterialID());
+        P[SourceID].material_id = P[SourceID].initial_vel_energy.w;
     }
     float previousBirthFrame = P[SourceID].Data.w;
     vec3 totalForce = vec3(0.0);
@@ -624,6 +678,21 @@ void fpml_comp_main()
                                 uint sphereBehavior =
                                     boundary_light_material_surface_behavior(
                                         LIGHTING_BALL_MATERIAL_ID);
+                                if (IsReflectionPhotonParticle(SourceID)) {
+                                    if (sphereBehavior ==
+                                            PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR) {
+                                        photon_set_payload_rgb(
+                                            SourceID,
+                                            photon_pickup_material_rgb(
+                                                SourceID,
+                                                LIGHTING_BALL_MATERIAL_ID));
+                                        photonVelocity =
+                                            ReverseFixedSpeed(photonVelocity);
+                                        photonReflected = true;
+                                        P[SourceID].colFlg = 1u;
+                                    }
+                                    continue;
+                                }
                                 float depositFraction = photon_deposit_fraction(
                                     photonVelocity,
                                     lightingBallResult.segment.normal,
@@ -671,7 +740,7 @@ void fpml_comp_main()
                                 if (sphereBehavior == PHOTON_SURFACE_BEHAVIOR_ABSORB ||
                                         remainingMass <=
                                         boundary_light_material_photon_min_relative_mass(
-                                            PhotonBaseMaterialID())) {
+                                            uint(round(P[SourceID].material_id)))) {
                                     retire_photon(SourceID);
                                     continue;
                                 }
@@ -709,7 +778,16 @@ void fpml_comp_main()
                 duplicateWalls[duplicateWallCount] = segment.wallFlag;
                 duplicateWallCount += 1u;
                 if (photonSource) {
+#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
+                    RectangleWallSegment selectedPhotonWall =
+                        SelectRectangleWallSegment(SourceID, TargetID);
+                    uint surfaceMaterialID = boundary_light_surface_material_id(
+                        BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL,
+                        selectedPhotonWall.wallFlag,
+                        uint(round(P[TargetID].material_id)));
+#else
                     uint surfaceMaterialID = uint(round(P[TargetID].material_id));
+#endif
                     uint surfaceBehavior =
                         boundary_light_material_surface_behavior(surfaceMaterialID);
                     P[SourceID].colFlg = 1u;
@@ -736,10 +814,8 @@ void fpml_comp_main()
                             depositFraction,
                             preTransferMass);
 #if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
-                        RectangleWallSegment selectedWall =
-                            SelectRectangleWallSegment(SourceID, TargetID);
                         DepositLightingSurfaceWallVertexSplat(
-                            selectedWall,
+                            selectedPhotonWall,
                             photonPosition,
                             grayRgb);
 #else
@@ -749,6 +825,14 @@ void fpml_comp_main()
                     }
 
                     if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR) {
+                        if (IsReflectionPhotonParticle(SourceID)) {
+                            photon_set_payload_rgb(
+                                SourceID,
+                                photon_pickup_material_rgb(SourceID, surfaceMaterialID));
+                            photonVelocity = ReverseFixedSpeed(photonVelocity);
+                            photonReflected = true;
+                            continue;
+                        }
                         vec3 surfaceRgb = photon_deposit_material_color_rgb(
                             depositFraction,
                             preTransferMass,
@@ -759,17 +843,15 @@ void fpml_comp_main()
                             BoundaryLight[cellID].rgb_valid = vec4(surfaceRgb, 1.0);
                         }
 #if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
-                        RectangleWallSegment selectedWall =
-                            SelectRectangleWallSegment(SourceID, TargetID);
                         DepositLightingSurfaceWallVertexSplat(
-                            selectedWall,
+                            selectedPhotonWall,
                             photonPosition,
                             surfaceRgb);
 #else
 #endif
                         if (remainingMass >
                                 boundary_light_material_photon_min_relative_mass(
-                                    PhotonBaseMaterialID())) {
+                                    uint(round(P[SourceID].material_id)))) {
                             photonVelocity =
                                 ReflectFixedSpeed(photonVelocity, segment.normal);
                             photonReflected = true;
@@ -778,34 +860,26 @@ void fpml_comp_main()
                     }
 
                     if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_REFLECT) {
-                        vec3 payloadRgb = photon_deposit_payload_rgb(
-                            SourceID,
-                            depositFraction,
-                            preTransferMass);
-                        uint cellID = boundary_light_cell_address(
-                            GetParticlePosition(TargetID).xyz);
-                        if (cellID != npos && cellID < MAX_CELL_ARRAY_LOCATIONS) {
-                            BoundaryLight[cellID].rgb_valid = vec4(payloadRgb, 1.0);
+                        if (!IsReflectionPhotonParticle(SourceID)) {
+                            continue;
                         }
+                        vec3 payloadRgb = photon_carried_payload_rgb(SourceID);
+                        if (photon_payload_valid(SourceID)) {
+                            uint cellID = boundary_light_cell_address(
+                                GetParticlePosition(TargetID).xyz);
+                            if (cellID != npos && cellID < MAX_CELL_ARRAY_LOCATIONS) {
+                                BoundaryLight[cellID].rgb_valid = vec4(payloadRgb, 1.0);
+                            }
 #if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
-                        RectangleWallSegment selectedWall =
-                            SelectRectangleWallSegment(SourceID, TargetID);
-                        DepositLightingSurfaceWallVertexSplat(
-                            selectedWall,
-                            photonPosition,
-                            payloadRgb);
+                            DepositLightingSurfaceWallVertexSplat(
+                                selectedPhotonWall,
+                                photonPosition,
+                                payloadRgb);
 #else
 #endif
-                        if (remainingMass >
-                                boundary_light_material_photon_min_relative_mass(
-                                    PhotonBaseMaterialID())) {
-                            photonVelocity =
-                                ReflectFixedSpeed(photonVelocity, segment.normal);
-                            photonReflected = true;
-                        } else {
-                            retire_photon(SourceID);
                         }
-                        continue;
+                        retire_photon(SourceID);
+                        return;
                     }
                     continue;
                 }

@@ -30,8 +30,9 @@ struct Particle {
     float material_id;         // material/color source
 
     vec4 initial_pos_birth;    // xyz=original slot position, w=original release frame
-    vec4 initial_vel_energy;   // xyz=original photon velocity, w=reserved
-    vec4 photon_transport;     // x=lived frames, y=cycle count, z=flags, w=reserved
+    vec4 initial_vel_energy;   // xyz=original photon velocity, w=original material id
+    vec4 photon_transport;     // x=lived frames, y=cycle count, z=flags, w=initial relative mass
+    vec4 photon_payload;       // rgb=carried light, w=valid
 };
 
 struct boundStruct {

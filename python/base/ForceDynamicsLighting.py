@@ -49,7 +49,7 @@ class ForceDynamicsLighting(PhotonDynamicsMixin, BaseForceDynamics):
                 float(particle.VelRad.x),
                 float(particle.VelRad.y),
                 float(particle.VelRad.z),
-                0.0,
+                float(getattr(particle, "material_id", 0.0)),
             )
             particle.photon_transport = self.create_vec4(
                 0.0,  # last lived frame count
@@ -84,7 +84,7 @@ class ForceDynamicsLighting(PhotonDynamicsMixin, BaseForceDynamics):
         particle.state_flg = float(next_birth_frame)
         particle.colFlg = 0
         particle.contactCount = 0
-        particle.material_id = self.BasePhotonMaterialID(SourceID)
+        particle.material_id = self.OriginalPhotonMaterialID(SourceID)
         particle.photon_transport.x = float(lived_frames)
         particle.photon_transport.y = float(particle.photon_transport.y) + 1.0
         particle.photon_transport.z = 1.0

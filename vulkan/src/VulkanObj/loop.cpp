@@ -194,7 +194,9 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 				float fps = static_cast<double>(nbFrames) / diff_time;
 				float spf = diff_time / nbFrames;
 				 
-				std::cout << "Seconds:" << aprCount << " FrameNumber:" << VulkanWin->m_FrameNumber 
+				std::cout << "Seconds:" << aprCount 
+					<< "Actual Frame:" << VulkanWin->m_ActualFrame 
+					<< " FrameNumber:" << VulkanWin->m_FrameNumber
 					<< " FRate:" << 1000.0 / double(nbFrames) << " ms/F, " 
 					<< " FPS:" << nbFrames << " F/s." << std::endl;
 				nbFrames = 0;

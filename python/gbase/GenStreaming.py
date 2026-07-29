@@ -5,6 +5,7 @@ from gbase.FunctionWall import BOUNDARY_KIND_RESERVOIR
 from gbase.FunctionWall import bounds as wall_bounds
 from gbase.FunctionWall import parse_keyed_curve_wall_segments
 from gbase.GenericGenData import GenericGenData, parse_keyed_rectangle_wall_segments
+from gbase.MaterialProperties import parse_particle_type
 
 
 class GenStreaming(GenericGenData):
@@ -158,6 +159,33 @@ class GenStreaming(GenericGenData):
                 return None
             return stream_positive_int(stream, context, name)
 
+        def optional_stream_particle_type(stream, context):
+            if "particle_type" not in stream:
+                return None
+            try:
+                return parse_particle_type(stream.get("particle_type"))
+            except (TypeError, ValueError):
+                errors.append(f"{context}.particle_type is unknown")
+                return None
+
+        def optional_stream_enabled(stream, context):
+            if "enabled" not in stream:
+                return True
+            value = stream.get("enabled")
+            if type(value) is not bool:
+                errors.append(f"{context}.enabled must be a boolean")
+                return None
+            return bool(value)
+
+        def optional_stream_nonnegative_float(stream, context, name, default):
+            if name not in stream:
+                return default
+            value = optional_stream_float(stream, context, name)
+            if value is not None and value < 0.0:
+                errors.append(f"{context}.{name} must not be negative")
+                return None
+            return value
+
         def parse_vector3(container, context, name):
             values = container.get(name)
             if values is None:
@@ -239,8 +267,85 @@ class GenStreaming(GenericGenData):
             errors.append(f"{curve_context}.kind must be 'polyline' or 'cubic_bezier'")
             return None
 
+        def parse_environment_sphere_emitter(emitter, context, particles_per_wave):
+            bounds_name = str(emitter.get("bounds", "")).lower()
+            if bounds_name != "death_bounds":
+                errors.append(f"{context}.bounds must be 'death_bounds'")
+            radius_mode = str(emitter.get("radius_mode", "")).lower()
+            if radius_mode != "inscribed":
+                errors.append(f"{context}.radius_mode must be 'inscribed'")
+            bounds_margin = optional_stream_nonnegative_float(
+                emitter,
+                context,
+                "bounds_margin",
+                0.0,
+            )
+            point_count = stream_positive_int(emitter, context, "point_count")
+            if point_count is not None and point_count != particles_per_wave:
+                errors.append(f"{context}.point_count must equal particles_per_wave")
+
+            direction_mode = str(emitter.get("direction_mode", "")).lower()
+            valid_direction_modes = (
+                "radial_outward",
+                "radial_inward",
+                "toward_point",
+                "diffuse_toward_point",
+            )
+            if direction_mode not in valid_direction_modes:
+                errors.append(
+                    f"{context}.direction_mode must be one of "
+                    "'radial_outward', 'radial_inward', 'toward_point', "
+                    "or 'diffuse_toward_point'"
+                )
+            target = None
+            if direction_mode in ("toward_point", "diffuse_toward_point"):
+                target = parse_vector3(emitter, context, "target")
+            elif "target" in emitter:
+                target = parse_vector3(emitter, context, "target")
+
+            angular_jitter_degrees = optional_stream_nonnegative_float(
+                emitter,
+                context,
+                "angular_jitter_degrees",
+                0.0,
+            )
+            return {
+                "type": "environment_sphere",
+                "bounds": bounds_name,
+                "radius_mode": radius_mode,
+                "bounds_margin": bounds_margin,
+                "point_count": point_count,
+                "direction_mode": direction_mode,
+                "target": target,
+                "angular_jitter_degrees": angular_jitter_degrees,
+            }
+
+        def parse_stream_emitter(emitter, context, particles_per_wave):
+            if emitter is None:
+                errors.append(f"{context} is required")
+                return None
+            emitter_type = str(emitter.get("type", "")).lower()
+            if emitter_type == "curve":
+                return parse_curve_emitter(emitter, context, particles_per_wave)
+            if emitter_type == "environment_sphere":
+                return parse_environment_sphere_emitter(
+                    emitter,
+                    context,
+                    particles_per_wave,
+                )
+            errors.append(f"{context}.type must be 'curve' or 'environment_sphere'")
+            return None
+
         def parse_stream(stream, index, context):
             stream_name = str(stream.get("name", f"stream{index}"))
+            enabled = optional_stream_enabled(stream, context)
+            if enabled is False:
+                return {
+                    "name": stream_name,
+                    "enabled": False,
+                }
+            if enabled is None:
+                enabled = True
             radius = stream_positive_float(stream, context, "radius")
             particle_separation_distance = stream_nonnegative_float(
                 stream,
@@ -261,7 +366,7 @@ class GenStreaming(GenericGenData):
             emitter = None
             emitter_mode = False
             if "emitter" in stream:
-                emitter = parse_curve_emitter(
+                emitter = parse_stream_emitter(
                     stream.get("emitter"),
                     f"{context}.emitter",
                     particles_per_wave,
@@ -279,6 +384,7 @@ class GenStreaming(GenericGenData):
             relative_mass = optional_stream_float(stream, context, "relative_mass")
             if relative_mass is not None and relative_mass <= 0.0:
                 errors.append(f"{context}.relative_mass must be positive")
+            particle_type = optional_stream_particle_type(stream, context)
             span_min = stream.get("span_min")
             span_max = stream.get("span_max")
             if (span_min is None) != (span_max is None):
@@ -346,6 +452,7 @@ class GenStreaming(GenericGenData):
 
             return {
                 "name": stream_name,
+                "enabled": True,
                 "radius": radius,
                 "particle_separation_distance": particle_separation_distance,
                 "initial_particle_velocity": initial_particle_velocity,
@@ -357,6 +464,7 @@ class GenStreaming(GenericGenData):
                 "inlet_value": inlet_value,
                 "material_id": material_id,
                 "relative_mass": relative_mass,
+                "particle_type": particle_type,
                 "span_min": span_min,
                 "span_max": span_max,
                 "patch_mode": patch_mode,
@@ -416,6 +524,11 @@ class GenStreaming(GenericGenData):
             legacy_stream["inlet_axis"] = "x" if inlet_x is not None else "y"
             legacy_stream["inlet_value"] = inlet_x if inlet_x is not None else inlet_y
             streams = [parse_stream(legacy_stream, 0, "legacy_stream")]
+
+        disabled_streams = [
+            stream for stream in streams if not stream.get("enabled", True)
+        ]
+        streams = [stream for stream in streams if stream.get("enabled", True)]
 
         for stream in streams:
             if stream["emitter_mode"]:
@@ -482,13 +595,7 @@ class GenStreaming(GenericGenData):
 
         uses_single_z_plane = any(
             not stream["emitter_mode"]
-            and not (
-                stream["patch_mode"]
-                and (
-                    stream["span_u_axis"] == "z"
-                    or stream["span_v_axis"] == "z"
-                )
-            )
+            and not stream["patch_mode"]
             for stream in streams
         )
         requires_particle_plane_z = bool(
@@ -689,6 +796,7 @@ class GenStreaming(GenericGenData):
             else particle_separation_distance
         )
         self.streaming_streams = streams
+        self.disabled_streaming_streams = disabled_streams
         self.number_configured_particles = 0
         self.explicit_particles = []
         self.radius = max_stream_radius
@@ -794,6 +902,148 @@ class GenStreaming(GenericGenData):
                 return self.lerp(points[index], points[index + 1], local_t)
             walked += segment_length
         return points[-1]
+
+    @staticmethod
+    def environment_sphere_center_radius(death_bounds, bounds_margin):
+        x_min, x_max, y_min, y_max, z_min, z_max = (
+            float(value) for value in death_bounds
+        )
+        center = (
+            0.5 * (x_min + x_max),
+            0.5 * (y_min + y_max),
+            0.5 * (z_min + z_max),
+        )
+        shortest_side = min(x_max - x_min, y_max - y_min, z_max - z_min)
+        radius = 0.5 * shortest_side - float(bounds_margin)
+        return center, radius, shortest_side
+
+    @staticmethod
+    def fibonacci_sphere_direction(index, count):
+        if count <= 1:
+            return (1.0, 0.0, 0.0)
+        golden_angle = math.pi * (3.0 - math.sqrt(5.0))
+        z = 1.0 - (2.0 * float(index) + 1.0) / float(count)
+        radius_xy = math.sqrt(max(0.0, 1.0 - z * z))
+        theta = float(index) * golden_angle
+        return (
+            math.cos(theta) * radius_xy,
+            math.sin(theta) * radius_xy,
+            z,
+        )
+
+    @classmethod
+    def deterministic_jitter_direction(cls, base_direction, max_degrees, index):
+        max_radians = math.radians(float(max_degrees))
+        if max_radians <= 0.0:
+            return cls.normalize_vector(base_direction)
+
+        base = cls.normalize_vector(base_direction)
+        reference = (0.0, 0.0, 1.0) if abs(base[2]) < 0.9 else (0.0, 1.0, 0.0)
+        tangent_a = cls.normalize_vector(
+            (
+                base[1] * reference[2] - base[2] * reference[1],
+                base[2] * reference[0] - base[0] * reference[2],
+                base[0] * reference[1] - base[1] * reference[0],
+            )
+        )
+        tangent_b = (
+            base[1] * tangent_a[2] - base[2] * tangent_a[1],
+            base[2] * tangent_a[0] - base[0] * tangent_a[2],
+            base[0] * tangent_a[1] - base[1] * tangent_a[0],
+        )
+        golden_angle = math.pi * (3.0 - math.sqrt(5.0))
+        phase = float(index) * golden_angle
+        radial_fraction = math.sqrt(((index * 37) % 997) / 996.0)
+        angle = max_radians * radial_fraction
+        sideways = tuple(
+            math.cos(phase) * tangent_a[axis] + math.sin(phase) * tangent_b[axis]
+            for axis in range(3)
+        )
+        return cls.normalize_vector(
+            tuple(
+                math.cos(angle) * base[axis] + math.sin(angle) * sideways[axis]
+                for axis in range(3)
+            )
+        )
+
+    def environment_sphere_velocity_direction(self, emitter, center, position, index):
+        direction_mode = emitter["direction_mode"]
+        if direction_mode == "radial_outward":
+            return self.normalize_vector(
+                tuple(float(position[axis]) - float(center[axis]) for axis in range(3))
+            )
+        if direction_mode == "radial_inward":
+            return self.normalize_vector(
+                tuple(float(center[axis]) - float(position[axis]) for axis in range(3))
+            )
+
+        target = emitter["target"]
+        base_direction = self.normalize_vector(
+            tuple(float(target[axis]) - float(position[axis]) for axis in range(3))
+        )
+        if direction_mode == "diffuse_toward_point":
+            return self.deterministic_jitter_direction(
+                base_direction,
+                emitter["angular_jitter_degrees"],
+                index,
+            )
+        return base_direction
+
+    def environment_sphere_samples(self, emitter, speed):
+        center, emitter_radius, shortest_side = self.environment_sphere_center_radius(
+            self.death_bounds,
+            emitter["bounds_margin"],
+        )
+        if emitter_radius <= 0.0:
+            raise ValueError(
+                "environment_sphere bounds_margin leaves no positive emitter radius"
+            )
+        samples = []
+        point_count = int(emitter["point_count"])
+        for index in range(point_count):
+            unit = self.fibonacci_sphere_direction(index, point_count)
+            position = tuple(
+                center[axis] + unit[axis] * emitter_radius
+                for axis in range(3)
+            )
+            direction = self.environment_sphere_velocity_direction(
+                emitter,
+                center,
+                position,
+                index,
+            )
+            velocity = tuple(direction[axis] * float(speed) for axis in range(3))
+            samples.append((position, velocity))
+        return tuple(samples), center, emitter_radius, shortest_side
+
+    @staticmethod
+    def min_sample_spacing(samples, search_spacing):
+        if len(samples) < 2:
+            return float("inf")
+        cell_size = max(float(search_spacing), 1.0e-12)
+        buckets = {}
+
+        def key(position):
+            return tuple(int(math.floor(component / cell_size)) for component in position)
+
+        def neighbor_keys(cell_key):
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for dz in (-1, 0, 1):
+                        yield (cell_key[0] + dx, cell_key[1] + dy, cell_key[2] + dz)
+
+        min_spacing = float("inf")
+        for position, _ in samples:
+            cell_key = key(position)
+            for neighbor_key in neighbor_keys(cell_key):
+                for other_position in buckets.get(neighbor_key, ()):
+                    dx = position[0] - other_position[0]
+                    dy = position[1] - other_position[1]
+                    dz = position[2] - other_position[2]
+                    distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+                    min_spacing = min(min_spacing, distance)
+            buckets.setdefault(cell_key, []).append(position)
+        return min_spacing
 
     @staticmethod
     def sample_centered_spacing(count, center_spacing):
@@ -932,6 +1182,14 @@ class GenStreaming(GenericGenData):
             f"  packing bounds: {self.packing_bounds}",
             f"  particle plane z: {plane_z_text}",
         ]
+        for stream in getattr(self, "disabled_streaming_streams", ()):
+            report_lines.extend(
+                (
+                    f"  stream: {stream['name']}",
+                    "    status: disabled",
+                    "    mobile particle count: 0",
+                )
+            )
         total_particle_count = 0
         max_boundary_clearance = 0.0
 
@@ -957,6 +1215,87 @@ class GenStreaming(GenericGenData):
             )
             if stream["emitter_mode"]:
                 emitter = stream["emitter"]
+                if emitter["type"] == "environment_sphere":
+                    speed = self.vector_length(stream["initial_particle_velocity"])
+                    samples, sphere_center, sphere_radius, shortest_side = (
+                        self.environment_sphere_samples(emitter, speed)
+                    )
+                    min_spacing = self.min_sample_spacing(samples, center_spacing)
+                    if min_spacing + 1.0e-12 < center_spacing:
+                        raise ValueError(
+                            f"{stream['name']} environment_sphere point_count "
+                            "creates overlapping particle slots"
+                        )
+                    particle_count = (
+                        stream["release_columns"] * stream["particles_per_wave"]
+                    )
+                    material = self.material_properties_by_id[stream["material_id"]]
+                    particle_type = (
+                        stream["particle_type"]
+                        if stream["particle_type"] is not None
+                        else material.get("particle_type", "regular")
+                    )
+                    particle_mass = (
+                        float(stream["relative_mass"])
+                        if stream["relative_mass"] is not None
+                        else float(material["relative_mass"])
+                    )
+                    stream.update(
+                        {
+                            "particle_type": particle_type,
+                            "runtime_ptype": self.pdata_ptype_for_particle_type(
+                                particle_type
+                            ),
+                            "particle_mass": particle_mass,
+                            "layout_mode": "environment_sphere",
+                            "environment_sphere_samples": samples,
+                            "environment_sphere_center": sphere_center,
+                            "environment_sphere_radius": sphere_radius,
+                            "environment_sphere_shortest_side": shortest_side,
+                            "environment_sphere_min_spacing": min_spacing,
+                            "frames_per_wave": frames_per_wave,
+                            "particle_count": particle_count,
+                        }
+                    )
+                    total_particle_count += particle_count
+                    min_spacing_text = (
+                        f"{min_spacing:g}"
+                        if math.isfinite(min_spacing)
+                        else f">= {center_spacing:g}"
+                    )
+                    report_lines.extend(
+                        (
+                            f"  stream: {stream['name']}",
+                            "    layout mode: environment_sphere",
+                            f"    bounds: {emitter['bounds']}",
+                            f"    radius mode: {emitter['radius_mode']}",
+                            f"    bounds margin: {emitter['bounds_margin']:g}",
+                            f"    death-bounds shortest side: {shortest_side:g}",
+                            f"    emitter center: {sphere_center}",
+                            f"    emitter radius: {sphere_radius:g}",
+                            f"    point count: {emitter['point_count']}",
+                            f"    direction mode: {emitter['direction_mode']}",
+                            f"    target: {emitter['target']}",
+                            "    angular jitter degrees: "
+                            f"{emitter['angular_jitter_degrees']:g}",
+                            f"    radius: {radius:g}",
+                            f"    surface separation: {particle_separation_distance:g}",
+                            f"    required center spacing: {center_spacing:g}",
+                            f"    sampled min spacing: {min_spacing_text}",
+                            f"    travel spacing: {travel_spacing:g}",
+                            f"    material_id: {stream['material_id']}",
+                            f"    relative mass: {stream['particle_mass']:g}",
+                            f"    particle type: {stream['particle_type']}",
+                            f"    release start frame: {stream['release_start_frame']:g}",
+                            f"    release columns/waves: {stream['release_columns']}",
+                            f"    particles per wave: {stream['particles_per_wave']}",
+                            f"    frames per wave: {stream['frames_per_wave']}",
+                            f"    mobile particle count: {stream['particle_count']}",
+                            f"    speed: {speed:g}",
+                        )
+                    )
+                    continue
+
                 stream_center_spacing = center_spacing
                 curve_length = self.stream_curve_length(emitter)
                 occupied_curve_length = (
@@ -990,6 +1329,11 @@ class GenStreaming(GenericGenData):
                 width_axis = self.normalize_vector(emitter["width_axis"])
                 particle_count = stream["release_columns"] * stream["particles_per_wave"]
                 material = self.material_properties_by_id[stream["material_id"]]
+                particle_type = (
+                    stream["particle_type"]
+                    if stream["particle_type"] is not None
+                    else material.get("particle_type", "regular")
+                )
                 particle_mass = (
                     float(stream["relative_mass"])
                     if stream["relative_mass"] is not None
@@ -997,7 +1341,10 @@ class GenStreaming(GenericGenData):
                 )
                 stream.update(
                     {
-                        "particle_type": material.get("particle_type", "regular"),
+                        "particle_type": particle_type,
+                        "runtime_ptype": self.pdata_ptype_for_particle_type(
+                            particle_type
+                        ),
                         "particle_mass": particle_mass,
                         "layout_mode": "curve",
                         "length_centers": length_centers,
@@ -1077,6 +1424,11 @@ class GenStreaming(GenericGenData):
                     )
                 particle_count = stream["release_columns"] * stream["particles_per_wave"]
                 material = self.material_properties_by_id[stream["material_id"]]
+                particle_type = (
+                    stream["particle_type"]
+                    if stream["particle_type"] is not None
+                    else material.get("particle_type", "regular")
+                )
                 particle_mass = (
                     float(stream["relative_mass"])
                     if stream["relative_mass"] is not None
@@ -1084,7 +1436,10 @@ class GenStreaming(GenericGenData):
                 )
                 stream.update(
                     {
-                        "particle_type": material.get("particle_type", "regular"),
+                        "particle_type": particle_type,
+                        "runtime_ptype": self.pdata_ptype_for_particle_type(
+                            particle_type
+                        ),
                         "particle_mass": particle_mass,
                         "layout_mode": "patch",
                         "span_u_centers": u_centers,
@@ -1154,6 +1509,11 @@ class GenStreaming(GenericGenData):
             first_span_center = span_min + 0.5 * (usable_span - occupied_span)
             particle_count = stream["release_columns"] * stream["particles_per_wave"]
             material = self.material_properties_by_id[stream["material_id"]]
+            particle_type = (
+                stream["particle_type"]
+                if stream["particle_type"] is not None
+                else material.get("particle_type", "regular")
+            )
             particle_mass = (
                 float(stream["relative_mass"])
                 if stream["relative_mass"] is not None
@@ -1161,7 +1521,8 @@ class GenStreaming(GenericGenData):
             )
             stream.update(
                 {
-                    "particle_type": material.get("particle_type", "regular"),
+                    "particle_type": particle_type,
+                    "runtime_ptype": self.pdata_ptype_for_particle_type(particle_type),
                     "particle_mass": particle_mass,
                     "layout_mode": "line",
                     "first_span_center": first_span_center,
@@ -1198,21 +1559,37 @@ class GenStreaming(GenericGenData):
         self.streaming_particle_count = total_particle_count
         self.streaming_report_text = "\n".join(report_lines)
 
-        first_stream = self.streaming_streams[0]
-        self.initial_particle_velocity = first_stream["initial_particle_velocity"]
-        self.release_start_frame = first_stream["release_start_frame"]
-        self.release_columns = first_stream["release_columns"]
-        self.particles_per_wave = first_stream["particles_per_wave"]
-        self.streaming_spacing_factor = first_stream["spacing_factor"]
-        self.streaming_inlet_axis = first_stream["inlet_axis"]
-        self.streaming_inlet_value = first_stream["inlet_value"]
-        self.streaming_stream_name = first_stream["name"]
-        self.streaming_particle_type = first_stream["particle_type"]
-        self.streaming_material_id = first_stream["material_id"]
-        self.frames_per_wave = first_stream["frames_per_wave"]
-        self.particle_center_spacing = first_stream["center_spacing"]
-        self.streaming_first_span_center = first_stream.get("first_span_center", 0.0)
-        self.streaming_last_span_center = first_stream.get("last_span_center", 0.0)
+        if self.streaming_streams:
+            first_stream = self.streaming_streams[0]
+            self.initial_particle_velocity = first_stream["initial_particle_velocity"]
+            self.release_start_frame = first_stream["release_start_frame"]
+            self.release_columns = first_stream["release_columns"]
+            self.particles_per_wave = first_stream["particles_per_wave"]
+            self.streaming_spacing_factor = first_stream["spacing_factor"]
+            self.streaming_inlet_axis = first_stream["inlet_axis"]
+            self.streaming_inlet_value = first_stream["inlet_value"]
+            self.streaming_stream_name = first_stream["name"]
+            self.streaming_particle_type = first_stream["particle_type"]
+            self.streaming_material_id = first_stream["material_id"]
+            self.frames_per_wave = first_stream["frames_per_wave"]
+            self.particle_center_spacing = first_stream["center_spacing"]
+            self.streaming_first_span_center = first_stream.get("first_span_center", 0.0)
+            self.streaming_last_span_center = first_stream.get("last_span_center", 0.0)
+        else:
+            self.initial_particle_velocity = (0.0, 0.0, 0.0)
+            self.release_start_frame = 0.0
+            self.release_columns = 0
+            self.particles_per_wave = 0
+            self.streaming_spacing_factor = 0.0
+            self.streaming_inlet_axis = ""
+            self.streaming_inlet_value = 0.0
+            self.streaming_stream_name = ""
+            self.streaming_particle_type = 0
+            self.streaming_material_id = 0
+            self.frames_per_wave = 0
+            self.particle_center_spacing = 0.0
+            self.streaming_first_span_center = 0.0
+            self.streaming_last_span_center = 0.0
         return self.streaming_particle_count
 
     def stream_position(self, stream, span_center=None, u_center=None, v_center=None):
@@ -1269,6 +1646,7 @@ class GenStreaming(GenericGenData):
                                 collision_stiffness_q=float(
                                     self.itemcfg.get("collision_stiffness_q", 0.0)
                                 ),
+                                ptype=stream["runtime_ptype"],
                             )
                             particle.state_flg = float(birth_frame)
                             initial_particle_records.append(
@@ -1297,6 +1675,7 @@ class GenStreaming(GenericGenData):
                                 collision_stiffness_q=float(
                                     self.itemcfg.get("collision_stiffness_q", 0.0)
                                 ),
+                                ptype=stream["runtime_ptype"],
                             )
                             particle.state_flg = float(birth_frame)
                             initial_particle_records.append(
@@ -1308,6 +1687,31 @@ class GenStreaming(GenericGenData):
                                     float(stream["particle_separation_distance"]),
                                 )
                             )
+                elif stream["layout_mode"] == "environment_sphere":
+                    for position, sample_velocity in stream[
+                        "environment_sphere_samples"
+                    ]:
+                        particle = self.add_mobile_particle(
+                            position,
+                            sample_velocity,
+                            radius=stream["radius"],
+                            mass=stream["particle_mass"],
+                            material_id=stream["material_id"],
+                            collision_stiffness_q=float(
+                                self.itemcfg.get("collision_stiffness_q", 0.0)
+                            ),
+                            ptype=stream["runtime_ptype"],
+                        )
+                        particle.state_flg = float(birth_frame)
+                        initial_particle_records.append(
+                            (
+                                int(particle.pnum),
+                                float(birth_frame),
+                                (particle.rx, particle.ry, particle.rz),
+                                float(stream["radius"]),
+                                float(stream["particle_separation_distance"]),
+                            )
+                        )
                 else:
                     first_center = stream["first_span_center"]
                     for row in range(stream["particles_per_wave"]):
@@ -1325,6 +1729,7 @@ class GenStreaming(GenericGenData):
                             collision_stiffness_q=float(
                                 self.itemcfg.get("collision_stiffness_q", 0.0)
                             ),
+                            ptype=stream["runtime_ptype"],
                         )
                         particle.state_flg = float(birth_frame)
                         initial_particle_records.append(
@@ -1503,6 +1908,7 @@ class GenStreaming(GenericGenData):
 
         self.initialize_generation()
         try:
+            self.report_scene_model_toggles()
             print(self.streaming_report_text)
             self.write_validation_log(self.streaming_report_text)
             self.report_collision_feasibility()

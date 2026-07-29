@@ -5,11 +5,16 @@
 // Optical photon helpers shared by generated simple Vulkan force shaders.
 
 const float PTYPE_PHOTON = -2.0;
+const float PTYPE_REFLECTION_PHOTON = -3.0;
+const uint PHOTON_HELPER_PARTICLE_TYPE_REFLECTION_PHOTON = 3u;
 
 uint GetParticleType(uint particleID)
 {
     if (int(round(P[particleID].ptype)) == int(PTYPE_PHOTON)) {
         return PARTICLE_TYPE_PHOTON;
+    }
+    if (int(round(P[particleID].ptype)) == int(PTYPE_REFLECTION_PHOTON)) {
+        return PHOTON_HELPER_PARTICLE_TYPE_REFLECTION_PHOTON;
     }
     if (int(round(P[particleID].ptype)) == int(PTYPE_BOUNDARY)) {
         return PARTICLE_TYPE_BOUNDARY;
@@ -19,7 +24,15 @@ uint GetParticleType(uint particleID)
 
 bool IsPhotonParticle(uint particleID)
 {
-    return GetParticleType(particleID) == PARTICLE_TYPE_PHOTON;
+    uint particleType = GetParticleType(particleID);
+    return particleType == PARTICLE_TYPE_PHOTON ||
+        particleType == PHOTON_HELPER_PARTICLE_TYPE_REFLECTION_PHOTON;
+}
+
+bool IsReflectionPhotonParticle(uint particleID)
+{
+    return GetParticleType(particleID) ==
+        PHOTON_HELPER_PARTICLE_TYPE_REFLECTION_PHOTON;
 }
 
 uint PhotonBaseMaterialID()
@@ -54,6 +67,11 @@ vec3 ReflectFixedSpeed(vec3 velocity, vec3 normal)
         return velocity;
     }
     return speed * reflected / reflectedLength;
+}
+
+vec3 ReverseFixedSpeed(vec3 velocity)
+{
+    return -velocity;
 }
 
 struct PhotonParticleReflection

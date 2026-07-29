@@ -22,7 +22,7 @@ from pathlib import Path
 from gbase.libconf import AttrDict
 from gbase.SceneModel import apply_scene_model
 from gbase.FunctionWall import parse_keyed_curve_wall_segments, wall_marker_records
-from gbase.pdata import PTYPE_BOUNDARY, PTYPE_NULL, PTYPE_PHOTON
+from gbase.pdata import PTYPE_BOUNDARY, PTYPE_NULL, PTYPE_PHOTON, PTYPE_REFLECTION_PHOTON
 AXIS_VECTOR = {
     "X": (1.0, 0.0, 0.0),
     "Y": (0.0, 1.0, 0.0),
@@ -443,7 +443,8 @@ class ForceDynamics(ForceContactDynamics):
         photon_ids = [
             particle_id
             for particle_id, particle in enumerate(self.particles)
-            if int(round(float(getattr(particle, "ptype", 0.0)))) == int(PTYPE_PHOTON)
+            if int(round(float(getattr(particle, "ptype", 0.0))))
+            in (int(PTYPE_PHOTON), int(PTYPE_REFLECTION_PHOTON))
         ]
         if photon_ids:
             sample = ", ".join(str(particle_id) for particle_id in photon_ids[:8])

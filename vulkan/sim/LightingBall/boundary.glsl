@@ -3,11 +3,11 @@
 const uint BOUNDARY_ENABLED = 1u;
 const float wall_contact_offset = 0.062500000;
 const float death_x_min = 1.000000000;
-const float death_x_max = 19.000000000;
+const float death_x_max = 38.000000000;
 const float death_y_min = 1.000000000;
-const float death_y_max = 19.000000000;
+const float death_y_max = 38.000000000;
 const float death_z_min = 1.000000000;
-const float death_z_max = 21.000000000;
+const float death_z_max = 38.000000000;
 struct FunctionWallSegment
 {
     uint boundaryKind;
@@ -59,20 +59,23 @@ struct LightingSurfaceWallMetadata
     uint wallFlag;
 };
 
-const uint LIGHTING_SURFACE_OBJECT_COUNT = 2u;
-const LightingSurfaceObjectMetadata LIGHTING_SURFACE_OBJECTS[2] = LightingSurfaceObjectMetadata[2](
+const uint LIGHTING_SURFACE_OBJECT_COUNT = 3u;
+const LightingSurfaceObjectMetadata LIGHTING_SURFACE_OBJECTS[3] = LightingSurfaceObjectMetadata[3](
     LightingSurfaceObjectMetadata(2u, 2000u, 2u, 0u, 38400u),
-    LightingSurfaceObjectMetadata(1u, 1000u, 1u, 38400u, 11904u)
+    LightingSurfaceObjectMetadata(2u, 3000u, 3u, 38400u, 38400u),
+    LightingSurfaceObjectMetadata(1u, 1000u, 1u, 76800u, 11904u)
 );
 
-const uint RECTANGLE_WALL_SEGMENT_COUNT = 1u;
-const RectangleWallSegment RECTANGLE_WALL_SEGMENTS[1] = RectangleWallSegment[1](
-    RectangleWallSegment(vec3(16.000000000, 2.000000000, 2.000000000), vec3(0.000000000, 1.000000000, 0.000000000), vec3(0.000000000, 0.000000000, 1.000000000), 14.000000000, 14.000000000, normalize(vec3(-1.000000000, 0.000000000, 0.000000000)), 2000u)
+const uint RECTANGLE_WALL_SEGMENT_COUNT = 2u;
+const RectangleWallSegment RECTANGLE_WALL_SEGMENTS[2] = RectangleWallSegment[2](
+    RectangleWallSegment(vec3(27.000000000, 14.000000000, 14.000000000), vec3(0.000000000, 1.000000000, 0.000000000), vec3(0.000000000, 0.000000000, 1.000000000), 14.000000000, 14.000000000, normalize(vec3(-1.000000000, 0.000000000, 0.000000000)), 2000u),
+    RectangleWallSegment(vec3(13.000000000, 14.000000000, 5.000000000), vec3(1.000000000, 0.000000000, 0.000000000), vec3(0.000000000, 1.000000000, 0.000000000), 14.000000000, 14.000000000, normalize(vec3(0.000000000, 0.000000000, 1.000000000)), 3000u)
 );
 
-const uint LIGHTING_SURFACE_WALL_COUNT = 1u;
-const LightingSurfaceWallMetadata LIGHTING_SURFACE_WALLS[1] = LightingSurfaceWallMetadata[1](
-    LightingSurfaceWallMetadata(vec3(16.000000000, 2.000000000, 2.000000000), vec3(0.000000000, 1.000000000, 0.000000000), vec3(0.000000000, 0.000000000, 1.000000000), 14.000000000, 14.000000000, 80u, 80u, 2000u)
+const uint LIGHTING_SURFACE_WALL_COUNT = 2u;
+const LightingSurfaceWallMetadata LIGHTING_SURFACE_WALLS[2] = LightingSurfaceWallMetadata[2](
+    LightingSurfaceWallMetadata(vec3(27.000000000, 14.000000000, 14.000000000), vec3(0.000000000, 1.000000000, 0.000000000), vec3(0.000000000, 0.000000000, 1.000000000), 14.000000000, 14.000000000, 80u, 80u, 2000u),
+    LightingSurfaceWallMetadata(vec3(13.000000000, 14.000000000, 5.000000000), vec3(1.000000000, 0.000000000, 0.000000000), vec3(0.000000000, 1.000000000, 0.000000000), 14.000000000, 14.000000000, 80u, 80u, 3000u)
 );
 
 #define HAS_BOUNDARY

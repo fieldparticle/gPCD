@@ -172,8 +172,12 @@ against the wall's \(u/v\) extents.
 surface identity to \texttt{BoundaryLight.frag}.  Sphere and rectangle wall
 surfaces now come from \texttt{ResourceLightingSurface}, a lighting-only
 resource that reads \texttt{lighting\_surface\_objects}, loads the configured
-OBJ files, and fills one combined surface-vertex buffer.  The surface buffer
-uses:
+object-specific OBJ files, and fills one combined surface-vertex buffer.  The
+Python generator may also write combined OBJ files for Blender inspection, but
+Vulkan runtime surface entries must point at per-object files.  If two
+\texttt{lighting\_surface\_objects} entries load the same multi-object OBJ,
+the loader cannot select one named OBJ object and may duplicate or mistag
+surface vertices.  The surface buffer uses:
 \begin{verbatim}
 struct LightingSurfaceVertex {
     vec4 pos;          // xyz world position, w surface_id
@@ -232,8 +236,9 @@ Vulkan material behavior now matches the Python photon-contact model:
     \item \texttt{SURFACE\_COLOR}: deposit the hit surface material color,
           reduce photon mass, and reflect the photon if it survives;
     \item \texttt{ABSORB}: deposit grayscale energy and retire the photon;
-    \item \texttt{REFLECT}: deposit the photon's current payload color,
-          reduce photon mass, and reflect the photon if it survives.
+    \item \texttt{REFLECT}: for reflection photons, deposit the photon's
+          current payload color onto the reflecting surface and retire the
+          photon.
 \end{itemize}
 
 The configuration item is:
@@ -315,17 +320,27 @@ relies on ordinary triangle interpolation between those vertices.
 
 \subsection{Next Lighting Behaviors}
 
-The next work should extend behavior in this order:
+The current milestone proves the complete basic behavior chain:
+\[
+    \textrm{front photon stream}
+    \rightarrow
+    \textrm{sphere pickup/deposit}
+    \rightarrow
+    \textrm{reflection photon payload}
+    \rightarrow
+    \textrm{reflecting wall deposit}
+    \rightarrow
+    \textrm{absorbing wall interaction}.
+\]
+
+The next work should refine behavior in this order:
 \begin{enumerate}
-    \item Diffuse light stream: broaden the photon source into a distributed
-          direction field so the scene is illuminated by many incident
-          directions rather than a single structured beam.
-    \item Absorbing and shadow surface refinement: tune the existing
-          \texttt{ABSORB} material rule so it produces the intended shadow
-          field and grayscale response on OBJ-backed surfaces.
-    \item Reflective surface: extend the \texttt{REFLECT} material rule so
-          redirected photons carry remaining spectral strength to later
-          deposits.
+    \item smooth the visible OBJ-backed vertex-light result without changing
+          the photon transport rule;
+    \item profile the slowdown that occurs when dense photons begin writing
+          surface vertices;
+    \item refine absorbing and shadow-surface brightness;
+    \item refine reflection payload strength and transport diagnostics.
 \end{enumerate}
 
 These behaviors should extend the current

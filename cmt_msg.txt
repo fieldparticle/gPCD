@@ -1,15 +1,18 @@
 Current status:
-	- LightingBall photon streams now own radius and particle separation.
-	- Stream wave timing is documented as a physical no-overlap calculation.
-	- Vulkan LightingBall captures were verified against generated beam layout.
-	- FPML capture decoding now has documented LightingParticle stride requirements.
+	- LightingBall has a frozen basic photon-lighting milestone.
+	- Vulkan and Python now share the scene_model authoring path for the lighting sphere, shadow wall, reflecting wall, and photon streams.
+	- Vulkan ParticleLighting shows the basic behavior chain: photon stream, sphere color pickup/deposit, reflection photon payload, reflecting-wall deposit, and absorbing-wall interaction.
+	- Runtime lighting surfaces now use object-specific OBJ files so enabling shadow_wall no longer redirects reflection payloads onto the wrong wall.
+	- Remaining issues are visual smoothing and performance when dense photons begin writing surface vertices.
 
 Code Changes:
-	- Updated dynamics docs for per-stream radius/separation and frames_per_wave.
-	- Added LightingBall Vulkan beam verification notes.
-	- Added FPML LightingParticle ABI/capture guidance.
-	- Added TODOs for capture-reader layout detection and spacing_factor cleanup.
+	- Added scene/stream enabled switches for isolation and generator reports.
+	- Added environment-sphere diffuse emitter support and stream-owned radius/separation validation.
+	- Split lighting particles from ordinary FPM particles and added reflection photon payload transport.
+	- Extended material export with photon surface behavior, photon coupling, relative-mass strength, spectral response/emission, and contact illumination.
+	- Moved visible LightingBall surface color to OBJ-backed LightingSurfaceVertex.light for sphere and rectangle walls.
+	- Updated Python OBJ export so lighting_surface_objects point at per-object runtime OBJ files while combined OBJ files remain Blender inspection artifacts.
+	- Regenerated FPML/common GLSL paths from ExportForceDynamicsSimpleGLSL.py.
+	- Updated Dynamics docs and ProblemEvolution for the current boundary-space lighting milestone.
 
-Testing:
-	- Not run per project rules.
-	- Recommended: regenerate LightingBall Py/Vk, run the Python simulation, then run Vulkan LightingBall and verify captures decode with the 256-byte LightingParticle layout.
+Next: Smooth the OBJ-backed surface-vertex lighting footprint and profile the surface-hit slowdown in FPML.

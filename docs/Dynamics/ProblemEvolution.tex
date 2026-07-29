@@ -3572,3 +3572,127 @@ ordinary particle stride can misdecode \texttt{FPML} captures.  Debug tools
 should select the \texttt{LightingParticle} layout for
 \texttt{ParticleLighting} scenarios or detect the stride from the generated
 run type.
+
+\subsection{Diffuse Light Becomes An Environment Sphere}
+
+\subsubsection{previous form}
+
+The first diffuse-light experiment used a second flat
+\texttt{particle\_streams} plane near the shadow wall.  It emitted photons in
+one configured direction with lower \texttt{relative\_mass}.  That proved
+that stream-level mass overrides could create a weaker light source, but the
+source was still beam-like.  It could cast structured plane-wave artifacts and
+required manual placement relative to the wall, sphere, and death bounds.
+
+\subsubsection{current form}
+
+\texttt{GenStreaming.py} now accepts:
+\begin{verbatim}
+emitter = {
+  type = "environment_sphere";
+  bounds = "death_bounds";
+  radius_mode = "inscribed";
+  bounds_margin = 1.0;
+  point_count = 6400;
+  direction_mode = "diffuse_toward_point";
+  target = [20.0, 20.0, 10.0];
+  angular_jitter_degrees = 10.0;
+};
+\end{verbatim}
+
+The emitter center is derived from \texttt{death\_bounds}.  Its radius is half
+the shortest death-bounds side minus \texttt{bounds\_margin}.  Particle start
+positions are deterministic Fibonacci samples on that sphere.  For
+\texttt{"diffuse\_toward\_point"}, each generated velocity points from the
+sampled position toward the configured target and then receives deterministic
+angular jitter.  The stream's \texttt{initial\_particle\_velocity} supplies
+speed only for this emitter type.
+
+The generated particles remain ordinary photon records.  Vulkan receives
+initial position, velocity, radius, material, release frame, and relative
+mass exactly as before; no runtime Vulkan emitter is introduced for the first
+environment-sphere version.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+This changes diffuse illumination from a manually positioned back beam into a
+scene-bound light environment.  The death bounds define the legal photon
+lifecycle volume, so using an inscribed sphere gives a clear default source
+volume that follows the scene.  The margin prevents photons from being born
+exactly on death planes.  The generator's existing same-birth overlap check
+also caught the important cross-stream issue: the environment sphere can
+overlap the front beam if both are born on the same frame.  Staggering the
+environment stream birth frame keeps both sources legal without changing
+their physics.
+
+The new \texttt{LightingBall\_NoEnv\_Vk.inc} and
+\texttt{LightingBall\_Env\_Vk.inc} files are A/B test includes, but they must
+keep the front \texttt{photon\_beam} geometry identical when the environment
+is the only intended variable.  The environment target should also match the
+active sphere center.  If both variants keep the same
+\texttt{output\_file\_prefix}, the last generated variant overwrites the
+shared \texttt{LightingBall\_Vk} output files, so comparison runs must be
+managed deliberately.
+
+\subsection{Lighting Surface OBJ Files Become Object-Specific}
+
+\subsubsection{previous form}
+
+Python generated one rectangle-wall OBJ file for all
+\texttt{LightingBall} rectangle lighting surfaces:
+\begin{verbatim}
+LightingBall_Vk_wall.obj
+\end{verbatim}
+That file contained multiple OBJ objects, such as \texttt{shadow\_wall} and
+\texttt{reflecting\_wall}.  This was acceptable for Blender inspection, but
+\texttt{ResourceLightingSurface} loads an OBJ file as one flat vertex stream;
+it does not select a named OBJ object inside the file.
+
+When only the reflecting wall was enabled, this limitation was hidden because
+there was no competing rectangle surface.  When the shadow wall was enabled at
+the same time, both surface entries could load the same multi-object wall OBJ
+and tag the loaded vertex stream with different surface ids.  Reflection
+payloads could therefore appear on the shadow wall instead of the reflecting
+wall even though the analytic contact and material behavior were otherwise
+working.
+
+\subsubsection{current form}
+
+Python still writes combined OBJ files for inspection, but the generated
+\texttt{lighting\_surface\_objects} records now point Vulkan at
+object-specific OBJ files:
+\begin{verbatim}
+LightingBall_Vk_lighting_sphere_1000.obj
+LightingBall_Vk_shadow_wall_2000.obj
+LightingBall_Vk_reflecting_wall_3000.obj
+\end{verbatim}
+Each runtime OBJ contains exactly the geometry for one configured lighting
+surface.  \texttt{ResourceLightingSurface} can therefore load the file, append
+its vertices to the shared \texttt{LightingSurfaceVertex} buffer, and tag the
+entire appended span with the intended \texttt{surfaceType},
+\texttt{surfaceID}, and \texttt{materialID}.
+
+\subsubsection{difference outcome}
+
+full solution
+
+\subsubsection{Analysis}
+
+This resolves the multi-wall surface-routing failure without changing the
+physics model.  Analytic sphere and rectangle records still own collision and
+deposit projection.  OBJ files are renderable lighting surfaces.  The runtime
+resource contract is now one surface object per loaded OBJ path, while the
+combined OBJ remains a human inspection artifact.
+
+The validated milestone is that \texttt{LightingBall} can run with the
+lighting sphere, shadow wall, reflecting wall, front photon beam, and
+reflection beam enabled.  The basic behavior chain is visible in Vulkan:
+photons hit the sphere, reflection photons carry picked-up surface color, the
+reflecting wall receives that payload, and absorbing surfaces still consume
+and display grayscale light.  Remaining work is smoothing the visible
+surface-vertex footprint and profiling the slowdown that appears when dense
+photon streams begin writing surface vertices.

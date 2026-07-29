@@ -27,7 +27,8 @@ vec4 color_map(uint index)
 
 bool color_map_is_photon(uint index)
 {
-    return int(round(P[index].ptype)) == -2;
+    int ptype = int(round(P[index].ptype));
+    return ptype == -2 || ptype == -3;
 }
 
 uint material_color_mode(uint materialID)

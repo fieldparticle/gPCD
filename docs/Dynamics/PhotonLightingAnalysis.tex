@@ -83,7 +83,8 @@ Several pieces of the target system already exist in partial form:
           detection;
     \item surface material lookup through \texttt{material\_id};
     \item material spectral fields through \texttt{spectral\_response},
-          \texttt{spectral\_emission}, and \texttt{photon\_energy};
+          \texttt{spectral\_emission}, with photon strength carried by
+          relative mass;
     \item analytic sphere normals in the lighting-ball evaluator;
     \item rectangle-wall normals from \texttt{rectangle\_wall\_segments};
     \item material debug visibility and debug color for optional photon
@@ -133,9 +134,9 @@ and deposit:
     E_p C_{\mathrm{incidence}} .
 \]
 
-The active Vulkan implementation writes exactly one spatial cell per photon
-event.  For the
-analytic sphere, the contact normal gives the hit point:
+The active Vulkan implementation writes visible color into nearby
+OBJ-backed surface vertices for each photon event.  For the analytic sphere,
+the contact normal gives the hit point:
 \begin{verbatim}
 LIGHTING_BALL_CENTER + contactNormal * LIGHTING_BALL_RADIUS
 \end{verbatim}
@@ -163,14 +164,16 @@ surface base color:
 At this stage the result may be speckled.  That is acceptable.  The goal is to
 prove that the boundary, not the photon point, is emitting the visible light.
 
-\subsubsection{Stage 3: Spatial Boundary-Space Spread}
+\subsubsection{Stage 3: Surface-Vertex Spread}
 
 This earlier proxy-kernel stage is superseded for the current Vulkan
-\texttt{LightingBall} path.  The active renderer colors the analytic sphere
-from the cell id computed from the fragment world position.  The fragment
-shader samples the current cell and six face-neighbor cells by distance to
-cell centers.  A wider kernel may still be useful later for filtering or
-smoothing, but it is not the first visible surface-lighting rule.
+\texttt{LightingBall} path.  The active renderer draws object-specific OBJ
+surfaces from \texttt{LightingSurfaceVertex.light}.  Compute maps the
+analytic hit point into the matching surface-object span and writes nearby
+vertices.  Ordinary triangle interpolation then spreads the visible color
+across the rendered surface.  Wider vertex splats, mesh-density changes, or a
+future smoothing pass may refine the image, but the moving photon point and
+the cell-owned debug record are not the final visible surface-lighting rule.
 
 The retired proxy-kernel form was:
 \[
@@ -198,7 +201,7 @@ The first material optical controls are active:
 \begin{itemize}
     \item \texttt{spectral\_response};
     \item \texttt{spectral\_emission};
-    \item \texttt{photon\_energy}.
+    \item photon relative mass in \texttt{parms.x}.
 \end{itemize}
 
 The next optical behavior controls are:

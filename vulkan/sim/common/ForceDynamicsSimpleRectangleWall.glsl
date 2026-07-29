@@ -52,9 +52,10 @@ float RectangleWallPhysicalPenetration(
 
 RectangleWallSegment SelectRectangleWallSegment(uint SourceID, uint BoundaryID)
 {
-    vec3 marker = GetParticlePosition(BoundaryID).xyz;
+    vec3 sourcePosition = GetParticlePosition(SourceID).xyz;
+    float sourceRadius = P[SourceID].Data.x;
     RectangleWallSegment selected = RECTANGLE_WALL_SEGMENTS[0];
-    float bestDistance = 3.402823466e+38;
+    float bestScore = -3.402823466e+38;
     for (uint index = 0u; index < RECTANGLE_WALL_SEGMENT_COUNT; ++index) {
         RectangleWallSegment candidate = RECTANGLE_WALL_SEGMENTS[index];
         float uCoord = 0.0;
@@ -62,16 +63,19 @@ RectangleWallSegment SelectRectangleWallSegment(uint SourceID, uint BoundaryID)
         float signedInwardDistance = 0.0;
         if (!RectangleWallProjectPoint(
                 candidate,
-                marker,
+                sourcePosition,
                 uCoord,
                 vCoord,
                 signedInwardDistance)) {
             continue;
         }
 
-        float distance = abs(signedInwardDistance);
-        if (distance < bestDistance) {
-            bestDistance = distance;
+        float penetrationDepth = sourceRadius - signedInwardDistance;
+        float score = penetrationDepth > EPSILON
+            ? 1000000.0 + penetrationDepth
+            : -abs(signedInwardDistance);
+        if (score > bestScore) {
+            bestScore = score;
             selected = candidate;
         }
     }

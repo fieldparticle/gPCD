@@ -110,6 +110,15 @@ def _as_required_string(raw_value, errors, context):
     return value
 
 
+def _as_optional_bool(raw_value, default_value, errors, context):
+    if raw_value is None:
+        return bool(default_value)
+    if type(raw_value) is not bool:
+        errors.append(f"{context} must be a boolean")
+        return None
+    return bool(raw_value)
+
+
 def _roles(raw_value, errors, context):
     if raw_value is None:
         errors.append(f"{context}.roles is required")
@@ -380,6 +389,7 @@ def apply_scene_model(config):
     rectangle_segments = AttrDict()
     curve_segments = AttrDict()
     lighting_surface_objects = []
+    disabled_objects = []
 
     names = set()
     surface_ids = set()
@@ -394,6 +404,17 @@ def apply_scene_model(config):
         if name in names:
             errors.append(f"{context}.name duplicates {name}")
         names.add(name)
+        enabled = _as_optional_bool(
+            obj.get("enabled"),
+            True,
+            errors,
+            f"{context}.enabled",
+        )
+        if enabled is False:
+            disabled_objects.append(name)
+            continue
+        if enabled is None:
+            continue
 
         object_type = _as_required_string(obj.get("type"), errors, f"{context}.type")
         object_type = None if object_type is None else object_type.lower()
@@ -472,4 +493,5 @@ def apply_scene_model(config):
     config["rectangle_wall_segments"] = rectangle_segments
     config["curve_wall_segments"] = curve_segments
     config["lighting_surface_objects"] = tuple(lighting_surface_objects)
+    config["_scene_model_disabled_objects"] = tuple(disabled_objects)
     config["_scene_model_derived"] = True
