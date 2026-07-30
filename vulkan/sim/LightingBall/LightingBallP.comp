@@ -45,7 +45,11 @@ BoundaryWallSegment EvaluateConfiguredWallSegment(uint SourceID, uint BoundaryID
     }
     return EvaluateFunctionWallSegment(SourceID, BoundaryID);
 }
-
+#define FPML_PROFILE_COUNTERS 0
+#define FPML_ENABLE_SURFACE_DEPOSIT 1
+#define FPML_ENABLE_SPHERE_DEPOSIT 0
+#define FPML_ENABLE_WALL_DEPOSIT 1
+#define FPML_ENABLE_REFLECTION_PICKUP 1
 #include "../common/FPML.comp"
 
 void main()

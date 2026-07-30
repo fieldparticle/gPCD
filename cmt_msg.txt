@@ -1,11 +1,17 @@
 Current status:
-	- LightingBall remains on the working OBJ-backed LightingSurfaceVertex.light path.
-	- The shared LightingSurfaceNode SSBO experiment was backed out.
-	- Shadow-wall and reflection behavior are preserved as the current priority over smoothing.
+	- Added FPML profiling switches for surface deposit, sphere deposit, wall deposit, reflection pickup, and profiling counters.
+	- Measured LightingBall debug performance:
+	  - photons move, no surface deposit: about 1000 FPS
+	  - wall deposit only: about 1000 FPS
+	  - sphere deposit only: about 300 FPS
+	  - reflection pickup plus wall deposit: about 1000 FPS
+	- Isolated the current LightingBall slowdown to sphere surface deposit.
 
 Code Changes:
-	- Documented the deferred shared-node SSBO experiment in ProblemEvolution.
-	- Updated boundary-space lighting docs to state the active single surface-vertex buffer contract.
-	- Added todo guidance to design smoothing/performance before adding another lighting SSBO.
+	- Added FPML-only profiling controls in the generated lighting compute path.
+	- Added lightweight optional counters for sphere hits, wall hits, surface vertex writes, and reflection pickups.
+	- Documented the profiling results in boundarySpaceLighting.tex.
+	- Updated Todo.tex to make DepositLightingSurfaceSphereVertexSplat the next performance target.
+	- Added a ProblemEvolution entry for the profiling investigation.
 
-Next: Find a narrower smoothing strategy for OBJ-backed surface lighting without disturbing the validated shadow-wall and reflection behavior.
+Next: Optimize sphere surface deposit with direct bounded sphere vertex addressing while leaving wall deposit and reflection pickup unchanged.

@@ -3755,3 +3755,55 @@ independently, such as indexed OBJ surface generation, CPU-side shared vertex
 deduplication inside \texttt{ResourceLightingSurface}, or a separate compute
 prepass that updates vertex light from a compact surface state only after the
 existing behavior is preserved.
+
+\subsection{FPML Surface Deposit Profiling Isolates Sphere Cost}
+
+\subsubsection{previous form}
+
+The working \texttt{LightingBall} path could show the complete visible
+behavior chain, but performance slowed when dense photons reached lit
+surfaces.  The likely causes were not separated.  Possible costs included
+ordinary photon motion, wall deposit, sphere deposit, reflection pickup, and
+the burst of surface-vertex writes.
+
+\subsubsection{current form}
+
+\texttt{FPML.comp} now has compile-time profiling switches:
+\begin{verbatim}
+FPML_ENABLE_SURFACE_DEPOSIT
+FPML_ENABLE_SPHERE_DEPOSIT
+FPML_ENABLE_WALL_DEPOSIT
+FPML_ENABLE_REFLECTION_PICKUP
+FPML_PROFILE_COUNTERS
+\end{verbatim}
+The switches are lighting-only and do not affect the base \texttt{FPM.*}
+shader family.
+
+The first debug-build measurements on \texttt{LightingBall} were:
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Case & Enabled Path & Approximate FPS \\
+\midrule
+1 & photons move, no surface deposit & 1000 \\
+2 & wall deposit only & 1000 \\
+3 & sphere deposit only & 300 \\
+4 & reflection pickup plus wall deposit & 1000 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+The profiling result isolates the slowdown to sphere surface deposit.  Wall
+deposit and reflection pickup both held the same approximate frame rate as
+the no-deposit baseline, so they should not be redesigned during the next
+performance step.  The optimization target is
+\texttt{DepositLightingSurfaceSphereVertexSplat}: sphere hits should use a
+direct, bounded mapping from hit normal to sphere surface vertices, comparable
+to the wall's direct local \(u/v\) addressing, instead of any broad scan or
+large write neighborhood.

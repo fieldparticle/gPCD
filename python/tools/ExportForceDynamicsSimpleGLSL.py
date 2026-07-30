@@ -2663,6 +2663,54 @@ float boundary_light_rgb_luminance(vec3 rgb)
     return dot(clamp(rgb, vec3(0.0), vec3(1.0)), vec3(0.2126, 0.7152, 0.0722));
 }
 
+#ifndef FPML_ENABLE_SURFACE_DEPOSIT
+#define FPML_ENABLE_SURFACE_DEPOSIT 1
+#endif
+
+#ifndef FPML_ENABLE_SPHERE_DEPOSIT
+#define FPML_ENABLE_SPHERE_DEPOSIT 1
+#endif
+
+#ifndef FPML_ENABLE_WALL_DEPOSIT
+#define FPML_ENABLE_WALL_DEPOSIT 1
+#endif
+
+#ifndef FPML_ENABLE_REFLECTION_PICKUP
+#define FPML_ENABLE_REFLECTION_PICKUP 1
+#endif
+
+#ifndef FPML_PROFILE_COUNTERS
+#define FPML_PROFILE_COUNTERS 0
+#endif
+
+void fpml_profile_count_sphere_hit()
+{
+#if FPML_PROFILE_COUNTERS
+    atomicAdd(collOut.CollisionCount, 1u);
+#endif
+}
+
+void fpml_profile_count_wall_hit()
+{
+#if FPML_PROFILE_COUNTERS
+    atomicAdd(collOut.numParticles, 1u);
+#endif
+}
+
+void fpml_profile_count_surface_vertex_write()
+{
+#if FPML_PROFILE_COUNTERS
+    atomicAdd(collOut.vnumParticles, 1u);
+#endif
+}
+
+void fpml_profile_count_reflection_pickup()
+{
+#if FPML_PROFILE_COUNTERS
+    atomicAdd(collOut.holdPidx, 1u);
+#endif
+}
+
 float photon_deposit_fraction(
     vec3 photonVelocity,
     vec3 surfaceNormal,
@@ -2781,53 +2829,123 @@ LightingSurfaceObjectMetadata boundary_light_surface_object_metadata(
         0u,
         npos,
         0u,
+        0u,
+        0u,
         vec4(0.0, 0.0, 0.0, 1.0));
 }
 
-vec3 photon_pickup_sphere_surface_rgb(
+uint boundary_light_sphere_ring_base_vertex(
+    LightingSurfaceObjectMetadata surfaceObject,
+    uint ringIndex)
+{
+    uint latSegments = surfaceObject.sphereLatSegments;
+    uint lonSegments = surfaceObject.sphereLonSegments;
+    if (latSegments < 2u || lonSegments < 3u)
+    {
+        return npos;
+    }
+
+    if (ringIndex >= latSegments)
+    {
+        return npos;
+    }
+
+    if (ringIndex == 0u)
+    {
+        return surfaceObject.vertexOffset;
+    }
+
+    if (ringIndex + 1u == latSegments)
+    {
+        return surfaceObject.vertexOffset
+            + lonSegments * 3u
+            + max(latSegments - 2u, 0u) * lonSegments * 6u;
+    }
+
+    return surfaceObject.vertexOffset
+        + lonSegments * 3u
+        + (ringIndex - 1u) * lonSegments * 6u;
+}
+
+vec3 photon_pickup_sphere_quad_rgb(
     uint SourceID,
     vec3 hitNormal,
-    uint surfaceID)
+    uint surfaceID,
+    uint fallbackMaterialID)
 {
+    fpml_profile_count_reflection_pickup();
+#if !FPML_ENABLE_REFLECTION_PICKUP
+    return photon_pickup_material_rgb(SourceID, fallbackMaterialID);
+#else
     LightingSurfaceObjectMetadata surfaceObject =
         boundary_light_surface_object_metadata(
             BOUNDARY_LIGHT_SURFACE_SPHERE,
             surfaceID);
-    if (surfaceObject.vertexOffset == npos || surfaceObject.vertexCount == 0u)
+    if (surfaceObject.vertexOffset == npos ||
+        surfaceObject.vertexCount == 0u ||
+        surfaceObject.sphereLatSegments < 2u ||
+        surfaceObject.sphereLonSegments < 3u)
     {
-        return vec3(0.0);
+        return photon_pickup_material_rgb(SourceID, fallbackMaterialID);
     }
 
-    vec3 targetNormal = normalize(hitNormal);
-    uint endVertex = surfaceObject.vertexOffset + surfaceObject.vertexCount;
-    float bestAlignment = -2.0;
-    uint bestVertexID = npos;
-    for (uint vertexID = surfaceObject.vertexOffset; vertexID < endVertex; ++vertexID)
+    vec3 normal = normalize(hitNormal);
+    float theta = acos(clamp(normal.z, -1.0, 1.0));
+    float phi = atan(normal.y, normal.x);
+    if (phi < 0.0)
     {
-        vec3 vertexNormal = normalize(LightingSurface[vertexID].normal_flag.xyz);
-        float alignment = dot(vertexNormal, targetNormal);
-        if (alignment > bestAlignment)
+        phi += 2.0 * FORCE_DYNAMICS_PI;
+    }
+
+    uint ringIndex = uint(clamp(
+        floor(theta / FORCE_DYNAMICS_PI * float(surfaceObject.sphereLatSegments)),
+        0.0,
+        float(surfaceObject.sphereLatSegments - 1u)));
+    uint segmentIndex = uint(clamp(
+        floor(phi / (2.0 * FORCE_DYNAMICS_PI) * float(surfaceObject.sphereLonSegments)),
+        0.0,
+        float(surfaceObject.sphereLonSegments - 1u)));
+
+    uint ringBase = boundary_light_sphere_ring_base_vertex(surfaceObject, ringIndex);
+    if (ringBase == npos)
+    {
+        return photon_pickup_material_rgb(SourceID, fallbackMaterialID);
+    }
+
+    uint verticesPerCell = (ringIndex == 0u ||
+        ringIndex + 1u == surfaceObject.sphereLatSegments) ? 3u : 6u;
+    uint baseVertex = ringBase + segmentIndex * verticesPerCell;
+    uint endVertex = min(
+        baseVertex + verticesPerCell,
+        surfaceObject.vertexOffset + surfaceObject.vertexCount);
+
+    vec4 bestLight = vec4(0.0);
+    float bestLuminance = -1.0;
+    for (uint vertexID = baseVertex; vertexID < endVertex; ++vertexID)
+    {
+        vec4 vertexLight = LightingSurface[vertexID].light;
+        if (vertexLight.w <= 0.5)
         {
-            bestAlignment = alignment;
-            bestVertexID = vertexID;
+            continue;
+        }
+        float luminance = boundary_light_rgb_luminance(vertexLight.rgb);
+        if (luminance > bestLuminance)
+        {
+            bestLuminance = luminance;
+            bestLight = vertexLight;
         }
     }
 
-    if (bestVertexID == npos)
+    if (bestLuminance < 0.0)
     {
-        return vec3(0.0);
-    }
-
-    vec4 surfaceLight = LightingSurface[bestVertexID].light;
-    if (surfaceLight.w <= 0.5)
-    {
-        return vec3(0.0);
+        return photon_pickup_material_rgb(SourceID, fallbackMaterialID);
     }
 
     return clamp(
-        surfaceLight.rgb * photon_relative_mass(SourceID),
+        bestLight.rgb * photon_relative_mass(SourceID),
         vec3(0.0),
         vec3(1.0));
+#endif
 }
 
 void boundary_light_write_surface_vertex(
@@ -2846,7 +2964,6 @@ void boundary_light_write_surface_vertex(
     {
         return;
     }
-
     vec4 currentLight = LightingSurface[vertexID].light;
     uint illuminationMode =
         boundary_light_material_contact_illumination(surfaceObject.materialID);
@@ -2872,6 +2989,7 @@ void boundary_light_write_surface_vertex(
         return;
     }
 
+    fpml_profile_count_surface_vertex_write();
     LightingSurface[vertexID].light = vec4(clampedRgb, 1.0);
 }
 
@@ -2940,6 +3058,9 @@ void DepositLightingSurfaceWallVertexSplat(
     vec3 point,
     vec3 rgb)
 {
+#if !FPML_ENABLE_SURFACE_DEPOSIT || !FPML_ENABLE_WALL_DEPOSIT
+    return;
+#endif
     LightingSurfaceWallMetadata surfaceWall =
         boundary_light_surface_wall_metadata(wall.wallFlag);
     LightingSurfaceObjectMetadata surfaceObject =
@@ -3037,6 +3158,9 @@ void DepositLightingSurfaceSphereVertexSplat(
     uint surfaceID,
     vec3 rgb)
 {
+#if !FPML_ENABLE_SURFACE_DEPOSIT || !FPML_ENABLE_SPHERE_DEPOSIT
+    return;
+#endif
     LightingSurfaceObjectMetadata surfaceObject =
         boundary_light_surface_object_metadata(
             BOUNDARY_LIGHT_SURFACE_SPHERE,
@@ -3131,6 +3255,9 @@ uint boundary_light_cell_address(vec3 worldPosition)
 
 void DepositBoundaryLightAtCell(uint cellID, uint materialID)
 {
+#if !FPML_ENABLE_SURFACE_DEPOSIT
+    return;
+#endif
     if (cellID == npos || cellID >= MAX_CELL_ARRAY_LOCATIONS) {
         return;
     }
@@ -3146,6 +3273,9 @@ void DepositSpectralBoundaryLightAtCell(
     vec3 surfaceNormal,
     float relativeMass)
 {
+#if !FPML_ENABLE_SURFACE_DEPOSIT
+    return;
+#endif
     if (cellID == npos || cellID >= MAX_CELL_ARRAY_LOCATIONS) {
         return;
     }
@@ -3227,6 +3357,15 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
         1,
     )
     body = body.replace(
+        """#if defined(DEBUG)
+    atomicAdd(collOut.numParticles, 1u);
+#endif""",
+        """#if defined(DEBUG) && !FPML_PROFILE_COUNTERS
+    atomicAdd(collOut.numParticles, 1u);
+#endif""",
+        1,
+    )
+    body = body.replace(
         """                            if (photonSource) {
                                 photonVelocity = ReflectFixedSpeed(
                                     photonVelocity,
@@ -3237,6 +3376,7 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                                 vec3 hitPoint = LIGHTING_BALL_CENTER
                                     + lightingBallResult.segment.normal
                                     * LIGHTING_BALL_RADIUS;
+                                fpml_profile_count_sphere_hit();
                                 uint sphereBehavior =
                                     boundary_light_material_surface_behavior(
                                         LIGHTING_BALL_MATERIAL_ID);
@@ -3245,10 +3385,11 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                                             PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR) {
                                         photon_set_payload_rgb(
                                             SourceID,
-                                            photon_pickup_sphere_surface_rgb(
+                                            photon_pickup_sphere_quad_rgb(
                                                 SourceID,
                                                 lightingBallResult.segment.normal,
-                                                LIGHTING_BALL_WALL_FLAG));
+                                                LIGHTING_BALL_WALL_FLAG,
+                                                LIGHTING_BALL_MATERIAL_ID));
                                         photonVelocity =
                                             ReverseFixedSpeed(photonVelocity);
                                         photonReflected = true;
@@ -3291,11 +3432,13 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                                     continue;
                                 }
                                 uint sphereCellID = boundary_light_cell_address(hitPoint);
+#if FPML_ENABLE_SURFACE_DEPOSIT && FPML_ENABLE_SPHERE_DEPOSIT
                                 if (sphereCellID != npos &&
                                         sphereCellID < MAX_CELL_ARRAY_LOCATIONS) {
                                     BoundaryLight[sphereCellID].rgb_valid =
                                         vec4(sphereRgb, 1.0);
                                 }
+#endif
                                 DepositLightingSurfaceSphereVertexSplat(
                                     lightingBallResult.segment.normal,
                                     LIGHTING_BALL_WALL_FLAG,
@@ -3322,6 +3465,7 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                     continue;
                 }""",
         """                if (photonSource) {
+                    fpml_profile_count_wall_hit();
 #if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
                     RectangleWallSegment selectedPhotonWall =
                         SelectRectangleWallSegment(SourceID, TargetID);
@@ -3370,6 +3514,7 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
 
                     if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR) {
                         if (IsReflectionPhotonParticle(SourceID)) {
+                            fpml_profile_count_reflection_pickup();
                             photon_set_payload_rgb(
                                 SourceID,
                                 photon_pickup_material_rgb(SourceID, surfaceMaterialID));
@@ -3383,9 +3528,11 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                             surfaceMaterialID);
                         uint cellID = boundary_light_cell_address(
                             GetParticlePosition(TargetID).xyz);
+#if FPML_ENABLE_SURFACE_DEPOSIT && FPML_ENABLE_WALL_DEPOSIT
                         if (cellID != npos && cellID < MAX_CELL_ARRAY_LOCATIONS) {
                             BoundaryLight[cellID].rgb_valid = vec4(surfaceRgb, 1.0);
                         }
+#endif
 #if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
                         DepositLightingSurfaceWallVertexSplat(
                             selectedPhotonWall,
@@ -3411,9 +3558,11 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                         if (photon_payload_valid(SourceID)) {
                             uint cellID = boundary_light_cell_address(
                                 GetParticlePosition(TargetID).xyz);
+#if FPML_ENABLE_SURFACE_DEPOSIT && FPML_ENABLE_WALL_DEPOSIT
                             if (cellID != npos && cellID < MAX_CELL_ARRAY_LOCATIONS) {
                                 BoundaryLight[cellID].rgb_valid = vec4(payloadRgb, 1.0);
                             }
+#endif
 #if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
                             DepositLightingSurfaceWallVertexSplat(
                                 selectedPhotonWall,

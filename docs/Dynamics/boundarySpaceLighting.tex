@@ -328,6 +328,41 @@ The render state does not need to know how the color was produced.  It only
 draws the current persistent visible color for each lighting-surface vertex and
 relies on ordinary triangle interpolation between those vertices.
 
+\subsection{FPML Profiling Switches}
+
+The lighting compute path now has compile-time switches for profiling
+surface-light cost without changing the visible model architecture:
+\begin{verbatim}
+FPML_ENABLE_SURFACE_DEPOSIT
+FPML_ENABLE_SPHERE_DEPOSIT
+FPML_ENABLE_WALL_DEPOSIT
+FPML_ENABLE_REFLECTION_PICKUP
+FPML_PROFILE_COUNTERS
+\end{verbatim}
+
+These switches belong to \texttt{FPML.comp}; the base \texttt{FPM.*} shader
+family remains lighting-free.  The first manual profiling pass used the
+\texttt{LightingBall} debug build and measured approximate one-second FPS
+from the existing application frame report:
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Case & Enabled Path & Approximate FPS \\
+\midrule
+1 & photons move, no surface deposit & 1000 \\
+2 & wall deposit only & 1000 \\
+3 & sphere deposit only & 300 \\
+4 & reflection pickup plus wall deposit & 1000 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+This isolates the current performance loss to sphere surface deposit.  Photon
+motion, wall vertex deposit, and reflection pickup are not the limiting cost
+in this measurement.  The next optimization should therefore target
+\texttt{DepositLightingSurfaceSphereVertexSplat} and keep the wall and
+reflection paths unchanged while it is being tested.
+
 \subsection{Next Lighting Behaviors}
 
 The current milestone proves the complete basic behavior chain:

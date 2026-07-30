@@ -925,6 +925,8 @@ std::ostringstream ShaderObj::RectangleWalls()
 		<< "    uint materialID;\n"
 		<< "    uint vertexOffset;\n"
 		<< "    uint vertexCount;\n"
+		<< "    uint sphereLatSegments;\n"
+		<< "    uint sphereLonSegments;\n"
 		<< "    vec4 initialSurfaceColor;\n"
 		<< "};\n\n";
 
@@ -957,7 +959,7 @@ std::ostringstream ShaderObj::RectangleWalls()
 		wall_str
 			<< "const LightingSurfaceObjectMetadata LIGHTING_SURFACE_OBJECTS[1] = "
 			<< "LightingSurfaceObjectMetadata[1](\n"
-			<< "    LightingSurfaceObjectMetadata(0u, 0u, 0u, 0u, 0u, "
+			<< "    LightingSurfaceObjectMetadata(0u, 0u, 0u, 0u, 0u, 0u, 0u, "
 			<< "vec4(0.000000000, 0.000000000, 0.000000000, 1.000000000))\n"
 			<< ");\n\n";
 	}
@@ -977,6 +979,8 @@ std::ostringstream ShaderObj::RectangleWalls()
 				<< object.materialID << "u, "
 				<< object.vertexOffset << "u, "
 				<< object.vertexCount << "u, "
+				<< object.sphereLatSegments << "u, "
+				<< object.sphereLonSegments << "u, "
 				<< "vec4("
 				<< object.initialSurfaceColor[0] << ", "
 				<< object.initialSurfaceColor[1] << ", "

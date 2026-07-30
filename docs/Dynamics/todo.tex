@@ -40,8 +40,12 @@ The next active lighting tasks are:
           Vulkan captures;
     \item smooth the OBJ-backed surface-vertex lighting footprint; the
           current behavior is correct but not yet visually smooth;
-    \item profile the surface-hit slowdown in \texttt{FPML.comp}, especially
-          dense photon contact and vertex splat writes;
+    \item optimize sphere surface deposit in \texttt{FPML.comp}.  The first
+          profiling pass measured about \(1000\) FPS for no surface deposit,
+          wall deposit only, and reflection pickup plus wall deposit, but
+          about \(300\) FPS when sphere deposit alone was enabled.  The next
+          performance work should focus on
+          \texttt{DepositLightingSurfaceSphereVertexSplat};
     \item design a better smoothing/performance path before adding another
           lighting SSBO.  The attempted shared
           \texttt{LightingSurfaceNode} SSBO was backed out because it made
