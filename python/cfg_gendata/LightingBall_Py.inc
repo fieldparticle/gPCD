@@ -12,6 +12,7 @@ scene_model = {
       radius 		= 4.0;
       material_id 	= 1;
       surface_id	= 1000;
+      initial_surface_color = [1.0, 1.0, 0.0, 1.0];
       roles 		= ["collision", "boundary_markers", "lighting_surface"];
     },
     {
@@ -26,6 +27,7 @@ scene_model = {
       normal 		= [-1.0, 0.0, 0.0];
       material_id 	= 2;
       surface_id 	= 2000;
+      initial_surface_color = [0.0, 0.0, 0.0, 1.0];
       roles 		= ["collision", "boundary_markers", "lighting_surface"];
       rectangle_u_segments = 80;
       rectangle_v_segments = 80;
@@ -42,6 +44,7 @@ scene_model = {
       normal 		= [0.0, 0.0, 1.0];
       material_id 	= 3;
       surface_id 	= 3000;
+      initial_surface_color = [0.0, 0.0, 0.0, 1.0];
       roles 		= ["collision", "boundary_markers", "lighting_surface"];
       rectangle_u_segments = 80;
       rectangle_v_segments = 80;

@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <string>
 
 namespace
@@ -17,6 +18,76 @@ namespace
 		if (length <= 1.0e-6f)
 			return glm::vec3(0.0f);
 		return value / length;
+	}
+
+	struct LightingSurfaceObjectConfig
+	{
+		std::string objFile;
+		uint32_t surfaceType = BOUNDARY_LIGHT_SURFACE_NONE;
+		uint32_t surfaceID = 0u;
+		uint32_t materialID = 0u;
+		glm::vec4 initialSurfaceColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		uint32_t rectangleUSegments = 0u;
+		uint32_t rectangleVSegments = 0u;
+		uint32_t sphereLatSegments = 0u;
+		uint32_t sphereLonSegments = 0u;
+	};
+
+	uint32_t ReadPositiveUInt(
+		config_setting_t* object,
+		int objectIndex,
+		const char* fieldName)
+	{
+		int value = 0;
+		if (config_setting_lookup_int(object, fieldName, &value) != CONFIG_TRUE)
+		{
+			throw std::runtime_error(
+				"lighting_surface_objects[" + std::to_string(objectIndex) +
+				"]." + fieldName + " is required"
+			);
+		}
+		if (value <= 0)
+		{
+			throw std::runtime_error(
+				"lighting_surface_objects[" + std::to_string(objectIndex) +
+				"]." + fieldName + " must be a positive integer"
+			);
+		}
+		return static_cast<uint32_t>(value);
+	}
+
+	glm::vec4 ReadInitialSurfaceColor(
+		config_setting_t* object,
+		int objectIndex)
+	{
+		config_setting_t* initialColor =
+			config_setting_lookup(object, "initial_surface_color");
+		if (initialColor == nullptr)
+			return glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
+		if (config_setting_length(initialColor) != 4)
+		{
+			throw std::runtime_error(
+				"lighting_surface_objects[" + std::to_string(objectIndex) +
+				"].initial_surface_color must contain four values"
+			);
+		}
+
+		glm::vec4 color(0.0f, 0.0f, 0.0f, 1.0f);
+		for (int channel = 0; channel < 4; ++channel)
+		{
+			double value = config_setting_get_float_elem(initialColor, channel);
+			if (!std::isfinite(value) || value < 0.0 || value > 1.0)
+			{
+				throw std::runtime_error(
+					"lighting_surface_objects[" + std::to_string(objectIndex) +
+					"].initial_surface_color values must be finite and in [0, 1]"
+				);
+			}
+			color[channel] = static_cast<float>(value);
+		}
+
+		return color;
 	}
 }
 
@@ -111,6 +182,11 @@ void ResourceLightingSurface::LoadObjSurface(
 	uint32_t surfaceType,
 	uint32_t surfaceID,
 	uint32_t materialID,
+	const glm::vec4& initialSurfaceColor,
+	uint32_t rectangleUSegments,
+	uint32_t rectangleVSegments,
+	uint32_t sphereLatSegments,
+	uint32_t sphereLonSegments,
 	uint32_t& emittedVertexID)
 {
 	std::vector<glm::vec3> positions;
@@ -152,7 +228,7 @@ void ResourceLightingSurface::LoadObjSurface(
 		LightingSurfaceVertex vertex{};
 		vertex.pos = glm::vec4(positions[index], static_cast<float>(surfaceID));
 		vertex.normal_flag = glm::vec4(normal, static_cast<float>(materialID));
-		vertex.light = glm::vec4(0.0f);
+		vertex.light = initialSurfaceColor;
 		vertex.meta = glm::vec4(
 			uv.x,
 			uv.y,
@@ -224,16 +300,42 @@ void ResourceLightingSurface::LoadLightingSurfaceObjects()
 				throw std::runtime_error(errtxt.str().c_str());
 			}
 
+			LightingSurfaceObjectConfig surfaceConfig{};
+			surfaceConfig.objFile = objFile;
 			uint32_t surfaceType = SurfaceTypeID(surfaceTypeText);
+			surfaceConfig.surfaceType = surfaceType;
+			surfaceConfig.surfaceID = static_cast<uint32_t>(surfaceID);
+			surfaceConfig.materialID = static_cast<uint32_t>(materialID);
+			surfaceConfig.initialSurfaceColor =
+				ReadInitialSurfaceColor(object, index);
+			if (surfaceType == BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL)
+			{
+				surfaceConfig.rectangleUSegments =
+					ReadPositiveUInt(object, index, "rectangle_u_segments");
+				surfaceConfig.rectangleVSegments =
+					ReadPositiveUInt(object, index, "rectangle_v_segments");
+			}
+			if (surfaceType == BOUNDARY_LIGHT_SURFACE_SPHERE)
+			{
+				surfaceConfig.sphereLatSegments =
+					ReadPositiveUInt(object, index, "sphere_lat_segments");
+				surfaceConfig.sphereLonSegments =
+					ReadPositiveUInt(object, index, "sphere_lon_segments");
+			}
 			bool wallPass = surfaceType == BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL;
 			if ((pass == 0u && !wallPass) || (pass == 1u && wallPass))
 				continue;
 
 			LoadObjSurface(
-				objFile,
-				surfaceType,
-				static_cast<uint32_t>(surfaceID),
-				static_cast<uint32_t>(materialID),
+				surfaceConfig.objFile,
+				surfaceConfig.surfaceType,
+				surfaceConfig.surfaceID,
+				surfaceConfig.materialID,
+				surfaceConfig.initialSurfaceColor,
+				surfaceConfig.rectangleUSegments,
+				surfaceConfig.rectangleVSegments,
+				surfaceConfig.sphereLatSegments,
+				surfaceConfig.sphereLonSegments,
 				emittedVertexID);
 		}
 	}

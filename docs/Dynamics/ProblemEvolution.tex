@@ -3696,3 +3696,62 @@ reflecting wall receives that payload, and absorbing surfaces still consume
 and display grayscale light.  Remaining work is smoothing the visible
 surface-vertex footprint and profiling the slowdown that appears when dense
 photon streams begin writing surface vertices.
+
+\subsection{Shared Lighting Surface Nodes Are Deferred}
+
+\subsubsection{previous form}
+
+The working OBJ-backed lighting path stored visible light directly on each
+\texttt{LightingSurfaceVertex}.  Compute wrote:
+\begin{verbatim}
+LightingSurface[vertexID].light
+\end{verbatim}
+and the lighting surface pass read that same vertex field for interpolation.
+This kept one combined surface buffer bound as both a graphics vertex buffer
+and a compute storage buffer.  It worked for the lighting sphere, shadow
+wall, reflecting wall, front beam, and reflection beam, but duplicated
+non-indexed OBJ vertices could still leave visible seams and uneven
+smoothing.
+
+\subsubsection{current form}
+
+A shared-node experiment introduced a second resource:
+\begin{verbatim}
+LightingSurfaceNode {
+    vec4 light;
+}
+\end{verbatim}
+and changed render vertices to carry node ids.  Compute wrote shared node
+light, and the vertex shader read \texttt{LightingSurfaceNodes[nodeID]}.
+That experiment has been backed out.  The active implementation is again the
+single \texttt{LightingSurfaceVertex} buffer path, and generated
+\texttt{FPML.comp} writes \texttt{LightingSurface[vertexID].light}.
+
+\subsubsection{difference outcome}
+
+no solution
+
+\subsubsection{Analysis}
+
+The node idea remains conceptually attractive because shared light state could
+remove duplicated-triangle seams and reduce repeated writes.  The attempted
+implementation was too large a resource-contract change for the current
+milestone.  It added a new SSBO, descriptor binding, metadata offsets, node
+indexing, and graphics/compute synchronization needs while breaking or
+obscuring the already validated shadow-wall and reflection behavior.
+
+The rollback preserves the useful working contract:
+\[
+    \textrm{analytic photon hit}
+    \rightarrow
+    \textrm{OBJ surface vertex span}
+    \rightarrow
+    \texttt{LightingSurfaceVertex.light}
+    \rightarrow
+    \textrm{interpolated surface color}.
+\]
+Future smoothing should start from a narrower design that can be tested
+independently, such as indexed OBJ surface generation, CPU-side shared vertex
+deduplication inside \texttt{ResourceLightingSurface}, or a separate compute
+prepass that updates vertex light from a compact surface state only after the
+existing behavior is preserved.

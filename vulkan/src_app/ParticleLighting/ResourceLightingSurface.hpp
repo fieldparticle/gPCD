@@ -39,6 +39,11 @@ private:
 		uint32_t surfaceType,
 		uint32_t surfaceID,
 		uint32_t materialID,
+		const glm::vec4& initialSurfaceColor,
+		uint32_t rectangleUSegments,
+		uint32_t rectangleVSegments,
+		uint32_t sphereLatSegments,
+		uint32_t sphereLonSegments,
 		uint32_t& emittedVertexID);
 
 	std::vector<LightingSurfaceVertex> m_SurfaceVertices;

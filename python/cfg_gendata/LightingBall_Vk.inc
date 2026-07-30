@@ -12,6 +12,7 @@ scene_model = {
       radius 			= 4.0;
       material_id 		= 1;
       surface_id 		= 1000;
+      initial_surface_color = [0.0, 0.0, 0.0, 1.0];
       roles 			= ["collision", "boundary_markers", "lighting_surface"];
     },
     {
@@ -26,6 +27,7 @@ scene_model = {
       normal 				= [-1.0, 0.0, 0.0];
       material_id 			= 2;
       surface_id 			= 2000;
+      initial_surface_color 	= [0.0, 0.0, 0.0, 1.0];
       roles 				= ["collision", "boundary_markers", "lighting_surface"];
       rectangle_u_segments 	= 80;
       rectangle_v_segments 	= 80;
@@ -42,6 +44,7 @@ scene_model = {
       normal 				= [0.0, 0.0, 1.0];
       material_id 			= 3;
       surface_id 			= 3000;
+      initial_surface_color = [0.0, 0.0, 0.0, 1.0];
       roles 				= ["collision", "boundary_markers", "lighting_surface"];
       rectangle_u_segments 	= 80;
       rectangle_v_segments 	= 80;
@@ -170,7 +173,7 @@ particle_streams = (
     material_id 					= 5;
     radius 							= 0.025;
     particle_separation_distance 	= 0.005;
-	relative_mass 					= 0.25;
+	relative_mass 					= 1.0;
 
     // Reflection test beam starts just above the reflecting_wall and moves
     // toward the sphere. Later it will carry sphere color back to the wall.
@@ -196,7 +199,7 @@ particle_streams = (
   },
   {
     name 							= "diffuse_environment";
-    enabled 						= false;
+    enabled 						= true;
     material_id 					= 4;
     radius 							= 0.025;
     particle_separation_distance 	= 0.005;

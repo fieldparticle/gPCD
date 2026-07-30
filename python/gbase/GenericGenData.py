@@ -1,5 +1,6 @@
 import os
 import re
+from collections import Counter
 
 from gbase.BoundarySpaceLighting import (
     BOUNDARY_SPACE_SURFACE_RECTANGLE_WALL,
@@ -187,6 +188,7 @@ class GenericGenData:
             int(item["material_id"]): dict(item)
             for item in self.material_properties
         }
+        self.lighting_surface_triangle_inventory = ()
 
     def create(self, parent, itemcfg):
         self.parent = parent
@@ -1047,6 +1049,7 @@ class GenericGenData:
         self.number_active_particles = 0
         self.number_boundary_particles = 0
         self.boundary_space_proxy_metadata = {}
+        self.lighting_surface_triangle_inventory = ()
 
         output_prefix = str(
             self.itemcfg.get("output_file_prefix", self.itemcfg.STUDY_NAME)
@@ -1904,6 +1907,33 @@ class GenericGenData:
                 )
             )
 
+        surface_type_by_name = {
+            str(surface_object.get("name")): str(
+                surface_object.get("surface_type", "UNKNOWN")
+            ).upper()
+            for surface_object in self.itemcfg.get("lighting_surface_objects", ())
+        }
+        self.lighting_surface_triangle_inventory = tuple(
+            {
+                "name": str(surface_object["name"]),
+                "surface_type": surface_type_by_name.get(
+                    str(surface_object["name"]),
+                    "UNKNOWN",
+                ),
+                "surface_id": int(surface_object["surface_id"]),
+                "material_id": int(surface_object["material_id"]),
+                "vertex_count": len(
+                    {
+                        int(vertex_id)
+                        for face in surface_object["faces"]
+                        for vertex_id in face
+                    }
+                ),
+                "triangle_count": len(surface_object["faces"]),
+            }
+            for surface_object in combined_obj["objects"]
+        )
+
         if written_paths:
             report_text = (
                 "Lighting surface OBJ report:\n"
@@ -1969,6 +1999,74 @@ class GenericGenData:
         print(report_text)
         self.write_validation_log(report_text)
         return center_bounds, perimeter_bounds
+
+    def particle_type_name(self, ptype):
+        ptype_value = int(round(float(ptype)))
+        if ptype_value == int(PTYPE_NULL):
+            return "null"
+        if ptype_value == int(PTYPE_MOBILE):
+            return "mobile"
+        if ptype_value == int(PTYPE_PHOTON):
+            return "photon"
+        if ptype_value == int(PTYPE_REFLECTION_PHOTON):
+            return "reflection_photon"
+        if ptype_value == int(PTYPE_BOUNDARY):
+            return "boundary"
+        return f"ptype_{ptype_value}"
+
+    def material_name(self, material_id):
+        material = self.material_properties_by_id.get(int(material_id))
+        if material is None:
+            return f"material_{int(material_id)}"
+        return str(material.get("name", f"material_{int(material_id)}"))
+
+    def report_generation_inventory(self):
+        """Print a final itemized inventory of generated particles and surfaces."""
+        particle_counts_by_name_type = Counter()
+        for particle in self.p_list:
+            particle_type = self.particle_type_name(particle.ptype)
+            material_id = int(round(float(particle.material_id)))
+            particle_counts_by_name_type[
+                (self.material_name(material_id), particle_type)
+            ] += 1
+        total_particles = sum(particle_counts_by_name_type.values())
+
+        lines = [
+            "Generated inventory:",
+            "  particles:",
+        ]
+        if particle_counts_by_name_type:
+            lines.append("    name, type, number particles")
+            for name, particle_type in sorted(particle_counts_by_name_type):
+                lines.append(
+                    f"    {name}, {particle_type}, "
+                    f"{particle_counts_by_name_type[(name, particle_type)]}"
+                )
+        else:
+            lines.append("    none")
+
+        lines.append("  objects:")
+        if self.lighting_surface_triangle_inventory:
+            lines.append("    name, type, number triangles")
+            for surface in self.lighting_surface_triangle_inventory:
+                lines.append(
+                    f"    {surface['name']}, {surface['surface_type']}, "
+                    f"{surface['triangle_count']}"
+                )
+        else:
+            lines.append("    none")
+
+        total_triangles = sum(
+            int(surface["triangle_count"])
+            for surface in self.lighting_surface_triangle_inventory
+        )
+        lines.append(f"  total, triangles, {total_triangles}")
+        lines.append(f"  total, particles, {total_particles}")
+
+        report_text = "\n".join(lines)
+        print(report_text)
+        self.write_validation_log(report_text)
+        return report_text
 
     @staticmethod
     def next_power_of_two(value):
@@ -2420,6 +2518,23 @@ class GenericGenData:
                 )
                 output.write(f'        surface_id = {int(surface_object["surface_id"])};\n')
                 output.write(f'        material_id = {int(surface_object["material_id"])};\n')
+                initial_surface_color = surface_object.get(
+                    "initial_surface_color",
+                    (0.0, 0.0, 0.0, 1.0),
+                )
+                if len(initial_surface_color) != 4:
+                    raise ValueError(
+                        "lighting_surface_objects."
+                        f"{surface_object['name']}.initial_surface_color "
+                        "must contain exactly 4 values"
+                    )
+                output.write(
+                    "        initial_surface_color = ["
+                    + ", ".join(
+                        f"{float(value):.9f}" for value in initial_surface_color
+                    )
+                    + "];\n"
+                )
                 if "rectangle_u_segments" in surface_object:
                     output.write(
                         "        rectangle_u_segments = "
@@ -2530,4 +2645,5 @@ class GenericGenData:
         )
         print(report_text)
         self.write_validation_log(report_text)
+        self.report_generation_inventory()
         return True

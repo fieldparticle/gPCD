@@ -200,9 +200,54 @@ namespace
 		uint32_t materialID = 0u;
 		uint32_t vertexOffset = 0u;
 		uint32_t vertexCount = 0u;
+		double initialSurfaceColor[4] = { 0.0, 0.0, 0.0, 1.0 };
 		uint32_t rectangleUSegments = 0u;
 		uint32_t rectangleVSegments = 0u;
+		uint32_t sphereLatSegments = 0u;
+		uint32_t sphereLonSegments = 0u;
 	};
+
+	uint32_t ReadPositiveUInt(config_setting_t* object, int objectIndex, const char* fieldName)
+	{
+		int value = 0;
+		if (config_setting_lookup_int(object, fieldName, &value) != CONFIG_TRUE)
+			throw std::runtime_error("lighting_surface_objects[" + std::to_string(objectIndex) + "]." + fieldName + " is required");
+		if (value <= 0)
+			throw std::runtime_error("lighting_surface_objects[" + std::to_string(objectIndex) + "]." + fieldName + " must be positive");
+		return static_cast<uint32_t>(value);
+	}
+
+	void ReadInitialSurfaceColor(
+		config_setting_t* object,
+		int objectIndex,
+		double (&color)[4])
+	{
+		config_setting_t* initialColor =
+			config_setting_lookup(object, "initial_surface_color");
+		if (initialColor == nullptr)
+			return;
+
+		if (config_setting_length(initialColor) != 4)
+		{
+			throw std::runtime_error(
+				"lighting_surface_objects[" + std::to_string(objectIndex) +
+				"].initial_surface_color must contain four values"
+			);
+		}
+
+		for (int channel = 0; channel < 4; ++channel)
+		{
+			double value = config_setting_get_float_elem(initialColor, channel);
+			if (!std::isfinite(value) || value < 0.0 || value > 1.0)
+			{
+				throw std::runtime_error(
+					"lighting_surface_objects[" + std::to_string(objectIndex) +
+					"].initial_surface_color values must be finite and in [0, 1]"
+				);
+			}
+			color[channel] = value;
+		}
+	}
 
 	std::vector<LightingSurfaceObjectInfo> LightingSurfaceObjectOffsets(ConfigObj* cfg)
 	{
@@ -253,22 +298,16 @@ namespace
 				info.materialID = static_cast<uint32_t>(materialID);
 				info.vertexOffset = vertexOffset;
 				info.vertexCount = CountObjFaceVertices(objFile);
+				ReadInitialSurfaceColor(object, index, info.initialSurfaceColor);
 				if (surfaceType == 2u)
 				{
-					int rectangleUSegments = 0;
-					int rectangleVSegments = 0;
-					if (config_setting_lookup_int(object, "rectangle_u_segments", &rectangleUSegments) == CONFIG_TRUE)
-					{
-						if (rectangleUSegments <= 0)
-							throw std::runtime_error("lighting_surface_objects[" + std::to_string(index) + "].rectangle_u_segments must be positive");
-						info.rectangleUSegments = static_cast<uint32_t>(rectangleUSegments);
-					}
-					if (config_setting_lookup_int(object, "rectangle_v_segments", &rectangleVSegments) == CONFIG_TRUE)
-					{
-						if (rectangleVSegments <= 0)
-							throw std::runtime_error("lighting_surface_objects[" + std::to_string(index) + "].rectangle_v_segments must be positive");
-						info.rectangleVSegments = static_cast<uint32_t>(rectangleVSegments);
-					}
+					info.rectangleUSegments = ReadPositiveUInt(object, index, "rectangle_u_segments");
+					info.rectangleVSegments = ReadPositiveUInt(object, index, "rectangle_v_segments");
+				}
+				else if (surfaceType == 1u)
+				{
+					info.sphereLatSegments = ReadPositiveUInt(object, index, "sphere_lat_segments");
+					info.sphereLonSegments = ReadPositiveUInt(object, index, "sphere_lon_segments");
 				}
 				objects.push_back(info);
 				vertexOffset += info.vertexCount;
@@ -886,6 +925,7 @@ std::ostringstream ShaderObj::RectangleWalls()
 		<< "    uint materialID;\n"
 		<< "    uint vertexOffset;\n"
 		<< "    uint vertexCount;\n"
+		<< "    vec4 initialSurfaceColor;\n"
 		<< "};\n\n";
 
 	wall_str
@@ -917,7 +957,8 @@ std::ostringstream ShaderObj::RectangleWalls()
 		wall_str
 			<< "const LightingSurfaceObjectMetadata LIGHTING_SURFACE_OBJECTS[1] = "
 			<< "LightingSurfaceObjectMetadata[1](\n"
-			<< "    LightingSurfaceObjectMetadata(0u, 0u, 0u, 0u, 0u)\n"
+			<< "    LightingSurfaceObjectMetadata(0u, 0u, 0u, 0u, 0u, "
+			<< "vec4(0.000000000, 0.000000000, 0.000000000, 1.000000000))\n"
 			<< ");\n\n";
 	}
 	else
@@ -935,7 +976,12 @@ std::ostringstream ShaderObj::RectangleWalls()
 				<< object.surfaceID << "u, "
 				<< object.materialID << "u, "
 				<< object.vertexOffset << "u, "
-				<< object.vertexCount << "u)";
+				<< object.vertexCount << "u, "
+				<< "vec4("
+				<< object.initialSurfaceColor[0] << ", "
+				<< object.initialSurfaceColor[1] << ", "
+				<< object.initialSurfaceColor[2] << ", "
+				<< object.initialSurfaceColor[3] << "))";
 			if (objectIndex + 1u < surfaceObjects.size())
 				wall_str << ",";
 			wall_str << "\n";

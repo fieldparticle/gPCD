@@ -87,11 +87,11 @@ void CommandLightingGraphics::RecordCommands(uint32_t imageindex, uint32_t curre
 	renderPassInfo.renderArea.extent = m_SCO->GetSwapExtent();
 
 	std::array<VkClearValue, 2> clearValues{};
-	clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
-	clearValues[1].depthStencil = { 1.0f, 0 };
-	VkClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
-	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-	renderPassInfo.pClearValues = clearValues.data();
+	clearValues[0].color				= { {0.3f, 0.3f, 0.3f, 1.0f} };
+	clearValues[1].depthStencil			= { 1.0f, 0 };
+	//VkClearValue clearColor				= { {{0.0f, 0.0f, 0.0f, 1.0f}} };
+	renderPassInfo.clearValueCount		= static_cast<uint32_t>(clearValues.size());
+	renderPassInfo.pClearValues			= clearValues.data();
 
 	vkCmdFillBuffer(m_CommandBuffers[currentBuffer],
 		collMem->m_Buffers[0],

@@ -228,6 +228,16 @@ the first generated meshes are non-indexed, vertices are duplicated per
 triangle; compute deposits write local surface spans rather than one abstract
 shared grid vertex.
 
+An attempted follow-up split the visible light state into a separate shared
+\texttt{LightingSurfaceNode} SSBO and made render vertices point at shared
+node ids.  That path was backed out.  It introduced a second writable/readable
+graphics resource and a new descriptor/synchronization contract, but the
+shadow wall and reflection path did not remain correct and the performance
+cost increased.  The active model therefore remains the simpler single
+\texttt{LightingSurfaceVertex} buffer where compute writes
+\texttt{LightingSurfaceVertex.light} and graphics reads the same vertex
+record.
+
 \subsection{Material Surface Behaviors}
 
 Vulkan material behavior now matches the Python photon-contact model:

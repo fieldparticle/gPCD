@@ -29,6 +29,29 @@ def _as_vector3(raw_value, errors, context):
     return values
 
 
+def _as_optional_rgba(raw_value, default_value, errors, context):
+    if raw_value is None:
+        return tuple(float(value) for value in default_value)
+    if isinstance(raw_value, (str, bytes)):
+        errors.append(f"{context} must be a list of 4 numeric values")
+        return None
+    try:
+        if len(raw_value) != 4:
+            errors.append(f"{context} must contain exactly 4 values")
+            return None
+        values = tuple(float(value) for value in raw_value)
+    except (TypeError, ValueError):
+        errors.append(f"{context} values must be numeric")
+        return None
+    if not all(math.isfinite(value) for value in values):
+        errors.append(f"{context} values must be finite")
+        return None
+    if not all(0.0 <= value <= 1.0 for value in values):
+        errors.append(f"{context} values must be in the range [0, 1]")
+        return None
+    return values
+
+
 def _as_positive_float(raw_value, errors, context):
     try:
         value = float(raw_value)
@@ -419,6 +442,12 @@ def apply_scene_model(config):
         object_type = _as_required_string(obj.get("type"), errors, f"{context}.type")
         object_type = None if object_type is None else object_type.lower()
         roles = _roles(obj.get("roles"), errors, context)
+        initial_surface_color = _as_optional_rgba(
+            obj.get("initial_surface_color"),
+            (0.0, 0.0, 0.0, 1.0),
+            errors,
+            f"{context}.initial_surface_color",
+        )
         surface_id = obj.get("surface_id")
         if type(surface_id) is int:
             if surface_id in surface_ids:
@@ -440,6 +469,7 @@ def apply_scene_model(config):
                         "sphere",
                         int(sphere_config["wall_flag"]),
                         int(sphere_config["material_id"]),
+                        initial_surface_color=initial_surface_color,
                         sphere_lat_segments=int(sphere_config["sphere_lat_segments"]),
                         sphere_lon_segments=int(sphere_config["sphere_lon_segments"]),
                     )
@@ -457,6 +487,7 @@ def apply_scene_model(config):
                         "rectangle_wall",
                         int(rectangle_config["wall_flag"]),
                         int(rectangle_config["material_id"]),
+                        initial_surface_color=initial_surface_color,
                         rectangle_u_segments=int(
                             rectangle_config["rectangle_u_segments"]
                         ),
@@ -478,6 +509,7 @@ def apply_scene_model(config):
                         "curve_wall",
                         int(curve_config["wall_flag"]),
                         int(curve_config["material_id"]),
+                        initial_surface_color=initial_surface_color,
                     )
                 )
         else:

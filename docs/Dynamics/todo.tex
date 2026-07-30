@@ -42,6 +42,11 @@ The next active lighting tasks are:
           current behavior is correct but not yet visually smooth;
     \item profile the surface-hit slowdown in \texttt{FPML.comp}, especially
           dense photon contact and vertex splat writes;
+    \item design a better smoothing/performance path before adding another
+          lighting SSBO.  The attempted shared
+          \texttt{LightingSurfaceNode} SSBO was backed out because it made
+          the graphics/compute synchronization and shader resource contract
+          larger without preserving shadow-wall and reflection behavior;
     \item update capture/debug readers so \texttt{ParticleLighting}/
           \texttt{FPML} captures use the \(256\)-byte
           \texttt{LightingParticle} layout instead of the ordinary particle

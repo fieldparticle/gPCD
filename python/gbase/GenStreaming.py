@@ -1938,4 +1938,5 @@ class GenStreaming(GenericGenData):
         )
         print(report_text)
         self.write_validation_log(report_text)
+        self.report_generation_inventory()
         return True

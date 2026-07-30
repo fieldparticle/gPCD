@@ -2647,6 +2647,22 @@ float boundary_light_material_photon_min_relative_mass(uint materialID)
     return 0.001;
 }
 
+uint boundary_light_material_contact_illumination(uint materialID)
+{
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].contactIllumination;
+    }
+
+    return CONTACT_ILLUMINATION_CURRENT;
+}
+
+float boundary_light_rgb_luminance(vec3 rgb)
+{
+    return dot(clamp(rgb, vec3(0.0), vec3(1.0)), vec3(0.2126, 0.7152, 0.0722));
+}
+
 float photon_deposit_fraction(
     vec3 photonVelocity,
     vec3 surfaceNormal,
@@ -2690,11 +2706,12 @@ vec3 photon_deposit_payload_rgb(
     float depositFraction,
     float relativeMass)
 {
-    uint payloadMaterialID = uint(round(P[SourceID].material_id));
-    return photon_deposit_material_color_rgb(
-        depositFraction,
-        relativeMass,
-        payloadMaterialID);
+    if (P[SourceID].photon_payload.w <= 0.5) {
+        return vec3(0.0);
+    }
+    vec3 payloadRgb = clamp(P[SourceID].photon_payload.rgb, vec3(0.0), vec3(1.0));
+    float scale = clamp(depositFraction, 0.0, 1.0) * max(relativeMass, 0.0);
+    return clamp(payloadRgb * scale, vec3(0.0), vec3(1.0));
 }
 
 bool photon_payload_valid(uint SourceID)
@@ -2763,7 +2780,54 @@ LightingSurfaceObjectMetadata boundary_light_surface_object_metadata(
         0u,
         0u,
         npos,
-        0u);
+        0u,
+        vec4(0.0, 0.0, 0.0, 1.0));
+}
+
+vec3 photon_pickup_sphere_surface_rgb(
+    uint SourceID,
+    vec3 hitNormal,
+    uint surfaceID)
+{
+    LightingSurfaceObjectMetadata surfaceObject =
+        boundary_light_surface_object_metadata(
+            BOUNDARY_LIGHT_SURFACE_SPHERE,
+            surfaceID);
+    if (surfaceObject.vertexOffset == npos || surfaceObject.vertexCount == 0u)
+    {
+        return vec3(0.0);
+    }
+
+    vec3 targetNormal = normalize(hitNormal);
+    uint endVertex = surfaceObject.vertexOffset + surfaceObject.vertexCount;
+    float bestAlignment = -2.0;
+    uint bestVertexID = npos;
+    for (uint vertexID = surfaceObject.vertexOffset; vertexID < endVertex; ++vertexID)
+    {
+        vec3 vertexNormal = normalize(LightingSurface[vertexID].normal_flag.xyz);
+        float alignment = dot(vertexNormal, targetNormal);
+        if (alignment > bestAlignment)
+        {
+            bestAlignment = alignment;
+            bestVertexID = vertexID;
+        }
+    }
+
+    if (bestVertexID == npos)
+    {
+        return vec3(0.0);
+    }
+
+    vec4 surfaceLight = LightingSurface[bestVertexID].light;
+    if (surfaceLight.w <= 0.5)
+    {
+        return vec3(0.0);
+    }
+
+    return clamp(
+        surfaceLight.rgb * photon_relative_mass(SourceID),
+        vec3(0.0),
+        vec3(1.0));
 }
 
 void boundary_light_write_surface_vertex(
@@ -2782,9 +2846,33 @@ void boundary_light_write_surface_vertex(
     {
         return;
     }
-    LightingSurface[vertexID].light = vec4(
-        max(LightingSurface[vertexID].light.rgb, clampedRgb),
-        1.0);
+
+    vec4 currentLight = LightingSurface[vertexID].light;
+    uint illuminationMode =
+        boundary_light_material_contact_illumination(surfaceObject.materialID);
+
+    if (illuminationMode == CONTACT_ILLUMINATION_FIRST && currentLight.w > 0.5)
+    {
+        return;
+    }
+
+    if (illuminationMode == CONTACT_ILLUMINATION_MAX &&
+        currentLight.w > 0.5 &&
+        boundary_light_rgb_luminance(clampedRgb) <
+            boundary_light_rgb_luminance(currentLight.rgb))
+    {
+        return;
+    }
+
+    if (illuminationMode == CONTACT_ILLUMINATION_MIN &&
+        currentLight.w > 0.5 &&
+        boundary_light_rgb_luminance(clampedRgb) >
+            boundary_light_rgb_luminance(currentLight.rgb))
+    {
+        return;
+    }
+
+    LightingSurface[vertexID].light = vec4(clampedRgb, 1.0);
 }
 
 #if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
@@ -3157,9 +3245,10 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                                             PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR) {
                                         photon_set_payload_rgb(
                                             SourceID,
-                                            photon_pickup_material_rgb(
+                                            photon_pickup_sphere_surface_rgb(
                                                 SourceID,
-                                                LIGHTING_BALL_MATERIAL_ID));
+                                                lightingBallResult.segment.normal,
+                                                LIGHTING_BALL_WALL_FLAG));
                                         photonVelocity =
                                             ReverseFixedSpeed(photonVelocity);
                                         photonReflected = true;

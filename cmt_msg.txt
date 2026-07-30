@@ -1,18 +1,11 @@
 Current status:
-	- LightingBall has a frozen basic photon-lighting milestone.
-	- Vulkan and Python now share the scene_model authoring path for the lighting sphere, shadow wall, reflecting wall, and photon streams.
-	- Vulkan ParticleLighting shows the basic behavior chain: photon stream, sphere color pickup/deposit, reflection photon payload, reflecting-wall deposit, and absorbing-wall interaction.
-	- Runtime lighting surfaces now use object-specific OBJ files so enabling shadow_wall no longer redirects reflection payloads onto the wrong wall.
-	- Remaining issues are visual smoothing and performance when dense photons begin writing surface vertices.
+	- LightingBall remains on the working OBJ-backed LightingSurfaceVertex.light path.
+	- The shared LightingSurfaceNode SSBO experiment was backed out.
+	- Shadow-wall and reflection behavior are preserved as the current priority over smoothing.
 
 Code Changes:
-	- Added scene/stream enabled switches for isolation and generator reports.
-	- Added environment-sphere diffuse emitter support and stream-owned radius/separation validation.
-	- Split lighting particles from ordinary FPM particles and added reflection photon payload transport.
-	- Extended material export with photon surface behavior, photon coupling, relative-mass strength, spectral response/emission, and contact illumination.
-	- Moved visible LightingBall surface color to OBJ-backed LightingSurfaceVertex.light for sphere and rectangle walls.
-	- Updated Python OBJ export so lighting_surface_objects point at per-object runtime OBJ files while combined OBJ files remain Blender inspection artifacts.
-	- Regenerated FPML/common GLSL paths from ExportForceDynamicsSimpleGLSL.py.
-	- Updated Dynamics docs and ProblemEvolution for the current boundary-space lighting milestone.
+	- Documented the deferred shared-node SSBO experiment in ProblemEvolution.
+	- Updated boundary-space lighting docs to state the active single surface-vertex buffer contract.
+	- Added todo guidance to design smoothing/performance before adding another lighting SSBO.
 
-Next: Smooth the OBJ-backed surface-vertex lighting footprint and profile the surface-hit slowdown in FPML.
+Next: Find a narrower smoothing strategy for OBJ-backed surface lighting without disturbing the validated shadow-wall and reflection behavior.
