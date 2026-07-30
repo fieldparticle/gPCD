@@ -289,7 +289,8 @@ LightingSurfaceObjectMetadata boundary_light_surface_object_metadata(
         0u,
         0u,
         0u,
-        vec4(0.0, 0.0, 0.0, 1.0));
+        vec4(0.0, 0.0, 0.0, 1.0),
+        0.0);
 }
 
 uint boundary_light_sphere_ring_base_vertex(
@@ -303,26 +304,25 @@ uint boundary_light_sphere_ring_base_vertex(
         return npos;
     }
 
-    if (ringIndex >= latSegments)
+    if (ringIndex > latSegments)
     {
         return npos;
     }
 
-    if (ringIndex == 0u)
-    {
-        return surfaceObject.vertexOffset;
-    }
+    return surfaceObject.vertexOffset + ringIndex * lonSegments;
+}
 
-    if (ringIndex + 1u == latSegments)
+uint boundary_light_sphere_vertex_id(
+    LightingSurfaceObjectMetadata surfaceObject,
+    uint ringIndex,
+    uint segmentIndex)
+{
+    uint ringBase = boundary_light_sphere_ring_base_vertex(surfaceObject, ringIndex);
+    if (ringBase == npos || surfaceObject.sphereLonSegments < 3u)
     {
-        return surfaceObject.vertexOffset
-            + lonSegments * 3u
-            + max(latSegments - 2u, 0u) * lonSegments * 6u;
+        return npos;
     }
-
-    return surfaceObject.vertexOffset
-        + lonSegments * 3u
-        + (ringIndex - 1u) * lonSegments * 6u;
+    return ringBase + (segmentIndex % surfaceObject.sphereLonSegments);
 }
 
 vec3 photon_pickup_sphere_quad_rgb(
@@ -364,35 +364,30 @@ vec3 photon_pickup_sphere_quad_rgb(
         0.0,
         float(surfaceObject.sphereLonSegments - 1u)));
 
-    uint ringBase = boundary_light_sphere_ring_base_vertex(surfaceObject, ringIndex);
-    if (ringBase == npos)
-    {
-        return photon_pickup_material_rgb(SourceID, fallbackMaterialID);
-    }
-
-    uint verticesPerCell = (ringIndex == 0u ||
-        ringIndex + 1u == surfaceObject.sphereLatSegments) ? 3u : 6u;
-    uint baseVertex = ringBase + segmentIndex * verticesPerCell;
-    uint endVertex = min(
-        baseVertex + verticesPerCell,
-        surfaceObject.vertexOffset + surfaceObject.vertexCount);
+    uint nextSegment = (segmentIndex + 1u) % surfaceObject.sphereLonSegments;
+    uint vertex00 = boundary_light_sphere_vertex_id(surfaceObject, ringIndex, segmentIndex);
+    uint vertex10 = boundary_light_sphere_vertex_id(surfaceObject, ringIndex, nextSegment);
+    uint vertex01 = boundary_light_sphere_vertex_id(surfaceObject, ringIndex + 1u, segmentIndex);
+    uint vertex11 = boundary_light_sphere_vertex_id(surfaceObject, ringIndex + 1u, nextSegment);
 
     vec4 bestLight = vec4(0.0);
     float bestLuminance = -1.0;
-    for (uint vertexID = baseVertex; vertexID < endVertex; ++vertexID)
-    {
-        vec4 vertexLight = LightingSurface[vertexID].light;
-        if (vertexLight.w <= 0.5)
-        {
-            continue;
-        }
-        float luminance = boundary_light_rgb_luminance(vertexLight.rgb);
-        if (luminance > bestLuminance)
-        {
-            bestLuminance = luminance;
-            bestLight = vertexLight;
-        }
-    }
+
+    vec4 vertexLight = vertex00 == npos ? vec4(0.0) : LightingSurface[vertex00].light;
+    float luminance = vertexLight.w <= 0.5 ? -1.0 : boundary_light_rgb_luminance(vertexLight.rgb);
+    if (luminance > bestLuminance) { bestLuminance = luminance; bestLight = vertexLight; }
+
+    vertexLight = vertex10 == npos ? vec4(0.0) : LightingSurface[vertex10].light;
+    luminance = vertexLight.w <= 0.5 ? -1.0 : boundary_light_rgb_luminance(vertexLight.rgb);
+    if (luminance > bestLuminance) { bestLuminance = luminance; bestLight = vertexLight; }
+
+    vertexLight = vertex01 == npos ? vec4(0.0) : LightingSurface[vertex01].light;
+    luminance = vertexLight.w <= 0.5 ? -1.0 : boundary_light_rgb_luminance(vertexLight.rgb);
+    if (luminance > bestLuminance) { bestLuminance = luminance; bestLight = vertexLight; }
+
+    vertexLight = vertex11 == npos ? vec4(0.0) : LightingSurface[vertex11].light;
+    luminance = vertexLight.w <= 0.5 ? -1.0 : boundary_light_rgb_luminance(vertexLight.rgb);
+    if (luminance > bestLuminance) { bestLuminance = luminance; bestLight = vertexLight; }
 
     if (bestLuminance < 0.0)
     {
@@ -426,7 +421,14 @@ void boundary_light_write_surface_vertex(
     uint illuminationMode =
         boundary_light_material_contact_illumination(surfaceObject.materialID);
 
-    if (illuminationMode == CONTACT_ILLUMINATION_FIRST && currentLight.w > 0.5)
+    vec4 initialLight = surfaceObject.initialSurfaceColor;
+    bool stillAtInitialColor =
+        length(currentLight.rgb - initialLight.rgb) <= 0.0001 &&
+        abs(currentLight.w - initialLight.w) <= 0.0001;
+
+    if (illuminationMode == CONTACT_ILLUMINATION_FIRST &&
+        currentLight.w > 0.5 &&
+        !stillAtInitialColor)
     {
         return;
     }
@@ -476,7 +478,10 @@ LightingSurfaceWallMetadata boundary_light_surface_wall_metadata(uint wallFlag)
 
 void boundary_light_deposit_wall_quad_vertices(
     LightingSurfaceObjectMetadata surfaceObject,
-    uint baseVertex,
+    uint vertex00,
+    uint vertex10,
+    uint vertex11,
+    uint vertex01,
     vec2 hitUV,
     vec2 uv00,
     vec2 uv10,
@@ -493,21 +498,19 @@ void boundary_light_deposit_wall_quad_vertices(
 
     if (w00 > 0.0)
     {
-        boundary_light_write_surface_vertex(surfaceObject, baseVertex + 0u, rgb * w00);
-        boundary_light_write_surface_vertex(surfaceObject, baseVertex + 3u, rgb * w00);
+        boundary_light_write_surface_vertex(surfaceObject, vertex00, rgb * w00);
     }
     if (w10 > 0.0)
     {
-        boundary_light_write_surface_vertex(surfaceObject, baseVertex + 1u, rgb * w10);
+        boundary_light_write_surface_vertex(surfaceObject, vertex10, rgb * w10);
     }
     if (w11 > 0.0)
     {
-        boundary_light_write_surface_vertex(surfaceObject, baseVertex + 2u, rgb * w11);
-        boundary_light_write_surface_vertex(surfaceObject, baseVertex + 4u, rgb * w11);
+        boundary_light_write_surface_vertex(surfaceObject, vertex11, rgb * w11);
     }
     if (w01 > 0.0)
     {
-        boundary_light_write_surface_vertex(surfaceObject, baseVertex + 5u, rgb * w01);
+        boundary_light_write_surface_vertex(surfaceObject, vertex01, rgb * w01);
     }
 }
 
@@ -564,9 +567,14 @@ void DepositLightingSurfaceWallVertexSplat(
     int uCenter = int(uQuad);
     int vCenter = int(vQuad);
     vec2 hitUV = vec2(uCoord, vCoord);
-    float splatRadius = max(max(uStep, vStep) * 1.5, EPSILON);
+    float automaticSplatRadius = max(max(uStep, vStep) * 1.5, EPSILON);
+    float splatRadius = surfaceObject.depositRadius > EPSILON
+        ? surfaceObject.depositRadius
+        : automaticSplatRadius;
+    int uSplatCells = int(clamp(ceil(splatRadius / max(uStep, EPSILON)), 1.0, 8.0));
+    int vSplatCells = int(clamp(ceil(splatRadius / max(vStep, EPSILON)), 1.0, 8.0));
 
-    for (int du = -1; du <= 1; ++du)
+    for (int du = -uSplatCells; du <= uSplatCells; ++du)
     {
         int uIndex = uCenter + du;
         if (uIndex < 0 || uIndex >= int(uStepCount))
@@ -574,7 +582,7 @@ void DepositLightingSurfaceWallVertexSplat(
             continue;
         }
 
-        for (int dv = -1; dv <= 1; ++dv)
+        for (int dv = -vSplatCells; dv <= vSplatCells; ++dv)
         {
             int vIndex = vCenter + dv;
             if (vIndex < 0 || vIndex >= int(vStepCount))
@@ -582,8 +590,15 @@ void DepositLightingSurfaceWallVertexSplat(
                 continue;
             }
 
-            uint baseVertex = surfaceObject.vertexOffset
-                + ((uint(uIndex) * vStepCount) + uint(vIndex)) * 6u;
+            uint rowStride = vStepCount + 1u;
+            uint vertex00 = surfaceObject.vertexOffset
+                + uint(uIndex) * rowStride + uint(vIndex);
+            uint vertex10 = surfaceObject.vertexOffset
+                + uint(uIndex + 1) * rowStride + uint(vIndex);
+            uint vertex11 = surfaceObject.vertexOffset
+                + uint(uIndex + 1) * rowStride + uint(vIndex + 1);
+            uint vertex01 = surfaceObject.vertexOffset
+                + uint(uIndex) * rowStride + uint(vIndex + 1);
             float u0 = float(uIndex) * uStep;
             float u1 = float(uIndex + 1) * uStep;
             float v0 = float(vIndex) * vStep;
@@ -598,7 +613,10 @@ void DepositLightingSurfaceWallVertexSplat(
 
             boundary_light_deposit_wall_quad_vertices(
                 surfaceObject,
-                baseVertex,
+                vertex00,
+                vertex10,
+                vertex11,
+                vertex01,
                 hitUV,
                 vec2(u0, v0),
                 vec2(u1, v0),
@@ -610,6 +628,47 @@ void DepositLightingSurfaceWallVertexSplat(
     }
 }
 #endif
+
+void boundary_light_deposit_sphere_cell_vertices(
+    LightingSurfaceObjectMetadata surfaceObject,
+    uint ringIndex,
+    uint segmentIndex,
+    vec3 targetNormal,
+    float minDot,
+    float invSpan,
+    vec3 rgb)
+{
+    if (ringIndex >= surfaceObject.sphereLatSegments)
+    {
+        return;
+    }
+
+    uint nextSegment = (segmentIndex + 1u) % surfaceObject.sphereLonSegments;
+    uint vertex00 = boundary_light_sphere_vertex_id(surfaceObject, ringIndex, segmentIndex);
+    uint vertex10 = boundary_light_sphere_vertex_id(surfaceObject, ringIndex, nextSegment);
+    uint vertex01 = boundary_light_sphere_vertex_id(surfaceObject, ringIndex + 1u, segmentIndex);
+    uint vertex11 = boundary_light_sphere_vertex_id(surfaceObject, ringIndex + 1u, nextSegment);
+
+    vec3 vertexNormal = vertex00 == npos ? vec3(0.0) : normalize(LightingSurface[vertex00].normal_flag.xyz);
+    float alignment = dot(vertexNormal, targetNormal);
+    float weight = alignment < minDot ? 0.0 : clamp((alignment - minDot) * invSpan, 0.0, 1.0);
+    if (weight > 0.0) { boundary_light_write_surface_vertex(surfaceObject, vertex00, rgb * weight); }
+
+    vertexNormal = vertex10 == npos ? vec3(0.0) : normalize(LightingSurface[vertex10].normal_flag.xyz);
+    alignment = dot(vertexNormal, targetNormal);
+    weight = alignment < minDot ? 0.0 : clamp((alignment - minDot) * invSpan, 0.0, 1.0);
+    if (weight > 0.0) { boundary_light_write_surface_vertex(surfaceObject, vertex10, rgb * weight); }
+
+    vertexNormal = vertex01 == npos ? vec3(0.0) : normalize(LightingSurface[vertex01].normal_flag.xyz);
+    alignment = dot(vertexNormal, targetNormal);
+    weight = alignment < minDot ? 0.0 : clamp((alignment - minDot) * invSpan, 0.0, 1.0);
+    if (weight > 0.0) { boundary_light_write_surface_vertex(surfaceObject, vertex01, rgb * weight); }
+
+    vertexNormal = vertex11 == npos ? vec3(0.0) : normalize(LightingSurface[vertex11].normal_flag.xyz);
+    alignment = dot(vertexNormal, targetNormal);
+    weight = alignment < minDot ? 0.0 : clamp((alignment - minDot) * invSpan, 0.0, 1.0);
+    if (weight > 0.0) { boundary_light_write_surface_vertex(surfaceObject, vertex11, rgb * weight); }
+}
 
 void DepositLightingSurfaceSphereVertexSplat(
     vec3 hitNormal,
@@ -623,30 +682,69 @@ void DepositLightingSurfaceSphereVertexSplat(
         boundary_light_surface_object_metadata(
             BOUNDARY_LIGHT_SURFACE_SPHERE,
             surfaceID);
-    if (surfaceObject.vertexOffset == npos || surfaceObject.vertexCount == 0u)
+    if (surfaceObject.vertexOffset == npos ||
+        surfaceObject.vertexCount == 0u ||
+        surfaceObject.sphereLatSegments < 2u ||
+        surfaceObject.sphereLonSegments < 3u)
     {
         return;
     }
 
     vec3 targetNormal = normalize(hitNormal);
-    float minDot = 0.985;
-    float invSpan = 1.0 / max(1.0 - minDot, EPSILON);
-    uint endVertex = surfaceObject.vertexOffset + surfaceObject.vertexCount;
-
-    for (uint vertexID = surfaceObject.vertexOffset; vertexID < endVertex; ++vertexID)
+    float theta = acos(clamp(targetNormal.z, -1.0, 1.0));
+    float phi = atan(targetNormal.y, targetNormal.x);
+    if (phi < 0.0)
     {
-        vec3 vertexNormal = normalize(LightingSurface[vertexID].normal_flag.xyz);
-        float alignment = dot(vertexNormal, targetNormal);
-        if (alignment < minDot)
+        phi += 2.0 * FORCE_DYNAMICS_PI;
+    }
+
+    uint centerRing = uint(clamp(
+        floor(theta / FORCE_DYNAMICS_PI * float(surfaceObject.sphereLatSegments)),
+        0.0,
+        float(surfaceObject.sphereLatSegments - 1u)));
+    uint centerSegment = uint(clamp(
+        floor(phi / (2.0 * FORCE_DYNAMICS_PI) * float(surfaceObject.sphereLonSegments)),
+        0.0,
+        float(surfaceObject.sphereLonSegments - 1u)));
+
+    float automaticAngularRadius = acos(0.985);
+    float angularRadius = surfaceObject.depositRadius > EPSILON &&
+        LIGHTING_BALL_RADIUS > EPSILON
+        ? surfaceObject.depositRadius / LIGHTING_BALL_RADIUS
+        : automaticAngularRadius;
+    angularRadius = clamp(angularRadius, 0.001, FORCE_DYNAMICS_PI);
+    float minDot = cos(angularRadius);
+    float invSpan = 1.0 / max(1.0 - minDot, EPSILON);
+
+    for (int dRing = -1; dRing <= 1; ++dRing)
+    {
+        int ring = int(centerRing) + dRing;
+        if (ring < 0 || ring >= int(surfaceObject.sphereLatSegments))
         {
             continue;
         }
 
-        float weight = clamp((alignment - minDot) * invSpan, 0.0, 1.0);
-        boundary_light_write_surface_vertex(
-            surfaceObject,
-            vertexID,
-            rgb * weight);
+        for (int dSegment = -1; dSegment <= 1; ++dSegment)
+        {
+            int segment = int(centerSegment) + dSegment;
+            if (segment < 0)
+            {
+                segment += int(surfaceObject.sphereLonSegments);
+            }
+            if (segment >= int(surfaceObject.sphereLonSegments))
+            {
+                segment -= int(surfaceObject.sphereLonSegments);
+            }
+
+            boundary_light_deposit_sphere_cell_vertices(
+                surfaceObject,
+                uint(ring),
+                uint(segment),
+                targetNormal,
+                minDot,
+                invSpan,
+                rgb);
+        }
     }
 }
 

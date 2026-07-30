@@ -1,17 +1,13 @@
 Current status:
-	- Added FPML profiling switches for surface deposit, sphere deposit, wall deposit, reflection pickup, and profiling counters.
-	- Measured LightingBall debug performance:
-	  - photons move, no surface deposit: about 1000 FPS
-	  - wall deposit only: about 1000 FPS
-	  - sphere deposit only: about 300 FPS
-	  - reflection pickup plus wall deposit: about 1000 FPS
-	- Isolated the current LightingBall slowdown to sphere surface deposit.
+	- ParticleLighting uses indexed runtime lighting surfaces with shared vertices.
+	- Per-object deposit_radius is available as a surface smoothing knob.
+	- Shadow-wall smoothing still benefits more from higher photon density than deposit-radius widening.
+	- Indexed OBJ export is deferred so Blender/debug inspection can later match runtime topology.
 
 Code Changes:
-	- Added FPML-only profiling controls in the generated lighting compute path.
-	- Added lightweight optional counters for sphere hits, wall hits, surface vertex writes, and reflection pickups.
-	- Documented the profiling results in boundarySpaceLighting.tex.
-	- Updated Todo.tex to make DepositLightingSurfaceSphereVertexSplat the next performance target.
-	- Added a ProblemEvolution entry for the profiling investigation.
+	- Added scene_model deposit_radius parsing and .tst export.
+	- Added depositRadius to generated LightingSurfaceObjectMetadata.
+	- Updated FPML wall/sphere deposit to use per-object deposit radius.
+	- Documented indexed runtime surface state and added TODO for indexed OBJ output.
 
-Next: Optimize sphere surface deposit with direct bounded sphere vertex addressing while leaving wall deposit and reflection pickup unchanged.
+Next: Increase photon_beam density and later add indexed OBJ export for generated lighting surfaces.

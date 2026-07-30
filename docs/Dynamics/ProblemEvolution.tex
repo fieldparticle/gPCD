@@ -3807,3 +3807,54 @@ performance step.  The optimization target is
 direct, bounded mapping from hit normal to sphere surface vertices, comparable
 to the wall's direct local \(u/v\) addressing, instead of any broad scan or
 large write neighborhood.
+
+\subsection{Lighting Surface Smoothing Stays On Indexed Surface Vertices}
+
+\subsubsection{previous form}
+
+The active \texttt{LightingBall} surface path wrote visible light into
+\texttt{LightingSurfaceVertex.light}.  Early generated OBJ surfaces were
+treated as flat triangle lists, so a physical wall or sphere location could
+exist as multiple duplicated vertices.  This made smoothing and
+\texttt{contact\_illumination} behavior harder to reason about, because the
+visible color belonged to triangle-expanded vertices rather than shared
+surface points.
+
+\subsubsection{current form}
+
+\texttt{ResourceLightingSurface} now builds indexed runtime geometry for the
+lighting surfaces.  Rectangle walls use a unique \((u+1)(v+1)\) vertex grid
+and an index buffer for triangle connectivity.  The sphere uses shared
+latitude/longitude vertices with wrapped segment indices.  Compute still
+writes:
+\begin{verbatim}
+LightingSurface[vertexID].light
+\end{verbatim}
+and the graphics pass renders the indexed surface.  The generated metadata now
+uses unique runtime vertex counts instead of OBJ face-vertex counts.
+
+Visible deposit smoothing has a per-object configuration field:
+\begin{verbatim}
+deposit_radius = 0.35;
+\end{verbatim}
+The value is exported through \texttt{lighting\_surface\_objects} and generated
+into \texttt{LightingSurfaceObjectMetadata.depositRadius}.  A zero value keeps
+the automatic local splat size; a positive value widens the wall or sphere
+deposit footprint.  The first tests showed that this knob does not fully solve
+shadow-wall roughness, so higher photon density remains the next practical
+visual smoothing path.
+
+\subsubsection{difference outcome}
+
+particle solution
+
+\subsubsection{Analysis}
+
+The indexed runtime surface is the correct direction because it preserves the
+simple one-buffer lighting contract while removing duplicate triangle-expanded
+lighting state.  It avoids reintroducing the deferred
+\texttt{LightingSurfaceNode} SSBO and keeps graphics/compute synchronization
+unchanged.  The exported OBJ files are still useful for Blender placement
+checks, but they do not yet encode the same shared-index topology.  A future
+cleanup should add indexed OBJ output so external inspection and Vulkan
+runtime geometry are easier to compare.

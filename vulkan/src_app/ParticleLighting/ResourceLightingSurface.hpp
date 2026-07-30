@@ -45,8 +45,32 @@ private:
 		uint32_t sphereLatSegments,
 		uint32_t sphereLonSegments,
 		uint32_t& emittedVertexID);
+	void BuildRectangleSurface(
+		uint32_t surfaceID,
+		uint32_t materialID,
+		const glm::vec4& initialSurfaceColor,
+		uint32_t rectangleUSegments,
+		uint32_t rectangleVSegments,
+		uint32_t& emittedVertexID);
+	void BuildSphereSurface(
+		uint32_t surfaceID,
+		uint32_t materialID,
+		const glm::vec4& initialSurfaceColor,
+		uint32_t sphereLatSegments,
+		uint32_t sphereLonSegments,
+		uint32_t& emittedVertexID);
+	void AppendSurfaceVertex(
+		const glm::vec3& position,
+		const glm::vec3& normal,
+		const glm::vec2& uv,
+		uint32_t surfaceType,
+		uint32_t surfaceID,
+		uint32_t materialID,
+		const glm::vec4& initialSurfaceColor,
+		uint32_t& emittedVertexID);
 
 	std::vector<LightingSurfaceVertex> m_SurfaceVertices;
+	std::vector<uint32_t> m_SurfaceIndices;
 };
 
 #endif

@@ -40,6 +40,9 @@ The next active lighting tasks are:
           Vulkan captures;
     \item smooth the OBJ-backed surface-vertex lighting footprint; the
           current behavior is correct but not yet visually smooth;
+    \item add indexed OBJ output for generated lighting surfaces so Blender
+          and other inspection tools can see the same shared-vertex topology
+          that Vulkan builds internally for lighting surfaces;
     \item optimize sphere surface deposit in \texttt{FPML.comp}.  The first
           profiling pass measured about \(1000\) FPS for no surface deposit,
           wall deposit only, and reflection pickup plus wall deposit, but

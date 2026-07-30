@@ -193,8 +193,12 @@ buffer.  \texttt{ShaderObj.cpp} also generates
 \texttt{LIGHTING\_SURFACE\_OBJECTS} metadata from
 \texttt{lighting\_surface\_objects}; each entry carries
 \texttt{surfaceType}, \texttt{surfaceID}, \texttt{materialID},
-\texttt{vertexOffset}, and \texttt{vertexCount}.  Rectangle-wall analytic
-geometry remains separate and is used only for collision/deposit projection.
+\texttt{vertexOffset}, \texttt{vertexCount},
+\texttt{initialSurfaceColor}, and \texttt{depositRadius}.
+\texttt{depositRadius} is a per-object smoothing knob: zero preserves the
+automatic mesh-step splat size, while a positive value widens the local
+visible deposit footprint for that surface.  Rectangle-wall analytic geometry
+remains separate and is used only for collision/deposit projection.
 Since compute updates lighting surfaces that graphics reads as vertex input,
 the \texttt{ParticleLighting} compute-finished wait includes vertex input,
 vertex shader, and fragment shader stages.
@@ -223,10 +227,12 @@ normal to nearby vertices in the OBJ-backed sphere surface and writes
 \texttt{LightingSurfaceVertex.light}.  The sphere and wall fragment paths
 therefore draw the same kind of interpolated vertex light.  This lets the
 surfaces use ordinary triangle interpolation to soften the footprint without
-making the moving photon point the final visible lighting result.  Because
-the first generated meshes are non-indexed, vertices are duplicated per
-triangle; compute deposits write local surface spans rather than one abstract
-shared grid vertex.
+making the moving photon point the final visible lighting result.  Vulkan now
+builds the runtime lighting surfaces as indexed geometry with shared vertices,
+even though the exported OBJ inspection files are still ordinary triangle OBJ
+files.  This removes duplicate per-triangle vertex light inside the runtime
+surface buffer.  A later cleanup should emit indexed OBJ files too, so
+Blender/debug inspection sees the same shared topology that the runtime uses.
 
 An attempted follow-up split the visible light state into a separate shared
 \texttt{LightingSurfaceNode} SSBO and made render vertices point at shared

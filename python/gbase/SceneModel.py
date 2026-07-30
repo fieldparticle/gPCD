@@ -448,6 +448,11 @@ def apply_scene_model(config):
             errors,
             f"{context}.initial_surface_color",
         )
+        deposit_radius = _as_nonnegative_float(
+            obj.get("deposit_radius", 0.0),
+            errors,
+            f"{context}.deposit_radius",
+        )
         surface_id = obj.get("surface_id")
         if type(surface_id) is int:
             if surface_id in surface_ids:
@@ -470,6 +475,7 @@ def apply_scene_model(config):
                         int(sphere_config["wall_flag"]),
                         int(sphere_config["material_id"]),
                         initial_surface_color=initial_surface_color,
+                        deposit_radius=deposit_radius,
                         sphere_lat_segments=int(sphere_config["sphere_lat_segments"]),
                         sphere_lon_segments=int(sphere_config["sphere_lon_segments"]),
                     )
@@ -488,6 +494,7 @@ def apply_scene_model(config):
                         int(rectangle_config["wall_flag"]),
                         int(rectangle_config["material_id"]),
                         initial_surface_color=initial_surface_color,
+                        deposit_radius=deposit_radius,
                         rectangle_u_segments=int(
                             rectangle_config["rectangle_u_segments"]
                         ),
@@ -510,6 +517,7 @@ def apply_scene_model(config):
                         int(curve_config["wall_flag"]),
                         int(curve_config["material_id"]),
                         initial_surface_color=initial_surface_color,
+                        deposit_radius=deposit_radius,
                     )
                 )
         else:

@@ -28,6 +28,7 @@ scene_model = {
       material_id 			= 2;
       surface_id 			= 2000;
       initial_surface_color 	= [0.0, 0.0, 0.0, 1.0];
+      deposit_radius 		= 0.65;
       roles 				= ["collision", "boundary_markers", "lighting_surface"];
       rectangle_u_segments 	= 80;
       rectangle_v_segments 	= 80;
@@ -52,10 +53,6 @@ scene_model = {
   );
   
 };
-
-// Enables persistent boundary-space lighting. Retired boundary_space_patch_*
-// keys must not be used; lighting is now cell-owned.
-boundary_space_lighting_enabled 	= true;
 
 // --------------------------------------------------------------------------
 // Domain and view
@@ -93,7 +90,7 @@ particle_streams = (
 
     release_start_frame 			= 10;
     release_columns 				= 1;
-    particles_per_wave 				= 8100;
+    particles_per_wave 				= 25600;
     spacing_factor 					= 1.05;
 
     inlet_axis 						= "x";
@@ -102,20 +99,20 @@ particle_streams = (
     span_u_axis 					= "y";
     span_u_min 						= 14.0;
     span_u_max 						= 28.0;
-    span_u_count 					= 90;
+    span_u_count 					= 160;
 
     span_v_axis 					= "z";
     span_v_min 						= 14.0;
     span_v_max 						= 28.0;
-    span_v_count 					= 90;
+    span_v_count 					= 160;
   },
   {
     name 							= "diffuse_beam_sphere";
     enabled 						= true;
     material_id 					= 4;
-    radius 							= 0.025;
+    radius 							= 0.015;
     particle_separation_distance 	= 0.005;
-	relative_mass 					= 0.25;
+	relative_mass 					= 0.025;
     // Dense x-directed beam matched to the shadow_wall y/z face.
     // Vulkan profile is dense: 80 x 80 = 6400 photons per wave.
     initial_particle_velocity 		= [-0.209968, 0.0, 0.0];

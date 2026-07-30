@@ -94,27 +94,32 @@ namespace
 void ResourceLightingSurface::Create(uint32_t BindPoint, Resource* particle)
 {
 	std::ostringstream objtxt;
+	std::ostringstream indexObjTxt;
 
 	m_BindPoint = BindPoint;
 	m_thisFramesBuffered = 1;
 	CreateLayout();
 	LoadLightingSurfaceObjects();
 
-	m_NumElements = static_cast<uint64_t>(m_SurfaceVertices.size());
+	m_NumElements = static_cast<uint64_t>(m_SurfaceIndices.size());
 	if (m_SurfaceVertices.empty())
 	{
 		LightingSurfaceVertex dummy{};
 		m_SurfaceVertices.push_back(dummy);
 	}
+	if (m_SurfaceIndices.empty())
+		m_SurfaceIndices.push_back(0u);
 
 	m_BufSize = static_cast<uint64_t>(sizeof(LightingSurfaceVertex)) *
 		static_cast<uint64_t>(m_SurfaceVertices.size());
-	m_Buffers.resize(m_thisFramesBuffered);
-	m_BuffersMemory.resize(m_thisFramesBuffered);
-	m_BuffersMapped.resize(m_thisFramesBuffered);
-	m_BufferInfo.resize(m_thisFramesBuffered);
-	m_DescriptorWrite.resize(m_thisFramesBuffered);
-	m_Allocation.resize(m_thisFramesBuffered);
+	uint64_t indexBufSize = static_cast<uint64_t>(sizeof(uint32_t)) *
+		static_cast<uint64_t>(m_SurfaceIndices.size());
+	m_Buffers.resize(2);
+	m_BuffersMemory.resize(2);
+	m_BuffersMapped.resize(2);
+	m_BufferInfo.resize(1);
+	m_DescriptorWrite.resize(1);
+	m_Allocation.resize(2);
 
 	objtxt << m_Name << " Number:" << 0 << std::ends;
 	VkBufferUsageFlags usage =
@@ -148,9 +153,29 @@ void ResourceLightingSurface::Create(uint32_t BindPoint, Resource* particle)
 		0,
 		m_BufSize);
 
+	indexObjTxt << m_Name << " Index Number:" << 0 << std::ends;
+	m_App->VMACreateDeviceBuffer(
+		indexBufSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+		VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_Buffers[1],
+		m_Allocation[1],
+		indexObjTxt.str());
+
+	vmaCopyMemoryToAllocation(
+		m_App->m_vmaAllocator,
+		m_SurfaceIndices.data(),
+		m_Allocation[1],
+		0,
+		indexBufSize);
+
 	m_SurfaceVertices.clear();
 	std::vector<LightingSurfaceVertex> empty;
 	m_SurfaceVertices.swap(empty);
+	m_SurfaceIndices.clear();
+	std::vector<uint32_t> emptyIndices;
+	m_SurfaceIndices.swap(emptyIndices);
 }
 
 void ResourceLightingSurface::CreateLayout()
@@ -177,6 +202,214 @@ uint32_t ResourceLightingSurface::SurfaceTypeID(const std::string& surfaceType)
 	throw std::runtime_error(errtxt.str().c_str());
 }
 
+void ResourceLightingSurface::AppendSurfaceVertex(
+	const glm::vec3& position,
+	const glm::vec3& normal,
+	const glm::vec2& uv,
+	uint32_t surfaceType,
+	uint32_t surfaceID,
+	uint32_t materialID,
+	const glm::vec4& initialSurfaceColor,
+	uint32_t& emittedVertexID)
+{
+	LightingSurfaceVertex vertex{};
+	vertex.pos = glm::vec4(position, static_cast<float>(surfaceID));
+	vertex.normal_flag = glm::vec4(SafeNormalize(normal), static_cast<float>(materialID));
+	vertex.light = initialSurfaceColor;
+	vertex.meta = glm::vec4(
+		uv.x,
+		uv.y,
+		static_cast<float>(emittedVertexID),
+		static_cast<float>(surfaceType));
+
+	m_SurfaceVertices.push_back(vertex);
+	emittedVertexID++;
+}
+
+void ResourceLightingSurface::BuildRectangleSurface(
+	uint32_t surfaceID,
+	uint32_t materialID,
+	const glm::vec4& initialSurfaceColor,
+	uint32_t rectangleUSegments,
+	uint32_t rectangleVSegments,
+	uint32_t& emittedVertexID)
+{
+	int segmentCount = 0;
+	config_setting_t* segmentList = nullptr;
+	if (CfgTst->CheckKey("rectangle_wall_segments"))
+		segmentList = CfgTst->StartStructure("rectangle_wall_segments", segmentCount);
+
+	config_setting_t* selected = nullptr;
+	for (int index = 0; segmentList != nullptr && index < segmentCount; ++index)
+	{
+		config_setting_t* segment = CfgTst->GetSubStructAddress(segmentList, index);
+		if (segment == nullptr || config_setting_length(segment) < 15)
+			continue;
+		uint32_t wallFlag =
+			static_cast<uint32_t>(config_setting_get_float_elem(segment, 14));
+		if (wallFlag == surfaceID)
+		{
+			selected = segment;
+			break;
+		}
+	}
+
+	if (selected == nullptr)
+	{
+		std::ostringstream errtxt;
+		errtxt << "No rectangle_wall_segments entry for lighting surface "
+			<< surfaceID << std::ends;
+		throw std::runtime_error(errtxt.str().c_str());
+	}
+
+	glm::vec3 origin(
+		static_cast<float>(config_setting_get_float_elem(selected, 0)),
+		static_cast<float>(config_setting_get_float_elem(selected, 1)),
+		static_cast<float>(config_setting_get_float_elem(selected, 2)));
+	glm::vec3 uAxis = SafeNormalize(glm::vec3(
+		static_cast<float>(config_setting_get_float_elem(selected, 3)),
+		static_cast<float>(config_setting_get_float_elem(selected, 4)),
+		static_cast<float>(config_setting_get_float_elem(selected, 5))));
+	glm::vec3 vAxis = SafeNormalize(glm::vec3(
+		static_cast<float>(config_setting_get_float_elem(selected, 6)),
+		static_cast<float>(config_setting_get_float_elem(selected, 7)),
+		static_cast<float>(config_setting_get_float_elem(selected, 8))));
+	float uLength = static_cast<float>(config_setting_get_float_elem(selected, 9));
+	float vLength = static_cast<float>(config_setting_get_float_elem(selected, 10));
+	glm::vec3 normal = SafeNormalize(glm::vec3(
+		static_cast<float>(config_setting_get_float_elem(selected, 11)),
+		static_cast<float>(config_setting_get_float_elem(selected, 12)),
+		static_cast<float>(config_setting_get_float_elem(selected, 13))));
+
+	uint32_t baseVertex = static_cast<uint32_t>(m_SurfaceVertices.size());
+	for (uint32_t uIndex = 0u; uIndex <= rectangleUSegments; ++uIndex)
+	{
+		float uCoord = uLength * static_cast<float>(uIndex) /
+			static_cast<float>(rectangleUSegments);
+		for (uint32_t vIndex = 0u; vIndex <= rectangleVSegments; ++vIndex)
+		{
+			float vCoord = vLength * static_cast<float>(vIndex) /
+				static_cast<float>(rectangleVSegments);
+			glm::vec3 position = origin + uAxis * uCoord + vAxis * vCoord;
+			glm::vec2 uv(
+				uLength <= 0.0f ? 0.0f : uCoord / uLength,
+				vLength <= 0.0f ? 0.0f : vCoord / vLength);
+			AppendSurfaceVertex(
+				position,
+				normal,
+				uv,
+				BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL,
+				surfaceID,
+				materialID,
+				initialSurfaceColor,
+				emittedVertexID);
+		}
+	}
+
+	uint32_t rowStride = rectangleVSegments + 1u;
+	for (uint32_t uIndex = 0u; uIndex < rectangleUSegments; ++uIndex)
+	{
+		for (uint32_t vIndex = 0u; vIndex < rectangleVSegments; ++vIndex)
+		{
+			uint32_t p00 = baseVertex + uIndex * rowStride + vIndex;
+			uint32_t p10 = baseVertex + (uIndex + 1u) * rowStride + vIndex;
+			uint32_t p11 = baseVertex + (uIndex + 1u) * rowStride + vIndex + 1u;
+			uint32_t p01 = baseVertex + uIndex * rowStride + vIndex + 1u;
+
+			m_SurfaceIndices.push_back(p00);
+			m_SurfaceIndices.push_back(p10);
+			m_SurfaceIndices.push_back(p11);
+			m_SurfaceIndices.push_back(p00);
+			m_SurfaceIndices.push_back(p11);
+			m_SurfaceIndices.push_back(p01);
+		}
+	}
+}
+
+void ResourceLightingSurface::BuildSphereSurface(
+	uint32_t surfaceID,
+	uint32_t materialID,
+	const glm::vec4& initialSurfaceColor,
+	uint32_t sphereLatSegments,
+	uint32_t sphereLonSegments,
+	uint32_t& emittedVertexID)
+{
+	if (!CfgTst->CheckKey("Lighting_ball"))
+		throw std::runtime_error("Lighting_ball is required for sphere lighting surface");
+
+	glm::vec3 center(
+		CfgTst->GetFloat("Lighting_ball.x", true),
+		CfgTst->GetFloat("Lighting_ball.y", true),
+		CfgTst->GetFloat("Lighting_ball.z", true));
+	float radius = CfgTst->GetFloat("Lighting_ball.radius", true);
+	uint32_t baseVertex = static_cast<uint32_t>(m_SurfaceVertices.size());
+	const float pi = 3.14159265358979323846f;
+
+	for (uint32_t ringIndex = 0u; ringIndex <= sphereLatSegments; ++ringIndex)
+	{
+		float theta = pi * static_cast<float>(ringIndex) /
+			static_cast<float>(sphereLatSegments);
+		float sinTheta = std::sin(theta);
+		float cosTheta = std::cos(theta);
+		for (uint32_t segmentIndex = 0u; segmentIndex < sphereLonSegments; ++segmentIndex)
+		{
+			float phi = 2.0f * pi * static_cast<float>(segmentIndex) /
+				static_cast<float>(sphereLonSegments);
+			glm::vec3 normal(
+				sinTheta * std::cos(phi),
+				sinTheta * std::sin(phi),
+				cosTheta);
+			glm::vec3 position = center + radius * normal;
+			glm::vec2 uv(
+				static_cast<float>(segmentIndex) / static_cast<float>(sphereLonSegments),
+				static_cast<float>(ringIndex) / static_cast<float>(sphereLatSegments));
+			AppendSurfaceVertex(
+				position,
+				normal,
+				uv,
+				BOUNDARY_LIGHT_SURFACE_SPHERE,
+				surfaceID,
+				materialID,
+				initialSurfaceColor,
+				emittedVertexID);
+		}
+	}
+
+	for (uint32_t ringIndex = 0u; ringIndex < sphereLatSegments; ++ringIndex)
+	{
+		for (uint32_t segmentIndex = 0u; segmentIndex < sphereLonSegments; ++segmentIndex)
+		{
+			uint32_t nextSegment = (segmentIndex + 1u) % sphereLonSegments;
+			uint32_t p00 = baseVertex + ringIndex * sphereLonSegments + segmentIndex;
+			uint32_t p10 = baseVertex + ringIndex * sphereLonSegments + nextSegment;
+			uint32_t p01 = baseVertex + (ringIndex + 1u) * sphereLonSegments + segmentIndex;
+			uint32_t p11 = baseVertex + (ringIndex + 1u) * sphereLonSegments + nextSegment;
+
+			if (ringIndex == 0u)
+			{
+				m_SurfaceIndices.push_back(p00);
+				m_SurfaceIndices.push_back(p11);
+				m_SurfaceIndices.push_back(p01);
+			}
+			else if (ringIndex + 1u == sphereLatSegments)
+			{
+				m_SurfaceIndices.push_back(p00);
+				m_SurfaceIndices.push_back(p10);
+				m_SurfaceIndices.push_back(p01);
+			}
+			else
+			{
+				m_SurfaceIndices.push_back(p00);
+				m_SurfaceIndices.push_back(p10);
+				m_SurfaceIndices.push_back(p11);
+				m_SurfaceIndices.push_back(p00);
+				m_SurfaceIndices.push_back(p11);
+				m_SurfaceIndices.push_back(p01);
+			}
+		}
+	}
+}
+
 void ResourceLightingSurface::LoadObjSurface(
 	const std::string& objFile,
 	uint32_t surfaceType,
@@ -189,60 +422,39 @@ void ResourceLightingSurface::LoadObjSurface(
 	uint32_t sphereLonSegments,
 	uint32_t& emittedVertexID)
 {
-	std::vector<glm::vec3> positions;
-	std::vector<glm::vec2> uvs;
-	std::vector<glm::vec3> normals;
-
-	if (!loadOBJ(objFile.c_str(), positions, uvs, normals))
+	if (surfaceType == BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL)
 	{
-		std::ostringstream errtxt;
-		errtxt << "Unable to load lighting surface OBJ: " << objFile << std::ends;
-		throw std::runtime_error(errtxt.str().c_str());
+		BuildRectangleSurface(
+			surfaceID,
+			materialID,
+			initialSurfaceColor,
+			rectangleUSegments,
+			rectangleVSegments,
+			emittedVertexID);
+		return;
+	}
+	if (surfaceType == BOUNDARY_LIGHT_SURFACE_SPHERE)
+	{
+		BuildSphereSurface(
+			surfaceID,
+			materialID,
+			initialSurfaceColor,
+			sphereLatSegments,
+			sphereLonSegments,
+			emittedVertexID);
+		return;
 	}
 
-	if (positions.empty())
-	{
-		std::ostringstream errtxt;
-		errtxt << "Lighting surface OBJ has no vertices: " << objFile << std::ends;
-		throw std::runtime_error(errtxt.str().c_str());
-	}
-
-	for (size_t index = 0; index < positions.size(); ++index)
-	{
-		glm::vec3 normal(0.0f);
-		if (index < normals.size())
-			normal = SafeNormalize(normals[index]);
-
-		if (glm::length(normal) <= 1.0e-6f && (index / 3u) * 3u + 2u < positions.size())
-		{
-			size_t base = (index / 3u) * 3u;
-			normal = SafeNormalize(glm::cross(
-				positions[base + 1u] - positions[base],
-				positions[base + 2u] - positions[base]));
-		}
-
-		glm::vec2 uv(0.0f);
-		if (index < uvs.size())
-			uv = uvs[index];
-
-		LightingSurfaceVertex vertex{};
-		vertex.pos = glm::vec4(positions[index], static_cast<float>(surfaceID));
-		vertex.normal_flag = glm::vec4(normal, static_cast<float>(materialID));
-		vertex.light = initialSurfaceColor;
-		vertex.meta = glm::vec4(
-			uv.x,
-			uv.y,
-			static_cast<float>(emittedVertexID),
-			static_cast<float>(surfaceType));
-
-		m_SurfaceVertices.push_back(vertex);
-		emittedVertexID++;
-	}
+	std::ostringstream errtxt;
+	errtxt << "Unsupported lighting surface type for OBJ-backed indexed surface: "
+		<< surfaceType << " from " << objFile << std::ends;
+	throw std::runtime_error(errtxt.str().c_str());
 }
 
 void ResourceLightingSurface::LoadLightingSurfaceObjects()
 {
 	m_SurfaceVertices.clear();
+	m_SurfaceIndices.clear();
 
 	int objectCount = 0;
 	config_setting_t* objectList = nullptr;

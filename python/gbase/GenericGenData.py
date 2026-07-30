@@ -2535,6 +2535,10 @@ class GenericGenData:
                     )
                     + "];\n"
                 )
+                output.write(
+                    "        deposit_radius = "
+                    f"{float(surface_object.get('deposit_radius', 0.0)):.9f};\n"
+                )
                 if "rectangle_u_segments" in surface_object:
                     output.write(
                         "        rectangle_u_segments = "

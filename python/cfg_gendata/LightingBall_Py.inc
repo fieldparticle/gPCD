@@ -28,6 +28,7 @@ scene_model = {
       material_id 	= 2;
       surface_id 	= 2000;
       initial_surface_color = [0.0, 0.0, 0.0, 1.0];
+      deposit_radius = 0.35;
       roles 		= ["collision", "boundary_markers", "lighting_surface"];
       rectangle_u_segments = 80;
       rectangle_v_segments = 80;
@@ -51,10 +52,6 @@ scene_model = {
     }
   );
 };
-
-// Enables persistent boundary-space lighting. Retired boundary_space_patch_*
-// keys must not be used; lighting is now cell-owned.
-boundary_space_lighting_enabled 	= true;
 
 // --------------------------------------------------------------------------
 // Domain and view

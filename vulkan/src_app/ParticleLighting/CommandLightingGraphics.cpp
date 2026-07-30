@@ -188,8 +188,15 @@ void CommandLightingGraphics::RecordSubPassCube(uint32_t imageindex, uint32_t cu
 		VkBuffer* wallVertexBuffers = static_cast<VkBuffer*>(&wallSurface->m_Buffers[0]);
 		vkCmdBindVertexBuffers(m_CommandBuffers[currentBuffer], 0, 1, wallVertexBuffers, offsets);
 
-		uint32_t wallVertexCount = wallSurface->m_NumElements;
-		vkCmdDraw(m_CommandBuffers[currentBuffer], wallVertexCount, 1, 0, 0);
+		VkBuffer* wallIndexBuffer = static_cast<VkBuffer*>(&wallSurface->m_Buffers[1]);
+		vkCmdBindIndexBuffer(
+			m_CommandBuffers[currentBuffer],
+			*wallIndexBuffer,
+			0,
+			VK_INDEX_TYPE_UINT32);
+
+		uint32_t wallIndexCount = static_cast<uint32_t>(wallSurface->m_NumElements);
+		vkCmdDrawIndexed(m_CommandBuffers[currentBuffer], wallIndexCount, 1, 0, 0, 0);
 	}
 }
 void CommandLightingGraphics::RecordSubPassParticle(uint32_t imageindex, uint32_t currentBuffer)

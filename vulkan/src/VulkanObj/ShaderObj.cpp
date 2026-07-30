@@ -167,32 +167,6 @@ namespace
 		throw std::runtime_error("material_properties[" + std::to_string(index) + "].contact_illumination must be a string or integer");
 	}
 
-	uint32_t CountObjFaceVertices(const std::string& objFile)
-	{
-		std::ifstream input(objFile);
-		if (!input.is_open())
-		{
-			std::ostringstream errtxt;
-			errtxt << "Unable to open lighting surface OBJ: " << objFile << std::ends;
-			throw std::runtime_error(errtxt.str().c_str());
-		}
-
-		uint32_t vertexCount = 0u;
-		std::string line;
-		while (std::getline(input, line))
-		{
-			if (line.size() < 2u || line[0] != 'f' || line[1] != ' ')
-				continue;
-
-			std::istringstream face(line.substr(2u));
-			std::string token;
-			while (face >> token)
-				vertexCount++;
-		}
-
-		return vertexCount;
-	}
-
 	struct LightingSurfaceObjectInfo
 	{
 		uint32_t surfaceType = 0u;
@@ -201,6 +175,7 @@ namespace
 		uint32_t vertexOffset = 0u;
 		uint32_t vertexCount = 0u;
 		double initialSurfaceColor[4] = { 0.0, 0.0, 0.0, 1.0 };
+		double depositRadius = 0.0;
 		uint32_t rectangleUSegments = 0u;
 		uint32_t rectangleVSegments = 0u;
 		uint32_t sphereLatSegments = 0u;
@@ -247,6 +222,39 @@ namespace
 			}
 			color[channel] = value;
 		}
+	}
+
+	double ReadOptionalNonnegativeFloat(
+		config_setting_t* object,
+		int objectIndex,
+		const char* fieldName,
+		double defaultValue)
+	{
+		config_setting_t* setting = config_setting_lookup(object, fieldName);
+		if (setting == nullptr)
+			return defaultValue;
+
+		int settingType = config_setting_type(setting);
+		double value = 0.0;
+		if (settingType == CONFIG_TYPE_FLOAT)
+			value = config_setting_get_float(setting);
+		else if (settingType == CONFIG_TYPE_INT)
+			value = static_cast<double>(config_setting_get_int(setting));
+		else
+		{
+			throw std::runtime_error(
+				"lighting_surface_objects[" + std::to_string(objectIndex) +
+				"]." + fieldName + " must be numeric"
+			);
+		}
+		if (!std::isfinite(value) || value < 0.0)
+		{
+			throw std::runtime_error(
+				"lighting_surface_objects[" + std::to_string(objectIndex) +
+				"]." + fieldName + " must be finite and nonnegative"
+			);
+		}
+		return value;
 	}
 
 	std::vector<LightingSurfaceObjectInfo> LightingSurfaceObjectOffsets(ConfigObj* cfg)
@@ -297,17 +305,31 @@ namespace
 				info.surfaceID = static_cast<uint32_t>(surfaceID);
 				info.materialID = static_cast<uint32_t>(materialID);
 				info.vertexOffset = vertexOffset;
-				info.vertexCount = CountObjFaceVertices(objFile);
 				ReadInitialSurfaceColor(object, index, info.initialSurfaceColor);
+				info.depositRadius = ReadOptionalNonnegativeFloat(
+					object, index, "deposit_radius", 0.0);
 				if (surfaceType == 2u)
 				{
 					info.rectangleUSegments = ReadPositiveUInt(object, index, "rectangle_u_segments");
 					info.rectangleVSegments = ReadPositiveUInt(object, index, "rectangle_v_segments");
+					info.vertexCount =
+						(info.rectangleUSegments + 1u) *
+						(info.rectangleVSegments + 1u);
 				}
 				else if (surfaceType == 1u)
 				{
 					info.sphereLatSegments = ReadPositiveUInt(object, index, "sphere_lat_segments");
 					info.sphereLonSegments = ReadPositiveUInt(object, index, "sphere_lon_segments");
+					info.vertexCount =
+						(info.sphereLatSegments + 1u) *
+						info.sphereLonSegments;
+				}
+				else
+				{
+					std::ostringstream errtxt;
+					errtxt << "Unsupported lighting surface type for indexed metadata: "
+						<< surfaceType << " from " << objFile << std::ends;
+					throw std::runtime_error(errtxt.str().c_str());
 				}
 				objects.push_back(info);
 				vertexOffset += info.vertexCount;
@@ -840,8 +862,8 @@ void ShaderObj::WriteWalls()
 
 	bool show_cell_boundary_cube = CfgApp->GetBool("application.show_cell_boundary_cube", true);
 	bool show_wall_as_boundary_cube = CfgApp->GetBool("application.show_wall_as_boundary_cube", true);
-	bool particle_as_spheres = CfgApp->GetBool("application.particle_as_spheres", true);
 	bool show_boundary_as_obj = CfgApp->GetBool("application.boundary_as_obj", true);
+	bool has_lighting_ball = CfgTst->CheckKey("Lighting_ball");
 
 	std::string wlflg = "0u";
 	wlflg = "1u;";
@@ -852,7 +874,7 @@ void ShaderObj::WriteWalls()
 		boundary << "#define HAS_BOUNDARY" << "\n";
 
 	}
-	if (particle_as_spheres == true)
+	if (has_lighting_ball)
 		boundary << "#define HAS_SPHERE" << "\n";
 
 	std::ostringstream death_str;
@@ -928,6 +950,7 @@ std::ostringstream ShaderObj::RectangleWalls()
 		<< "    uint sphereLatSegments;\n"
 		<< "    uint sphereLonSegments;\n"
 		<< "    vec4 initialSurfaceColor;\n"
+		<< "    float depositRadius;\n"
 		<< "};\n\n";
 
 	wall_str
@@ -960,7 +983,8 @@ std::ostringstream ShaderObj::RectangleWalls()
 			<< "const LightingSurfaceObjectMetadata LIGHTING_SURFACE_OBJECTS[1] = "
 			<< "LightingSurfaceObjectMetadata[1](\n"
 			<< "    LightingSurfaceObjectMetadata(0u, 0u, 0u, 0u, 0u, 0u, 0u, "
-			<< "vec4(0.000000000, 0.000000000, 0.000000000, 1.000000000))\n"
+			<< "vec4(0.000000000, 0.000000000, 0.000000000, 1.000000000), "
+			<< "0.000000000)\n"
 			<< ");\n\n";
 	}
 	else
@@ -985,7 +1009,8 @@ std::ostringstream ShaderObj::RectangleWalls()
 				<< object.initialSurfaceColor[0] << ", "
 				<< object.initialSurfaceColor[1] << ", "
 				<< object.initialSurfaceColor[2] << ", "
-				<< object.initialSurfaceColor[3] << "))";
+				<< object.initialSurfaceColor[3] << "), "
+				<< object.depositRadius << ")";
 			if (objectIndex + 1u < surfaceObjects.size())
 				wall_str << ",";
 			wall_str << "\n";
