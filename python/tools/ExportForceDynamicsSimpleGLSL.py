@@ -2873,6 +2873,71 @@ uint boundary_light_sphere_vertex_id(
     return ringBase + (segmentIndex % surfaceObject.sphereLonSegments);
 }
 
+uint boundary_light_sphere_attached_material_id(
+    vec3 hitNormal,
+    uint surfaceID,
+    uint fallbackMaterialID)
+{
+    LightingSurfaceObjectMetadata surfaceObject =
+        boundary_light_surface_object_metadata(
+            BOUNDARY_LIGHT_SURFACE_SPHERE,
+            surfaceID);
+    if (surfaceObject.vertexOffset == npos ||
+        surfaceObject.vertexCount == 0u ||
+        surfaceObject.sphereLatSegments < 2u ||
+        surfaceObject.sphereLonSegments < 3u)
+    {
+        return fallbackMaterialID;
+    }
+
+    uint latticeVertexCount =
+        (surfaceObject.sphereLatSegments + 1u) *
+        surfaceObject.sphereLonSegments;
+    if (surfaceObject.vertexCount <= latticeVertexCount)
+    {
+        return fallbackMaterialID;
+    }
+
+    vec3 normal = normalize(hitNormal);
+    float attachedAngularRadius = surfaceObject.depositRadius > EPSILON &&
+        LIGHTING_BALL_RADIUS > EPSILON
+        ? surfaceObject.depositRadius / LIGHTING_BALL_RADIUS
+        : acos(0.94);
+    attachedAngularRadius = max(attachedAngularRadius, acos(0.94));
+    attachedAngularRadius = clamp(attachedAngularRadius, 0.001, FORCE_DYNAMICS_PI);
+    float attachedMinDot = cos(attachedAngularRadius);
+    uint bestMaterialID = fallbackMaterialID;
+    float bestAlignment = -1.0;
+    uint firstAttachedVertex = surfaceObject.vertexOffset + latticeVertexCount;
+    uint endAttachedVertex = surfaceObject.vertexOffset + surfaceObject.vertexCount;
+    for (uint attachedVertexID = firstAttachedVertex;
+         attachedVertexID < endAttachedVertex;
+         ++attachedVertexID)
+    {
+        vec3 attachedVector =
+            LightingSurface[attachedVertexID].pos.xyz - LIGHTING_BALL_CENTER;
+        if (length(attachedVector) <= EPSILON)
+        {
+            continue;
+        }
+        float alignment = dot(normalize(attachedVector), normal);
+        if (alignment < attachedMinDot || alignment <= bestAlignment)
+        {
+            continue;
+        }
+        uint attachedMaterialID =
+            uint(round(LightingSurface[attachedVertexID].normal_flag.w));
+        if (attachedMaterialID == 0u ||
+            attachedMaterialID == fallbackMaterialID)
+        {
+            continue;
+        }
+        bestAlignment = alignment;
+        bestMaterialID = attachedMaterialID;
+    }
+    return bestMaterialID;
+}
+
 vec3 photon_pickup_sphere_quad_rgb(
     uint SourceID,
     vec3 hitNormal,
@@ -2881,7 +2946,7 @@ vec3 photon_pickup_sphere_quad_rgb(
 {
     fpml_profile_count_reflection_pickup();
 #if !FPML_ENABLE_REFLECTION_PICKUP
-    return photon_pickup_material_rgb(SourceID, fallbackMaterialID);
+    return vec3(0.0);
 #else
     LightingSurfaceObjectMetadata surfaceObject =
         boundary_light_surface_object_metadata(
@@ -2892,10 +2957,89 @@ vec3 photon_pickup_sphere_quad_rgb(
         surfaceObject.sphereLatSegments < 2u ||
         surfaceObject.sphereLonSegments < 3u)
     {
-        return photon_pickup_material_rgb(SourceID, fallbackMaterialID);
+        return vec3(0.0);
     }
 
     vec3 normal = normalize(hitNormal);
+
+    float attachedAngularRadius = surfaceObject.depositRadius > EPSILON &&
+        LIGHTING_BALL_RADIUS > EPSILON
+        ? surfaceObject.depositRadius / LIGHTING_BALL_RADIUS
+        : acos(0.985);
+    attachedAngularRadius = clamp(attachedAngularRadius, 0.001, FORCE_DYNAMICS_PI);
+    float attachedMinDot = cos(attachedAngularRadius);
+    uint latticeVertexCount =
+        (surfaceObject.sphereLatSegments + 1u) *
+        surfaceObject.sphereLonSegments;
+    if (surfaceObject.vertexCount > latticeVertexCount)
+    {
+        vec4 bestAttachedLight = vec4(0.0);
+        float bestAttachedScore = -1.0;
+        uint bestAttachedMaterialID = surfaceObject.materialID;
+        float bestAttachedMaterialScore = -1.0;
+        uint firstAttachedVertex = surfaceObject.vertexOffset + latticeVertexCount;
+        uint endAttachedVertex = surfaceObject.vertexOffset + surfaceObject.vertexCount;
+        for (uint attachedVertexID = firstAttachedVertex;
+             attachedVertexID < endAttachedVertex;
+             ++attachedVertexID)
+        {
+            vec3 attachedVector =
+                LightingSurface[attachedVertexID].pos.xyz - LIGHTING_BALL_CENTER;
+            if (length(attachedVector) <= EPSILON)
+            {
+                continue;
+            }
+            float alignment = dot(normalize(attachedVector), normal);
+            if (alignment < attachedMinDot)
+            {
+                continue;
+            }
+            uint attachedMaterialID =
+                uint(round(LightingSurface[attachedVertexID].normal_flag.w));
+            if (attachedMaterialID != 0u &&
+                attachedMaterialID != surfaceObject.materialID &&
+                alignment > bestAttachedMaterialScore)
+            {
+                bestAttachedMaterialScore = alignment;
+                bestAttachedMaterialID = attachedMaterialID;
+            }
+            vec4 attachedLight = LightingSurface[attachedVertexID].light;
+            if (attachedLight.w <= 0.5)
+            {
+                continue;
+            }
+            float luminance = boundary_light_rgb_luminance(attachedLight.rgb);
+            float score = luminance * alignment;
+            if (score > bestAttachedScore)
+            {
+                bestAttachedScore = score;
+                bestAttachedLight = attachedLight;
+            }
+        }
+
+        if (bestAttachedScore >= 0.0)
+        {
+            return clamp(
+                bestAttachedLight.rgb * photon_relative_mass(SourceID),
+                vec3(0.0),
+                vec3(1.0));
+        }
+
+        if (bestAttachedMaterialScore >= 0.0)
+        {
+            return clamp(
+                boundary_light_material_color(bestAttachedMaterialID).rgb *
+                    photon_relative_mass(SourceID),
+                vec3(0.0),
+                vec3(1.0));
+        }
+    }
+
+    if (fallbackMaterialID != surfaceObject.materialID)
+    {
+        return photon_pickup_material_rgb(SourceID, fallbackMaterialID);
+    }
+
     float theta = acos(clamp(normal.z, -1.0, 1.0));
     float phi = atan(normal.y, normal.x);
     if (phi < 0.0)
@@ -2939,7 +3083,7 @@ vec3 photon_pickup_sphere_quad_rgb(
 
     if (bestLuminance < 0.0)
     {
-        return photon_pickup_material_rgb(SourceID, fallbackMaterialID);
+        return vec3(0.0);
     }
 
     return clamp(
@@ -2960,14 +3104,36 @@ void boundary_light_write_surface_vertex(
     {
         return;
     }
+    uint vertexMaterialID =
+        uint(round(LightingSurface[vertexID].normal_flag.w));
+    if (vertexMaterialID == 0u)
+    {
+        vertexMaterialID = surfaceObject.materialID;
+    }
+
     vec3 clampedRgb = clamp(rgb, vec3(0.0), vec3(1.0));
+    vec3 vertexAlbedo = clamp(LightingSurface[vertexID].albedo.rgb, vec3(0.0), vec3(1.0));
+    bool hasObjAlbedo = length(vertexAlbedo - vec3(1.0)) > 0.0001;
+    if (hasObjAlbedo)
+    {
+        float intensity = max(max(clampedRgb.r, clampedRgb.g), clampedRgb.b);
+        clampedRgb = clamp(vertexAlbedo * intensity, vec3(0.0), vec3(1.0));
+    }
+    else if (vertexMaterialID != surfaceObject.materialID)
+    {
+        float intensity = max(max(clampedRgb.r, clampedRgb.g), clampedRgb.b);
+        clampedRgb = clamp(
+            boundary_light_material_color(vertexMaterialID).rgb * intensity,
+            vec3(0.0),
+            vec3(1.0));
+    }
     if (max(max(clampedRgb.r, clampedRgb.g), clampedRgb.b) <= 0.0)
     {
         return;
     }
     vec4 currentLight = LightingSurface[vertexID].light;
     uint illuminationMode =
-        boundary_light_material_contact_illumination(surfaceObject.materialID);
+        boundary_light_material_contact_illumination(vertexMaterialID);
 
     vec4 initialLight = surfaceObject.initialSurfaceColor;
     bool stillAtInitialColor =
@@ -3218,6 +3384,41 @@ void boundary_light_deposit_sphere_cell_vertices(
     if (weight > 0.0) { boundary_light_write_surface_vertex(surfaceObject, vertex11, rgb * weight); }
 }
 
+void boundary_light_deposit_sphere_attached_vertices(
+    LightingSurfaceObjectMetadata surfaceObject,
+    vec3 targetNormal,
+    float minDot,
+    float invSpan,
+    vec3 rgb)
+{
+    uint latticeVertexCount =
+        (surfaceObject.sphereLatSegments + 1u) *
+        surfaceObject.sphereLonSegments;
+    if (surfaceObject.vertexCount <= latticeVertexCount)
+    {
+        return;
+    }
+
+    uint firstVertex = surfaceObject.vertexOffset + latticeVertexCount;
+    uint endVertex = surfaceObject.vertexOffset + surfaceObject.vertexCount;
+    for (uint vertexID = firstVertex; vertexID < endVertex; ++vertexID)
+    {
+        vec3 radialNormal =
+            normalize(LightingSurface[vertexID].pos.xyz - LIGHTING_BALL_CENTER);
+        float alignment = dot(radialNormal, targetNormal);
+        float weight = alignment < minDot ?
+            0.0 :
+            clamp((alignment - minDot) * invSpan, 0.0, 1.0);
+        if (weight > 0.0)
+        {
+            boundary_light_write_surface_vertex(
+                surfaceObject,
+                vertexID,
+                rgb * weight);
+        }
+    }
+}
+
 void DepositLightingSurfaceSphereVertexSplat(
     vec3 hitNormal,
     uint surfaceID,
@@ -3294,6 +3495,13 @@ void DepositLightingSurfaceSphereVertexSplat(
                 rgb);
         }
     }
+
+    boundary_light_deposit_sphere_attached_vertices(
+        surfaceObject,
+        targetNormal,
+        minDot,
+        invSpan,
+        rgb);
 }
 
 vec3 boundary_light_wall_incidence_normal(uint SourceID, uint BoundaryID, vec3 fallbackNormal)
@@ -3481,9 +3689,14 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                                     + lightingBallResult.segment.normal
                                     * LIGHTING_BALL_RADIUS;
                                 fpml_profile_count_sphere_hit();
+                                uint sphereMaterialID =
+                                    boundary_light_sphere_attached_material_id(
+                                        lightingBallResult.segment.normal,
+                                        LIGHTING_BALL_WALL_FLAG,
+                                        LIGHTING_BALL_MATERIAL_ID);
                                 uint sphereBehavior =
                                     boundary_light_material_surface_behavior(
-                                        LIGHTING_BALL_MATERIAL_ID);
+                                        sphereMaterialID);
                                 if (IsReflectionPhotonParticle(SourceID)) {
                                     if (sphereBehavior ==
                                             PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR) {
@@ -3493,7 +3706,7 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                                                 SourceID,
                                                 lightingBallResult.segment.normal,
                                                 LIGHTING_BALL_WALL_FLAG,
-                                                LIGHTING_BALL_MATERIAL_ID));
+                                                sphereMaterialID));
                                         photonVelocity =
                                             ReverseFixedSpeed(photonVelocity);
                                         photonReflected = true;
@@ -3504,7 +3717,7 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                                 float depositFraction = photon_deposit_fraction(
                                     photonVelocity,
                                     lightingBallResult.segment.normal,
-                                    LIGHTING_BALL_MATERIAL_ID);
+                                    sphereMaterialID);
                                 float preTransferMass = photon_relative_mass(SourceID);
                                 float remainingMass =
                                     reduce_photon_mass_by_deposit_fraction(
@@ -3516,7 +3729,7 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                                     sphereRgb = photon_deposit_material_color_rgb(
                                         depositFraction,
                                         preTransferMass,
-                                        LIGHTING_BALL_MATERIAL_ID);
+                                        uint(round(P[SourceID].material_id)));
                                 }
                                 else if (sphereBehavior == PHOTON_SURFACE_BEHAVIOR_ABSORB)
                                 {

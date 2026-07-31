@@ -405,6 +405,39 @@ def _optional_mesh_file(obj):
     return str(raw_value)
 
 
+def _obj_regions(obj, errors, context):
+    raw_regions = obj.get("obj_regions", ())
+    if raw_regions is None:
+        return ()
+    regions = []
+    for index, region in enumerate(raw_regions):
+        region_context = f"{context}.obj_regions[{index}]"
+        if not hasattr(region, "get"):
+            errors.append(f"{region_context} must be a key-value object")
+            continue
+        obj_name = _as_required_string(
+            region.get("obj_name"),
+            errors,
+            f"{region_context}.obj_name",
+        )
+        material_id = _as_nonnegative_int(
+            region.get("material_id", 0),
+            errors,
+            f"{region_context}.material_id",
+        )
+        if obj_name is None or material_id is None:
+            continue
+        regions.append(
+            AttrDict(
+                {
+                    "obj_name": obj_name,
+                    "material_id": material_id,
+                }
+            )
+        )
+    return tuple(regions)
+
+
 def apply_scene_model(config):
     """Derive legacy runtime geometry config from authored scene_model."""
     scene_model = config.get("scene_model")
@@ -479,6 +512,7 @@ def apply_scene_model(config):
                 continue
             obj_file = _optional_obj_file(obj)
             mesh_file = _optional_mesh_file(obj)
+            obj_regions = _obj_regions(obj, errors, context)
             if "collision" in roles or "boundary_markers" in roles:
                 if lighting_ball is not None:
                     errors.append("scene_model supports one Lighting_ball sphere for now")
@@ -496,6 +530,7 @@ def apply_scene_model(config):
                         sphere_lon_segments=int(sphere_config["sphere_lon_segments"]),
                         obj_file=obj_file,
                         mesh_file=mesh_file,
+                        obj_regions=obj_regions,
                     )
                 )
         elif object_type == "rectangle":

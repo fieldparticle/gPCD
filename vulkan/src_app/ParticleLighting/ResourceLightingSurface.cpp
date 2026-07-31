@@ -47,6 +47,8 @@ namespace
 		uint32_t indexOffset = 0u;
 		uint32_t indexCount = 0u;
 		std::vector<uint32_t> indices;
+		std::vector<glm::vec4> triangleColors;
+		std::vector<uint32_t> triangleMaterialIDs;
 	};
 
 	struct LightingSurfaceMeshSidecar
@@ -412,6 +414,68 @@ namespace
 					context + ".index_count does not match indices length");
 			}
 
+			config_setting_t* triangleColors =
+				config_setting_lookup(object, "triangle_colors");
+			if (triangleColors != nullptr)
+			{
+				if (config_setting_length(triangleColors) != triangleCount)
+				{
+					config_destroy(&meshConfig);
+					throw std::runtime_error(
+						context + ".triangle_colors length must match triangle count");
+				}
+				meshObject.triangleColors.reserve(static_cast<size_t>(triangleCount));
+				for (int triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex)
+				{
+					config_setting_t* color =
+						config_setting_get_elem(triangleColors, triangleIndex);
+					if (color == nullptr || config_setting_length(color) < 3)
+					{
+						config_destroy(&meshConfig);
+						throw std::runtime_error(
+							context + ".triangle_colors[" +
+							std::to_string(triangleIndex) +
+							"] must contain at least RGB values");
+					}
+					float alpha = config_setting_length(color) >= 4 ?
+						static_cast<float>(config_setting_get_float_elem(color, 3)) :
+						1.0f;
+					meshObject.triangleColors.push_back(glm::vec4(
+						static_cast<float>(config_setting_get_float_elem(color, 0)),
+						static_cast<float>(config_setting_get_float_elem(color, 1)),
+						static_cast<float>(config_setting_get_float_elem(color, 2)),
+						alpha));
+				}
+			}
+
+			config_setting_t* triangleMaterialIDs =
+				config_setting_lookup(object, "triangle_material_ids");
+			if (triangleMaterialIDs != nullptr)
+			{
+				if (config_setting_length(triangleMaterialIDs) != triangleCount)
+				{
+					config_destroy(&meshConfig);
+					throw std::runtime_error(
+						context + ".triangle_material_ids length must match triangle count");
+				}
+				meshObject.triangleMaterialIDs.reserve(static_cast<size_t>(triangleCount));
+				for (int triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex)
+				{
+					int materialID =
+						config_setting_get_int_elem(triangleMaterialIDs, triangleIndex);
+					if (materialID < 0)
+					{
+						config_destroy(&meshConfig);
+						throw std::runtime_error(
+							context + ".triangle_material_ids[" +
+							std::to_string(triangleIndex) +
+							"] must not be negative");
+					}
+					meshObject.triangleMaterialIDs.push_back(
+						static_cast<uint32_t>(materialID));
+				}
+			}
+
 			mesh.objects.push_back(meshObject);
 		}
 
@@ -596,6 +660,7 @@ void ResourceLightingSurface::AppendSurfaceVertex(
 	uint32_t surfaceID,
 	uint32_t materialID,
 	const glm::vec4& initialSurfaceColor,
+	const glm::vec4& albedo,
 	uint32_t& emittedVertexID)
 {
 	LightingSurfaceVertex vertex{};
@@ -607,6 +672,7 @@ void ResourceLightingSurface::AppendSurfaceVertex(
 		uv.y,
 		static_cast<float>(emittedVertexID),
 		static_cast<float>(surfaceType));
+	vertex.albedo = albedo;
 
 	m_SurfaceVertices.push_back(vertex);
 	emittedVertexID++;
@@ -688,6 +754,7 @@ void ResourceLightingSurface::BuildRectangleSurface(
 				surfaceID,
 				materialID,
 				initialSurfaceColor,
+				glm::vec4(1.0f),
 				emittedVertexID);
 		}
 	}
@@ -757,6 +824,7 @@ void ResourceLightingSurface::BuildSphereSurface(
 				surfaceID,
 				materialID,
 				initialSurfaceColor,
+				glm::vec4(1.0f),
 				emittedVertexID);
 		}
 	}
@@ -858,6 +926,56 @@ void ResourceLightingSurface::LoadObjSurface(
 		throw std::runtime_error(errtxt.str().c_str());
 	}
 
+	std::vector<glm::vec4> vertexAlbedos(
+		meshSidecar.vertexCount,
+		glm::vec4(1.0f));
+	std::vector<bool> hasVertexAlbedo(meshSidecar.vertexCount, false);
+	std::vector<uint32_t> vertexMaterialIDs(
+		meshSidecar.vertexCount,
+		materialID);
+	std::vector<bool> hasVertexMaterialID(meshSidecar.vertexCount, false);
+	if (!selectedMeshObject->triangleColors.empty())
+	{
+		for (size_t triangleIndex = 0u;
+			triangleIndex < selectedMeshObject->triangleColors.size();
+			++triangleIndex)
+		{
+			glm::vec4 color = selectedMeshObject->triangleColors[triangleIndex];
+			size_t firstIndex = triangleIndex * 3u;
+			for (size_t corner = 0u; corner < 3u; ++corner)
+			{
+				uint32_t vertexIndex =
+					selectedMeshObject->indices[firstIndex + corner];
+				if (!hasVertexAlbedo[vertexIndex])
+				{
+					vertexAlbedos[vertexIndex] = color;
+					hasVertexAlbedo[vertexIndex] = true;
+				}
+			}
+		}
+	}
+	if (!selectedMeshObject->triangleMaterialIDs.empty())
+	{
+		for (size_t triangleIndex = 0u;
+			triangleIndex < selectedMeshObject->triangleMaterialIDs.size();
+			++triangleIndex)
+		{
+			uint32_t triangleMaterialID =
+				selectedMeshObject->triangleMaterialIDs[triangleIndex];
+			size_t firstIndex = triangleIndex * 3u;
+			for (size_t corner = 0u; corner < 3u; ++corner)
+			{
+				uint32_t vertexIndex =
+					selectedMeshObject->indices[firstIndex + corner];
+				if (!hasVertexMaterialID[vertexIndex])
+				{
+					vertexMaterialIDs[vertexIndex] = triangleMaterialID;
+					hasVertexMaterialID[vertexIndex] = true;
+				}
+			}
+		}
+	}
+
 	uint32_t baseVertex = static_cast<uint32_t>(m_SurfaceVertices.size());
 	for (uint32_t vertexIndex = 0u; vertexIndex < meshSidecar.vertexCount; ++vertexIndex)
 	{
@@ -876,8 +994,9 @@ void ResourceLightingSurface::LoadObjSurface(
 			uv,
 			surfaceType,
 			surfaceID,
-			materialID,
+			vertexMaterialIDs[vertexIndex],
 			initialSurfaceColor,
+			vertexAlbedos[vertexIndex],
 			emittedVertexID);
 	}
 
@@ -1028,6 +1147,10 @@ std::vector<VkVertexInputAttributeDescription>* ResourceLightingSurface::GetAttr
 
 	ad.location = 3;
 	ad.offset = offsetof(LightingSurfaceVertex, meta);
+	m_AttributeDescriptions.push_back(ad);
+
+	ad.location = 4;
+	ad.offset = offsetof(LightingSurfaceVertex, albedo);
 	m_AttributeDescriptions.push_back(ad);
 
 	return &m_AttributeDescriptions;

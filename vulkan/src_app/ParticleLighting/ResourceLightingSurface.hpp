@@ -68,6 +68,7 @@ private:
 		uint32_t surfaceID,
 		uint32_t materialID,
 		const glm::vec4& initialSurfaceColor,
+		const glm::vec4& albedo,
 		uint32_t& emittedVertexID);
 
 	std::vector<LightingSurfaceVertex> m_SurfaceVertices;

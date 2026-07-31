@@ -43,6 +43,7 @@ layout(location = 0) in vec4 inPosition;
 layout(location = 1) in vec4 inNormalFlag;
 layout(location = 2) in vec4 inLight;
 layout(location = 3) in vec4 inMeta;
+layout(location = 4) in vec4 inAlbedo;
 
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec3 surfaceNormal;
@@ -50,6 +51,7 @@ layout(location = 2) flat out uint surfaceCellId;
 layout(location = 3) out vec3 surfaceWorldPos;
 layout(location = 4) flat out uint renderSurfaceType;
 layout(location = 5) flat out uint renderSurfaceID;
+layout(location = 6) out vec4 surfaceAlbedo;
 
 mat4 BuildTranslation(vec3 delta)
 {

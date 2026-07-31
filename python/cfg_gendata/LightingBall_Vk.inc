@@ -16,6 +16,16 @@ scene_model = {
       roles 			= ["collision", "boundary_markers", "lighting_surface"];
 	  obj_file = "C:/_DJ/gPCD/vulkan/sim/LightingBall/UFBall.obj";
 	  mesh_file = "C:/_DJ/gPCD/vulkan/sim/LightingBall/UFBall.mesh.cfg";
+      obj_regions = (
+        {
+          obj_name = "UF_F";
+          material_id = 7;
+        },
+        {
+          obj_name = "UF_U";
+          material_id = 7;
+        }
+      );
     },
     {
       name 					= "shadow_wall";

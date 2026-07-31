@@ -47,6 +47,9 @@ struct LightingSurfaceVertex
 
     // x = local_u, y = local_v, z = vertex_id, w = surface_type
     vec4 meta;
+
+    // xyz = OBJ/MTL material color, w = reserved
+    vec4 albedo;
 };
 
 layout(std430, binding = 9)

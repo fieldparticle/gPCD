@@ -1895,6 +1895,30 @@ class GenericGenData:
             return self._normalized_obj_path(configured_mesh_file)
         return self._mesh_file_path_for_obj(obj_path)
 
+    def _read_mtl_colors(self, obj_path, mtllibs):
+        colors = {}
+        for mtllib in mtllibs:
+            mtl_path = os.path.join(os.path.dirname(obj_path), mtllib)
+            if not os.path.exists(mtl_path):
+                continue
+            current_material = None
+            with open(mtl_path, "r", encoding="ascii") as source:
+                for raw_line in source:
+                    line = raw_line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    parts = line.split()
+                    if parts[0] == "newmtl" and len(parts) >= 2:
+                        current_material = " ".join(parts[1:])
+                    elif parts[0] == "Kd" and current_material and len(parts) >= 4:
+                        colors[current_material] = (
+                            float(parts[1]),
+                            float(parts[2]),
+                            float(parts[3]),
+                            1.0,
+                        )
+        return colors
+
     def _write_surface_mesh_cfg(self, path, obj_path, obj_data, description):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="ascii", newline="\n") as output:
@@ -1947,6 +1971,39 @@ class GenericGenData:
                         f"      [{first}, {second}, {third}]{face_separator}\n"
                     )
                 output.write("    );\n")
+                face_colors = tuple(surface_object.get("face_colors", ()))
+                if face_colors:
+                    if len(face_colors) != len(faces):
+                        raise ValueError(
+                            f"{surface_object['name']} face_colors length must match faces"
+                        )
+                    output.write("    triangle_colors = (\n")
+                    for face_index, color in enumerate(face_colors):
+                        color_separator = "," if face_index + 1 < len(face_colors) else ""
+                        red, green, blue, alpha = (
+                            float(value) for value in color[:4]
+                        )
+                        output.write(
+                            "      "
+                            f"[{red:.9f}, {green:.9f}, {blue:.9f}, {alpha:.9f}]"
+                            f"{color_separator}\n"
+                        )
+                    output.write("    );\n")
+                face_material_ids = tuple(surface_object.get("face_material_ids", ()))
+                if face_material_ids:
+                    if len(face_material_ids) != len(faces):
+                        raise ValueError(
+                            f"{surface_object['name']} face_material_ids length must match faces"
+                        )
+                    output.write("    triangle_material_ids = (\n")
+                    for face_index, material_id in enumerate(face_material_ids):
+                        material_separator = (
+                            "," if face_index + 1 < len(face_material_ids) else ""
+                        )
+                        output.write(
+                            f"      {int(material_id)}{material_separator}\n"
+                        )
+                    output.write("    );\n")
                 output.write(f"  }}{separator}\n")
             output.write(");\n")
         return path
@@ -1967,13 +2024,31 @@ class GenericGenData:
         texcoords = []
         normals = []
         faces = []
+        face_colors = []
+        face_material_ids = []
+        mtllibs = []
+        current_obj_name = None
+        current_material = None
+        material_colors = {}
+        region_material_ids = {
+            str(region.get("obj_name")): int(region.get("material_id"))
+            for region in template_surface_object.get("obj_regions", ())
+            if hasattr(region, "get")
+        }
         with open(path, "r", encoding="ascii") as source:
             for line_number, raw_line in enumerate(source, start=1):
                 line = raw_line.strip()
                 if not line or line.startswith("#"):
                     continue
                 parts = line.split()
-                if parts[0] == "v":
+                if parts[0] == "mtllib" and len(parts) >= 2:
+                    mtllibs.append(" ".join(parts[1:]))
+                    material_colors = self._read_mtl_colors(path, mtllibs)
+                elif parts[0] == "o" and len(parts) >= 2:
+                    current_obj_name = " ".join(parts[1:])
+                elif parts[0] == "usemtl" and len(parts) >= 2:
+                    current_material = " ".join(parts[1:])
+                elif parts[0] == "v":
                     if len(parts) < 4:
                         raise ValueError(f"{path}:{line_number} vertex requires xyz")
                     vertices.append(tuple(float(value) for value in parts[1:4]))
@@ -1993,8 +2068,16 @@ class GenericGenData:
                         for value in parts[1:]
                     ]
                     first = face_vertices[0]
+                    color = material_colors.get(current_material)
+                    face_material_id = region_material_ids.get(
+                        current_obj_name,
+                        int(template_surface_object["material_id"]),
+                    )
                     for index in range(1, len(face_vertices) - 1):
                         faces.append((first, face_vertices[index], face_vertices[index + 1]))
+                        if color is not None:
+                            face_colors.append(color)
+                        face_material_ids.append(face_material_id)
 
         if not vertices:
             raise ValueError(f"{path} contains no OBJ vertices")
@@ -2003,6 +2086,10 @@ class GenericGenData:
 
         surface_object = dict(template_surface_object)
         surface_object["faces"] = faces
+        if face_colors and len(face_colors) == len(faces):
+            surface_object["face_colors"] = face_colors
+        if face_material_ids and len(face_material_ids) == len(faces):
+            surface_object["face_material_ids"] = face_material_ids
         return {
             "objects": [surface_object],
             "vertices": vertices,

@@ -14,6 +14,7 @@ layout(location = 2) flat in uint surfaceCellId;
 layout(location = 3) in vec3 surfaceWorldPos;
 layout(location = 4) flat in uint renderSurfaceType;
 layout(location = 5) flat in uint renderSurfaceID;
+layout(location = 6) in vec4 surfaceAlbedo;
 
 #include "params.glsl"
 #include "sphere.glsl"

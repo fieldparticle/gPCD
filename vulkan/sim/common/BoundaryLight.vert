@@ -10,6 +10,7 @@ void boundary_light_main()
 		renderSurfaceType = uint(inMeta.w + 0.5);
 		renderSurfaceID = uint(inPosition.w + 0.5);
 		fragColor = inLight;
+		surfaceAlbedo = inAlbedo;
 		return;
 	}
 
@@ -22,6 +23,7 @@ void boundary_light_main()
 		surfaceWorldPos = vec3(0.0);
 		renderSurfaceType = BOUNDARY_LIGHT_SURFACE_NONE;
 		renderSurfaceID = 0u;
+		surfaceAlbedo = vec4(1.0);
 		return;
 	}
 
@@ -34,4 +36,5 @@ void boundary_light_main()
 	renderSurfaceType = BOUNDARY_LIGHT_SURFACE_SPHERE;
 	renderSurfaceID = LIGHTING_BALL_WALL_FLAG;
 	fragColor = vec4(0.0);
+	surfaceAlbedo = vec4(1.0);
 }

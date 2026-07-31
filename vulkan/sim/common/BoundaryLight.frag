@@ -310,7 +310,7 @@ void boundary_light_main()
 {
 	if (renderSurfaceType == BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL)
 	{
-		outColor = fragColor;
+		outColor = vec4(fragColor.rgb * surfaceAlbedo.rgb, fragColor.a);
 		if (outColor.a <= 0.0)
 		{
 			discard;
@@ -320,7 +320,7 @@ void boundary_light_main()
 
 	if (renderSurfaceType == BOUNDARY_LIGHT_SURFACE_SPHERE)
 	{
-		outColor = fragColor;
+		outColor = vec4(fragColor.rgb * surfaceAlbedo.rgb, fragColor.a);
 		if (outColor.a <= 0.0)
 		{
 			discard;

@@ -43,6 +43,7 @@ struct LightingSurfaceVertex {
     glm::vec4 normal_flag;  // xyz normal, w material_id or surface_flag
     glm::vec4 light;        // rgb, valid; compute writes this
     glm::vec4 meta;         // local_u, local_v, vertex_id, surface_type
+    glm::vec4 albedo;       // rgb OBJ/MTL material color, w reserved
 };
 
 struct BoundaryLightRecord

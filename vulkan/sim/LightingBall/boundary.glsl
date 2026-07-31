@@ -68,7 +68,7 @@ const uint LIGHTING_SURFACE_OBJECT_COUNT = 3u;
 const LightingSurfaceObjectMetadata LIGHTING_SURFACE_OBJECTS[3] = LightingSurfaceObjectMetadata[3](
     LightingSurfaceObjectMetadata(2u, 2000u, 2u, 0u, 6561u, 38400u, 0u, 0u, vec4(0.000000000, 0.000000000, 0.000000000, 1.000000000), 0.650000000),
     LightingSurfaceObjectMetadata(2u, 3000u, 3u, 6561u, 6561u, 38400u, 0u, 0u, vec4(0.000000000, 0.000000000, 0.000000000, 1.000000000), 0.000000000),
-    LightingSurfaceObjectMetadata(1u, 1000u, 1u, 13122u, 2976u, 16260u, 32u, 64u, vec4(0.000000000, 0.000000000, 0.000000000, 1.000000000), 0.000000000)
+    LightingSurfaceObjectMetadata(1u, 1000u, 1u, 13122u, 5674u, 32136u, 32u, 64u, vec4(0.000000000, 0.000000000, 0.000000000, 1.000000000), 0.000000000)
 );
 
 const uint RECTANGLE_WALL_SEGMENT_COUNT = 2u;
