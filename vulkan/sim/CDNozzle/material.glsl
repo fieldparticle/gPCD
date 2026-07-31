@@ -11,6 +11,16 @@ const uint PARTICLE_TYPE_PHOTON = 1u;
 
 const uint PARTICLE_TYPE_BOUNDARY = 2u;
 
+const uint PHOTON_SURFACE_BEHAVIOR_NONE = 0u;
+const uint PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR = 1u;
+const uint PHOTON_SURFACE_BEHAVIOR_ABSORB = 2u;
+const uint PHOTON_SURFACE_BEHAVIOR_REFLECT = 3u;
+
+const uint CONTACT_ILLUMINATION_MAX = 0u;
+const uint CONTACT_ILLUMINATION_MIN = 1u;
+const uint CONTACT_ILLUMINATION_CURRENT = 2u;
+const uint CONTACT_ILLUMINATION_FIRST = 3u;
+
 struct MaterialProperty
 {
     uint materialID;
@@ -21,12 +31,18 @@ struct MaterialProperty
     vec4 color;
     uint debugVisible;
     vec4 debugColor;
+    vec4 spectralResponseEnergy;
+    vec4 spectralEmission;
+    float photonCoupling;
+    float photonMinRelativeMass;
+    uint photonSurfaceBehavior;
+    uint contactIllumination;
     float cellDensity;
 };
 
 const uint MATERIAL_PROPERTY_COUNT = 1u;
 const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](
-    MaterialProperty(0u, 0u, 1.000000000, 0.000000000, 1u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0.000000000)
+    MaterialProperty(0u, 0u, 1.000000000, 0.000000000, 1u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, 0u, 0u, 0.000000000)
 );
 
 const float VELOCITY_ANGLE_COLOR_SAT = 1.00;

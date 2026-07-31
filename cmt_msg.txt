@@ -1,13 +1,13 @@
 Current status:
-	- ParticleLighting uses indexed runtime lighting surfaces with shared vertices.
-	- Per-object deposit_radius is available as a surface smoothing knob.
-	- Shadow-wall smoothing still benefits more from higher photon density than deposit-radius widening.
-	- Indexed OBJ export is deferred so Blender/debug inspection can later match runtime topology.
+	- Editable LightingBall sphere OBJ now renders Blender-authored UF text in Vulkan.
+	- UFBall.obj is treated as the editable source mesh, with UFBall.mesh.cfg as the generated sidecar metadata.
+	- Refresh Models updates only the mesh sidecar from the edited OBJ; Gen OBJ warns before overwriting the OBJ.
 
 Code Changes:
-	- Added scene_model deposit_radius parsing and .tst export.
-	- Added depositRadius to generated LightingSurfaceObjectMetadata.
-	- Updated FPML wall/sphere deposit to use per-object deposit radius.
-	- Documented indexed runtime surface state and added TODO for indexed OBJ output.
+	- Added Python OBJ refresh flow that reads the current sphere OBJ and rewrites only *.mesh.cfg.
+	- Added Vulkan OBJ/mesh-sidecar import for the lighting sphere, including OBJ vertices, normals, UVs, and sidecar indices.
+	- Updated shader metadata generation to use sidecar vertex_count and index_count for OBJ-backed sphere surfaces.
+	- Kept rectangle walls on the procedural path so missing wall sidecars are not required.
+	- Documented the Gen OBJ vs Refresh Models workflow and the validated UFBall UF-text Vulkan render.
 
-Next: Increase photon_beam density and later add indexed OBJ export for generated lighting surfaces.
+Next: Continue refining editable OBJ lighting-surface workflow and decide whether sidecar/object selection should preserve separate Blender object/material regions.

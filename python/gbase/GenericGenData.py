@@ -1606,8 +1606,21 @@ class GenericGenData:
             "objects": [
                 {
                     "name": "lighting_sphere",
+                    "surface_type": "SPHERE",
                     "material_id": lighting_ball["material_id"],
                     "surface_id": lighting_ball["surface_id"],
+                    "obj_file": (
+                        surface_object.get("obj_file")
+                        if surface_object is not None
+                        else None
+                    ),
+                    "mesh_file": (
+                        surface_object.get("mesh_file")
+                        if surface_object is not None
+                        else None
+                    ),
+                    "sphere_lat_segments": rings,
+                    "sphere_lon_segments": segments,
                     "faces": [],
                 }
             ],
@@ -1676,8 +1689,19 @@ class GenericGenData:
         for segment in rectangle_wall_segments:
             surface_object = {
                 "name": str(segment["name"]),
+                "surface_type": "RECTANGLE_WALL",
                 "material_id": int(segment.get("material_id", 0)),
                 "surface_id": int(segment["wall_flag"]),
+                "obj_file": (
+                    lighting_surface.get("obj_file")
+                    if lighting_surface is not None
+                    else None
+                ),
+                "mesh_file": (
+                    lighting_surface.get("mesh_file")
+                    if lighting_surface is not None
+                    else None
+                ),
                 "faces": [],
             }
             obj_data["objects"].append(surface_object)
@@ -1766,6 +1790,8 @@ class GenericGenData:
                         "name": surface_object["name"],
                         "material_id": surface_object["material_id"],
                         "surface_id": surface_object["surface_id"],
+                        "obj_file": surface_object.get("obj_file"),
+                        "mesh_file": surface_object.get("mesh_file"),
                         "faces": tuple(
                             tuple(vertex_id + vertex_offset for vertex_id in face)
                             for face in surface_object["faces"]
@@ -1799,6 +1825,8 @@ class GenericGenData:
                         "name": surface_object["name"],
                         "material_id": surface_object["material_id"],
                         "surface_id": surface_object["surface_id"],
+                        "obj_file": surface_object.get("obj_file"),
+                        "mesh_file": surface_object.get("mesh_file"),
                         "faces": tuple(
                             tuple(vertex_map[vertex_id] for vertex_id in face)
                             for face in surface_object["faces"]
@@ -1844,6 +1872,229 @@ class GenericGenData:
                         f"{third}/{third}/{third}\n"
                     )
         return path
+
+    def _normalized_obj_path(self, raw_path):
+        path = str(raw_path)
+        path = (
+            path.replace("\b", "\\b")
+            .replace("\f", "\\f")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+            .replace("\v", "\\v")
+        )
+        return os.path.normpath(path)
+
+    def _mesh_file_path_for_obj(self, obj_path):
+        root, _extension = os.path.splitext(obj_path)
+        return f"{root}.mesh.cfg"
+
+    def _mesh_file_path_for_surface(self, surface_object, obj_path):
+        configured_mesh_file = surface_object.get("mesh_file")
+        if configured_mesh_file:
+            return self._normalized_obj_path(configured_mesh_file)
+        return self._mesh_file_path_for_obj(obj_path)
+
+    def _write_surface_mesh_cfg(self, path, obj_path, obj_data, description):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="ascii", newline="\n") as output:
+            output.write(f"# {description}\n")
+            output.write("# Generated metadata for Vulkan lighting surface import.\n")
+            output.write('format = "gpcd_lighting_surface_mesh_v1";\n')
+            output.write(f'obj_file = "{obj_path.replace("\\", "/")}";\n')
+            output.write(f"vertex_count = {len(obj_data['vertices'])};\n")
+            output.write("objects = (\n")
+            for object_index, surface_object in enumerate(obj_data["objects"]):
+                separator = "," if object_index + 1 < len(obj_data["objects"]) else ""
+                faces = tuple(surface_object["faces"])
+                referenced_vertices = {
+                    int(vertex_id)
+                    for face in faces
+                    for vertex_id in face
+                }
+                surface_type = str(surface_object.get("surface_type", "SPHERE")).upper()
+                output.write("  {\n")
+                output.write(f'    name = "{surface_object["name"]}";\n')
+                output.write(f'    surface_type = "{surface_type}";\n')
+                output.write(f"    surface_id = {int(surface_object['surface_id'])};\n")
+                output.write(f"    material_id = {int(surface_object['material_id'])};\n")
+                output.write("    vertex_offset = 0;\n")
+                output.write(f"    vertex_count = {len(referenced_vertices)};\n")
+                output.write("    index_offset = 0;\n")
+                output.write(f"    index_count = {len(faces) * 3};\n")
+                output.write(f"    triangle_count = {len(faces)};\n")
+                if "sphere_lat_segments" in surface_object:
+                    output.write(
+                        f"    sphere_lat_segments = {int(surface_object['sphere_lat_segments'])};\n"
+                    )
+                if "sphere_lon_segments" in surface_object:
+                    output.write(
+                        f"    sphere_lon_segments = {int(surface_object['sphere_lon_segments'])};\n"
+                    )
+                if "rectangle_u_segments" in surface_object:
+                    output.write(
+                        f"    rectangle_u_segments = {int(surface_object['rectangle_u_segments'])};\n"
+                    )
+                if "rectangle_v_segments" in surface_object:
+                    output.write(
+                        f"    rectangle_v_segments = {int(surface_object['rectangle_v_segments'])};\n"
+                    )
+                output.write("    indices = (\n")
+                for face_index, face in enumerate(faces):
+                    face_separator = "," if face_index + 1 < len(faces) else ""
+                    first, second, third = (int(value) - 1 for value in face)
+                    output.write(
+                        f"      [{first}, {second}, {third}]{face_separator}\n"
+                    )
+                output.write("    );\n")
+                output.write(f"  }}{separator}\n")
+            output.write(");\n")
+        return path
+
+    def _parse_obj_face_vertex(self, raw_value, vertex_count):
+        token = raw_value.split("/")[0]
+        if not token:
+            raise ValueError(f"OBJ face token {raw_value!r} has no vertex index")
+        vertex_id = int(token)
+        if vertex_id < 0:
+            vertex_id = vertex_count + vertex_id + 1
+        if vertex_id <= 0 or vertex_id > vertex_count:
+            raise ValueError(f"OBJ face vertex index {vertex_id} is out of range")
+        return vertex_id
+
+    def _read_surface_obj(self, path, template_surface_object):
+        vertices = []
+        texcoords = []
+        normals = []
+        faces = []
+        with open(path, "r", encoding="ascii") as source:
+            for line_number, raw_line in enumerate(source, start=1):
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split()
+                if parts[0] == "v":
+                    if len(parts) < 4:
+                        raise ValueError(f"{path}:{line_number} vertex requires xyz")
+                    vertices.append(tuple(float(value) for value in parts[1:4]))
+                elif parts[0] == "vt":
+                    if len(parts) < 3:
+                        raise ValueError(f"{path}:{line_number} texcoord requires uv")
+                    texcoords.append(tuple(float(value) for value in parts[1:3]))
+                elif parts[0] == "vn":
+                    if len(parts) < 4:
+                        raise ValueError(f"{path}:{line_number} normal requires xyz")
+                    normals.append(tuple(float(value) for value in parts[1:4]))
+                elif parts[0] == "f":
+                    if len(parts) < 4:
+                        raise ValueError(f"{path}:{line_number} face requires 3 vertices")
+                    face_vertices = [
+                        self._parse_obj_face_vertex(value, len(vertices))
+                        for value in parts[1:]
+                    ]
+                    first = face_vertices[0]
+                    for index in range(1, len(face_vertices) - 1):
+                        faces.append((first, face_vertices[index], face_vertices[index + 1]))
+
+        if not vertices:
+            raise ValueError(f"{path} contains no OBJ vertices")
+        if not faces:
+            raise ValueError(f"{path} contains no OBJ faces")
+
+        surface_object = dict(template_surface_object)
+        surface_object["faces"] = faces
+        return {
+            "objects": [surface_object],
+            "vertices": vertices,
+            "normals": normals,
+            "texcoords": texcoords,
+        }
+
+    def generate_lighting_sphere_obj(self):
+        """Write only the lighting sphere OBJ from scene_model."""
+        if self.itemcfg.get("scene_model") is None:
+            print("No scene_model configured; no sphere OBJ generated.")
+            return ()
+
+        sphere_obj = self._build_lighting_sphere_obj_data()
+        if sphere_obj is None or not sphere_obj["objects"]:
+            print("No lighting sphere configured; no sphere OBJ generated.")
+            return ()
+
+        surface_object = sphere_obj["objects"][0]
+        obj_file = surface_object.get("obj_file")
+        if obj_file:
+            obj_path = self._normalized_obj_path(obj_file)
+        else:
+            output_prefix = str(
+                self.itemcfg.get("output_file_prefix", self.itemcfg.STUDY_NAME)
+            )
+            obj_path = os.path.join(
+                str(self.itemcfg.data_dir),
+                f"{output_prefix}_sphere.obj",
+            )
+
+        written_path = self._write_surface_obj(
+            obj_path,
+            sphere_obj,
+            "Generated LightingBall sphere surface",
+        )
+        mesh_path = self._mesh_file_path_for_surface(surface_object, written_path)
+        written_mesh_path = self._write_surface_mesh_cfg(
+            mesh_path,
+            written_path,
+            sphere_obj,
+            "Generated LightingBall sphere mesh metadata",
+        )
+        report_text = (
+            "Lighting sphere OBJ report:\n"
+            f"  file: {written_path}\n"
+            f"  mesh file: {written_mesh_path}\n"
+            f"  vertices: {len(sphere_obj['vertices'])}\n"
+            f"  triangles: {len(surface_object['faces'])}"
+        )
+        print(report_text)
+        return (written_path, written_mesh_path)
+
+    def refresh_lighting_sphere_mesh(self):
+        """Refresh only sphere mesh metadata from the current OBJ file."""
+        if self.itemcfg.get("scene_model") is None:
+            print("No scene_model configured; no sphere mesh refreshed.")
+            return ()
+
+        sphere_obj = self._build_lighting_sphere_obj_data()
+        if sphere_obj is None or not sphere_obj["objects"]:
+            print("No lighting sphere configured; no sphere mesh refreshed.")
+            return ()
+
+        surface_object = sphere_obj["objects"][0]
+        obj_file = surface_object.get("obj_file")
+        if not obj_file:
+            print("lighting_sphere has no obj_file; no sphere mesh refreshed.")
+            return ()
+
+        obj_path = self._normalized_obj_path(obj_file)
+        if not os.path.exists(obj_path):
+            raise FileNotFoundError(f"lighting_sphere obj_file does not exist: {obj_path}")
+
+        edited_obj = self._read_surface_obj(obj_path, surface_object)
+        mesh_path = self._mesh_file_path_for_surface(surface_object, obj_path)
+        written_mesh_path = self._write_surface_mesh_cfg(
+            mesh_path,
+            obj_path,
+            edited_obj,
+            "Refreshed LightingBall sphere mesh metadata",
+        )
+        face_count = len(edited_obj["objects"][0]["faces"])
+        report_text = (
+            "Lighting sphere mesh refresh report:\n"
+            f"  obj file: {obj_path}\n"
+            f"  mesh file: {written_mesh_path}\n"
+            f"  vertices: {len(edited_obj['vertices'])}\n"
+            f"  triangles: {face_count}"
+        )
+        print(report_text)
+        return (written_mesh_path,)
 
     def write_lighting_surface_objs(self):
         """Write render-surface OBJ files for LightingBall inspection."""
@@ -1944,6 +2195,9 @@ class GenericGenData:
         return tuple(written_paths)
 
     def lighting_surface_obj_file_for_export(self, surface_object):
+        configured_obj_file = surface_object.get("obj_file")
+        if configured_obj_file:
+            return self._normalized_obj_path(configured_obj_file).replace("\\", "/")
         object_path = self.surface_object_obj_names.get(str(surface_object["name"]))
         if object_path is not None:
             return object_path.replace("\\", "/")
@@ -1953,6 +2207,13 @@ class GenericGenData:
         if surface_type == "RECTANGLE_WALL":
             return self.surface_wall_obj_name.replace("\\", "/")
         return self.surface_combined_obj_name.replace("\\", "/")
+
+    def lighting_surface_mesh_file_for_export(self, surface_object):
+        configured_mesh_file = surface_object.get("mesh_file")
+        if configured_mesh_file:
+            return self._normalized_obj_path(configured_mesh_file).replace("\\", "/")
+        obj_file = self.lighting_surface_obj_file_for_export(surface_object)
+        return self._mesh_file_path_for_obj(obj_file).replace("\\", "/")
 
     def report_generated_bounds(self):
         """Report generated mobile-particle center and perimeter bounds."""
@@ -2513,6 +2774,14 @@ class GenericGenData:
                     "        obj_file = "
                     f'"{self.lighting_surface_obj_file_for_export(surface_object)}";\n'
                 )
+                if (
+                    surface_object["surface_type"] == "SPHERE"
+                    or surface_object.get("mesh_file")
+                ):
+                    output.write(
+                        "        mesh_file = "
+                        f'"{self.lighting_surface_mesh_file_for_export(surface_object)}";\n'
+                    )
                 output.write(
                     f'        surface_type = "{surface_object["surface_type"]}";\n'
                 )
@@ -2630,7 +2899,6 @@ class GenericGenData:
             self.report_cell_occupancy_capacity()
             self.write_particle_bin()
             self.write_test_file()
-            self.write_lighting_surface_objs()
             self.report_generated_bounds()
         except (OSError, RuntimeError, TypeError, ValueError) as error:
             self.close_bin_file()

@@ -5,7 +5,7 @@ const uint DEPTH=5;
 const uint CENTER=0;
 const float RADIUS=0;
 const uint MAX_CELL_OCCUPANY=64;
-const uint SCR_W =1000;
+const uint SCR_W =1500;
 const uint SCR_H =1000;
 const uint SCR_X =0;
 const uint SCR_Y =0;
@@ -19,11 +19,7 @@ const uint LockAryLen=40000;
 const uint MAX_CELL_ARRAY_LOCATIONS =40000;
 const uint bbound =332;
 const float point_size = 3.00;
-const uint BOUNDARY_SPACE_PROXY_COUNT = 0;
-const uint BOUNDARY_SPACE_FIRST_PARTICLE_ID = 0;
-const float BOUNDARY_SPACE_PATCH_ANGLE = 0.00;
-const float BOUNDARY_SPACE_PATCH_RADIUS = 0.00;
-const uint BOUNDARY_SPACE_PATCH_FALLOFF_QUADRATIC = 0;
+#define PHOTON_PERIODIC_RECYCLE_ENABLED 0u
 #define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN 8.000000000
 #define FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER 2.000000000
 const uint DUP_LIST_SIZE = 32;

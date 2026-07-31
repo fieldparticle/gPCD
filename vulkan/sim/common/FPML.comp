@@ -289,6 +289,7 @@ LightingSurfaceObjectMetadata boundary_light_surface_object_metadata(
         0u,
         0u,
         0u,
+        0u,
         vec4(0.0, 0.0, 0.0, 1.0),
         0.0);
 }

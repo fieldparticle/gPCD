@@ -174,10 +174,19 @@ namespace
 		uint32_t materialID = 0u;
 		uint32_t vertexOffset = 0u;
 		uint32_t vertexCount = 0u;
+		uint32_t indexCount = 0u;
 		double initialSurfaceColor[4] = { 0.0, 0.0, 0.0, 1.0 };
 		double depositRadius = 0.0;
 		uint32_t rectangleUSegments = 0u;
 		uint32_t rectangleVSegments = 0u;
+		uint32_t sphereLatSegments = 0u;
+		uint32_t sphereLonSegments = 0u;
+	};
+
+	struct LightingSurfaceMeshCounts
+	{
+		uint32_t vertexCount = 0u;
+		uint32_t indexCount = 0u;
 		uint32_t sphereLatSegments = 0u;
 		uint32_t sphereLonSegments = 0u;
 	};
@@ -190,6 +199,111 @@ namespace
 		if (value <= 0)
 			throw std::runtime_error("lighting_surface_objects[" + std::to_string(objectIndex) + "]." + fieldName + " must be positive");
 		return static_cast<uint32_t>(value);
+	}
+
+	uint32_t ReadMeshPositiveUInt(
+		config_setting_t* object,
+		const std::string& context,
+		const char* fieldName)
+	{
+		int value = 0;
+		if (config_setting_lookup_int(object, fieldName, &value) != CONFIG_TRUE)
+			throw std::runtime_error(context + "." + fieldName + " is required");
+		if (value <= 0)
+			throw std::runtime_error(context + "." + fieldName + " must be positive");
+		return static_cast<uint32_t>(value);
+	}
+
+	uint32_t ReadMeshOptionalUInt(
+		config_setting_t* object,
+		const char* fieldName,
+		uint32_t defaultValue)
+	{
+		int value = 0;
+		if (config_setting_lookup_int(object, fieldName, &value) != CONFIG_TRUE)
+			return defaultValue;
+		if (value < 0)
+			throw std::runtime_error(std::string("mesh object ") + fieldName + " must not be negative");
+		return static_cast<uint32_t>(value);
+	}
+
+	LightingSurfaceMeshCounts ReadLightingSurfaceMeshCounts(
+		const std::string& meshFile,
+		uint32_t surfaceType,
+		uint32_t surfaceID,
+		uint32_t materialID)
+	{
+		config_t meshConfig;
+		config_init(&meshConfig);
+		if (!config_read_file(&meshConfig, meshFile.c_str()))
+		{
+			std::ostringstream errtxt;
+			errtxt << "Could not read lighting surface mesh file "
+				<< meshFile << ":" << config_error_line(&meshConfig)
+				<< ": " << config_error_text(&meshConfig) << std::ends;
+			config_destroy(&meshConfig);
+			throw std::runtime_error(errtxt.str().c_str());
+		}
+
+		config_setting_t* objects = config_lookup(&meshConfig, "objects");
+		if (objects == nullptr || config_setting_length(objects) <= 0)
+		{
+			config_destroy(&meshConfig);
+			throw std::runtime_error("lighting surface mesh objects is required and must not be empty");
+		}
+
+		int objectCount = config_setting_length(objects);
+		for (int objectIndex = 0; objectIndex < objectCount; ++objectIndex)
+		{
+			config_setting_t* object = config_setting_get_elem(objects, objectIndex);
+			if (object == nullptr)
+			{
+				config_destroy(&meshConfig);
+				throw std::runtime_error("lighting surface mesh object is invalid");
+			}
+
+			const char* surfaceTypeText = nullptr;
+			int meshSurfaceID = 0;
+			int meshMaterialID = 0;
+			if (config_setting_lookup_string(object, "surface_type", &surfaceTypeText) != CONFIG_TRUE ||
+				config_setting_lookup_int(object, "surface_id", &meshSurfaceID) != CONFIG_TRUE ||
+				config_setting_lookup_int(object, "material_id", &meshMaterialID) != CONFIG_TRUE)
+			{
+				config_destroy(&meshConfig);
+				throw std::runtime_error(
+					"lighting surface mesh objects[" + std::to_string(objectIndex) +
+					"] must contain surface_type, surface_id, and material_id");
+			}
+
+			if (LightingSurfaceTypeID(surfaceTypeText) != surfaceType ||
+				static_cast<uint32_t>(meshSurfaceID) != surfaceID ||
+				static_cast<uint32_t>(meshMaterialID) != materialID)
+			{
+				continue;
+			}
+
+			std::string context =
+				"lighting surface mesh objects[" + std::to_string(objectIndex) + "]";
+			LightingSurfaceMeshCounts counts{};
+			counts.vertexCount =
+				ReadMeshPositiveUInt(object, context, "vertex_count");
+			counts.indexCount =
+				ReadMeshPositiveUInt(object, context, "index_count");
+			counts.sphereLatSegments =
+				ReadMeshOptionalUInt(object, "sphere_lat_segments", 0u);
+			counts.sphereLonSegments =
+				ReadMeshOptionalUInt(object, "sphere_lon_segments", 0u);
+			config_destroy(&meshConfig);
+			return counts;
+		}
+
+		std::ostringstream errtxt;
+		errtxt << "Mesh file " << meshFile
+			<< " has no object matching surface_type " << surfaceType
+			<< ", surface_id " << surfaceID
+			<< ", material_id " << materialID << std::ends;
+		config_destroy(&meshConfig);
+		throw std::runtime_error(errtxt.str().c_str());
 	}
 
 	void ReadInitialSurfaceColor(
@@ -279,6 +393,7 @@ namespace
 
 				const char* source = nullptr;
 				const char* objFile = nullptr;
+				const char* meshFile = nullptr;
 				const char* surfaceTypeText = nullptr;
 				int surfaceID = 0;
 				int materialID = 0;
@@ -291,7 +406,8 @@ namespace
 					config_setting_lookup_int(object, "material_id", &materialID) != CONFIG_TRUE)
 				{
 					std::ostringstream errtxt;
-					errtxt << "lighting_surface_objects[" << index << "] must contain OBJ metadata" << std::ends;
+					errtxt << "lighting_surface_objects[" << index
+						<< "] must contain OBJ metadata" << std::ends;
 					throw std::runtime_error(errtxt.str().c_str());
 				}
 
@@ -310,19 +426,43 @@ namespace
 					object, index, "deposit_radius", 0.0);
 				if (surfaceType == 2u)
 				{
-					info.rectangleUSegments = ReadPositiveUInt(object, index, "rectangle_u_segments");
-					info.rectangleVSegments = ReadPositiveUInt(object, index, "rectangle_v_segments");
+					info.rectangleUSegments =
+						ReadPositiveUInt(object, index, "rectangle_u_segments");
+					info.rectangleVSegments =
+						ReadPositiveUInt(object, index, "rectangle_v_segments");
 					info.vertexCount =
 						(info.rectangleUSegments + 1u) *
 						(info.rectangleVSegments + 1u);
+					info.indexCount =
+						info.rectangleUSegments *
+						info.rectangleVSegments *
+						6u;
 				}
 				else if (surfaceType == 1u)
 				{
-					info.sphereLatSegments = ReadPositiveUInt(object, index, "sphere_lat_segments");
-					info.sphereLonSegments = ReadPositiveUInt(object, index, "sphere_lon_segments");
-					info.vertexCount =
-						(info.sphereLatSegments + 1u) *
-						info.sphereLonSegments;
+					if (config_setting_lookup_string(object, "mesh_file", &meshFile) != CONFIG_TRUE)
+					{
+						std::ostringstream errtxt;
+						errtxt << "lighting_surface_objects[" << index
+							<< "].mesh_file is required for SPHERE" << std::ends;
+						throw std::runtime_error(errtxt.str().c_str());
+					}
+					LightingSurfaceMeshCounts meshCounts =
+						ReadLightingSurfaceMeshCounts(
+							meshFile,
+							info.surfaceType,
+							info.surfaceID,
+							info.materialID);
+					info.vertexCount = meshCounts.vertexCount;
+					info.indexCount = meshCounts.indexCount;
+					info.sphereLatSegments = meshCounts.sphereLatSegments;
+					info.sphereLonSegments = meshCounts.sphereLonSegments;
+					if (info.sphereLatSegments == 0u)
+						info.sphereLatSegments =
+							ReadPositiveUInt(object, index, "sphere_lat_segments");
+					if (info.sphereLonSegments == 0u)
+						info.sphereLonSegments =
+							ReadPositiveUInt(object, index, "sphere_lon_segments");
 				}
 				else
 				{
@@ -947,6 +1087,7 @@ std::ostringstream ShaderObj::RectangleWalls()
 		<< "    uint materialID;\n"
 		<< "    uint vertexOffset;\n"
 		<< "    uint vertexCount;\n"
+		<< "    uint indexCount;\n"
 		<< "    uint sphereLatSegments;\n"
 		<< "    uint sphereLonSegments;\n"
 		<< "    vec4 initialSurfaceColor;\n"
@@ -982,7 +1123,7 @@ std::ostringstream ShaderObj::RectangleWalls()
 		wall_str
 			<< "const LightingSurfaceObjectMetadata LIGHTING_SURFACE_OBJECTS[1] = "
 			<< "LightingSurfaceObjectMetadata[1](\n"
-			<< "    LightingSurfaceObjectMetadata(0u, 0u, 0u, 0u, 0u, 0u, 0u, "
+			<< "    LightingSurfaceObjectMetadata(0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, "
 			<< "vec4(0.000000000, 0.000000000, 0.000000000, 1.000000000), "
 			<< "0.000000000)\n"
 			<< ");\n\n";
@@ -1003,6 +1144,7 @@ std::ostringstream ShaderObj::RectangleWalls()
 				<< object.materialID << "u, "
 				<< object.vertexOffset << "u, "
 				<< object.vertexCount << "u, "
+				<< object.indexCount << "u, "
 				<< object.sphereLatSegments << "u, "
 				<< object.sphereLonSegments << "u, "
 				<< "vec4("

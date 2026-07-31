@@ -49,9 +49,44 @@ struct RectangleWallSegment
     uint wallFlag;
 };
 
+struct LightingSurfaceObjectMetadata
+{
+    uint surfaceType;
+    uint surfaceID;
+    uint materialID;
+    uint vertexOffset;
+    uint vertexCount;
+    uint sphereLatSegments;
+    uint sphereLonSegments;
+    vec4 initialSurfaceColor;
+    float depositRadius;
+};
+
+struct LightingSurfaceWallMetadata
+{
+    vec3 origin;
+    vec3 uAxis;
+    vec3 vAxis;
+    float uLength;
+    float vLength;
+    uint uStepCount;
+    uint vStepCount;
+    uint wallFlag;
+};
+
+const uint LIGHTING_SURFACE_OBJECT_COUNT = 0u;
+const LightingSurfaceObjectMetadata LIGHTING_SURFACE_OBJECTS[1] = LightingSurfaceObjectMetadata[1](
+    LightingSurfaceObjectMetadata(0u, 0u, 0u, 0u, 0u, 0u, 0u, vec4(0.000000000, 0.000000000, 0.000000000, 1.000000000), 0.000000000)
+);
+
 const uint RECTANGLE_WALL_SEGMENT_COUNT = 0u;
 const RectangleWallSegment RECTANGLE_WALL_SEGMENTS[1] = RectangleWallSegment[1](
     RectangleWallSegment(vec3(0.000000000), vec3(1.000000000, 0.000000000, 0.000000000), vec3(0.000000000, 1.000000000, 0.000000000), 0.000000000, 0.000000000, vec3(0.000000000, 0.000000000, 1.000000000), 0u)
+);
+
+const uint LIGHTING_SURFACE_WALL_COUNT = 0u;
+const LightingSurfaceWallMetadata LIGHTING_SURFACE_WALLS[1] = LightingSurfaceWallMetadata[1](
+    LightingSurfaceWallMetadata(vec3(0.000000000), vec3(1.000000000, 0.000000000, 0.000000000), vec3(0.000000000, 1.000000000, 0.000000000), 0.000000000, 0.000000000, 1u, 1u, 0u)
 );
 
 #define HAS_BOUNDARY

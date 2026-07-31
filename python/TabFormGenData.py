@@ -184,6 +184,9 @@ class TabGenData(QTabWidget):
         
         # Enable to generate data
         self.GenDataButton.setEnabled(True)
+        self.RefreshObjButton.setEnabled(True)
+        self.GenObjButton.setEnabled(hasattr(self.gen_class, "generate_lighting_sphere_obj"))
+        #self.RefreshObjButton.setEnabled(hasattr(self.gen_class, "refresh_lighting_sphere_mesh"))
             
 
 
@@ -279,7 +282,38 @@ class TabGenData(QTabWidget):
                 f"{cfg_file} dimensions must be 2 or 3, got {dimensions}"
             )
         return dimensions
+    #******************************************************************
+    # Generate the model obj
+    #
+    def gen_obj(self):
+        if self.refresh() == False:
+            print("Config file error")
+            return
+        if not hasattr(self.gen_class, "generate_lighting_sphere_obj"):
+            self.log.log(self, "Selected generator does not support OBJ generation.")
+            return
+        answer = QMessageBox.question(
+            self,
+            "Overwrite OBJ?",
+            "Gen OBJ overwrites the editable OBJ file. Use Refresh Models after Blender edits. Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            self.log.log(self, "OBJ generation canceled.")
+            return
+        os.system('cls' if os.name == 'nt' else 'clear')
+        self.gen_class.generate_lighting_sphere_obj()
 
+    def refresh_obj(self):
+        if self.refresh() == False:
+            print("Config file error")
+            return
+        if not hasattr(self.gen_class, "refresh_lighting_sphere_mesh"):
+            self.log.log(self, "Selected generator does not support OBJ refresh.")
+            return
+        os.system('cls' if os.name == 'nt' else 'clear')
+        self.gen_class.refresh_lighting_sphere_mesh()
     #******************************************************************
     # Generate the data
     #
@@ -589,12 +623,26 @@ class TabGenData(QTabWidget):
             self.GenDataButton.setEnabled(False)
             dirgrid.addWidget(self.GenDataButton,2,4)
 
+            self.GenObjButton = QPushButton("Gen Models")
+            self.setSize(self.GenObjButton,30,100)
+            self.GenObjButton.setStyleSheet("background-color:  #dddddd")
+            self.GenObjButton.clicked.connect(self.gen_obj)
+            self.GenObjButton.setEnabled(False)
+            dirgrid.addWidget(self.GenObjButton,2,5)
+
+            self.RefreshObjButton = QPushButton("Refresh Models")
+            self.setSize(self.RefreshObjButton,30,100)
+            self.RefreshObjButton.setStyleSheet("background-color:  #dddddd")
+            self.RefreshObjButton.clicked.connect(self.refresh_obj)
+            self.RefreshObjButton.setEnabled(False)
+            dirgrid.addWidget(self.RefreshObjButton,2,6)
+
             self.StopButton = QPushButton("Test Config")
             self.setSize(self.StopButton,30,100)
             self.StopButton.setStyleSheet("background-color:  #dddddd")
             self.StopButton.clicked.connect(self.test_config)
             #self.StopButton.setEnabled(False)
-            dirgrid.addWidget(self.StopButton,2,5)
+            dirgrid.addWidget(self.StopButton,2,7)
 
             self.ToggleCellsBtn = QPushButton("Toggle Cells")
             self.setSize(self.ToggleCellsBtn,30,100)

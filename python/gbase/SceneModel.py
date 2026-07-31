@@ -391,6 +391,20 @@ def _lighting_surface_object(name, object_type, surface_id, material_id, **metad
     return surface_object
 
 
+def _optional_obj_file(obj):
+    raw_value = obj.get("obj_file")
+    if raw_value is None:
+        return None
+    return str(raw_value)
+
+
+def _optional_mesh_file(obj):
+    raw_value = obj.get("mesh_file")
+    if raw_value is None:
+        return None
+    return str(raw_value)
+
+
 def apply_scene_model(config):
     """Derive legacy runtime geometry config from authored scene_model."""
     scene_model = config.get("scene_model")
@@ -463,6 +477,8 @@ def apply_scene_model(config):
             sphere_config = _lighting_ball_config(obj, errors, context)
             if sphere_config is None:
                 continue
+            obj_file = _optional_obj_file(obj)
+            mesh_file = _optional_mesh_file(obj)
             if "collision" in roles or "boundary_markers" in roles:
                 if lighting_ball is not None:
                     errors.append("scene_model supports one Lighting_ball sphere for now")
@@ -478,12 +494,16 @@ def apply_scene_model(config):
                         deposit_radius=deposit_radius,
                         sphere_lat_segments=int(sphere_config["sphere_lat_segments"]),
                         sphere_lon_segments=int(sphere_config["sphere_lon_segments"]),
+                        obj_file=obj_file,
+                        mesh_file=mesh_file,
                     )
                 )
         elif object_type == "rectangle":
             rectangle_config = _rectangle_wall_config(name, obj, errors, context)
             if rectangle_config is None:
                 continue
+            obj_file = _optional_obj_file(obj)
+            mesh_file = _optional_mesh_file(obj)
             if "collision" in roles or "boundary_markers" in roles:
                 rectangle_segments[name] = rectangle_config
             if "lighting_surface" in roles:
@@ -501,12 +521,16 @@ def apply_scene_model(config):
                         rectangle_v_segments=int(
                             rectangle_config["rectangle_v_segments"]
                         ),
+                        obj_file=obj_file,
+                        mesh_file=mesh_file,
                     )
                 )
         elif object_type == "curve":
             curve_config = _curve_wall_config(obj, errors, context)
             if curve_config is None:
                 continue
+            obj_file = _optional_obj_file(obj)
+            mesh_file = _optional_mesh_file(obj)
             if "collision" in roles or "boundary_markers" in roles:
                 curve_segments[name] = curve_config
             if "lighting_surface" in roles:
@@ -518,6 +542,8 @@ def apply_scene_model(config):
                         int(curve_config["material_id"]),
                         initial_surface_color=initial_surface_color,
                         deposit_radius=deposit_radius,
+                        obj_file=obj_file,
+                        mesh_file=mesh_file,
                     )
                 )
         else:

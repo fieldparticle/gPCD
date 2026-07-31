@@ -36,6 +36,7 @@ private:
 	uint32_t SurfaceTypeID(const std::string& surfaceType);
 	void LoadObjSurface(
 		const std::string& objFile,
+		const std::string& meshFile,
 		uint32_t surfaceType,
 		uint32_t surfaceID,
 		uint32_t materialID,

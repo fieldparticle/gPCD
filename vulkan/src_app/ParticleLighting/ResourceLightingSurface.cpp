@@ -7,7 +7,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <limits>
+#include <sstream>
 #include <string>
 
 namespace
@@ -23,6 +25,7 @@ namespace
 	struct LightingSurfaceObjectConfig
 	{
 		std::string objFile;
+		std::string meshFile;
 		uint32_t surfaceType = BOUNDARY_LIGHT_SURFACE_NONE;
 		uint32_t surfaceID = 0u;
 		uint32_t materialID = 0u;
@@ -32,6 +35,389 @@ namespace
 		uint32_t sphereLatSegments = 0u;
 		uint32_t sphereLonSegments = 0u;
 	};
+
+	struct LightingSurfaceMeshObject
+	{
+		std::string surfaceTypeText;
+		uint32_t surfaceType = BOUNDARY_LIGHT_SURFACE_NONE;
+		uint32_t surfaceID = 0u;
+		uint32_t materialID = 0u;
+		uint32_t vertexOffset = 0u;
+		uint32_t vertexCount = 0u;
+		uint32_t indexOffset = 0u;
+		uint32_t indexCount = 0u;
+		std::vector<uint32_t> indices;
+	};
+
+	struct LightingSurfaceMeshSidecar
+	{
+		uint32_t vertexCount = 0u;
+		std::vector<LightingSurfaceMeshObject> objects;
+	};
+
+	struct LightingSurfaceObjFaceVertex
+	{
+		int32_t positionIndex = -1;
+		int32_t texCoordIndex = -1;
+		int32_t normalIndex = -1;
+	};
+
+	struct LightingSurfaceObjRaw
+	{
+		std::vector<glm::vec3> positions;
+		std::vector<glm::vec2> texCoords;
+		std::vector<glm::vec3> normals;
+		std::vector<glm::vec2> vertexTexCoords;
+		std::vector<glm::vec3> vertexNormals;
+		std::vector<bool> hasVertexTexCoord;
+		std::vector<bool> hasVertexNormal;
+	};
+
+	int32_t ResolveObjIndex(
+		int32_t objIndex,
+		size_t arraySize,
+		const std::string& objFile,
+		uint32_t lineNumber)
+	{
+		if (objIndex == 0)
+		{
+			std::ostringstream errtxt;
+			errtxt << objFile << ":" << lineNumber
+				<< ": OBJ indices are 1-based; zero is invalid" << std::ends;
+			throw std::runtime_error(errtxt.str().c_str());
+		}
+
+		int64_t resolved = objIndex > 0 ?
+			static_cast<int64_t>(objIndex) - 1 :
+			static_cast<int64_t>(arraySize) + static_cast<int64_t>(objIndex);
+		if (resolved < 0 || resolved >= static_cast<int64_t>(arraySize))
+		{
+			std::ostringstream errtxt;
+			errtxt << objFile << ":" << lineNumber
+				<< ": OBJ index " << objIndex << " is outside available data"
+				<< std::ends;
+			throw std::runtime_error(errtxt.str().c_str());
+		}
+		return static_cast<int32_t>(resolved);
+	}
+
+	LightingSurfaceObjFaceVertex ParseObjFaceVertex(
+		const std::string& token,
+		const LightingSurfaceObjRaw& obj,
+		const std::string& objFile,
+		uint32_t lineNumber)
+	{
+		LightingSurfaceObjFaceVertex vertex{};
+		std::vector<std::string> fields;
+		size_t start = 0u;
+		while (start <= token.size())
+		{
+			size_t slash = token.find('/', start);
+			fields.push_back(token.substr(
+				start,
+				slash == std::string::npos ? std::string::npos : slash - start));
+			if (slash == std::string::npos)
+				break;
+			start = slash + 1u;
+		}
+		if (fields.empty() || fields[0].empty())
+		{
+			std::ostringstream errtxt;
+			errtxt << objFile << ":" << lineNumber
+				<< ": face vertex is missing a position index" << std::ends;
+			throw std::runtime_error(errtxt.str().c_str());
+		}
+
+		vertex.positionIndex = ResolveObjIndex(
+			std::stoi(fields[0]),
+			obj.positions.size(),
+			objFile,
+			lineNumber);
+		if (fields.size() > 1u && !fields[1].empty())
+		{
+			vertex.texCoordIndex = ResolveObjIndex(
+				std::stoi(fields[1]),
+				obj.texCoords.size(),
+				objFile,
+				lineNumber);
+		}
+		if (fields.size() > 2u && !fields[2].empty())
+		{
+			vertex.normalIndex = ResolveObjIndex(
+				std::stoi(fields[2]),
+				obj.normals.size(),
+				objFile,
+				lineNumber);
+		}
+		return vertex;
+	}
+
+	LightingSurfaceObjRaw LoadLightingSurfaceObjRaw(
+		const std::string& objFile)
+	{
+		std::ifstream input(objFile);
+		if (!input.is_open())
+		{
+			throw std::runtime_error("Could not open lighting surface OBJ file " + objFile);
+		}
+
+		LightingSurfaceObjRaw obj{};
+		std::string line;
+		uint32_t lineNumber = 0u;
+		while (std::getline(input, line))
+		{
+			lineNumber++;
+			size_t comment = line.find('#');
+			if (comment != std::string::npos)
+				line = line.substr(0u, comment);
+
+			std::istringstream lineStream(line);
+			std::string kind;
+			lineStream >> kind;
+			if (kind.empty())
+				continue;
+
+			if (kind == "v")
+			{
+				glm::vec3 position(0.0f);
+				if (!(lineStream >> position.x >> position.y >> position.z))
+				{
+					std::ostringstream errtxt;
+					errtxt << objFile << ":" << lineNumber
+						<< ": malformed vertex position" << std::ends;
+					throw std::runtime_error(errtxt.str().c_str());
+				}
+				obj.positions.push_back(position);
+				obj.vertexTexCoords.push_back(glm::vec2(0.0f));
+				obj.vertexNormals.push_back(glm::vec3(0.0f));
+				obj.hasVertexTexCoord.push_back(false);
+				obj.hasVertexNormal.push_back(false);
+			}
+			else if (kind == "vt")
+			{
+				glm::vec2 texCoord(0.0f);
+				if (!(lineStream >> texCoord.x >> texCoord.y))
+				{
+					std::ostringstream errtxt;
+					errtxt << objFile << ":" << lineNumber
+						<< ": malformed texture coordinate" << std::ends;
+					throw std::runtime_error(errtxt.str().c_str());
+				}
+				obj.texCoords.push_back(texCoord);
+			}
+			else if (kind == "vn")
+			{
+				glm::vec3 normal(0.0f);
+				if (!(lineStream >> normal.x >> normal.y >> normal.z))
+				{
+					std::ostringstream errtxt;
+					errtxt << objFile << ":" << lineNumber
+						<< ": malformed vertex normal" << std::ends;
+					throw std::runtime_error(errtxt.str().c_str());
+				}
+				obj.normals.push_back(SafeNormalize(normal));
+			}
+			else if (kind == "f")
+			{
+				std::string token;
+				std::vector<LightingSurfaceObjFaceVertex> faceVertices;
+				while (lineStream >> token)
+				{
+					faceVertices.push_back(ParseObjFaceVertex(
+						token,
+						obj,
+						objFile,
+						lineNumber));
+				}
+				if (faceVertices.size() < 3u)
+				{
+					std::ostringstream errtxt;
+					errtxt << objFile << ":" << lineNumber
+						<< ": face must contain at least three vertices" << std::ends;
+					throw std::runtime_error(errtxt.str().c_str());
+				}
+
+				for (const LightingSurfaceObjFaceVertex& faceVertex : faceVertices)
+				{
+					uint32_t positionIndex =
+						static_cast<uint32_t>(faceVertex.positionIndex);
+					if (faceVertex.texCoordIndex >= 0 &&
+						!obj.hasVertexTexCoord[positionIndex])
+					{
+						obj.vertexTexCoords[positionIndex] =
+							obj.texCoords[static_cast<uint32_t>(faceVertex.texCoordIndex)];
+						obj.hasVertexTexCoord[positionIndex] = true;
+					}
+					if (faceVertex.normalIndex >= 0 &&
+						!obj.hasVertexNormal[positionIndex])
+					{
+						obj.vertexNormals[positionIndex] =
+							obj.normals[static_cast<uint32_t>(faceVertex.normalIndex)];
+						obj.hasVertexNormal[positionIndex] = true;
+					}
+				}
+			}
+		}
+
+		if (obj.positions.empty())
+			throw std::runtime_error("Lighting surface OBJ file has no vertices: " + objFile);
+
+		return obj;
+	}
+
+	uint32_t ReadMeshRequiredUInt(
+		config_setting_t* object,
+		const std::string& context,
+		const char* fieldName,
+		bool allowZero = false)
+	{
+		int value = 0;
+		if (config_setting_lookup_int(object, fieldName, &value) != CONFIG_TRUE)
+		{
+			throw std::runtime_error(context + "." + fieldName + " is required");
+		}
+		if (value < 0 || (!allowZero && value == 0))
+		{
+			throw std::runtime_error(
+				context + "." + fieldName +
+				(allowZero ? " must not be negative" : " must be positive"));
+		}
+		return static_cast<uint32_t>(value);
+	}
+
+	uint32_t MeshSurfaceTypeID(const std::string& surfaceType)
+	{
+		if (surfaceType == "SPHERE")
+			return BOUNDARY_LIGHT_SURFACE_SPHERE;
+		if (surfaceType == "RECTANGLE_WALL")
+			return BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL;
+		if (surfaceType == "NONE")
+			return BOUNDARY_LIGHT_SURFACE_NONE;
+
+		throw std::runtime_error("Unknown mesh surface_type: " + surfaceType);
+	}
+
+	LightingSurfaceMeshSidecar LoadLightingSurfaceMeshSidecar(
+		const std::string& meshFile)
+	{
+		config_t meshConfig;
+		config_init(&meshConfig);
+		if (!config_read_file(&meshConfig, meshFile.c_str()))
+		{
+			std::ostringstream errtxt;
+			errtxt << "Could not read lighting surface mesh file "
+				<< meshFile << ":" << config_error_line(&meshConfig)
+				<< ": " << config_error_text(&meshConfig) << std::ends;
+			config_destroy(&meshConfig);
+			throw std::runtime_error(errtxt.str().c_str());
+		}
+
+		LightingSurfaceMeshSidecar mesh{};
+		int vertexCount = 0;
+		if (config_lookup_int(&meshConfig, "vertex_count", &vertexCount) != CONFIG_TRUE ||
+			vertexCount <= 0)
+		{
+			config_destroy(&meshConfig);
+			throw std::runtime_error(
+				"lighting surface mesh vertex_count is required and must be positive");
+		}
+		mesh.vertexCount = static_cast<uint32_t>(vertexCount);
+
+		config_setting_t* objects = config_lookup(&meshConfig, "objects");
+		if (objects == nullptr || config_setting_length(objects) <= 0)
+		{
+			config_destroy(&meshConfig);
+			throw std::runtime_error(
+				"lighting surface mesh objects is required and must not be empty");
+		}
+
+		int objectCount = config_setting_length(objects);
+		for (int objectIndex = 0; objectIndex < objectCount; ++objectIndex)
+		{
+			config_setting_t* object = config_setting_get_elem(objects, objectIndex);
+			if (object == nullptr)
+			{
+				config_destroy(&meshConfig);
+				throw std::runtime_error("lighting surface mesh object is invalid");
+			}
+
+			std::string context =
+				"lighting surface mesh objects[" + std::to_string(objectIndex) + "]";
+			const char* surfaceTypeText = nullptr;
+			if (config_setting_lookup_string(
+				object, "surface_type", &surfaceTypeText) != CONFIG_TRUE)
+			{
+				config_destroy(&meshConfig);
+				throw std::runtime_error(context + ".surface_type is required");
+			}
+
+			LightingSurfaceMeshObject meshObject{};
+			meshObject.surfaceTypeText = surfaceTypeText;
+			meshObject.surfaceType = MeshSurfaceTypeID(meshObject.surfaceTypeText);
+			meshObject.surfaceID =
+				ReadMeshRequiredUInt(object, context, "surface_id");
+			meshObject.materialID =
+				ReadMeshRequiredUInt(object, context, "material_id", true);
+			meshObject.vertexOffset =
+				ReadMeshRequiredUInt(object, context, "vertex_offset", true);
+			meshObject.vertexCount =
+				ReadMeshRequiredUInt(object, context, "vertex_count");
+			meshObject.indexOffset =
+				ReadMeshRequiredUInt(object, context, "index_offset", true);
+			meshObject.indexCount =
+				ReadMeshRequiredUInt(object, context, "index_count");
+
+			config_setting_t* indices = config_setting_lookup(object, "indices");
+			if (indices == nullptr)
+			{
+				config_destroy(&meshConfig);
+				throw std::runtime_error(context + ".indices is required");
+			}
+			int triangleCount = config_setting_length(indices);
+			if (triangleCount <= 0)
+			{
+				config_destroy(&meshConfig);
+				throw std::runtime_error(context + ".indices must not be empty");
+			}
+			meshObject.indices.reserve(static_cast<size_t>(triangleCount) * 3u);
+			for (int triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex)
+			{
+				config_setting_t* triangle =
+					config_setting_get_elem(indices, triangleIndex);
+				if (triangle == nullptr || config_setting_length(triangle) != 3)
+				{
+					config_destroy(&meshConfig);
+					throw std::runtime_error(
+						context + ".indices[" + std::to_string(triangleIndex) +
+						"] must contain exactly three vertex indices");
+				}
+				for (int corner = 0; corner < 3; ++corner)
+				{
+					int vertexIndex = config_setting_get_int_elem(triangle, corner);
+					if (vertexIndex < 0 ||
+						static_cast<uint32_t>(vertexIndex) >= mesh.vertexCount)
+					{
+						config_destroy(&meshConfig);
+						throw std::runtime_error(
+							context + ".indices[" + std::to_string(triangleIndex) +
+							"] contains a vertex index outside vertex_count");
+					}
+					meshObject.indices.push_back(static_cast<uint32_t>(vertexIndex));
+				}
+			}
+			if (meshObject.indices.size() != meshObject.indexCount)
+			{
+				config_destroy(&meshConfig);
+				throw std::runtime_error(
+					context + ".index_count does not match indices length");
+			}
+
+			mesh.objects.push_back(meshObject);
+		}
+
+		config_destroy(&meshConfig);
+		return mesh;
+	}
 
 	uint32_t ReadPositiveUInt(
 		config_setting_t* object,
@@ -412,6 +798,7 @@ void ResourceLightingSurface::BuildSphereSurface(
 
 void ResourceLightingSurface::LoadObjSurface(
 	const std::string& objFile,
+	const std::string& meshFile,
 	uint32_t surfaceType,
 	uint32_t surfaceID,
 	uint32_t materialID,
@@ -422,6 +809,9 @@ void ResourceLightingSurface::LoadObjSurface(
 	uint32_t sphereLonSegments,
 	uint32_t& emittedVertexID)
 {
+	(void)sphereLatSegments;
+	(void)sphereLonSegments;
+
 	if (surfaceType == BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL)
 	{
 		BuildRectangleSurface(
@@ -433,22 +823,68 @@ void ResourceLightingSurface::LoadObjSurface(
 			emittedVertexID);
 		return;
 	}
-	if (surfaceType == BOUNDARY_LIGHT_SURFACE_SPHERE)
+
+	LightingSurfaceMeshSidecar meshSidecar =
+		LoadLightingSurfaceMeshSidecar(meshFile);
+	const LightingSurfaceMeshObject* selectedMeshObject = nullptr;
+	for (const LightingSurfaceMeshObject& meshObject : meshSidecar.objects)
 	{
-		BuildSphereSurface(
+		if (meshObject.surfaceType == surfaceType &&
+			meshObject.surfaceID == surfaceID &&
+			meshObject.materialID == materialID)
+		{
+			selectedMeshObject = &meshObject;
+			break;
+		}
+	}
+	if (selectedMeshObject == nullptr)
+	{
+		std::ostringstream errtxt;
+		errtxt << "Mesh file " << meshFile
+			<< " has no object matching surface_type " << surfaceType
+			<< ", surface_id " << surfaceID
+			<< ", material_id " << materialID << std::ends;
+		throw std::runtime_error(errtxt.str().c_str());
+	}
+
+	LightingSurfaceObjRaw obj = LoadLightingSurfaceObjRaw(objFile);
+	if (obj.positions.size() != meshSidecar.vertexCount)
+	{
+		std::ostringstream errtxt;
+		errtxt << "OBJ file " << objFile << " has " << obj.positions.size()
+			<< " vertices but mesh file " << meshFile
+			<< " declares vertex_count " << meshSidecar.vertexCount
+			<< std::ends;
+		throw std::runtime_error(errtxt.str().c_str());
+	}
+
+	uint32_t baseVertex = static_cast<uint32_t>(m_SurfaceVertices.size());
+	for (uint32_t vertexIndex = 0u; vertexIndex < meshSidecar.vertexCount; ++vertexIndex)
+	{
+		glm::vec3 normal =
+			obj.hasVertexNormal[vertexIndex] ?
+			obj.vertexNormals[vertexIndex] :
+			SafeNormalize(obj.positions[vertexIndex]);
+		glm::vec2 uv =
+			obj.hasVertexTexCoord[vertexIndex] ?
+			obj.vertexTexCoords[vertexIndex] :
+			glm::vec2(0.0f);
+
+		AppendSurfaceVertex(
+			obj.positions[vertexIndex],
+			normal,
+			uv,
+			surfaceType,
 			surfaceID,
 			materialID,
 			initialSurfaceColor,
-			sphereLatSegments,
-			sphereLonSegments,
 			emittedVertexID);
-		return;
 	}
 
-	std::ostringstream errtxt;
-	errtxt << "Unsupported lighting surface type for OBJ-backed indexed surface: "
-		<< surfaceType << " from " << objFile << std::ends;
-	throw std::runtime_error(errtxt.str().c_str());
+	for (uint32_t index : selectedMeshObject->indices)
+	{
+		m_SurfaceIndices.push_back(baseVertex + index);
+	}
 }
 
 void ResourceLightingSurface::LoadLightingSurfaceObjects()
@@ -476,6 +912,7 @@ void ResourceLightingSurface::LoadLightingSurfaceObjects()
 
 			const char* source = nullptr;
 			const char* objFile = nullptr;
+			const char* meshFile = nullptr;
 			const char* surfaceTypeText = nullptr;
 			int surfaceID = 0;
 			int materialID = 0;
@@ -529,6 +966,14 @@ void ResourceLightingSurface::LoadLightingSurfaceObjects()
 			}
 			if (surfaceType == BOUNDARY_LIGHT_SURFACE_SPHERE)
 			{
+				if (config_setting_lookup_string(object, "mesh_file", &meshFile) != CONFIG_TRUE)
+				{
+					std::ostringstream errtxt;
+					errtxt << "lighting_surface_objects[" << index
+						<< "].mesh_file is required for SPHERE" << std::ends;
+					throw std::runtime_error(errtxt.str().c_str());
+				}
+				surfaceConfig.meshFile = meshFile;
 				surfaceConfig.sphereLatSegments =
 					ReadPositiveUInt(object, index, "sphere_lat_segments");
 				surfaceConfig.sphereLonSegments =
@@ -540,6 +985,7 @@ void ResourceLightingSurface::LoadLightingSurfaceObjects()
 
 			LoadObjSurface(
 				surfaceConfig.objFile,
+				surfaceConfig.meshFile,
 				surfaceConfig.surfaceType,
 				surfaceConfig.surfaceID,
 				surfaceConfig.materialID,

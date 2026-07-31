@@ -14,6 +14,8 @@ scene_model = {
       surface_id 		= 1000;
       initial_surface_color = [0.0, 0.0, 0.0, 1.0];
       roles 			= ["collision", "boundary_markers", "lighting_surface"];
+	  obj_file = "C:/_DJ/gPCD/vulkan/sim/LightingBall/UFBall.obj";
+	  mesh_file = "C:/_DJ/gPCD/vulkan/sim/LightingBall/UFBall.mesh.cfg";
     },
     {
       name 					= "shadow_wall";
@@ -85,7 +87,7 @@ particle_streams = (
 
     // Dense x-directed beam matched to the shadow_wall y/z face.
     // Vulkan profile is dense: 80 x 80 = 6400 photons per wave.
-    initial_particle_velocity 		= [0.209968, 0.0, 0.0];
+    initial_particle_velocity 		= [0.5, 0.0, 0.0];
 	
 
     release_start_frame 			= 10;
@@ -109,13 +111,13 @@ particle_streams = (
   {
     name 							= "diffuse_beam_sphere";
     enabled 						= true;
-    material_id 					= 4;
+    material_id 					= 6;
     radius 							= 0.015;
     particle_separation_distance 	= 0.005;
 	relative_mass 					= 0.025;
     // Dense x-directed beam matched to the shadow_wall y/z face.
     // Vulkan profile is dense: 80 x 80 = 6400 photons per wave.
-    initial_particle_velocity 		= [-0.209968, 0.0, 0.0];
+    initial_particle_velocity 		= [-0.5, 0.0, 0.0];
 
     release_start_frame 			= 10;
     release_columns 				= 1;
@@ -144,7 +146,7 @@ particle_streams = (
 	relative_mass 					= 0.25;
     // Dense x-directed beam matched to the shadow_wall y/z face.
     // Vulkan profile is dense: 80 x 80 = 6400 photons per wave.
-    initial_particle_velocity 		= [0.209968, 0.0, 0.0];
+    initial_particle_velocity 		= [0.5, 0.0, 0.0];
 
     release_start_frame 			= 10;
     release_columns 				= 1;
@@ -174,7 +176,7 @@ particle_streams = (
 
     // Reflection test beam starts just above the reflecting_wall and moves
     // toward the sphere. Later it will carry sphere color back to the wall.
-    initial_particle_velocity 		= [0.0, 0.0, 0.209968];
+    initial_particle_velocity 		= [0.0, 0.0, 0.5];
 
     release_start_frame 			= 10;
     release_columns 				= 1;
@@ -196,7 +198,7 @@ particle_streams = (
   },
   {
     name 							= "diffuse_environment";
-    enabled 						= true;
+    enabled 						= false;
     material_id 					= 4;
     radius 							= 0.025;
     particle_separation_distance 	= 0.005;
@@ -204,7 +206,7 @@ particle_streams = (
 
     // Environment-sphere emitters use the magnitude of this velocity. The
     // per-particle direction is generated from the emitter direction mode.
-    initial_particle_velocity 		= [0.209968, 0.0, 0.0];
+    initial_particle_velocity 		= [0.5, 0.0, 0.0];
 
     release_start_frame 			= 16;
     release_columns 				= 1;
@@ -227,7 +229,7 @@ particle_streams = (
 // --------------------------------------------------------------------------
 // Integration
 // --------------------------------------------------------------------------
-dt 								= 0.045;
+dt 								= 0.55;
 
 // --------------------------------------------------------------------------
 // Output

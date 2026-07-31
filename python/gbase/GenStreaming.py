@@ -1919,7 +1919,6 @@ class GenStreaming(GenericGenData):
             self.report_cell_occupancy_capacity()
             self.write_particle_bin()
             self.write_test_file()
-            self.write_lighting_surface_objs()
             self.report_generated_bounds()
         except (OSError, RuntimeError, TypeError, ValueError) as error:
             self.close_bin_file()

@@ -1639,8 +1639,13 @@ bool IsReflectionPhotonParticle(uint particleID)
         PHOTON_HELPER_PARTICLE_TYPE_REFLECTION_PHOTON;
 }
 
-uint PhotonBaseMaterialID()
+uint PhotonBaseMaterialID(uint particleID)
 {
+#if defined(LIGHTING_PARTICLE_STRUCT_AVAILABLE)
+    if (IsPhotonParticle(particleID)) {
+        return uint(round(P[particleID].initial_vel_energy.w));
+    }
+#endif
     for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii) {
         if (MATERIAL_PROPERTIES[ii].particleType == PARTICLE_TYPE_PHOTON) {
             return MATERIAL_PROPERTIES[ii].materialID;
@@ -2062,7 +2067,7 @@ void fpml_comp_main()
     P[SourceID].colFlg = 0u;
     bool photonSource = IsPhotonParticle(SourceID);
     if (photonSource) {
-        P[SourceID].material_id = float(PhotonBaseMaterialID());
+        P[SourceID].material_id = float(PhotonBaseMaterialID(SourceID));
     }
     vec3 totalForce = vec3(0.0);
     bool photonReflected = false;
@@ -2454,7 +2459,7 @@ def render_fpm() -> str:
     photon_chunks = [
         """    bool photonSource = IsPhotonParticle(SourceID);
     if (photonSource) {
-        P[SourceID].material_id = float(PhotonBaseMaterialID());
+        P[SourceID].material_id = float(PhotonBaseMaterialID(SourceID));
     }
 """,
         """    bool photonReflected = false;
@@ -2828,6 +2833,7 @@ LightingSurfaceObjectMetadata boundary_light_surface_object_metadata(
         0u,
         0u,
         npos,
+        0u,
         0u,
         0u,
         0u,
@@ -3447,7 +3453,7 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
     body = body.split("#endif\n\n", 1)[1]
     body = body.replace(
         """    if (photonSource) {
-        P[SourceID].material_id = float(PhotonBaseMaterialID());
+        P[SourceID].material_id = float(PhotonBaseMaterialID(SourceID));
     }""",
         """    if (photonSource) {
         P[SourceID].material_id = P[SourceID].initial_vel_energy.w;
