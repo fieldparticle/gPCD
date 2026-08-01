@@ -2684,8 +2684,28 @@ float boundary_light_rgb_luminance(vec3 rgb)
 #define FPML_ENABLE_REFLECTION_PICKUP 1
 #endif
 
+#ifndef FPML_ENABLE_ATTACHED_VERTEX_SCAN
+#define FPML_ENABLE_ATTACHED_VERTEX_SCAN 0
+#endif
+
 #ifndef FPML_PROFILE_COUNTERS
 #define FPML_PROFILE_COUNTERS 0
+#endif
+
+#ifndef LIGHTING_SPHERE_SURFACE_MAP_DEFINED
+#define LIGHTING_SPHERE_SURFACE_MAP_DEFINED 1
+const uint LIGHTING_SPHERE_SURFACE_MAP_SURFACE_ID = 0u;
+const uint LIGHTING_SPHERE_SURFACE_MAP_COUNT = 0u;
+const uint LIGHTING_SPHERE_SURFACE_MAP_MATERIAL_IDS[1] = uint[1](0u);
+const vec4 LIGHTING_SPHERE_SURFACE_MAP_ALBEDOS[1] = vec4[1](vec4(0.0));
+#endif
+
+#ifndef LIGHTING_SPHERE_DECAL_MAP_DEFINED
+#define LIGHTING_SPHERE_DECAL_MAP_DEFINED 1
+const uint LIGHTING_SPHERE_DECAL_MAP_SURFACE_ID = 0u;
+const uint LIGHTING_SPHERE_DECAL_MAP_COUNT = 0u;
+const uvec4 LIGHTING_SPHERE_DECAL_MAP_CELLS[1] = uvec4[1](uvec4(0u));
+const vec4 LIGHTING_SPHERE_DECAL_MAP_ALBEDOS[1] = vec4[1](vec4(0.0));
 #endif
 
 void fpml_profile_count_sphere_hit()
@@ -2873,11 +2893,110 @@ uint boundary_light_sphere_vertex_id(
     return ringBase + (segmentIndex % surfaceObject.sphereLonSegments);
 }
 
+uint boundary_light_sphere_surface_map_material_id(
+    LightingSurfaceObjectMetadata surfaceObject,
+    uint vertexID,
+    uint fallbackMaterialID)
+{
+    if (surfaceObject.surfaceType != BOUNDARY_LIGHT_SURFACE_SPHERE ||
+        surfaceObject.surfaceID != LIGHTING_SPHERE_SURFACE_MAP_SURFACE_ID ||
+        vertexID < surfaceObject.vertexOffset)
+    {
+        return fallbackMaterialID;
+    }
+
+    uint localVertexID = vertexID - surfaceObject.vertexOffset;
+    if (localVertexID >= LIGHTING_SPHERE_SURFACE_MAP_COUNT)
+    {
+        return fallbackMaterialID;
+    }
+
+    uint mappedMaterialID =
+        LIGHTING_SPHERE_SURFACE_MAP_MATERIAL_IDS[localVertexID];
+    return mappedMaterialID == 0u ? fallbackMaterialID : mappedMaterialID;
+}
+
+vec4 boundary_light_sphere_surface_map_albedo(
+    LightingSurfaceObjectMetadata surfaceObject,
+    uint vertexID)
+{
+    if (surfaceObject.surfaceType != BOUNDARY_LIGHT_SURFACE_SPHERE ||
+        surfaceObject.surfaceID != LIGHTING_SPHERE_SURFACE_MAP_SURFACE_ID ||
+        vertexID < surfaceObject.vertexOffset)
+    {
+        return vec4(0.0);
+    }
+
+    uint localVertexID = vertexID - surfaceObject.vertexOffset;
+    if (localVertexID >= LIGHTING_SPHERE_SURFACE_MAP_COUNT)
+    {
+        return vec4(0.0);
+    }
+
+    return LIGHTING_SPHERE_SURFACE_MAP_ALBEDOS[localVertexID];
+}
+
+uint boundary_light_sphere_decal_material_id(
+    LightingSurfaceObjectMetadata surfaceObject,
+    uint vertexID,
+    uint fallbackMaterialID)
+{
+    if (surfaceObject.surfaceType != BOUNDARY_LIGHT_SURFACE_SPHERE ||
+        surfaceObject.surfaceID != LIGHTING_SPHERE_DECAL_MAP_SURFACE_ID ||
+        vertexID < surfaceObject.vertexOffset ||
+        surfaceObject.sphereLonSegments == 0u)
+    {
+        return fallbackMaterialID;
+    }
+
+    uint localVertexID = vertexID - surfaceObject.vertexOffset;
+    uint ring = localVertexID / surfaceObject.sphereLonSegments;
+    uint segment = localVertexID % surfaceObject.sphereLonSegments;
+    for (uint cellIndex = 0u; cellIndex < LIGHTING_SPHERE_DECAL_MAP_COUNT; ++cellIndex)
+    {
+        uvec4 cell = LIGHTING_SPHERE_DECAL_MAP_CELLS[cellIndex];
+        if (cell.x == ring && cell.y == segment && cell.z != 0u)
+        {
+            return cell.z;
+        }
+    }
+    return fallbackMaterialID;
+}
+
+vec4 boundary_light_sphere_decal_albedo(
+    LightingSurfaceObjectMetadata surfaceObject,
+    uint vertexID)
+{
+    if (surfaceObject.surfaceType != BOUNDARY_LIGHT_SURFACE_SPHERE ||
+        surfaceObject.surfaceID != LIGHTING_SPHERE_DECAL_MAP_SURFACE_ID ||
+        vertexID < surfaceObject.vertexOffset ||
+        surfaceObject.sphereLonSegments == 0u)
+    {
+        return vec4(0.0);
+    }
+
+    uint localVertexID = vertexID - surfaceObject.vertexOffset;
+    uint ring = localVertexID / surfaceObject.sphereLonSegments;
+    uint segment = localVertexID % surfaceObject.sphereLonSegments;
+    for (uint cellIndex = 0u; cellIndex < LIGHTING_SPHERE_DECAL_MAP_COUNT; ++cellIndex)
+    {
+        uvec4 cell = LIGHTING_SPHERE_DECAL_MAP_CELLS[cellIndex];
+        if (cell.x == ring && cell.y == segment)
+        {
+            return LIGHTING_SPHERE_DECAL_MAP_ALBEDOS[cellIndex];
+        }
+    }
+    return vec4(0.0);
+}
+
 uint boundary_light_sphere_attached_material_id(
     vec3 hitNormal,
     uint surfaceID,
     uint fallbackMaterialID)
 {
+#if !FPML_ENABLE_ATTACHED_VERTEX_SCAN
+    return fallbackMaterialID;
+#else
     LightingSurfaceObjectMetadata surfaceObject =
         boundary_light_surface_object_metadata(
             BOUNDARY_LIGHT_SURFACE_SPHERE,
@@ -2936,6 +3055,7 @@ uint boundary_light_sphere_attached_material_id(
         bestMaterialID = attachedMaterialID;
     }
     return bestMaterialID;
+#endif
 }
 
 vec3 photon_pickup_sphere_quad_rgb(
@@ -2962,6 +3082,7 @@ vec3 photon_pickup_sphere_quad_rgb(
 
     vec3 normal = normalize(hitNormal);
 
+#if FPML_ENABLE_ATTACHED_VERTEX_SCAN
     float attachedAngularRadius = surfaceObject.depositRadius > EPSILON &&
         LIGHTING_BALL_RADIUS > EPSILON
         ? surfaceObject.depositRadius / LIGHTING_BALL_RADIUS
@@ -3034,6 +3155,7 @@ vec3 photon_pickup_sphere_quad_rgb(
                 vec3(1.0));
         }
     }
+#endif
 
     if (fallbackMaterialID != surfaceObject.materialID)
     {
@@ -3110,9 +3232,27 @@ void boundary_light_write_surface_vertex(
     {
         vertexMaterialID = surfaceObject.materialID;
     }
+    vertexMaterialID = boundary_light_sphere_surface_map_material_id(
+        surfaceObject,
+        vertexID,
+        vertexMaterialID);
+    vertexMaterialID = boundary_light_sphere_decal_material_id(
+        surfaceObject,
+        vertexID,
+        vertexMaterialID);
 
     vec3 clampedRgb = clamp(rgb, vec3(0.0), vec3(1.0));
     vec3 vertexAlbedo = clamp(LightingSurface[vertexID].albedo.rgb, vec3(0.0), vec3(1.0));
+    vec4 mapAlbedo = boundary_light_sphere_surface_map_albedo(surfaceObject, vertexID);
+    if (mapAlbedo.a > 0.0)
+    {
+        vertexAlbedo = clamp(mapAlbedo.rgb, vec3(0.0), vec3(1.0));
+    }
+    vec4 decalAlbedo = boundary_light_sphere_decal_albedo(surfaceObject, vertexID);
+    if (decalAlbedo.a > 0.0)
+    {
+        vertexAlbedo = clamp(decalAlbedo.rgb, vec3(0.0), vec3(1.0));
+    }
     bool hasObjAlbedo = length(vertexAlbedo - vec3(1.0)) > 0.0001;
     if (hasObjAlbedo)
     {
@@ -3391,6 +3531,9 @@ void boundary_light_deposit_sphere_attached_vertices(
     float invSpan,
     vec3 rgb)
 {
+#if !FPML_ENABLE_ATTACHED_VERTEX_SCAN
+    return;
+#else
     uint latticeVertexCount =
         (surfaceObject.sphereLatSegments + 1u) *
         surfaceObject.sphereLonSegments;
@@ -3417,6 +3560,7 @@ void boundary_light_deposit_sphere_attached_vertices(
                 rgb * weight);
         }
     }
+#endif
 }
 
 void DepositLightingSurfaceSphereVertexSplat(

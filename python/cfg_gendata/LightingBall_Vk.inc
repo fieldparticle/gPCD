@@ -13,6 +13,8 @@ scene_model = {
       material_id 		= 1;
       surface_id 		= 1000;
       initial_surface_color = [0.0, 0.0, 0.0, 1.0];
+      sphere_lat_segments = 64;
+      sphere_lon_segments = 128;
       roles 			= ["collision", "boundary_markers", "lighting_surface"];
 	  obj_file = "C:/_DJ/gPCD/vulkan/sim/LightingBall/UFBall.obj";
 	  mesh_file = "C:/_DJ/gPCD/vulkan/sim/LightingBall/UFBall.mesh.cfg";
@@ -65,6 +67,8 @@ scene_model = {
   );
   
 };
+
+sphere_decal_bucket_search_radius = 2;
 
 // --------------------------------------------------------------------------
 // Domain and view

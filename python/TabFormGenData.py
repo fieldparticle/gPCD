@@ -318,8 +318,9 @@ class TabGenData(QTabWidget):
     # Generate the data
     #
     def gen_data(self):
+        
          # Pass the function to execute
-        if self.refresh() == False:
+        if self.refresh_obj() == False:
             print("Config file error")
             return
         index = 0

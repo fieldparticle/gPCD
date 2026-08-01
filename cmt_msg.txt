@@ -1,11 +1,11 @@
 Current status:
-	- Editable UFBall OBJ now carries OBJ/MTL material color into Vulkan surface lighting.
-	- Sphere reflection color is documented as incoming photon intensity tinted by OBJ/MTL albedo.
-	- Yellow sphere material and purple reflection-photon display material are no longer intended to own visible sphere reflection color.
+	- Documented the LightingBall text-on-sphere investigation and current OBJ/decal limitations.
+	- Recorded glTF/GLB as the preferred next asset path for authored sphere-surface text color.
+	- Updated next work to treat OBJ projection as temporary fallback/diagnostic workflow.
 
 Code Changes:
-	- Updated LightingBall docs with sidecar material/albedo workflow.
-	- Added ProblemEvolution entry for OBJ/MTL albedo-owned sphere reflection color.
-	- Updated lighting TODOs for attached-vertex scan optimization and reflection color validation.
+	- Updated LightingBall docs with bucketed Refresh Models, sphere-grid inference, and diagnostic marker OBJ notes.
+	- Updated todo docs to prioritize Blender-authored glTF vertex color or UV texture data.
+	- Added a ProblemEvolution entry for moving from OBJ ray projection toward authored glTF surface color.
 
-Next: Validate Vulkan sphere reflection color after GenData and optimize attached/text vertex lookup.
+Next: Add a glTF/GLB refresh path that imports Blender-authored sphere vertex colors or texture/decal data.

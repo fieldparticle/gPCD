@@ -1619,6 +1619,11 @@ class GenericGenData:
                         if surface_object is not None
                         else None
                     ),
+                    "obj_regions": (
+                        surface_object.get("obj_regions", ())
+                        if surface_object is not None
+                        else ()
+                    ),
                     "sphere_lat_segments": rings,
                     "sphere_lon_segments": segments,
                     "faces": [],
@@ -1873,6 +1878,164 @@ class GenericGenData:
                     )
         return path
 
+    def _material_name_for_obj(self, prefix, material_id):
+        safe_prefix = "".join(
+            value if value.isalnum() or value == "_" else "_"
+            for value in str(prefix)
+        )
+        return f"{safe_prefix}_material_{int(material_id)}"
+
+    def _write_decaled_sphere_diag_obj(self, obj_path, obj_data):
+        surface_object = obj_data["objects"][0]
+        sphere_decal_map = surface_object.get("sphere_decal_map")
+        if not sphere_decal_map:
+            return None
+
+        rings = int(surface_object.get("sphere_lat_segments", 0))
+        segments = int(surface_object.get("sphere_lon_segments", 0))
+        if rings < 2 or segments < 3:
+            return None
+
+        object_name = str(surface_object.get("name", "lighting_sphere"))
+        diag_dir = os.path.dirname(obj_path)
+        diag_obj_path = os.path.join(diag_dir, f"{object_name}diag.obj")
+        marker_obj_path = os.path.join(diag_dir, f"{object_name}diag_markers.obj")
+        marker_mtl_name = f"{object_name}diag_markers.mtl"
+        marker_mtl_path = os.path.join(diag_dir, marker_mtl_name)
+        default_material_id = int(surface_object.get("material_id", 0))
+        default_color = (
+            self._material_color_by_id(default_material_id)
+            or (0.8, 0.8, 0.8, 1.0)
+        )
+        decal_cells = {
+            (int(cell["ring"]), int(cell["segment"])): cell
+            for cell in sphere_decal_map.get("cells", ())
+        }
+
+        def vertex_cell(vertex_id):
+            local_vertex_id = int(vertex_id) - 1
+            if local_vertex_id < 0:
+                return None
+            ring = local_vertex_id // segments
+            segment = local_vertex_id % segments
+            if ring < 0 or ring > rings:
+                return None
+            return ring, segment
+
+        def vertex_color(vertex_id):
+            cell_key = vertex_cell(vertex_id)
+            if cell_key in decal_cells:
+                return tuple(float(value) for value in decal_cells[cell_key]["albedo"][:4])
+            return default_color
+
+        def sphere_normal(point):
+            lighting_ball = self._lighting_ball_values()
+            if lighting_ball is None:
+                return (0.0, 0.0, 1.0)
+            center = lighting_ball["center"]
+            direction = tuple(
+                float(point[axis]) - float(center[axis])
+                for axis in range(3)
+            )
+            direction_length = math.sqrt(sum(value * value for value in direction))
+            if direction_length <= 1.0e-9:
+                return (0.0, 0.0, 1.0)
+            return tuple(value / direction_length for value in direction)
+
+        with open(diag_obj_path, "w", encoding="ascii", newline="\n") as output:
+            output.write("# Generated decaled LightingBall sphere diagnostic.\n")
+            output.write("# Vertex colors mark projected sphere_decal_map cells.\n")
+            for vertex_index, (vertex_x, vertex_y, vertex_z) in enumerate(
+                obj_data["vertices"],
+                start=1,
+            ):
+                red, green, blue, _alpha = vertex_color(vertex_index)
+                output.write(
+                    f"v {vertex_x:.9f} {vertex_y:.9f} {vertex_z:.9f} "
+                    f"{red:.9f} {green:.9f} {blue:.9f}\n"
+                )
+            for tex_u, tex_v in obj_data["texcoords"]:
+                output.write(f"vt {tex_u:.9f} {tex_v:.9f}\n")
+            for normal_x, normal_y, normal_z in obj_data["normals"]:
+                output.write(f"vn {normal_x:.9f} {normal_y:.9f} {normal_z:.9f}\n")
+            output.write(f"o {object_name}_decal_diag\n")
+            for first, second, third in surface_object["faces"]:
+                output.write(
+                    f"f {first}/{first}/{first} "
+                    f"{second}/{second}/{second} "
+                    f"{third}/{third}/{third}\n"
+                )
+        marker_vertices = []
+        marker_faces = []
+        marker_size = float(
+            surface_object.get(
+                "sphere_decal_diag_marker_size",
+                self.itemcfg.get("sphere_decal_diag_marker_size", 0.075),
+            )
+        )
+        for cell in decal_cells.values():
+            ring = int(cell["ring"])
+            segment = int(cell["segment"])
+            vertex_id = ring * segments + segment + 1
+            if vertex_id <= 0 or vertex_id > len(obj_data["vertices"]):
+                continue
+            point = tuple(float(value) for value in obj_data["vertices"][vertex_id - 1])
+            normal = sphere_normal(point)
+            up = (0.0, 0.0, 1.0)
+            if abs(sum(normal[axis] * up[axis] for axis in range(3))) > 0.95:
+                up = (0.0, 1.0, 0.0)
+            tangent_u = (
+                up[1] * normal[2] - up[2] * normal[1],
+                up[2] * normal[0] - up[0] * normal[2],
+                up[0] * normal[1] - up[1] * normal[0],
+            )
+            tangent_u_length = math.sqrt(sum(value * value for value in tangent_u))
+            if tangent_u_length <= 1.0e-9:
+                continue
+            tangent_u = tuple(value / tangent_u_length for value in tangent_u)
+            tangent_v = (
+                normal[1] * tangent_u[2] - normal[2] * tangent_u[1],
+                normal[2] * tangent_u[0] - normal[0] * tangent_u[2],
+                normal[0] * tangent_u[1] - normal[1] * tangent_u[0],
+            )
+            base_index = len(marker_vertices) + 1
+            lifted_point = tuple(point[axis] + normal[axis] * marker_size for axis in range(3))
+            marker_vertices.extend(
+                (
+                    tuple(lifted_point[axis] + tangent_u[axis] * marker_size for axis in range(3)),
+                    tuple(
+                        lifted_point[axis]
+                        - tangent_u[axis] * marker_size * 0.5
+                        + tangent_v[axis] * marker_size * 0.866
+                        for axis in range(3)
+                    ),
+                    tuple(
+                        lifted_point[axis]
+                        - tangent_u[axis] * marker_size * 0.5
+                        - tangent_v[axis] * marker_size * 0.866
+                        for axis in range(3)
+                    ),
+                )
+            )
+            marker_faces.append((base_index, base_index + 1, base_index + 2))
+
+        with open(marker_mtl_path, "w", encoding="ascii", newline="\n") as output:
+            output.write("# Generated decal diagnostic marker material.\n")
+            output.write("newmtl decal_marker_blue\n")
+            output.write("Kd 0.000000000 0.000000000 1.000000000\n")
+            output.write("d 1.000000000\n")
+
+        with open(marker_obj_path, "w", encoding="ascii", newline="\n") as output:
+            output.write("# Generated visible decal vertex markers.\n")
+            output.write(f"mtllib {marker_mtl_name}\n")
+            output.write(f"o {object_name}_decal_vertex_markers\n")
+            output.write("usemtl decal_marker_blue\n")
+            for vertex_x, vertex_y, vertex_z in marker_vertices:
+                output.write(f"v {vertex_x:.9f} {vertex_y:.9f} {vertex_z:.9f}\n")
+            for first, second, third in marker_faces:
+                output.write(f"f {first} {second} {third}\n")
+        return diag_obj_path
+
     def _normalized_obj_path(self, raw_path):
         path = str(raw_path)
         path = (
@@ -1955,6 +2118,68 @@ class GenericGenData:
                     output.write(
                         f"    sphere_lon_segments = {int(surface_object['sphere_lon_segments'])};\n"
                     )
+                sphere_surface_map = surface_object.get("sphere_surface_map")
+                if sphere_surface_map:
+                    material_ids = tuple(sphere_surface_map["material_ids"])
+                    albedos = tuple(sphere_surface_map["albedos"])
+                    if len(material_ids) != len(albedos):
+                        raise ValueError(
+                            f"{surface_object['name']} sphere_surface_map material/albedo length mismatch"
+                        )
+                    output.write("    sphere_surface_map = {\n")
+                    output.write(
+                        f"      lat_segments = {int(sphere_surface_map['lat_segments'])};\n"
+                    )
+                    output.write(
+                        f"      lon_segments = {int(sphere_surface_map['lon_segments'])};\n"
+                    )
+                    output.write(f"      cell_count = {len(material_ids)};\n")
+                    output.write("      material_ids = (\n")
+                    for cell_index, material_id in enumerate(material_ids):
+                        separator = "," if cell_index + 1 < len(material_ids) else ""
+                        output.write(f"        {int(material_id)}{separator}\n")
+                    output.write("      );\n")
+                    output.write("      albedos = (\n")
+                    for cell_index, albedo in enumerate(albedos):
+                        separator = "," if cell_index + 1 < len(albedos) else ""
+                        red, green, blue, alpha = (
+                            float(value) for value in albedo[:4]
+                        )
+                        output.write(
+                            "        "
+                            f"[{red:.9f}, {green:.9f}, {blue:.9f}, {alpha:.9f}]"
+                            f"{separator}\n"
+                        )
+                    output.write("      );\n")
+                    output.write("    };\n")
+                sphere_decal_map = surface_object.get("sphere_decal_map")
+                if sphere_decal_map:
+                    cells = tuple(sphere_decal_map["cells"])
+                    output.write("    sphere_decal_map = {\n")
+                    output.write(
+                        f"      lat_segments = {int(sphere_decal_map['lat_segments'])};\n"
+                    )
+                    output.write(
+                        f"      lon_segments = {int(sphere_decal_map['lon_segments'])};\n"
+                    )
+                    output.write(f"      cell_count = {len(cells)};\n")
+                    output.write("      cells = (\n")
+                    for cell_index, cell in enumerate(cells):
+                        separator = "," if cell_index + 1 < len(cells) else ""
+                        red, green, blue, alpha = (
+                            float(value) for value in cell["albedo"][:4]
+                        )
+                        output.write("        {\n")
+                        output.write(f"          ring = {int(cell['ring'])};\n")
+                        output.write(f"          segment = {int(cell['segment'])};\n")
+                        output.write(f"          material_id = {int(cell['material_id'])};\n")
+                        output.write(
+                            "          "
+                            f"albedo = [{red:.9f}, {green:.9f}, {blue:.9f}, {alpha:.9f}];\n"
+                        )
+                        output.write(f"        }}{separator}\n")
+                    output.write("      );\n")
+                    output.write("    };\n")
                 if "rectangle_u_segments" in surface_object:
                     output.write(
                         f"    rectangle_u_segments = {int(surface_object['rectangle_u_segments'])};\n"
@@ -2008,6 +2233,404 @@ class GenericGenData:
             output.write(");\n")
         return path
 
+    def _build_sphere_surface_map(self, surface_object, obj_data):
+        if str(surface_object.get("surface_type", "")).upper() != "SPHERE":
+            return None
+        if "sphere_lat_segments" not in surface_object or "sphere_lon_segments" not in surface_object:
+            return None
+
+        lighting_ball = self._lighting_ball_values()
+        if lighting_ball is None:
+            return None
+
+        rings = int(surface_object["sphere_lat_segments"])
+        segments = int(surface_object["sphere_lon_segments"])
+        if rings < 2 or segments < 3:
+            return None
+
+        cell_count = (rings + 1) * segments
+        default_material_id = int(surface_object.get("material_id", 0))
+        material_ids = [0 for _ in range(cell_count)]
+        albedos = [(0.0, 0.0, 0.0, 0.0) for _ in range(cell_count)]
+        faces = tuple(surface_object.get("faces", ()))
+        face_colors = tuple(surface_object.get("face_colors", ()))
+        face_material_ids = tuple(surface_object.get("face_material_ids", ()))
+        vertices = tuple(obj_data.get("vertices", ()))
+        center = tuple(float(value) for value in lighting_ball["center"])
+
+        for face_index, face in enumerate(faces):
+            material_id = (
+                int(face_material_ids[face_index])
+                if face_index < len(face_material_ids)
+                else default_material_id
+            )
+            color = (
+                tuple(float(value) for value in face_colors[face_index][:4])
+                if face_index < len(face_colors)
+                else None
+            )
+            if material_id == default_material_id and color is None:
+                continue
+
+            points = []
+            for vertex_id in face:
+                vertex = vertices[int(vertex_id) - 1]
+                points.append(tuple(float(value) for value in vertex[:3]))
+            centroid = tuple(sum(point[axis] for point in points) / len(points) for axis in range(3))
+            direction = tuple(centroid[axis] - center[axis] for axis in range(3))
+            direction_length = math.sqrt(sum(value * value for value in direction))
+            if direction_length <= 1.0e-9:
+                continue
+
+            nx, ny, nz = (value / direction_length for value in direction)
+            theta = math.acos(max(-1.0, min(1.0, nz)))
+            phi = math.atan2(ny, nx)
+            if phi < 0.0:
+                phi += 2.0 * math.pi
+            ring = int(round(theta / math.pi * rings))
+            segment = int(round(phi / (2.0 * math.pi) * segments)) % segments
+            ring = max(0, min(rings, ring))
+            cell_index = ring * segments + segment
+            material_ids[cell_index] = material_id
+            if color is not None:
+                albedos[cell_index] = color
+
+        if not any(material_ids) and not any(albedo[3] > 0.0 for albedo in albedos):
+            return None
+
+        return {
+            "lat_segments": rings,
+            "lon_segments": segments,
+            "material_ids": material_ids,
+            "albedos": albedos,
+        }
+
+    def _material_color_by_id(self, material_id):
+        requested_id = int(material_id)
+        for material in self.itemcfg.get("material_properties", ()):
+            if not hasattr(material, "get"):
+                continue
+            if int(material.get("material_id", -1)) != requested_id:
+                continue
+            color = material.get("color")
+            if color is None:
+                return None
+            values = tuple(float(value) for value in color)
+            if len(values) >= 4:
+                return values[:4]
+            if len(values) >= 3:
+                return (values[0], values[1], values[2], 1.0)
+        return None
+
+    def _infer_sphere_segments_from_faces(self, surface_object, vertex_count):
+        faces = tuple(surface_object.get("faces", ()))
+        face_count = len(faces)
+        if vertex_count <= 0 or face_count <= 0 or face_count % 2 != 0:
+            return None
+        half_face_count = face_count // 2
+        segment_delta = vertex_count - half_face_count
+        if segment_delta <= 0 or segment_delta % 2 != 0:
+            return None
+        segments = segment_delta // 2
+        if segments < 3 or vertex_count % segments != 0:
+            return None
+        rings = vertex_count // segments - 1
+        if rings < 2 or face_count != 2 * segments * (rings - 1):
+            return None
+        return rings, segments
+
+    def _build_sphere_decal_map(self, surface_object, obj_data):
+        if str(surface_object.get("surface_type", "")).upper() != "SPHERE":
+            return None
+        if "sphere_lat_segments" not in surface_object or "sphere_lon_segments" not in surface_object:
+            return None
+
+        lighting_ball = self._lighting_ball_values()
+        if lighting_ball is None:
+            return None
+
+        rings = int(surface_object["sphere_lat_segments"])
+        segments = int(surface_object["sphere_lon_segments"])
+        if rings < 2 or segments < 3:
+            return None
+
+        radius = float(lighting_ball["radius"])
+        if radius <= 0.0:
+            return None
+        default_material_id = int(surface_object.get("material_id", 0))
+        faces = tuple(
+            surface_object.get("decal_faces")
+            or surface_object.get("faces", ())
+        )
+        face_colors = tuple(
+            surface_object.get("decal_face_colors")
+            or surface_object.get("face_colors", ())
+        )
+        face_material_ids = tuple(
+            surface_object.get("decal_face_material_ids")
+            or surface_object.get("face_material_ids", ())
+        )
+        vertices = tuple(obj_data.get("vertices", ()))
+        center = tuple(float(value) for value in lighting_ball["center"])
+        source_triangles = []
+
+        for face_index, face in enumerate(faces):
+            material_id = (
+                int(face_material_ids[face_index])
+                if face_index < len(face_material_ids)
+                else default_material_id
+            )
+            if material_id == default_material_id:
+                continue
+
+            color = self._material_color_by_id(material_id)
+            if color is None and face_index < len(face_colors):
+                color = tuple(float(value) for value in face_colors[face_index][:4])
+            if color is None:
+                color = (0.0, 0.0, 0.0, 0.0)
+            points = [
+                tuple(float(value) for value in vertices[int(vertex_id) - 1][:3])
+                for vertex_id in face
+            ]
+            edge_a = tuple(points[1][axis] - points[0][axis] for axis in range(3))
+            edge_b = tuple(points[2][axis] - points[0][axis] for axis in range(3))
+            face_normal = (
+                edge_a[1] * edge_b[2] - edge_a[2] * edge_b[1],
+                edge_a[2] * edge_b[0] - edge_a[0] * edge_b[2],
+                edge_a[0] * edge_b[1] - edge_a[1] * edge_b[0],
+            )
+            face_normal_length = math.sqrt(
+                sum(value * value for value in face_normal)
+            )
+            if face_normal_length <= 1.0e-9:
+                continue
+            centroid = tuple(
+                sum(point[axis] for point in points) / len(points)
+                for axis in range(3)
+            )
+            direction = tuple(centroid[axis] - center[axis] for axis in range(3))
+            direction_length = math.sqrt(sum(value * value for value in direction))
+            if direction_length <= 1.0e-9:
+                continue
+
+            nx, ny, nz = (value / direction_length for value in direction)
+            unit_face_normal = tuple(value / face_normal_length for value in face_normal)
+            if abs(
+                sum(unit_face_normal[axis] * (nx, ny, nz)[axis] for axis in range(3))
+            ) < 0.35:
+                continue
+
+            source_triangles.append(
+                {
+                    "points": points,
+                    "direction": (nx, ny, nz),
+                    "material_id": material_id,
+                    "albedo": color,
+                }
+            )
+
+        if not source_triangles:
+            return None
+
+        def direction_to_sphere_cell(direction):
+            nx, ny, nz = direction
+            theta = math.acos(max(-1.0, min(1.0, nz)))
+            phi = math.atan2(ny, nx)
+            if phi < 0.0:
+                phi += 2.0 * math.pi
+            ring = int(round(theta / math.pi * rings))
+            segment = int(round(phi / (2.0 * math.pi) * segments)) % segments
+            return max(0, min(rings, ring)), segment
+
+        max_ray_distance = float(
+            surface_object.get(
+                "sphere_decal_ray_distance",
+                self.itemcfg.get("sphere_decal_ray_distance", radius * 0.35),
+            )
+        )
+        ray_epsilon = max(radius * 1.0e-5, 1.0e-5)
+
+        triangle_buckets = {}
+        for triangle in source_triangles:
+            bucket_key = direction_to_sphere_cell(triangle["direction"])
+            triangle_buckets.setdefault(bucket_key, []).append(triangle)
+
+        default_bucket_radius = max(
+            1,
+            int(math.ceil(math.asin(min(0.999, max_ray_distance / radius)) / math.pi * rings)) + 2,
+        )
+        bucket_search_radius = int(
+            surface_object.get(
+                "sphere_decal_bucket_search_radius",
+                self.itemcfg.get(
+                    "sphere_decal_bucket_search_radius",
+                    default_bucket_radius,
+                ),
+            )
+        )
+        if bucket_search_radius < 0:
+            bucket_search_radius = 0
+
+        def candidate_triangles(direction):
+            center_ring, center_segment = direction_to_sphere_cell(direction)
+            candidates = []
+            seen_triangle_ids = set()
+            for ring_offset in range(-bucket_search_radius, bucket_search_radius + 1):
+                ring = center_ring + ring_offset
+                if ring < 0 or ring > rings:
+                    continue
+                for segment_offset in range(
+                    -bucket_search_radius,
+                    bucket_search_radius + 1,
+                ):
+                    segment = (center_segment + segment_offset) % segments
+                    for triangle in triangle_buckets.get((ring, segment), ()):
+                        triangle_id = id(triangle)
+                        if triangle_id in seen_triangle_ids:
+                            continue
+                        seen_triangle_ids.add(triangle_id)
+                        candidates.append(triangle)
+            return candidates
+
+        def ray_triangle_distance(origin, direction, points):
+            edge_a = tuple(points[1][axis] - points[0][axis] for axis in range(3))
+            edge_b = tuple(points[2][axis] - points[0][axis] for axis in range(3))
+            h = (
+                direction[1] * edge_b[2] - direction[2] * edge_b[1],
+                direction[2] * edge_b[0] - direction[0] * edge_b[2],
+                direction[0] * edge_b[1] - direction[1] * edge_b[0],
+            )
+            determinant = sum(edge_a[axis] * h[axis] for axis in range(3))
+            if abs(determinant) <= 1.0e-9:
+                return None
+            inverse_determinant = 1.0 / determinant
+            s = tuple(origin[axis] - points[0][axis] for axis in range(3))
+            u_value = inverse_determinant * sum(s[axis] * h[axis] for axis in range(3))
+            if u_value < -1.0e-7 or u_value > 1.0 + 1.0e-7:
+                return None
+            q = (
+                s[1] * edge_a[2] - s[2] * edge_a[1],
+                s[2] * edge_a[0] - s[0] * edge_a[2],
+                s[0] * edge_a[1] - s[1] * edge_a[0],
+            )
+            v_value = inverse_determinant * sum(
+                direction[axis] * q[axis] for axis in range(3)
+            )
+            if v_value < -1.0e-7 or u_value + v_value > 1.0 + 1.0e-7:
+                return None
+            distance = inverse_determinant * sum(edge_b[axis] * q[axis] for axis in range(3))
+            if distance <= ray_epsilon or distance > max_ray_distance:
+                return None
+            return distance
+
+        def vertex_cell(vertex_id):
+            local_vertex_id = int(vertex_id) - 1
+            if local_vertex_id < 0:
+                return None
+            ring = local_vertex_id // segments
+            segment = local_vertex_id % segments
+            if ring < 0 or ring > rings or segment < 0 or segment >= segments:
+                return None
+            return ring, segment
+
+        def face_rect_cell(face):
+            face_cells = [vertex_cell(vertex_id) for vertex_id in face]
+            face_cells = [cell for cell in face_cells if cell is not None]
+            if not face_cells:
+                return None
+            face_rings = [ring for ring, _segment in face_cells]
+            ring = min(face_rings)
+            if ring >= rings:
+                ring = rings - 1
+
+            face_segments = [_segment for _ring, _segment in face_cells]
+            unique_segments = sorted(set(face_segments))
+            if 0 in unique_segments and segments - 1 in unique_segments:
+                segment = segments - 1
+            else:
+                segment = min(unique_segments)
+            return ring, segment
+
+        def face_rect_indices(face_index):
+            if face_index < segments:
+                return (face_index,)
+            interior_face_count = max(0, rings - 2) * segments * 2
+            interior_start = segments
+            interior_end = interior_start + interior_face_count
+            if face_index < interior_end:
+                local_index = face_index - interior_start
+                rect_start = interior_start + (local_index // 2) * 2
+                return (rect_start, rect_start + 1)
+            return (face_index,)
+
+        cells = {}
+        diag_faces = []
+        diag_face_keys = set()
+        for face_index, sphere_face in enumerate(surface_object.get("faces", ())):
+            face_points = [
+                tuple(float(value) for value in vertices[int(vertex_id) - 1][:3])
+                for vertex_id in sphere_face
+            ]
+            sphere_point = tuple(
+                sum(point[axis] for point in face_points) / len(face_points)
+                for axis in range(3)
+            )
+            direction = tuple(sphere_point[axis] - center[axis] for axis in range(3))
+            direction_length = math.sqrt(sum(value * value for value in direction))
+            if direction_length <= 1.0e-9:
+                continue
+            normal = tuple(value / direction_length for value in direction)
+            origin = tuple(
+                sphere_point[axis] + normal[axis] * ray_epsilon
+                for axis in range(3)
+            )
+            closest_distance = None
+            closest_triangle = None
+            for triangle in candidate_triangles(normal):
+                distance = ray_triangle_distance(
+                    origin,
+                    normal,
+                    triangle["points"],
+                )
+                if distance is None:
+                    continue
+                if closest_distance is None or distance < closest_distance:
+                    closest_distance = distance
+                    closest_triangle = triangle
+            if closest_triangle is None:
+                continue
+            for diag_face_index in face_rect_indices(face_index):
+                if diag_face_index in diag_face_keys:
+                    continue
+                diag_face_keys.add(diag_face_index)
+                diag_faces.append(
+                    {
+                        "face_index": diag_face_index,
+                        "material_id": closest_triangle["material_id"],
+                        "albedo": closest_triangle["albedo"],
+                    }
+                )
+            cell_key = face_rect_cell(sphere_face)
+            if cell_key is None:
+                continue
+            ring, segment = cell_key
+            cells[cell_key] = {
+                "ring": ring,
+                "segment": segment,
+                "material_id": closest_triangle["material_id"],
+                "albedo": closest_triangle["albedo"],
+            }
+
+        if not cells:
+            return None
+
+        return {
+            "lat_segments": rings,
+            "lon_segments": segments,
+            "cells": [cells[key] for key in sorted(cells)],
+            "diag_faces": diag_faces,
+        }
+
     def _parse_obj_face_vertex(self, raw_value, vertex_count):
         token = raw_value.split("/")[0]
         if not token:
@@ -2026,10 +2649,14 @@ class GenericGenData:
         faces = []
         face_colors = []
         face_material_ids = []
+        decal_faces = []
+        decal_face_colors = []
+        decal_face_material_ids = []
         mtllibs = []
         current_obj_name = None
         current_material = None
         material_colors = {}
+        default_material_id = int(template_surface_object["material_id"])
         region_material_ids = {
             str(region.get("obj_name")): int(region.get("material_id"))
             for region in template_surface_object.get("obj_regions", ())
@@ -2071,13 +2698,20 @@ class GenericGenData:
                     color = material_colors.get(current_material)
                     face_material_id = region_material_ids.get(
                         current_obj_name,
-                        int(template_surface_object["material_id"]),
+                        default_material_id,
                     )
                     for index in range(1, len(face_vertices) - 1):
-                        faces.append((first, face_vertices[index], face_vertices[index + 1]))
-                        if color is not None:
-                            face_colors.append(color)
-                        face_material_ids.append(face_material_id)
+                        triangle = (first, face_vertices[index], face_vertices[index + 1])
+                        if face_material_id == default_material_id:
+                            faces.append(triangle)
+                            if color is not None:
+                                face_colors.append(color)
+                            face_material_ids.append(face_material_id)
+                        else:
+                            decal_faces.append(triangle)
+                            if color is not None:
+                                decal_face_colors.append(color)
+                            decal_face_material_ids.append(face_material_id)
 
         if not vertices:
             raise ValueError(f"{path} contains no OBJ vertices")
@@ -2090,6 +2724,45 @@ class GenericGenData:
             surface_object["face_colors"] = face_colors
         if face_material_ids and len(face_material_ids) == len(faces):
             surface_object["face_material_ids"] = face_material_ids
+        if decal_faces:
+            surface_object["decal_faces"] = decal_faces
+        if decal_face_colors and len(decal_face_colors) == len(decal_faces):
+            surface_object["decal_face_colors"] = decal_face_colors
+        if decal_face_material_ids and len(decal_face_material_ids) == len(decal_faces):
+            surface_object["decal_face_material_ids"] = decal_face_material_ids
+        if str(surface_object.get("surface_type", "")).upper() == "SPHERE":
+            sphere_vertex_ids = {
+                int(vertex_id)
+                for face in faces
+                for vertex_id in face
+            }
+            inferred_segments = self._infer_sphere_segments_from_faces(
+                surface_object,
+                len(sphere_vertex_ids),
+            )
+            if inferred_segments is not None:
+                inferred_rings, inferred_lon_segments = inferred_segments
+                surface_object["sphere_lat_segments"] = inferred_rings
+                surface_object["sphere_lon_segments"] = inferred_lon_segments
+        if bool(self.itemcfg.get("enable_sphere_surface_map", False)):
+            sphere_surface_map = self._build_sphere_surface_map(
+                surface_object,
+                {
+                    "vertices": vertices,
+                    "objects": [surface_object],
+                },
+            )
+            if sphere_surface_map is not None:
+                surface_object["sphere_surface_map"] = sphere_surface_map
+        sphere_decal_map = self._build_sphere_decal_map(
+            surface_object,
+            {
+                "vertices": vertices,
+                "objects": [surface_object],
+            },
+        )
+        if sphere_decal_map is not None:
+            surface_object["sphere_decal_map"] = sphere_decal_map
         return {
             "objects": [surface_object],
             "vertices": vertices,
@@ -2172,14 +2845,27 @@ class GenericGenData:
             edited_obj,
             "Refreshed LightingBall sphere mesh metadata",
         )
+        diag_obj_path = self._write_decaled_sphere_diag_obj(obj_path, edited_obj)
         face_count = len(edited_obj["objects"][0]["faces"])
+        decal_source_face_count = len(
+            edited_obj["objects"][0].get("decal_faces", ())
+        )
+        decal_cell_count = len(
+            edited_obj["objects"][0]
+            .get("sphere_decal_map", {})
+            .get("cells", ())
+        )
         report_text = (
             "Lighting sphere mesh refresh report:\n"
             f"  obj file: {obj_path}\n"
             f"  mesh file: {written_mesh_path}\n"
             f"  vertices: {len(edited_obj['vertices'])}\n"
-            f"  triangles: {face_count}"
+            f"  triangles: {face_count}\n"
+            f"  decal source triangles: {decal_source_face_count}\n"
+            f"  decal cells: {decal_cell_count}"
         )
+        if diag_obj_path is not None:
+            report_text += f"\n  decal diag obj: {diag_obj_path}"
         print(report_text)
         return (written_mesh_path,)
 

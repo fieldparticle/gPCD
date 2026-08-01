@@ -1,3 +1,48 @@
+vec4 boundary_light_render_decal_albedo(
+	uint surfaceType,
+	uint surfaceID,
+	uint vertexID,
+	vec4 fallbackAlbedo)
+{
+	if (surfaceType != BOUNDARY_LIGHT_SURFACE_SPHERE ||
+		surfaceID != LIGHTING_SPHERE_DECAL_MAP_SURFACE_ID)
+	{
+		return fallbackAlbedo;
+	}
+
+	for (uint objectIndex = 0u; objectIndex < LIGHTING_SURFACE_OBJECT_COUNT; ++objectIndex)
+	{
+		LightingSurfaceObjectMetadata surfaceObject =
+			LIGHTING_SURFACE_OBJECTS[objectIndex];
+		if (surfaceObject.surfaceType != surfaceType ||
+			surfaceObject.surfaceID != surfaceID ||
+			surfaceObject.sphereLonSegments == 0u ||
+			vertexID < surfaceObject.vertexOffset ||
+			vertexID >= surfaceObject.vertexOffset + surfaceObject.vertexCount)
+		{
+			continue;
+		}
+
+		uint localVertexID = vertexID - surfaceObject.vertexOffset;
+		uint ring = localVertexID / surfaceObject.sphereLonSegments;
+		uint segment = localVertexID % surfaceObject.sphereLonSegments;
+		for (uint cellIndex = 0u; cellIndex < LIGHTING_SPHERE_DECAL_MAP_COUNT; ++cellIndex)
+		{
+			uvec4 cell = LIGHTING_SPHERE_DECAL_MAP_CELLS[cellIndex];
+			if (cell.x == ring && cell.y == segment)
+			{
+				vec4 decalAlbedo = LIGHTING_SPHERE_DECAL_MAP_ALBEDOS[cellIndex];
+				if (decalAlbedo.a > 0.0)
+				{
+					return decalAlbedo;
+				}
+			}
+		}
+	}
+
+	return fallbackAlbedo;
+}
+
 void boundary_light_main()
 {
 	if (ShaderFlags.DrawInstance == 2.0)
@@ -10,7 +55,11 @@ void boundary_light_main()
 		renderSurfaceType = uint(inMeta.w + 0.5);
 		renderSurfaceID = uint(inPosition.w + 0.5);
 		fragColor = inLight;
-		surfaceAlbedo = inAlbedo;
+		surfaceAlbedo = boundary_light_render_decal_albedo(
+			renderSurfaceType,
+			renderSurfaceID,
+			surfaceCellId,
+			inAlbedo);
 		return;
 	}
 

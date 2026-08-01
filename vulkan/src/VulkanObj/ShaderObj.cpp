@@ -181,6 +181,12 @@ namespace
 		uint32_t rectangleVSegments = 0u;
 		uint32_t sphereLatSegments = 0u;
 		uint32_t sphereLonSegments = 0u;
+		std::vector<uint32_t> sphereSurfaceMapMaterialIDs;
+		std::vector<double> sphereSurfaceMapAlbedos;
+		std::vector<uint32_t> sphereDecalRings;
+		std::vector<uint32_t> sphereDecalSegments;
+		std::vector<uint32_t> sphereDecalMaterialIDs;
+		std::vector<double> sphereDecalAlbedos;
 	};
 
 	struct LightingSurfaceMeshCounts
@@ -189,6 +195,12 @@ namespace
 		uint32_t indexCount = 0u;
 		uint32_t sphereLatSegments = 0u;
 		uint32_t sphereLonSegments = 0u;
+		std::vector<uint32_t> sphereSurfaceMapMaterialIDs;
+		std::vector<double> sphereSurfaceMapAlbedos;
+		std::vector<uint32_t> sphereDecalRings;
+		std::vector<uint32_t> sphereDecalSegments;
+		std::vector<uint32_t> sphereDecalMaterialIDs;
+		std::vector<double> sphereDecalAlbedos;
 	};
 
 	uint32_t ReadPositiveUInt(config_setting_t* object, int objectIndex, const char* fieldName)
@@ -293,6 +305,140 @@ namespace
 				ReadMeshOptionalUInt(object, "sphere_lat_segments", 0u);
 			counts.sphereLonSegments =
 				ReadMeshOptionalUInt(object, "sphere_lon_segments", 0u);
+
+			config_setting_t* sphereSurfaceMap =
+				config_setting_lookup(object, "sphere_surface_map");
+			if (sphereSurfaceMap != nullptr)
+			{
+				uint32_t mapLatSegments =
+					ReadMeshPositiveUInt(sphereSurfaceMap, context + ".sphere_surface_map", "lat_segments");
+				uint32_t mapLonSegments =
+					ReadMeshPositiveUInt(sphereSurfaceMap, context + ".sphere_surface_map", "lon_segments");
+				uint32_t cellCount =
+					ReadMeshPositiveUInt(sphereSurfaceMap, context + ".sphere_surface_map", "cell_count");
+				if (mapLatSegments != counts.sphereLatSegments ||
+					mapLonSegments != counts.sphereLonSegments ||
+					cellCount != (mapLatSegments + 1u) * mapLonSegments)
+				{
+					config_destroy(&meshConfig);
+					throw std::runtime_error(context + ".sphere_surface_map dimensions do not match sphere segments");
+				}
+
+				config_setting_t* materialIDs =
+					config_setting_lookup(sphereSurfaceMap, "material_ids");
+				config_setting_t* albedos =
+					config_setting_lookup(sphereSurfaceMap, "albedos");
+				if (materialIDs == nullptr ||
+					albedos == nullptr ||
+					static_cast<uint32_t>(config_setting_length(materialIDs)) != cellCount ||
+					static_cast<uint32_t>(config_setting_length(albedos)) != cellCount)
+				{
+					config_destroy(&meshConfig);
+					throw std::runtime_error(context + ".sphere_surface_map material_ids/albedos length must match cell_count");
+				}
+
+				counts.sphereSurfaceMapMaterialIDs.reserve(cellCount);
+				counts.sphereSurfaceMapAlbedos.reserve(static_cast<size_t>(cellCount) * 4u);
+				for (uint32_t cellIndex = 0u; cellIndex < cellCount; ++cellIndex)
+				{
+					int materialID =
+						config_setting_get_int_elem(materialIDs, static_cast<int>(cellIndex));
+					if (materialID < 0)
+					{
+						config_destroy(&meshConfig);
+						throw std::runtime_error(context + ".sphere_surface_map material id must not be negative");
+					}
+					counts.sphereSurfaceMapMaterialIDs.push_back(
+						static_cast<uint32_t>(materialID));
+
+					config_setting_t* albedo =
+						config_setting_get_elem(albedos, static_cast<int>(cellIndex));
+					if (albedo == nullptr || config_setting_length(albedo) != 4)
+					{
+						config_destroy(&meshConfig);
+						throw std::runtime_error(context + ".sphere_surface_map albedo must contain RGBA");
+					}
+					for (int channel = 0; channel < 4; ++channel)
+						counts.sphereSurfaceMapAlbedos.push_back(
+							config_setting_get_float_elem(albedo, channel));
+				}
+			}
+
+			config_setting_t* sphereDecalMap =
+				config_setting_lookup(object, "sphere_decal_map");
+			if (sphereDecalMap != nullptr)
+			{
+				uint32_t mapLatSegments =
+					ReadMeshPositiveUInt(sphereDecalMap, context + ".sphere_decal_map", "lat_segments");
+				uint32_t mapLonSegments =
+					ReadMeshPositiveUInt(sphereDecalMap, context + ".sphere_decal_map", "lon_segments");
+				uint32_t cellCount =
+					ReadMeshPositiveUInt(sphereDecalMap, context + ".sphere_decal_map", "cell_count");
+				if (mapLatSegments != counts.sphereLatSegments ||
+					mapLonSegments != counts.sphereLonSegments)
+				{
+					config_destroy(&meshConfig);
+					throw std::runtime_error(context + ".sphere_decal_map dimensions do not match sphere segments");
+				}
+
+				config_setting_t* cells =
+					config_setting_lookup(sphereDecalMap, "cells");
+				if (cells == nullptr ||
+					static_cast<uint32_t>(config_setting_length(cells)) != cellCount)
+				{
+					config_destroy(&meshConfig);
+					throw std::runtime_error(context + ".sphere_decal_map cells length must match cell_count");
+				}
+
+				counts.sphereDecalRings.reserve(cellCount);
+				counts.sphereDecalSegments.reserve(cellCount);
+				counts.sphereDecalMaterialIDs.reserve(cellCount);
+				counts.sphereDecalAlbedos.reserve(static_cast<size_t>(cellCount) * 4u);
+				for (uint32_t cellIndex = 0u; cellIndex < cellCount; ++cellIndex)
+				{
+					config_setting_t* cell =
+						config_setting_get_elem(cells, static_cast<int>(cellIndex));
+					if (cell == nullptr)
+					{
+						config_destroy(&meshConfig);
+						throw std::runtime_error(context + ".sphere_decal_map cell is invalid");
+					}
+					int ringValue = 0;
+					int segmentValue = 0;
+					if (config_setting_lookup_int(cell, "ring", &ringValue) != CONFIG_TRUE ||
+						config_setting_lookup_int(cell, "segment", &segmentValue) != CONFIG_TRUE ||
+						ringValue < 0 ||
+						segmentValue < 0)
+					{
+						config_destroy(&meshConfig);
+						throw std::runtime_error(context + ".sphere_decal_map cell ring/segment must be non-negative");
+					}
+					uint32_t ring = static_cast<uint32_t>(ringValue);
+					uint32_t segment = static_cast<uint32_t>(segmentValue);
+					uint32_t materialID =
+						ReadMeshPositiveUInt(cell, context + ".sphere_decal_map.cells", "material_id");
+					if (ring > counts.sphereLatSegments ||
+						segment >= counts.sphereLonSegments)
+					{
+						config_destroy(&meshConfig);
+						throw std::runtime_error(context + ".sphere_decal_map cell ring/segment is outside sphere");
+					}
+
+					config_setting_t* albedo =
+						config_setting_lookup(cell, "albedo");
+					if (albedo == nullptr || config_setting_length(albedo) != 4)
+					{
+						config_destroy(&meshConfig);
+						throw std::runtime_error(context + ".sphere_decal_map albedo must contain RGBA");
+					}
+					counts.sphereDecalRings.push_back(ring);
+					counts.sphereDecalSegments.push_back(segment);
+					counts.sphereDecalMaterialIDs.push_back(materialID);
+					for (int channel = 0; channel < 4; ++channel)
+						counts.sphereDecalAlbedos.push_back(
+							config_setting_get_float_elem(albedo, channel));
+				}
+			}
 			config_destroy(&meshConfig);
 			return counts;
 		}
@@ -457,6 +603,18 @@ namespace
 					info.indexCount = meshCounts.indexCount;
 					info.sphereLatSegments = meshCounts.sphereLatSegments;
 					info.sphereLonSegments = meshCounts.sphereLonSegments;
+					info.sphereSurfaceMapMaterialIDs =
+						meshCounts.sphereSurfaceMapMaterialIDs;
+					info.sphereSurfaceMapAlbedos =
+						meshCounts.sphereSurfaceMapAlbedos;
+					info.sphereDecalRings =
+						meshCounts.sphereDecalRings;
+					info.sphereDecalSegments =
+						meshCounts.sphereDecalSegments;
+					info.sphereDecalMaterialIDs =
+						meshCounts.sphereDecalMaterialIDs;
+					info.sphereDecalAlbedos =
+						meshCounts.sphereDecalAlbedos;
 					if (info.sphereLatSegments == 0u)
 						info.sphereLatSegments =
 							ReadPositiveUInt(object, index, "sphere_lat_segments");
@@ -1154,6 +1312,149 @@ std::ostringstream ShaderObj::RectangleWalls()
 				<< object.initialSurfaceColor[3] << "), "
 				<< object.depositRadius << ")";
 			if (objectIndex + 1u < surfaceObjects.size())
+				wall_str << ",";
+			wall_str << "\n";
+		}
+		wall_str << ");\n\n";
+	}
+
+	const bool enableSphereSurfaceMap =
+		CfgTst->CheckKey("enable_sphere_surface_map") &&
+		CfgTst->GetBool("enable_sphere_surface_map", true);
+	const LightingSurfaceObjectInfo* sphereSurfaceMapObject = nullptr;
+	if (enableSphereSurfaceMap)
+	{
+		for (const LightingSurfaceObjectInfo& object : surfaceObjects)
+		{
+			if (object.surfaceType == LightingSurfaceTypeID("SPHERE") &&
+				!object.sphereSurfaceMapMaterialIDs.empty() &&
+				object.sphereSurfaceMapAlbedos.size() ==
+					static_cast<size_t>(object.sphereSurfaceMapMaterialIDs.size()) * 4u)
+			{
+				sphereSurfaceMapObject = &object;
+				break;
+			}
+		}
+	}
+
+	if (sphereSurfaceMapObject == nullptr)
+	{
+		wall_str
+			<< "#define LIGHTING_SPHERE_SURFACE_MAP_DEFINED 1\n"
+			<< "const uint LIGHTING_SPHERE_SURFACE_MAP_SURFACE_ID = 0u;\n"
+			<< "const uint LIGHTING_SPHERE_SURFACE_MAP_COUNT = 0u;\n"
+			<< "const uint LIGHTING_SPHERE_SURFACE_MAP_MATERIAL_IDS[1] = uint[1](0u);\n"
+			<< "const vec4 LIGHTING_SPHERE_SURFACE_MAP_ALBEDOS[1] = vec4[1](vec4(0.0));\n\n";
+	}
+	else
+	{
+		const size_t mapCount =
+			sphereSurfaceMapObject->sphereSurfaceMapMaterialIDs.size();
+		wall_str
+			<< "#define LIGHTING_SPHERE_SURFACE_MAP_DEFINED 1\n"
+			<< "const uint LIGHTING_SPHERE_SURFACE_MAP_SURFACE_ID = "
+			<< sphereSurfaceMapObject->surfaceID << "u;\n"
+			<< "const uint LIGHTING_SPHERE_SURFACE_MAP_COUNT = "
+			<< mapCount << "u;\n";
+
+		wall_str
+			<< "const uint LIGHTING_SPHERE_SURFACE_MAP_MATERIAL_IDS["
+			<< mapCount << "] = uint[" << mapCount << "](\n";
+		for (size_t cellIndex = 0u; cellIndex < mapCount; ++cellIndex)
+		{
+			wall_str
+				<< "    "
+				<< sphereSurfaceMapObject->sphereSurfaceMapMaterialIDs[cellIndex]
+				<< "u";
+			if (cellIndex + 1u < mapCount)
+				wall_str << ",";
+			wall_str << "\n";
+		}
+		wall_str << ");\n";
+
+		wall_str
+			<< "const vec4 LIGHTING_SPHERE_SURFACE_MAP_ALBEDOS["
+			<< mapCount << "] = vec4[" << mapCount << "](\n";
+		for (size_t cellIndex = 0u; cellIndex < mapCount; ++cellIndex)
+		{
+			size_t albedoIndex = cellIndex * 4u;
+			wall_str
+				<< "    vec4("
+				<< sphereSurfaceMapObject->sphereSurfaceMapAlbedos[albedoIndex] << ", "
+				<< sphereSurfaceMapObject->sphereSurfaceMapAlbedos[albedoIndex + 1u] << ", "
+				<< sphereSurfaceMapObject->sphereSurfaceMapAlbedos[albedoIndex + 2u] << ", "
+				<< sphereSurfaceMapObject->sphereSurfaceMapAlbedos[albedoIndex + 3u] << ")";
+			if (cellIndex + 1u < mapCount)
+				wall_str << ",";
+			wall_str << "\n";
+		}
+		wall_str << ");\n\n";
+	}
+
+	const LightingSurfaceObjectInfo* sphereDecalMapObject = nullptr;
+	for (const LightingSurfaceObjectInfo& object : surfaceObjects)
+	{
+		if (object.surfaceType == LightingSurfaceTypeID("SPHERE") &&
+			!object.sphereDecalRings.empty() &&
+			object.sphereDecalSegments.size() == object.sphereDecalRings.size() &&
+			object.sphereDecalMaterialIDs.size() == object.sphereDecalRings.size() &&
+			object.sphereDecalAlbedos.size() ==
+				static_cast<size_t>(object.sphereDecalRings.size()) * 4u)
+		{
+			sphereDecalMapObject = &object;
+			break;
+		}
+	}
+
+	if (sphereDecalMapObject == nullptr)
+	{
+		wall_str
+			<< "#define LIGHTING_SPHERE_DECAL_MAP_DEFINED 1\n"
+			<< "const uint LIGHTING_SPHERE_DECAL_MAP_SURFACE_ID = 0u;\n"
+			<< "const uint LIGHTING_SPHERE_DECAL_MAP_COUNT = 0u;\n"
+			<< "const uvec4 LIGHTING_SPHERE_DECAL_MAP_CELLS[1] = uvec4[1](uvec4(0u));\n"
+			<< "const vec4 LIGHTING_SPHERE_DECAL_MAP_ALBEDOS[1] = vec4[1](vec4(0.0));\n\n";
+	}
+	else
+	{
+		const size_t mapCount = sphereDecalMapObject->sphereDecalRings.size();
+		wall_str
+			<< "#define LIGHTING_SPHERE_DECAL_MAP_DEFINED 1\n"
+			<< "const uint LIGHTING_SPHERE_DECAL_MAP_SURFACE_ID = "
+			<< sphereDecalMapObject->surfaceID << "u;\n"
+			<< "const uint LIGHTING_SPHERE_DECAL_MAP_COUNT = "
+			<< mapCount << "u;\n";
+
+		wall_str
+			<< "const uvec4 LIGHTING_SPHERE_DECAL_MAP_CELLS["
+			<< mapCount << "] = uvec4[" << mapCount << "](\n";
+		for (size_t cellIndex = 0u; cellIndex < mapCount; ++cellIndex)
+		{
+			wall_str
+				<< "    uvec4("
+				<< sphereDecalMapObject->sphereDecalRings[cellIndex] << "u, "
+				<< sphereDecalMapObject->sphereDecalSegments[cellIndex] << "u, "
+				<< sphereDecalMapObject->sphereDecalMaterialIDs[cellIndex] << "u, "
+				<< "0u)";
+			if (cellIndex + 1u < mapCount)
+				wall_str << ",";
+			wall_str << "\n";
+		}
+		wall_str << ");\n";
+
+		wall_str
+			<< "const vec4 LIGHTING_SPHERE_DECAL_MAP_ALBEDOS["
+			<< mapCount << "] = vec4[" << mapCount << "](\n";
+		for (size_t cellIndex = 0u; cellIndex < mapCount; ++cellIndex)
+		{
+			size_t albedoIndex = cellIndex * 4u;
+			wall_str
+				<< "    vec4("
+				<< sphereDecalMapObject->sphereDecalAlbedos[albedoIndex] << ", "
+				<< sphereDecalMapObject->sphereDecalAlbedos[albedoIndex + 1u] << ", "
+				<< sphereDecalMapObject->sphereDecalAlbedos[albedoIndex + 2u] << ", "
+				<< sphereDecalMapObject->sphereDecalAlbedos[albedoIndex + 3u] << ")";
+			if (cellIndex + 1u < mapCount)
 				wall_str << ",";
 			wall_str << "\n";
 		}
