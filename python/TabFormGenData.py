@@ -308,12 +308,13 @@ class TabGenData(QTabWidget):
     def refresh_obj(self):
         if self.refresh() == False:
             print("Config file error")
-            return
+            return False
         if not hasattr(self.gen_class, "refresh_lighting_sphere_mesh"):
             self.log.log(self, "Selected generator does not support OBJ refresh.")
-            return
+            return False
         os.system('cls' if os.name == 'nt' else 'clear')
         self.gen_class.refresh_lighting_sphere_mesh()
+        return True
     #******************************************************************
     # Generate the data
     #

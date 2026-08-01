@@ -1,11 +1,13 @@
 Current status:
-	- LightingBall is back on a simple sphere-coloring baseline after backing away from text experiments.
-	- Material 1 now uses matching orange color, spectral_response, and spectral_emission values.
-	- This is documented as base coloring so we can return to it if later text, OBJ, glTF, or boundary-marker work breaks the lighting path.
+    - LightingBall reflecting wall OBJ refresh is fixed for generated rectangle surfaces.
+    - Reflecting wall density changes now reach the OBJ, tst, and boundary.glsl metadata.
+    - Further triangle increases reveal smaller jagged sampling artifacts rather than smoothing the reflection.
+    - The next investigation is deterministic positional jitter on reflection_beam.
 
 Code Changes:
-	- Updated LightingBall sphere material color fields to [1.0, 0.18, 0.0].
-	- Documented the base-coloring checkpoint in LightingBall docs.
-	- Added a ProblemEvolution entry for the LightingBall base coloring checkpoint.
+    - Refresh generated lighting surface OBJs during GenData.
+    - Fix rectangle wall OBJ export metadata lookup before using lighting surface object fields.
+    - Make the Python UI refresh_obj path return success/failure before GenData continues.
+    - Document the generated wall OBJ refresh path and the reflecting-wall sampling diagnosis.
 
-Next: Verify the orange sphere lighting in Vulkan, then add any text work back one isolated feature at a time.
+Next: Add small deterministic patch-position jitter for reflection_beam and compare whether grid-aligned reflection artifacts become less coherent.

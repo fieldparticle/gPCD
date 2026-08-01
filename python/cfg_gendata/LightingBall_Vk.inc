@@ -60,6 +60,7 @@ scene_model = {
       material_id 			= 3;
       surface_id 			= 3000;
       initial_surface_color = [0.0, 0.0, 0.0, 1.0];
+	  deposit_radius 		= 0.15;
       roles 				= ["collision", "boundary_markers", "lighting_surface"];
       rectangle_u_segments 	= 80;
       rectangle_v_segments 	= 80;
@@ -83,7 +84,7 @@ cell_array_depth 			= 40;
 // Mobile particles die/recycle before they can drift outside the legal scene.
 death_bounds 				= [1, 38, 1, 38, 1, 38];
 // Must be large enough for dense photons plus boundary markers in one cell.
-cell_occupancy_list_size 	= 256;
+cell_occupancy_list_size 	= 404;
 
 // Debug particle point size only. Does not affect surface-light deposit size.
 gl_point_size 				= 1.5;
@@ -184,7 +185,7 @@ particle_streams = (
     name 							= "reflection_beam";
     enabled 						= true;
     material_id 					= 5;
-    radius 							= 0.025;
+    radius 							= 0.024;
     particle_separation_distance 	= 0.005;
 	relative_mass 					= 1.0;
 
@@ -194,7 +195,7 @@ particle_streams = (
 
     release_start_frame 			= 10;
     release_columns 				= 1;
-    particles_per_wave 				= 8100;
+    particles_per_wave 				= 25600;
     spacing_factor 					= 1.05;
 
     inlet_axis 						= "z";
@@ -203,12 +204,12 @@ particle_streams = (
     span_u_axis 					= "x";
     span_u_min 						= 13.0;
     span_u_max 						= 27.0;
-    span_u_count 					= 90;
+    span_u_count 					= 160;
 
     span_v_axis 					= "y";
     span_v_min 						= 14.0;
     span_v_max 						= 28.0;
-    span_v_count 					= 90;
+    span_v_count 					= 160;
   },
   {
     name 							= "diffuse_environment";

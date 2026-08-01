@@ -1692,6 +1692,10 @@ class GenericGenData:
             "texcoords": [],
         }
         for segment in rectangle_wall_segments:
+            lighting_surface = self._lighting_surface_object_by_type_and_id(
+                "RECTANGLE_WALL",
+                int(segment["wall_flag"]),
+            )
             surface_object = {
                 "name": str(segment["name"]),
                 "surface_type": "RECTANGLE_WALL",
@@ -1716,10 +1720,6 @@ class GenericGenData:
             normal = segment["normal"]
             u_length = float(segment["u_length"])
             v_length = float(segment["v_length"])
-            lighting_surface = self._lighting_surface_object_by_type_and_id(
-                "RECTANGLE_WALL",
-                int(segment["wall_flag"]),
-            )
             u_step_count = int(
                 lighting_surface.get(
                     "rectangle_u_segments",
@@ -1793,6 +1793,7 @@ class GenericGenData:
                 merged["objects"].append(
                     {
                         "name": surface_object["name"],
+                        "surface_type": surface_object.get("surface_type"),
                         "material_id": surface_object["material_id"],
                         "surface_id": surface_object["surface_id"],
                         "obj_file": surface_object.get("obj_file"),
@@ -1828,6 +1829,7 @@ class GenericGenData:
                 "objects": [
                     {
                         "name": surface_object["name"],
+                        "surface_type": surface_object.get("surface_type"),
                         "material_id": surface_object["material_id"],
                         "surface_id": surface_object["surface_id"],
                         "obj_file": surface_object.get("obj_file"),
@@ -3671,6 +3673,7 @@ class GenericGenData:
             self.report_boundary_space_lighting()
             self.report_cell_occupancy_capacity()
             self.write_particle_bin()
+            self.write_lighting_surface_objs()
             self.write_test_file()
             self.report_generated_bounds()
         except (OSError, RuntimeError, TypeError, ValueError) as error:
