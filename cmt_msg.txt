@@ -1,11 +1,11 @@
 Current status:
-	- Documented the LightingBall text-on-sphere investigation and current OBJ/decal limitations.
-	- Recorded glTF/GLB as the preferred next asset path for authored sphere-surface text color.
-	- Updated next work to treat OBJ projection as temporary fallback/diagnostic workflow.
+	- LightingBall is back on a simple sphere-coloring baseline after backing away from text experiments.
+	- Material 1 now uses matching orange color, spectral_response, and spectral_emission values.
+	- This is documented as base coloring so we can return to it if later text, OBJ, glTF, or boundary-marker work breaks the lighting path.
 
 Code Changes:
-	- Updated LightingBall docs with bucketed Refresh Models, sphere-grid inference, and diagnostic marker OBJ notes.
-	- Updated todo docs to prioritize Blender-authored glTF vertex color or UV texture data.
-	- Added a ProblemEvolution entry for moving from OBJ ray projection toward authored glTF surface color.
+	- Updated LightingBall sphere material color fields to [1.0, 0.18, 0.0].
+	- Documented the base-coloring checkpoint in LightingBall docs.
+	- Added a ProblemEvolution entry for the LightingBall base coloring checkpoint.
 
-Next: Add a glTF/GLB refresh path that imports Blender-authored sphere vertex colors or texture/decal data.
+Next: Verify the orange sphere lighting in Vulkan, then add any text work back one isolated feature at a time.
