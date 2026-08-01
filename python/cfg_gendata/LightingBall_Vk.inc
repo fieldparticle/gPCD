@@ -60,10 +60,10 @@ scene_model = {
       material_id 			= 3;
       surface_id 			= 3000;
       initial_surface_color = [0.0, 0.0, 0.0, 1.0];
-	  deposit_radius 		= 0.15;
+	  deposit_radius 		= 0.5;
       roles 				= ["collision", "boundary_markers", "lighting_surface"];
-      rectangle_u_segments 	= 80;
-      rectangle_v_segments 	= 80;
+      rectangle_u_segments 	= 20;
+      rectangle_v_segments 	= 20;
     }
   );
   
@@ -185,7 +185,7 @@ particle_streams = (
     name 							= "reflection_beam";
     enabled 						= true;
     material_id 					= 5;
-    radius 							= 0.024;
+    radius 							= 0.025;
     particle_separation_distance 	= 0.005;
 	relative_mass 					= 1.0;
 
@@ -210,6 +210,9 @@ particle_streams = (
     span_v_min 						= 14.0;
     span_v_max 						= 28.0;
     span_v_count 					= 160;
+
+    position_jitter_fraction 		= 0.10;
+    position_jitter_seed 			= 3000;
   },
   {
     name 							= "diffuse_environment";

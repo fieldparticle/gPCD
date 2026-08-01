@@ -1,13 +1,5 @@
 Current status:
-    - LightingBall reflecting wall OBJ refresh is fixed for generated rectangle surfaces.
-    - Reflecting wall density changes now reach the OBJ, tst, and boundary.glsl metadata.
-    - Further triangle increases reveal smaller jagged sampling artifacts rather than smoothing the reflection.
-    - The next investigation is deterministic positional jitter on reflection_beam.
+    - We have the problem of vertex lighting, we need to go to pixel rendeirng
+    - The current code draws the orange sphere and jitter (which does not help)
+	- I am going to check this in and then remove the jitter and then recomit
 
-Code Changes:
-    - Refresh generated lighting surface OBJs during GenData.
-    - Fix rectangle wall OBJ export metadata lookup before using lighting surface object fields.
-    - Make the Python UI refresh_obj path return success/failure before GenData continues.
-    - Document the generated wall OBJ refresh path and the reflecting-wall sampling diagnosis.
-
-Next: Add small deterministic patch-position jitter for reflection_beam and compare whether grid-aligned reflection artifacts become less coherent.

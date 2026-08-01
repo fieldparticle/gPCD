@@ -1385,7 +1385,7 @@ void fpml_comp_main()
                                     sphereRgb = photon_deposit_material_color_rgb(
                                         depositFraction,
                                         preTransferMass,
-                                        uint(round(P[SourceID].material_id)));
+                                        sphereMaterialID);
                                 }
                                 else if (sphereBehavior == PHOTON_SURFACE_BEHAVIOR_ABSORB)
                                 {
