@@ -210,9 +210,6 @@ particle_streams = (
     span_v_min 						= 14.0;
     span_v_max 						= 28.0;
     span_v_count 					= 160;
-
-    position_jitter_fraction 		= 0.10;
-    position_jitter_seed 			= 3000;
   },
   {
     name 							= "diffuse_environment";

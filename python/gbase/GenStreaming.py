@@ -159,15 +159,6 @@ class GenStreaming(GenericGenData):
                 return None
             return stream_positive_int(stream, context, name)
 
-        def optional_stream_int(stream, context, name, default):
-            if name not in stream:
-                return default
-            value = stream.get(name)
-            if not isinstance(value, int):
-                errors.append(f"{context}.{name} must be an integer")
-                return default
-            return value
-
         def optional_stream_particle_type(stream, context):
             if "particle_type" not in stream:
                 return None
@@ -420,18 +411,6 @@ class GenStreaming(GenericGenData):
             span_v_min = optional_stream_float(stream, context, "span_v_min")
             span_v_max = optional_stream_float(stream, context, "span_v_max")
             span_v_count = optional_stream_positive_int(stream, context, "span_v_count")
-            position_jitter_fraction = optional_stream_nonnegative_float(
-                stream,
-                context,
-                "position_jitter_fraction",
-                0.0,
-            )
-            position_jitter_seed = optional_stream_int(
-                stream,
-                context,
-                "position_jitter_seed",
-                0,
-            )
             patch_values = (
                 span_u_axis,
                 span_u_min,
@@ -460,17 +439,6 @@ class GenStreaming(GenericGenData):
                         f"{context}.particles_per_wave must equal "
                         "span_u_count * span_v_count"
                     )
-                if (
-                    position_jitter_fraction is not None
-                    and position_jitter_fraction > 0.5
-                ):
-                    errors.append(
-                        f"{context}.position_jitter_fraction must be between 0.0 and 0.5"
-                    )
-            elif position_jitter_fraction not in (None, 0.0):
-                errors.append(
-                    f"{context}.position_jitter_fraction requires patch stream fields"
-                )
 
             if not emitter_mode and inlet_axis not in ("x", "y", "z"):
                 errors.append(f"{context}.inlet_axis must be 'x', 'y', or 'z'")
@@ -508,8 +476,6 @@ class GenStreaming(GenericGenData):
                 "span_v_min": span_v_min,
                 "span_v_max": span_v_max,
                 "span_v_count": span_v_count,
-                "position_jitter_fraction": position_jitter_fraction,
-                "position_jitter_seed": position_jitter_seed,
                 "emitter_mode": emitter_mode,
                 "emitter": emitter,
             }
@@ -963,33 +929,6 @@ class GenStreaming(GenericGenData):
             math.cos(theta) * radius_xy,
             math.sin(theta) * radius_xy,
             z,
-        )
-
-    @staticmethod
-    def deterministic_patch_jitter(seed, stream_name, column, u_index, v_index):
-        """Return stable patch jitter offsets in [-1, 1]."""
-        key = (
-            int(seed),
-            str(stream_name),
-            int(column),
-            int(u_index),
-            int(v_index),
-        )
-
-        def fnv1a32(text):
-            value = 2166136261
-            for byte in text.encode("utf-8"):
-                value ^= byte
-                value = (value * 16777619) & 0xFFFFFFFF
-            return value
-
-        def signed_unit(axis):
-            text = "|".join(str(value) for value in key + (axis,))
-            return fnv1a32(text) / 0xFFFFFFFF * 2.0 - 1.0
-
-        return (
-            signed_unit("u"),
-            signed_unit("v"),
         )
 
     @classmethod
@@ -1505,8 +1444,6 @@ class GenStreaming(GenericGenData):
                         "layout_mode": "patch",
                         "span_u_centers": u_centers,
                         "span_v_centers": v_centers,
-                        "span_u_spacing": u_spacing,
-                        "span_v_spacing": v_spacing,
                         "particle_count": particle_count,
                     }
                 )
@@ -1528,9 +1465,6 @@ class GenStreaming(GenericGenData):
                         f"    required center spacing: {center_spacing:g}",
                         f"    span u center spacing: {u_spacing:g}",
                         f"    span v center spacing: {v_spacing:g}",
-                        "    position jitter fraction: "
-                        f"{stream['position_jitter_fraction']:g}",
-                        f"    position jitter seed: {stream['position_jitter_seed']}",
                         f"    travel spacing: {travel_spacing:g}",
                         f"    material_id: {stream['material_id']}",
                         f"    relative mass: {stream['particle_mass']:g}",
@@ -1696,40 +1630,12 @@ class GenStreaming(GenericGenData):
                     + column * stream["frames_per_wave"]
                 )
                 if stream["layout_mode"] == "patch":
-                    jitter_fraction = float(stream.get("position_jitter_fraction", 0.0) or 0.0)
-                    jitter_seed = int(stream.get("position_jitter_seed", 0) or 0)
-                    u_spacing = float(stream.get("span_u_spacing", 0.0))
-                    v_spacing = float(stream.get("span_v_spacing", 0.0))
-                    for v_index, v_center in enumerate(stream["span_v_centers"]):
-                        for u_index, u_center in enumerate(stream["span_u_centers"]):
-                            jittered_u = u_center
-                            jittered_v = v_center
-                            if jitter_fraction > 0.0:
-                                rand_u, rand_v = self.deterministic_patch_jitter(
-                                    jitter_seed,
-                                    stream["name"],
-                                    column,
-                                    u_index,
-                                    v_index,
-                                )
-                                jittered_u = min(
-                                    stream["span_u_max"],
-                                    max(
-                                        stream["span_u_min"],
-                                        u_center + rand_u * jitter_fraction * u_spacing,
-                                    ),
-                                )
-                                jittered_v = min(
-                                    stream["span_v_max"],
-                                    max(
-                                        stream["span_v_min"],
-                                        v_center + rand_v * jitter_fraction * v_spacing,
-                                    ),
-                                )
+                    for v_center in stream["span_v_centers"]:
+                        for u_center in stream["span_u_centers"]:
                             position = self.stream_position(
                                 stream,
-                                u_center=jittered_u,
-                                v_center=jittered_v,
+                                u_center=u_center,
+                                v_center=v_center,
                             )
                             particle = self.add_mobile_particle(
                                 position,

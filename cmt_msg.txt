@@ -1,5 +1,3 @@
 Current status:
-    - We have the problem of vertex lighting, we need to go to pixel rendeirng
-    - The current code draws the orange sphere and jitter (which does not help)
-	- I am going to check this in and then remove the jitter and then recomit
+    - This is with the jitter removed. I tested so we have basic behavour.
 
