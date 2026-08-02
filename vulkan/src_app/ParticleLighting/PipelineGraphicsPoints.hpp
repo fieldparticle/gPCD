@@ -3,9 +3,9 @@
 %*******************************************************************
 % $Author: jb $
 %
-% $Date: 2023-06-12 16:17:58 -0400 (Mon, 12 Jun 2023) $
-% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src_app/mfpm/CommandPool.hpp $
-% $Id: CommandPool.hpp 31 2023-06-12 20:17:58Z jb $
+% $Date: 2023-05-03 15:30:42 -0400 (Wed, 03 May 2023) $
+% $HeadURL: https://jbworkstation/svn/svnrootr5/svnvulcan/src_app/mfpm/GraphicsPipeline.hpp $
+% $Id: GraphicsPipeline.hpp 28 2023-05-03 19:30:42Z jb $
 %*******************************************************************
 %***                         DESCRIPTION                         ***
 %*******************************************************************
@@ -25,29 +25,26 @@
 ********************************************************************
 %***                     SVN CHANGE RECORD                       ***
 %*******************************************************************
-%*$Revision: 31 $
+%*$Revision: 28 $
 %*
 %*
 %******************************************************************/
-#ifndef CommandLightingGraphics_HPP
-#define CommandLightingGraphics_HPP
 
-class CommandLightingGraphics : public CommandObj
+#ifndef PipelineGraphicsPoints_HPP
+#define PipelineGraphicsPoints_HPP
+
+class PipelineGraphicsPoints : public PipelineObj
 {
-public:
-	virtual void Create(SwapChainObj* SCO,
-		FrameBufferObj* FBO,
-		RenderPassObj* RPO,
-		ResourceContainerObj* RCO,
-	std::vector<PipelineObj*> PLO);
-	uint32_t m_BoundarySubPass = 0;
-	uint32_t m_ParticleSubPass = 0;
-	uint32_t m_BoundaryPointsSubPass = 0;
-	virtual void RecordCommands(uint32_t currentBuffer,uint32_t imageIndex);
+    public:
+		
 	
-	CommandLightingGraphics(VulkanObj* App, std::string Name) : CommandObj(App, Name){};
-	void RecordSubPassCube(uint32_t imageindex, uint32_t currentBuffer);
-	void RecordSubPassParticle(uint32_t imageindex, uint32_t currentBuffer);
-	void RecordSubPassPoints(uint32_t imageindex, uint32_t currentBuffer);
+	//void Create(SwapChainObj* SCO, ResourceContainerObj* RCO, RenderPassObj* RPO);
+	PipelineGraphicsPoints(VulkanObj *App, std::string Name): PipelineObj(App, Name, VBW_TYPE_GRAPHPIPE)
+	{
+		
+	};
+	
+	void CreatePipeline();
+	
 };
 #endif

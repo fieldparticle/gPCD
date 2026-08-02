@@ -164,18 +164,20 @@ void ResourceContainerObj::AllocateDescriptorSets()
 void ResourceContainerObj::UpdateDescriptorSets()
 {
     // After allocating a spot in the
-    std::vector<VkWriteDescriptorSet> descriptorWrites{};
     for (uint32_t j = 0; j < m_App->m_FramesBuffered; j++)
     {
+        std::vector<VkWriteDescriptorSet> descriptorWrites{};
         for (uint32_t ii = 0; ii < m_DRList.size(); ii++)
         {
-            if (m_DRList[ii]->m_DescriptorWrite.size() != 0)
+            for (uint32_t writeIndex = 0;
+                writeIndex < m_DRList[ii]->m_DescriptorWrite.size();
+                ++writeIndex)
             {
-                m_DRList[ii]->m_DescriptorWrite[0].dstSet= 
-                    m_ResourceDescriptorSets[j];;
-                descriptorWrites.push_back(m_DRList[ii]->m_DescriptorWrite[0]);
+                m_DRList[ii]->m_DescriptorWrite[writeIndex].dstSet =
+                    m_ResourceDescriptorSets[j];
+                descriptorWrites.push_back(
+                    m_DRList[ii]->m_DescriptorWrite[writeIndex]);
             }
-
         }
 
         if (descriptorWrites.size() > 0)

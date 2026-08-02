@@ -69,6 +69,7 @@
 #include "ParticleLighting/ResourceLightingSurface.hpp"
 #include "ParticleLighting/ResourceLightingReflectingWall.hpp"
 #include "ParticleLighting/ResourceLighting.hpp"
+#include "ParticleLighting/PipelineGraphicsPoints.hpp"
 #include "ParticleBoundary/ResourceUBOSphere.hpp"
 #include "ParticleBoundary/RenderPassSubPasses.hpp"
 #include "ParticleBoundary/ResourceSubpassBoundary.hpp"

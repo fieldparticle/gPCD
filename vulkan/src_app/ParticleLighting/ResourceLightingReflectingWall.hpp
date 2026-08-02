@@ -35,14 +35,17 @@ public:
 		std::vector<uint32_t>& surfaceIndices,
 		uint32_t& emittedVertexID);
 
-	std::vector<VkVertexInputAttributeDescription>* GetAttributeDescriptions()
+	std::vector<VkVertexInputAttributeDescription>* GetAttributeDescriptions();
+	VkVertexInputBindingDescription* GetBindingDescription();
+	uint32_t GetSplatCount() const
 	{
-		return {};
-	};
-	VkVertexInputBindingDescription* GetBindingDescription()
+		// Draw the fixed capacity; unused records carry zero alpha and discard.
+		return m_SplatCount;
+	}
+	uint32_t GetSplatBufferIndex() const
 	{
-		return {};
-	};
+		return 1u;
+	}
 	void PullMem(uint32_t currentBuffer) {};
 	virtual void PushMem(uint32_t currentBuffer) {};
 	void ClearTempMemory()
@@ -50,6 +53,9 @@ public:
 		m_LightMap.clear();
 		std::vector<ReflectingWallLightMapCell> empty;
 		m_LightMap.swap(empty);
+		m_Splats.clear();
+		std::vector<ReflectingWallPhotonSplat> emptySplats;
+		m_Splats.swap(emptySplats);
 	};
 	void Cleanup()
 	{
@@ -59,7 +65,11 @@ public:
 
 	uint32_t m_MapWidth = 1u;
 	uint32_t m_MapHeight = 1u;
+	uint32_t m_SplatCapacity = 0u;
+	uint32_t m_SplatCount = 0u;
+	uint64_t m_SplatBufSize = 0u;
 	std::vector<ReflectingWallLightMapCell> m_LightMap;
+	std::vector<ReflectingWallPhotonSplat> m_Splats;
 };
 
 #endif

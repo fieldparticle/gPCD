@@ -44,12 +44,19 @@ void CommandLightingGraphics::Create(SwapChainObj* SCO,
 	{
 		if (!m_PLO[ii]->m_RenderPassName.compare("SubpassCube"))
 			m_BoundarySubPass = ii;
+
 	}
 
 	for (uint32_t ii = 0; ii < m_PLO.size(); ii++)
 	{
 		if (!m_PLO[ii]->m_RenderPassName.compare("SubpassParticle"))
 			m_ParticleSubPass = ii;
+	}
+
+	for (uint32_t ii = 0; ii < m_PLO.size(); ii++)
+	{
+		if (!m_PLO[ii]->m_RenderPassName.compare("SubpassPoints"))
+			m_BoundaryPointsSubPass = ii;
 	}
 
 
@@ -110,6 +117,7 @@ void CommandLightingGraphics::RecordCommands(uint32_t imageindex, uint32_t curre
 	RecordSubPassParticle(imageindex,currentBuffer);
 	vkCmdNextSubpass(m_CommandBuffers[currentBuffer], VK_SUBPASS_CONTENTS_INLINE);
 	RecordSubPassCube(imageindex,currentBuffer);
+	RecordSubPassPoints(imageindex, currentBuffer);
 	vkCmdEndRenderPass(m_CommandBuffers[currentBuffer]);
 
 	if (vkEndCommandBuffer(m_CommandBuffers[currentBuffer]) != VK_SUCCESS)
@@ -197,6 +205,77 @@ void CommandLightingGraphics::RecordSubPassCube(uint32_t imageindex, uint32_t cu
 
 		uint32_t wallIndexCount = static_cast<uint32_t>(wallSurface->m_NumElements);
 		vkCmdDrawIndexed(m_CommandBuffers[currentBuffer], wallIndexCount, 1, 0, 0, 0);
+	}
+}
+void CommandLightingGraphics::RecordSubPassPoints(uint32_t imageindex, uint32_t currentBuffer)
+{
+	bool use_lighting = CfgApp->GetBool("application.use_lighting", true);
+
+	if (use_lighting == false)
+	{
+		return;
+	}
+
+	// Bind a pipline to this render pass.
+	vkCmdBindPipeline(m_CommandBuffers[currentBuffer],
+		VK_PIPELINE_BIND_POINT_GRAPHICS, m_PLO[m_BoundaryPointsSubPass]->m_Pipeline);
+
+	// Record the viewpoer to be used
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = static_cast<float>(m_CPL->m_SCO->GetSwapWidth());
+	viewport.height = static_cast<float>(m_CPL->m_SCO->GetSwapHeight());
+	viewport.minDepth = static_cast<float>(m_CPL->m_SCO->GetSizzorMin());
+	viewport.maxDepth = static_cast<float>(m_CPL->m_SCO->GetSizzorMax());
+	vkCmdSetViewport(m_CommandBuffers[currentBuffer], 0, 1, &viewport);
+
+	// Record the scissor area.
+	VkRect2D scissor{};
+	scissor.offset = { 0, 0 };
+	scissor.extent = m_CPL->m_SCO->GetSwapExtent();
+	vkCmdSetScissor(m_CommandBuffers[currentBuffer], 0, 1, &scissor);
+
+	// Bind the descriptor set associated with this record.
+	vkCmdBindDescriptorSets(m_CommandBuffers[currentBuffer],
+		VK_PIPELINE_BIND_POINT_GRAPHICS,
+		m_PLO[m_BoundaryPointsSubPass]->m_PipelineLayout,
+		0,
+		1,
+		m_PLO[m_BoundaryPointsSubPass]->m_RCO->GetResourceSets(currentBuffer),
+		0,
+		nullptr);
+
+	ResourceParticlePush* pco = (ResourceParticlePush*)(m_RCO->GetResourceName("PushConstants"));
+	unsigned long pcosize = sizeof(pco->m_ShaderFlags);
+	void* sfl = &pco->m_ShaderFlags;
+	uint32_t upcosize = static_cast<uint32_t>(pcosize);
+
+	VkDeviceSize offsets[] = { 0 };
+	pco->m_ShaderFlags.DrawInstance = 2.0;
+	vkCmdPushConstants(m_CommandBuffers[currentBuffer],
+		m_PLO[m_BoundaryPointsSubPass]->m_PipelineLayout,
+		VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+		0,
+		upcosize,
+		sfl);
+
+	ResourceLightingReflectingWall* reflectingWall =
+		static_cast<ResourceLightingReflectingWall*>(
+			m_RCO->GetResourceName("ReflectingWall"));
+	uint32_t splatCount = reflectingWall->GetSplatCount();
+	if (splatCount > 0)
+	{
+		VkBuffer* splatVertexBuffers = static_cast<VkBuffer*>(
+			&reflectingWall->m_Buffers[reflectingWall->GetSplatBufferIndex()]);
+		vkCmdBindVertexBuffers(
+			m_CommandBuffers[currentBuffer],
+			0,
+			1,
+			splatVertexBuffers,
+			offsets);
+
+		vkCmdDraw(m_CommandBuffers[currentBuffer], splatCount, 1, 0, 0);
 	}
 }
 void CommandLightingGraphics::RecordSubPassParticle(uint32_t imageindex, uint32_t currentBuffer)

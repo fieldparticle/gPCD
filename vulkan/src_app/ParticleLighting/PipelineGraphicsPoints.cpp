@@ -33,16 +33,16 @@
 
 #include "VulkanObj/VulkanApp.hpp"
 
-void PipelineGraphicsLighting::CreatePipeline()
+void PipelineGraphicsPoints::CreatePipeline()
 {
         ConfigObj* cfg = CfgApp;
-        m_RenderPassName = "SubpassCube";
+        m_RenderPassName = "SubpassPoints";
 
 
-        std::string fshader_spv = CfgApp->GetString("application.frag_boundParticlespv", true);
-        std::string fshader_glsl = CfgApp->GetString("application.frag_boundParticle", true);
-        std::string vshader_spv = CfgApp->GetString("application.vert_boundParticlespv", true);
-        std::string vshader_glsl = CfgApp->GetString("application.vert_boundParticle", true);
+        std::string fshader_spv = CfgApp->GetString("application.frag_boundParticlespvPoints", true);
+        std::string fshader_glsl = CfgApp->GetString("application.frag_boundParticlePoints", true);
+        std::string vshader_spv = CfgApp->GetString("application.vert_boundParticlespvPoints", true);
+        std::string vshader_glsl = CfgApp->GetString("application.vert_boundParticlePoints", true);
 
         std::vector<char>  fragShaderCode;
         m_SHO->CompileShader(fshader_glsl, fshader_spv, fragShaderCode, m_SHO->SH_FRAG);
@@ -69,8 +69,8 @@ void PipelineGraphicsLighting::CreatePipeline()
 
         VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-	    // Get binding and attribute descriptions for the wall-only lighting surface.
-        Resource* dvo = (m_RCO->GetResourceName("LightingSurfaces"));
+	    // Get binding and attribute descriptions for reflecting-wall photon splats.
+        Resource* dvo = (m_RCO->GetResourceName("ReflectingWall"));
         VkVertexInputBindingDescription* bindingDescription = dvo->GetBindingDescription();
 
         std::vector<VkVertexInputAttributeDescription>* attributeDescriptions 	=
@@ -90,7 +90,7 @@ void PipelineGraphicsLighting::CreatePipeline()
 
        VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
        inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-       inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+       inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
        inputAssembly.primitiveRestartEnable = VK_FALSE;
 
 	    // Viewport State
@@ -148,10 +148,10 @@ void PipelineGraphicsLighting::CreatePipeline()
         colorBlendAttachment.blendEnable 	= VK_TRUE;
 		colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
 		colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-		colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
 		colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-		colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-		colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+		colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 
         VkPipelineColorBlendStateCreateInfo colorBlending{};
         colorBlending.sType 			= VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -168,7 +168,7 @@ void PipelineGraphicsLighting::CreatePipeline()
         VkPipelineDepthStencilStateCreateInfo depthStencil{};
         depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
         depthStencil.depthTestEnable = VK_TRUE;
-        depthStencil.depthWriteEnable = VK_TRUE;
+        depthStencil.depthWriteEnable = VK_FALSE;
         depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
         depthStencil.depthBoundsTestEnable = VK_FALSE;
         depthStencil.minDepthBounds = 0.0f; // Optional
@@ -207,7 +207,7 @@ void PipelineGraphicsLighting::CreatePipeline()
             &pipelineLayoutInfo, nullptr,
             &m_PipelineLayout) != VK_SUCCESS)
 		{
-            throw std::runtime_error("PipelineGraphicsLighting::CreatePipeline failed at vkCreatePipelineLayout");
+            throw std::runtime_error("PipelineGraphicsPoints::CreatePipeline failed at vkCreatePipelineLayout");
         }
 
         m_wkstr = m_Name + " Layout";
@@ -229,7 +229,7 @@ void PipelineGraphicsLighting::CreatePipeline()
         pipelineInfo.pDynamicState 			= &dynamicState;
         pipelineInfo.layout 				= m_PipelineLayout;
         pipelineInfo.renderPass 			= m_RPO->GetRenderPass();
-        pipelineInfo.subpass 				= 1; // 0
+        pipelineInfo.subpass 				= 1; // Draw splats in the lighting surface subpass.
 
 
         pipelineInfo.basePipelineHandle 	= VK_NULL_HANDLE;
@@ -241,7 +241,7 @@ void PipelineGraphicsLighting::CreatePipeline()
 										nullptr,
 										&m_Pipeline) != VK_SUCCESS)
 		{
-            throw std::runtime_error("PipelineGraphicsLighting::CreatePipeline failed at vkCreateGraphicsPipelines");
+            throw std::runtime_error("PipelineGraphicsPoints::CreatePipeline failed at vkCreateGraphicsPipelines");
         }
 
 

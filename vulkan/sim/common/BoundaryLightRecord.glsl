@@ -75,9 +75,23 @@ struct ReflectingWallLightMapCell
     vec4 light;
 };
 
+struct ReflectingWallPhotonSplat
+{
+    // xyz = world-space photon hit position, w = point size in pixels
+    vec4 pos_radius;
+
+    // xyz = reflected light RGB, w = splat alpha / strength
+    vec4 color;
+};
+
 layout(std430, binding = 10)
 buffer ReflectingWallLightMapSSBO {
     ReflectingWallLightMapCell ReflectingWallLightMap[];
+};
+
+layout(std430, binding = 11)
+buffer ReflectingWallPhotonSplatSSBO {
+    ReflectingWallPhotonSplat ReflectingWallPhotonSplats[];
 };
 
 layout(std430, binding = 8)

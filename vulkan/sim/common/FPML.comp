@@ -839,6 +839,12 @@ bool reflecting_wall_light_map_texel_index(
 #endif
 }
 
+void reflecting_wall_photon_splat_deposit(
+    uint splatIndex,
+    RectangleWallSegment wall,
+    vec3 point,
+    vec3 rgb);
+
 void reflecting_wall_light_map_deposit(
     RectangleWallSegment wall,
     vec3 point,
@@ -851,6 +857,50 @@ void reflecting_wall_light_map_deposit(
     }
 
     ReflectingWallLightMap[texelIndex].light = vec4(rgb, 1.0);
+}
+
+void reflecting_wall_photon_splat_deposit(
+    uint splatIndex,
+    RectangleWallSegment wall,
+    vec3 point,
+    vec3 rgb)
+{
+#if defined(REFLECTING_WALL_LIGHT_MAP_DEFINED)
+    if (REFLECTING_WALL_LIGHT_MAP_ENABLED == 0u ||
+        wall.wallFlag != REFLECTING_WALL_LIGHT_MAP_SURFACE_ID ||
+        REFLECTING_WALL_LIGHT_MAP_COUNT == 0u)
+    {
+        return;
+    }
+    if (splatIndex >= REFLECTING_WALL_LIGHT_MAP_COUNT)
+    {
+        return;
+    }
+
+    float uCoord = 0.0;
+    float vCoord = 0.0;
+    float signedInwardDistance = 0.0;
+    if (!RectangleWallProjectPoint(
+            wall,
+            point,
+            uCoord,
+            vCoord,
+            signedInwardDistance))
+    {
+        vec3 rel = point - wall.origin;
+        uCoord = clamp(dot(rel, wall.uAxis), 0.0, wall.uLength);
+        vCoord = clamp(dot(rel, wall.vAxis), 0.0, wall.vLength);
+    }
+
+    vec3 hitPoint =
+        wall.origin +
+        wall.uAxis * uCoord +
+        wall.vAxis * vCoord +
+        wall.inwardNormal * 0.01;
+    ReflectingWallPhotonSplats[splatIndex].pos_radius = vec4(hitPoint, 6.0);
+    ReflectingWallPhotonSplats[splatIndex].color =
+        vec4(clamp(rgb, vec3(0.0), vec3(1.0)), 0.08);
+#endif
 }
 
 bool reflecting_wall_light_map_is_target(RectangleWallSegment wall)
@@ -1659,10 +1709,20 @@ void fpml_comp_main()
                             }
 #endif
 #if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
-                            reflecting_wall_light_map_deposit(
-                                selectedPhotonWall,
-                                photonPosition,
-                                payloadRgb);
+                            uint texelIndex = npos;
+                            if (reflecting_wall_light_map_texel_index(
+                                    selectedPhotonWall,
+                                    photonPosition,
+                                    texelIndex))
+                            {
+                                ReflectingWallLightMap[texelIndex].light =
+                                    vec4(payloadRgb, 1.0);
+                                reflecting_wall_photon_splat_deposit(
+                                    texelIndex,
+                                    selectedPhotonWall,
+                                    photonPosition,
+                                    payloadRgb);
+                            }
                             if (!reflecting_wall_light_map_is_target(selectedPhotonWall))
                             {
                                 DepositLightingSurfaceWallVertexSplat(

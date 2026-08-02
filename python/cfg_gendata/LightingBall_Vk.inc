@@ -132,7 +132,7 @@ particle_streams = (
   },
   {
     name 							= "diffuse_beam_sphere";
-    enabled 						= true;
+    enabled 						= false;
     material_id 					= 6;
     radius 							= 0.015;
     particle_separation_distance 	= 0.005;
@@ -161,7 +161,7 @@ particle_streams = (
   },
   {
     name 							= "diffuse_beam_wall";
-    enabled 						= true;
+    enabled 						= false;
     material_id 					= 4;
     radius 							= 0.025;
     particle_separation_distance 	= 0.005;

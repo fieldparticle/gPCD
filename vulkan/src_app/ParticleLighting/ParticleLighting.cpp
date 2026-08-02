@@ -95,6 +95,8 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 		= new  CommandLightingGraphics(vulkanObj, "CommandObjParticleGraphics");
 	PipelineGraphicsLighting* pipelineGraphicsLighting
 		= new PipelineGraphicsLighting(vulkanObj, "Graphics Pipeline Boundary");
+	PipelineGraphicsPoints* pipelineGraphicsPoints
+		= new PipelineGraphicsPoints(vulkanObj, "Graphics Pipeline Points");
 	PipelineGraphicsParticleOnly* pipelineGraphicsParticle
 		= new PipelineGraphicsParticleOnly(vulkanObj, "Graphics Pipeline Particle");
 	PipelineComputeLighting* pipelineComputeParticle
@@ -167,6 +169,7 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	resourceComputeContainer->ClearTempMemory();
 	pipelineGraphicsLighting->Create(shaderObj, swapChain, resourceGraphicsContainer, renderPass);
 	pipelineGraphicsParticle->Create(shaderObj, swapChain, resourceGraphicsContainer, renderPass);
+	pipelineGraphicsPoints->Create(shaderObj, swapChain, resourceGraphicsContainer, renderPass);
 	pipelineComputeParticle->Create(shaderObj, resourceComputeContainer);
 
 	// Create coomand for grphics pipline
@@ -174,7 +177,7 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 										frameBuffer,
 										renderPass,
 										resourceGraphicsContainer,
-										{ pipelineGraphicsLighting,pipelineGraphicsParticle }
+										{ pipelineGraphicsLighting,pipelineGraphicsParticle,pipelineGraphicsPoints }
 										);
 
 	commandLightingCompute->Create(swapChain,

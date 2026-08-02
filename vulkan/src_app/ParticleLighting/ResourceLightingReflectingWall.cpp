@@ -83,13 +83,21 @@ void ResourceLightingReflectingWall::Create(uint32_t BindPoint)
 	m_LightMap.assign(static_cast<size_t>(cellCount), ReflectingWallLightMapCell{});
 	m_BufSize =
 		static_cast<uint64_t>(sizeof(ReflectingWallLightMapCell)) * cellCount;
+	m_SplatCapacity = static_cast<uint32_t>(cellCount);
+	m_SplatCount = m_SplatCapacity;
+	m_Splats.assign(
+		static_cast<size_t>(m_SplatCapacity),
+		ReflectingWallPhotonSplat{});
+	m_SplatBufSize =
+		static_cast<uint64_t>(sizeof(ReflectingWallPhotonSplat)) *
+		static_cast<uint64_t>(m_SplatCapacity);
 
-	m_Buffers.resize(1);
-	m_BuffersMemory.resize(1);
-	m_BuffersMapped.resize(1);
-	m_BufferInfo.resize(1);
-	m_DescriptorWrite.resize(1);
-	m_Allocation.resize(1);
+	m_Buffers.resize(2);
+	m_BuffersMemory.resize(2);
+	m_BuffersMapped.resize(2);
+	m_BufferInfo.resize(2);
+	m_DescriptorWrite.resize(2);
+	m_Allocation.resize(2);
 
 	std::ostringstream objtxt;
 	objtxt << m_Name << " LightMap Number:" << 0 << std::ends;
@@ -102,9 +110,25 @@ void ResourceLightingReflectingWall::Create(uint32_t BindPoint)
 		m_Allocation[0],
 		objtxt.str());
 
+	std::ostringstream splatTxt;
+	splatTxt << m_Name << " PhotonSplat Number:" << 1 << std::ends;
+	m_App->VMACreateDeviceBuffer(
+		m_SplatBufSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_Buffers[1],
+		m_Allocation[1],
+		splatTxt.str());
+
 	m_BufferInfo[0].buffer = m_Buffers[0];
 	m_BufferInfo[0].offset = 0;
 	m_BufferInfo[0].range = m_BufSize;
+
+	m_BufferInfo[1].buffer = m_Buffers[1];
+	m_BufferInfo[1].offset = 0;
+	m_BufferInfo[1].range = m_SplatBufSize;
 
 	m_DescriptorWrite[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	m_DescriptorWrite[0].dstBinding = m_BindPoint;
@@ -113,22 +137,42 @@ void ResourceLightingReflectingWall::Create(uint32_t BindPoint)
 	m_DescriptorWrite[0].descriptorCount = 1;
 	m_DescriptorWrite[0].pBufferInfo = &m_BufferInfo[0];
 
+	m_DescriptorWrite[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	m_DescriptorWrite[1].dstBinding = m_BindPoint + 1u;
+	m_DescriptorWrite[1].dstArrayElement = 0;
+	m_DescriptorWrite[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	m_DescriptorWrite[1].descriptorCount = 1;
+	m_DescriptorWrite[1].pBufferInfo = &m_BufferInfo[1];
+
 	vmaCopyMemoryToAllocation(
 		m_App->m_vmaAllocator,
 		m_LightMap.data(),
 		m_Allocation[0],
 		0,
 		m_BufSize);
+
+	vmaCopyMemoryToAllocation(
+		m_App->m_vmaAllocator,
+		m_Splats.data(),
+		m_Allocation[1],
+		0,
+		m_SplatBufSize);
 }
 
 void ResourceLightingReflectingWall::CreateLayout()
 {
-	m_LayoutBinding.resize(1);
+	m_LayoutBinding.resize(2);
 	m_LayoutBinding[0].binding = m_BindPoint;
 	m_LayoutBinding[0].descriptorCount = 1;
 	m_LayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	m_LayoutBinding[0].pImmutableSamplers = nullptr;
 	m_LayoutBinding[0].stageFlags = VK_SHADER_STAGE_ALL;
+
+	m_LayoutBinding[1].binding = m_BindPoint + 1u;
+	m_LayoutBinding[1].descriptorCount = 1;
+	m_LayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	m_LayoutBinding[1].pImmutableSamplers = nullptr;
+	m_LayoutBinding[1].stageFlags = VK_SHADER_STAGE_ALL;
 }
 
 void ResourceLightingReflectingWall::InitializeLightMap(
@@ -254,4 +298,31 @@ void ResourceLightingReflectingWall::AppendSurface(
 			surfaceIndices.push_back(p01);
 		}
 	}
+}
+
+VkVertexInputBindingDescription* ResourceLightingReflectingWall::GetBindingDescription()
+{
+	m_BindingDescription.binding = 0;
+	m_BindingDescription.stride = sizeof(ReflectingWallPhotonSplat);
+	m_BindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	return &m_BindingDescription;
+}
+
+std::vector<VkVertexInputAttributeDescription>*
+ResourceLightingReflectingWall::GetAttributeDescriptions()
+{
+	m_AttributeDescriptions.clear();
+
+	VkVertexInputAttributeDescription ad{};
+	ad.binding = 0;
+	ad.location = 0;
+	ad.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	ad.offset = offsetof(ReflectingWallPhotonSplat, pos_radius);
+	m_AttributeDescriptions.push_back(ad);
+
+	ad.location = 1;
+	ad.offset = offsetof(ReflectingWallPhotonSplat, color);
+	m_AttributeDescriptions.push_back(ad);
+
+	return &m_AttributeDescriptions;
 }

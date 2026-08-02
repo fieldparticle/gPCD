@@ -70,4 +70,15 @@ struct ReflectingWallLightMapCell
     // xyz = accumulated reflected light RGB
     // w   = valid flag / sample count
 };
+
+struct ReflectingWallPhotonSplat
+{
+    alignas(16) glm::vec4 pos_radius;
+    // xyz = world-space photon hit position
+    // w   = point size in pixels
+
+    alignas(16) glm::vec4 color;
+    // xyz = reflected light RGB
+    // w   = splat alpha / strength
+};
 #endif

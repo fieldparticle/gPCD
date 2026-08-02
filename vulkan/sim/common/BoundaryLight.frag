@@ -211,6 +211,8 @@ vec4 boundary_light_sample_reflecting_wall_light_map(uint surfaceID)
 		return vec4(0.0);
 	}
 
+	return vec4(0.0);
+
 	vec2 uv = clamp(surfaceUV, vec2(0.0), vec2(1.0));
 	uint x = min(
 		uint(floor(uv.x * float(REFLECTING_WALL_LIGHT_MAP_WIDTH))),

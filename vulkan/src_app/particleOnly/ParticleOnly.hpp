@@ -58,6 +58,7 @@
 #include "ParticleLighting/ResourceLighting.hpp"
 #include "ParticleLighting/ResourceLightingReflectingWall.hpp"
 #include "ParticleLighting/CommandLightingCompute.hpp"
+#include "ParticleLighting/PipelineGraphicsPoints.hpp"
 
 #include "particleOnly/ResourceVertexParticle.hpp"
 #include "ParticleLighting/ResourceLightingParticle.hpp"
