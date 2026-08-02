@@ -83,7 +83,11 @@ void ResourceLightingReflectingWall::Create(uint32_t BindPoint)
 	m_LightMap.assign(static_cast<size_t>(cellCount), ReflectingWallLightMapCell{});
 	m_BufSize =
 		static_cast<uint64_t>(sizeof(ReflectingWallLightMapCell)) * cellCount;
-	m_SplatCapacity = static_cast<uint32_t>(cellCount);
+	m_SplatCapacity = CfgTst->CheckKey("reflecting_wall_light_map.splat_capacity")
+		? CfgTst->GetUInt("reflecting_wall_light_map.splat_capacity", true)
+		: CfgTst->GetUInt("num_particles", true) + 1u;
+	if (m_SplatCapacity == 0u)
+		throw std::runtime_error("reflecting_wall_light_map.splat_capacity must be positive");
 	m_SplatCount = m_SplatCapacity;
 	m_Splats.assign(
 		static_cast<size_t>(m_SplatCapacity),

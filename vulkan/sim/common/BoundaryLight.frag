@@ -356,14 +356,6 @@ void boundary_light_main()
 			return;
 		}
 
-#if defined(REFLECTING_WALL_LIGHT_MAP_DEFINED)
-		if (REFLECTING_WALL_LIGHT_MAP_ENABLED != 0u &&
-			renderSurfaceID == REFLECTING_WALL_LIGHT_MAP_SURFACE_ID)
-		{
-			discard;
-		}
-#endif
-
 		outColor = vec4(fragColor.rgb * surfaceAlbedo.rgb, fragColor.a);
 		if (outColor.a <= 0.0)
 		{

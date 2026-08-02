@@ -1164,6 +1164,11 @@ class GenericGenData:
             "    height = "
             f"{int(light_map.get('height', 1))};\n"
         )
+        if "splat_capacity" in light_map:
+            output.write(
+                "    splat_capacity = "
+                f"{int(light_map.get('splat_capacity', 1))};\n"
+            )
         output.write("};\n")
 
     def add_null_particle(self):

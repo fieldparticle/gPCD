@@ -1,10 +1,11 @@
 Current status:
-	- Reflecting-wall photon splats now render as soft point sprites from a ResourceLightingReflectingWall-owned splat buffer.
-	- Compute-written splats are visible after fixing descriptor updates for multi-binding resources.
-	- Wall-texel splat indexing fills the previous missing region but exposes a zebra/grid reconstruction artifact.
+	- Reflecting wall reflection now uses per-photon point splats indexed by SourceID.
+	- Photon beam no longer creates reflecting-wall sparkles.
+	- ReflectingWallLightMap is no longer the visible reflection path and is now a cleanup candidate.
+
 Code Changes:
-	- Added ReflectingWallPhotonSplat storage and point rendering path using binding 11.
-	- Updated descriptor-set writes so resources with multiple descriptor writes update all bindings.
-	- Restricted reflection splats to valid reflection-photon payload deposits and indexed them by wall texel.
-	- Updated Dynamics docs and TODOs for the splat-rendering milestone and remaining reconstruction work.
-Next: Refine splat reconstruction with wider lower-alpha splats, neighboring texel writes, or temporal persistence before restoring/configuring the old wall light-map display.
+	- Documented the particle-owned splat path and old image SSBO status.
+	- Updated TODO to remove or isolate the old reflecting-wall light-map SSBO.
+	- Preserved the current photon-splat baseline for future tuning.
+
+Next: Remove or gate the old ReflectingWallLightMap SSBO, then tune splat radius/alpha.

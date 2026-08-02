@@ -1522,6 +1522,7 @@ std::ostringstream ShaderObj::RectangleWalls()
 	uint32_t reflectingWallLightMapSurfaceID = 0u;
 	uint32_t reflectingWallLightMapWidth = 1u;
 	uint32_t reflectingWallLightMapHeight = 1u;
+	uint32_t reflectingWallPhotonSplatCount = 1u;
 	if (reflectingWallLightMapEnabled)
 	{
 		reflectingWallLightMapSurfaceID =
@@ -1536,6 +1537,15 @@ std::ostringstream ShaderObj::RectangleWalls()
 			throw std::runtime_error(
 				"reflecting_wall_light_map width/height must be positive");
 		}
+		reflectingWallPhotonSplatCount =
+			CfgTst->CheckKey("reflecting_wall_light_map.splat_capacity")
+			? CfgTst->GetUInt("reflecting_wall_light_map.splat_capacity", true)
+			: CfgTst->GetUInt("num_particles", true) + 1u;
+		if (reflectingWallPhotonSplatCount == 0u)
+		{
+			throw std::runtime_error(
+				"reflecting_wall_light_map.splat_capacity must be positive");
+		}
 	}
 	wall_str
 		<< "#define REFLECTING_WALL_LIGHT_MAP_DEFINED 1\n"
@@ -1549,6 +1559,9 @@ std::ostringstream ShaderObj::RectangleWalls()
 		<< reflectingWallLightMapHeight << "u;\n"
 		<< "const uint REFLECTING_WALL_LIGHT_MAP_COUNT = "
 		<< reflectingWallLightMapWidth * reflectingWallLightMapHeight
+		<< "u;\n"
+		<< "const uint REFLECTING_WALL_PHOTON_SPLAT_COUNT = "
+		<< reflectingWallPhotonSplatCount
 		<< "u;\n\n";
 
 	if (segmentList == nullptr || segmentCount <= 0)
