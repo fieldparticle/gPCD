@@ -17,6 +17,12 @@ layout(location = 5) flat in uint renderSurfaceID;
 layout(location = 6) in vec4 surfaceAlbedo;
 layout(location = 7) in vec2 surfaceUV;
 
+layout(binding = 1) uniform UniformBufferObject{
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+} ubo;
+
 #include "params.glsl"
 #include "sphere.glsl"
 #include "..\common\constants.glsl"

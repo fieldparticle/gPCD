@@ -1523,6 +1523,11 @@ std::ostringstream ShaderObj::RectangleWalls()
 	uint32_t reflectingWallLightMapWidth = 1u;
 	uint32_t reflectingWallLightMapHeight = 1u;
 	uint32_t reflectingWallPhotonSplatCount = 1u;
+	float reflectingWallPhotonSplatRadius = 10.0f;
+	float reflectingWallPhotonSplatAlpha = 0.06f;
+	glm::vec4 reflectingWallGlassTint(0.08f, 0.12f, 0.14f, 0.35f);
+	float reflectingWallReflectionGain = 1.5f;
+	float reflectingWallFresnelStrength = 0.25f;
 	if (reflectingWallLightMapEnabled)
 	{
 		reflectingWallLightMapSurfaceID =
@@ -1546,6 +1551,48 @@ std::ostringstream ShaderObj::RectangleWalls()
 			throw std::runtime_error(
 				"reflecting_wall_light_map.splat_capacity must be positive");
 		}
+		if (CfgTst->CheckKey("reflecting_wall_light_map.splat_radius"))
+			reflectingWallPhotonSplatRadius =
+				CfgTst->GetFloat("reflecting_wall_light_map.splat_radius", true);
+		if (CfgTst->CheckKey("reflecting_wall_light_map.splat_alpha"))
+			reflectingWallPhotonSplatAlpha =
+				CfgTst->GetFloat("reflecting_wall_light_map.splat_alpha", true);
+		if (CfgTst->CheckKey("reflecting_wall_light_map.glass_tint"))
+		{
+			config_setting_t* glassTint =
+				CfgTst->CheckKey("reflecting_wall_light_map.glass_tint");
+			if (glassTint == nullptr || config_setting_length(glassTint) != 4)
+				throw std::runtime_error(
+					"reflecting_wall_light_map.glass_tint must contain 4 values");
+			reflectingWallGlassTint =
+				glm::vec4(
+					static_cast<float>(config_setting_get_float_elem(glassTint, 0)),
+					static_cast<float>(config_setting_get_float_elem(glassTint, 1)),
+					static_cast<float>(config_setting_get_float_elem(glassTint, 2)),
+					static_cast<float>(config_setting_get_float_elem(glassTint, 3)));
+		}
+		if (CfgTst->CheckKey("reflecting_wall_light_map.reflection_gain"))
+			reflectingWallReflectionGain =
+				CfgTst->GetFloat("reflecting_wall_light_map.reflection_gain", true);
+		if (CfgTst->CheckKey("reflecting_wall_light_map.fresnel_strength"))
+			reflectingWallFresnelStrength =
+				CfgTst->GetFloat("reflecting_wall_light_map.fresnel_strength", true);
+		if (reflectingWallPhotonSplatRadius <= 0.0f)
+			throw std::runtime_error(
+				"reflecting_wall_light_map.splat_radius must be positive");
+		if (reflectingWallPhotonSplatAlpha < 0.0f ||
+			reflectingWallPhotonSplatAlpha > 1.0f)
+			throw std::runtime_error(
+				"reflecting_wall_light_map.splat_alpha must be between 0 and 1");
+		if (reflectingWallGlassTint.a < 0.0f || reflectingWallGlassTint.a > 1.0f)
+			throw std::runtime_error(
+				"reflecting_wall_light_map.glass_tint alpha must be between 0 and 1");
+		if (reflectingWallReflectionGain < 0.0f)
+			throw std::runtime_error(
+				"reflecting_wall_light_map.reflection_gain must be non-negative");
+		if (reflectingWallFresnelStrength < 0.0f)
+			throw std::runtime_error(
+				"reflecting_wall_light_map.fresnel_strength must be non-negative");
 	}
 	wall_str
 		<< "#define REFLECTING_WALL_LIGHT_MAP_DEFINED 1\n"
@@ -1562,7 +1609,24 @@ std::ostringstream ShaderObj::RectangleWalls()
 		<< "u;\n"
 		<< "const uint REFLECTING_WALL_PHOTON_SPLAT_COUNT = "
 		<< reflectingWallPhotonSplatCount
-		<< "u;\n\n";
+		<< "u;\n"
+		<< "const float REFLECTING_WALL_PHOTON_SPLAT_RADIUS = "
+		<< reflectingWallPhotonSplatRadius
+		<< ";\n"
+		<< "const float REFLECTING_WALL_PHOTON_SPLAT_ALPHA = "
+		<< reflectingWallPhotonSplatAlpha
+		<< ";\n"
+		<< "const vec4 REFLECTING_WALL_GLASS_TINT = vec4("
+		<< reflectingWallGlassTint.r << ", "
+		<< reflectingWallGlassTint.g << ", "
+		<< reflectingWallGlassTint.b << ", "
+		<< reflectingWallGlassTint.a << ");\n"
+		<< "const float REFLECTING_WALL_REFLECTION_GAIN = "
+		<< reflectingWallReflectionGain
+		<< ";\n"
+		<< "const float REFLECTING_WALL_FRESNEL_STRENGTH = "
+		<< reflectingWallFresnelStrength
+		<< ";\n\n";
 
 	if (segmentList == nullptr || segmentCount <= 0)
 	{

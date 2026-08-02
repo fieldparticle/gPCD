@@ -74,6 +74,11 @@ reflecting_wall_light_map = {
   surface_id = 3000;
   width = 64;
   height = 64;
+  splat_radius = 10.0;
+  splat_alpha = 0.06;
+  glass_tint = [0.08, 0.12, 0.14, 0.35];
+  reflection_gain = 1.5;
+  fresnel_strength = 0.25;
 };
 
 sphere_decal_bucket_search_radius = 2;
@@ -132,7 +137,7 @@ particle_streams = (
   },
   {
     name 							= "diffuse_beam_sphere";
-    enabled 						= false;
+    enabled 						= true;
     material_id 					= 6;
     radius 							= 0.015;
     particle_separation_distance 	= 0.005;
@@ -161,7 +166,7 @@ particle_streams = (
   },
   {
     name 							= "diffuse_beam_wall";
-    enabled 						= false;
+    enabled 						= true;
     material_id 					= 4;
     radius 							= 0.025;
     particle_separation_distance 	= 0.005;

@@ -1169,6 +1169,33 @@ class GenericGenData:
                 "    splat_capacity = "
                 f"{int(light_map.get('splat_capacity', 1))};\n"
             )
+        if "splat_radius" in light_map:
+            output.write(
+                "    splat_radius = "
+                f"{float(light_map.get('splat_radius', 10.0))};\n"
+            )
+        if "splat_alpha" in light_map:
+            output.write(
+                "    splat_alpha = "
+                f"{float(light_map.get('splat_alpha', 0.06))};\n"
+            )
+        if "glass_tint" in light_map:
+            tint = light_map.get("glass_tint", [0.08, 0.12, 0.14, 0.35])
+            output.write(
+                "    glass_tint = "
+                f"[{float(tint[0])}, {float(tint[1])}, "
+                f"{float(tint[2])}, {float(tint[3])}];\n"
+            )
+        if "reflection_gain" in light_map:
+            output.write(
+                "    reflection_gain = "
+                f"{float(light_map.get('reflection_gain', 1.5))};\n"
+            )
+        if "fresnel_strength" in light_map:
+            output.write(
+                "    fresnel_strength = "
+                f"{float(light_map.get('fresnel_strength', 0.25))};\n"
+            )
         output.write("};\n")
 
     def add_null_particle(self):

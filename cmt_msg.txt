@@ -1,11 +1,11 @@
 Current status:
-	- Reflecting wall reflection now uses per-photon point splats indexed by SourceID.
-	- Photon beam no longer creates reflecting-wall sparkles.
-	- ReflectingWallLightMap is no longer the visible reflection path and is now a cleanup candidate.
+	- Basic reflecting-wall system is now in place.
+	- Visible reflection uses per-photon point splats over a glass-tinted wall.
+	- ReflectingWallLightMap remains available while splat/glass tuning continues.
 
 Code Changes:
-	- Documented the particle-owned splat path and old image SSBO status.
-	- Updated TODO to remove or isolate the old reflecting-wall light-map SSBO.
-	- Preserved the current photon-splat baseline for future tuning.
+	- Added configurable splat radius, alpha, reflection gain, glass tint, and fresnel strength.
+	- Updated the reflecting-wall fragment path to render a glass-style base surface.
+	- Updated docs to record the current splat/glass baseline.
 
-Next: Remove or gate the old ReflectingWallLightMap SSBO, then tune splat radius/alpha.
+Next: Tune reflecting-wall appearance, then decide whether to remove or gate the old image SSBO.

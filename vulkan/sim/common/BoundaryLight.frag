@@ -344,6 +344,31 @@ vec4 boundary_light_sample_rectangle_wall(uint wallFlag)
 		wallFlag);
 }
 
+vec4 boundary_light_reflecting_wall_base(vec4 baseColor)
+{
+#if defined(REFLECTING_WALL_LIGHT_MAP_DEFINED)
+	if (REFLECTING_WALL_LIGHT_MAP_ENABLED != 0u &&
+		renderSurfaceID == REFLECTING_WALL_LIGHT_MAP_SURFACE_ID)
+	{
+		vec3 normal = normalize(surfaceNormal);
+		vec3 cameraPosition = vec3(inverse(ubo.view)[3]);
+		vec3 viewDirection = normalize(cameraPosition - surfaceWorldPos);
+		float viewFacing = clamp(abs(dot(normal, viewDirection)), 0.0, 1.0);
+		float fresnel = pow(1.0 - viewFacing, 5.0) *
+			REFLECTING_WALL_FRESNEL_STRENGTH;
+		vec3 glassRgb = mix(
+			baseColor.rgb,
+			REFLECTING_WALL_GLASS_TINT.rgb,
+			clamp(REFLECTING_WALL_GLASS_TINT.a, 0.0, 1.0));
+		glassRgb += vec3(fresnel);
+		return vec4(
+			clamp(glassRgb, vec3(0.0), vec3(1.0)),
+			clamp(REFLECTING_WALL_GLASS_TINT.a, 0.0, 1.0));
+	}
+#endif
+	return baseColor;
+}
+
 void boundary_light_main()
 {
 	if (renderSurfaceType == BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL)
@@ -356,7 +381,8 @@ void boundary_light_main()
 			return;
 		}
 
-		outColor = vec4(fragColor.rgb * surfaceAlbedo.rgb, fragColor.a);
+		outColor = boundary_light_reflecting_wall_base(
+			vec4(fragColor.rgb * surfaceAlbedo.rgb, fragColor.a));
 		if (outColor.a <= 0.0)
 		{
 			discard;
