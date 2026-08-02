@@ -53,8 +53,11 @@
 #include "particleOnly/ContainerGraphics.hpp"
 #include "particleOnly/ContainerCompute.hpp"
 #include "particleOnly/PipelineGraphicsParticleOnly.hpp"
+
 #include "ParticleLighting/PipelineGraphicsLighting.hpp"
 #include "ParticleLighting/ResourceLighting.hpp"
+#include "ParticleLighting/ResourceLightingReflectingWall.hpp"
+#include "ParticleLighting/CommandLightingCompute.hpp"
 
 #include "particleOnly/ResourceVertexParticle.hpp"
 #include "ParticleLighting/ResourceLightingParticle.hpp"

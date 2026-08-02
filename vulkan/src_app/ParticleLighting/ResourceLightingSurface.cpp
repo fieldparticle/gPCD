@@ -3,6 +3,7 @@
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
 #include "VulkanObj/ObjLoader.hpp"
+#include "ParticleLighting/ResourceLightingReflectingWall.hpp"
 
 
 #include <algorithm>
@@ -541,12 +542,16 @@ namespace
 	}
 }
 
-void ResourceLightingSurface::Create(uint32_t BindPoint, Resource* particle)
+void ResourceLightingSurface::Create(
+	uint32_t BindPoint,
+	Resource* particle,
+	ResourceLightingReflectingWall* reflectingWall)
 {
 	std::ostringstream objtxt;
 	std::ostringstream indexObjTxt;
 
 	m_BindPoint = BindPoint;
+	m_ReflectingWall = reflectingWall;
 	m_thisFramesBuffered = 1;
 	CreateLayout();
 	LoadLightingSurfaceObjects();
@@ -686,6 +691,28 @@ void ResourceLightingSurface::BuildRectangleSurface(
 	uint32_t rectangleVSegments,
 	uint32_t& emittedVertexID)
 {
+	if (surfaceID == ResourceLightingReflectingWall::SurfaceID)
+	{
+		if (m_ReflectingWall == nullptr)
+		{
+			std::ostringstream errtxt;
+			errtxt << "Reflecting wall lighting surface " << surfaceID
+				<< " was not registered" << std::ends;
+			throw std::runtime_error(errtxt.str().c_str());
+		}
+
+		m_ReflectingWall->AppendSurface(
+			surfaceID,
+			materialID,
+			initialSurfaceColor,
+			rectangleUSegments,
+			rectangleVSegments,
+			m_SurfaceVertices,
+			m_SurfaceIndices,
+			emittedVertexID);
+		return;
+	}
+
 	int segmentCount = 0;
 	config_setting_t* segmentList = nullptr;
 	if (CfgTst->CheckKey("rectangle_wall_segments"))

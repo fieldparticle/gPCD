@@ -63,4 +63,11 @@ struct BoundaryLightRecord
     // w = reserved
 
 };
+
+struct ReflectingWallLightMapCell
+{
+    alignas(16) glm::vec4 light;
+    // xyz = accumulated reflected light RGB
+    // w   = valid flag / sample count
+};
 #endif

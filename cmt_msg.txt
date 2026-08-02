@@ -1,3 +1,7 @@
 Current status:
-    - This is with the jitter removed. I tested so we have basic behavour.
-
+	- Material-level photon_life_time is documented as the owner of periodic/perish photon behavior.
+	- Reflecting wall SSBO light-map behavior is documented as cell-quantized unless explicit filtering is added.
+Code Changes:
+	- Fixed GenericGenData material copying so photon_life_time is preserved into generated material records.
+	- Updated Dynamics docs for photon lifetime config and reflecting wall light-map analysis.
+Next: Regenerate LightingBall data and verify material 5 emits photon_life_time = 1 before retesting perish photons.

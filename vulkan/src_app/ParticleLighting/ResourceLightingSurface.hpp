@@ -6,6 +6,8 @@
 
 #include "ParticleLighting/LightingStructs.hpp"
 
+class ResourceLightingReflectingWall;
+
 class ResourceLightingSurface : public Resource
 {
 public:
@@ -16,7 +18,10 @@ public:
 	};
 
 	virtual void AskObject(uint32_t AnyNumber) {};
-	virtual void Create(uint32_t BindPoint, Resource* particle);
+	virtual void Create(
+		uint32_t BindPoint,
+		Resource* particle,
+		ResourceLightingReflectingWall* reflectingWall);
 	void CreateLayout();
 	void LoadLightingSurfaceObjects();
 
@@ -73,6 +78,7 @@ private:
 
 	std::vector<LightingSurfaceVertex> m_SurfaceVertices;
 	std::vector<uint32_t> m_SurfaceIndices;
+	ResourceLightingReflectingWall* m_ReflectingWall = nullptr;
 };
 
 #endif

@@ -1611,6 +1611,8 @@ def render_photons() -> str:
 const float PTYPE_PHOTON = -2.0;
 const float PTYPE_REFLECTION_PHOTON = -3.0;
 const uint PHOTON_HELPER_PARTICLE_TYPE_REFLECTION_PHOTON = 3u;
+const uint PHOTON_LIFE_TIME_PERIODIC = 0u;
+const uint PHOTON_LIFE_TIME_PERISH = 1u;
 
 uint GetParticleType(uint particleID)
 {
@@ -2663,6 +2665,17 @@ uint boundary_light_material_contact_illumination(uint materialID)
     return CONTACT_ILLUMINATION_CURRENT;
 }
 
+uint boundary_light_material_photon_life_time(uint materialID)
+{
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].photonLifeTime;
+    }
+
+    return PHOTON_LIFE_TIME_PERIODIC;
+}
+
 float boundary_light_rgb_luminance(vec3 rgb)
 {
     return dot(clamp(rgb, vec3(0.0), vec3(1.0)), vec3(0.2126, 0.7152, 0.0722));
@@ -3330,6 +3343,75 @@ LightingSurfaceWallMetadata boundary_light_surface_wall_metadata(uint wallFlag)
         0u);
 }
 
+bool reflecting_wall_light_map_texel_index(
+    RectangleWallSegment wall,
+    vec3 point,
+    out uint texelIndex)
+{
+    texelIndex = npos;
+#if defined(REFLECTING_WALL_LIGHT_MAP_DEFINED)
+    if (REFLECTING_WALL_LIGHT_MAP_ENABLED == 0u ||
+        wall.wallFlag != REFLECTING_WALL_LIGHT_MAP_SURFACE_ID ||
+        REFLECTING_WALL_LIGHT_MAP_WIDTH == 0u ||
+        REFLECTING_WALL_LIGHT_MAP_HEIGHT == 0u)
+    {
+        return false;
+    }
+
+    float uCoord = 0.0;
+    float vCoord = 0.0;
+    float signedInwardDistance = 0.0;
+    if (!RectangleWallProjectPoint(
+            wall,
+            point,
+            uCoord,
+            vCoord,
+            signedInwardDistance))
+    {
+        vec3 rel = point - wall.origin;
+        uCoord = clamp(dot(rel, wall.uAxis), 0.0, wall.uLength);
+        vCoord = clamp(dot(rel, wall.vAxis), 0.0, wall.vLength);
+    }
+
+    float u = clamp(uCoord / max(wall.uLength, EPSILON), 0.0, 1.0);
+    float v = clamp(vCoord / max(wall.vLength, EPSILON), 0.0, 1.0);
+    uint x = min(
+        uint(floor(u * float(REFLECTING_WALL_LIGHT_MAP_WIDTH))),
+        REFLECTING_WALL_LIGHT_MAP_WIDTH - 1u);
+    uint y = min(
+        uint(floor(v * float(REFLECTING_WALL_LIGHT_MAP_HEIGHT))),
+        REFLECTING_WALL_LIGHT_MAP_HEIGHT - 1u);
+    texelIndex = y * REFLECTING_WALL_LIGHT_MAP_WIDTH + x;
+    return texelIndex < REFLECTING_WALL_LIGHT_MAP_COUNT;
+#else
+    return false;
+#endif
+}
+
+void reflecting_wall_light_map_deposit(
+    RectangleWallSegment wall,
+    vec3 point,
+    vec3 rgb)
+{
+    uint texelIndex = npos;
+    if (!reflecting_wall_light_map_texel_index(wall, point, texelIndex))
+    {
+        return;
+    }
+
+    ReflectingWallLightMap[texelIndex].light = vec4(rgb, 1.0);
+}
+
+bool reflecting_wall_light_map_is_target(RectangleWallSegment wall)
+{
+#if defined(REFLECTING_WALL_LIGHT_MAP_DEFINED)
+    return REFLECTING_WALL_LIGHT_MAP_ENABLED != 0u &&
+        wall.wallFlag == REFLECTING_WALL_LIGHT_MAP_SURFACE_ID;
+#else
+    return false;
+#endif
+}
+
 void boundary_light_deposit_wall_quad_vertices(
     LightingSurfaceObjectMetadata surfaceObject,
     uint vertex00,
@@ -3764,6 +3846,12 @@ bool PhotonPeriodicRecycleEnabled()
 #endif
 }
 
+uint photon_life_time(uint SourceID)
+{
+    uint materialID = uint(round(P[SourceID].material_id));
+    return boundary_light_material_photon_life_time(materialID);
+}
+
 bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
 {
 #if defined(LIGHTING_PARTICLE_STRUCT_AVAILABLE)
@@ -3771,6 +3859,10 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
         return false;
     }
     if (P[SourceID].Data.w >= 0.0) {
+        return false;
+    }
+    if (photon_life_time(SourceID) != PHOTON_LIFE_TIME_PERIODIC) {
+        retire_photon(SourceID);
         return false;
     }
 
@@ -3793,7 +3885,6 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
     P[SourceID].parms.x = max(0.0, P[SourceID].photon_transport.w);
     P[SourceID].photon_transport.x = livedFrames;
     P[SourceID].photon_transport.y += 1.0;
-    P[SourceID].photon_transport.z = 1.0;
     photon_clear_payload(SourceID);
     return true;
 #else
@@ -3963,10 +4054,17 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                             depositFraction,
                             preTransferMass);
 #if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
-                        DepositLightingSurfaceWallVertexSplat(
+                        reflecting_wall_light_map_deposit(
                             selectedPhotonWall,
                             photonPosition,
                             grayRgb);
+                        if (!reflecting_wall_light_map_is_target(selectedPhotonWall))
+                        {
+                            DepositLightingSurfaceWallVertexSplat(
+                                selectedPhotonWall,
+                                photonPosition,
+                                grayRgb);
+                        }
 #else
 #endif
                         retire_photon(SourceID);
@@ -3995,10 +4093,17 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                         }
 #endif
 #if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
-                        DepositLightingSurfaceWallVertexSplat(
+                        reflecting_wall_light_map_deposit(
                             selectedPhotonWall,
                             photonPosition,
                             surfaceRgb);
+                        if (!reflecting_wall_light_map_is_target(selectedPhotonWall))
+                        {
+                            DepositLightingSurfaceWallVertexSplat(
+                                selectedPhotonWall,
+                                photonPosition,
+                                surfaceRgb);
+                        }
 #else
 #endif
                         if (remainingMass >
@@ -4025,10 +4130,17 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                             }
 #endif
 #if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
-                            DepositLightingSurfaceWallVertexSplat(
+                            reflecting_wall_light_map_deposit(
                                 selectedPhotonWall,
                                 photonPosition,
                                 payloadRgb);
+                            if (!reflecting_wall_light_map_is_target(selectedPhotonWall))
+                            {
+                                DepositLightingSurfaceWallVertexSplat(
+                                    selectedPhotonWall,
+                                    photonPosition,
+                                    payloadRgb);
+                            }
 #else
 #endif
                         }

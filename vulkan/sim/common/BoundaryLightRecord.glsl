@@ -69,6 +69,17 @@ struct BoundaryLightRecord
     uvec4 ids;
 };
 
+struct ReflectingWallLightMapCell
+{
+    // xyz = accumulated reflected light RGB, w = valid flag / sample count
+    vec4 light;
+};
+
+layout(std430, binding = 10)
+buffer ReflectingWallLightMapSSBO {
+    ReflectingWallLightMapCell ReflectingWallLightMap[];
+};
+
 layout(std430, binding = 8)
 buffer BoundaryLightSSBO {
     BoundaryLightRecord BoundaryLight[];

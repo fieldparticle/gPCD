@@ -68,6 +68,8 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 		= new ResourceLighting(vulkanObj, "LightingResources");
 	ResourceLightingSurface* resourceLightingSurface
 		= new ResourceLightingSurface(vulkanObj, "LightingSurfaces");
+	ResourceLightingReflectingWall* resourceLightingReflectingWall
+		= new ResourceLightingReflectingWall(vulkanObj, "ReflectingWall");
 	ResourceLockMatrix* resourceLockMatrix
 		= new ResourceLockMatrix(vulkanObj, "CollisionLockImage");
 	ResourceGraphicsContainer* resourceGraphicsContainer
@@ -87,8 +89,8 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	ImageColor* imageColor
 		= new ImageColor(vulkanObj, "ColorImage");
 	CommandPoolObj* commandPool = new CommandPoolObj(vulkanObj, "CmdPool");
-	CommandObj* commandParticleCompute
-		= new  CommandParticleCompute(vulkanObj, "CommandParticleCompute");
+	CommandObj* commandLightingCompute
+		= new  CommandLightingCompute(vulkanObj, "CommandLightingCompute");
 	CommandLightingGraphics* commandParticleGraphicsSub
 		= new  CommandLightingGraphics(vulkanObj, "CommandObjParticleGraphics");
 	PipelineGraphicsLighting* pipelineGraphicsLighting
@@ -101,8 +103,8 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 		= new FrameBufferSubPass(vulkanObj, "FrameBufferSubPass");
 	SyncObj* syncObjects
 		= new SyncObj(vulkanObj, "cubeSyncObj");
-	DrawParticleBoundary* drawParticleBoundary
-		= new DrawParticleBoundary(vulkanObj, "Draw Instance Particle");
+	DrawParticleLighting* drawParticleBoundary
+		= new DrawParticleLighting(vulkanObj, "Draw Instance Particle");
 	ExportObject* exportObject = new ExportObject(vulkanObj, "SSBO Export");
 
 
@@ -127,8 +129,8 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 	//resourceVertexSphere->Create(resourceLightingParticle);
 	//resourceVertexCube->Create(resourceLightingParticle);
 	resourceCollMatrix->Create(3, resourceLightingParticle);
-	resourceLightingSurface->Create(9, resourceLightingParticle);
-
+	resourceLightingReflectingWall->Create(10);
+	resourceLightingSurface->Create(9, resourceLightingParticle, resourceLightingReflectingWall);
 	resourceLockMatrix->Create(6, resourceLightingParticle);
 	resourceLighting->Create(8, resourceLightingParticle);
 	resourceParticlePush->Create(resourceLightingParticle);
@@ -151,6 +153,7 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 											resourceCollMatrix,
 											resourceLockMatrix,
 											resourceLightingSurface,
+											resourceLightingReflectingWall,
 											resourceAtomicG});
 	resourceGraphicsContainer->ClearTempMemory();
 	resourceComputeContainer->Create({ 	resourceParticlePush,
@@ -159,7 +162,8 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 										resourceAtomicCompute,
 										resourceLockMatrix,
 										resourceCollMatrix,
-										resourceLightingSurface });
+										resourceLightingSurface,
+										resourceLightingReflectingWall });
 	resourceComputeContainer->ClearTempMemory();
 	pipelineGraphicsLighting->Create(shaderObj, swapChain, resourceGraphicsContainer, renderPass);
 	pipelineGraphicsParticle->Create(shaderObj, swapChain, resourceGraphicsContainer, renderPass);
@@ -173,7 +177,7 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 										{ pipelineGraphicsLighting,pipelineGraphicsParticle }
 										);
 
-	commandParticleCompute->Create(swapChain,
+	commandLightingCompute->Create(swapChain,
 									frameBuffer,
 									renderPass,
 									resourceComputeContainer,
@@ -181,7 +185,7 @@ int ParticleLighting(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool rmtFlag)
 									);
 
 	commandPool->Create(physDevObj, swapChain, renderPass, frameBuffer,
-		{ commandParticleGraphicsSub,commandParticleCompute });
+		{ commandParticleGraphicsSub,commandLightingCompute });
 	exportObject->Create(resourceLightingParticle);
 
 	syncObjects->Create();

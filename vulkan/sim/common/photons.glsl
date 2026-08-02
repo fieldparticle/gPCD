@@ -7,6 +7,8 @@
 const float PTYPE_PHOTON = -2.0;
 const float PTYPE_REFLECTION_PHOTON = -3.0;
 const uint PHOTON_HELPER_PARTICLE_TYPE_REFLECTION_PHOTON = 3u;
+const uint PHOTON_LIFE_TIME_PERIODIC = 0u;
+const uint PHOTON_LIFE_TIME_PERISH = 1u;
 
 uint GetParticleType(uint particleID)
 {

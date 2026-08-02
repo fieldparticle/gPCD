@@ -167,6 +167,58 @@ namespace
 		throw std::runtime_error("material_properties[" + std::to_string(index) + "].contact_illumination must be a string or integer");
 	}
 
+	uint32_t PhotonLifeTimeID(const std::string& mode)
+	{
+		std::string normalized = mode;
+		normalized.erase(
+			normalized.begin(),
+			std::find_if(
+				normalized.begin(),
+				normalized.end(),
+				[](unsigned char value) { return !std::isspace(value); }));
+		normalized.erase(
+			std::find_if(
+				normalized.rbegin(),
+				normalized.rend(),
+				[](unsigned char value) { return !std::isspace(value); }).base(),
+			normalized.end());
+		std::transform(
+			normalized.begin(),
+			normalized.end(),
+			normalized.begin(),
+			[](unsigned char value) { return static_cast<char>(std::toupper(value)); });
+
+		if (normalized == "PERIODIC" || normalized == "PHOTON_LIFE_TIME_PERIODIC")
+			return 0u;
+		if (normalized == "PERISH" || normalized == "PHOTON_LIFE_TIME_PERISH")
+			return 1u;
+
+		std::ostringstream errtxt;
+		errtxt << "Unknown photon_life_time: " << mode << std::ends;
+		throw std::runtime_error(errtxt.str().c_str());
+	}
+
+	uint32_t MaterialPhotonLifeTime(config_setting_t* material, int index)
+	{
+		config_setting_t* modeSetting =
+			config_setting_lookup(material, "photon_life_time");
+		if (modeSetting == nullptr)
+			return 0u;
+
+		int settingType = config_setting_type(modeSetting);
+		if (settingType == CONFIG_TYPE_STRING)
+			return PhotonLifeTimeID(config_setting_get_string(modeSetting));
+		if (settingType == CONFIG_TYPE_INT)
+		{
+			int mode = config_setting_get_int(modeSetting);
+			if (mode < 0 || mode > 1)
+				throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_life_time is outside the valid range");
+			return static_cast<uint32_t>(mode);
+		}
+
+		throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_life_time must be a string or integer");
+	}
+
 	struct LightingSurfaceObjectInfo
 	{
 		uint32_t surfaceType = 0u;
@@ -698,7 +750,6 @@ void ShaderObj::WriteMaterials()
 	ostrm << "const uint CONTACT_ILLUMINATION_MIN = 1u;\n";
 	ostrm << "const uint CONTACT_ILLUMINATION_CURRENT = 2u;\n";
 	ostrm << "const uint CONTACT_ILLUMINATION_FIRST = 3u;\n\n";
-
 	ostrm << "struct MaterialProperty\n";
 	ostrm << "{\n";
 	ostrm << "    uint materialID;\n";
@@ -714,6 +765,7 @@ void ShaderObj::WriteMaterials()
 	ostrm << "    float photonCoupling;\n";
 	ostrm << "    float photonMinRelativeMass;\n";
 	ostrm << "    uint photonSurfaceBehavior;\n";
+	ostrm << "    uint photonLifeTime;\n";
 	ostrm << "    uint contactIllumination;\n";
 	ostrm << "    float cellDensity;\n";
 	ostrm << "};\n\n";
@@ -728,7 +780,7 @@ void ShaderObj::WriteMaterials()
 	{
 		ostrm << "const uint MATERIAL_PROPERTY_COUNT = 1u;\n";
 		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](\n";
-		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, PHOTON_SURFACE_BEHAVIOR_NONE, CONTACT_ILLUMINATION_MAX, 0.000000000)\n";
+		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, PHOTON_SURFACE_BEHAVIOR_NONE, 0u, CONTACT_ILLUMINATION_MAX, 0.000000000)\n";
 		ostrm << ");\n\n";
 	}
 	else
@@ -772,6 +824,7 @@ void ShaderObj::WriteMaterials()
 			double photonCoupling = 1.0;
 			double photonMinRelativeMass = 0.001;
 			uint32_t photonSurfaceBehavior = 0u;
+			uint32_t photonLifeTime = 0u;
 			uint32_t contactIllumination = 0u;
 
 			if (config_setting_lookup_int(material, "material_id", &materialID) == CONFIG_FALSE)
@@ -871,6 +924,7 @@ void ShaderObj::WriteMaterials()
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].photon_min_relative_mass must not be negative");
 
 			photonSurfaceBehavior = MaterialPhotonSurfaceBehavior(material, index);
+			photonLifeTime = MaterialPhotonLifeTime(material, index);
 			contactIllumination = MaterialContactIllumination(material, index);
 
 			if (config_setting_lookup_float(material, "cell_density", &cellDensity) == CONFIG_FALSE)
@@ -906,6 +960,7 @@ void ShaderObj::WriteMaterials()
 				<< std::fixed << std::setprecision(9) << photonCoupling << ", "
 				<< std::fixed << std::setprecision(9) << photonMinRelativeMass << ", "
 				<< photonSurfaceBehavior << "u, "
+				<< photonLifeTime << "u, "
 				<< contactIllumination << "u, "
 				<< std::fixed << std::setprecision(9) << cellDensity << ")";
 
@@ -1460,6 +1515,41 @@ std::ostringstream ShaderObj::RectangleWalls()
 		}
 		wall_str << ");\n\n";
 	}
+
+	bool reflectingWallLightMapEnabled =
+		CfgTst->CheckKey("reflecting_wall_light_map.enabled") &&
+		CfgTst->GetBool("reflecting_wall_light_map.enabled", true);
+	uint32_t reflectingWallLightMapSurfaceID = 0u;
+	uint32_t reflectingWallLightMapWidth = 1u;
+	uint32_t reflectingWallLightMapHeight = 1u;
+	if (reflectingWallLightMapEnabled)
+	{
+		reflectingWallLightMapSurfaceID =
+			CfgTst->GetUInt("reflecting_wall_light_map.surface_id", true);
+		reflectingWallLightMapWidth =
+			CfgTst->GetUInt("reflecting_wall_light_map.width", true);
+		reflectingWallLightMapHeight =
+			CfgTst->GetUInt("reflecting_wall_light_map.height", true);
+		if (reflectingWallLightMapWidth == 0u ||
+			reflectingWallLightMapHeight == 0u)
+		{
+			throw std::runtime_error(
+				"reflecting_wall_light_map width/height must be positive");
+		}
+	}
+	wall_str
+		<< "#define REFLECTING_WALL_LIGHT_MAP_DEFINED 1\n"
+		<< "const uint REFLECTING_WALL_LIGHT_MAP_ENABLED = "
+		<< (reflectingWallLightMapEnabled ? 1u : 0u) << "u;\n"
+		<< "const uint REFLECTING_WALL_LIGHT_MAP_SURFACE_ID = "
+		<< reflectingWallLightMapSurfaceID << "u;\n"
+		<< "const uint REFLECTING_WALL_LIGHT_MAP_WIDTH = "
+		<< reflectingWallLightMapWidth << "u;\n"
+		<< "const uint REFLECTING_WALL_LIGHT_MAP_HEIGHT = "
+		<< reflectingWallLightMapHeight << "u;\n"
+		<< "const uint REFLECTING_WALL_LIGHT_MAP_COUNT = "
+		<< reflectingWallLightMapWidth * reflectingWallLightMapHeight
+		<< "u;\n\n";
 
 	if (segmentList == nullptr || segmentCount <= 0)
 	{

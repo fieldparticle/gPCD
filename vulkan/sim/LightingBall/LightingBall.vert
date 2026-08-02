@@ -52,6 +52,7 @@ layout(location = 3) out vec3 surfaceWorldPos;
 layout(location = 4) flat out uint renderSurfaceType;
 layout(location = 5) flat out uint renderSurfaceID;
 layout(location = 6) out vec4 surfaceAlbedo;
+layout(location = 7) out vec2 surfaceUV;
 
 mat4 BuildTranslation(vec3 delta)
 {

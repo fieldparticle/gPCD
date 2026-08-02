@@ -200,6 +200,42 @@ vec4 boundary_light_sample_rectangle_wall_surface(uint surfaceID)
 	return vec4(weightedRgb / totalWeight, 1.0);
 }
 
+vec4 boundary_light_sample_reflecting_wall_light_map(uint surfaceID)
+{
+#if defined(REFLECTING_WALL_LIGHT_MAP_DEFINED)
+	if (REFLECTING_WALL_LIGHT_MAP_ENABLED == 0u ||
+		surfaceID != REFLECTING_WALL_LIGHT_MAP_SURFACE_ID ||
+		REFLECTING_WALL_LIGHT_MAP_WIDTH == 0u ||
+		REFLECTING_WALL_LIGHT_MAP_HEIGHT == 0u)
+	{
+		return vec4(0.0);
+	}
+
+	vec2 uv = clamp(surfaceUV, vec2(0.0), vec2(1.0));
+	uint x = min(
+		uint(floor(uv.x * float(REFLECTING_WALL_LIGHT_MAP_WIDTH))),
+		REFLECTING_WALL_LIGHT_MAP_WIDTH - 1u);
+	uint y = min(
+		uint(floor(uv.y * float(REFLECTING_WALL_LIGHT_MAP_HEIGHT))),
+		REFLECTING_WALL_LIGHT_MAP_HEIGHT - 1u);
+	uint index = y * REFLECTING_WALL_LIGHT_MAP_WIDTH + x;
+	if (index >= REFLECTING_WALL_LIGHT_MAP_COUNT)
+	{
+		return vec4(0.0);
+	}
+
+	vec4 light = ReflectingWallLightMap[index].light;
+	if (light.w <= 0.0)
+	{
+		return vec4(0.0);
+	}
+
+	return vec4(clamp(light.rgb, vec3(0.0), vec3(1.0)), 1.0);
+#else
+	return vec4(0.0);
+#endif
+}
+
 vec4 boundary_light_sample_surface(uint surfaceType, uint surfaceID)
 {
 	if (surfaceType == BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL)
@@ -310,6 +346,22 @@ void boundary_light_main()
 {
 	if (renderSurfaceType == BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL)
 	{
+		vec4 lightMapColor =
+			boundary_light_sample_reflecting_wall_light_map(renderSurfaceID);
+		if (lightMapColor.a > 0.0)
+		{
+			outColor = lightMapColor;
+			return;
+		}
+
+#if defined(REFLECTING_WALL_LIGHT_MAP_DEFINED)
+		if (REFLECTING_WALL_LIGHT_MAP_ENABLED != 0u &&
+			renderSurfaceID == REFLECTING_WALL_LIGHT_MAP_SURFACE_ID)
+		{
+			discard;
+		}
+#endif
+
 		outColor = vec4(fragColor.rgb * surfaceAlbedo.rgb, fragColor.a);
 		if (outColor.a <= 0.0)
 		{

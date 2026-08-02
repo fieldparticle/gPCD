@@ -62,11 +62,18 @@ scene_model = {
       initial_surface_color = [0.0, 0.0, 0.0, 1.0];
 	  deposit_radius 		= 0.5;
       roles 				= ["collision", "boundary_markers", "lighting_surface"];
-      rectangle_u_segments 	= 20;
-      rectangle_v_segments 	= 20;
+      rectangle_u_segments 	= 10;
+      rectangle_v_segments 	= 10;
     }
   );
-  
+
+};
+
+reflecting_wall_light_map = {
+  enabled = true;
+  surface_id = 3000;
+  width = 64;
+  height = 64;
 };
 
 sphere_decal_bucket_search_radius = 2;
@@ -244,7 +251,7 @@ particle_streams = (
 // --------------------------------------------------------------------------
 // Integration
 // --------------------------------------------------------------------------
-dt 								= 0.55;
+dt 								= 0.05;
 
 // --------------------------------------------------------------------------
 // Output

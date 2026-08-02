@@ -43,7 +43,7 @@ void DrawParticleLighting::Create(CommandPoolObj* CPL,
 	m_FBO = FBO; 
 	m_SO = SO;
 	m_EO = EO;
-	m_ComputeCommandObj = m_CPL->GetCommandObjByName("CommandParticleCompute");
+	m_ComputeCommandObj = m_CPL->GetCommandObjByName("CommandLightingCompute");
 	m_GraphicsCommandObj = m_CPL->GetCommandObjByName("CommandObjParticleGraphics");
 	m_Graphicslst = m_GraphicsCommandObj->m_RCO->m_DRList;
 	m_Computelst = m_ComputeCommandObj->m_RCO->m_DRList;

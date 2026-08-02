@@ -23,6 +23,8 @@ from gbase.MaterialProperties import (
     PARTICLE_TYPE_REFLECTION_PHOTON,
     PHOTON_SURFACE_BEHAVIOR_NONE,
     PHOTON_SURFACE_BEHAVIOR_REFLECT,
+    PHOTON_LIFE_TIME_PERIODIC,
+    PHOTON_LIFE_TIME_PERISH,
     CONTACT_ILLUMINATION_MAX,
     CONTACT_ILLUMINATION_FIRST,
     parse_debug_visible,
@@ -30,6 +32,7 @@ from gbase.MaterialProperties import (
     parse_material_color,
     parse_particle_type,
     parse_photon_surface_behavior,
+    parse_photon_life_time,
     parse_spectral_rgb,
     write_color_mode_defines,
     write_material_properties,
@@ -400,6 +403,22 @@ class GenericGenData:
                 errors.append(f"{context}.photon_surface_behavior is outside the valid range")
 
             try:
+                photon_life_time = parse_photon_life_time(
+                    raw_material.get(
+                        "photon_life_time",
+                        PHOTON_LIFE_TIME_PERIODIC,
+                    )
+                )
+            except (TypeError, ValueError):
+                errors.append(f"{context}.photon_life_time is unknown")
+                photon_life_time = None
+            if photon_life_time is not None and (
+                photon_life_time < PHOTON_LIFE_TIME_PERIODIC
+                or photon_life_time > PHOTON_LIFE_TIME_PERISH
+            ):
+                errors.append(f"{context}.photon_life_time is outside the valid range")
+
+            try:
                 contact_illumination = parse_contact_illumination(
                     raw_material.get(
                         "contact_illumination",
@@ -430,6 +449,7 @@ class GenericGenData:
                 and photon_coupling is not None
                 and photon_min_relative_mass is not None
                 and photon_surface_behavior is not None
+                and photon_life_time is not None
                 and contact_illumination is not None
             ):
                 materials.append(
@@ -448,6 +468,7 @@ class GenericGenData:
                         "photon_coupling": photon_coupling,
                         "photon_min_relative_mass": photon_min_relative_mass,
                         "photon_surface_behavior": photon_surface_behavior,
+                        "photon_life_time": photon_life_time,
                         "contact_illumination": contact_illumination,
                         "cell_density": cell_density,
                     }
@@ -1120,6 +1141,30 @@ class GenericGenData:
 
     def write_material_properties(self, output):
         write_material_properties(output, {"material_properties": self.material_properties})
+
+    def write_reflecting_wall_light_map(self, output):
+        light_map = self.itemcfg.get("reflecting_wall_light_map")
+        if light_map is None:
+            return
+
+        output.write("reflecting_wall_light_map = {\n")
+        output.write(
+            "    enabled = "
+            f"{'true' if light_map.get('enabled', False) else 'false'};\n"
+        )
+        output.write(
+            "    surface_id = "
+            f"{int(light_map.get('surface_id', 0))};\n"
+        )
+        output.write(
+            "    width = "
+            f"{int(light_map.get('width', 1))};\n"
+        )
+        output.write(
+            "    height = "
+            f"{int(light_map.get('height', 1))};\n"
+        )
+        output.write("};\n")
 
     def add_null_particle(self):
         particle = pdata()
@@ -3625,6 +3670,7 @@ class GenericGenData:
             self.write_color_mode_defines(output)
             self.write_material_properties(output)
             self.write_boundary_space_lighting(output)
+            self.write_reflecting_wall_light_map(output)
             output.write(
                 f"as_points = {1 if self.itemcfg.get('as_points', False) else 0};\n"
             )

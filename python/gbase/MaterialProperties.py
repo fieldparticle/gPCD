@@ -75,6 +75,16 @@ CONTACT_ILLUMINATION_NAMES = {
     "CONTACT_ILLUMINATION_FIRST": CONTACT_ILLUMINATION_FIRST,
 }
 
+PHOTON_LIFE_TIME_PERIODIC = 0
+PHOTON_LIFE_TIME_PERISH = 1
+
+PHOTON_LIFE_TIME_NAMES = {
+    "PERIODIC": PHOTON_LIFE_TIME_PERIODIC,
+    "PERISH": PHOTON_LIFE_TIME_PERISH,
+    "PHOTON_LIFE_TIME_PERIODIC": PHOTON_LIFE_TIME_PERIODIC,
+    "PHOTON_LIFE_TIME_PERISH": PHOTON_LIFE_TIME_PERISH,
+}
+
 
 def parse_color_mode(raw_value):
     if isinstance(raw_value, str):
@@ -152,6 +162,15 @@ def parse_contact_illumination(raw_value):
     return int(raw_value)
 
 
+def parse_photon_life_time(raw_value):
+    if isinstance(raw_value, str):
+        photon_life_time = PHOTON_LIFE_TIME_NAMES.get(raw_value.strip().upper())
+        if photon_life_time is None:
+            raise ValueError(f"unknown photon_life_time: {raw_value}")
+        return photon_life_time
+    return int(raw_value)
+
+
 DEFAULT_MATERIAL_PROPERTIES = (
     {
         "material_id": 0,
@@ -168,6 +187,7 @@ DEFAULT_MATERIAL_PROPERTIES = (
         "photon_coupling": 1.0,
         "photon_min_relative_mass": 0.001,
         "photon_surface_behavior": PHOTON_SURFACE_BEHAVIOR_NONE,
+        "photon_life_time": PHOTON_LIFE_TIME_PERIODIC,
         "contact_illumination": CONTACT_ILLUMINATION_MAX,
         "cell_density": 0.0,
     },
@@ -238,6 +258,13 @@ def normalized_material_properties(source=None):
                 CONTACT_ILLUMINATION_MAX,
             )
         )
+        photon_life_time = parse_photon_life_time(
+            _material_get(
+                raw_material,
+                "photon_life_time",
+                PHOTON_LIFE_TIME_PERIODIC,
+            )
+        )
 
         if not all(
             math.isfinite(value)
@@ -264,6 +291,11 @@ def normalized_material_properties(source=None):
             or contact_illumination > CONTACT_ILLUMINATION_FIRST
         ):
             raise ValueError("contact_illumination is outside the valid range")
+        if (
+            photon_life_time < PHOTON_LIFE_TIME_PERIODIC
+            or photon_life_time > PHOTON_LIFE_TIME_PERISH
+        ):
+            raise ValueError("photon_life_time is outside the valid range")
 
         materials.append(
             {
@@ -281,6 +313,7 @@ def normalized_material_properties(source=None):
                 "photon_coupling": photon_coupling,
                 "photon_min_relative_mass": photon_min_relative_mass,
                 "photon_surface_behavior": photon_surface_behavior,
+                "photon_life_time": photon_life_time,
                 "contact_illumination": contact_illumination,
                 "cell_density": cell_density,
             }
@@ -322,11 +355,17 @@ def write_contact_illumination_defines(output):
     output.write(f"CONTACT_ILLUMINATION_FIRST = {CONTACT_ILLUMINATION_FIRST};\n")
 
 
+def write_photon_life_time_defines(output):
+    output.write(f"PHOTON_LIFE_TIME_PERIODIC = {PHOTON_LIFE_TIME_PERIODIC};\n")
+    output.write(f"PHOTON_LIFE_TIME_PERISH = {PHOTON_LIFE_TIME_PERISH};\n")
+
+
 def write_material_properties(output, source=None):
     materials = normalized_material_properties(source)
     write_particle_type_defines(output)
     write_photon_surface_behavior_defines(output)
     write_contact_illumination_defines(output)
+    write_photon_life_time_defines(output)
     output.write(f"num_material_properties = {len(materials)};\n")
     output.write("material_properties = (\n")
     for material_index, material in enumerate(materials):
@@ -384,6 +423,10 @@ def write_material_properties(output, source=None):
         output.write(
             "        photon_surface_behavior = "
             f"{int(material.get('photon_surface_behavior', PHOTON_SURFACE_BEHAVIOR_NONE))};\n"
+        )
+        output.write(
+            "        photon_life_time = "
+            f"{int(material.get('photon_life_time', PHOTON_LIFE_TIME_PERIODIC))};\n"
         )
         output.write(
             "        contact_illumination = "
