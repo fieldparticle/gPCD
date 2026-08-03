@@ -739,6 +739,10 @@ void ShaderObj::WriteMaterials()
 	ostrm << "const uint COLOR_MODE_VELOCITY_ANGLE = 1u;\n";
 	ostrm << "const uint COLOR_MODE_SOLID = 2u;\n";
 	ostrm << "const uint COLOR_MODE_LUMENS = 3u;\n\n";
+	ostrm << "const uint COLOR_MAP_HSV = 0u;\n";
+	ostrm << "const uint COLOR_MAP_GRAYSCALE = 1u;\n";
+	ostrm << "const uint COLOR_MAP_HEAT = 2u;\n";
+	ostrm << "const uint COLOR_MAP_SOLID = 3u;\n\n";
 	ostrm << "const uint PARTICLE_TYPE_REGULAR = 0u;\n";
 	ostrm << "const uint PARTICLE_TYPE_PHOTON = 1u;\n\n";
 	ostrm << "const uint PARTICLE_TYPE_BOUNDARY = 2u;\n\n";
@@ -757,6 +761,7 @@ void ShaderObj::WriteMaterials()
 	ostrm << "    float relativeMass;\n";
 	ostrm << "    float tempVel;\n";
 	ostrm << "    uint colorMode;\n";
+	ostrm << "    uint colorMap;\n";
 	ostrm << "    vec4 color;\n";
 	ostrm << "    uint debugVisible;\n";
 	ostrm << "    vec4 debugColor;\n";
@@ -780,7 +785,7 @@ void ShaderObj::WriteMaterials()
 	{
 		ostrm << "const uint MATERIAL_PROPERTY_COUNT = 1u;\n";
 		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](\n";
-		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, PHOTON_SURFACE_BEHAVIOR_NONE, 0u, CONTACT_ILLUMINATION_MAX, 0.000000000)\n";
+		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, COLOR_MAP_HSV, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, PHOTON_SURFACE_BEHAVIOR_NONE, 0u, CONTACT_ILLUMINATION_MAX, 0.000000000)\n";
 		ostrm << ");\n\n";
 	}
 	else
@@ -801,6 +806,7 @@ void ShaderObj::WriteMaterials()
 
 			int materialID = 0;
 			int colorMode = 0;
+			int colorMap = 0;
 			int particleType = 0;
 			double relativeMass = 1.0;
 			double tempVel = 0.0;
@@ -845,6 +851,15 @@ void ShaderObj::WriteMaterials()
 
 			if (config_setting_lookup_int(material, "color_mode", &colorMode) == CONFIG_FALSE)
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].color_mode missing");
+			if (config_setting_lookup_int(material, "color_map", &colorMap) == CONFIG_FALSE)
+			{
+				if (colorMode == 1)
+					colorMap = 0;
+				else
+					colorMap = 3;
+			}
+			if (colorMap < 0 || colorMap > 3)
+				throw std::runtime_error("material_properties[" + std::to_string(index) + "].color_map is outside the valid range");
 
 			config_setting_t* color = config_setting_lookup(material, "color");
 			if (color != nullptr)
@@ -936,6 +951,7 @@ void ShaderObj::WriteMaterials()
 				<< std::fixed << std::setprecision(9) << relativeMass << ", "
 				<< std::fixed << std::setprecision(9) << tempVel << ", "
 				<< colorMode << "u, "
+				<< colorMap << "u, "
 				<< "vec4("
 				<< std::fixed << std::setprecision(9) << colorRed << ", "
 				<< std::fixed << std::setprecision(9) << colorGreen << ", "

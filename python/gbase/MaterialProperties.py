@@ -20,6 +20,24 @@ COLOR_MODE_NAMES = {
     "COLOR_MODE_VELOCITY": COLOR_MODE_VELOCITY_ANGLE,
 }
 
+COLOR_MAP_HSV = 0
+COLOR_MAP_GRAYSCALE = 1
+COLOR_MAP_HEAT = 2
+COLOR_MAP_SOLID = 3
+
+COLOR_MAP_NAMES = {
+    "HSV": COLOR_MAP_HSV,
+    "GRAYSCALE": COLOR_MAP_GRAYSCALE,
+    "GREYSCALE": COLOR_MAP_GRAYSCALE,
+    "HEAT": COLOR_MAP_HEAT,
+    "SOLID": COLOR_MAP_SOLID,
+    "COLOR_MAP_HSV": COLOR_MAP_HSV,
+    "COLOR_MAP_GRAYSCALE": COLOR_MAP_GRAYSCALE,
+    "COLOR_MAP_GREYSCALE": COLOR_MAP_GRAYSCALE,
+    "COLOR_MAP_HEAT": COLOR_MAP_HEAT,
+    "COLOR_MAP_SOLID": COLOR_MAP_SOLID,
+}
+
 DEFAULT_COLOR_BY_MODE = {
     COLOR_MODE_COLLISION: (0.0, 1.0, 0.0, 1.0),
     COLOR_MODE_VELOCITY_ANGLE: (1.0, 1.0, 1.0, 1.0),
@@ -93,6 +111,20 @@ def parse_color_mode(raw_value):
             raise ValueError(f"unknown color_mode: {raw_value}")
         return color_mode
     return int(raw_value)
+
+
+def parse_color_map(raw_value):
+    if raw_value is None:
+        return None
+    if isinstance(raw_value, str):
+        color_map = COLOR_MAP_NAMES.get(raw_value.strip().upper())
+        if color_map is None:
+            raise ValueError(f"unknown color_map: {raw_value}")
+        return color_map
+    color_map = int(raw_value)
+    if color_map not in COLOR_MAP_NAMES.values():
+        raise ValueError(f"unknown color_map: {raw_value}")
+    return color_map
 
 
 def default_color_for_mode(color_mode):
@@ -219,6 +251,7 @@ def normalized_material_properties(source=None):
                 COLOR_MODE_VELOCITY_ANGLE,
             )
         )
+        color_map = parse_color_map(_material_get(raw_material, "color_map", None))
         color = parse_material_color(_material_get(raw_material, "color", None), color_mode)
         debug_visible = parse_debug_visible(
             _material_get(raw_material, "debug_visible", False)
@@ -318,6 +351,8 @@ def normalized_material_properties(source=None):
                 "cell_density": cell_density,
             }
         )
+        if color_map is not None:
+            materials[-1]["color_map"] = color_map
 
     return sorted(materials, key=lambda material: int(material["material_id"]))
 
@@ -327,6 +362,13 @@ def write_color_mode_defines(output):
     output.write(f"COLOR_MODE_VELOCITY_ANGLE = {COLOR_MODE_VELOCITY_ANGLE};\n")
     output.write(f"COLOR_MODE_SOLID = {COLOR_MODE_SOLID};\n")
     output.write(f"COLOR_MODE_LUMENS = {COLOR_MODE_LUMENS};\n")
+
+
+def write_color_map_defines(output):
+    output.write(f"COLOR_MAP_HSV = {COLOR_MAP_HSV};\n")
+    output.write(f"COLOR_MAP_GRAYSCALE = {COLOR_MAP_GRAYSCALE};\n")
+    output.write(f"COLOR_MAP_HEAT = {COLOR_MAP_HEAT};\n")
+    output.write(f"COLOR_MAP_SOLID = {COLOR_MAP_SOLID};\n")
 
 
 def write_particle_type_defines(output):
@@ -362,6 +404,7 @@ def write_photon_life_time_defines(output):
 
 def write_material_properties(output, source=None):
     materials = normalized_material_properties(source)
+    write_color_map_defines(output)
     write_particle_type_defines(output)
     write_photon_surface_behavior_defines(output)
     write_contact_illumination_defines(output)
@@ -379,6 +422,8 @@ def write_material_properties(output, source=None):
             f"        thermal_velocity = {float(material['thermal_velocity']):.9f};\n"
         )
         output.write(f"        color_mode = {int(material['color_mode'])};\n")
+        if material.get("color_map") is not None:
+            output.write(f"        color_map = {int(material['color_map'])};\n")
         output.write(
             "        color = "
             f"[{float(material['color'][0]):.9f}, "

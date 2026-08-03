@@ -7,12 +7,14 @@
 vec3 hsv2rgb(in vec3 hsv);
 vec3 colorizeVelocity(float v_ang, float sat, float val);
 uint material_color_mode(uint materialID);
+uint material_color_map(uint materialID);
 vec4 material_color(uint materialID);
 uint material_debug_visible(uint materialID);
 vec4 material_debug_color(uint materialID);
 bool color_map_is_photon(uint index);
 vec4 lumens_color(uint index, vec4 baseColor);
-vec4 color_from_mode(uint index, uint colorMode, vec4 baseColor);
+vec4 value_from_color_mode(uint index, uint colorMode, vec4 baseColor);
+vec4 color_from_color_map(vec4 value, uint colorMap, vec4 baseColor);
 
 vec4 color_map(uint index)
 {
@@ -20,8 +22,10 @@ vec4 color_map(uint index)
     if (color_map_is_photon(index))
         return lumens_color(index, material_color(materialID));
     uint colorMode = material_color_mode(materialID);
+    uint colorMap = material_color_map(materialID);
     vec4 baseColor = material_color(materialID);
-    return color_from_mode(index, colorMode, baseColor);
+    vec4 value = value_from_color_mode(index, colorMode, baseColor);
+    return color_from_color_map(value, colorMap, baseColor);
 
 }
 
@@ -40,6 +44,17 @@ uint material_color_mode(uint materialID)
     }
 
     return COLOR_MODE_COLLISION;
+}
+
+uint material_color_map(uint materialID)
+{
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].colorMap;
+    }
+
+    return COLOR_MAP_SOLID;
 }
 
 vec4 material_color(uint materialID)
@@ -89,21 +104,14 @@ vec4 lumens_color(uint index, vec4 baseColor)
     return material_color(materialID);
 }
 
-vec4 color_from_mode(uint index, uint colorMode, vec4 baseColor)
+vec4 value_from_color_mode(uint index, uint colorMode, vec4 baseColor)
 {
     if (colorMode == COLOR_MODE_VELOCITY_ANGLE)
     {
         float velocityAngle = ShaderFlags.positionBuffer == 0u
             ? P[index].VelRadA.w
             : P[index].VelRadB.w;
-        return vec4(
-            colorizeVelocity(
-                velocityAngle,
-                VELOCITY_ANGLE_COLOR_SAT,
-                VELOCITY_ANGLE_COLOR_VAL
-            ),
-            baseColor.a
-        );
+        return vec4(velocityAngle, 0.0, 0.0, baseColor.a);
     }
 
     if (colorMode == COLOR_MODE_COLLISION)
@@ -120,6 +128,34 @@ vec4 color_from_mode(uint index, uint colorMode, vec4 baseColor)
         return lumens_color(index, baseColor);
 
     return vec4(1.0, 1.0, 1.0, 1.0);
+}
+
+vec4 color_from_color_map(vec4 value, uint colorMap, vec4 baseColor)
+{
+    float scalar = clamp(value.x, 0.0, 1.0);
+
+    if (colorMap == COLOR_MAP_HSV)
+    {
+        return vec4(
+            colorizeVelocity(
+                scalar,
+                VELOCITY_ANGLE_COLOR_SAT,
+                VELOCITY_ANGLE_COLOR_VAL
+            ),
+            value.a
+        );
+    }
+
+    if (colorMap == COLOR_MAP_GRAYSCALE)
+        return vec4(vec3(scalar), value.a);
+
+    if (colorMap == COLOR_MAP_HEAT)
+        return vec4(clamp(vec3(2.0 * scalar, 2.0 * scalar - 0.5, 2.0 * scalar - 1.0), 0.0, 1.0), value.a);
+
+    if (colorMap == COLOR_MAP_SOLID)
+        return value;
+
+    return baseColor;
 }
 
 vec3 hsv2rgb(in vec3 hsv)

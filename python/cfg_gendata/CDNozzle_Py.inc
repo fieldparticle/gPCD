@@ -23,11 +23,6 @@ min_compression_frames = 3.0;
 // Required: simulation timestep.
 dt= 0.5;
 
-// Required: mobile particle radius used for generation and collision.
-radius = 0.25;
-
-
-
 // Required: binary particle file consumed by the Python runner.
 output_file_prefix = "CDNozzle_Py";
 obj_file_name = "C:/_DJ/gPCD/vulkan/sim/CDNozzle/CDNozzle_Py.obj";
@@ -42,9 +37,6 @@ zoom= 1.0;
 x_axis_lims = [0.0,90.0];
 y_axis_lims = [10.0,40.0];
 z_axis_lims = [0.75,1.25];
-
-//  Distance between particle perimiters
-particle_separation_distance 	= 1.0;
 
 // Required: explicit cell counts for the cell-array domain.
 cell_array_width 				= 90;
@@ -69,8 +61,17 @@ death_bounds = [
     0, 4
 ];
 
-initial_particle_velocity = [ 0.05, 0.0, 0.0 ];
 piston_velocity = [ 0.05, 0.0, 0.0 ];
+
+particle_streams = (
+  {
+    name = "reservoir_substance";
+    material_id = 0;
+    radius = 0.25;
+    particle_separation_distance = 1.0;
+    initial_particle_velocity = [ 0.05, 0.0, 0.0 ];
+  }
+);
 
 // 2D packing curves derive x/y packing bounds. Particles live on one Z cell center.
 particle_plane_z = 1.5;

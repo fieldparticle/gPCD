@@ -58,6 +58,131 @@ class GenReservoir(GenericGenData):
                 errors.append(f"{name} must not be negative")
             return result
 
+        def stream_values(stream, context, name, count):
+            values = stream.get(name)
+            if values is None:
+                errors.append(f"{context}.{name} is required")
+                return ()
+            try:
+                if len(values) != count:
+                    errors.append(f"{context}.{name} must contain exactly {count} values")
+                    return ()
+                result = tuple(float(value) for value in values)
+            except (TypeError, ValueError):
+                errors.append(f"{context}.{name} values must be numeric")
+                return ()
+            if not all(math.isfinite(value) for value in result):
+                errors.append(f"{context}.{name} values must be finite")
+                return ()
+            return result
+
+        def stream_positive_float(stream, context, name):
+            value = stream.get(name)
+            try:
+                result = float(value)
+            except (TypeError, ValueError):
+                errors.append(f"{context}.{name} is required and must be numeric")
+                return None
+            if not math.isfinite(result):
+                errors.append(f"{context}.{name} must be finite")
+            elif result <= 0.0:
+                errors.append(f"{context}.{name} must be positive")
+            return result
+
+        def stream_nonnegative_float(stream, context, name):
+            value = stream.get(name)
+            try:
+                result = float(value)
+            except (TypeError, ValueError):
+                errors.append(f"{context}.{name} is required and must be numeric")
+                return None
+            if not math.isfinite(result):
+                errors.append(f"{context}.{name} must be finite")
+            elif result < 0.0:
+                errors.append(f"{context}.{name} must not be negative")
+            return result
+
+        def stream_enabled(stream, context):
+            value = stream.get("enabled", True)
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, (int, float)):
+                return bool(value)
+            if isinstance(value, str):
+                lowered = value.strip().lower()
+                if lowered in ("true", "yes", "on", "1"):
+                    return True
+                if lowered in ("false", "no", "off", "0"):
+                    return False
+            errors.append(f"{context}.enabled must be true or false")
+            return True
+
+        def parse_reservoir_streams():
+            raw_streams = self.itemcfg.get("particle_streams")
+            if raw_streams is None:
+                return None
+            try:
+                stream_count = len(raw_streams)
+            except TypeError:
+                errors.append("particle_streams must be a list or tuple")
+                return None
+            if stream_count <= 0:
+                errors.append("particle_streams must contain at least one stream")
+                return None
+
+            enabled_streams = []
+            for index, stream in enumerate(raw_streams):
+                context = f"particle_streams[{index}]"
+                if not hasattr(stream, "get"):
+                    errors.append(f"{context} must be a stream object")
+                    continue
+                name = str(stream.get("name", f"stream{index}")).strip()
+                if not name:
+                    errors.append(f"{context}.name must not be empty")
+                    name = f"stream{index}"
+                enabled = stream_enabled(stream, context)
+                if not enabled:
+                    continue
+
+                try:
+                    material_id = int(stream.get("material_id", 0))
+                except (TypeError, ValueError):
+                    errors.append(f"{context}.material_id must be an integer")
+                    material_id = 0
+                if material_id not in self.material_properties_by_id:
+                    errors.append(f"{context}.material_id is not defined")
+
+                enabled_streams.append(
+                    {
+                        "name": name,
+                        "enabled": True,
+                        "material_id": material_id,
+                        "radius": stream_positive_float(stream, context, "radius"),
+                        "particle_separation_distance": stream_nonnegative_float(
+                            stream,
+                            context,
+                            "particle_separation_distance",
+                        ),
+                        "initial_particle_velocity": stream_values(
+                            stream,
+                            context,
+                            "initial_particle_velocity",
+                            3,
+                        ),
+                    }
+                )
+
+            if len(enabled_streams) != 1:
+                errors.append(
+                    "particle_streams must contain exactly one enabled reservoir stream"
+                )
+                return enabled_streams[0] if enabled_streams else None
+            return enabled_streams[0]
+
+        self.validate_material_properties(errors)
+        reservoir_streams_present = self.itemcfg.get("particle_streams") is not None
+        reservoir_stream = parse_reservoir_streams()
+
         dimensions = []
         for name in (
             "cell_array_width",
@@ -115,7 +240,12 @@ class GenReservoir(GenericGenData):
 
         death_bounds = required_values("death_bounds", 6)
         particle_plane_z = required_nonnegative_float("particle_plane_z")
-        initial_particle_velocity = required_values("initial_particle_velocity", 3)
+        if reservoir_stream is None and not reservoir_streams_present:
+            initial_particle_velocity = required_values("initial_particle_velocity", 3)
+        elif reservoir_stream is None:
+            initial_particle_velocity = ()
+        else:
+            initial_particle_velocity = reservoir_stream["initial_particle_velocity"]
 
         piston_enabled = optional_bool(
             "piston_enabled",
@@ -143,12 +273,19 @@ class GenReservoir(GenericGenData):
         else:
             packing_bounds = self.derive_packing_bounds(packing_curve_segments)
 
-        separation = self.itemcfg.get("particle_separation_distance")
-        try:
-            particle_separation_distance = float(separation)
-        except (TypeError, ValueError):
-            errors.append("particle_separation_distance is required and numeric")
+        if reservoir_stream is None and not reservoir_streams_present:
+            separation = self.itemcfg.get("particle_separation_distance")
+            try:
+                particle_separation_distance = float(separation)
+            except (TypeError, ValueError):
+                errors.append("particle_separation_distance is required and numeric")
+                particle_separation_distance = None
+        elif reservoir_stream is None:
             particle_separation_distance = None
+        else:
+            particle_separation_distance = reservoir_stream[
+                "particle_separation_distance"
+            ]
 
         piston_start_frame = self.itemcfg.get("piston_start_frame", 0)
         try:
@@ -184,11 +321,16 @@ class GenReservoir(GenericGenData):
             elif piston_start_offset_value < 0.0:
                 errors.append("piston_start_offset must not be negative")
 
-        try:
-            radius = float(self.itemcfg.radius)
-        except (AttributeError, TypeError, ValueError):
-            errors.append("radius is required and must be numeric")
+        if reservoir_stream is None and not reservoir_streams_present:
+            try:
+                radius = float(self.itemcfg.radius)
+            except (AttributeError, TypeError, ValueError):
+                errors.append("radius is required and must be numeric")
+                radius = None
+        elif reservoir_stream is None:
             radius = None
+        else:
+            radius = reservoir_stream["radius"]
 
         if radius is not None:
             if not math.isfinite(radius):
@@ -292,6 +434,12 @@ class GenReservoir(GenericGenData):
         self.piston_start_frame = int(piston_start_frame_value)
         self.number_configured_particles = 0
         self.explicit_particles = []
+        self.reservoir_stream = reservoir_stream
+        self.reservoir_material_id = (
+            int(reservoir_stream["material_id"])
+            if reservoir_stream is not None
+            else 0
+        )
         self.radius = radius
         self.wall_contact_offset = float(self.itemcfg.wall_contact_offset)
         self.dt = float(self.itemcfg.dt)
@@ -383,7 +531,7 @@ class GenReservoir(GenericGenData):
                     (particle_x, particle_y, particle_z),
                     velocity,
                     radius=self.radius,
-                    mass=1.0,
+                    material_id=self.reservoir_material_id,
                     collision_stiffness_q=float(
                         self.itemcfg.get("collision_stiffness_q", 0.0)
                     ),

@@ -29,6 +29,7 @@ from gbase.MaterialProperties import (
     CONTACT_ILLUMINATION_FIRST,
     parse_debug_visible,
     parse_contact_illumination,
+    parse_color_map,
     parse_material_color,
     parse_particle_type,
     parse_photon_surface_behavior,
@@ -314,6 +315,12 @@ class GenericGenData:
                 errors,
                 context,
             )
+            color_map = None
+            if raw_material.get("color_map") is not None:
+                try:
+                    color_map = parse_color_map(raw_material.get("color_map"))
+                except (TypeError, ValueError) as exc:
+                    errors.append(f"{context}.color_map is invalid: {exc}")
             color = None
             if color_mode is not None:
                 try:
@@ -473,6 +480,8 @@ class GenericGenData:
                         "cell_density": cell_density,
                     }
                 )
+                if color_map is not None:
+                    materials[-1]["color_map"] = color_map
 
         if material_count == 0:
             errors.append("material_properties must not be empty")

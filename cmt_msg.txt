@@ -1,12 +1,12 @@
 Current status:
-    - CDNozzle piston physics remains an analytic moving plane.
-    - CDNozzle now has a generated visual piston symbol with a head and centered rod.
-    - The piston visual is owned by Python generator config and generated test metadata, not Vulkan override config or curve wall geometry.
+    - CDNozzle reservoir particles now use a particle_streams material path.
+    - color_mode and color_map are split so CDNozzle can select velocity-angle data and an HSV palette independently.
+    - color_map is optional and application-specific, so LightingBall and older material configs keep their existing behavior.
 
 Code Changes:
-    - Documented piston_visual ownership in CDNozzle_Py.inc/CDNozzle_Vk.inc and generated .tst output.
-    - Documented Vulkan piston visual rendering as tagged boundary vertices moved by the boundary vertex shader.
-    - Documented piston_dt as generated from DT so visual and compute piston motion stay synchronized.
-    - Updated configuration docs for piston_visual fields and the optional write_to_obj diagnostic path.
+    - Added CDNozzle reservoir stream documentation for material_id, radius, separation, and initial velocity.
+    - Documented that piston_velocity, piston_start_frame, death_bounds, and particle_plane_z remain global reservoir fields.
+    - Documented Vulkan MaterialProperty.colorMap and the value_from_color_mode/color_from_color_map shader split.
+    - Added problem-evolution notes for CDNozzle stream material assignment and the material display split.
 
-Next: Regenerate CDNozzle data/models and run the Vulkan CDNozzle simulation to verify the piston symbol stays aligned with the analytic piston.
+Next: Commit this checkpoint after confirming the clean test run covers CDNozzle GenData and Vulkan shader generation.
