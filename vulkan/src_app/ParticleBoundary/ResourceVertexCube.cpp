@@ -47,6 +47,7 @@ void ResourceVertexCube::Create(ResourceVertexParticle* PartVert)
 			tmp.pos.z = m_vtemp[ii].z; //*m_ParticleVert->m_SideLength;
 			tmp.pos.w = 1.0;
 			tmp.color = glm::vec4(1.0, 1.0, 1.0, 1.0);
+			tmp.extra = glm::vec4(0.0, 0.0, 0.0, 0.0);
 			m_Verts.push_back(tmp);
 		}
 	}
@@ -55,6 +56,77 @@ void ResourceVertexCube::Create(ResourceVertexParticle* PartVert)
 
 			MakeAxes(PartVert->m_SideLength);
 		}
+
+	ConfigObj* pistonVisualCfg = nullptr;
+	std::string pistonVisualPrefix;
+	if (CfgTst != nullptr && CfgTst->CheckKey("piston_visual.enabled"))
+	{
+		pistonVisualCfg = CfgTst;
+		pistonVisualPrefix = "piston_visual.";
+	}
+	else if (CfgApp->CheckKey("application.piston_visual.enabled"))
+	{
+		pistonVisualCfg = CfgApp;
+		pistonVisualPrefix = "application.piston_visual.";
+	}
+
+	if (pistonVisualCfg != nullptr &&
+		pistonVisualCfg->GetBool(pistonVisualPrefix + "enabled", true))
+	{
+		float pistonX = 0.0f;
+		if (CfgTst != nullptr && CfgTst->CheckKey("piston_x_start"))
+			pistonX = CfgTst->GetFloat("piston_x_start", true);
+		else if (pistonVisualCfg->CheckKey(pistonVisualPrefix + "x"))
+			pistonX = pistonVisualCfg->GetFloat(pistonVisualPrefix + "x", true);
+
+		float yMin = pistonVisualCfg->GetFloat(pistonVisualPrefix + "y_min", true);
+		float yMax = pistonVisualCfg->GetFloat(pistonVisualPrefix + "y_max", true);
+		float z = pistonVisualCfg->GetFloat(pistonVisualPrefix + "z", true);
+		float headLength = pistonVisualCfg->CheckKey(pistonVisualPrefix + "head_length")
+			? pistonVisualCfg->GetFloat(pistonVisualPrefix + "head_length", true)
+			: pistonVisualCfg->GetFloat(pistonVisualPrefix + "x_thickness", true);
+		float rodLength = pistonVisualCfg->GetFloat(pistonVisualPrefix + "rod_length", true);
+		float rodHeight = pistonVisualCfg->GetFloat(pistonVisualPrefix + "rod_height", true);
+		float yCenter = 0.5f * (yMin + yMax);
+		float rodYMin = yCenter - 0.5f * rodHeight;
+		float rodYMax = yCenter + 0.5f * rodHeight;
+		glm::vec4 headColor(
+			pistonVisualCfg->GetFloat(pistonVisualPrefix + "head_color.red", true),
+			pistonVisualCfg->GetFloat(pistonVisualPrefix + "head_color.green", true),
+			pistonVisualCfg->GetFloat(pistonVisualPrefix + "head_color.blue", true),
+			pistonVisualCfg->GetFloat(pistonVisualPrefix + "head_color.alpha", true));
+		glm::vec4 rodColor(
+			pistonVisualCfg->GetFloat(pistonVisualPrefix + "rod_color.red", true),
+			pistonVisualCfg->GetFloat(pistonVisualPrefix + "rod_color.green", true),
+			pistonVisualCfg->GetFloat(pistonVisualPrefix + "rod_color.blue", true),
+			pistonVisualCfg->GetFloat(pistonVisualPrefix + "rod_color.alpha", true));
+
+		auto addVertex = [&](float x, float y, float z, const glm::vec4& color)
+		{
+			CartVert tmp = {};
+			tmp.pos = glm::vec4(x, y, z, 1.0f);
+			tmp.color = color;
+			tmp.extra = glm::vec4(1.0, 0.0, 0.0, 0.0);
+			m_Verts.push_back(tmp);
+		};
+
+		auto addRect = [&](float xMin, float xMax, float rectYMin, float rectYMax, const glm::vec4& color)
+		{
+			addVertex(xMin, rectYMin, z, color);
+			addVertex(xMax, rectYMin, z, color);
+			addVertex(xMax, rectYMax, z, color);
+			addVertex(xMin, rectYMin, z, color);
+			addVertex(xMax, rectYMax, z, color);
+			addVertex(xMin, rectYMax, z, color);
+		};
+
+		float headXMin = pistonX - headLength;
+		float headXMax = pistonX;
+		float rodXMin = headXMin - rodLength;
+		float rodXMax = headXMin;
+		addRect(headXMin, headXMax, yMin, yMax, headColor);
+		addRect(rodXMin, rodXMax, rodYMin, rodYMax, rodColor);
+	}
 	
 	Resource::CheckBindPoint(0);
 

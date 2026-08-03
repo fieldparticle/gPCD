@@ -12,6 +12,8 @@
 
 #include "params.glsl"
 #include "material.glsl"
+#include "piston.glsl"
+#define FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE
 #include "../common/constants.glsl"
 #include "boundary.glsl"
 #include "sphere.glsl"

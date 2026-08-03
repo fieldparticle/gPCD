@@ -86,10 +86,26 @@ void SetCallBacks(VulkanObj* VO)
 	glfwSetMouseButtonCallback(VO->GetGLFWWindow(), onMouseButton);
 	
 	QuitEvent = false;
-	rRotZ = CfgApp->GetFloat("application.initial_view.rRotZ", true);
-	rRotY = CfgApp->GetFloat("application.initial_view.rRotY", true);
-	rRotX = CfgApp->GetFloat("application.initial_view.rRotX", true);
-	ZoomX = CfgApp->GetFloat("application.initial_view.zoom", true);
+	if (CfgTst->CheckKey("view") && CfgTst->CheckKey("zoom"))
+	{
+		rRotZ = 0.0f;
+		rRotY = 0.0f;
+		rRotX = 0.0f;
+		RotateZ = 0.0f;
+		RotateY = 0.0f;
+		RotateX = 0.0f;
+		ZoomX = CfgTst->GetFloat("zoom", true);
+	}
+	else
+	{
+		rRotZ = CfgApp->GetFloat("application.initial_view.rRotZ", true);
+		rRotY = CfgApp->GetFloat("application.initial_view.rRotY", true);
+		rRotX = CfgApp->GetFloat("application.initial_view.rRotX", true);
+		RotateZ = rRotZ;
+		RotateY = rRotY;
+		RotateX = rRotX;
+		ZoomX = CfgApp->GetFloat("application.initial_view.zoom", true);
+	}
 	
 }
 void onMouseButton(GLFWwindow* window, int button, int action, int mods)
@@ -97,10 +113,17 @@ void onMouseButton(GLFWwindow* window, int button, int action, int mods)
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
 	{
 		rightMouse = true;
+		double xpos = 0.0;
+		double ypos = 0.0;
+		glfwGetCursorPos(window, &xpos, &ypos);
+		ox = static_cast<float>(xpos);
+		oy = static_cast<float>(ypos);
 	}
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
 	{
 		rightMouse = false;
+		ox = -1.0f;
+		oy = -1.0f;
 	}
 	
 

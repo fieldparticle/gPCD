@@ -30,9 +30,7 @@ radius = 0.25;
 
 // Required: binary particle file consumed by the Python runner.
 output_file_prefix = "CDNozzle_Py";
-
-// Temporary upper bound that includes the chamber packing and wall markers.
-particle_range = [1,500];
+obj_file_name = "C:/_DJ/gPCD/vulkan/sim/CDNozzle/CDNozzle_Py.obj";
 
 // Required: Python viewer zoom.
 zoom= 1.0;
@@ -77,139 +75,116 @@ piston_velocity = [ 0.05, 0.0, 0.0 ];
 // 2D packing curves derive x/y packing bounds. Particles live on one Z cell center.
 particle_plane_z = 1.5;
 
+// Visual-only piston symbol written to the generated .tst for Vulkan display.
+piston_visual = {
+    enabled = true;
+    y_min = 15.0;
+    y_max = 35.0;
+    head_length = 10.0;
+    rod_length = 18.0;
+    rod_height = 4.0;
+    z = 1.5;
+    head_color = {red = 0.0; green = 0.8; blue = 1.0; alpha = 1.0;};
+    rod_color = {red = 0.0; green = 0.45; blue = 0.7; alpha = 1.0;};
+};
+
 // Function wall format:
 //   -1 for lower walls where outward is below the conduit
 //    1 for upper walls where outward is above the conduit
+// Grouped curves inherit function, normal_sign, wall_flag, and material_id.
+// The first segment in each curve needs u_start, f_start, and length.
+// Later segments continue from the previous segment and only need length.
 // Boundary particles are cell-locality sentinels; they are not wall geometry.
 curve_wall_segments = {
-    wall3 = {
-        boundary_kind = "reservoir";
+    lower_wall = {
         function = "y_of_x";
-        u_start = 2;
-        u_end = 30;
-        f_start = 15;
-        a1 = 0;
-        a2 = 0;
-        a3 = 0;
         normal_sign = -1;
         wall_flag = 3;
+        segments = {
+            wall3 = {
+                boundary_kind = "reservoir";
+                u_start = 2;
+                length = 28;
+                f_start = 15;
+                a1 = 0;
+                a2 = 0;
+                a3 = 0;
+            };
+            segment03 = {
+                boundary_kind = "regular";
+                length = 20;
+                a1 = 0.25;
+                a2 = -0.00625;
+                a3 = 0;
+            };
+            segment05 = {
+                boundary_kind = "regular";
+                length = 5;
+                a1 = 0;
+                a2 = 0;
+                a3 = 0;
+            };
+            segment07 = {
+                boundary_kind = "regular";
+                length = 20;
+                a1 = 0;
+                a2 = -0.00625;
+                a3 = 0;
+            };
+            segment09 = {
+                boundary_kind = "regular";
+                length = 10;
+                a1 = 0;
+                a2 = 0;
+                a3 = 0;
+            };
+        };
     };
-    wall4 = {
-        boundary_kind = "reservoir";
+    upper_wall = {
         function = "y_of_x";
-        u_start = 2;
-        u_end = 30;
-        f_start = 35;
-        a1 = 0;
-        a2 = 0;
-        a3 = 0;
         normal_sign = 1;
         wall_flag = 4;
-    };
-    wall3_segment03 = {
-        boundary_kind = "regular";
-        function = "y_of_x";
-        u_start = 30;
-        u_end = 50;
-        f_start = 15;
-        a1 = 0.25;
-        a2 = -0.00625;
-        a3 = 0;
-        normal_sign = -1;
-        wall_flag = 3;
-    };
-    wall4_segment04 = {
-        boundary_kind = "regular";
-        function = "y_of_x";
-        u_start = 30;
-        u_end = 50;
-        f_start = 35;
-        a1 = -0.25;
-        a2 = 0.00625;
-        a3 = 0;
-        normal_sign = 1;
-        wall_flag = 4;
-    };
-    wall3_segment05 = {
-        boundary_kind = "regular";
-        function = "y_of_x";
-        u_start = 50;
-        u_end = 55;
-        f_start = 17.5;
-        a1 = 0;
-        a2 = 0;
-        a3 = 0;
-        normal_sign = -1;
-        wall_flag = 3;
-    };
-    wall4_segment06 = {
-        boundary_kind = "regular";
-        function = "y_of_x";
-        u_start = 50;
-        u_end = 55;
-        f_start = 32.5;
-        a1 = 0;
-        a2 = 0;
-        a3 = 0;
-        normal_sign = 1;
-        wall_flag = 4;
-    };
-    wall3_segment07 = {
-        boundary_kind = "regular";
-        function = "y_of_x";
-        u_start = 55;
-        u_end = 75;
-        f_start = 17.5;
-        a1 = 0;
-        a2 = -0.00625;
-        a3 = 0;
-        normal_sign = -1;
-        wall_flag = 3;
-    };
-    wall4_segment08 = {
-        boundary_kind = "regular";
-        function = "y_of_x";
-        u_start = 55;
-        u_end = 75;
-        f_start = 32.5;
-        a1 = 0;
-        a2 = 0.00625;
-        a3 = 0;
-        normal_sign = 1;
-        wall_flag = 4;
-    };
-    wall3_segment09 = {
-        boundary_kind = "regular";
-        function = "y_of_x";
-        u_start = 75;
-        u_end = 85;
-        f_start = 15;
-        a1 = 0;
-        a2 = 0;
-        a3 = 0;
-        normal_sign = -1;
-        wall_flag = 3;
-    };
-    wall4_segment10 = {
-        boundary_kind = "regular";
-        function = "y_of_x";
-        u_start = 75;
-        u_end = 85;
-        f_start = 35;
-        a1 = 0;
-        a2 = 0;
-        a3 = 0;
-        normal_sign = 1;
-        wall_flag = 4;
+        segments = {
+            wall4 = {
+                boundary_kind = "reservoir";
+                u_start = 2;
+                length = 28;
+                f_start = 35;
+                a1 = 0;
+                a2 = 0;
+                a3 = 0;
+            };
+            segment04 = {
+                boundary_kind = "regular";
+                length = 20;
+                a1 = -0.25;
+                a2 = 0.00625;
+                a3 = 0;
+            };
+            segment06 = {
+                boundary_kind = "regular";
+                length = 5;
+                a1 = 0;
+                a2 = 0;
+                a3 = 0;
+            };
+            segment08 = {
+                boundary_kind = "regular";
+                length = 20;
+                a1 = 0;
+                a2 = 0.00625;
+                a3 = 0;
+            };
+            segment10 = {
+                boundary_kind = "regular";
+                length = 10;
+                a1 = 0;
+                a2 = 0;
+                a3 = 0;
+            };
+        };
     };
 };
 
 // Required: tells ForceDynamicsBase to load particles from bin_file.
 pdata_from_file = true;
-
-// Required: enables or disables study/batch generation mode.
-study=false;
-
-// Required when study is true; otherwise kept at zero.
-num_studies = 0;
-

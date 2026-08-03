@@ -5,7 +5,23 @@ void boundary_vert_main()
 	if (ShaderFlags.DrawInstance == 1.0)
 	{
 #if defined(HAS_BOUNDARY)
-		gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition.xyz, 1.0);
+		vec3 boundaryPosition = inPosition.xyz;
+#if defined(HAS_PISTON_VISUAL)
+		if (inExtra.x > 0.5)
+		{
+			uint pistonStartFrame = uint(piston_start_frame);
+			float pistonX = piston_x_start;
+			if (ShaderFlags.frameNum >= pistonStartFrame)
+			{
+				float elapsedFrames = float(ShaderFlags.frameNum - pistonStartFrame);
+				pistonX = min(
+					piston_x_start + elapsedFrames * piston_dt * piston_velocity_x,
+					piston_x_stop);
+			}
+			boundaryPosition.x += pistonX - piston_x_start;
+		}
+#endif
+		gl_Position = ubo.proj * ubo.view * ubo.model * vec4(boundaryPosition, 1.0);
 		fragColor = inColor;
 #else
 		gl_Position = vec4(0.0, 0.0, 0.0, 1.0);

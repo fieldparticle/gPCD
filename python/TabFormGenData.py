@@ -185,7 +185,10 @@ class TabGenData(QTabWidget):
         # Enable to generate data
         self.GenDataButton.setEnabled(True)
         self.RefreshObjButton.setEnabled(True)
-        self.GenObjButton.setEnabled(hasattr(self.gen_class, "generate_lighting_sphere_obj"))
+        self.GenObjButton.setEnabled(
+            hasattr(self.gen_class, "generate_lighting_sphere_obj")
+            or hasattr(self.gen_class, "generate_model_obj")
+        )
         #self.RefreshObjButton.setEnabled(hasattr(self.gen_class, "refresh_lighting_sphere_mesh"))
             
 
@@ -289,7 +292,14 @@ class TabGenData(QTabWidget):
         if self.refresh() == False:
             print("Config file error")
             return
-        if not hasattr(self.gen_class, "generate_lighting_sphere_obj"):
+        has_scene_model = self.itemcfg.get("scene_model") is not None
+        if has_scene_model and hasattr(self.gen_class, "generate_lighting_sphere_obj"):
+            generate_obj = self.gen_class.generate_lighting_sphere_obj
+        elif hasattr(self.gen_class, "generate_model_obj"):
+            generate_obj = self.gen_class.generate_model_obj
+        elif hasattr(self.gen_class, "generate_lighting_sphere_obj"):
+            generate_obj = self.gen_class.generate_lighting_sphere_obj
+        else:
             self.log.log(self, "Selected generator does not support OBJ generation.")
             return
         answer = QMessageBox.question(
@@ -303,7 +313,7 @@ class TabGenData(QTabWidget):
             self.log.log(self, "OBJ generation canceled.")
             return
         os.system('cls' if os.name == 'nt' else 'clear')
-        self.gen_class.generate_lighting_sphere_obj()
+        generate_obj()
 
     def refresh_obj(self):
         if self.refresh() == False:
@@ -737,12 +747,12 @@ class TabGenData(QTabWidget):
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TwoParticleAngled.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TestCompressor.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/TestReservoir.cfg")
-        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/CDNozzle.cfg")
+        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/CDNozzle.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/FreeStream.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/FreeStreamHeteroPy.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/lumens.cfg")
         #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/Cathedral.cfg")
-        self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/LightingBall.cfg")
+        #self.load_item_cfg("C:/_DJ/gPCD/python/cfg_gendata/LightingBall.cfg")
         self.update_list_widget()
         self.update_data_list_widget()
         

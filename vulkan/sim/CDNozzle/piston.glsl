@@ -1,3 +1,4 @@
+const float piston_dt=0.025000000;
 const float piston_x_start=2.000000000;
 const float piston_x_stop=102.000000000;
 const float piston_velocity_x=0.500000000;

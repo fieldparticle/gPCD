@@ -1,11 +1,12 @@
 Current status:
-	- Basic reflecting-wall system is now in place.
-	- Visible reflection uses per-photon point splats over a glass-tinted wall.
-	- ReflectingWallLightMap remains available while splat/glass tuning continues.
+    - CDNozzle piston physics remains an analytic moving plane.
+    - CDNozzle now has a generated visual piston symbol with a head and centered rod.
+    - The piston visual is owned by Python generator config and generated test metadata, not Vulkan override config or curve wall geometry.
 
 Code Changes:
-	- Added configurable splat radius, alpha, reflection gain, glass tint, and fresnel strength.
-	- Updated the reflecting-wall fragment path to render a glass-style base surface.
-	- Updated docs to record the current splat/glass baseline.
+    - Documented piston_visual ownership in CDNozzle_Py.inc/CDNozzle_Vk.inc and generated .tst output.
+    - Documented Vulkan piston visual rendering as tagged boundary vertices moved by the boundary vertex shader.
+    - Documented piston_dt as generated from DT so visual and compute piston motion stay synchronized.
+    - Updated configuration docs for piston_visual fields and the optional write_to_obj diagnostic path.
 
-Next: Tune reflecting-wall appearance, then decide whether to remove or gate the old image SSBO.
+Next: Regenerate CDNozzle data/models and run the Vulkan CDNozzle simulation to verify the piston symbol stays aligned with the analytic piston.

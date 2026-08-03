@@ -1471,7 +1471,7 @@ float GetPistonPosition(uint frame)
         piston_velocity_y,
         piston_velocity_z);
     float position = piston_x_start
-        + elapsedFrames * ShaderFlags.dt * pistonVelocity.x;
+        + elapsedFrames * piston_dt * pistonVelocity.x;
     return min(position, piston_x_stop);
 }}
 

@@ -36,13 +36,14 @@ struct MaterialProperty
     float photonCoupling;
     float photonMinRelativeMass;
     uint photonSurfaceBehavior;
+    uint photonLifeTime;
     uint contactIllumination;
     float cellDensity;
 };
 
 const uint MATERIAL_PROPERTY_COUNT = 1u;
 const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](
-    MaterialProperty(0u, 0u, 1.000000000, 0.000000000, 1u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, 0u, 0u, 0.000000000)
+    MaterialProperty(0u, 0u, 1.000000000, 0.000000000, 1u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, 0u, 0u, 0u, 0.000000000)
 );
 
 const float VELOCITY_ANGLE_COLOR_SAT = 1.00;

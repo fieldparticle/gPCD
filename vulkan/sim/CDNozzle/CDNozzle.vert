@@ -8,6 +8,8 @@
 #extension GL_EXT_scalar_block_layout :enable
 #include "params.glsl"
 #include "material.glsl"
+#include "piston.glsl"
+#define HAS_PISTON_VISUAL
 #include "..\common\constants.glsl"
 #include "..\common\atomicg.glsl"
 #include "..\common\push.glsl"
@@ -40,6 +42,7 @@ out gl_PerVertex {
 
 layout(location = 0) in vec4 inPosition;
 layout(location = 1) in vec4 inColor;
+layout(location = 2) in vec4 inExtra;
 
 layout(location = 0) out vec4 fragColor;
 mat4 BuildTranslation(vec3 delta)

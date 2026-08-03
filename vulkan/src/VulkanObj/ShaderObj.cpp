@@ -1132,6 +1132,9 @@ void ShaderObj::Piston()
 		}
 		
 		ostrm
+			<< "const float piston_dt=" << std::fixed << std::setprecision(9)
+			<< CfgTst->GetFloat("DT", true) << ";\n"
+
 			<< "const float piston_x_start=" << std::fixed << std::setprecision(9)
 			<< CfgTst->GetFloat("piston_x_start", true) << ";\n"
 

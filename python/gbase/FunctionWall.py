@@ -40,6 +40,20 @@ def _required_number(segment_name, segment_config, field_name, errors):
     return value
 
 
+def _optional_number(segment_name, segment_config, field_name, errors):
+    if field_name not in segment_config:
+        return None
+    try:
+        value = float(segment_config[field_name])
+    except (TypeError, ValueError):
+        errors.append(f"curve_wall_segments.{segment_name}.{field_name} must be numeric")
+        return None
+    if not math.isfinite(value):
+        errors.append(f"curve_wall_segments.{segment_name}.{field_name} must be finite")
+        return None
+    return value
+
+
 def parse_segment(segment_name, segment_config):
     """Parse one canonical key-value wall segment into numeric internal form."""
     errors = []
@@ -124,8 +138,98 @@ def parse_segment(segment_name, segment_config):
     return tuple(float(value) for value in values), []
 
 
+def _prepare_group_segment(segment_name, segment_config, previous_segment):
+    """Expand grouped curve authoring with optional length chaining."""
+    errors = []
+    prepared_config = dict(segment_config)
+
+    if "length" not in prepared_config:
+        return prepared_config, errors
+
+    length = _optional_number(segment_name, prepared_config, "length", errors)
+    if length is None:
+        return prepared_config, errors
+    if abs(length) <= 1.0e-12:
+        errors.append(f"curve_wall_segments.{segment_name}.length must not be zero")
+        return prepared_config, errors
+
+    if previous_segment is None:
+        u_start = _optional_number(segment_name, prepared_config, "u_start", errors)
+        _optional_number(segment_name, prepared_config, "f_start", errors)
+        if u_start is None:
+            errors.append(
+                f"curve_wall_segments.{segment_name}.u_start is required "
+                "for the first segment in a grouped curve"
+            )
+        if "f_start" not in prepared_config:
+            errors.append(
+                f"curve_wall_segments.{segment_name}.f_start is required "
+                "for the first segment in a grouped curve"
+            )
+        if u_start is not None:
+            expected_u_end = u_start + length
+            configured_u_end = _optional_number(
+                segment_name,
+                prepared_config,
+                "u_end",
+                errors,
+            )
+            if configured_u_end is None and "u_end" not in prepared_config:
+                prepared_config["u_end"] = expected_u_end
+            elif (
+                configured_u_end is not None
+                and abs(configured_u_end - expected_u_end) > 1.0e-9
+            ):
+                errors.append(
+                    f"curve_wall_segments.{segment_name}.u_end must equal "
+                    "u_start + length"
+                )
+        return prepared_config, errors
+
+    (
+        _boundary_kind,
+        _independent_axis,
+        previous_u_start,
+        previous_u_end,
+        _previous_f_start,
+        _a1,
+        _a2,
+        _a3,
+        _normal_sign,
+        _wall_flag,
+        _material_id,
+    ) = segment_values(previous_segment)
+
+    if "u_start" not in prepared_config:
+        prepared_config["u_start"] = previous_u_end
+    if "f_start" not in prepared_config:
+        prepared_config["f_start"], _slope = evaluate_function(
+            previous_segment,
+            previous_u_end,
+        )
+    expected_u_end = float(prepared_config["u_start"]) + length
+    configured_u_end = _optional_number(
+        segment_name,
+        prepared_config,
+        "u_end",
+        errors,
+    )
+    if configured_u_end is None and "u_end" not in prepared_config:
+        prepared_config["u_end"] = expected_u_end
+    elif (
+        configured_u_end is not None
+        and abs(configured_u_end - expected_u_end) > 1.0e-9
+    ):
+        errors.append(
+            f"curve_wall_segments.{segment_name}.u_end must equal "
+            "u_start + length"
+        )
+
+    return prepared_config, errors
+
+
 def parse_keyed_curve_wall_segments(raw_segments):
-    """Parse the canonical key-value curve_wall_segments config object."""
+    """Parse flat or grouped key-value curve_wall_segments config objects."""
     if not raw_segments:
         return (), ["curve_wall_segments is required and must not be empty"]
     if not isinstance(raw_segments, Mapping):
@@ -134,6 +238,46 @@ def parse_keyed_curve_wall_segments(raw_segments):
     errors = []
     parsed_segments = []
     for segment_name, segment_config in raw_segments.items():
+        if isinstance(segment_config, Mapping) and "segments" in segment_config:
+            curve_segments = segment_config.get("segments")
+            if not isinstance(curve_segments, Mapping):
+                errors.append(
+                    f"curve_wall_segments.{segment_name}.segments "
+                    "must be a key-value object"
+                )
+                continue
+
+            inherited = {
+                key: value
+                for key, value in segment_config.items()
+                if key != "segments"
+            }
+            previous_segment = None
+            for child_name, child_config in curve_segments.items():
+                child_path = f"{segment_name}.{child_name}"
+                if not isinstance(child_config, Mapping):
+                    segment, segment_errors = parse_segment(child_path, child_config)
+                else:
+                    merged_config = dict(inherited)
+                    merged_config.update(child_config)
+                    prepared_config, segment_errors = _prepare_group_segment(
+                        child_path,
+                        merged_config,
+                        previous_segment,
+                    )
+                    if not segment_errors:
+                        segment, segment_errors = parse_segment(
+                            child_path,
+                            prepared_config,
+                        )
+                    else:
+                        segment = None
+                errors.extend(segment_errors)
+                if segment is not None:
+                    parsed_segments.append(segment)
+                    previous_segment = segment
+            continue
+
         segment, segment_errors = parse_segment(segment_name, segment_config)
         errors.extend(segment_errors)
         if segment is not None:

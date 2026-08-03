@@ -1071,7 +1071,9 @@ class GenericGenData:
         self.number_boundary_particles = 0
         self.boundary_space_proxy_metadata = {}
         self.lighting_surface_triangle_inventory = ()
+        self.configure_output_paths(delete_stale=True)
 
+    def configure_output_paths(self, delete_stale=False):
         output_prefix = str(
             self.itemcfg.get("output_file_prefix", self.itemcfg.STUDY_NAME)
         )
@@ -1081,7 +1083,8 @@ class GenericGenData:
         self.test_file_name = os.path.join(output_directory, f"{output_prefix}.tst")
         self.report_file = os.path.join(output_directory, f"{output_prefix}.rpt")
         self.validation_log_name = os.path.join(output_directory, f"{output_prefix}.log")
-        self.delete_stale_generated_outputs()
+        if delete_stale:
+            self.delete_stale_generated_outputs()
         with open(self.validation_log_name, "w", encoding="ascii", newline="\n") as output:
             output.write(
                 "Function-wall particle validation log\n"
@@ -1525,7 +1528,8 @@ class GenericGenData:
         """Write triangle ribbons sampled from function-wall paths."""
         half_thickness = 0.25
         vertices = []
-        faces = []
+        wall_faces = []
+        piston_faces = []
 
         for segment in self.curve_wall_segments:
             points = self.curve_marker_points(segment)
@@ -1570,14 +1574,15 @@ class GenericGenData:
             for index in range(len(segment_vertices) - 1):
                 outer_a, inner_a = segment_vertices[index]
                 outer_b, inner_b = segment_vertices[index + 1]
-                faces.append((outer_a, outer_b, inner_b))
-                faces.append((outer_a, inner_b, inner_a))
+                wall_faces.append((outer_a, outer_b, inner_b))
+                wall_faces.append((outer_a, inner_b, inner_a))
+
+        piston_faces.extend(self._append_piston_visual_obj(vertices))
 
         os.makedirs(os.path.dirname(self.obj_file_name), exist_ok=True)
         with open(self.obj_file_name, "w", encoding="ascii", newline="\n") as output:
             output.write("# Generated from function-wall curve_wall_segments.\n")
             output.write("# Dynamics use boundary particles; this mesh is visual only.\n")
-            output.write("o GeneratedFunctionWalls\n")
             for vertex_x, vertex_y, vertex_z in vertices:
                 output.write(
                     f"v {vertex_x:.9f} {vertex_y:.9f} {vertex_z:.9f}\n"
@@ -1586,23 +1591,85 @@ class GenericGenData:
                 output.write("vt 0.0 0.0\n")
             output.write("vn 0.0 0.0 1.0\n")
             output.write("vn 0.0 0.0 -1.0\n")
-            for first, second, third in faces:
+            output.write("o GeneratedFunctionWalls\n")
+            for first, second, third in wall_faces:
                 output.write(
                     f"f {first}/{first}/1 {second}/{second}/1 {third}/{third}/1\n"
                 )
                 output.write(
                     f"f {third}/{third}/2 {second}/{second}/2 {first}/{first}/2\n"
                 )
+            if piston_faces:
+                output.write("o PistonVisual\n")
+                for first, second, third in piston_faces:
+                    output.write(
+                        f"f {first}/{first}/1 {second}/{second}/1 {third}/{third}/1\n"
+                    )
+                    output.write(
+                        f"f {third}/{third}/2 {second}/{second}/2 {first}/{first}/2\n"
+                    )
 
         report_text = (
             "Function wall OBJ report:\n"
             f"  file: {self.obj_file_name}\n"
             f"  vertices: {len(vertices)}\n"
-            f"  triangles: {2 * len(faces)}"
+            f"  wall triangles: {2 * len(wall_faces)}\n"
+            f"  piston visual triangles: {2 * len(piston_faces)}"
         )
         print(report_text)
         self.write_validation_log(report_text)
         return self.obj_file_name
+
+    def _append_piston_visual_obj(self, vertices):
+        piston_visual = self.itemcfg.get("piston_visual")
+        if (
+            not piston_visual
+            or not piston_visual.get("enabled", False)
+            or not piston_visual.get("write_to_obj", False)
+        ):
+            return []
+
+        x = float(getattr(self, "piston_x_start", piston_visual.get("x", 0.0)))
+        y_min = float(
+            piston_visual.get(
+                "y_min",
+                getattr(self, "packing_bounds", (0.0, 0.0, 0.0, 0.0))[2],
+            )
+        )
+        y_max = float(
+            piston_visual.get(
+                "y_max",
+                getattr(self, "packing_bounds", (0.0, 0.0, 0.0, 0.0))[3],
+            )
+        )
+        x_thickness = float(piston_visual.get("x_thickness", 1.0))
+        z = float(piston_visual.get("z", getattr(self, "particle_plane_z", 0.5)))
+        if y_min >= y_max:
+            raise ValueError("piston_visual.y_min must be less than y_max")
+        if x_thickness <= 0.0:
+            raise ValueError("piston_visual.x_thickness must be positive")
+
+        x_min = x - 0.5 * x_thickness
+        x_max = x + 0.5 * x_thickness
+        first_index = len(vertices) + 1
+        vertices.extend(
+            (
+                (x_min, y_min, z),
+                (x_max, y_min, z),
+                (x_max, y_max, z),
+                (x_min, y_max, z),
+            )
+        )
+        return [
+            (first_index, first_index + 1, first_index + 2),
+            (first_index, first_index + 2, first_index + 3),
+        ]
+
+    def generate_model_obj(self):
+        """Generate only the editable/visual model OBJ for the current config."""
+        self.validate_simulation_configuration()
+        self.configure_output_paths(delete_stale=False)
+        return self.write_function_wall_obj()
 
     def _lighting_ball_values(self):
         lighting_ball = self.itemcfg.get("Lighting_ball")

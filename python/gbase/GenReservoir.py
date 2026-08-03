@@ -615,6 +615,46 @@ class GenReservoir(GenericGenData):
             output.write(f"piston_velocity_x = {self.piston_velocity[0]:.9f};\n")
             output.write(f"piston_velocity_y = {self.piston_velocity[1]:.9f};\n")
             output.write(f"piston_velocity_z = {self.piston_velocity[2]:.9f};\n")
+            piston_visual = self.itemcfg.get("piston_visual")
+            if piston_visual and piston_visual.get("enabled", False):
+                head_color = piston_visual.get("head_color")
+                rod_color = piston_visual.get("rod_color")
+                output.write("piston_visual = {\n")
+                output.write("    enabled = true;\n")
+                output.write(
+                    f"    y_min = {float(piston_visual.get('y_min')):.9f};\n"
+                )
+                output.write(
+                    f"    y_max = {float(piston_visual.get('y_max')):.9f};\n"
+                )
+                output.write(
+                    "    head_length = "
+                    f"{float(piston_visual.get('head_length', piston_visual.get('x_thickness', 1.0))):.9f};\n"
+                )
+                output.write(
+                    f"    rod_length = {float(piston_visual.get('rod_length')):.9f};\n"
+                )
+                output.write(
+                    f"    rod_height = {float(piston_visual.get('rod_height')):.9f};\n"
+                )
+                output.write(f"    z = {float(piston_visual.get('z')):.9f};\n")
+                output.write(
+                    "    head_color = {"
+                    f"red = {float(head_color.get('red')):.9f}; "
+                    f"green = {float(head_color.get('green')):.9f}; "
+                    f"blue = {float(head_color.get('blue')):.9f}; "
+                    f"alpha = {float(head_color.get('alpha')):.9f};"
+                    "};\n"
+                )
+                output.write(
+                    "    rod_color = {"
+                    f"red = {float(rod_color.get('red')):.9f}; "
+                    f"green = {float(rod_color.get('green')):.9f}; "
+                    f"blue = {float(rod_color.get('blue')):.9f}; "
+                    f"alpha = {float(rod_color.get('alpha')):.9f};"
+                    "};\n"
+                )
+                output.write("};\n")
         return test_file_name
 
     def runner(self):
