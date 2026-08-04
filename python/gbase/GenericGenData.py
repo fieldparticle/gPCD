@@ -31,6 +31,8 @@ from gbase.MaterialProperties import (
     parse_contact_illumination,
     parse_color_map,
     parse_material_color,
+    parse_material_point_size,
+    parse_capture_angles,
     parse_particle_type,
     parse_photon_surface_behavior,
     parse_photon_life_time,
@@ -321,6 +323,17 @@ class GenericGenData:
                     color_map = parse_color_map(raw_material.get("color_map"))
                 except (TypeError, ValueError) as exc:
                     errors.append(f"{context}.color_map is invalid: {exc}")
+            point_size = None
+            if raw_material.get("point_size") is not None:
+                try:
+                    point_size = parse_material_point_size(raw_material.get("point_size"))
+                except (TypeError, ValueError) as exc:
+                    errors.append(f"{context}.point_size is invalid: {exc}")
+            capture_angles = ()
+            try:
+                capture_angles = parse_capture_angles(raw_material)
+            except (TypeError, ValueError) as exc:
+                errors.append(f"{context}.capture_angle is invalid: {exc}")
             color = None
             if color_mode is not None:
                 try:
@@ -330,6 +343,22 @@ class GenericGenData:
                     )
                 except (TypeError, ValueError) as exc:
                     errors.append(f"{context}.color is invalid: {exc}")
+            collision_color = None
+            try:
+                collision_color = parse_material_color(
+                    raw_material.get("collision_color", (1.0, 0.0, 0.0, 1.0)),
+                    self.COLOR_MODE_SOLID,
+                )
+            except (TypeError, ValueError) as exc:
+                errors.append(f"{context}.collision_color is invalid: {exc}")
+            non_collision_color = None
+            try:
+                non_collision_color = parse_material_color(
+                    raw_material.get("non_collision_color", (0.0, 1.0, 0.0, 1.0)),
+                    self.COLOR_MODE_SOLID,
+                )
+            except (TypeError, ValueError) as exc:
+                errors.append(f"{context}.non_collision_color is invalid: {exc}")
 
             try:
                 debug_visible = parse_debug_visible(
@@ -448,6 +477,8 @@ class GenericGenData:
                 and cell_density is not None
                 and color_mode is not None
                 and color is not None
+                and collision_color is not None
+                and non_collision_color is not None
                 and particle_type is not None
                 and debug_visible is not None
                 and debug_color is not None
@@ -468,6 +499,9 @@ class GenericGenData:
                         "thermal_velocity": thermal_velocity,
                         "color_mode": color_mode,
                         "color": color,
+                        "capture_angles": capture_angles,
+                        "collision_color": collision_color,
+                        "non_collision_color": non_collision_color,
                         "debug_visible": debug_visible,
                         "debug_color": debug_color,
                         "spectral_response": spectral_response,
@@ -482,6 +516,8 @@ class GenericGenData:
                 )
                 if color_map is not None:
                     materials[-1]["color_map"] = color_map
+                if point_size is not None:
+                    materials[-1]["point_size"] = point_size
 
         if material_count == 0:
             errors.append("material_properties must not be empty")

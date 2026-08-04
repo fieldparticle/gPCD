@@ -1,12 +1,13 @@
 Current status:
-    - CDNozzle reservoir particles now use a particle_streams material path.
-    - color_mode and color_map are split so CDNozzle can select velocity-angle data and an HSV palette independently.
-    - color_map is optional and application-specific, so LightingBall and older material configs keep their existing behavior.
+    - CDNozzle reservoir authoring now uses a stream-owned velocity contract.
+    - Material display diagnostics now support point size, collision colors, and HSV capture-angle masks.
 
 Code Changes:
-    - Added CDNozzle reservoir stream documentation for material_id, radius, separation, and initial velocity.
-    - Documented that piston_velocity, piston_start_frame, death_bounds, and particle_plane_z remain global reservoir fields.
-    - Documented Vulkan MaterialProperty.colorMap and the value_from_color_mode/color_from_color_map shader split.
-    - Added problem-evolution notes for CDNozzle stream material assignment and the material display split.
+    - Documented stream_velocity as the active CDNozzle reservoir velocity field.
+    - Documented piston velocity as generated from the reservoir stream for Vulkan compatibility.
+    - Documented material-owned point_size, collision_color, non_collision_color, and capture_angleN fields.
+    - Documented Vulkan shader material fields for capture angle masks and display diagnostics.
 
-Next: Commit this checkpoint after confirming the clean test run covers CDNozzle GenData and Vulkan shader generation.
+Next:
+    - Regenerate CDNozzle data and rebuild Vulkan shaders.
+    - Test CDNozzle_Vk with material 0 when validating HSV capture-angle output.

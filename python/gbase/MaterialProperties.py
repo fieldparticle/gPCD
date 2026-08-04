@@ -1,4 +1,5 @@
 import math
+import re
 
 
 COLOR_MODE_COLLISION = 0
@@ -127,6 +128,64 @@ def parse_color_map(raw_value):
     return color_map
 
 
+def parse_material_point_size(raw_value):
+    if raw_value is None:
+        return None
+    point_size = float(raw_value)
+    if not math.isfinite(point_size) or point_size <= 0.0:
+        raise ValueError("point_size must be a positive finite number")
+    return point_size
+
+
+def _material_keys(material):
+    if hasattr(material, "keys"):
+        return list(material.keys())
+    if hasattr(material, "__dict__"):
+        return list(vars(material).keys())
+    return []
+
+
+def parse_capture_angles(material):
+    raw_capture_angles = _material_get(material, "capture_angles", None)
+    indexed_angles = []
+
+    if raw_capture_angles is not None:
+        for index, raw_angle in enumerate(raw_capture_angles):
+            indexed_angles.append((index, raw_angle))
+
+    seen_numbered_keys = set()
+    for key in _material_keys(material):
+        match = re.fullmatch(r"capture_angle(\d+)", str(key))
+        if match is None:
+            continue
+        capture_index = int(match.group(1))
+        seen_numbered_keys.add(capture_index)
+        indexed_angles.append((capture_index, _material_get(material, key, None)))
+
+    for capture_index in range(128):
+        if capture_index in seen_numbered_keys:
+            continue
+        key = f"capture_angle{capture_index}"
+        raw_angle = _material_get(material, key, None)
+        if raw_angle is not None:
+            indexed_angles.append((capture_index, raw_angle))
+
+    capture_angles = []
+    for _index, raw_angle in sorted(indexed_angles, key=lambda item: item[0]):
+        if raw_angle is None or len(raw_angle) != 3:
+            raise ValueError("capture_angle values must contain exactly 3 values")
+        center = float(raw_angle[0])
+        plus_range = float(raw_angle[1])
+        minus_range = float(raw_angle[2])
+        if not all(math.isfinite(value) for value in (center, plus_range, minus_range)):
+            raise ValueError("capture_angle values must be finite")
+        if plus_range < 0.0 or minus_range < 0.0:
+            raise ValueError("capture_angle ranges must not be negative")
+        capture_angles.append((center, plus_range, minus_range))
+
+    return tuple(capture_angles)
+
+
 def default_color_for_mode(color_mode):
     return DEFAULT_COLOR_BY_MODE.get(int(color_mode), (1.0, 1.0, 1.0, 1.0))
 
@@ -212,6 +271,8 @@ DEFAULT_MATERIAL_PROPERTIES = (
         "thermal_velocity": 0.0,
         "color_mode": COLOR_MODE_VELOCITY_ANGLE,
         "color": default_color_for_mode(COLOR_MODE_VELOCITY_ANGLE),
+        "collision_color": (1.0, 0.0, 0.0, 1.0),
+        "non_collision_color": (0.0, 1.0, 0.0, 1.0),
         "debug_visible": False,
         "debug_color": (1.0, 1.0, 1.0, 1.0),
         "spectral_response": (1.0, 1.0, 1.0),
@@ -252,7 +313,19 @@ def normalized_material_properties(source=None):
             )
         )
         color_map = parse_color_map(_material_get(raw_material, "color_map", None))
+        point_size = parse_material_point_size(
+            _material_get(raw_material, "point_size", None)
+        )
+        capture_angles = parse_capture_angles(raw_material)
         color = parse_material_color(_material_get(raw_material, "color", None), color_mode)
+        collision_color = parse_material_color(
+            _material_get(raw_material, "collision_color", (1.0, 0.0, 0.0, 1.0)),
+            COLOR_MODE_SOLID,
+        )
+        non_collision_color = parse_material_color(
+            _material_get(raw_material, "non_collision_color", (0.0, 1.0, 0.0, 1.0)),
+            COLOR_MODE_SOLID,
+        )
         debug_visible = parse_debug_visible(
             _material_get(raw_material, "debug_visible", False)
         )
@@ -339,6 +412,9 @@ def normalized_material_properties(source=None):
                 "thermal_velocity": thermal_velocity,
                 "color_mode": color_mode,
                 "color": color,
+                "capture_angles": capture_angles,
+                "collision_color": collision_color,
+                "non_collision_color": non_collision_color,
                 "debug_visible": debug_visible,
                 "debug_color": debug_color,
                 "spectral_response": spectral_response,
@@ -353,6 +429,8 @@ def normalized_material_properties(source=None):
         )
         if color_map is not None:
             materials[-1]["color_map"] = color_map
+        if point_size is not None:
+            materials[-1]["point_size"] = point_size
 
     return sorted(materials, key=lambda material: int(material["material_id"]))
 
@@ -424,12 +502,43 @@ def write_material_properties(output, source=None):
         output.write(f"        color_mode = {int(material['color_mode'])};\n")
         if material.get("color_map") is not None:
             output.write(f"        color_map = {int(material['color_map'])};\n")
+        if material.get("point_size") is not None:
+            output.write(f"        point_size = {float(material['point_size']):.9f};\n")
+        capture_angles = material.get("capture_angles", ())
+        if capture_angles:
+            output.write("        capture_angles = (\n")
+            for capture_index, capture_angle in enumerate(capture_angles):
+                capture_separator = "," if capture_index + 1 < len(capture_angles) else ""
+                output.write(
+                    "            "
+                    f"[{float(capture_angle[0]):.9f}, "
+                    f"{float(capture_angle[1]):.9f}, "
+                    f"{float(capture_angle[2]):.9f}]"
+                    f"{capture_separator}\n"
+                )
+            output.write("        );\n")
         output.write(
             "        color = "
             f"[{float(material['color'][0]):.9f}, "
             f"{float(material['color'][1]):.9f}, "
             f"{float(material['color'][2]):.9f}, "
             f"{float(material['color'][3]):.9f}];\n"
+        )
+        collision_color = material.get("collision_color", (1.0, 0.0, 0.0, 1.0))
+        output.write(
+            "        collision_color = "
+            f"[{float(collision_color[0]):.9f}, "
+            f"{float(collision_color[1]):.9f}, "
+            f"{float(collision_color[2]):.9f}, "
+            f"{float(collision_color[3]):.9f}];\n"
+        )
+        non_collision_color = material.get("non_collision_color", (0.0, 1.0, 0.0, 1.0))
+        output.write(
+            "        non_collision_color = "
+            f"[{float(non_collision_color[0]):.9f}, "
+            f"{float(non_collision_color[1]):.9f}, "
+            f"{float(non_collision_color[2]):.9f}, "
+            f"{float(non_collision_color[3]):.9f}];\n"
         )
         output.write(
             "        debug_visible = "

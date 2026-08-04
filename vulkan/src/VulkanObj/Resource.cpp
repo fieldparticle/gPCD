@@ -160,7 +160,7 @@ void Resource::GeneralViewing(uint32_t CurrentBuffer)
 		pythonView.x += rRotX;
 		pythonView.y += rRotY;
 		pythonView.z += rRotZ;
-		float pythonZoom = LookupFloatStrict(CfgTst, "zoom");
+		float pythonZoom = ZoomX;
 		if (pythonZoom <= 0.0f)
 			throw std::runtime_error("zoom must be greater than zero");
 		glm::vec2 viewPan(0.0f);

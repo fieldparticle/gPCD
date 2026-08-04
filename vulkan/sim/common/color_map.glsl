@@ -8,13 +8,20 @@ vec3 hsv2rgb(in vec3 hsv);
 vec3 colorizeVelocity(float v_ang, float sat, float val);
 uint material_color_mode(uint materialID);
 uint material_color_map(uint materialID);
+float material_point_size(uint materialID);
+uint material_capture_angle_offset(uint materialID);
+uint material_capture_angle_count(uint materialID);
 vec4 material_color(uint materialID);
+vec4 material_collision_color(uint materialID);
+vec4 material_non_collision_color(uint materialID);
 uint material_debug_visible(uint materialID);
 vec4 material_debug_color(uint materialID);
 bool color_map_is_photon(uint index);
 vec4 lumens_color(uint index, vec4 baseColor);
-vec4 value_from_color_mode(uint index, uint colorMode, vec4 baseColor);
-vec4 color_from_color_map(vec4 value, uint colorMap, vec4 baseColor);
+vec4 value_from_color_mode(uint index, uint materialID, uint colorMode, vec4 baseColor);
+bool capture_angle_matches(uint materialID, float angle);
+float signed_angle_delta(float angle, float center);
+vec4 color_from_color_map(vec4 value, uint materialID, uint colorMode, uint colorMap, vec4 baseColor);
 
 vec4 color_map(uint index)
 {
@@ -24,8 +31,8 @@ vec4 color_map(uint index)
     uint colorMode = material_color_mode(materialID);
     uint colorMap = material_color_map(materialID);
     vec4 baseColor = material_color(materialID);
-    vec4 value = value_from_color_mode(index, colorMode, baseColor);
-    return color_from_color_map(value, colorMap, baseColor);
+    vec4 value = value_from_color_mode(index, materialID, colorMode, baseColor);
+    return color_from_color_map(value, materialID, colorMode, colorMap, baseColor);
 
 }
 
@@ -57,6 +64,39 @@ uint material_color_map(uint materialID)
     return COLOR_MAP_SOLID;
 }
 
+float material_point_size(uint materialID)
+{
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return max(MATERIAL_PROPERTIES[ii].pointSize, 1.0);
+    }
+
+    return max(point_size, 1.0);
+}
+
+uint material_capture_angle_offset(uint materialID)
+{
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].captureAngleOffset;
+    }
+
+    return 0u;
+}
+
+uint material_capture_angle_count(uint materialID)
+{
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].captureAngleCount;
+    }
+
+    return 0u;
+}
+
 vec4 material_color(uint materialID)
 {
     for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
@@ -66,6 +106,28 @@ vec4 material_color(uint materialID)
     }
 
     return vec4(1.0, 1.0, 1.0, 1.0);
+}
+
+vec4 material_collision_color(uint materialID)
+{
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].collisionColor;
+    }
+
+    return vec4(1.0, 0.0, 0.0, 1.0);
+}
+
+vec4 material_non_collision_color(uint materialID)
+{
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].nonCollisionColor;
+    }
+
+    return vec4(0.0, 1.0, 0.0, 1.0);
 }
 
 uint material_debug_visible(uint materialID)
@@ -104,7 +166,7 @@ vec4 lumens_color(uint index, vec4 baseColor)
     return material_color(materialID);
 }
 
-vec4 value_from_color_mode(uint index, uint colorMode, vec4 baseColor)
+vec4 value_from_color_mode(uint index, uint materialID, uint colorMode, vec4 baseColor)
 {
     if (colorMode == COLOR_MODE_VELOCITY_ANGLE)
     {
@@ -117,8 +179,8 @@ vec4 value_from_color_mode(uint index, uint colorMode, vec4 baseColor)
     if (colorMode == COLOR_MODE_COLLISION)
     {
         if (uint(P[index].colFlg) == 1u)
-            return vec4(colcolor, 1.0);
-        return vec4(ncolcolor, 1.0);
+            return material_collision_color(materialID);
+        return material_non_collision_color(materialID);
     }
 
     if (colorMode == COLOR_MODE_SOLID)
@@ -130,12 +192,45 @@ vec4 value_from_color_mode(uint index, uint colorMode, vec4 baseColor)
     return vec4(1.0, 1.0, 1.0, 1.0);
 }
 
-vec4 color_from_color_map(vec4 value, uint colorMap, vec4 baseColor)
+float signed_angle_delta(float angle, float center)
+{
+    const float TWO_PI = 6.28318530718;
+    return mod(angle - center + 3.14159265359, TWO_PI) - 3.14159265359;
+}
+
+bool capture_angle_matches(uint materialID, float angle)
+{
+    uint captureCount = material_capture_angle_count(materialID);
+    uint captureOffset = material_capture_angle_offset(materialID);
+    for (uint ii = 0u; ii < captureCount; ++ii)
+    {
+        uint captureIndex = captureOffset + ii;
+        if (captureIndex >= CAPTURE_ANGLE_COUNT)
+            break;
+        float delta = signed_angle_delta(angle, CAPTURE_ANGLES[captureIndex].center);
+        if (delta >= 0.0 && delta <= CAPTURE_ANGLES[captureIndex].plusRange)
+            return true;
+        if (delta < 0.0 && -delta <= CAPTURE_ANGLES[captureIndex].minusRange)
+            return true;
+    }
+
+    return false;
+}
+
+vec4 color_from_color_map(vec4 value, uint materialID, uint colorMode, uint colorMap, vec4 baseColor)
 {
     float scalar = clamp(value.x, 0.0, 1.0);
 
     if (colorMap == COLOR_MAP_HSV)
     {
+        if (
+            colorMode == COLOR_MODE_VELOCITY_ANGLE &&
+            material_capture_angle_count(materialID) > 0u &&
+            !capture_angle_matches(materialID, value.x)
+        )
+        {
+            return vec4(0.0, 0.0, 0.0, value.a);
+        }
         return vec4(
             colorizeVelocity(
                 scalar,

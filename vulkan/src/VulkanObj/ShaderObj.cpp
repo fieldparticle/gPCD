@@ -762,7 +762,12 @@ void ShaderObj::WriteMaterials()
 	ostrm << "    float tempVel;\n";
 	ostrm << "    uint colorMode;\n";
 	ostrm << "    uint colorMap;\n";
+	ostrm << "    float pointSize;\n";
+	ostrm << "    uint captureAngleOffset;\n";
+	ostrm << "    uint captureAngleCount;\n";
 	ostrm << "    vec4 color;\n";
+	ostrm << "    vec4 collisionColor;\n";
+	ostrm << "    vec4 nonCollisionColor;\n";
 	ostrm << "    uint debugVisible;\n";
 	ostrm << "    vec4 debugColor;\n";
 	ostrm << "    vec4 spectralResponseEnergy;\n";
@@ -777,6 +782,19 @@ void ShaderObj::WriteMaterials()
 
 	int materialCount = 0;
 	config_setting_t* materialList = nullptr;
+	struct CaptureAngleRecord
+	{
+		double centerRadians;
+		double plusRadians;
+		double minusRadians;
+	};
+	std::vector<CaptureAngleRecord> captureAngleRecords;
+	const double degreeToRadians = 0.017453292519943295;
+	double defaultPointSize = CfgTst->CheckKey("gl_point_size")
+		? CfgTst->GetFloat("gl_point_size", true)
+		: 3.0;
+	if (defaultPointSize <= 0.0)
+		throw std::runtime_error("gl_point_size must be positive");
 
 	if (CfgTst->CheckKey("material_properties"))
 		materialList = CfgTst->StartStructure("material_properties", materialCount);
@@ -785,7 +803,9 @@ void ShaderObj::WriteMaterials()
 	{
 		ostrm << "const uint MATERIAL_PROPERTY_COUNT = 1u;\n";
 		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](\n";
-		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, COLOR_MAP_HSV, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, PHOTON_SURFACE_BEHAVIOR_NONE, 0u, CONTACT_ILLUMINATION_MAX, 0.000000000)\n";
+		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, COLOR_MAP_HSV, "
+			<< std::fixed << std::setprecision(9) << defaultPointSize
+			<< ", 0u, 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 0.000000000, 0.000000000, 1.000000000), vec4(0.000000000, 1.000000000, 0.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, PHOTON_SURFACE_BEHAVIOR_NONE, 0u, CONTACT_ILLUMINATION_MAX, 0.000000000)\n";
 		ostrm << ");\n\n";
 	}
 	else
@@ -808,6 +828,9 @@ void ShaderObj::WriteMaterials()
 			int colorMode = 0;
 			int colorMap = 0;
 			int particleType = 0;
+			double pointSize = defaultPointSize;
+			uint32_t captureAngleOffset = 0u;
+			uint32_t captureAngleCount = 0u;
 			double relativeMass = 1.0;
 			double tempVel = 0.0;
 			double cellDensity = 0.0;
@@ -815,6 +838,14 @@ void ShaderObj::WriteMaterials()
 			double colorGreen = 1.0;
 			double colorBlue = 1.0;
 			double colorAlpha = 1.0;
+			double collisionRed = 1.0;
+			double collisionGreen = 0.0;
+			double collisionBlue = 0.0;
+			double collisionAlpha = 1.0;
+			double nonCollisionRed = 0.0;
+			double nonCollisionGreen = 1.0;
+			double nonCollisionBlue = 0.0;
+			double nonCollisionAlpha = 1.0;
 			int debugVisible = 0;
 			double debugRed = 1.0;
 			double debugGreen = 1.0;
@@ -860,6 +891,35 @@ void ShaderObj::WriteMaterials()
 			}
 			if (colorMap < 0 || colorMap > 3)
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].color_map is outside the valid range");
+			if (config_setting_lookup_float(material, "point_size", &pointSize) == CONFIG_FALSE)
+				pointSize = defaultPointSize;
+			if (pointSize <= 0.0)
+				throw std::runtime_error("material_properties[" + std::to_string(index) + "].point_size must be positive");
+
+			captureAngleOffset = static_cast<uint32_t>(captureAngleRecords.size());
+			config_setting_t* captureAngles = config_setting_lookup(material, "capture_angles");
+			if (captureAngles != nullptr)
+			{
+				captureAngleCount = static_cast<uint32_t>(config_setting_length(captureAngles));
+				for (uint32_t captureIndex = 0u; captureIndex < captureAngleCount; ++captureIndex)
+				{
+					config_setting_t* captureAngle = config_setting_get_elem(captureAngles, static_cast<unsigned int>(captureIndex));
+					if (captureAngle == nullptr || config_setting_length(captureAngle) != 3)
+						throw std::runtime_error("material_properties[" + std::to_string(index) + "].capture_angles entries must contain 3 values");
+					double centerDegrees = config_setting_get_float_elem(captureAngle, 0);
+					double plusDegrees = config_setting_get_float_elem(captureAngle, 1);
+					double minusDegrees = config_setting_get_float_elem(captureAngle, 2);
+					if (plusDegrees < 0.0 || minusDegrees < 0.0)
+						throw std::runtime_error("material_properties[" + std::to_string(index) + "].capture_angles ranges must not be negative");
+					captureAngleRecords.push_back(
+						{
+							centerDegrees * degreeToRadians,
+							plusDegrees * degreeToRadians,
+							minusDegrees * degreeToRadians
+						}
+					);
+				}
+			}
 
 			config_setting_t* color = config_setting_lookup(material, "color");
 			if (color != nullptr)
@@ -874,6 +934,23 @@ void ShaderObj::WriteMaterials()
 				if (colorLength == 4)
 					colorAlpha = config_setting_get_float_elem(color, 3);
 			}
+
+			auto readOptionalRGBA = [&](const char* key, double& red, double& green, double& blue, double& alpha)
+			{
+				config_setting_t* rgba = config_setting_lookup(material, key);
+				if (rgba == nullptr)
+					return;
+				int colorLength = config_setting_length(rgba);
+				if (colorLength != 3 && colorLength != 4)
+					throw std::runtime_error("material_properties[" + std::to_string(index) + "]." + key + " must contain 3 or 4 values");
+				red = config_setting_get_float_elem(rgba, 0);
+				green = config_setting_get_float_elem(rgba, 1);
+				blue = config_setting_get_float_elem(rgba, 2);
+				if (colorLength == 4)
+					alpha = config_setting_get_float_elem(rgba, 3);
+			};
+			readOptionalRGBA("collision_color", collisionRed, collisionGreen, collisionBlue, collisionAlpha);
+			readOptionalRGBA("non_collision_color", nonCollisionRed, nonCollisionGreen, nonCollisionBlue, nonCollisionAlpha);
 
 			config_setting_t* debugVisibleSetting = config_setting_lookup(material, "debug_visible");
 			if (debugVisibleSetting != nullptr)
@@ -952,11 +1029,24 @@ void ShaderObj::WriteMaterials()
 				<< std::fixed << std::setprecision(9) << tempVel << ", "
 				<< colorMode << "u, "
 				<< colorMap << "u, "
+				<< std::fixed << std::setprecision(9) << pointSize << ", "
+				<< captureAngleOffset << "u, "
+				<< captureAngleCount << "u, "
 				<< "vec4("
 				<< std::fixed << std::setprecision(9) << colorRed << ", "
 				<< std::fixed << std::setprecision(9) << colorGreen << ", "
 				<< std::fixed << std::setprecision(9) << colorBlue << ", "
 				<< std::fixed << std::setprecision(9) << colorAlpha << "), "
+				<< "vec4("
+				<< std::fixed << std::setprecision(9) << collisionRed << ", "
+				<< std::fixed << std::setprecision(9) << collisionGreen << ", "
+				<< std::fixed << std::setprecision(9) << collisionBlue << ", "
+				<< std::fixed << std::setprecision(9) << collisionAlpha << "), "
+				<< "vec4("
+				<< std::fixed << std::setprecision(9) << nonCollisionRed << ", "
+				<< std::fixed << std::setprecision(9) << nonCollisionGreen << ", "
+				<< std::fixed << std::setprecision(9) << nonCollisionBlue << ", "
+				<< std::fixed << std::setprecision(9) << nonCollisionAlpha << "), "
 				<< (debugVisible ? "1u" : "0u") << ", "
 				<< "vec4("
 				<< std::fixed << std::setprecision(9) << debugRed << ", "
@@ -986,6 +1076,38 @@ void ShaderObj::WriteMaterials()
 			ostrm << "\n";
 		}
 
+		ostrm << ");\n\n";
+	}
+
+
+	ostrm << "struct CaptureAngle\n";
+	ostrm << "{\n";
+	ostrm << "    float center;\n";
+	ostrm << "    float plusRange;\n";
+	ostrm << "    float minusRange;\n";
+	ostrm << "};\n\n";
+	ostrm << "const uint CAPTURE_ANGLE_COUNT = " << captureAngleRecords.size() << "u;\n";
+	if (captureAngleRecords.empty())
+	{
+		ostrm << "const CaptureAngle CAPTURE_ANGLES[1] = CaptureAngle[1](\n";
+		ostrm << "    CaptureAngle(0.000000000, 0.000000000, 0.000000000)\n";
+		ostrm << ");\n\n";
+	}
+	else
+	{
+		ostrm << "const CaptureAngle CAPTURE_ANGLES[" << captureAngleRecords.size() << "] = CaptureAngle["
+			<< captureAngleRecords.size() << "](\n";
+		for (size_t captureIndex = 0; captureIndex < captureAngleRecords.size(); ++captureIndex)
+		{
+			const CaptureAngleRecord& captureAngle = captureAngleRecords[captureIndex];
+			ostrm << "    CaptureAngle("
+				<< std::fixed << std::setprecision(9) << captureAngle.centerRadians << ", "
+				<< std::fixed << std::setprecision(9) << captureAngle.plusRadians << ", "
+				<< std::fixed << std::setprecision(9) << captureAngle.minusRadians << ")";
+			if (captureIndex + 1 < captureAngleRecords.size())
+				ostrm << ",";
+			ostrm << "\n";
+		}
 		ostrm << ");\n\n";
 	}
 

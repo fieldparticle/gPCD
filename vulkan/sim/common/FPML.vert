@@ -34,7 +34,7 @@ void fpml_vert_main(){
 	
 	
 	// Set point size 
-	gl_PointSize = point_size;
+	gl_PointSize = material_point_size(uint(round(P[index].material_id)));
 	if(uint(ShaderFlags.frameNum) == 0u)
 	{
 		gl_Position = vec4(0.0, 0.0, 0.0, 1.0);

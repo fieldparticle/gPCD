@@ -34,17 +34,17 @@ zoom							= 5.5;
 
 
 // Required for Python plotter: axis limits for the particle preview.
-x_axis_lims 			= [0.0, 170.0];
+x_axis_lims 			= [0.0, 470.0];
 y_axis_lims 			= [10.0,40.0];
 z_axis_lims 			= [0.75,1.25];
 
 
 // Required: explicit cell counts for the cell-array domain.
-cell_array_width 		= 200;
+cell_array_width 		= 500;
 cell_array_height 		= 40;
 cell_array_depth 		= 5;
 
-view_center 			= [150, 25, 2];
+view_center 			= [450, 25, 2];
 
 // Frame when the piston begins moving.
 piston_start_frame 		= 20;
@@ -57,20 +57,18 @@ piston_start_frame 		= 20;
 //];
 
 death_bounds 			= [
-							1, 198,
+							1, 498,
 							12, 38,
 							0, 4
 							];
 
-piston_velocity 			= [ 0.5, 0.0, 0.0 ];
-
 particle_streams = (
   {
     name 						= "reservoir_substance";
-    material_id 				= 0;
+    material_id 				= 3;
     radius 						= 0.15;
     particle_separation_distance = 0.0005;
-    initial_particle_velocity 	= [ 0.5, 0.0, 0.0 ];
+    stream_velocity 			= [ 0.09, 0.0, 0.0 ];
   }
 );
 
@@ -106,7 +104,7 @@ curve_wall_segments = {
             wall3 = {
                 boundary_kind 	= "reservoir";
                 u_start 		= 2;
-                length 			= 100;
+                length 			= 400;
                 f_start 		= 15;
                 a1 				= 0;
                 a2 				= 0;
@@ -157,7 +155,7 @@ curve_wall_segments = {
             wall4 = {
                 boundary_kind = "reservoir";
                 u_start 		= 2;
-                length 			= 100;
+                length 			= 400;
                 f_start 		= 35;
                 a1 				= 0;
                 a2 				= 0;

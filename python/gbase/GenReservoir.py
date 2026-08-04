@@ -163,10 +163,12 @@ class GenReservoir(GenericGenData):
                             context,
                             "particle_separation_distance",
                         ),
-                        "initial_particle_velocity": stream_values(
+                        "stream_velocity": stream_values(
                             stream,
                             context,
-                            "initial_particle_velocity",
+                            "stream_velocity"
+                            if stream.get("stream_velocity") is not None
+                            else "initial_particle_velocity",
                             3,
                         ),
                     }
@@ -241,19 +243,17 @@ class GenReservoir(GenericGenData):
         death_bounds = required_values("death_bounds", 6)
         particle_plane_z = required_nonnegative_float("particle_plane_z")
         if reservoir_stream is None and not reservoir_streams_present:
-            initial_particle_velocity = required_values("initial_particle_velocity", 3)
+            stream_velocity = required_values("initial_particle_velocity", 3)
         elif reservoir_stream is None:
-            initial_particle_velocity = ()
+            stream_velocity = ()
         else:
-            initial_particle_velocity = reservoir_stream["initial_particle_velocity"]
+            stream_velocity = reservoir_stream["stream_velocity"]
 
         piston_enabled = optional_bool(
             "piston_enabled",
-            self.itemcfg.get("piston_velocity") is not None,
+            bool(stream_velocity),
         )
-        piston_velocity = (0.0, 0.0, 0.0)
-        if piston_enabled:
-            piston_velocity = required_values("piston_velocity", 3)
+        piston_velocity = stream_velocity if piston_enabled else (0.0, 0.0, 0.0)
 
         raw_segments = self.itemcfg.get("curve_wall_segments")
         curve_segments, curve_errors = parse_keyed_curve_wall_segments(raw_segments)
@@ -377,13 +377,13 @@ class GenReservoir(GenericGenData):
             if death_bounds and piston_x_start < death_bounds[0]:
                 errors.append("piston_x_start must fit inside death_bounds")
 
-        if initial_particle_velocity:
-            if not all(math.isfinite(value) for value in initial_particle_velocity):
-                errors.append("initial_particle_velocity values must be finite")
+        if stream_velocity:
+            if not all(math.isfinite(value) for value in stream_velocity):
+                errors.append("stream_velocity values must be finite")
 
         if piston_enabled and piston_velocity:
             if not all(math.isfinite(value) for value in piston_velocity):
-                errors.append("piston_velocity values must be finite")
+                errors.append("stream_velocity values must be finite")
 
         if death_bounds and len(dimensions) == 3:
             width, height, depth = dimensions
@@ -427,7 +427,8 @@ class GenReservoir(GenericGenData):
         self.piston_start_offset = piston_start_offset_value or 0.0
         self.piston_x_start = packing_bounds[0] - self.piston_start_offset
         self.piston_x_stop = packing_bounds[1]
-        self.initial_particle_velocity = initial_particle_velocity
+        self.stream_velocity = stream_velocity
+        self.initial_particle_velocity = stream_velocity
         self.piston_enabled = piston_enabled
         self.piston_velocity = piston_velocity
         self.particle_separation_distance = particle_separation_distance
@@ -513,15 +514,15 @@ class GenReservoir(GenericGenData):
             f"  particle count: {self.packing_particle_count}\n"
             f"  first center: {self.packing_first_center}\n"
             f"  last center: {self.packing_last_center}\n"
-            f"  initial particle velocity: {self.initial_particle_velocity}\n"
+            f"  stream velocity: {self.stream_velocity}\n"
             f"  piston enabled: {self.piston_enabled}\n"
-            f"  piston velocity: {self.piston_velocity}"
+            f"  piston follows stream velocity: {self.piston_velocity}"
         )
         return self.packing_particle_count
 
     def add_reservoir_mobile_particles(self):
         first_x, first_y, particle_z = self.packing_first_center
-        velocity = self.initial_particle_velocity
+        velocity = self.stream_velocity
 
         for column in range(self.packing_x_count):
             particle_x = first_x + column * self.particle_center_spacing
@@ -540,7 +541,7 @@ class GenReservoir(GenericGenData):
         report_text = (
             "Reservoir mobile-particle report:\n"
             f"  mobile particles: {self.number_active_particles}\n"
-            f"  velocity: {self.initial_particle_velocity}\n"
+            f"  stream velocity: {self.stream_velocity}\n"
             f"  first particle number: 1\n"
             f"  last particle number: {self.number_active_particles}"
         )

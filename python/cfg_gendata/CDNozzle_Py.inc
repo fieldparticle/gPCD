@@ -61,15 +61,13 @@ death_bounds = [
     0, 4
 ];
 
-piston_velocity = [ 0.05, 0.0, 0.0 ];
-
 particle_streams = (
   {
     name = "reservoir_substance";
-    material_id = 0;
+    material_id = 1;
     radius = 0.25;
     particle_separation_distance = 1.0;
-    initial_particle_velocity = [ 0.05, 0.0, 0.0 ];
+    stream_velocity = [ 0.05, 0.0, 0.0 ];
   }
 );
 

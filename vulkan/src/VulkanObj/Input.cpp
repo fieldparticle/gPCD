@@ -267,7 +267,12 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	//std::cout << "scrool:" << yoffset << "  " << yoffset << std::endl;
-		
-	ZoomX += static_cast<float>(yoffset)*0.1f;
+
+	float zoomScale = 1.0f + (static_cast<float>(yoffset) * 0.1f);
+	if (zoomScale < 0.1f)
+		zoomScale = 0.1f;
+	ZoomX *= zoomScale;
+	if (ZoomX < 0.01f)
+		ZoomX = 0.01f;
 	//std::cout << "scrool:" << xoffset << ":"<< yoffset << std::endl;
 }
