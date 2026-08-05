@@ -32,6 +32,7 @@
 
 
 #include "VulkanObj/VulkanApp.hpp"
+#include <string>
 
 
 void CommandParticleGraphics::RecordCommands( uint32_t imageIndex, uint32_t currentBuffer)
@@ -86,10 +87,15 @@ void CommandParticleGraphics::RecordCommands( uint32_t imageIndex, uint32_t curr
 	
 	//VkClearValue clearValues{};
 	//clearValues.color = { {1.0f, 1.0f, 1.0f, 1.0f} };
-	float clr_red = CfgApp->GetFloat("application.clear_color.red", true);
-	float clr_green = CfgApp->GetFloat("application.clear_color.green", true);
-	float clr_blue = CfgApp->GetFloat("application.clear_color.blue", true);
-	float clr_alpha = CfgApp->GetFloat("application.clear_color.red", true);
+	const bool useTestClearColor = CfgTst->CheckKey("clear_color");
+	const std::string clearColorPrefix = useTestClearColor
+		? "clear_color."
+		: "application.clear_color.";
+	ConfigObj* clearColorCfg = useTestClearColor ? CfgTst : CfgApp;
+	float clr_red = clearColorCfg->GetFloat(clearColorPrefix + "red", true);
+	float clr_green = clearColorCfg->GetFloat(clearColorPrefix + "green", true);
+	float clr_blue = clearColorCfg->GetFloat(clearColorPrefix + "blue", true);
+	float clr_alpha = clearColorCfg->GetFloat(clearColorPrefix + "alpha", true);
 	VkClearValue clearColor = { {{clr_red, clr_green, clr_blue, clr_alpha}} };
 	renderPassInfo.clearValueCount = 1;
 	renderPassInfo.pClearValues = &clearColor;

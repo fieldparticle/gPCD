@@ -90,7 +90,8 @@ piston_visual = {
 // Function wall format:
 //   -1 for lower walls where outward is below the conduit
 //    1 for upper walls where outward is above the conduit
-// Grouped curves inherit function, normal_sign, wall_flag, and material_id.
+// Grouped curves inherit function, normal_sign, wall_flag,
+// boundary_visual_material_id, and boundary_particle_material_id.
 // The first segment in each curve needs u_start, f_start, and length.
 // Later segments continue from the previous segment and only need length.
 // Boundary particles are cell-locality sentinels; they are not wall geometry.
@@ -99,6 +100,8 @@ curve_wall_segments = {
         function = "y_of_x";
         normal_sign = -1;
         wall_flag = 3;
+        boundary_visual_material_id = 5;
+        boundary_particle_material_id = 5;
         segments = {
             wall3 = {
                 boundary_kind = "reservoir";
@@ -143,6 +146,8 @@ curve_wall_segments = {
         function = "y_of_x";
         normal_sign = 1;
         wall_flag = 4;
+        boundary_visual_material_id = 5;
+        boundary_particle_material_id = 5;
         segments = {
             wall4 = {
                 boundary_kind = "reservoir";

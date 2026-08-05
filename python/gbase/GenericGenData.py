@@ -11,8 +11,10 @@ from gbase.FunctionWall import bounds as wall_bounds
 from gbase.FunctionWall import evaluate_wall_at_point
 from gbase.FunctionWall import parse_keyed_curve_wall_segments
 from gbase.FunctionWall import sample_points
+from gbase.FunctionWall import segment_values
 from gbase.MaterialProperties import (
     COLOR_MODE_COLLISION,
+    COLOR_MODE_INTERNAL_MOMENTUM,
     COLOR_MODE_LUMENS,
     COLOR_MODE_NAMES,
     COLOR_MODE_SOLID,
@@ -32,6 +34,7 @@ from gbase.MaterialProperties import (
     parse_color_map,
     parse_material_color,
     parse_material_point_size,
+    parse_momentum_span,
     parse_capture_angles,
     parse_particle_type,
     parse_photon_surface_behavior,
@@ -171,6 +174,7 @@ class GenericGenData:
     COLOR_MODE_VELOCITY_ANGLE = COLOR_MODE_VELOCITY_ANGLE
     COLOR_MODE_SOLID = COLOR_MODE_SOLID
     COLOR_MODE_LUMENS = COLOR_MODE_LUMENS
+    COLOR_MODE_INTERNAL_MOMENTUM = COLOR_MODE_INTERNAL_MOMENTUM
     COLOR_MODE_NAMES = COLOR_MODE_NAMES
     COLOR_MODE_VALUES = set(COLOR_MODE_NAMES.values())
     DEFAULT_MATERIAL_PROPERTIES = DEFAULT_MATERIAL_PROPERTIES
@@ -329,6 +333,15 @@ class GenericGenData:
                     point_size = parse_material_point_size(raw_material.get("point_size"))
                 except (TypeError, ValueError) as exc:
                     errors.append(f"{context}.point_size is invalid: {exc}")
+            start_mom = None
+            end_mom = None
+            try:
+                start_mom, end_mom = parse_momentum_span(
+                    raw_material.get("start_mom", 0.0),
+                    raw_material.get("end_mom", 1.0),
+                )
+            except (TypeError, ValueError) as exc:
+                errors.append(f"{context}.momentum span is invalid: {exc}")
             capture_angles = ()
             try:
                 capture_angles = parse_capture_angles(raw_material)
@@ -479,6 +492,8 @@ class GenericGenData:
                 and color is not None
                 and collision_color is not None
                 and non_collision_color is not None
+                and start_mom is not None
+                and end_mom is not None
                 and particle_type is not None
                 and debug_visible is not None
                 and debug_color is not None
@@ -499,6 +514,8 @@ class GenericGenData:
                         "thermal_velocity": thermal_velocity,
                         "color_mode": color_mode,
                         "color": color,
+                        "start_mom": start_mom,
+                        "end_mom": end_mom,
                         "capture_angles": capture_angles,
                         "collision_color": collision_color,
                         "non_collision_color": non_collision_color,
@@ -1404,7 +1421,7 @@ class GenericGenData:
 
         for segment in self.curve_wall_segments:
             wall_flag = int(round(segment[9]))
-            material_id = int(round(segment[10])) if len(segment) >= 11 else 0
+            material_id = int(round(segment_values(segment)[10]))
             points = self.curve_marker_points(segment)
             added_for_segment = 0
             for marker_x, marker_y in points:
@@ -1573,10 +1590,15 @@ class GenericGenData:
         """Write triangle ribbons sampled from function-wall paths."""
         half_thickness = 0.25
         vertices = []
+        vertex_colors = []
         wall_faces = []
         piston_faces = []
 
         for segment in self.curve_wall_segments:
+            boundary_visual_material_id = int(round(segment_values(segment)[11]))
+            boundary_visual_color = self._material_color_by_id(
+                boundary_visual_material_id
+            ) or (1.0, 1.0, 1.0, 1.0)
             points = self.curve_marker_points(segment)
             segment_vertices = []
 
@@ -1607,6 +1629,7 @@ class GenericGenData:
                         self.particle_plane_z,
                     )
                 )
+                vertex_colors.append(boundary_visual_color)
                 vertices.append(
                     (
                         point_x - half_thickness * normal_x,
@@ -1614,30 +1637,62 @@ class GenericGenData:
                         self.particle_plane_z,
                     )
                 )
+                vertex_colors.append(boundary_visual_color)
                 segment_vertices.append((first_index, first_index + 1))
 
             for index in range(len(segment_vertices) - 1):
                 outer_a, inner_a = segment_vertices[index]
                 outer_b, inner_b = segment_vertices[index + 1]
-                wall_faces.append((outer_a, outer_b, inner_b))
-                wall_faces.append((outer_a, inner_b, inner_a))
+                wall_faces.append(
+                    ((outer_a, outer_b, inner_b), boundary_visual_material_id)
+                )
+                wall_faces.append(
+                    ((outer_a, inner_b, inner_a), boundary_visual_material_id)
+                )
 
         piston_faces.extend(self._append_piston_visual_obj(vertices))
 
         os.makedirs(os.path.dirname(self.obj_file_name), exist_ok=True)
+        mtl_file_name = os.path.splitext(self.obj_file_name)[0] + ".mtl"
+        mtl_base_name = os.path.basename(mtl_file_name)
+        material_ids = sorted({material_id for _face, material_id in wall_faces})
+        with open(mtl_file_name, "w", encoding="ascii", newline="\n") as output:
+            output.write("# Generated from function-wall boundary_visual_material_id.\n")
+            for material_id in material_ids:
+                color = self._material_color_by_id(material_id) or (1.0, 1.0, 1.0, 1.0)
+                output.write(
+                    f"newmtl {self._material_name_for_obj('boundary', material_id)}\n"
+                )
+                output.write(
+                    f"Kd {color[0]:.9f} {color[1]:.9f} {color[2]:.9f}\n"
+                )
+                output.write(f"d {color[3]:.9f}\n")
         with open(self.obj_file_name, "w", encoding="ascii", newline="\n") as output:
             output.write("# Generated from function-wall curve_wall_segments.\n")
             output.write("# Dynamics use boundary particles; this mesh is visual only.\n")
-            for vertex_x, vertex_y, vertex_z in vertices:
+            output.write(f"mtllib {mtl_base_name}\n")
+            for vertex_index, (vertex_x, vertex_y, vertex_z) in enumerate(vertices):
+                color = (
+                    vertex_colors[vertex_index]
+                    if vertex_index < len(vertex_colors)
+                    else (1.0, 1.0, 1.0, 1.0)
+                )
                 output.write(
-                    f"v {vertex_x:.9f} {vertex_y:.9f} {vertex_z:.9f}\n"
+                    f"v {vertex_x:.9f} {vertex_y:.9f} {vertex_z:.9f} "
+                    f"{color[0]:.9f} {color[1]:.9f} {color[2]:.9f}\n"
                 )
             for _ in vertices:
                 output.write("vt 0.0 0.0\n")
             output.write("vn 0.0 0.0 1.0\n")
             output.write("vn 0.0 0.0 -1.0\n")
             output.write("o GeneratedFunctionWalls\n")
-            for first, second, third in wall_faces:
+            current_material_id = None
+            for (first, second, third), material_id in wall_faces:
+                if material_id != current_material_id:
+                    output.write(
+                        f"usemtl {self._material_name_for_obj('boundary', material_id)}\n"
+                    )
+                    current_material_id = material_id
                 output.write(
                     f"f {first}/{first}/1 {second}/{second}/1 {third}/{third}/1\n"
                 )
@@ -3542,6 +3597,28 @@ class GenericGenData:
                 f"{view_pan[0]:.9f}, "
                 f"{view_pan[1]:.9f}];\n"
             )
+            clear_color = self.itemcfg.get("clear_color")
+            if clear_color is not None:
+                try:
+                    clear_red = float(clear_color.get("red", 0.0))
+                    clear_green = float(clear_color.get("green", 0.0))
+                    clear_blue = float(clear_color.get("blue", 0.0))
+                    clear_alpha = float(clear_color.get("alpha", 1.0))
+                except (AttributeError, TypeError, ValueError) as exc:
+                    raise ValueError("clear_color must contain numeric red, green, blue, and alpha values") from exc
+                if not all(
+                    math.isfinite(value)
+                    for value in (clear_red, clear_green, clear_blue, clear_alpha)
+                ):
+                    raise ValueError("clear_color values must be finite")
+                output.write(
+                    "clear_color = {"
+                    f"red = {clear_red:.9f}; "
+                    f"green = {clear_green:.9f}; "
+                    f"blue = {clear_blue:.9f}; "
+                    f"alpha = {clear_alpha:.9f};"
+                    "};\n"
+                )
             gl_point_size = float(self.itemcfg.get("gl_point_size", 3.0))
             if not math.isfinite(gl_point_size) or gl_point_size <= 0.0:
                 raise ValueError("gl_point_size must be a positive finite number")
@@ -3809,8 +3886,8 @@ class GenericGenData:
                 "contact_force_measure = "
                 f'"{self.itemcfg.get("contact_force_measure", "depth")}";\n'
             )
-            output.write(f"hsv_sat = {float(self.itemcfg.hsv_sat):.9f};\n")
-            output.write(f"hsv_val = {float(self.itemcfg.hsv_val):.9f};\n")
+            output.write(f"hsv_sat = {float(self.itemcfg.get('hsv_sat', 1.0)):.9f};\n")
+            output.write(f"hsv_val = {float(self.itemcfg.get('hsv_val', 1.0)):.9f};\n")
             self.write_color_mode_defines(output)
             self.write_material_properties(output)
             self.write_boundary_space_lighting(output)

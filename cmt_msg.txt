@@ -1,13 +1,15 @@
 Current status:
-    - CDNozzle reservoir authoring now uses a stream-owned velocity contract.
-    - Material display diagnostics now support point size, collision colors, and HSV capture-angle masks.
+	- Added CDNozzle boundary material split between marker particles and visible OBJ geometry.
+	- Added OBJ vertex color support so generated boundary meshes can carry visual material color.
+	- Added INTERNAL_MOMENTUM / GRAY_LINEAR diagnostic display path and documented that stored momentum is not yet released back to velocity.
+	- Updated CDNozzle docs and ProblemEvolution with the approved boundary/material/internal-momentum state.
 
 Code Changes:
-    - Documented stream_velocity as the active CDNozzle reservoir velocity field.
-    - Documented piston velocity as generated from the reservoir stream for Vulkan compatibility.
-    - Documented material-owned point_size, collision_color, non_collision_color, and capture_angleN fields.
-    - Documented Vulkan shader material fields for capture angle masks and display diagnostics.
+	- Parse boundary_particle_material_id and boundary_visual_material_id with material_id fallback.
+	- Write generated boundary OBJ vertex RGB and MTL/usemtl material data.
+	- Extend Vulkan OBJ loading to read optional vertex RGB and feed CartVert.color.
+	- Switch boundary pipeline blending so opaque black boundaries render over white background.
+	- Accumulate contact impulse into parms.yzw for internal momentum diagnostics.
+	- Add material start_mom/end_mom and GRAY_LINEAR shader mapping.
 
-Next:
-    - Regenerate CDNozzle data and rebuild Vulkan shaders.
-    - Test CDNozzle_Vk with material 0 when validating HSV capture-angle output.
+Next: Define the physical release rule that converts stored internal momentum back into particle velocity.

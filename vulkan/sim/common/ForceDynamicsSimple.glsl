@@ -576,7 +576,9 @@ bool AccumulateContactForce(
         max(0.0, contact.penetrationDepth),
         P[SourceID].Data.x);
     float forceMagnitude = stiffness * max(0.0, contact.penetrationDepth);
-    totalForce -= forceMagnitude * contact.normal;
+    vec3 contactForce = -forceMagnitude * contact.normal;
+    P[SourceID].parms.yzw += contactForce * ShaderFlags.dt;
+    totalForce += contactForce;
     P[SourceID].colFlg = 1u;
     return true;
 }

@@ -18,12 +18,14 @@ bool loadOBJ(
 	const char * path, 
 	std::vector<glm::vec3> & out_vertices, 
 	std::vector<glm::vec2> & out_uvs,
-	std::vector<glm::vec3> & out_normals
+	std::vector<glm::vec3> & out_normals,
+	std::vector<glm::vec4>* out_colors
 ){
 	mout << "Loading OBJ file:" << path << ende;
 
 	std::vector<unsigned int> vertexIndices, uvIndices, normalIndices;
 	std::vector<glm::vec3> temp_vertices; 
+	std::vector<glm::vec4> temp_colors;
 	std::vector<glm::vec2> temp_uvs;
 	std::vector<glm::vec3> temp_normals;
 
@@ -46,8 +48,26 @@ bool loadOBJ(
 		
 		if ( strcmp( lineHeader, "v" ) == 0 ){
 			glm::vec3 vertex;
-			fscanf(file, "%f %f %f\n", &vertex.x, &vertex.y, &vertex.z );
+			glm::vec4 color(1.0f, 1.0f, 1.0f, 1.0f);
+			char lineBuffer[1000];
+			fgets(lineBuffer, 1000, file);
+			int matches = sscanf(
+				lineBuffer,
+				"%f %f %f %f %f %f",
+				&vertex.x,
+				&vertex.y,
+				&vertex.z,
+				&color.x,
+				&color.y,
+				&color.z);
+			if (matches != 3 && matches != 6)
+			{
+				mout << "OBJ vertex line can't be read" << ende;
+				fclose(file);
+				return false;
+			}
 			temp_vertices.push_back(vertex);
+			temp_colors.push_back(color);
 		}else if ( strcmp( lineHeader, "vt" ) == 0 ){
 			glm::vec2 uv;
 			fscanf(file, "%f %f\n", &uv.x, &uv.y );
@@ -93,6 +113,7 @@ bool loadOBJ(
 		
 		// Get the attributes thanks to the index
 		glm::vec3 vertex = temp_vertices[ vertexIndex-1 ];
+		glm::vec4 color = temp_colors[ vertexIndex-1 ];
 		glm::vec2 uv = temp_uvs[ uvIndex-1 ];
 		glm::vec3 normal = temp_normals[ normalIndex-1 ];
 		
@@ -100,6 +121,8 @@ bool loadOBJ(
 		out_vertices.push_back(vertex);
 		out_uvs     .push_back(uv);
 		out_normals .push_back(normal);
+		if (out_colors != nullptr)
+			out_colors->push_back(color);
 	
 	}
 	fclose(file);

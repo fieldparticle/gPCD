@@ -9,6 +9,8 @@ vec3 colorizeVelocity(float v_ang, float sat, float val);
 uint material_color_mode(uint materialID);
 uint material_color_map(uint materialID);
 float material_point_size(uint materialID);
+float material_start_mom(uint materialID);
+float material_end_mom(uint materialID);
 uint material_capture_angle_offset(uint materialID);
 uint material_capture_angle_count(uint materialID);
 vec4 material_color(uint materialID);
@@ -73,6 +75,28 @@ float material_point_size(uint materialID)
     }
 
     return max(point_size, 1.0);
+}
+
+float material_start_mom(uint materialID)
+{
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].startMom;
+    }
+
+    return 0.0;
+}
+
+float material_end_mom(uint materialID)
+{
+    for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii)
+    {
+        if (MATERIAL_PROPERTIES[ii].materialID == materialID)
+            return MATERIAL_PROPERTIES[ii].endMom;
+    }
+
+    return 1.0;
 }
 
 uint material_capture_angle_offset(uint materialID)
@@ -189,6 +213,9 @@ vec4 value_from_color_mode(uint index, uint materialID, uint colorMode, vec4 bas
     if (colorMode == COLOR_MODE_LUMENS)
         return lumens_color(index, baseColor);
 
+    if (colorMode == COLOR_MODE_INTERNAL_MOMENTUM)
+        return vec4(length(P[index].parms.yzw), 0.0, 0.0, baseColor.a);
+
     return vec4(1.0, 1.0, 1.0, 1.0);
 }
 
@@ -249,6 +276,18 @@ vec4 color_from_color_map(vec4 value, uint materialID, uint colorMode, uint colo
 
     if (colorMap == COLOR_MAP_SOLID)
         return value;
+
+    if (colorMap == COLOR_MAP_GRAY_LINEAR)
+    {
+        float startMom = material_start_mom(materialID);
+        float endMom = material_end_mom(materialID);
+        float span = max(endMom - startMom, 0.000000001);
+        float normalizedMomentum = (value.x - startMom) / span;
+        if (normalizedMomentum > 1.0)
+            return vec4(1.0, 0.0, 0.0, value.a);
+        float gray = 1.0 - clamp(normalizedMomentum, 0.0, 1.0);
+        return vec4(gray, gray, gray, value.a);
+    }
 
     return baseColor;
 }

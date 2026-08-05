@@ -54,6 +54,26 @@ def _optional_number(segment_name, segment_config, field_name, errors):
     return value
 
 
+def _optional_material_id(segment_name, segment_config, field_name, fallback, errors):
+    raw_value = segment_config.get(field_name, fallback)
+    try:
+        material_id = float(raw_value)
+    except (TypeError, ValueError):
+        errors.append(f"curve_wall_segments.{segment_name}.{field_name} must be numeric")
+        return None
+    if (
+        not math.isfinite(material_id)
+        or not material_id.is_integer()
+        or int(material_id) < 0
+    ):
+        errors.append(
+            f"curve_wall_segments.{segment_name}.{field_name} "
+            "must be a non-negative integer"
+        )
+        return None
+    return material_id
+
+
 def parse_segment(segment_name, segment_config):
     """Parse one canonical key-value wall segment into numeric internal form."""
     errors = []
@@ -90,21 +110,23 @@ def parse_segment(segment_name, segment_config):
         segment_name, segment_config, "normal_sign", errors
     )
     wall_flag = _required_number(segment_name, segment_config, "wall_flag", errors)
-    material_id = segment_config.get("material_id", 0)
-    try:
-        material_id = float(material_id)
-    except (TypeError, ValueError):
-        errors.append(f"curve_wall_segments.{segment_name}.material_id must be numeric")
-        material_id = None
-    if material_id is not None and (
-        not math.isfinite(material_id)
-        or not material_id.is_integer()
-        or int(material_id) < 0
-    ):
-        errors.append(
-            f"curve_wall_segments.{segment_name}.material_id "
-            "must be a non-negative integer"
-        )
+    legacy_material_id = segment_config.get("material_id", 0)
+    boundary_particle_material_id = _optional_material_id(
+        segment_name,
+        segment_config,
+        "boundary_particle_material_id",
+        legacy_material_id,
+        errors,
+    )
+    boundary_visual_material_id = _optional_material_id(
+        segment_name,
+        segment_config,
+        "boundary_visual_material_id",
+        boundary_particle_material_id
+        if boundary_particle_material_id is not None
+        else legacy_material_id,
+        errors,
+    )
 
     if u_start is not None and u_end is not None and abs(u_end - u_start) <= 1.0e-12:
         errors.append(f"curve_wall_segments.{segment_name} has zero length")
@@ -131,7 +153,8 @@ def parse_segment(segment_name, segment_config):
         a3,
         normal_sign,
         wall_flag,
-        material_id,
+        boundary_particle_material_id,
+        boundary_visual_material_id,
     )
     if errors or any(value is None for value in values):
         return None, errors
@@ -197,7 +220,8 @@ def _prepare_group_segment(segment_name, segment_config, previous_segment):
         _a3,
         _normal_sign,
         _wall_flag,
-        _material_id,
+        _boundary_particle_material_id,
+        _boundary_visual_material_id,
     ) = segment_values(previous_segment)
 
     if "u_start" not in prepared_config:
@@ -287,11 +311,15 @@ def parse_keyed_curve_wall_segments(raw_segments):
 
 
 def segment_values(segment):
-    """Return function-wall values, including optional marker material id."""
+    """Return function-wall values with particle and visual material ids."""
     if len(segment) == 10:
-        return (*tuple(float(value) for value in segment), 0.0)
-    if len(segment) != 11:
-        raise ValueError("function wall segment must contain 10 or 11 values")
+        values = tuple(float(value) for value in segment)
+        return (*values, 0.0, 0.0)
+    if len(segment) == 11:
+        values = tuple(float(value) for value in segment)
+        return (*values, values[10])
+    if len(segment) != 12:
+        raise ValueError("function wall segment must contain 10, 11, or 12 values")
     return tuple(float(value) for value in segment)
 
 
@@ -308,7 +336,8 @@ def evaluate_function(segment, independent_value):
         a3,
         _normal_sign,
         _wall_flag,
-        _material_id,
+        _boundary_particle_material_id,
+        _boundary_visual_material_id,
     ) = segment_values(segment)
     du = float(independent_value) - u_start
     value = f_start + a1 * du + a2 * du * du + a3 * du * du * du
@@ -340,7 +369,8 @@ def evaluate_wall_at_point(segment, point):
         _a3,
         normal_sign,
         wall_flag,
-        material_id,
+        boundary_particle_material_id,
+        _boundary_visual_material_id,
     ) = segment_values(segment)
     independent_axis = int(round(independent_axis))
     if independent_axis not in (AXIS_X, AXIS_Y):
@@ -380,7 +410,7 @@ def evaluate_wall_at_point(segment, point):
         "wall_point": wall_point,
         "normal": normal,
         "wall_flag": int(round(wall_flag)),
-        "material_id": int(round(material_id)),
+        "material_id": int(round(boundary_particle_material_id)),
     }
 
 
@@ -411,7 +441,8 @@ def bounds(segment):
         _a3,
         _normal_sign,
         _wall_flag,
-        _material_id,
+        _boundary_particle_material_id,
+        _boundary_visual_material_id,
     ) = segment_values(segment)
     independent_axis = int(round(independent_axis))
     samples = [u_start, u_end]
@@ -439,7 +470,8 @@ def sample_points(segment, maximum_spacing=1.0):
         _a3,
         _normal_sign,
         _wall_flag,
-        _material_id,
+        _boundary_particle_material_id,
+        _boundary_visual_material_id,
     ) = segment_values(segment)
     independent_axis = int(round(independent_axis))
     length = abs(u_end - u_start)
@@ -467,7 +499,7 @@ def wall_marker_records(segments, plane_z):
     records = []
     for segment in segments:
         wall_flag = int(round(float(segment[9])))
-        material_id = int(round(float(segment[10]))) if len(segment) >= 11 else 0
+        material_id = int(round(segment_values(segment)[10]))
         for point_x, point_y in sample_points(segment):
             marker_cell = (
                 round(point_x),

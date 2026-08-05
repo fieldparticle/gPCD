@@ -44,6 +44,7 @@ class ResourceVertexObj : public Resource
 		std::vector<CartVert>	m_Axes;
 		std::string				m_FileName;
 		std::vector<glm::vec3>	m_vtemp;
+		std::vector<glm::vec4>	m_Colors;
 		
 		virtual void GetShaderMem() {};
 		//vcb::Mesh                                m_Model;

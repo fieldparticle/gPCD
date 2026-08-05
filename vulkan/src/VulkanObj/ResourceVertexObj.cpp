@@ -38,7 +38,11 @@ void ResourceVertexObj::Create(uint32_t BindPoint, Resource* PartVert)
 {
 	
 	m_ParticleVert = PartVert;
-	bool res = loadOBJ(m_FileName.c_str(), m_vtemp, m_UVS, m_Normals);
+	m_vtemp.clear();
+	m_UVS.clear();
+	m_Normals.clear();
+	m_Colors.clear();
+	bool res = loadOBJ(m_FileName.c_str(), m_vtemp, m_UVS, m_Normals, &m_Colors);
 	if (!res)
 	{
 		std::ostringstream  objtxt;

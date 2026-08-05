@@ -739,10 +739,12 @@ void ShaderObj::WriteMaterials()
 	ostrm << "const uint COLOR_MODE_VELOCITY_ANGLE = 1u;\n";
 	ostrm << "const uint COLOR_MODE_SOLID = 2u;\n";
 	ostrm << "const uint COLOR_MODE_LUMENS = 3u;\n\n";
+	ostrm << "const uint COLOR_MODE_INTERNAL_MOMENTUM = 4u;\n\n";
 	ostrm << "const uint COLOR_MAP_HSV = 0u;\n";
 	ostrm << "const uint COLOR_MAP_GRAYSCALE = 1u;\n";
 	ostrm << "const uint COLOR_MAP_HEAT = 2u;\n";
-	ostrm << "const uint COLOR_MAP_SOLID = 3u;\n\n";
+	ostrm << "const uint COLOR_MAP_SOLID = 3u;\n";
+	ostrm << "const uint COLOR_MAP_GRAY_LINEAR = 4u;\n\n";
 	ostrm << "const uint PARTICLE_TYPE_REGULAR = 0u;\n";
 	ostrm << "const uint PARTICLE_TYPE_PHOTON = 1u;\n\n";
 	ostrm << "const uint PARTICLE_TYPE_BOUNDARY = 2u;\n\n";
@@ -763,6 +765,8 @@ void ShaderObj::WriteMaterials()
 	ostrm << "    uint colorMode;\n";
 	ostrm << "    uint colorMap;\n";
 	ostrm << "    float pointSize;\n";
+	ostrm << "    float startMom;\n";
+	ostrm << "    float endMom;\n";
 	ostrm << "    uint captureAngleOffset;\n";
 	ostrm << "    uint captureAngleCount;\n";
 	ostrm << "    vec4 color;\n";
@@ -805,7 +809,7 @@ void ShaderObj::WriteMaterials()
 		ostrm << "const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](\n";
 		ostrm << "    MaterialProperty(0u, PARTICLE_TYPE_REGULAR, 1.000000000, 0.000000000, COLOR_MODE_VELOCITY_ANGLE, COLOR_MAP_HSV, "
 			<< std::fixed << std::setprecision(9) << defaultPointSize
-			<< ", 0u, 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 0.000000000, 0.000000000, 1.000000000), vec4(0.000000000, 1.000000000, 0.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, PHOTON_SURFACE_BEHAVIOR_NONE, 0u, CONTACT_ILLUMINATION_MAX, 0.000000000)\n";
+			<< ", 0.000000000, 1.000000000, 0u, 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 0.000000000, 0.000000000, 1.000000000), vec4(0.000000000, 1.000000000, 0.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, PHOTON_SURFACE_BEHAVIOR_NONE, 0u, CONTACT_ILLUMINATION_MAX, 0.000000000)\n";
 		ostrm << ");\n\n";
 	}
 	else
@@ -829,6 +833,8 @@ void ShaderObj::WriteMaterials()
 			int colorMap = 0;
 			int particleType = 0;
 			double pointSize = defaultPointSize;
+			double startMom = 0.0;
+			double endMom = 1.0;
 			uint32_t captureAngleOffset = 0u;
 			uint32_t captureAngleCount = 0u;
 			double relativeMass = 1.0;
@@ -889,12 +895,18 @@ void ShaderObj::WriteMaterials()
 				else
 					colorMap = 3;
 			}
-			if (colorMap < 0 || colorMap > 3)
+			if (colorMap < 0 || colorMap > 4)
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].color_map is outside the valid range");
 			if (config_setting_lookup_float(material, "point_size", &pointSize) == CONFIG_FALSE)
 				pointSize = defaultPointSize;
 			if (pointSize <= 0.0)
 				throw std::runtime_error("material_properties[" + std::to_string(index) + "].point_size must be positive");
+			if (config_setting_lookup_float(material, "start_mom", &startMom) == CONFIG_FALSE)
+				startMom = 0.0;
+			if (config_setting_lookup_float(material, "end_mom", &endMom) == CONFIG_FALSE)
+				endMom = 1.0;
+			if (endMom <= startMom)
+				throw std::runtime_error("material_properties[" + std::to_string(index) + "].end_mom must be greater than start_mom");
 
 			captureAngleOffset = static_cast<uint32_t>(captureAngleRecords.size());
 			config_setting_t* captureAngles = config_setting_lookup(material, "capture_angles");
@@ -1030,6 +1042,8 @@ void ShaderObj::WriteMaterials()
 				<< colorMode << "u, "
 				<< colorMap << "u, "
 				<< std::fixed << std::setprecision(9) << pointSize << ", "
+				<< std::fixed << std::setprecision(9) << startMom << ", "
+				<< std::fixed << std::setprecision(9) << endMom << ", "
 				<< captureAngleOffset << "u, "
 				<< captureAngleCount << "u, "
 				<< "vec4("
@@ -1111,24 +1125,37 @@ void ShaderObj::WriteMaterials()
 		ostrm << ");\n\n";
 	}
 
+	auto appFloatOrDefault = [&](const std::string& key, float defaultValue)
+	{
+		return CfgApp->CheckKey(key)
+			? CfgApp->GetFloat(key, true)
+			: defaultValue;
+	};
+	auto testThenAppFloatOrDefault = [&](const std::string& testKey, const std::string& appKey, float defaultValue)
+	{
+		if (CfgTst->CheckKey(testKey))
+			return CfgTst->GetFloat(testKey, true);
+		return appFloatOrDefault(appKey, defaultValue);
+	};
 
-	float col_red = CfgApp->GetFloat("application.col_color.red", true);
-	float col_green = CfgApp->GetFloat("application.col_color.green", true);
-	float col_blue = CfgApp->GetFloat("application.col_color.blue", true);
-	float col_alpha = CfgApp->GetFloat("application.col_color.alpha", true);
+	float col_red = appFloatOrDefault("application.col_color.red", 1.0f);
+	float col_green = appFloatOrDefault("application.col_color.green", 0.0f);
+	float col_blue = appFloatOrDefault("application.col_color.blue", 0.0f);
 
-	float ncol_red = CfgApp->GetFloat("application.ncol_color.red", true);
-	float ncol_green = CfgApp->GetFloat("application.ncol_color.green", true);
-	float ncol_blue = CfgApp->GetFloat("application.ncol_color.blue", true);
-	float ncol_alpha = CfgApp->GetFloat("application.ncol_color.alpha", true);
+	float ncol_red = appFloatOrDefault("application.ncol_color.red", 0.0f);
+	float ncol_green = appFloatOrDefault("application.ncol_color.green", 1.0f);
+	float ncol_blue = appFloatOrDefault("application.ncol_color.blue", 0.0f);
+
+	float hsvSat = testThenAppFloatOrDefault("hsv_sat", "application.hsv_sat", 1.0f);
+	float hsvVal = testThenAppFloatOrDefault("hsv_val", "application.hsv_val", 1.0f);
 
 	ostrm
 		<< "const float VELOCITY_ANGLE_COLOR_SAT = "
 		<< std::fixed << std::setprecision(2)
-		<< CfgApp->GetFloat("application.hsv_sat", true) << ";\n"
+		<< hsvSat << ";\n"
 		<< "const float VELOCITY_ANGLE_COLOR_VAL = "
 		<< std::fixed << std::setprecision(2)
-		<< CfgApp->GetFloat("application.hsv_val", true) << ";\n";
+		<< hsvVal << ";\n";
 	
 
 	std::ostringstream col_color;
@@ -1958,17 +1985,6 @@ void  ShaderObj::WriteShaderHeader()
 		std::string version = {};
 		version = "VERPONLY ";
 		
-
-		float col_red = CfgApp->GetFloat("application.col_color.red", true);
-		float col_green = CfgApp->GetFloat("application.col_color.green", true);
-		float col_blue = CfgApp->GetFloat("application.col_color.blue", true);
-		float col_alpha = CfgApp->GetFloat("application.col_color.alpha", true);
-
-		float ncol_red = CfgApp->GetFloat("application.ncol_color.red", true);
-		float ncol_green = CfgApp->GetFloat("application.ncol_color.green", true);
-		float ncol_blue = CfgApp->GetFloat("application.ncol_color.blue", true);
-		float ncol_alpha = CfgApp->GetFloat("application.ncol_color.alpha", true);
-
         std::ofstream ostrm(filename);
 		if (!ostrm.is_open())
 		{

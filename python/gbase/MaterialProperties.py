@@ -6,16 +6,19 @@ COLOR_MODE_COLLISION = 0
 COLOR_MODE_VELOCITY_ANGLE = 1
 COLOR_MODE_SOLID = 2
 COLOR_MODE_LUMENS = 3
+COLOR_MODE_INTERNAL_MOMENTUM = 4
 
 COLOR_MODE_NAMES = {
     "COLLISION": COLOR_MODE_COLLISION,
     "VELOCITY_ANGLE": COLOR_MODE_VELOCITY_ANGLE,
     "SOLID": COLOR_MODE_SOLID,
     "LUMENS": COLOR_MODE_LUMENS,
+    "INTERNAL_MOMENTUM": COLOR_MODE_INTERNAL_MOMENTUM,
     "COLOR_MODE_COLLISION": COLOR_MODE_COLLISION,
     "COLOR_MODE_VELOCITY_ANGLE": COLOR_MODE_VELOCITY_ANGLE,
     "COLOR_MODE_SOLID": COLOR_MODE_SOLID,
     "COLOR_MODE_LUMENS": COLOR_MODE_LUMENS,
+    "COLOR_MODE_INTERNAL_MOMENTUM": COLOR_MODE_INTERNAL_MOMENTUM,
     "VELOCITY": COLOR_MODE_VELOCITY_ANGLE,
     "HSV": COLOR_MODE_VELOCITY_ANGLE,
     "COLOR_MODE_VELOCITY": COLOR_MODE_VELOCITY_ANGLE,
@@ -25,6 +28,7 @@ COLOR_MAP_HSV = 0
 COLOR_MAP_GRAYSCALE = 1
 COLOR_MAP_HEAT = 2
 COLOR_MAP_SOLID = 3
+COLOR_MAP_GRAY_LINEAR = 4
 
 COLOR_MAP_NAMES = {
     "HSV": COLOR_MAP_HSV,
@@ -32,11 +36,15 @@ COLOR_MAP_NAMES = {
     "GREYSCALE": COLOR_MAP_GRAYSCALE,
     "HEAT": COLOR_MAP_HEAT,
     "SOLID": COLOR_MAP_SOLID,
+    "GRAY_LINEAR": COLOR_MAP_GRAY_LINEAR,
+    "GREY_LINEAR": COLOR_MAP_GRAY_LINEAR,
     "COLOR_MAP_HSV": COLOR_MAP_HSV,
     "COLOR_MAP_GRAYSCALE": COLOR_MAP_GRAYSCALE,
     "COLOR_MAP_GREYSCALE": COLOR_MAP_GRAYSCALE,
     "COLOR_MAP_HEAT": COLOR_MAP_HEAT,
     "COLOR_MAP_SOLID": COLOR_MAP_SOLID,
+    "COLOR_MAP_GRAY_LINEAR": COLOR_MAP_GRAY_LINEAR,
+    "COLOR_MAP_GREY_LINEAR": COLOR_MAP_GRAY_LINEAR,
 }
 
 DEFAULT_COLOR_BY_MODE = {
@@ -44,6 +52,7 @@ DEFAULT_COLOR_BY_MODE = {
     COLOR_MODE_VELOCITY_ANGLE: (1.0, 1.0, 1.0, 1.0),
     COLOR_MODE_SOLID: (1.0, 1.0, 1.0, 1.0),
     COLOR_MODE_LUMENS: (1.0, 1.0, 1.0, 1.0),
+    COLOR_MODE_INTERNAL_MOMENTUM: (1.0, 1.0, 1.0, 1.0),
 }
 
 PARTICLE_TYPE_REGULAR = 0
@@ -135,6 +144,16 @@ def parse_material_point_size(raw_value):
     if not math.isfinite(point_size) or point_size <= 0.0:
         raise ValueError("point_size must be a positive finite number")
     return point_size
+
+
+def parse_momentum_span(start_raw, end_raw):
+    start_mom = float(start_raw)
+    end_mom = float(end_raw)
+    if not math.isfinite(start_mom) or not math.isfinite(end_mom):
+        raise ValueError("start_mom and end_mom must be finite")
+    if end_mom <= start_mom:
+        raise ValueError("end_mom must be greater than start_mom")
+    return start_mom, end_mom
 
 
 def _material_keys(material):
@@ -316,6 +335,10 @@ def normalized_material_properties(source=None):
         point_size = parse_material_point_size(
             _material_get(raw_material, "point_size", None)
         )
+        start_mom, end_mom = parse_momentum_span(
+            _material_get(raw_material, "start_mom", 0.0),
+            _material_get(raw_material, "end_mom", 1.0),
+        )
         capture_angles = parse_capture_angles(raw_material)
         color = parse_material_color(_material_get(raw_material, "color", None), color_mode)
         collision_color = parse_material_color(
@@ -412,6 +435,8 @@ def normalized_material_properties(source=None):
                 "thermal_velocity": thermal_velocity,
                 "color_mode": color_mode,
                 "color": color,
+                "start_mom": start_mom,
+                "end_mom": end_mom,
                 "capture_angles": capture_angles,
                 "collision_color": collision_color,
                 "non_collision_color": non_collision_color,
@@ -440,6 +465,7 @@ def write_color_mode_defines(output):
     output.write(f"COLOR_MODE_VELOCITY_ANGLE = {COLOR_MODE_VELOCITY_ANGLE};\n")
     output.write(f"COLOR_MODE_SOLID = {COLOR_MODE_SOLID};\n")
     output.write(f"COLOR_MODE_LUMENS = {COLOR_MODE_LUMENS};\n")
+    output.write(f"COLOR_MODE_INTERNAL_MOMENTUM = {COLOR_MODE_INTERNAL_MOMENTUM};\n")
 
 
 def write_color_map_defines(output):
@@ -447,6 +473,7 @@ def write_color_map_defines(output):
     output.write(f"COLOR_MAP_GRAYSCALE = {COLOR_MAP_GRAYSCALE};\n")
     output.write(f"COLOR_MAP_HEAT = {COLOR_MAP_HEAT};\n")
     output.write(f"COLOR_MAP_SOLID = {COLOR_MAP_SOLID};\n")
+    output.write(f"COLOR_MAP_GRAY_LINEAR = {COLOR_MAP_GRAY_LINEAR};\n")
 
 
 def write_particle_type_defines(output):
@@ -504,6 +531,8 @@ def write_material_properties(output, source=None):
             output.write(f"        color_map = {int(material['color_map'])};\n")
         if material.get("point_size") is not None:
             output.write(f"        point_size = {float(material['point_size']):.9f};\n")
+        output.write(f"        start_mom = {float(material.get('start_mom', 0.0)):.9f};\n")
+        output.write(f"        end_mom = {float(material.get('end_mom', 1.0)):.9f};\n")
         capture_angles = material.get("capture_angles", ())
         if capture_angles:
             output.write("        capture_angles = (\n")

@@ -37,8 +37,13 @@ bool IsReflectionPhotonParticle(uint particleID)
         PHOTON_HELPER_PARTICLE_TYPE_REFLECTION_PHOTON;
 }
 
-uint PhotonBaseMaterialID()
+uint PhotonBaseMaterialID(uint particleID)
 {
+#if defined(LIGHTING_PARTICLE_STRUCT_AVAILABLE)
+    if (IsPhotonParticle(particleID)) {
+        return uint(round(P[particleID].initial_vel_energy.w));
+    }
+#endif
     for (uint ii = 0u; ii < MATERIAL_PROPERTY_COUNT; ++ii) {
         if (MATERIAL_PROPERTIES[ii].particleType == PARTICLE_TYPE_PHOTON) {
             return MATERIAL_PROPERTIES[ii].materialID;

@@ -46,7 +46,7 @@ void ResourceVertexCube::Create(ResourceVertexParticle* PartVert)
 			tmp.pos.y = m_vtemp[ii].y; //*m_ParticleVert->m_SideLength;
 			tmp.pos.z = m_vtemp[ii].z; //*m_ParticleVert->m_SideLength;
 			tmp.pos.w = 1.0;
-			tmp.color = glm::vec4(1.0, 1.0, 1.0, 1.0);
+			tmp.color = ii < m_Colors.size() ? m_Colors[ii] : glm::vec4(1.0, 1.0, 1.0, 1.0);
 			tmp.extra = glm::vec4(0.0, 0.0, 0.0, 0.0);
 			m_Verts.push_back(tmp);
 		}

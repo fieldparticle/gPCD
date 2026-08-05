@@ -91,7 +91,8 @@ piston_visual = {
 // Function wall format:
 //   -1 for lower walls where outward is below the conduit
 //    1 for upper walls where outward is above the conduit
-// Grouped curves inherit function, normal_sign, wall_flag, and material_id.
+// Grouped curves inherit function, normal_sign, wall_flag,
+// boundary_visual_material_id, and boundary_particle_material_id.
 // The first segment in each curve needs u_start, f_start, and length.
 // Later segments continue from the previous segment and only need length.
 // Boundary particles are cell-locality sentinels; they are not wall geometry.

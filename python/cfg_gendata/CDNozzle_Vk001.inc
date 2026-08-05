@@ -7,7 +7,7 @@
 // ============================================================================
 
 // Required: default particle-owned contact stiffness written to Data.y.
-collision_stiffness_q 			= 3.0;
+collision_stiffness_q 			= 16.0;
 
 // Required: depth-dependent stiffness shape for current contact dynamics.
 compression_stiffness_gain 		= 8.0;
@@ -66,7 +66,7 @@ particle_streams = (
     material_id 				= 4;
     radius 						= 0.15;
     particle_separation_distance = 0.00005;
-    stream_velocity 			= [ 0.4, 0.0, 0.0 ];
+    stream_velocity 			= [ 0.1, 0.0, 0.0 ];
   }
 );
 
@@ -96,9 +96,9 @@ piston_visual = {
 // Boundary particles are cell-locality sentinels; they are not wall geometry.
 curve_wall_segments = {
     lower_wall = {
-        function 		= "y_of_x";
-        normal_sign 	= -1;
-        wall_flag 		= 3;
+        function 						= "y_of_x";
+        normal_sign 					= -1;
+        wall_flag 						= 3;
 		boundary_visual_material_id 	= 5;
 		boundary_particle_material_id	= 5;
         segments = {
@@ -121,8 +121,8 @@ curve_wall_segments = {
             segment05 = {
                 boundary_kind 	= "regular";
                 length 			= 20;
-                a1 				= 0.25;
-                a2 				= -0.00625;
+                a1 				= 0.325;
+                a2 				= -0.008125;
                 a3 				= 0;
             };
             segment07 = {
@@ -136,7 +136,7 @@ curve_wall_segments = {
                 boundary_kind 	= "regular";
                 length 			= 20;
                 a1 				= 0;
-                a2 				= -0.00625;
+                a2 				= -0.008125;
                 a3 				= 0;
             };
             segment11 = {
@@ -149,9 +149,9 @@ curve_wall_segments = {
         };
     };
     upper_wall = {
-        function 		= "y_of_x";
-        normal_sign 	= 1;
-        wall_flag 		= 4;
+        function 						= "y_of_x";
+        normal_sign 					= 1;
+        wall_flag 						= 4;
 		boundary_visual_material_id 	= 5;
 		boundary_particle_material_id	= 5;
         segments = {
@@ -174,8 +174,8 @@ curve_wall_segments = {
             segment06 = {
                 boundary_kind 	= "regular";
                 length 			= 20;
-                a1 				= -0.25;
-                a2			 	= 0.00625;
+                a1 				= -0.325;
+                a2			 	= 0.008125;
                 a3 				= 0;
             };
             segment08 = {
@@ -189,7 +189,7 @@ curve_wall_segments = {
                 boundary_kind 	= "regular";
                 length 			= 20;
                 a1 				= 0;
-                a2 				= 0.00625;
+                a2 				= 0.008125;
                 a3 				= 0;
             };
             segment12 = {

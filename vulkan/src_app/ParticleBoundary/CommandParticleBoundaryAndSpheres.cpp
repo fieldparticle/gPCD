@@ -31,6 +31,7 @@
 %******************************************************************/
 
 #include "VulkanObj/VulkanApp.hpp"
+#include <string>
 
 
 void CommandParticleBoundaryAndSpheres::Create(SwapChainObj* SCO,
@@ -87,9 +88,18 @@ void CommandParticleBoundaryAndSpheres::RecordCommands(uint32_t imageindex, uint
 	renderPassInfo.renderArea.extent = m_SCO->GetSwapExtent();
 
 	std::array<VkClearValue, 2> clearValues{};
-	clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+	const bool useTestClearColor = CfgTst->CheckKey("clear_color");
+	const std::string clearColorPrefix = useTestClearColor
+		? "clear_color."
+		: "application.clear_color.";
+	ConfigObj* clearColorCfg = useTestClearColor ? CfgTst : CfgApp;
+	clearValues[0].color = { {
+		clearColorCfg->GetFloat(clearColorPrefix + "red", true),
+		clearColorCfg->GetFloat(clearColorPrefix + "green", true),
+		clearColorCfg->GetFloat(clearColorPrefix + "blue", true),
+		clearColorCfg->GetFloat(clearColorPrefix + "alpha", true)
+	} };
 	clearValues[1].depthStencil = { 1.0f, 0 };
-	VkClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
 	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 	renderPassInfo.pClearValues = clearValues.data();
 
