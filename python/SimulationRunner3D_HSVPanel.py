@@ -7,7 +7,9 @@ import time
 from base.DynamicsFactory import create_dynamics_for_cfg
 from gbase.MaterialProperties import (
     COLOR_MODE_COLLISION,
+    COLOR_MODE_INTERNAL_MOMENTUM,
     COLOR_MODE_LUMENS,
+    COLOR_MAP_GRAY_LINEAR,
     COLOR_MODE_SOLID,
     COLOR_MODE_VELOCITY_ANGLE,
     normalized_material_properties,
@@ -127,6 +129,31 @@ def _material_unit_color_by_id(material_id, run_configuration):
     return [max(0.0, min(1.0, float(color[index]))) for index in range(3)]
 
 
+def _particle_internal_momentum(particle):
+    collision_stored = getattr(particle, "report_collision_stored_mom", None)
+    if collision_stored is not None:
+        return float(collision_stored)
+    parms = getattr(particle, "parms", None)
+    if parms is not None:
+        px = float(getattr(parms, "y", 0.0))
+        py = float(getattr(parms, "z", 0.0))
+        pz = float(getattr(parms, "w", 0.0))
+        return math.sqrt(px * px + py * py + pz * pz)
+    return float(getattr(particle, "internal_momentum", 0.0))
+
+
+def _gray_linear_internal_momentum_color(particle, material):
+    value = _particle_internal_momentum(particle)
+    start_mom = float(material.get("start_mom", 0.0))
+    end_mom = float(material.get("end_mom", 1.0))
+    if value > end_mom:
+        return [1.0, 0.0, 0.0]
+    span = max(1.0e-12, end_mom - start_mom)
+    fraction = max(0.0, min(1.0, (value - start_mom) / span))
+    gray = 1.0 - fraction
+    return [gray, gray, gray]
+
+
 def _material_debug_color(particle, run_configuration):
     material = _material_property(particle, run_configuration)
     if material is None or not bool(material.get("debug_visible", False)):
@@ -172,6 +199,7 @@ def _is_photon_particle(particle):
 
 
 def _particle_color(particle_id, particle, dynamics, run_configuration):
+    material = _material_property(particle, run_configuration)
     color_mode = _material_color_mode(particle, run_configuration)
     if _is_photon_particle(particle):
         color_mode = COLOR_MODE_LUMENS
@@ -180,6 +208,10 @@ def _particle_color(particle_id, particle, dynamics, run_configuration):
         hsv_val = float(run_configuration.get("hsv_val", 1.0))
         return _unit_color(hsv_angle(float(particle.VelRad.w), hsv_val, hsv_sat))
     if color_mode == COLOR_MODE_SOLID:
+        return _material_unit_color(particle, run_configuration)
+    if color_mode == COLOR_MODE_INTERNAL_MOMENTUM:
+        if material is not None and int(material.get("color_map", -1)) == COLOR_MAP_GRAY_LINEAR:
+            return _gray_linear_internal_momentum_color(particle, material)
         return _material_unit_color(particle, run_configuration)
     if color_mode == COLOR_MODE_LUMENS:
         if _is_photon_particle(particle):

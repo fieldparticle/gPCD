@@ -18,7 +18,9 @@ from gbase.FunctionWall import bounds as wall_bounds
 from gbase.FunctionWall import sample_points
 from gbase.MaterialProperties import (
     COLOR_MODE_COLLISION,
+    COLOR_MODE_INTERNAL_MOMENTUM,
     COLOR_MODE_LUMENS,
+    COLOR_MAP_GRAY_LINEAR,
     COLOR_MODE_SOLID,
     COLOR_MODE_VELOCITY_ANGLE,
     normalized_material_properties,
@@ -602,6 +604,31 @@ def _material_rgb255_by_id(material_id, run_configuration):
     )
 
 
+def _particle_internal_momentum_magnitude(particle):
+    collision_stored = getattr(particle, "report_collision_stored_mom", None)
+    if collision_stored is not None:
+        return float(collision_stored)
+    parms = getattr(particle, "parms", None)
+    if parms is not None:
+        px = float(getattr(parms, "y", 0.0))
+        py = float(getattr(parms, "z", 0.0))
+        pz = float(getattr(parms, "w", 0.0))
+        return math.sqrt(px * px + py * py + pz * pz)
+    return float(getattr(particle, "internal_momentum", 0.0))
+
+
+def _gray_linear_internal_momentum_rgb255(particle, material):
+    value = _particle_internal_momentum_magnitude(particle)
+    start_mom = float(material.get("start_mom", 0.0))
+    end_mom = float(material.get("end_mom", 1.0))
+    if value > end_mom:
+        return (255, 0, 0)
+    span = max(1.0e-12, end_mom - start_mom)
+    fraction = max(0.0, min(1.0, (value - start_mom) / span))
+    gray = int(round((1.0 - fraction) * 255.0))
+    return (gray, gray, gray)
+
+
 def _material_debug_rgb255(particle, run_configuration):
     material = _material_property(particle, run_configuration)
     if material is None or not bool(material.get("debug_visible", False)):
@@ -670,6 +697,7 @@ def _particle_colors(
     hsv_sat,
     hsv_val,
 ):
+    material = _material_property(particle, run_configuration)
     color_mode = _material_color_mode(particle, run_configuration)
     if _is_boundary_particle(particle_index, particle, dynamics):
         color = _boundary_space_light_rgb255(
@@ -705,6 +733,12 @@ def _particle_colors(
         color = hsv_angle(particle.VelRad.w, hsv_val, hsv_sat)
         return color, color
     if color_mode == COLOR_MODE_SOLID:
+        color = _material_rgb255(particle, run_configuration)
+        return color, color
+    if color_mode == COLOR_MODE_INTERNAL_MOMENTUM:
+        if material is not None and int(material.get("color_map", -1)) == COLOR_MAP_GRAY_LINEAR:
+            color = _gray_linear_internal_momentum_rgb255(particle, material)
+            return color, color
         color = _material_rgb255(particle, run_configuration)
         return color, color
     if color_mode == COLOR_MODE_COLLISION:

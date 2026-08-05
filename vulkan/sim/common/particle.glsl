@@ -44,6 +44,8 @@ struct Particle {
 
     vec4 Data;                 // x=radius, y=collision_stiffness_q, z=reserved, w=state/flags
     vec4 parms;                // x=mass, yzw=source-owned recoverable internal momentum
+    vec4 collisionStartMomentum;  // xyz=mv at collision entry, w=active flag
+    vec4 collisionStoredMomentum; // xyz=display stored mv, w=magnitude
 
     lstr CornerList[8];
 

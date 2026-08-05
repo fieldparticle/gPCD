@@ -443,6 +443,45 @@ float GetParticleMass(uint ParticleID)
     return max(P[ParticleID].parms.x, EPSILON);
 }}
 
+void ClearCollisionStoredMomentum(uint SourceID)
+{{
+    P[SourceID].collisionStartMomentum = vec4(0.0);
+    P[SourceID].collisionStoredMomentum = vec4(0.0);
+}}
+
+void RecordCollisionStartMomentum(uint SourceID)
+{{
+    if (P[SourceID].collisionStartMomentum.w != 0.0) {{
+        return;
+    }}
+    vec3 startMomentum = GetParticleMass(SourceID)
+        * GetStartFrameVelocity(SourceID).xyz;
+    P[SourceID].collisionStartMomentum = vec4(startMomentum, 1.0);
+}}
+
+void UpdateCollisionStoredMomentum(uint SourceID)
+{{
+    if (P[SourceID].collisionStartMomentum.w == 0.0) {{
+        P[SourceID].collisionStoredMomentum = vec4(0.0);
+        return;
+    }}
+    vec3 startMomentum = P[SourceID].collisionStartMomentum.xyz;
+    float startMagnitude = length(startMomentum);
+    vec3 currentMomentum = GetParticleMass(SourceID)
+        * GetNextParticleVelocity(SourceID).xyz;
+    float currentMagnitude = length(currentMomentum);
+    float storedMagnitude = clamp(
+        startMagnitude - currentMagnitude,
+        0.0,
+        startMagnitude);
+    vec3 storedMomentum = startMagnitude > EPSILON
+        ? storedMagnitude * startMomentum / startMagnitude
+        : vec3(0.0);
+    P[SourceID].collisionStoredMomentum = vec4(
+        storedMomentum,
+        storedMagnitude);
+}}
+
 float GetContactTargetDepth(float sourceRadius);
 float GetContactHardDepth(float sourceRadius);
 float GetContactRemainingDepth(float sourceRadius, float penetrationDepth);
@@ -771,6 +810,7 @@ bool AccumulateContactForce(
     float forceMagnitude = stiffness * max(0.0, contact.penetrationDepth);
     vec3 contactForce = -forceMagnitude * contact.normal;
     P[SourceID].parms.yzw += contactForce * ShaderFlags.dt;
+    RecordCollisionStartMomentum(SourceID);
     totalForce += contactForce;
     P[SourceID].colFlg = 1u;
     return true;
@@ -2034,7 +2074,7 @@ vec4 value_from_color_mode(uint index, uint materialID, uint colorMode, vec4 bas
         return lumens_color(index, baseColor);
 
     if (colorMode == COLOR_MODE_INTERNAL_MOMENTUM)
-        return vec4(length(P[index].parms.yzw), 0.0, 0.0, baseColor.a);
+        return vec4(P[index].collisionStoredMomentum.w, 0.0, 0.0, baseColor.a);
 
     return vec4(1.0, 1.0, 1.0, 1.0);
 }
@@ -2406,12 +2446,17 @@ void fpml_comp_main()
         }
     }
 
+    if (P[SourceID].contactCount == 0u) {
+        ClearCollisionStoredMomentum(SourceID);
+    }
+
     if (!CalcVelocity(SourceID, totalForce)) {
         return;
     }
     if (!ApplySourceMaximumDepth(SourceID, 9401u)) {
         return;
     }
+    UpdateCollisionStoredMomentum(SourceID);
     if (photonReflected) {
         SetNextParticleVelocity(
             SourceID,

@@ -232,6 +232,7 @@ class ForceDynamics(ForceContactDynamics):
             self.piston_total_momentum.y += transfer_y
             self.piston_total_momentum.z += transfer_z
         self.RecordRecoverableInternalMomentum(SourceID, contact_state)
+        self.RecordCollisionStartMomentum(SourceID)
         contact_state.contact_potential_energy = self.GetOverlapPotentialEnergy(
             source_radius,
             target_radius,
@@ -260,6 +261,14 @@ class ForceDynamics(ForceContactDynamics):
         particle.Data.z = 0.0
         particle.report_stored_mom = 0.0
 
+    def ClearCollisionStoredMomentum(self, particle):
+        """Clear collision-entry momentum accounting for an inactive contact."""
+        particle.collision_start_momentum = None
+        particle.report_collision_stored_mom = 0.0
+        particle.report_collision_stored_px = 0.0
+        particle.report_collision_stored_py = 0.0
+        particle.report_collision_stored_pz = 0.0
+
     def ClearInactiveRecoverableInternalMomentum(self):
         """Clear recoverable internal momentum when a source has no contacts."""
         for particle_index, particle in enumerate(self.particles):
@@ -267,6 +276,57 @@ class ForceDynamics(ForceContactDynamics):
                 continue
             if int(getattr(particle, "contactCount", 0)) == 0:
                 self.ClearRecoverableInternalMomentum(particle)
+                self.ClearCollisionStoredMomentum(particle)
+
+    def RecordCollisionStartMomentum(self, SourceID):
+        """Store this particle's momentum at the start of an active collision."""
+        source = self.particles[SourceID]
+        if getattr(source, "collision_start_momentum", None) is not None:
+            return
+        velocity = self.GetStartFrameVelocity(SourceID)
+        mass = self.GetParticleMass(SourceID)
+        source.collision_start_momentum = self.create_vec4(
+            mass * float(velocity.x),
+            mass * float(velocity.y),
+            mass * float(velocity.z),
+            0.0,
+        )
+
+    def UpdateCollisionStoredMomentum(self, SourceID):
+        """Update missing motion momentum from collision-entry magnitude."""
+        source = self.particles[SourceID]
+        start_momentum = getattr(source, "collision_start_momentum", None)
+        if start_momentum is None:
+            source.report_collision_stored_mom = 0.0
+            source.report_collision_stored_px = 0.0
+            source.report_collision_stored_py = 0.0
+            source.report_collision_stored_pz = 0.0
+            return 0.0
+        mass = self.GetParticleMass(SourceID)
+        start_x = float(start_momentum.x)
+        start_y = float(start_momentum.y)
+        start_z = float(start_momentum.z)
+        current_x = mass * float(source.VelRad.x)
+        current_y = mass * float(source.VelRad.y)
+        current_z = mass * float(source.VelRad.z)
+        start_mag = math.sqrt(start_x * start_x + start_y * start_y + start_z * start_z)
+        current_mag = math.sqrt(
+            current_x * current_x + current_y * current_y + current_z * current_z
+        )
+        magnitude = max(0.0, min(start_mag, start_mag - current_mag))
+        if start_mag > self.EPSILON:
+            stored_x = magnitude * start_x / start_mag
+            stored_y = magnitude * start_y / start_mag
+            stored_z = magnitude * start_z / start_mag
+        else:
+            stored_x = 0.0
+            stored_y = 0.0
+            stored_z = 0.0
+        source.report_collision_stored_px = stored_x
+        source.report_collision_stored_py = stored_y
+        source.report_collision_stored_pz = stored_z
+        source.report_collision_stored_mom = magnitude
+        return magnitude
 
     def RecordRecoverableInternalMomentum(self, SourceID, contact_state):
         """Diagnostic-only source-owned compression/rebound momentum storage."""
@@ -324,6 +384,7 @@ class ForceDynamics(ForceContactDynamics):
         if not self.CheckResolvedContactStep(SourceID):
             return False
         source = self.particles[SourceID]
+        self.UpdateCollisionStoredMomentum(SourceID)
         mass = self.GetParticleMass(SourceID)
         delta_momentum_x = mass * (source.VelRad.x - start_velocity.x)
         delta_momentum_y = mass * (source.VelRad.y - start_velocity.y)
@@ -1027,6 +1088,7 @@ class ForceDynamics(ForceContactDynamics):
         )
         particle.parms = self.create_vec4(mass, 0.0, 0.0, 0.0)
         particle.internal_momentum = 0.0
+        particle.collision_start_momentum = None
         particle.contacts = (
             [self.create_geo_contact_state() for _ in range(16)]
             if float(ptype) <= 0.5
@@ -1050,6 +1112,10 @@ class ForceDynamics(ForceContactDynamics):
         particle.report_normal_y = 0.0
         particle.report_normal_z = 0.0
         particle.report_stored_mom = 0.0
+        particle.report_collision_stored_mom = 0.0
+        particle.report_collision_stored_px = 0.0
+        particle.report_collision_stored_py = 0.0
+        particle.report_collision_stored_pz = 0.0
         particle.report_alpha_zero = 0.0
         particle.report_zero_area = 0.0
         particle.report_compression_fraction = 0.0
@@ -1082,7 +1148,12 @@ class ForceDynamics(ForceContactDynamics):
         self.ClearContactDiagnostics(contact_state)
         return contact_state
 
-    def create_particle_from_cfg(self, particle_name, particle_cfg):
+    def create_particle_from_cfg(
+        self,
+        particle_name,
+        particle_cfg,
+        default_material_id=0.0,
+    ):
         particle_number = int(str(particle_name).lstrip("p") or 0)
         location = particle_cfg.get("location", {})
         state_flg = particle_cfg.get(
@@ -1105,7 +1176,7 @@ class ForceDynamics(ForceContactDynamics):
             mass=particle_cfg.get("mass", 1.0),
             radius=particle_cfg.get("radius", 0.0),
             ptype=particle_cfg.get("ptype", 0.0),
-            material_id=particle_cfg.get("material_id", 0.0),
+            material_id=particle_cfg.get("material_id", default_material_id),
             collision_stiffness_q=collision_stiffness_q,
             state_flg=state_flg,
         )
@@ -1153,10 +1224,19 @@ class ForceDynamics(ForceContactDynamics):
 
     def create_particle_array_from_cfg(self, particle_data):
         particles = []
+        default_material_id = particle_data.get("material_id", 0.0)
+        particle_names = sorted(
+            (
+                str(particle_name)
+                for particle_name in particle_data.keys()
+                if re.fullmatch(r"p\d+", str(particle_name))
+            ),
+            key=lambda name: int(name[1:]),
+        )
 
         if not any(
-            int(str(particle_name).lstrip("p") or 0) == 0
-            for particle_name in particle_data.keys()
+            int(particle_name[1:]) == 0
+            for particle_name in particle_names
         ):
             particles.append(
                 self.create_particle(
@@ -1166,14 +1246,12 @@ class ForceDynamics(ForceContactDynamics):
                 )
             )
 
-        for particle_name in sorted(
-            particle_data.keys(),
-            key=lambda name: int(str(name).lstrip("p") or 0),
-        ):
+        for particle_name in particle_names:
             particles.append(
                 self.create_particle_from_cfg(
                     particle_name,
                     particle_data[particle_name],
+                    default_material_id,
                 )
             )
         if not particles or int(particles[0].pnum) != 0:
@@ -1601,6 +1679,10 @@ class ForceDynamics(ForceContactDynamics):
             particle.report_normal_y = 0.0
             particle.report_normal_z = 0.0
             particle.report_stored_mom = 0.0
+            particle.report_collision_stored_mom = 0.0
+            particle.report_collision_stored_px = 0.0
+            particle.report_collision_stored_py = 0.0
+            particle.report_collision_stored_pz = 0.0
             particle.report_alpha_zero = 0.0
             particle.report_zero_area = 0.0
             particle.report_compression_fraction = 0.0

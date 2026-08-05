@@ -660,14 +660,30 @@ class GenericGenData:
         if not particle_data:
             errors.append("PARTICLE_DATA is required and must not be empty")
         else:
-            for index in range(len(particle_data)):
-                name = f"p{index + 1}"
+            try:
+                default_particle_material_id = int(particle_data.get("material_id", 0))
+            except (TypeError, ValueError):
+                errors.append("PARTICLE_DATA.material_id must be an integer")
+                default_particle_material_id = 0
+            particle_names = sorted(
+                (
+                    str(key)
+                    for key in particle_data.keys()
+                    if re.fullmatch(r"p\d+", str(key))
+                ),
+                key=lambda name: int(name[1:]),
+            )
+            if not particle_names:
+                errors.append("PARTICLE_DATA must define at least one p# particle")
+            for name in particle_names:
                 particle = particle_data.get(name)
                 if particle is None:
                     errors.append(f"PARTICLE_DATA.{name} is required")
                     continue
                 try:
-                    material_id = int(particle.get("material_id", 0))
+                    material_id = int(
+                        particle.get("material_id", default_particle_material_id)
+                    )
                     raw_mass = particle.get("mass")
                     mass = None if raw_mass is None else float(raw_mass)
                     values = {

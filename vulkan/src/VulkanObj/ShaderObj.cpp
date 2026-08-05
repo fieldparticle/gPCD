@@ -1384,7 +1384,8 @@ void ShaderObj::WriteWalls()
 	bool show_cell_boundary_cube = CfgApp->GetBool("application.show_cell_boundary_cube", true);
 	bool show_wall_as_boundary_cube = CfgApp->GetBool("application.show_wall_as_boundary_cube", true);
 	bool show_boundary_as_obj = CfgApp->GetBool("application.boundary_as_obj", true);
-	bool has_lighting_ball = CfgTst->CheckKey("Lighting_ball");
+	bool particle_as_spheres = CfgApp->GetBool("application.particle_as_spheres", true);
+	bool has_lighting_sphere = CfgTst->CheckKey("Lighting_ball");
 
 	std::string wlflg = "0u";
 	wlflg = "1u;";
@@ -1395,8 +1396,10 @@ void ShaderObj::WriteWalls()
 		boundary << "#define HAS_BOUNDARY" << "\n";
 
 	}
-	if (has_lighting_ball)
+	if (particle_as_spheres)
 		boundary << "#define HAS_SPHERE" << "\n";
+	if (has_lighting_sphere)
+		boundary << "#define HAS_LIGHTING_SPHERE" << "\n";
 
 	std::ostringstream death_str;
 	death_str

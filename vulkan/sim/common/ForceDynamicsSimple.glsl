@@ -250,6 +250,45 @@ float GetParticleMass(uint ParticleID)
     return max(P[ParticleID].parms.x, EPSILON);
 }
 
+void ClearCollisionStoredMomentum(uint SourceID)
+{
+    P[SourceID].collisionStartMomentum = vec4(0.0);
+    P[SourceID].collisionStoredMomentum = vec4(0.0);
+}
+
+void RecordCollisionStartMomentum(uint SourceID)
+{
+    if (P[SourceID].collisionStartMomentum.w != 0.0) {
+        return;
+    }
+    vec3 startMomentum = GetParticleMass(SourceID)
+        * GetStartFrameVelocity(SourceID).xyz;
+    P[SourceID].collisionStartMomentum = vec4(startMomentum, 1.0);
+}
+
+void UpdateCollisionStoredMomentum(uint SourceID)
+{
+    if (P[SourceID].collisionStartMomentum.w == 0.0) {
+        P[SourceID].collisionStoredMomentum = vec4(0.0);
+        return;
+    }
+    vec3 startMomentum = P[SourceID].collisionStartMomentum.xyz;
+    float startMagnitude = length(startMomentum);
+    vec3 currentMomentum = GetParticleMass(SourceID)
+        * GetNextParticleVelocity(SourceID).xyz;
+    float currentMagnitude = length(currentMomentum);
+    float storedMagnitude = clamp(
+        startMagnitude - currentMagnitude,
+        0.0,
+        startMagnitude);
+    vec3 storedMomentum = startMagnitude > EPSILON
+        ? storedMagnitude * startMomentum / startMagnitude
+        : vec3(0.0);
+    P[SourceID].collisionStoredMomentum = vec4(
+        storedMomentum,
+        storedMagnitude);
+}
+
 float GetContactTargetDepth(float sourceRadius);
 float GetContactHardDepth(float sourceRadius);
 float GetContactRemainingDepth(float sourceRadius, float penetrationDepth);
@@ -578,6 +617,7 @@ bool AccumulateContactForce(
     float forceMagnitude = stiffness * max(0.0, contact.penetrationDepth);
     vec3 contactForce = -forceMagnitude * contact.normal;
     P[SourceID].parms.yzw += contactForce * ShaderFlags.dt;
+    RecordCollisionStartMomentum(SourceID);
     totalForce += contactForce;
     P[SourceID].colFlg = 1u;
     return true;

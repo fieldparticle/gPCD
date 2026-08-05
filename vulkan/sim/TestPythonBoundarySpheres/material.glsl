@@ -6,10 +6,28 @@ const uint COLOR_MODE_VELOCITY_ANGLE = 1u;
 const uint COLOR_MODE_SOLID = 2u;
 const uint COLOR_MODE_LUMENS = 3u;
 
+const uint COLOR_MODE_INTERNAL_MOMENTUM = 4u;
+
+const uint COLOR_MAP_HSV = 0u;
+const uint COLOR_MAP_GRAYSCALE = 1u;
+const uint COLOR_MAP_HEAT = 2u;
+const uint COLOR_MAP_SOLID = 3u;
+const uint COLOR_MAP_GRAY_LINEAR = 4u;
+
 const uint PARTICLE_TYPE_REGULAR = 0u;
 const uint PARTICLE_TYPE_PHOTON = 1u;
 
 const uint PARTICLE_TYPE_BOUNDARY = 2u;
+
+const uint PHOTON_SURFACE_BEHAVIOR_NONE = 0u;
+const uint PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR = 1u;
+const uint PHOTON_SURFACE_BEHAVIOR_ABSORB = 2u;
+const uint PHOTON_SURFACE_BEHAVIOR_REFLECT = 3u;
+
+const uint CONTACT_ILLUMINATION_MAX = 0u;
+const uint CONTACT_ILLUMINATION_MIN = 1u;
+const uint CONTACT_ILLUMINATION_CURRENT = 2u;
+const uint CONTACT_ILLUMINATION_FIRST = 3u;
 
 struct MaterialProperty
 {
@@ -18,15 +36,45 @@ struct MaterialProperty
     float relativeMass;
     float tempVel;
     uint colorMode;
+    uint colorMap;
+    float pointSize;
+    float startMom;
+    float endMom;
+    uint captureAngleOffset;
+    uint captureAngleCount;
     vec4 color;
+    vec4 collisionColor;
+    vec4 nonCollisionColor;
     uint debugVisible;
     vec4 debugColor;
+    vec4 spectralResponseEnergy;
+    vec4 spectralEmission;
+    float photonCoupling;
+    float photonMinRelativeMass;
+    uint photonSurfaceBehavior;
+    uint photonLifeTime;
+    uint contactIllumination;
     float cellDensity;
 };
 
-const uint MATERIAL_PROPERTY_COUNT = 1u;
-const MaterialProperty MATERIAL_PROPERTIES[1] = MaterialProperty[1](
-    MaterialProperty(0u, 0u, 1.000000000, 0.000000000, 1u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), 0.000000000)
+const uint MATERIAL_PROPERTY_COUNT = 4u;
+const MaterialProperty MATERIAL_PROPERTIES[4] = MaterialProperty[4](
+    MaterialProperty(0u, 0u, 1.000000000, 0.000000000, 1u, 0u, 1.000000000, 0.000000000, 1.000000000, 0u, 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 0.000000000, 0.000000000, 1.000000000), vec4(0.000000000, 1.000000000, 0.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, 0u, 0u, 0u, 0.000000000),
+    MaterialProperty(1u, 0u, 1.000000000, 0.000000000, 0u, 3u, 1.000000000, 0.000000000, 1.000000000, 0u, 0u, vec4(0.000000000, 1.000000000, 0.000000000, 1.000000000), vec4(1.000000000, 0.000000000, 0.000000000, 1.000000000), vec4(0.000000000, 1.000000000, 0.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, 0u, 0u, 0u, 0.000000000),
+    MaterialProperty(2u, 2u, 1.000000000, 0.000000000, 2u, 3u, 1.000000000, 0.000000000, 1.000000000, 0u, 0u, vec4(0.000000000, 1.000000000, 0.000000000, 1.000000000), vec4(1.000000000, 0.000000000, 0.000000000, 1.000000000), vec4(0.000000000, 1.000000000, 0.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, 0u, 0u, 0u, 0.000000000),
+    MaterialProperty(3u, 0u, 1.000000000, 0.000000000, 4u, 4u, 3.000000000, 0.000000000, 0.055000000, 0u, 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 0.000000000, 0.000000000, 1.000000000), vec4(0.000000000, 1.000000000, 0.000000000, 1.000000000), 0u, vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 1.000000000), vec4(1.000000000, 1.000000000, 1.000000000, 0.000000000), 1.000000000, 0.001000000, 0u, 0u, 0u, 0.000000000)
+);
+
+struct CaptureAngle
+{
+    float center;
+    float plusRange;
+    float minusRange;
+};
+
+const uint CAPTURE_ANGLE_COUNT = 0u;
+const CaptureAngle CAPTURE_ANGLES[1] = CaptureAngle[1](
+    CaptureAngle(0.000000000, 0.000000000, 0.000000000)
 );
 
 const float VELOCITY_ANGLE_COLOR_SAT = 1.00;

@@ -1,15 +1,10 @@
 Current status:
-	- Added CDNozzle boundary material split between marker particles and visible OBJ geometry.
-	- Added OBJ vertex color support so generated boundary meshes can carry visual material color.
-	- Added INTERNAL_MOMENTUM / GRAY_LINEAR diagnostic display path and documented that stored momentum is not yet released back to velocity.
-	- Updated CDNozzle docs and ProblemEvolution with the approved boundary/material/internal-momentum state.
+	- FPM internal momentum display now tracks collision-start stored momentum instead of raw parms.yzw.
+	- HAS_SPHERE has been restored to particle sphere rendering, with HAS_LIGHTING_SPHERE separated for LightingBall.
 
 Code Changes:
-	- Parse boundary_particle_material_id and boundary_visual_material_id with material_id fallback.
-	- Write generated boundary OBJ vertex RGB and MTL/usemtl material data.
-	- Extend Vulkan OBJ loading to read optional vertex RGB and feed CartVert.color.
-	- Switch boundary pipeline blending so opaque black boundaries render over white background.
-	- Accumulate contact impulse into parms.yzw for internal momentum diagnostics.
-	- Add material start_mom/end_mom and GRAY_LINEAR shader mapping.
+	- Added Python and Vulkan collision-start momentum display fields and coloring path.
+	- Updated shader generation so INTERNAL_MOMENTUM reads collisionStoredMomentum.w.
+	- Updated project docs with the new internal-momentum diagnostic and sphere define split.
 
-Next: Define the physical release rule that converts stored internal momentum back into particle velocity.
+Next: Run TwoParticleHorizontal with material 3 and end_mom = 0.055, then verify Vulkan coloring does not exceed red unless stored momentum exceeds the starting momentum budget.

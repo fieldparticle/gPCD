@@ -1277,16 +1277,19 @@ class ForceContactDynamics:
         contact_state.base_stiffness_q = base_stiffness
         contact_state.effective_stiffness_q = pair_stiffness
         contact_state.force_magnitude = force_magnitude
-        impulse_x = -force_magnitude * float(contact_state.geom.x) * self.dt
-        impulse_y = -force_magnitude * float(contact_state.geom.y) * self.dt
-        impulse_z = -force_magnitude * float(contact_state.geom.z) * self.dt
+        dt = float(self.ShaderFlags.dt)
+        if dt <= 0.0:
+            return self.SetError(self.constants.ERROR_INVALID_DT)
+        impulse_x = -force_magnitude * float(contact_state.geom.x) * dt
+        impulse_y = -force_magnitude * float(contact_state.geom.y) * dt
+        impulse_z = -force_magnitude * float(contact_state.geom.z) * dt
         source = self.particles[SourceID]
         source.parms.y += impulse_x
         source.parms.z += impulse_y
         source.parms.w += impulse_z
-        totalForce.x += impulse_x / self.dt
-        totalForce.y += impulse_y / self.dt
-        totalForce.z += impulse_z / self.dt
+        totalForce.x += impulse_x / dt
+        totalForce.y += impulse_y / dt
+        totalForce.z += impulse_z / dt
         return True
 
     def GetCompressionStiffnessGain(self):

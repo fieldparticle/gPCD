@@ -25,6 +25,8 @@ struct Particle {
 
 	glm::vec4 Data;    // x=radius, y=collision_stiffness_q, z=reserved, w=state/flags
 	glm::vec4 parms;   // x=mass, y=delta_vx, z=delta_vy, w=delta_speed
+	glm::vec4 collisionStartMomentum;  // xyz=mv at collision entry, w=active flag
+	glm::vec4 collisionStoredMomentum; // xyz=display stored mv, w=magnitude
 
 	lstr CornerList[8];
 

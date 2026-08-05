@@ -214,7 +214,7 @@ vec4 value_from_color_mode(uint index, uint materialID, uint colorMode, vec4 bas
         return lumens_color(index, baseColor);
 
     if (colorMode == COLOR_MODE_INTERNAL_MOMENTUM)
-        return vec4(length(P[index].parms.yzw), 0.0, 0.0, baseColor.a);
+        return vec4(P[index].collisionStoredMomentum.w, 0.0, 0.0, baseColor.a);
 
     return vec4(1.0, 1.0, 1.0, 1.0);
 }

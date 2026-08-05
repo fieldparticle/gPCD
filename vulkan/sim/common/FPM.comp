@@ -161,12 +161,17 @@ void fpm_comp_main()
         }
     }
 
+    if (P[SourceID].contactCount == 0u) {
+        ClearCollisionStoredMomentum(SourceID);
+    }
+
     if (!CalcVelocity(SourceID, totalForce)) {
         return;
     }
     if (!ApplySourceMaximumDepth(SourceID, 9401u)) {
         return;
     }
+    UpdateCollisionStoredMomentum(SourceID);
 #if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
     if (!RegisterResolvedPistonContactStep(SourceID)) {
         return;
