@@ -60,9 +60,10 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 	bool				doCap			= MpsApp->GetBool("do_cap", true);
 	bool				stopOnError		= CfgApp->GetBool("application.stopOnError", true);
 	bool				doAutoSingleFile= CfgApp->GetBool("application.doAutoSingleFile", true); 
+	bool				capture_error_frame = CfgApp->GetBool("application.capture_error_frame", true);
 	uint32_t			imgNum			= 0;
-	std::string			oringcap_dir = CfgApp->GetString("application.testfile", true);
-	std::string			out_dir = CfgApp->GetString("application.capture_dir", true);
+	std::string			oringcap_dir	= CfgApp->GetString("application.testfile", true);
+	std::string			out_dir			= CfgApp->GetString("application.capture_dir", true);
 	fs::path p = oringcap_dir;
 
 	std::cout << "Root name      : " << p.root_name() << '\n';
@@ -150,10 +151,10 @@ int Loop(PerfObj* perfObj, TCPObj* tcp,TCPObj* tcpsapp, DrawObj* DrawInstance, V
 			DrawInstance->DrawFrame();
 	
 
-			if(VulkanWin->m_quit_event > 0)
+			if(VulkanWin->m_quit_event > 0 && capture_error_frame == true)
 			{
 				std::ostringstream out_file;
-				out_file << cap_prfx.str() << "_" << VulkanWin->m_FrameNumber-1.0 << ".cap";
+				out_file << cap_prfx.str() << "_" << VulkanWin->m_ActualFrame-1.0 << ".cap";
 				DrawInstance->CaptureFrame(out_file.str());
 				return VulkanWin->m_quit_event;
 			}

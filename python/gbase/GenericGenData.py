@@ -588,9 +588,32 @@ class GenericGenData:
             else:
                 dimensions.append(value)
 
+        particle_data = self.itemcfg.get("PARTICLE_DATA")
+
+        def particle_data_float(name, default):
+            source = particle_data if particle_data and hasattr(particle_data, "get") else self.itemcfg
+            value = source.get(name, self.itemcfg.get(name, default))
+            try:
+                result = float(value)
+            except (TypeError, ValueError):
+                errors.append(f"{name} must be numeric")
+                return default
+            if not math.isfinite(result):
+                errors.append(f"{name} must be finite")
+                return default
+            return result
+
         try:
             target_penetration_fraction = float(
-                self.itemcfg.get(
+                particle_data.get(
+                    "target_penetration_fraction",
+                    self.itemcfg.get(
+                        "target_penetration_fraction",
+                        self.itemcfg.get("max_penetration_fraction", 0.5),
+                    ),
+                )
+                if particle_data and hasattr(particle_data, "get")
+                else self.itemcfg.get(
                     "target_penetration_fraction",
                     self.itemcfg.get("max_penetration_fraction", 0.5),
                 )
@@ -601,11 +624,25 @@ class GenericGenData:
 
         try:
             hard_penetration_fraction = float(
-                self.itemcfg.get("hard_penetration_fraction", 0.75)
+                particle_data.get(
+                    "hard_penetration_fraction",
+                    self.itemcfg.get("hard_penetration_fraction", 0.75),
+                )
+                if particle_data and hasattr(particle_data, "get")
+                else self.itemcfg.get("hard_penetration_fraction", 0.75)
             )
         except (TypeError, ValueError):
             errors.append("hard_penetration_fraction must be numeric")
             hard_penetration_fraction = None
+        min_compression_frames = particle_data_float("min_compression_frames", 3.0)
+        compression_stiffness_gain = particle_data_float(
+            "compression_stiffness_gain",
+            0.0,
+        )
+        compression_stiffness_power = particle_data_float(
+            "compression_stiffness_power",
+            2.0,
+        )
 
         if target_penetration_fraction is not None:
             if not math.isfinite(target_penetration_fraction):
@@ -618,6 +655,13 @@ class GenericGenData:
                 errors.append("hard_penetration_fraction must be finite")
             elif not 0.0 < hard_penetration_fraction < 1.0:
                 errors.append("hard_penetration_fraction must be between 0 and 1")
+        for field_name, field_value in (
+            ("min_compression_frames", min_compression_frames),
+            ("compression_stiffness_gain", compression_stiffness_gain),
+            ("compression_stiffness_power", compression_stiffness_power),
+        ):
+            if field_value < 0.0:
+                errors.append(f"{field_name} must not be negative")
 
         if (
             target_penetration_fraction is not None
@@ -655,7 +699,6 @@ class GenericGenData:
             curve_segments, curve_errors = parse_keyed_curve_wall_segments(raw_segments)
             errors.extend(curve_errors)
 
-        particle_data = self.itemcfg.get("PARTICLE_DATA")
         particles = []
         if not particle_data:
             errors.append("PARTICLE_DATA is required and must not be empty")
@@ -700,7 +743,10 @@ class GenericGenData:
                         "collision_stiffness_q": float(
                             particle.get(
                                 "collision_stiffness_q",
-                                self.itemcfg.get("collision_stiffness_q", 0.0),
+                                particle_data.get(
+                                    "collision_stiffness_q",
+                                    self.itemcfg.get("collision_stiffness_q", 0.0),
+                                ),
                             )
                         ),
                     }
@@ -864,6 +910,11 @@ class GenericGenData:
         self.dt = float(self.itemcfg.dt)
         self.cell_occupancy_list_size = int(self.itemcfg.cell_occupancy_list_size)
         self.boundary_space_lighting_enabled = bool(boundary_space_lighting_enabled)
+        self.target_penetration_fraction = target_penetration_fraction
+        self.hard_penetration_fraction = hard_penetration_fraction
+        self.min_compression_frames = min_compression_frames
+        self.compression_stiffness_gain = compression_stiffness_gain
+        self.compression_stiffness_power = compression_stiffness_power
         return True
 
     def report_collision_feasibility(self):
@@ -875,26 +926,11 @@ class GenericGenData:
             return []
 
         dt = float(self.dt)
-        target_penetration_fraction = float(
-            self.itemcfg.get(
-                "target_penetration_fraction",
-                self.itemcfg.get("max_penetration_fraction", 0.5),
-            )
-        )
-        hard_penetration_fraction = float(
-            self.itemcfg.get("hard_penetration_fraction", 0.75)
-        )
-        min_compression_frames = float(
-            self.itemcfg.get("min_compression_frames", 3.0)
-        )
-        compression_stiffness_gain = max(
-            0.0,
-            float(self.itemcfg.get("compression_stiffness_gain", 0.0)),
-        )
-        compression_stiffness_power = max(
-            0.0,
-            float(self.itemcfg.get("compression_stiffness_power", 2.0)),
-        )
+        target_penetration_fraction = self.target_penetration_fraction
+        hard_penetration_fraction = self.hard_penetration_fraction
+        min_compression_frames = self.min_compression_frames
+        compression_stiffness_gain = max(0.0, self.compression_stiffness_gain)
+        compression_stiffness_power = max(0.0, self.compression_stiffness_power)
         reports = []
 
         lines = [
@@ -3890,12 +3926,24 @@ class GenericGenData:
 
             output.write(f"wall_contact_offset = {self.wall_contact_offset:.9f};\n")
             output.write(
+                "target_penetration_fraction = "
+                f"{float(getattr(self, 'target_penetration_fraction', self.itemcfg.get('target_penetration_fraction', self.itemcfg.get('max_penetration_fraction', 0.5)))):.9f};\n"
+            )
+            output.write(
+                "hard_penetration_fraction = "
+                f"{float(getattr(self, 'hard_penetration_fraction', self.itemcfg.get('hard_penetration_fraction', 0.75))):.9f};\n"
+            )
+            output.write(
+                "min_compression_frames = "
+                f"{float(getattr(self, 'min_compression_frames', self.itemcfg.get('min_compression_frames', 3.0))):.9f};\n"
+            )
+            output.write(
                 "compression_stiffness_gain = "
-                f"{float(self.itemcfg.get('compression_stiffness_gain', 0.0)):.9f};\n"
+                f"{float(getattr(self, 'compression_stiffness_gain', self.itemcfg.get('compression_stiffness_gain', 0.0))):.9f};\n"
             )
             output.write(
                 "compression_stiffness_power = "
-                f"{float(self.itemcfg.get('compression_stiffness_power', 2.0)):.9f};\n"
+                f"{float(getattr(self, 'compression_stiffness_power', self.itemcfg.get('compression_stiffness_power', 2.0))):.9f};\n"
             )
             output.write(f"DT = {self.dt:.9f};\n")
             output.write(

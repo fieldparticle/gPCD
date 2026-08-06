@@ -6,22 +6,8 @@
 // 
 // ============================================================================
 
-// Required: default particle-owned contact stiffness written to Data.y.
-collision_stiffness_q 			= 16.0;
-
-// Required: depth-dependent stiffness shape for current contact dynamics.
-compression_stiffness_gain 		= 8.0;
-compression_stiffness_power 	= 2.0;
-
-// Required: penetration-depth limits for contact compression.
-target_penetration_fraction 	= 0.5;
-hard_penetration_fraction 		= 0.75;
-
-// Required: generation-time compression feasibility threshold.
-min_compression_frames 			= 3.0;
-
 // Required: binary particle file consumed by the Python runner.
-output_file_prefix 				= "CDNozzle_Vk";
+output_file_prefix 				= "CDNozzle_Vk001";
 obj_file_name 					= "C:/_DJ/gPCD/vulkan/sim/CDNozzle/CDNozzle_Vk.obj";
 
 // Required: Python viewer zoom.
@@ -63,9 +49,17 @@ dt								= 0.01;
 particle_streams = (
   {
     name 						= "reservoir_substance";
-    material_id 				= 4;
+    material_id 				= 3;
     radius 						= 0.15;
-    particle_separation_distance = 0.00005;
+    particle_separation_distance = 0.005;
+    particle_spacing_x 			= 0.005;
+    particle_spacing_y 			= 0.005;
+    collision_stiffness_q 		= 16.0;
+    compression_stiffness_gain 	= 8.0;
+    compression_stiffness_power = 2.0;
+    target_penetration_fraction = 0.5;
+    hard_penetration_fraction 	= 0.75;
+    min_compression_frames 		= 3.0;
     stream_velocity 			= [ 0.1, 0.0, 0.0 ];
   }
 );
@@ -99,8 +93,8 @@ curve_wall_segments = {
         function 						= "y_of_x";
         normal_sign 					= -1;
         wall_flag 						= 3;
-		boundary_visual_material_id 	= 5;
-		boundary_particle_material_id	= 5;
+		boundary_visual_material_id 	= 6;
+		boundary_particle_material_id	= 6;
         segments = {
             wall3 = {
                 boundary_kind 	= "reservoir";

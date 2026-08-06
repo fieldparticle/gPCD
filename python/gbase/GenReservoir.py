@@ -102,6 +102,55 @@ class GenReservoir(GenericGenData):
                 errors.append(f"{context}.{name} must not be negative")
             return result
 
+        def optional_stream_nonnegative_float(stream, context, name):
+            value = stream.get(name)
+            if value is None:
+                return None
+            try:
+                result = float(value)
+            except (TypeError, ValueError):
+                errors.append(f"{context}.{name} must be numeric")
+                return None
+            if not math.isfinite(result):
+                errors.append(f"{context}.{name} must be finite")
+            elif result < 0.0:
+                errors.append(f"{context}.{name} must not be negative")
+            return result
+
+        def config_float(name, default):
+            value = self.itemcfg.get(name, default)
+            try:
+                result = float(value)
+            except (TypeError, ValueError):
+                errors.append(f"{name} must be numeric")
+                return default
+            if not math.isfinite(result):
+                errors.append(f"{name} must be finite")
+                return default
+            return result
+
+        def stream_float_or_config(stream, context, name, default):
+            value = stream.get(name)
+            label = f"{context}.{name}"
+            if value is None:
+                value = self.itemcfg.get(name, default)
+                label = name
+            try:
+                result = float(value)
+            except (TypeError, ValueError):
+                errors.append(f"{label} must be numeric")
+                return default
+            if not math.isfinite(result):
+                errors.append(f"{label} must be finite")
+                return default
+            return result
+
+        def stream_nonnegative_float_or_config(stream, context, name, default):
+            result = stream_float_or_config(stream, context, name, default)
+            if result < 0.0:
+                errors.append(f"{context}.{name} must not be negative")
+            return result
+
         def stream_enabled(stream, context):
             value = stream.get("enabled", True)
             if isinstance(value, bool):
@@ -152,16 +201,93 @@ class GenReservoir(GenericGenData):
                 if material_id not in self.material_properties_by_id:
                     errors.append(f"{context}.material_id is not defined")
 
+                particle_spacing_x = optional_stream_nonnegative_float(
+                    stream,
+                    context,
+                    "particle_spacing_x",
+                )
+                particle_spacing_y = optional_stream_nonnegative_float(
+                    stream,
+                    context,
+                    "particle_spacing_y",
+                )
+                if (particle_spacing_x is None) != (particle_spacing_y is None):
+                    errors.append(
+                        f"{context}.particle_spacing_x and "
+                        "particle_spacing_y must be set together"
+                    )
+                particle_separation_distance = stream.get(
+                    "particle_separation_distance"
+                )
+                if particle_spacing_x is None or particle_spacing_y is None:
+                    particle_separation_distance = stream_nonnegative_float(
+                        stream,
+                        context,
+                        "particle_separation_distance",
+                    )
+                    particle_spacing_x = particle_separation_distance
+                    particle_spacing_y = particle_separation_distance
+                else:
+                    try:
+                        particle_separation_distance = float(
+                            particle_separation_distance
+                        )
+                    except (TypeError, ValueError):
+                        particle_separation_distance = particle_spacing_x
+                    if not math.isfinite(particle_separation_distance):
+                        particle_separation_distance = particle_spacing_x
+
+                target_penetration_fraction = stream_float_or_config(
+                    stream,
+                    context,
+                    "target_penetration_fraction",
+                    self.itemcfg.get("max_penetration_fraction", 0.5),
+                )
+                hard_penetration_fraction = stream_float_or_config(
+                    stream,
+                    context,
+                    "hard_penetration_fraction",
+                    0.75,
+                )
+
                 enabled_streams.append(
                     {
                         "name": name,
                         "enabled": True,
                         "material_id": material_id,
                         "radius": stream_positive_float(stream, context, "radius"),
-                        "particle_separation_distance": stream_nonnegative_float(
+                        "particle_separation_distance": particle_separation_distance,
+                        "particle_spacing_x": particle_spacing_x,
+                        "particle_spacing_y": particle_spacing_y,
+                        "collision_stiffness_q": stream_nonnegative_float_or_config(
                             stream,
                             context,
-                            "particle_separation_distance",
+                            "collision_stiffness_q",
+                            0.0,
+                        ),
+                        "compression_stiffness_gain": (
+                            stream_nonnegative_float_or_config(
+                                stream,
+                                context,
+                                "compression_stiffness_gain",
+                                0.0,
+                            )
+                        ),
+                        "compression_stiffness_power": (
+                            stream_nonnegative_float_or_config(
+                                stream,
+                                context,
+                                "compression_stiffness_power",
+                                2.0,
+                            )
+                        ),
+                        "target_penetration_fraction": target_penetration_fraction,
+                        "hard_penetration_fraction": hard_penetration_fraction,
+                        "min_compression_frames": stream_nonnegative_float_or_config(
+                            stream,
+                            context,
+                            "min_compression_frames",
+                            3.0,
                         ),
                         "stream_velocity": stream_values(
                             stream,
@@ -197,24 +323,38 @@ class GenReservoir(GenericGenData):
             else:
                 dimensions.append(value)
 
-        try:
-            target_penetration_fraction = float(
-                self.itemcfg.get(
-                    "target_penetration_fraction",
-                    self.itemcfg.get("max_penetration_fraction", 0.5),
-                )
+        if reservoir_stream is None:
+            target_penetration_fraction = config_float(
+                "target_penetration_fraction",
+                self.itemcfg.get("max_penetration_fraction", 0.5),
             )
-        except (TypeError, ValueError):
-            errors.append("target_penetration_fraction must be numeric")
-            target_penetration_fraction = None
-
-        try:
-            hard_penetration_fraction = float(
-                self.itemcfg.get("hard_penetration_fraction", 0.75)
+            hard_penetration_fraction = config_float(
+                "hard_penetration_fraction",
+                0.75,
             )
-        except (TypeError, ValueError):
-            errors.append("hard_penetration_fraction must be numeric")
-            hard_penetration_fraction = None
+            collision_stiffness_q = config_float("collision_stiffness_q", 0.0)
+            compression_stiffness_gain = config_float(
+                "compression_stiffness_gain",
+                0.0,
+            )
+            compression_stiffness_power = config_float(
+                "compression_stiffness_power",
+                2.0,
+            )
+            min_compression_frames = config_float("min_compression_frames", 3.0)
+        else:
+            target_penetration_fraction = reservoir_stream[
+                "target_penetration_fraction"
+            ]
+            hard_penetration_fraction = reservoir_stream["hard_penetration_fraction"]
+            collision_stiffness_q = reservoir_stream["collision_stiffness_q"]
+            compression_stiffness_gain = reservoir_stream[
+                "compression_stiffness_gain"
+            ]
+            compression_stiffness_power = reservoir_stream[
+                "compression_stiffness_power"
+            ]
+            min_compression_frames = reservoir_stream["min_compression_frames"]
 
         if target_penetration_fraction is not None:
             if not math.isfinite(target_penetration_fraction):
@@ -227,6 +367,17 @@ class GenReservoir(GenericGenData):
                 errors.append("hard_penetration_fraction must be finite")
             elif not 0.0 < hard_penetration_fraction < 1.0:
                 errors.append("hard_penetration_fraction must be between 0 and 1")
+        for field_name, field_value in (
+            ("collision_stiffness_q", collision_stiffness_q),
+            ("compression_stiffness_gain", compression_stiffness_gain),
+            ("compression_stiffness_power", compression_stiffness_power),
+            ("min_compression_frames", min_compression_frames),
+        ):
+            if field_value is not None:
+                if not math.isfinite(field_value):
+                    errors.append(f"{field_name} must be finite")
+                elif field_value < 0.0:
+                    errors.append(f"{field_name} must not be negative")
 
         if (
             target_penetration_fraction is not None
@@ -280,12 +431,18 @@ class GenReservoir(GenericGenData):
             except (TypeError, ValueError):
                 errors.append("particle_separation_distance is required and numeric")
                 particle_separation_distance = None
+            particle_spacing_x = particle_separation_distance
+            particle_spacing_y = particle_separation_distance
         elif reservoir_stream is None:
             particle_separation_distance = None
+            particle_spacing_x = None
+            particle_spacing_y = None
         else:
             particle_separation_distance = reservoir_stream[
                 "particle_separation_distance"
             ]
+            particle_spacing_x = reservoir_stream["particle_spacing_x"]
+            particle_spacing_y = reservoir_stream["particle_spacing_y"]
 
         piston_start_frame = self.itemcfg.get("piston_start_frame", 0)
         try:
@@ -306,6 +463,15 @@ class GenReservoir(GenericGenData):
                 errors.append("particle_separation_distance must be finite")
             elif particle_separation_distance < 0.0:
                 errors.append("particle_separation_distance must not be negative")
+        for spacing_name, spacing_value in (
+            ("particle_spacing_x", particle_spacing_x),
+            ("particle_spacing_y", particle_spacing_y),
+        ):
+            if spacing_value is not None:
+                if not math.isfinite(spacing_value):
+                    errors.append(f"{spacing_name} must be finite")
+                elif spacing_value < 0.0:
+                    errors.append(f"{spacing_name} must not be negative")
 
         if piston_start_frame_value is not None:
             if not math.isfinite(piston_start_frame_value):
@@ -432,6 +598,14 @@ class GenReservoir(GenericGenData):
         self.piston_enabled = piston_enabled
         self.piston_velocity = piston_velocity
         self.particle_separation_distance = particle_separation_distance
+        self.particle_spacing_x = particle_spacing_x
+        self.particle_spacing_y = particle_spacing_y
+        self.collision_stiffness_q = collision_stiffness_q
+        self.compression_stiffness_gain = compression_stiffness_gain
+        self.compression_stiffness_power = compression_stiffness_power
+        self.target_penetration_fraction = target_penetration_fraction
+        self.hard_penetration_fraction = hard_penetration_fraction
+        self.min_compression_frames = min_compression_frames
         self.piston_start_frame = int(piston_start_frame_value)
         self.number_configured_particles = 0
         self.explicit_particles = []
@@ -468,7 +642,8 @@ class GenReservoir(GenericGenData):
 
     def calculate_chamber_packing(self):
         radius = self.radius
-        center_spacing = 2.0 * radius + self.particle_separation_distance
+        center_spacing_x = 2.0 * radius + self.particle_spacing_x
+        center_spacing_y = 2.0 * radius + self.particle_spacing_y
         boundary_clearance = radius * (1.0 + self.wall_contact_offset) + 1.0e-9
         x_start, x_end, y_bottom, y_top = self.packing_bounds
 
@@ -482,17 +657,19 @@ class GenReservoir(GenericGenData):
         if usable_x < 0.0 or usable_y < 0.0:
             raise ValueError("packing bounds are too small for particle clearance")
 
-        x_count = int(math.floor((usable_x / center_spacing) + 1.0e-12)) + 1
-        y_count = int(math.floor((usable_y / center_spacing) + 1.0e-12)) + 1
-        occupied_x = (x_count - 1) * center_spacing
-        occupied_y = (y_count - 1) * center_spacing
+        x_count = int(math.floor((usable_x / center_spacing_x) + 1.0e-12)) + 1
+        y_count = int(math.floor((usable_y / center_spacing_y) + 1.0e-12)) + 1
+        occupied_x = (x_count - 1) * center_spacing_x
+        occupied_y = (y_count - 1) * center_spacing_y
         first_x = x_center_min + 0.5 * (usable_x - occupied_x)
         first_y = y_center_min + 0.5 * (usable_y - occupied_y)
 
         self.packing_x_count = x_count
         self.packing_y_count = y_count
         self.packing_particle_count = x_count * y_count
-        self.particle_center_spacing = center_spacing
+        self.particle_center_spacing = center_spacing_x
+        self.particle_center_spacing_x = center_spacing_x
+        self.particle_center_spacing_y = center_spacing_y
         self.boundary_particle_clearance = boundary_clearance
         self.packing_first_center = (first_x, first_y, self.particle_plane_z)
         self.packing_last_center = (
@@ -508,7 +685,10 @@ class GenReservoir(GenericGenData):
             f"  piston x range: {self.piston_x_start:g} to {self.piston_x_stop:g}\n"
             f"  radius: {radius:g}\n"
             f"  surface separation: {self.particle_separation_distance:g}\n"
-            f"  center spacing: {center_spacing:g}\n"
+            f"  particle spacing x: {self.particle_spacing_x:g}\n"
+            f"  particle spacing y: {self.particle_spacing_y:g}\n"
+            f"  center spacing x: {center_spacing_x:g}\n"
+            f"  center spacing y: {center_spacing_y:g}\n"
             f"  boundary clearance: {boundary_clearance:g}\n"
             f"  grid: {x_count} columns x {y_count} rows\n"
             f"  particle count: {self.packing_particle_count}\n"
@@ -525,17 +705,15 @@ class GenReservoir(GenericGenData):
         velocity = self.stream_velocity
 
         for column in range(self.packing_x_count):
-            particle_x = first_x + column * self.particle_center_spacing
+            particle_x = first_x + column * self.particle_center_spacing_x
             for row in range(self.packing_y_count):
-                particle_y = first_y + row * self.particle_center_spacing
+                particle_y = first_y + row * self.particle_center_spacing_y
                 self.add_mobile_particle(
                     (particle_x, particle_y, particle_z),
                     velocity,
                     radius=self.radius,
                     material_id=self.reservoir_material_id,
-                    collision_stiffness_q=float(
-                        self.itemcfg.get("collision_stiffness_q", 0.0)
-                    ),
+                    collision_stiffness_q=self.collision_stiffness_q,
                 )
 
         report_text = (
@@ -551,26 +729,11 @@ class GenReservoir(GenericGenData):
 
     def report_collision_feasibility(self):
         """Print piston-driven collision timing estimates for reservoir packing."""
-        min_compression_frames = float(
-            self.itemcfg.get("min_compression_frames", 3.0)
-        )
-        target_penetration_fraction = float(
-            self.itemcfg.get(
-                "target_penetration_fraction",
-                self.itemcfg.get("max_penetration_fraction", 0.5),
-            )
-        )
-        hard_penetration_fraction = float(
-            self.itemcfg.get("hard_penetration_fraction", 0.75)
-        )
-        compression_stiffness_gain = max(
-            0.0,
-            float(self.itemcfg.get("compression_stiffness_gain", 0.0)),
-        )
-        compression_stiffness_power = max(
-            0.0,
-            float(self.itemcfg.get("compression_stiffness_power", 2.0)),
-        )
+        min_compression_frames = self.min_compression_frames
+        target_penetration_fraction = self.target_penetration_fraction
+        hard_penetration_fraction = self.hard_penetration_fraction
+        compression_stiffness_gain = max(0.0, self.compression_stiffness_gain)
+        compression_stiffness_power = max(0.0, self.compression_stiffness_power)
         piston_normal_speed = abs(float(self.piston_velocity[0]))
         per_frame_closing_distance = piston_normal_speed * self.dt
         target_penetration_depth = target_penetration_fraction * self.radius
@@ -590,7 +753,7 @@ class GenReservoir(GenericGenData):
 
         first_x, _first_y, _particle_z = self.packing_first_center
         piston_to_first_gap = first_x - self.radius - self.piston_x_start
-        particle_gap = self.particle_separation_distance
+        particle_gap = self.particle_spacing_x
 
         def frames_for_distance(distance):
             if distance <= 0.0:
@@ -607,7 +770,7 @@ class GenReservoir(GenericGenData):
         time_to_neighbor_contact = frames_to_neighbor_contact * self.dt
         time_to_target_depth = frames_to_target_depth * self.dt
         time_to_hard_depth = frames_to_hard_depth * self.dt
-        stiffness_at_contact = float(self.itemcfg.get("collision_stiffness_q", 0.0))
+        stiffness_at_contact = self.collision_stiffness_q
         if (
             compression_stiffness_gain > 0.0
             and hard_penetration_depth > 0.0

@@ -1,10 +1,15 @@
 Current status:
-	- FPM internal momentum display now tracks collision-start stored momentum instead of raw parms.yzw.
-	- HAS_SPHERE has been restored to particle sphere rendering, with HAS_LIGHTING_SPHERE separated for LightingBall.
+	- Added true wall ghost contact placement for function-wall collisions.
+	- Added separate reservoir particle_spacing_x and particle_spacing_y controls.
+	- Moved CDNozzle stream contact/compression settings into particle_streams.
+	- Moved batch explicit-particle contact/compression settings into PARTICLE_DATA.
+	- Updated Dynamics docs for the new contact configuration ownership and wall ghost model.
 
 Code Changes:
-	- Added Python and Vulkan collision-start momentum display fields and coloring path.
-	- Updated shader generation so INTERNAL_MOMENTUM reads collisionStoredMomentum.w.
-	- Updated project docs with the new internal-momentum diagnostic and sphere define split.
+	- GenReservoir now parses stream-owned spacing and contact/compression fields.
+	- GenericGenData now reads explicit-particle contact defaults from PARTICLE_DATA.
+	- Batch cfg items were migrated to the new PARTICLE_DATA shape.
+	- CDNozzle includes were migrated to stream-owned contact settings.
+	- Python/Vulkan generated shader/config outputs were refreshed for the current CDNozzle path.
 
-Next: Run TwoParticleHorizontal with material 3 and end_mom = 0.055, then verify Vulkan coloring does not exceed red unless stored momentum exceeds the starting momentum budget.
+Next: Run GenData for CDNozzle and batch_test_001, fix the missing TwoParticleAngledGrazed.cfg reference, then compare new nozzle captures for transverse scatter with x/y spacing tuned independently.

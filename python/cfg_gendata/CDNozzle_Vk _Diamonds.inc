@@ -6,22 +6,8 @@
 // 
 // ============================================================================
 
-// Required: default particle-owned contact stiffness written to Data.y.
-collision_stiffness_q 			= 16.0;
-
-// Required: depth-dependent stiffness shape for current contact dynamics.
-compression_stiffness_gain 		= 8.0;
-compression_stiffness_power 	= 2.0;
-
-// Required: penetration-depth limits for contact compression.
-target_penetration_fraction 	= 0.5;
-hard_penetration_fraction 		= 0.75;
-
-// Required: generation-time compression feasibility threshold.
-min_compression_frames 			= 3.0;
-
 // Required: simulation timestep.
-dt								= 0.025;
+dt								= 0.1;
 
 // Required: binary particle file consumed by the Python runner.
 output_file_prefix 				= "CDNozzle_Vk";
@@ -44,7 +30,7 @@ cell_array_width 		= 500;
 cell_array_height 		= 40;
 cell_array_depth 		= 5;
 
-view_center 			= [250, 25, 2];
+view_center 			= [450, 25, 2];
 
 // Frame when the piston begins moving.
 piston_start_frame 		= 20;
@@ -65,10 +51,20 @@ death_bounds 			= [
 particle_streams = (
   {
     name 						= "reservoir_substance";
-    material_id 				= 1;
-    radius 						= 0.15;
-    particle_separation_distance = 0.0005;
-    stream_velocity 			= [ 0.5, 0.0, 0.0 ];
+	material_id 				= 3;
+    radius 						= 0.05;
+	//was 0.0005
+    particle_separation_distance = 0.15;
+    particle_spacing_x 			= 0.05;
+    particle_spacing_y 			= 0.15;
+    collision_stiffness_q 		= 0.05;
+    compression_stiffness_gain 	= 1.0;
+    compression_stiffness_power = 1.0;
+    target_penetration_fraction = 0.5;
+    hard_penetration_fraction 	= 0.75;
+    min_compression_frames 		= 3.0;
+	//was 0.5
+    stream_velocity 			= [ 0.002, 0.0, 0.0 ];
   }
 );
 
@@ -121,9 +117,9 @@ curve_wall_segments = {
             segment05 = {
                 boundary_kind 	= "regular";
                 length 			= 20;
-                a1 				= 0.25;
-                a2 				= -0.00625;
-                a3 				= 0;
+                a1 				= 0;
+                a2 				= 0.01875;
+                a3 				= -0.000625;
             };
             segment07 = {
                 boundary_kind 	= "regular";
@@ -172,9 +168,9 @@ curve_wall_segments = {
             segment06 = {
                 boundary_kind 	= "regular";
                 length 			= 20;
-                a1 				= -0.25;
-                a2			 	= 0.00625;
-                a3 				= 0;
+                a1 				= 0;
+                a2			 	= -0.01875;
+                a3 				= 0.000625;
             };
             segment08 = {
                 boundary_kind 	= "regular";

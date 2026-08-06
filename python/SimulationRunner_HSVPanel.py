@@ -898,6 +898,46 @@ def _has_active_wall_contact(particle):
     return False
 
 
+def _draw_wall_ghost_particles(screen, particles, dynamics, view_box):
+    screen_width, screen_height = screen.get_size()
+    for index, particle in enumerate(particles):
+        if not _is_visible_particle(index, particle, dynamics):
+            continue
+        if _is_boundary_particle(index, particle, dynamics):
+            continue
+        position = _runtime_particle_position(index, particle, dynamics)
+        particle_radius = _particle_radius(particle)
+        ghost_radius = _radius_to_pixels(
+            particle_radius,
+            view_box,
+            screen_width,
+            screen_height,
+        )
+        contacts = getattr(particle, "contacts", getattr(particle, "gcs", []))
+        for contact in contacts:
+            ids = getattr(contact, "ids", None)
+            geom = getattr(contact, "geom", None)
+            aux = getattr(contact, "aux", None)
+            if ids is None or geom is None or aux is None:
+                continue
+            if int(getattr(ids, "y", 0)) != 2 or int(getattr(ids, "w", 0)) != 1:
+                continue
+            center_distance = float(getattr(aux, "x", 0.0))
+            if center_distance <= 0.0:
+                continue
+            ghost_x = float(position.x) + float(getattr(geom, "x", 0.0)) * center_distance
+            ghost_y = float(position.y) + float(getattr(geom, "y", 0.0)) * center_distance
+            ghost_center = _to_screen(
+                ghost_x,
+                ghost_y,
+                view_box,
+                screen_width,
+                screen_height,
+            )
+            pygame.draw.circle(screen, (80, 190, 255), ghost_center, ghost_radius, 2)
+            pygame.draw.circle(screen, (255, 255, 255), ghost_center, max(2, ghost_radius // 4))
+
+
 def _run_start_diagnostics(dynamics):
     particles = dynamics.particles
     ke = _total_kinetic_energy(particles, dynamics)
@@ -1263,6 +1303,7 @@ def _draw_particles(
                 if fill is None:
                     continue
                 pygame.draw.circle(screen, fill, center, radius)
+        _draw_wall_ghost_particles(screen, particles, dynamics, view_box)
         _draw_piston(screen, run_configuration, dynamics, frame_number, view_box)
         return
 
@@ -1294,6 +1335,7 @@ def _draw_particles(
             if fill is None:
                 continue
             pygame.draw.circle(screen, fill, center, 1)
+        _draw_wall_ghost_particles(screen, particles, dynamics, view_box)
         return
 
     motion_summary = _motion_summary(
@@ -1390,6 +1432,7 @@ def _draw_particles(
                     target_radius,
                 )
 
+    _draw_wall_ghost_particles(screen, particles, dynamics, view_box)
     _draw_piston(screen, run_configuration, dynamics, frame_number, view_box)
     _draw_piston_status_overlay(
         screen,

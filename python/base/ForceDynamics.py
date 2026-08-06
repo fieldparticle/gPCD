@@ -326,13 +326,20 @@ class ForceContactDynamics:
         if wall_flag <= 0:
             return None
 
-        radius = float(self.particles[SourceID].Data.x)
-        penetration_depth = physical_penetration(segment, source_point, radius)
-        if penetration_depth is None or penetration_depth <= self.EPSILON:
-            return None
         normal_x, normal_y = evaluation["normal"]
+        wall_x, wall_y = evaluation["wall_point"]
+        radius = float(self.particles[SourceID].Data.x)
+        offset = self.WallContactOffsetDistance(radius)
+        ghost_x = wall_x + normal_x * (radius - offset)
+        ghost_y = wall_y + normal_y * (radius - offset)
+        ghost_z = float(source_position.z)
+        dx = ghost_x - float(source_position.x)
+        dy = ghost_y - float(source_position.y)
+        dz = ghost_z - float(source_position.z)
+        center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if center_distance >= 2.0 * radius:
+            return None
         normal = (normal_x, normal_y, 0.0)
-        center_distance = max(0.0, 2.0 * radius - penetration_depth)
         overlap_area = self.particle_overlap_area(
             radius,
             radius,

@@ -260,7 +260,7 @@ vec4 color_from_color_map(vec4 value, uint materialID, uint colorMode, uint colo
         }
         return vec4(
             colorizeVelocity(
-                scalar,
+                value.x,
                 VELOCITY_ANGLE_COLOR_SAT,
                 VELOCITY_ANGLE_COLOR_VAL
             ),

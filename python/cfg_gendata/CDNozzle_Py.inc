@@ -6,20 +6,6 @@
 // 
 // ============================================================================
 
-// Required: default particle-owned contact stiffness written to Data.y.
-collision_stiffness_q = 0.5;
-
-// Required: depth-dependent stiffness shape for current contact dynamics.
-compression_stiffness_gain = 8.0;
-compression_stiffness_power = 2.0;
-
-// Required: penetration-depth limits for contact compression.
-target_penetration_fraction = 0.5;
-hard_penetration_fraction = 0.75;
-
-// Required: generation-time compression feasibility threshold.
-min_compression_frames = 3.0;
-
 // Required: simulation timestep.
 dt= 0.5;
 
@@ -67,6 +53,14 @@ particle_streams = (
     material_id = 1;
     radius = 0.25;
     particle_separation_distance = 1.0;
+    particle_spacing_x = 1.0;
+    particle_spacing_y = 1.0;
+    collision_stiffness_q = 0.5;
+    compression_stiffness_gain = 8.0;
+    compression_stiffness_power = 2.0;
+    target_penetration_fraction = 0.5;
+    hard_penetration_fraction = 0.75;
+    min_compression_frames = 3.0;
     stream_velocity = [ 0.05, 0.0, 0.0 ];
   }
 );

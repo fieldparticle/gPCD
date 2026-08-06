@@ -105,12 +105,12 @@ BoundaryWallSegment EvaluateFunctionWallSegment(uint SourceID, uint BoundaryID)
     }
 
     float radius = P[SourceID].Data.x;
-    float penetrationDepth = FunctionWallPhysicalPenetration(
-        selected,
-        sourcePosition.xy,
-        radius);
-    if (penetrationDepth <= EPSILON) {
-        float centerDistance = max(0.0, 2.0 * radius - penetrationDepth);
+    float offset = WallContactOffsetDistance(radius);
+    vec3 ghost = vec3(
+        wallPoint + normal2d * (radius - offset),
+        sourcePosition.z);
+    float centerDistance = length(ghost - sourcePosition);
+    if (centerDistance >= 2.0 * radius) {
         return BoundaryWallSegment(
             vec3(normal2d, 0.0),
             0.0,
@@ -119,7 +119,6 @@ BoundaryWallSegment EvaluateFunctionWallSegment(uint SourceID, uint BoundaryID)
             false);
     }
 
-    float centerDistance = max(0.0, 2.0 * radius - penetrationDepth);
     float overlapArea = particle_overlap_area(radius, radius, centerDistance);
     return BoundaryWallSegment(
         vec3(normal2d, 0.0),

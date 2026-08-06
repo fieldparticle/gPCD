@@ -90,7 +90,7 @@ void ResourceCollMatrix::createBuffers()
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
-        if (CfgApp->GetBool("application.auto_cap_frames", true))
+        if (CfgApp->GetBool("application.auto_cap_frames", true) || CfgApp->GetBool("application.capture_error_frame", true))
         {
             mout << "PERFORMANCE WARING: Capture is enabled so Vertex Particle is in host-transfer mode" << ende;
             usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
