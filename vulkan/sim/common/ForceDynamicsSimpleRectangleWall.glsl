@@ -82,10 +82,10 @@ RectangleWallSegment SelectRectangleWallSegment(uint SourceID, uint BoundaryID)
     return selected;
 }
 
-// Python source: ForceDynamics.py:362
-BoundaryWallSegment EvaluateRectangleWallSegment(uint SourceID, uint BoundaryID)
+// Python source: ForceDynamics.py:407
+BoundaryWallSegment EvaluateRectangleWallSegmentContact(
+    uint SourceID, RectangleWallSegment selected)
 {
-    RectangleWallSegment selected = SelectRectangleWallSegment(SourceID, BoundaryID);
     vec3 sourcePosition = GetParticlePosition(SourceID).xyz;
     float radius = P[SourceID].Data.x;
     float penetrationDepth = RectangleWallPhysicalPenetration(
@@ -104,6 +104,11 @@ BoundaryWallSegment EvaluateRectangleWallSegment(uint SourceID, uint BoundaryID)
             0.0,
             centerDistance,
             selected.wallFlag,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
             false);
     }
 
@@ -114,7 +119,69 @@ BoundaryWallSegment EvaluateRectangleWallSegment(uint SourceID, uint BoundaryID)
         overlapArea,
         centerDistance,
         selected.wallFlag,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
         true);
+}
+
+BoundaryWallSegment EvaluateRectangleWallSegment(uint SourceID, uint BoundaryID)
+{
+    RectangleWallSegment selected = SelectRectangleWallSegment(SourceID, BoundaryID);
+    return EvaluateRectangleWallSegmentContact(SourceID, selected);
+}
+
+BoundaryWallContactSet EvaluateRectangleWallContacts(uint SourceID)
+{
+    BoundaryWallContactSet contacts;
+    contacts.count = 0u;
+    float sourceRadius = P[SourceID].Data.x;
+
+    for (uint segmentIndex = 0u;
+            segmentIndex < RECTANGLE_WALL_SEGMENT_COUNT;
+            ++segmentIndex) {
+        BoundaryWallSegment segment = EvaluateRectangleWallSegmentContact(
+            SourceID,
+            RECTANGLE_WALL_SEGMENTS[segmentIndex]);
+        if (!segment.valid) {
+            continue;
+        }
+
+        float penetrationDepth = ParticlePenetrationDepth(
+            sourceRadius,
+            sourceRadius,
+            segment.centerDistance);
+        bool replaced = false;
+        for (uint contactIndex = 0u;
+                contactIndex < contacts.count;
+                ++contactIndex) {
+            if (contacts.segments[contactIndex].wallFlag != segment.wallFlag) {
+                continue;
+            }
+            float previousDepth = ParticlePenetrationDepth(
+                sourceRadius,
+                sourceRadius,
+                contacts.segments[contactIndex].centerDistance);
+            if (penetrationDepth > previousDepth) {
+                contacts.segments[contactIndex] = segment;
+            }
+            replaced = true;
+            break;
+        }
+        if (replaced) {
+            continue;
+        }
+        if (contacts.count >= DUP_LIST_SIZE) {
+            SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+            return contacts;
+        }
+        contacts.segments[contacts.count] = segment;
+        contacts.count += 1u;
+    }
+
+    return contacts;
 }
 
 #endif

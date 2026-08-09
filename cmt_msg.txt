@@ -1,15 +1,12 @@
 Current status:
-	- Added true wall ghost contact placement for function-wall collisions.
-	- Added separate reservoir particle_spacing_x and particle_spacing_y controls.
-	- Moved CDNozzle stream contact/compression settings into particle_streams.
-	- Moved batch explicit-particle contact/compression settings into PARTICLE_DATA.
-	- Updated Dynamics docs for the new contact configuration ownership and wall ghost model.
+    - Wall-owned stiffness changes are reaching generated Vulkan wall metadata.
+    - The lower-wall visual response is dominated by velocity constraints, not soft wall stiffness.
+    - CDNozzle_Vk.inc is now heavily documented as the reference nozzle include.
 
 Code Changes:
-	- GenReservoir now parses stream-owned spacing and contact/compression fields.
-	- GenericGenData now reads explicit-particle contact defaults from PARTICLE_DATA.
-	- Batch cfg items were migrated to the new PARTICLE_DATA shape.
-	- CDNozzle includes were migrated to stream-owned contact settings.
-	- Python/Vulkan generated shader/config outputs were refreshed for the current CDNozzle path.
+    - Documented CDNozzle_Vk.inc with nozzle stations, stream packing, wall semantics, and segment intent.
+    - Updated dynamics docs to distinguish wall soft force from wall velocity constraints.
+    - Added ProblemEvolution notes for wall stiffness versus constraint behavior.
+    - Added ProblemEvolution notes for the CDNozzle Vulkan reference include.
 
-Next: Run GenData for CDNozzle and batch_test_001, fix the missing TwoParticleAngledGrazed.cfg reference, then compare new nozzle captures for transverse scatter with x/y spacing tuned independently.
+Next: Add explicit per-wall controls for max-depth/contact-step constraints so wall force and wall containment can be isolated.

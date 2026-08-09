@@ -212,6 +212,9 @@ const float HARD_PENETRATION_FRACTION = 0.75;
 const uint CONTACT_PARTICLE = 1u;
 const uint CONTACT_WALL = 2u;
 const uint CONTACT_ACTIVE_THIS_FRAME = 1u;
+const float TEMP_VEL_TYPE_NONE = 0.0;
+const float TEMP_VEL_TYPE_DIRECTIONAL = 1.0;
+const float TEMP_VEL_TYPE_MAGNITUDE = 2.0;
 const uint ERROR_NONE = 0u;
 const uint ERROR_INVALID_DT = 3u;
 const uint ERROR_CONTACT_LIST_MISSING = 4u;
@@ -237,7 +240,18 @@ struct BoundaryWallSegment
     float overlapArea;
     float centerDistance;
     uint wallFlag;
+    float wallCollisionStiffnessQ;
+    float wallTargetPenetrationFraction;
+    float wallHardPenetrationFraction;
+    float wallCompressionStiffnessGain;
+    float wallCompressionStiffnessPower;
     bool valid;
+}};
+
+struct BoundaryWallContactSet
+{{
+    uint count;
+    BoundaryWallSegment segments[DUP_LIST_SIZE];
 }};
 
 struct ContactForceInput
@@ -248,6 +262,11 @@ struct ContactForceInput
     float overlapArea;
     float penetrationDepth;
     vec3 targetVelocity;
+    float wallCollisionStiffnessQ;
+    float wallTargetPenetrationFraction;
+    float wallHardPenetrationFraction;
+    float wallCompressionStiffnessGain;
+    float wallCompressionStiffnessPower;
     bool valid;
 }};
 
@@ -443,6 +462,44 @@ float GetParticleMass(uint ParticleID)
     return max(P[ParticleID].parms.x, EPSILON);
 }}
 
+bool IsTempVelocityDirectional(uint ParticleID)
+{{
+    return abs(P[ParticleID].tempParams.x - TEMP_VEL_TYPE_DIRECTIONAL) < 0.5;
+}}
+
+bool IsTempVelocityMagnitude(uint ParticleID)
+{{
+    return abs(P[ParticleID].tempParams.x - TEMP_VEL_TYPE_MAGNITUDE) < 0.5;
+}}
+
+void ApplyTempVelocity(uint SourceID)
+{{
+    bool directionalMode = IsTempVelocityDirectional(SourceID);
+    bool magnitudeMode = IsTempVelocityMagnitude(SourceID);
+    if (!directionalMode && !magnitudeMode) {{
+        return;
+    }}
+    float rate = clamp(P[SourceID].tempParams.y, 0.0, 1.0);
+    if (rate <= 0.0) {{
+        return;
+    }}
+
+    vec4 velocity = GetNextParticleVelocity(SourceID);
+    if (directionalMode) {{
+        velocity.xyz = mix(velocity.xyz, P[SourceID].tempVelocity.xyz, rate);
+    }} else {{
+        float targetSpeed = max(0.0, P[SourceID].tempVelocity.x);
+        float speed = length(velocity.xyz);
+        if (speed <= EPSILON) {{
+            return;
+        }}
+        float nextSpeed = mix(speed, targetSpeed, rate);
+        velocity.xyz = normalize(velocity.xyz) * nextSpeed;
+    }}
+    velocity.w = VelocityAngle(velocity.x, velocity.y);
+    SetNextParticleVelocity(SourceID, velocity);
+}}
+
 void ClearCollisionStoredMomentum(uint SourceID)
 {{
     P[SourceID].collisionStartMomentum = vec4(0.0);
@@ -482,43 +539,58 @@ void UpdateCollisionStoredMomentum(uint SourceID)
         storedMagnitude);
 }}
 
-float GetContactTargetDepth(float sourceRadius);
-float GetContactHardDepth(float sourceRadius);
-float GetContactRemainingDepth(float sourceRadius, float penetrationDepth);
+float GetContactTargetDepth(ContactForceInput contact, float sourceRadius);
+float GetContactHardDepth(ContactForceInput contact, float sourceRadius);
+float GetContactRemainingDepth(ContactForceInput contact, float sourceRadius, float penetrationDepth);
 
 float GetPairStiffness(uint SourceID, uint TargetID)
 {{
     return max(0.0, 0.5 * (P[SourceID].Data.y + P[TargetID].Data.y));
 }}
 
-float GetContactStiffness(uint SourceID, uint TargetID, uint contactType)
+float GetContactStiffness(uint SourceID, uint TargetID, ContactForceInput contact)
 {{
+    uint contactType = contact.contactType;
     if (contactType == CONTACT_WALL) {{
+        if (contact.wallCollisionStiffnessQ >= 0.0) {{
+            return contact.wallCollisionStiffnessQ;
+        }}
         return max(0.0, P[SourceID].Data.y);
     }}
     return GetPairStiffness(SourceID, TargetID);
 }}
 
-float GetCompressionStiffnessGain()
+float GetCompressionStiffnessGain(ContactForceInput contact)
 {{
+    if (contact.contactType == CONTACT_WALL
+            && contact.wallCompressionStiffnessGain >= 0.0) {{
+        return contact.wallCompressionStiffnessGain;
+    }}
     return max(0.0, FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_GAIN);
 }}
 
-float GetCompressionStiffnessPower()
+float GetCompressionStiffnessPower(ContactForceInput contact)
 {{
+    if (contact.contactType == CONTACT_WALL
+            && contact.wallCompressionStiffnessPower >= 0.0) {{
+        return contact.wallCompressionStiffnessPower;
+    }}
     return max(0.0, FORCE_DYNAMICS_SIMPLE_COMPRESSION_STIFFNESS_POWER);
 }}
 
 float GetEffectiveContactStiffness(
-    float baseStiffness, float penetrationDepth, float sourceRadius)
+    ContactForceInput contact,
+    float baseStiffness,
+    float penetrationDepth,
+    float sourceRadius)
 {{
     float stiffness = max(0.0, baseStiffness);
-    float gain = GetCompressionStiffnessGain();
+    float gain = GetCompressionStiffnessGain(contact);
     if (stiffness <= 0.0 || gain <= 0.0) {{
         return stiffness;
     }}
 
-    float hardDepth = GetContactHardDepth(sourceRadius);
+    float hardDepth = GetContactHardDepth(contact, sourceRadius);
     if (hardDepth <= EPSILON) {{
         return stiffness;
     }}
@@ -526,7 +598,7 @@ float GetEffectiveContactStiffness(
     float compressionFraction = clamp(
         penetrationDepth / hardDepth, 0.0, 1.0);
     return stiffness * (
-        1.0 + gain * pow(compressionFraction, GetCompressionStiffnessPower()));
+        1.0 + gain * pow(compressionFraction, GetCompressionStiffnessPower(contact)));
 }}
 
 float WallContactOffsetDistance(float radius)
@@ -557,32 +629,49 @@ ParticleGeometry GetParticleGeometry(uint SourceID, uint TargetID)
 }}
 
 bool CheckPenetrationStepResolution(
-    uint SourceID, vec3 normal, float sourceRadius, vec3 targetVelocity)
+    uint SourceID,
+    vec3 normal,
+    float sourceRadius,
+    vec3 targetVelocity,
+    uint contactType,
+    float wallHardPenetrationFraction)
 {{
     vec3 sourceVelocity = GetStartFrameVelocity(SourceID).xyz;
     float relativeNormalVelocity = dot(targetVelocity - sourceVelocity, normal);
     float inwardDisplacement = max(
         0.0, -relativeNormalVelocity * ShaderFlags.dt);
-    float penetrationReserve = GetContactHardDepth(sourceRadius);
+    float penetrationReserve =
+        (contactType == CONTACT_WALL && wallHardPenetrationFraction > 0.0)
+        ? wallHardPenetrationFraction * sourceRadius
+        : HARD_PENETRATION_FRACTION * sourceRadius;
     if (inwardDisplacement > penetrationReserve + EPSILON) {{
         return SetErrorDetail(ERROR_PENETRATION_STEP_TOO_LARGE, SourceID, 1001u);
     }}
     return true;
 }}
 
-float GetContactTargetDepth(float sourceRadius)
+float GetContactTargetDepth(ContactForceInput contact, float sourceRadius)
 {{
+    if (contact.contactType == CONTACT_WALL
+            && contact.wallTargetPenetrationFraction > 0.0) {{
+        return contact.wallTargetPenetrationFraction * sourceRadius;
+    }}
     return TARGET_PENETRATION_FRACTION * sourceRadius;
 }}
 
-float GetContactHardDepth(float sourceRadius)
+float GetContactHardDepth(ContactForceInput contact, float sourceRadius)
 {{
+    if (contact.contactType == CONTACT_WALL
+            && contact.wallHardPenetrationFraction > 0.0) {{
+        return contact.wallHardPenetrationFraction * sourceRadius;
+    }}
     return HARD_PENETRATION_FRACTION * sourceRadius;
 }}
 
-float GetContactRemainingDepth(float sourceRadius, float penetrationDepth)
+float GetContactRemainingDepth(
+    ContactForceInput contact, float sourceRadius, float penetrationDepth)
 {{
-    return GetContactHardDepth(sourceRadius) - penetrationDepth;
+    return GetContactHardDepth(contact, sourceRadius) - penetrationDepth;
 }}
 
 float GetContactInwardDisplacement(
@@ -597,10 +686,16 @@ bool CheckResolvedContactStep(
     vec3 normal,
     float penetrationDepth,
     float sourceRadius,
-    vec3 targetVelocity)
+    vec3 targetVelocity,
+    uint contactType,
+    float wallHardPenetrationFraction)
 {{
-    float remainingDepth = GetContactRemainingDepth(sourceRadius, penetrationDepth);
-    if (penetrationDepth > GetContactHardDepth(sourceRadius) + EPSILON) {{
+    float hardDepth =
+        (contactType == CONTACT_WALL && wallHardPenetrationFraction > 0.0)
+        ? wallHardPenetrationFraction * sourceRadius
+        : HARD_PENETRATION_FRACTION * sourceRadius;
+    float remainingDepth = hardDepth - penetrationDepth;
+    if (penetrationDepth > hardDepth + EPSILON) {{
         return SetErrorDetail(ERROR_MAX_DEPTH_CONSTRAINT, SourceID, 9001u);
     }}
 
@@ -631,7 +726,9 @@ bool CheckResolvedParticleContactStep(
         geometry.normal,
         penetrationDepth,
         geometry.sourceRadius,
-        GetStartFrameVelocity(TargetID).xyz);
+        GetStartFrameVelocity(TargetID).xyz,
+        CONTACT_PARTICLE,
+        -1.0);
 }}
 
 bool CheckResolvedFunctionWallContactStep(
@@ -649,7 +746,9 @@ bool CheckResolvedFunctionWallContactStep(
         segment.normal,
         penetrationDepth,
         sourceRadius,
-        vec3(0.0));
+        vec3(0.0),
+        CONTACT_WALL,
+        segment.wallHardPenetrationFraction);
 }}
 
 ParticleGeometry GetPhysicalParticleContact(uint SourceID, uint TargetID)
@@ -668,7 +767,9 @@ ParticleGeometry GetPhysicalParticleContact(uint SourceID, uint TargetID)
             SourceID,
             geometry.normal,
             geometry.sourceRadius,
-            GetStartFrameVelocity(TargetID).xyz)) {{
+            GetStartFrameVelocity(TargetID).xyz,
+            CONTACT_PARTICLE,
+            -1.0)) {{
         return ParticleGeometry(vec3(0.0), 0.0, geometry.centerDistance,
             geometry.sourceRadius, geometry.targetRadius, false);
     }}
@@ -680,14 +781,19 @@ bool RegisterMaximumDepthConstraint(
     vec3 normal,
     float penetrationDepth,
     float sourceRadius,
-    vec3 targetVelocity)
+    vec3 targetVelocity,
+    uint contactType,
+    float wallTargetPenetrationFraction)
 {{
     if (maximumDepthConstraintOwner != SourceID) {{
         maximumDepthConstraintOwner = SourceID;
         maximumDepthConstraintCount = 0u;
     }}
 
-    float targetDepth = GetContactTargetDepth(sourceRadius);
+    float targetDepth =
+        (contactType == CONTACT_WALL && wallTargetPenetrationFraction > 0.0)
+        ? wallTargetPenetrationFraction * sourceRadius
+        : TARGET_PENETRATION_FRACTION * sourceRadius;
     if (penetrationDepth < targetDepth - EPSILON) {{
         return true;
     }}
@@ -724,14 +830,19 @@ bool RegisterContactStepConstraint(
     vec3 normal,
     float penetrationDepth,
     float sourceRadius,
-    vec3 targetVelocity)
+    vec3 targetVelocity,
+    uint contactType,
+    float wallHardPenetrationFraction)
 {{
     if (maximumDepthConstraintOwner != SourceID) {{
         maximumDepthConstraintOwner = SourceID;
         maximumDepthConstraintCount = 0u;
     }}
 
-    float hardDepth = GetContactHardDepth(sourceRadius);
+    float hardDepth =
+        (contactType == CONTACT_WALL && wallHardPenetrationFraction > 0.0)
+        ? wallHardPenetrationFraction * sourceRadius
+        : HARD_PENETRATION_FRACTION * sourceRadius;
     if (penetrationDepth > hardDepth + EPSILON) {{
         return SetErrorDetail(ERROR_MAX_DEPTH_CONSTRAINT, SourceID, 9001u);
     }}
@@ -802,8 +913,9 @@ bool AccumulateContactForce(
 {{
     if (!contact.valid) {{ return true; }}
     float baseStiffness = GetContactStiffness(
-        SourceID, contact.targetID, contact.contactType);
+        SourceID, contact.targetID, contact);
     float stiffness = GetEffectiveContactStiffness(
+        contact,
         baseStiffness,
         max(0.0, contact.penetrationDepth),
         P[SourceID].Data.x);
@@ -832,7 +944,9 @@ bool ProcessParticleCollision(
             geometry.normal,
             penetrationDepth,
             geometry.sourceRadius,
-            GetStartFrameVelocity(TargetID).xyz)) {{
+            GetStartFrameVelocity(TargetID).xyz,
+            CONTACT_PARTICLE,
+            -1.0)) {{
         return false;
     }}
     P[SourceID].contactCount += 1u;
@@ -843,6 +957,11 @@ bool ProcessParticleCollision(
         geometry.overlapArea,
         penetrationDepth,
         GetStartFrameVelocity(TargetID).xyz,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
         true);
     return AccumulateContactForce(SourceID, contact, totalForce);
 }}
@@ -860,7 +979,12 @@ bool ProcessFunctionWallCollision(
         return SetError(ERROR_WALL_TUNNELING, SourceID);
     }}
     if (!CheckPenetrationStepResolution(
-            SourceID, segment.normal, sourceRadius, vec3(0.0))) {{
+            SourceID,
+            segment.normal,
+            sourceRadius,
+            vec3(0.0),
+            CONTACT_WALL,
+            segment.wallHardPenetrationFraction)) {{
         return false;
     }}
     if (!RegisterMaximumDepthConstraint(
@@ -868,7 +992,9 @@ bool ProcessFunctionWallCollision(
             segment.normal,
             penetrationDepth,
             sourceRadius,
-            vec3(0.0))) {{
+            vec3(0.0),
+            CONTACT_WALL,
+            segment.wallTargetPenetrationFraction)) {{
         return false;
     }}
     P[SourceID].contactCount += 1u;
@@ -879,6 +1005,11 @@ bool ProcessFunctionWallCollision(
         segment.overlapArea,
         penetrationDepth,
         vec3(0.0),
+        segment.wallCollisionStiffnessQ,
+        segment.wallTargetPenetrationFraction,
+        segment.wallHardPenetrationFraction,
+        segment.wallCompressionStiffnessGain,
+        segment.wallCompressionStiffnessPower,
         true);
     return AccumulateContactForce(SourceID, contact, totalForce);
 }}
@@ -898,7 +1029,9 @@ bool RegisterResolvedParticleContactStep(
         geometry.normal,
         penetrationDepth,
         geometry.sourceRadius,
-        GetStartFrameVelocity(TargetID).xyz);
+        GetStartFrameVelocity(TargetID).xyz,
+        CONTACT_PARTICLE,
+        -1.0);
 }}
 
 bool RegisterResolvedFunctionWallContactStep(
@@ -916,7 +1049,9 @@ bool RegisterResolvedFunctionWallContactStep(
         segment.normal,
         penetrationDepth,
         sourceRadius,
-        vec3(0.0));
+        vec3(0.0),
+        CONTACT_WALL,
+        segment.wallHardPenetrationFraction);
 }}
 
 bool ProjectSourceVelocityToContactSet(
@@ -1200,14 +1335,24 @@ FunctionWallSegment SelectFunctionWallSegment(uint SourceID, uint BoundaryID)
 }}
 
 // Python source: ForceDynamics.py:{line("EvaluateFunctionWallSegment")}
-BoundaryWallSegment EvaluateFunctionWallSegment(uint SourceID, uint BoundaryID)
+BoundaryWallSegment EvaluateFunctionWallSegmentContact(
+    uint SourceID, FunctionWallSegment selected)
 {{
-    FunctionWallSegment selected = SelectFunctionWallSegment(SourceID, BoundaryID);
     vec3 sourcePosition = GetParticlePosition(SourceID).xyz;
     vec2 wallPoint;
     vec2 normal2d;
     if (!FunctionWallEvaluateAtPoint(selected, sourcePosition.xy, wallPoint, normal2d)) {{
-        return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, selected.wallFlag, false);
+        return BoundaryWallSegment(
+            vec3(0.0),
+            0.0,
+            0.0,
+            selected.wallFlag,
+            selected.wallCollisionStiffnessQ,
+            selected.wallTargetPenetrationFraction,
+            selected.wallHardPenetrationFraction,
+            selected.wallCompressionStiffnessGain,
+            selected.wallCompressionStiffnessPower,
+            false);
     }}
 
     float radius = P[SourceID].Data.x;
@@ -1222,6 +1367,11 @@ BoundaryWallSegment EvaluateFunctionWallSegment(uint SourceID, uint BoundaryID)
             0.0,
             centerDistance,
             selected.wallFlag,
+            selected.wallCollisionStiffnessQ,
+            selected.wallTargetPenetrationFraction,
+            selected.wallHardPenetrationFraction,
+            selected.wallCompressionStiffnessGain,
+            selected.wallCompressionStiffnessPower,
             false);
     }}
 
@@ -1231,7 +1381,69 @@ BoundaryWallSegment EvaluateFunctionWallSegment(uint SourceID, uint BoundaryID)
         overlapArea,
         centerDistance,
         selected.wallFlag,
+        selected.wallCollisionStiffnessQ,
+        selected.wallTargetPenetrationFraction,
+        selected.wallHardPenetrationFraction,
+        selected.wallCompressionStiffnessGain,
+        selected.wallCompressionStiffnessPower,
         true);
+}}
+
+BoundaryWallSegment EvaluateFunctionWallSegment(uint SourceID, uint BoundaryID)
+{{
+    FunctionWallSegment selected = SelectFunctionWallSegment(SourceID, BoundaryID);
+    return EvaluateFunctionWallSegmentContact(SourceID, selected);
+}}
+
+BoundaryWallContactSet EvaluateFunctionWallContacts(uint SourceID)
+{{
+    BoundaryWallContactSet contacts;
+    contacts.count = 0u;
+    float sourceRadius = P[SourceID].Data.x;
+
+    for (uint segmentIndex = 0u;
+            segmentIndex < CURVE_WALL_SEGMENT_COUNT;
+            ++segmentIndex) {{
+        BoundaryWallSegment segment = EvaluateFunctionWallSegmentContact(
+            SourceID,
+            CURVE_WALL_SEGMENTS[segmentIndex]);
+        if (!segment.valid) {{
+            continue;
+        }}
+
+        float penetrationDepth = ParticlePenetrationDepth(
+            sourceRadius,
+            sourceRadius,
+            segment.centerDistance);
+        bool replaced = false;
+        for (uint contactIndex = 0u;
+                contactIndex < contacts.count;
+                ++contactIndex) {{
+            if (contacts.segments[contactIndex].wallFlag != segment.wallFlag) {{
+                continue;
+            }}
+            float previousDepth = ParticlePenetrationDepth(
+                sourceRadius,
+                sourceRadius,
+                contacts.segments[contactIndex].centerDistance);
+            if (penetrationDepth > previousDepth) {{
+                contacts.segments[contactIndex] = segment;
+            }}
+            replaced = true;
+            break;
+        }}
+        if (replaced) {{
+            continue;
+        }}
+        if (contacts.count >= DUP_LIST_SIZE) {{
+            SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+            return contacts;
+        }}
+        contacts.segments[contacts.count] = segment;
+        contacts.count += 1u;
+    }}
+
+    return contacts;
 }}
 
 #endif
@@ -1325,9 +1537,9 @@ RectangleWallSegment SelectRectangleWallSegment(uint SourceID, uint BoundaryID)
 }}
 
 // Python source: ForceDynamics.py:{line("EvaluateRectangleWallSegment")}
-BoundaryWallSegment EvaluateRectangleWallSegment(uint SourceID, uint BoundaryID)
+BoundaryWallSegment EvaluateRectangleWallSegmentContact(
+    uint SourceID, RectangleWallSegment selected)
 {{
-    RectangleWallSegment selected = SelectRectangleWallSegment(SourceID, BoundaryID);
     vec3 sourcePosition = GetParticlePosition(SourceID).xyz;
     float radius = P[SourceID].Data.x;
     float penetrationDepth = RectangleWallPhysicalPenetration(
@@ -1346,6 +1558,11 @@ BoundaryWallSegment EvaluateRectangleWallSegment(uint SourceID, uint BoundaryID)
             0.0,
             centerDistance,
             selected.wallFlag,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
             false);
     }}
 
@@ -1356,7 +1573,69 @@ BoundaryWallSegment EvaluateRectangleWallSegment(uint SourceID, uint BoundaryID)
         overlapArea,
         centerDistance,
         selected.wallFlag,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
         true);
+}}
+
+BoundaryWallSegment EvaluateRectangleWallSegment(uint SourceID, uint BoundaryID)
+{{
+    RectangleWallSegment selected = SelectRectangleWallSegment(SourceID, BoundaryID);
+    return EvaluateRectangleWallSegmentContact(SourceID, selected);
+}}
+
+BoundaryWallContactSet EvaluateRectangleWallContacts(uint SourceID)
+{{
+    BoundaryWallContactSet contacts;
+    contacts.count = 0u;
+    float sourceRadius = P[SourceID].Data.x;
+
+    for (uint segmentIndex = 0u;
+            segmentIndex < RECTANGLE_WALL_SEGMENT_COUNT;
+            ++segmentIndex) {{
+        BoundaryWallSegment segment = EvaluateRectangleWallSegmentContact(
+            SourceID,
+            RECTANGLE_WALL_SEGMENTS[segmentIndex]);
+        if (!segment.valid) {{
+            continue;
+        }}
+
+        float penetrationDepth = ParticlePenetrationDepth(
+            sourceRadius,
+            sourceRadius,
+            segment.centerDistance);
+        bool replaced = false;
+        for (uint contactIndex = 0u;
+                contactIndex < contacts.count;
+                ++contactIndex) {{
+            if (contacts.segments[contactIndex].wallFlag != segment.wallFlag) {{
+                continue;
+            }}
+            float previousDepth = ParticlePenetrationDepth(
+                sourceRadius,
+                sourceRadius,
+                contacts.segments[contactIndex].centerDistance);
+            if (penetrationDepth > previousDepth) {{
+                contacts.segments[contactIndex] = segment;
+            }}
+            replaced = true;
+            break;
+        }}
+        if (replaced) {{
+            continue;
+        }}
+        if (contacts.count >= DUP_LIST_SIZE) {{
+            SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+            return contacts;
+        }}
+        contacts.segments[contacts.count] = segment;
+        contacts.count += 1u;
+    }}
+
+    return contacts;
 }}
 
 #endif
@@ -1393,7 +1672,17 @@ LightingBallCollisionResult NoLightingBallCollision()
     return LightingBallCollisionResult(
         false,
         true,
-        BoundaryWallSegment(vec3(0.0), 0.0, 0.0, LIGHTING_BALL_WALL_FLAG, false));
+        BoundaryWallSegment(
+            vec3(0.0),
+            0.0,
+            0.0,
+            LIGHTING_BALL_WALL_FLAG,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            false));
 }}
 
 // Python source: ForceDynamics.py:{line("EvaluateLightingBallContact")}
@@ -1405,6 +1694,11 @@ BoundaryWallSegment EvaluateLightingBallContact(uint SourceID)
             0.0,
             0.0,
             LIGHTING_BALL_WALL_FLAG,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
             false);
     }}
 
@@ -1419,6 +1713,11 @@ BoundaryWallSegment EvaluateLightingBallContact(uint SourceID)
             0.0,
             0.0,
             LIGHTING_BALL_WALL_FLAG,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
             false);
     }}
 
@@ -1433,6 +1732,11 @@ BoundaryWallSegment EvaluateLightingBallContact(uint SourceID)
             0.0,
             contactCenterDistance,
             LIGHTING_BALL_WALL_FLAG,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
             false);
     }}
 
@@ -1448,6 +1752,11 @@ BoundaryWallSegment EvaluateLightingBallContact(uint SourceID)
         overlapArea,
         contactCenterDistance,
         LIGHTING_BALL_WALL_FLAG,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
         true);
 }}
 
@@ -1546,11 +1855,31 @@ BoundaryWallSegment EvaluatePistonWall(uint SourceID)
     vec3 normal = vec3(-1.0, 0.0, 0.0);
     float centerDistance = abs(ghost.x - sourcePosition.x);
     if (centerDistance >= 2.0 * radius) {{
-        return BoundaryWallSegment(normal, 0.0, centerDistance, 1u, false);
+        return BoundaryWallSegment(
+            normal,
+            0.0,
+            centerDistance,
+            1u,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            false);
     }}
 
     float overlapArea = particle_overlap_area(radius, radius, centerDistance);
-    return BoundaryWallSegment(normal, overlapArea, centerDistance, 1u, true);
+    return BoundaryWallSegment(
+        normal,
+        overlapArea,
+        centerDistance,
+        1u,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        true);
 }}
 
 // Python source: ForceDynamics.py:{line("ProcessPistonCollision")}
@@ -1572,7 +1901,12 @@ bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
 
     vec3 pistonVelocity = GetPistonVelocity(uint(ShaderFlags.frameNum));
     if (!CheckPenetrationStepResolution(
-            SourceID, segment.normal, sourceRadius, pistonVelocity)) {{
+            SourceID,
+            segment.normal,
+            sourceRadius,
+            pistonVelocity,
+            CONTACT_WALL,
+            -1.0)) {{
         return false;
     }}
     if (!RegisterMaximumDepthConstraint(
@@ -1580,7 +1914,9 @@ bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
             segment.normal,
             penetrationDepth,
             sourceRadius,
-            pistonVelocity)) {{
+            pistonVelocity,
+            CONTACT_WALL,
+            -1.0)) {{
         return false;
     }}
 
@@ -1592,6 +1928,11 @@ bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
         segment.overlapArea,
         penetrationDepth,
         pistonVelocity,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
         true);
     return AccumulateContactForce(SourceID, contact, totalForce);
 }}
@@ -1613,7 +1954,9 @@ bool CheckResolvedPistonContactStep(uint SourceID)
         segment.normal,
         penetrationDepth,
         sourceRadius,
-        GetPistonVelocity(uint(ShaderFlags.frameNum)));
+        GetPistonVelocity(uint(ShaderFlags.frameNum)),
+        CONTACT_WALL,
+        -1.0);
 }}
 
 bool RegisterResolvedPistonContactStep(uint SourceID)
@@ -1633,7 +1976,9 @@ bool RegisterResolvedPistonContactStep(uint SourceID)
         segment.normal,
         penetrationDepth,
         sourceRadius,
-        GetPistonVelocity(uint(ShaderFlags.frameNum)));
+        GetPistonVelocity(uint(ShaderFlags.frameNum)),
+        CONTACT_WALL,
+        -1.0);
 }}
 
 #endif
@@ -2240,11 +2585,11 @@ def render_fpml_schedule() -> str:
 // Lighting source-owned compute schedule.
 
 // Scenarios with richer wall models can define this function before including
-// FPML.comp and set EVALUATE_CONFIGURED_WALL_SEGMENT_DEFINED.
-#ifndef EVALUATE_CONFIGURED_WALL_SEGMENT_DEFINED
-BoundaryWallSegment EvaluateConfiguredWallSegment(uint SourceID, uint BoundaryID)
+// FPML.comp and set EVALUATE_CONFIGURED_WALL_CONTACTS_DEFINED.
+#ifndef EVALUATE_CONFIGURED_WALL_CONTACTS_DEFINED
+BoundaryWallContactSet EvaluateConfiguredWallContacts(uint SourceID)
 {
-    return EvaluateFunctionWallSegment(SourceID, BoundaryID);
+    return EvaluateFunctionWallContacts(SourceID);
 }
 #endif
 
@@ -2296,8 +2641,7 @@ void fpml_comp_main()
 
     uint duplicateTargets[DUP_LIST_SIZE];
     uint duplicateCount = 0u;
-    uint duplicateWalls[DUP_LIST_SIZE];
-    uint duplicateWallCount = 0u;
+    bool hasLocalBoundaryMarker = false;
     bool lightingBallContactProcessed = false;
 
     for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
@@ -2343,42 +2687,7 @@ void fpml_comp_main()
                     continue;
                 }
 
-                BoundaryWallSegment segment =
-                    EvaluateConfiguredWallSegment(SourceID, TargetID);
-                if (!segment.valid) {
-                    continue;
-                }
-                bool duplicateWall = false;
-                for (uint duplicateIndex = 0u;
-                        duplicateIndex < duplicateWallCount;
-                        ++duplicateIndex) {
-                    if (duplicateWalls[duplicateIndex] == segment.wallFlag) {
-                        duplicateWall = true;
-                        break;
-                    }
-                }
-                if (duplicateWall) {
-                    continue;
-                }
-                if (duplicateWallCount >= DUP_LIST_SIZE) {
-                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
-                    return;
-                }
-                duplicateWalls[duplicateWallCount] = segment.wallFlag;
-                duplicateWallCount += 1u;
-                if (photonSource) {
-                    photonVelocity =
-                        ReflectFixedSpeed(photonVelocity, segment.normal);
-                    photonReflected = true;
-                    P[SourceID].colFlg = 1u;
-                    continue;
-                }
-                if (!ProcessFunctionWallCollision(
-                        SourceID,
-                        segment,
-                        totalForce)) {
-                    return;
-                }
+                hasLocalBoundaryMarker = true;
                 continue;
             }
 
@@ -2445,6 +2754,32 @@ void fpml_comp_main()
         }
     }
 
+    if (hasLocalBoundaryMarker) {
+        BoundaryWallContactSet wallContacts =
+            EvaluateConfiguredWallContacts(SourceID);
+        if (collOut.ErrorNumber != ERROR_NONE) {
+            return;
+        }
+        for (uint contactIndex = 0u;
+                contactIndex < wallContacts.count;
+                ++contactIndex) {
+            BoundaryWallSegment segment = wallContacts.segments[contactIndex];
+            if (photonSource) {
+                photonVelocity =
+                    ReflectFixedSpeed(photonVelocity, segment.normal);
+                photonReflected = true;
+                P[SourceID].colFlg = 1u;
+                continue;
+            }
+            if (!ProcessFunctionWallCollision(
+                    SourceID,
+                    segment,
+                    totalForce)) {
+                return;
+            }
+        }
+    }
+
     if (P[SourceID].contactCount == 0u) {
         ClearCollisionStoredMomentum(SourceID);
     }
@@ -2474,7 +2809,7 @@ void fpml_comp_main()
 #endif
 
     duplicateCount = 0u;
-    duplicateWallCount = 0u;
+    hasLocalBoundaryMarker = false;
     bool lightingBallResolvedProcessed = false;
 
     for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
@@ -2510,37 +2845,7 @@ void fpml_comp_main()
                     continue;
                 }
 
-                BoundaryWallSegment segment =
-                    EvaluateConfiguredWallSegment(SourceID, TargetID);
-                if (!segment.valid) {
-                    continue;
-                }
-                bool duplicateWall = false;
-                for (uint duplicateIndex = 0u;
-                        duplicateIndex < duplicateWallCount;
-                        ++duplicateIndex) {
-                    if (duplicateWalls[duplicateIndex] == segment.wallFlag) {
-                        duplicateWall = true;
-                        break;
-                    }
-                }
-                if (duplicateWall) {
-                    continue;
-                }
-                if (duplicateWallCount >= DUP_LIST_SIZE) {
-                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
-                    return;
-                }
-                duplicateWalls[duplicateWallCount] = segment.wallFlag;
-                duplicateWallCount += 1u;
-                if (photonSource) {
-                    continue;
-                }
-                if (!RegisterResolvedFunctionWallContactStep(
-                        SourceID,
-                        segment)) {
-                    return;
-                }
+                hasLocalBoundaryMarker = true;
                 continue;
             }
 
@@ -2588,6 +2893,23 @@ void fpml_comp_main()
         }
     }
 
+    if (hasLocalBoundaryMarker && !photonSource) {
+        BoundaryWallContactSet wallContacts =
+            EvaluateConfiguredWallContacts(SourceID);
+        if (collOut.ErrorNumber != ERROR_NONE) {
+            return;
+        }
+        for (uint contactIndex = 0u;
+                contactIndex < wallContacts.count;
+                ++contactIndex) {
+            if (!RegisterResolvedFunctionWallContactStep(
+                    SourceID,
+                    wallContacts.segments[contactIndex])) {
+                return;
+            }
+        }
+    }
+
     if (!ApplySourceMaximumDepth(SourceID, 9402u)) {
         return;
     }
@@ -2602,6 +2924,7 @@ void fpml_comp_main()
         }
     }
 
+    ApplyTempVelocity(SourceID);
     if (!photonPositionOverride && !CalcPosition(SourceID)) {
         return;
     }
@@ -2632,6 +2955,10 @@ struct Particle {
 
     vec4 Data;                 // x=radius, y=collision_stiffness_q, z=reserved, w=state/flags
     vec4 parms;                // x=mass, yzw=source-owned recoverable internal momentum
+    vec4 collisionStartMomentum;  // xyz=mv at collision entry, w=active flag
+    vec4 collisionStoredMomentum; // xyz=display stored mv, w=magnitude
+    vec4 tempVelocity;         // xyz=target velocity, w=target angle
+    vec4 tempParams;           // x=temp velocity type, y=rate, z/w=reserved
 
     lstr CornerList[8];
 
@@ -2669,8 +2996,8 @@ def render_fpm() -> str:
         1,
     )
     body = body.replace(
-        "// FPML.comp and set EVALUATE_CONFIGURED_WALL_SEGMENT_DEFINED.",
-        "// FPM.comp and set EVALUATE_CONFIGURED_WALL_SEGMENT_DEFINED.",
+        "// FPML.comp and set EVALUATE_CONFIGURED_WALL_CONTACTS_DEFINED.",
+        "// FPM.comp and set EVALUATE_CONFIGURED_WALL_CONTACTS_DEFINED.",
         1,
     )
     body = body.replace("void fpml_comp_main()", "void fpm_comp_main()", 1)
@@ -2744,6 +3071,14 @@ def render_fpm() -> str:
                     continue;
                 }
 """,
+        """            if (photonSource) {
+                photonVelocity =
+                    ReflectFixedSpeed(photonVelocity, segment.normal);
+                photonReflected = true;
+                P[SourceID].colFlg = 1u;
+                continue;
+            }
+""",
         """            if (ShouldSkipParticlePair(SourceID, TargetID)) {
                 continue;
             }
@@ -2756,6 +3091,10 @@ def render_fpm() -> str:
     for chunk in photon_chunks:
         body = body.replace(chunk, "")
     body = body.replace(
+        "    if (hasLocalBoundaryMarker && !photonSource) {",
+        "    if (hasLocalBoundaryMarker) {",
+    )
+    body = body.replace(
         "    if (!photonPositionOverride && !CalcPosition(SourceID)) {",
         "    if (!CalcPosition(SourceID)) {",
     )
@@ -2767,11 +3106,11 @@ def render_fpml() -> str:
 // Lighting source-owned compute schedule. Requires BoundaryLightRecord.glsl.
 
 // Scenarios with richer wall models can define this function before including
-// FPML.comp and set EVALUATE_CONFIGURED_WALL_SEGMENT_DEFINED.
-#ifndef EVALUATE_CONFIGURED_WALL_SEGMENT_DEFINED
-BoundaryWallSegment EvaluateConfiguredWallSegment(uint SourceID, uint BoundaryID)
+// FPML.comp and set EVALUATE_CONFIGURED_WALL_CONTACTS_DEFINED.
+#ifndef EVALUATE_CONFIGURED_WALL_CONTACTS_DEFINED
+BoundaryWallContactSet EvaluateConfiguredWallContacts(uint SourceID)
 {
-    return EvaluateFunctionWallSegment(SourceID, BoundaryID);
+    return EvaluateFunctionWallContacts(SourceID);
 }
 #endif
 
@@ -4503,13 +4842,13 @@ def render_compute(source_path: Path, enable_piston: bool = False) -> str:
 // Simple source-owned compute schedule.
 // Do not hand edit generated dynamics content.
 
-#define EVALUATE_CONFIGURED_WALL_SEGMENT_DEFINED
-BoundaryWallSegment EvaluateConfiguredWallSegment(uint SourceID, uint BoundaryID)
+#define EVALUATE_CONFIGURED_WALL_CONTACTS_DEFINED
+BoundaryWallContactSet EvaluateConfiguredWallContacts(uint SourceID)
 {{
     if (RECTANGLE_WALL_SEGMENT_COUNT > 0u) {{
-        return EvaluateRectangleWallSegment(SourceID, BoundaryID);
+        return EvaluateRectangleWallContacts(SourceID);
     }}
-    return EvaluateFunctionWallSegment(SourceID, BoundaryID);
+    return EvaluateFunctionWallContacts(SourceID);
 }}
 
 #include "../common/FPM.comp"

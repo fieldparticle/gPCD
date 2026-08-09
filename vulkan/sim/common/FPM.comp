@@ -2,11 +2,11 @@
 // Shared simple source-owned compute schedule.
 
 // Scenarios with richer wall models can define this function before including
-// FPM.comp and set EVALUATE_CONFIGURED_WALL_SEGMENT_DEFINED.
-#ifndef EVALUATE_CONFIGURED_WALL_SEGMENT_DEFINED
-BoundaryWallSegment EvaluateConfiguredWallSegment(uint SourceID, uint BoundaryID)
+// FPM.comp and set EVALUATE_CONFIGURED_WALL_CONTACTS_DEFINED.
+#ifndef EVALUATE_CONFIGURED_WALL_CONTACTS_DEFINED
+BoundaryWallContactSet EvaluateConfiguredWallContacts(uint SourceID)
 {
-    return EvaluateFunctionWallSegment(SourceID, BoundaryID);
+    return EvaluateFunctionWallContacts(SourceID);
 }
 #endif
 
@@ -50,8 +50,7 @@ void fpm_comp_main()
 
     uint duplicateTargets[DUP_LIST_SIZE];
     uint duplicateCount = 0u;
-    uint duplicateWalls[DUP_LIST_SIZE];
-    uint duplicateWallCount = 0u;
+    bool hasLocalBoundaryMarker = false;
     bool lightingBallContactProcessed = false;
 
     for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
@@ -91,35 +90,7 @@ void fpm_comp_main()
                     continue;
                 }
 
-                BoundaryWallSegment segment =
-                    EvaluateConfiguredWallSegment(SourceID, TargetID);
-                if (!segment.valid) {
-                    continue;
-                }
-                bool duplicateWall = false;
-                for (uint duplicateIndex = 0u;
-                        duplicateIndex < duplicateWallCount;
-                        ++duplicateIndex) {
-                    if (duplicateWalls[duplicateIndex] == segment.wallFlag) {
-                        duplicateWall = true;
-                        break;
-                    }
-                }
-                if (duplicateWall) {
-                    continue;
-                }
-                if (duplicateWallCount >= DUP_LIST_SIZE) {
-                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
-                    return;
-                }
-                duplicateWalls[duplicateWallCount] = segment.wallFlag;
-                duplicateWallCount += 1u;
-                if (!ProcessFunctionWallCollision(
-                        SourceID,
-                        segment,
-                        totalForce)) {
-                    return;
-                }
+                hasLocalBoundaryMarker = true;
                 continue;
             }
 
@@ -161,6 +132,25 @@ void fpm_comp_main()
         }
     }
 
+    if (hasLocalBoundaryMarker) {
+        BoundaryWallContactSet wallContacts =
+            EvaluateConfiguredWallContacts(SourceID);
+        if (collOut.ErrorNumber != ERROR_NONE) {
+            return;
+        }
+        for (uint contactIndex = 0u;
+                contactIndex < wallContacts.count;
+                ++contactIndex) {
+            BoundaryWallSegment segment = wallContacts.segments[contactIndex];
+            if (!ProcessFunctionWallCollision(
+                    SourceID,
+                    segment,
+                    totalForce)) {
+                return;
+            }
+        }
+    }
+
     if (P[SourceID].contactCount == 0u) {
         ClearCollisionStoredMomentum(SourceID);
     }
@@ -179,7 +169,7 @@ void fpm_comp_main()
 #endif
 
     duplicateCount = 0u;
-    duplicateWallCount = 0u;
+    hasLocalBoundaryMarker = false;
     bool lightingBallResolvedProcessed = false;
 
     for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
@@ -215,34 +205,7 @@ void fpm_comp_main()
                     continue;
                 }
 
-                BoundaryWallSegment segment =
-                    EvaluateConfiguredWallSegment(SourceID, TargetID);
-                if (!segment.valid) {
-                    continue;
-                }
-                bool duplicateWall = false;
-                for (uint duplicateIndex = 0u;
-                        duplicateIndex < duplicateWallCount;
-                        ++duplicateIndex) {
-                    if (duplicateWalls[duplicateIndex] == segment.wallFlag) {
-                        duplicateWall = true;
-                        break;
-                    }
-                }
-                if (duplicateWall) {
-                    continue;
-                }
-                if (duplicateWallCount >= DUP_LIST_SIZE) {
-                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
-                    return;
-                }
-                duplicateWalls[duplicateWallCount] = segment.wallFlag;
-                duplicateWallCount += 1u;
-                if (!RegisterResolvedFunctionWallContactStep(
-                        SourceID,
-                        segment)) {
-                    return;
-                }
+                hasLocalBoundaryMarker = true;
                 continue;
             }
 
@@ -283,9 +246,27 @@ void fpm_comp_main()
         }
     }
 
+    if (hasLocalBoundaryMarker) {
+        BoundaryWallContactSet wallContacts =
+            EvaluateConfiguredWallContacts(SourceID);
+        if (collOut.ErrorNumber != ERROR_NONE) {
+            return;
+        }
+        for (uint contactIndex = 0u;
+                contactIndex < wallContacts.count;
+                ++contactIndex) {
+            if (!RegisterResolvedFunctionWallContactStep(
+                    SourceID,
+                    wallContacts.segments[contactIndex])) {
+                return;
+            }
+        }
+    }
+
     if (!ApplySourceMaximumDepth(SourceID, 9402u)) {
         return;
     }
+    ApplyTempVelocity(SourceID);
     if (!CalcPosition(SourceID)) {
         return;
     }

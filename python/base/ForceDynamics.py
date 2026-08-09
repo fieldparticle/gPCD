@@ -3,6 +3,7 @@ import itertools
 
 from gbase.FunctionWall import evaluate_wall_at_point
 from gbase.FunctionWall import physical_penetration
+from gbase.FunctionWall import segment_values
 from gbase.MaterialProperties import (
     PARTICLE_TYPE_BOUNDARY,
     PARTICLE_TYPE_REGULAR,
@@ -212,10 +213,18 @@ class ForceContactDynamics:
 
     def GetContactTargetDepth(self, contact_state):
         """Return the preferred source-owned compression depth."""
+        if int(contact_state.ids.y) == self.CONTACT_WALL:
+            fraction = float(getattr(contact_state, "wall_target_penetration_fraction", -1.0))
+            if fraction > 0.0:
+                return fraction * float(contact_state.source_radius)
         return self.GetTargetPenetrationDepth(contact_state.source_radius)
 
     def GetContactHardDepth(self, contact_state):
         """Return the source-owned fatal compression depth."""
+        if int(contact_state.ids.y) == self.CONTACT_WALL:
+            fraction = float(getattr(contact_state, "wall_hard_penetration_fraction", -1.0))
+            if fraction > 0.0:
+                return fraction * float(contact_state.source_radius)
         return self.GetHardPenetrationDepth(contact_state.source_radius)
 
     def GetContactRemainingDepth(self, contact_state):
@@ -345,7 +354,36 @@ class ForceContactDynamics:
             radius,
             center_distance,
         )
-        return (*normal, overlap_area, center_distance, wall_flag)
+        (
+            _boundary_kind,
+            _independent_axis,
+            _u_start,
+            _u_end,
+            _f_start,
+            _a1,
+            _a2,
+            _a3,
+            _normal_sign,
+            _segment_wall_flag,
+            _boundary_particle_material_id,
+            _boundary_visual_material_id,
+            wall_collision_stiffness_q,
+            wall_target_penetration_fraction,
+            wall_hard_penetration_fraction,
+            wall_compression_stiffness_gain,
+            wall_compression_stiffness_power,
+        ) = segment_values(segment)
+        return (
+            *normal,
+            overlap_area,
+            center_distance,
+            wall_flag,
+            wall_collision_stiffness_q,
+            wall_target_penetration_fraction,
+            wall_hard_penetration_fraction,
+            wall_compression_stiffness_gain,
+            wall_compression_stiffness_power,
+        )
 
     def EvaluateFunctionWallContacts(self, SourceID):
         """Return the deepest current contact for each physical wall."""
@@ -355,11 +393,11 @@ class ForceContactDynamics:
             contact = self.EvaluateFunctionWallSegment(SourceID, segment)
             if contact is None:
                 continue
-            wall_flag = int(contact[-1])
+            wall_flag = int(contact[5])
             penetration_depth = self.ParticlePenetrationDepth(
                 radius,
                 radius,
-                float(contact[-2]),
+                float(contact[4]),
             )
             previous = contacts.get(wall_flag)
             if previous is None or penetration_depth > previous[0]:
@@ -443,11 +481,11 @@ class ForceContactDynamics:
             contact = self.EvaluateRectangleWallSegment(SourceID, wall_config)
             if contact is None:
                 continue
-            wall_flag = int(contact[-1])
+            wall_flag = int(contact[5])
             penetration_depth = self.ParticlePenetrationDepth(
                 radius,
                 radius,
-                float(contact[-2]),
+                float(contact[4]),
             )
             previous = contacts.get(wall_flag)
             if previous is None or penetration_depth > previous[0]:
@@ -460,7 +498,7 @@ class ForceContactDynamics:
         if contact is None:
             return None
         radius = float(self.particles[SourceID].Data.x)
-        return self.ParticlePenetrationDepth(radius, radius, float(contact[-2]))
+        return self.ParticlePenetrationDepth(radius, radius, float(contact[4]))
 
     def EvaluateConfiguredWallContacts(self, SourceID):
         """Return current wall contacts for the active configured wall model."""
@@ -572,7 +610,7 @@ class ForceContactDynamics:
             )
             self.DepositBoundarySpaceLightForSurface(
                 1,
-                int(contact[-1]),
+                int(contact[5]),
                 sphere_material_id,
                 hit_point,
                 rgb=deposit_rgb,
@@ -580,7 +618,7 @@ class ForceContactDynamics:
             if remaining_mass <= self.PhotonMinRelativeMass(SourceID):
                 photon_died_on_hit = True
         source.report_contacts = max(int(getattr(source, "report_contacts", 0)), 1)
-        source.report_target = int(contact[-1])
+        source.report_target = int(contact[5])
         source.report_normal_x = normal[0]
         source.report_normal_y = normal[1]
         source.report_normal_z = normal[2]
@@ -710,7 +748,17 @@ class ForceContactDynamics:
 
     def InitializeFunctionWallContactState(self, SourceID, contact):
         """Initialize one current-frame source-function-wall contact."""
-        normal_x, normal_y, normal_z, overlap_area, center_distance, wall_flag = contact
+        normal_x, normal_y, normal_z, overlap_area, center_distance, wall_flag = contact[:6]
+        wall_parameters = tuple(contact[6:11])
+        if len(wall_parameters) < 5:
+            wall_parameters = wall_parameters + (-1.0,) * (5 - len(wall_parameters))
+        (
+            wall_collision_stiffness_q,
+            wall_target_penetration_fraction,
+            wall_hard_penetration_fraction,
+            wall_compression_stiffness_gain,
+            wall_compression_stiffness_power,
+        ) = wall_parameters
         radius = float(self.particles[SourceID].Data.x)
         geometry = (
             normal_x,
@@ -724,6 +772,11 @@ class ForceContactDynamics:
         contact_state = self.AppendWallContactSlot(SourceID, wall_flag, geometry)
         if contact_state is None:
             return None
+        contact_state.wall_collision_stiffness_q = wall_collision_stiffness_q
+        contact_state.wall_target_penetration_fraction = wall_target_penetration_fraction
+        contact_state.wall_hard_penetration_fraction = wall_hard_penetration_fraction
+        contact_state.wall_compression_stiffness_gain = wall_compression_stiffness_gain
+        contact_state.wall_compression_stiffness_power = wall_compression_stiffness_power
         if not self.CheckContactMaximumDepth(SourceID, contact_state):
             return None
         if not self.CheckContactPenetrationStepResolution(SourceID, contact_state):
@@ -1269,12 +1322,14 @@ class ForceContactDynamics:
             SourceID,
             TargetID,
             contact_type,
+            contact_state,
         )
         penetration_depth = max(0.0, float(contact_state.aux.y))
         pair_stiffness = self.GetEffectiveContactStiffness(
             base_stiffness,
             penetration_depth,
             float(getattr(contact_state, "source_radius", 0.0)),
+            contact_state,
         )
         if self.contact_force_measure == "depth":
             contact_measure = penetration_depth
@@ -1299,15 +1354,23 @@ class ForceContactDynamics:
         totalForce.z += impulse_z / dt
         return True
 
-    def GetCompressionStiffnessGain(self):
+    def GetCompressionStiffnessGain(self, contact_state=None):
         """Return the dimensionless near-hard-depth stiffness gain."""
+        if contact_state is not None and int(contact_state.ids.y) == self.CONTACT_WALL:
+            value = float(getattr(contact_state, "wall_compression_stiffness_gain", -1.0))
+            if value >= 0.0:
+                return value
         return max(
             0.0,
             float(self.run_configuration.get("compression_stiffness_gain", 0.0)),
         )
 
-    def GetCompressionStiffnessPower(self):
+    def GetCompressionStiffnessPower(self, contact_state=None):
         """Return the exponent used by the depth-dependent stiffness curve."""
+        if contact_state is not None and int(contact_state.ids.y) == self.CONTACT_WALL:
+            value = float(getattr(contact_state, "wall_compression_stiffness_power", -1.0))
+            if value >= 0.0:
+                return value
         return max(
             0.0,
             float(self.run_configuration.get("compression_stiffness_power", 2.0)),
@@ -1318,14 +1381,19 @@ class ForceContactDynamics:
         base_stiffness,
         penetration_depth,
         source_radius,
+        contact_state=None,
     ):
         """Return reversible depth-dependent stiffness for one contact."""
         base_stiffness = max(0.0, float(base_stiffness))
-        gain = self.GetCompressionStiffnessGain()
+        gain = self.GetCompressionStiffnessGain(contact_state)
         if gain <= 0.0:
             return base_stiffness
 
-        hard_depth = self.GetHardPenetrationDepth(source_radius)
+        hard_depth = (
+            self.GetContactHardDepth(contact_state)
+            if contact_state is not None
+            else self.GetHardPenetrationDepth(source_radius)
+        )
         if hard_depth <= self.EPSILON:
             return base_stiffness
 
@@ -1333,7 +1401,7 @@ class ForceContactDynamics:
             0.0,
             min(1.0, float(penetration_depth) / hard_depth),
         )
-        power = self.GetCompressionStiffnessPower()
+        power = self.GetCompressionStiffnessPower(contact_state)
         return base_stiffness * (1.0 + gain * (compression_fraction ** power))
 
     def GetPairStiffness(self, SourceID, TargetID):
@@ -1342,9 +1410,15 @@ class ForceContactDynamics:
         target_q = self.particles[TargetID].Data.y or 0.0
         return max(0.0, 0.5 * (source_q + target_q))
 
-    def GetContactStiffness(self, SourceID, TargetID, contact_type):
+    def GetContactStiffness(self, SourceID, TargetID, contact_type, contact_state=None):
         """Return contact stiffness for a particle or equal-material wall ghost."""
         if contact_type == self.CONTACT_WALL:
+            if contact_state is not None:
+                wall_stiffness = float(
+                    getattr(contact_state, "wall_collision_stiffness_q", -1.0)
+                )
+                if wall_stiffness >= 0.0:
+                    return wall_stiffness
             return max(0.0, float(self.particles[SourceID].Data.y or 0.0))
         return self.GetPairStiffness(SourceID, TargetID)
 
@@ -1389,6 +1463,11 @@ class ForceContactDynamics:
         contact_state.target_radius = target_radius
         contact_state.separation_limit = source_radius + target_radius
         contact_state.wall_target_velocity = self.create_vec4()
+        contact_state.wall_collision_stiffness_q = -1.0
+        contact_state.wall_target_penetration_fraction = -1.0
+        contact_state.wall_hard_penetration_fraction = -1.0
+        contact_state.wall_compression_stiffness_gain = -1.0
+        contact_state.wall_compression_stiffness_power = -1.0
         contact_state.is_piston_contact = 0.0
         source.contactCount += 1
         source.colFlg = 1

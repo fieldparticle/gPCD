@@ -76,6 +76,34 @@ class GenReservoir(GenericGenData):
                 return ()
             return result
 
+        def optional_stream_values(stream, context, names, count, default):
+            if isinstance(names, str):
+                names = (names,)
+            selected_name = None
+            values = None
+            for name in names:
+                if stream.get(name) is not None:
+                    selected_name = name
+                    values = stream.get(name)
+                    break
+            if values is None:
+                return tuple(default)
+            try:
+                if len(values) != count:
+                    errors.append(
+                        f"{context}.{selected_name} must contain exactly "
+                        f"{count} values"
+                    )
+                    return tuple(default)
+                result = tuple(float(value) for value in values)
+            except (TypeError, ValueError):
+                errors.append(f"{context}.{selected_name} values must be numeric")
+                return tuple(default)
+            if not all(math.isfinite(value) for value in result):
+                errors.append(f"{context}.{selected_name} values must be finite")
+                return tuple(default)
+            return result
+
         def stream_positive_float(stream, context, name):
             value = stream.get(name)
             try:
@@ -165,6 +193,15 @@ class GenReservoir(GenericGenData):
                     return False
             errors.append(f"{context}.enabled must be true or false")
             return True
+
+        def stream_temp_velocity_type(stream, context):
+            value = str(stream.get("temp_vel_type", "none")).strip().lower()
+            if value not in ("none", "directional", "magnitude"):
+                errors.append(
+                    f"{context}.temp_vel_type must be none, directional, or magnitude"
+                )
+                return "none"
+            return value
 
         def parse_reservoir_streams():
             raw_streams = self.itemcfg.get("particle_streams")
@@ -289,6 +326,20 @@ class GenReservoir(GenericGenData):
                             "min_compression_frames",
                             3.0,
                         ),
+                        "temp_velocity": optional_stream_values(
+                            stream,
+                            context,
+                            ("temp_velocity", "temp_vel"),
+                            4,
+                            (0.0, 0.0, 0.0, 0.0),
+                        ),
+                        "temp_vel_type": stream_temp_velocity_type(stream, context),
+                        "temp_vel_rate": stream_nonnegative_float_or_config(
+                            stream,
+                            context,
+                            "temp_vel_rate",
+                            0.0,
+                        ),
                         "stream_velocity": stream_values(
                             stream,
                             context,
@@ -342,6 +393,9 @@ class GenReservoir(GenericGenData):
                 2.0,
             )
             min_compression_frames = config_float("min_compression_frames", 3.0)
+            temp_velocity = (0.0, 0.0, 0.0, 0.0)
+            temp_vel_type = "none"
+            temp_vel_rate = 0.0
         else:
             target_penetration_fraction = reservoir_stream[
                 "target_penetration_fraction"
@@ -355,6 +409,9 @@ class GenReservoir(GenericGenData):
                 "compression_stiffness_power"
             ]
             min_compression_frames = reservoir_stream["min_compression_frames"]
+            temp_velocity = reservoir_stream["temp_velocity"]
+            temp_vel_type = reservoir_stream["temp_vel_type"]
+            temp_vel_rate = reservoir_stream["temp_vel_rate"]
 
         if target_penetration_fraction is not None:
             if not math.isfinite(target_penetration_fraction):
@@ -547,6 +604,10 @@ class GenReservoir(GenericGenData):
             if not all(math.isfinite(value) for value in stream_velocity):
                 errors.append("stream_velocity values must be finite")
 
+        if temp_velocity:
+            if not all(math.isfinite(value) for value in temp_velocity):
+                errors.append("temp_velocity values must be finite")
+
         if piston_enabled and piston_velocity:
             if not all(math.isfinite(value) for value in piston_velocity):
                 errors.append("stream_velocity values must be finite")
@@ -606,6 +667,9 @@ class GenReservoir(GenericGenData):
         self.target_penetration_fraction = target_penetration_fraction
         self.hard_penetration_fraction = hard_penetration_fraction
         self.min_compression_frames = min_compression_frames
+        self.temp_velocity = temp_velocity
+        self.temp_vel_type = temp_vel_type
+        self.temp_vel_rate = temp_vel_rate
         self.piston_start_frame = int(piston_start_frame_value)
         self.number_configured_particles = 0
         self.explicit_particles = []
@@ -714,6 +778,9 @@ class GenReservoir(GenericGenData):
                     radius=self.radius,
                     material_id=self.reservoir_material_id,
                     collision_stiffness_q=self.collision_stiffness_q,
+                    temp_velocity=self.temp_velocity,
+                    temp_vel_type=self.temp_vel_type,
+                    temp_vel_rate=self.temp_vel_rate,
                 )
 
         report_text = (

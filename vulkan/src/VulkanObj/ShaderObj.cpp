@@ -1195,6 +1195,11 @@ std::ostringstream ShaderObj::FunctionWalls()
 		<< "    float a3;\n"
 		<< "    float normalSign;\n"
 		<< "    uint wallFlag;\n"
+		<< "    float wallCollisionStiffnessQ;\n"
+		<< "    float wallTargetPenetrationFraction;\n"
+		<< "    float wallHardPenetrationFraction;\n"
+		<< "    float wallCompressionStiffnessGain;\n"
+		<< "    float wallCompressionStiffnessPower;\n"
 		<< "};\n\n";
 
 	int segmentCount = 0;
@@ -1213,7 +1218,9 @@ std::ostringstream ShaderObj::FunctionWalls()
 			<< "0u, 0u, "
 			<< "0.000000000, 0.000000000, 0.000000000, "
 			<< "0.000000000, 0.000000000, 0.000000000, "
-			<< "1.000000000, 0u)\n"
+			<< "1.000000000, 0u, "
+			<< "-1.000000000, -1.000000000, -1.000000000, "
+			<< "-1.000000000, -1.000000000)\n"
 			<< ");\n\n";
 		return wall_str;
 	}
@@ -1230,11 +1237,12 @@ std::ostringstream ShaderObj::FunctionWalls()
 		config_setting_t* segment =
 			CfgTst->GetSubStructAddress(segmentList, index);
 
-		if (segment == nullptr || config_setting_length(segment) != 10)
+		int segmentLength = segment == nullptr ? 0 : config_setting_length(segment);
+		if (segment == nullptr || (segmentLength != 10 && segmentLength != 17))
 		{
 			throw std::runtime_error(
 				"curve_wall_segments[" + std::to_string(index) +
-				"] must contain ten values"
+				"] must contain ten or seventeen values"
 			);
 		}
 
@@ -1254,6 +1262,19 @@ std::ostringstream ShaderObj::FunctionWalls()
 		uint32_t wallFlag = static_cast<uint32_t>(
 			config_setting_get_float_elem(segment, 9)
 			);
+		double wallCollisionStiffnessQ = -1.0;
+		double wallTargetPenetrationFraction = -1.0;
+		double wallHardPenetrationFraction = -1.0;
+		double wallCompressionStiffnessGain = -1.0;
+		double wallCompressionStiffnessPower = -1.0;
+		if (segmentLength == 17)
+		{
+			wallCollisionStiffnessQ = config_setting_get_float_elem(segment, 12);
+			wallTargetPenetrationFraction = config_setting_get_float_elem(segment, 13);
+			wallHardPenetrationFraction = config_setting_get_float_elem(segment, 14);
+			wallCompressionStiffnessGain = config_setting_get_float_elem(segment, 15);
+			wallCompressionStiffnessPower = config_setting_get_float_elem(segment, 16);
+		}
 
 		wall_str
 			<< "    FunctionWallSegment("
@@ -1266,7 +1287,12 @@ std::ostringstream ShaderObj::FunctionWalls()
 			<< a2 << ", "
 			<< a3 << ", "
 			<< normalSign << ", "
-			<< wallFlag << "u)";
+			<< wallFlag << "u, "
+			<< wallCollisionStiffnessQ << ", "
+			<< wallTargetPenetrationFraction << ", "
+			<< wallHardPenetrationFraction << ", "
+			<< wallCompressionStiffnessGain << ", "
+			<< wallCompressionStiffnessPower << ")";
 
 		if (index + 1 < segmentCount)
 			wall_str << ",";

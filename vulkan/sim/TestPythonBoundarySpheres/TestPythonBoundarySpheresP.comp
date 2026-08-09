@@ -35,13 +35,13 @@
 // Simple source-owned compute schedule.
 // Do not hand edit generated dynamics content.
 
-#define EVALUATE_CONFIGURED_WALL_SEGMENT_DEFINED
-BoundaryWallSegment EvaluateConfiguredWallSegment(uint SourceID, uint BoundaryID)
+#define EVALUATE_CONFIGURED_WALL_CONTACTS_DEFINED
+BoundaryWallContactSet EvaluateConfiguredWallContacts(uint SourceID)
 {
     if (RECTANGLE_WALL_SEGMENT_COUNT > 0u) {
-        return EvaluateRectangleWallSegment(SourceID, BoundaryID);
+        return EvaluateRectangleWallContacts(SourceID);
     }
-    return EvaluateFunctionWallSegment(SourceID, BoundaryID);
+    return EvaluateFunctionWallContacts(SourceID);
 }
 
 #include "../common/FPM.comp"

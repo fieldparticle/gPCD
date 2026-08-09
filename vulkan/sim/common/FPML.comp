@@ -2,11 +2,11 @@
 // Lighting source-owned compute schedule. Requires BoundaryLightRecord.glsl.
 
 // Scenarios with richer wall models can define this function before including
-// FPML.comp and set EVALUATE_CONFIGURED_WALL_SEGMENT_DEFINED.
-#ifndef EVALUATE_CONFIGURED_WALL_SEGMENT_DEFINED
-BoundaryWallSegment EvaluateConfiguredWallSegment(uint SourceID, uint BoundaryID)
+// FPML.comp and set EVALUATE_CONFIGURED_WALL_CONTACTS_DEFINED.
+#ifndef EVALUATE_CONFIGURED_WALL_CONTACTS_DEFINED
+BoundaryWallContactSet EvaluateConfiguredWallContacts(uint SourceID)
 {
-    return EvaluateFunctionWallSegment(SourceID, BoundaryID);
+    return EvaluateFunctionWallContacts(SourceID);
 }
 #endif
 
@@ -1446,8 +1446,7 @@ void fpml_comp_main()
 
     uint duplicateTargets[DUP_LIST_SIZE];
     uint duplicateCount = 0u;
-    uint duplicateWalls[DUP_LIST_SIZE];
-    uint duplicateWallCount = 0u;
+    bool hasLocalBoundaryMarker = false;
     bool lightingBallContactProcessed = false;
 
     for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
@@ -1575,177 +1574,7 @@ void fpml_comp_main()
                     continue;
                 }
 
-                BoundaryWallSegment segment =
-                    EvaluateConfiguredWallSegment(SourceID, TargetID);
-                if (!segment.valid) {
-                    continue;
-                }
-                bool duplicateWall = false;
-                for (uint duplicateIndex = 0u;
-                        duplicateIndex < duplicateWallCount;
-                        ++duplicateIndex) {
-                    if (duplicateWalls[duplicateIndex] == segment.wallFlag) {
-                        duplicateWall = true;
-                        break;
-                    }
-                }
-                if (duplicateWall) {
-                    continue;
-                }
-                if (duplicateWallCount >= DUP_LIST_SIZE) {
-                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
-                    return;
-                }
-                duplicateWalls[duplicateWallCount] = segment.wallFlag;
-                duplicateWallCount += 1u;
-                if (photonSource) {
-                    fpml_profile_count_wall_hit();
-#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
-                    RectangleWallSegment selectedPhotonWall =
-                        SelectRectangleWallSegment(SourceID, TargetID);
-                    uint surfaceMaterialID = boundary_light_surface_material_id(
-                        BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL,
-                        selectedPhotonWall.wallFlag,
-                        uint(round(P[TargetID].material_id)));
-#else
-                    uint surfaceMaterialID = uint(round(P[TargetID].material_id));
-#endif
-                    uint surfaceBehavior =
-                        boundary_light_material_surface_behavior(surfaceMaterialID);
-#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
-                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_REFLECT &&
-                            reflecting_wall_light_map_is_target(selectedPhotonWall) &&
-                            !IsReflectionPhotonParticle(SourceID)) {
-                        continue;
-                    }
-#endif
-                    P[SourceID].colFlg = 1u;
-                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_NONE) {
-                        continue;
-                    }
-
-                    vec3 incidenceNormal = boundary_light_wall_incidence_normal(
-                        SourceID,
-                        TargetID,
-                        segment.normal);
-                    float depositFraction = photon_deposit_fraction(
-                        photonVelocity,
-                        incidenceNormal,
-                        surfaceMaterialID);
-                    float preTransferMass = photon_relative_mass(SourceID);
-                    float remainingMass =
-                        reduce_photon_mass_by_deposit_fraction(
-                            SourceID,
-                            depositFraction);
-
-                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_ABSORB) {
-                        vec3 grayRgb = photon_deposit_energy_gray_rgb(
-                            depositFraction,
-                            preTransferMass);
-#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
-                        if (!reflecting_wall_light_map_is_target(selectedPhotonWall))
-                        {
-                            DepositLightingSurfaceWallVertexSplat(
-                                selectedPhotonWall,
-                                photonPosition,
-                                grayRgb);
-                        }
-#else
-#endif
-                        retire_photon(SourceID);
-                        continue;
-                    }
-
-                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR) {
-                        if (IsReflectionPhotonParticle(SourceID)) {
-                            fpml_profile_count_reflection_pickup();
-                            photon_set_payload_rgb(
-                                SourceID,
-                                photon_pickup_material_rgb(SourceID, surfaceMaterialID));
-                            photonVelocity = ReverseFixedSpeed(photonVelocity);
-                            photonReflected = true;
-                            continue;
-                        }
-                        vec3 surfaceRgb = photon_deposit_material_color_rgb(
-                            depositFraction,
-                            preTransferMass,
-                            surfaceMaterialID);
-                        uint cellID = boundary_light_cell_address(
-                            GetParticlePosition(TargetID).xyz);
-#if FPML_ENABLE_SURFACE_DEPOSIT && FPML_ENABLE_WALL_DEPOSIT
-                        if (cellID != npos && cellID < MAX_CELL_ARRAY_LOCATIONS) {
-                            BoundaryLight[cellID].rgb_valid = vec4(surfaceRgb, 1.0);
-                        }
-#endif
-#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
-                        if (!reflecting_wall_light_map_is_target(selectedPhotonWall))
-                        {
-                            DepositLightingSurfaceWallVertexSplat(
-                                selectedPhotonWall,
-                                photonPosition,
-                                surfaceRgb);
-                        }
-#else
-#endif
-                        if (remainingMass >
-                                boundary_light_material_photon_min_relative_mass(
-                                    uint(round(P[SourceID].material_id)))) {
-                            photonVelocity =
-                                ReflectFixedSpeed(photonVelocity, segment.normal);
-                            photonReflected = true;
-                        }
-                        continue;
-                    }
-
-                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_REFLECT) {
-                        if (!IsReflectionPhotonParticle(SourceID)) {
-                            continue;
-                        }
-                        vec3 payloadRgb = photon_carried_payload_rgb(SourceID);
-                        if (photon_payload_valid(SourceID)) {
-                            uint cellID = boundary_light_cell_address(
-                                GetParticlePosition(TargetID).xyz);
-#if FPML_ENABLE_SURFACE_DEPOSIT && FPML_ENABLE_WALL_DEPOSIT
-                            if (cellID != npos && cellID < MAX_CELL_ARRAY_LOCATIONS) {
-                                BoundaryLight[cellID].rgb_valid = vec4(payloadRgb, 1.0);
-                            }
-#endif
-#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
-                            uint texelIndex = npos;
-                            if (reflecting_wall_light_map_texel_index(
-                                    selectedPhotonWall,
-                                    photonPosition,
-                                    texelIndex))
-                            {
-                                ReflectingWallLightMap[texelIndex].light =
-                                    vec4(payloadRgb, 1.0);
-                                reflecting_wall_photon_splat_deposit(
-                                    SourceID,
-                                    selectedPhotonWall,
-                                    photonPosition,
-                                    payloadRgb);
-                            }
-                            if (!reflecting_wall_light_map_is_target(selectedPhotonWall))
-                            {
-                                DepositLightingSurfaceWallVertexSplat(
-                                    selectedPhotonWall,
-                                    photonPosition,
-                                    payloadRgb);
-                            }
-#else
-#endif
-                        }
-                        retire_photon(SourceID);
-                        return;
-                    }
-                    continue;
-                }
-                if (!ProcessFunctionWallCollision(
-                        SourceID,
-                        segment,
-                        totalForce)) {
-                    return;
-                }
+                hasLocalBoundaryMarker = true;
                 continue;
             }
 
@@ -1812,12 +1641,43 @@ void fpml_comp_main()
         }
     }
 
+    if (hasLocalBoundaryMarker) {
+        BoundaryWallContactSet wallContacts =
+            EvaluateConfiguredWallContacts(SourceID);
+        if (collOut.ErrorNumber != ERROR_NONE) {
+            return;
+        }
+        for (uint contactIndex = 0u;
+                contactIndex < wallContacts.count;
+                ++contactIndex) {
+            BoundaryWallSegment segment = wallContacts.segments[contactIndex];
+            if (photonSource) {
+                photonVelocity =
+                    ReflectFixedSpeed(photonVelocity, segment.normal);
+                photonReflected = true;
+                P[SourceID].colFlg = 1u;
+                continue;
+            }
+            if (!ProcessFunctionWallCollision(
+                    SourceID,
+                    segment,
+                    totalForce)) {
+                return;
+            }
+        }
+    }
+
+    if (P[SourceID].contactCount == 0u) {
+        ClearCollisionStoredMomentum(SourceID);
+    }
+
     if (!CalcVelocity(SourceID, totalForce)) {
         return;
     }
     if (!ApplySourceMaximumDepth(SourceID, 9401u)) {
         return;
     }
+    UpdateCollisionStoredMomentum(SourceID);
     if (photonReflected) {
         SetNextParticleVelocity(
             SourceID,
@@ -1836,7 +1696,7 @@ void fpml_comp_main()
 #endif
 
     duplicateCount = 0u;
-    duplicateWallCount = 0u;
+    hasLocalBoundaryMarker = false;
     bool lightingBallResolvedProcessed = false;
 
     for (uint CornerIndex = 0u; CornerIndex < 8u; ++CornerIndex) {
@@ -1872,37 +1732,7 @@ void fpml_comp_main()
                     continue;
                 }
 
-                BoundaryWallSegment segment =
-                    EvaluateConfiguredWallSegment(SourceID, TargetID);
-                if (!segment.valid) {
-                    continue;
-                }
-                bool duplicateWall = false;
-                for (uint duplicateIndex = 0u;
-                        duplicateIndex < duplicateWallCount;
-                        ++duplicateIndex) {
-                    if (duplicateWalls[duplicateIndex] == segment.wallFlag) {
-                        duplicateWall = true;
-                        break;
-                    }
-                }
-                if (duplicateWall) {
-                    continue;
-                }
-                if (duplicateWallCount >= DUP_LIST_SIZE) {
-                    SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
-                    return;
-                }
-                duplicateWalls[duplicateWallCount] = segment.wallFlag;
-                duplicateWallCount += 1u;
-                if (photonSource) {
-                    continue;
-                }
-                if (!RegisterResolvedFunctionWallContactStep(
-                        SourceID,
-                        segment)) {
-                    return;
-                }
+                hasLocalBoundaryMarker = true;
                 continue;
             }
 
@@ -1950,6 +1780,23 @@ void fpml_comp_main()
         }
     }
 
+    if (hasLocalBoundaryMarker && !photonSource) {
+        BoundaryWallContactSet wallContacts =
+            EvaluateConfiguredWallContacts(SourceID);
+        if (collOut.ErrorNumber != ERROR_NONE) {
+            return;
+        }
+        for (uint contactIndex = 0u;
+                contactIndex < wallContacts.count;
+                ++contactIndex) {
+            if (!RegisterResolvedFunctionWallContactStep(
+                    SourceID,
+                    wallContacts.segments[contactIndex])) {
+                return;
+            }
+        }
+    }
+
     if (!ApplySourceMaximumDepth(SourceID, 9402u)) {
         return;
     }
@@ -1964,6 +1811,7 @@ void fpml_comp_main()
         }
     }
 
+    ApplyTempVelocity(SourceID);
     if (!photonPositionOverride && !CalcPosition(SourceID)) {
         if (!RecycleLightingPhotonIfDead(SourceID, previousBirthFrame)) {
             return;

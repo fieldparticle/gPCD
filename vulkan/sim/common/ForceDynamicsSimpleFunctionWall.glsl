@@ -93,15 +93,25 @@ FunctionWallSegment SelectFunctionWallSegment(uint SourceID, uint BoundaryID)
     return selected;
 }
 
-// Python source: ForceDynamics.py:314
-BoundaryWallSegment EvaluateFunctionWallSegment(uint SourceID, uint BoundaryID)
+// Python source: ForceDynamics.py:323
+BoundaryWallSegment EvaluateFunctionWallSegmentContact(
+    uint SourceID, FunctionWallSegment selected)
 {
-    FunctionWallSegment selected = SelectFunctionWallSegment(SourceID, BoundaryID);
     vec3 sourcePosition = GetParticlePosition(SourceID).xyz;
     vec2 wallPoint;
     vec2 normal2d;
     if (!FunctionWallEvaluateAtPoint(selected, sourcePosition.xy, wallPoint, normal2d)) {
-        return BoundaryWallSegment(vec3(0.0), 0.0, 0.0, selected.wallFlag, false);
+        return BoundaryWallSegment(
+            vec3(0.0),
+            0.0,
+            0.0,
+            selected.wallFlag,
+            selected.wallCollisionStiffnessQ,
+            selected.wallTargetPenetrationFraction,
+            selected.wallHardPenetrationFraction,
+            selected.wallCompressionStiffnessGain,
+            selected.wallCompressionStiffnessPower,
+            false);
     }
 
     float radius = P[SourceID].Data.x;
@@ -116,6 +126,11 @@ BoundaryWallSegment EvaluateFunctionWallSegment(uint SourceID, uint BoundaryID)
             0.0,
             centerDistance,
             selected.wallFlag,
+            selected.wallCollisionStiffnessQ,
+            selected.wallTargetPenetrationFraction,
+            selected.wallHardPenetrationFraction,
+            selected.wallCompressionStiffnessGain,
+            selected.wallCompressionStiffnessPower,
             false);
     }
 
@@ -125,7 +140,69 @@ BoundaryWallSegment EvaluateFunctionWallSegment(uint SourceID, uint BoundaryID)
         overlapArea,
         centerDistance,
         selected.wallFlag,
+        selected.wallCollisionStiffnessQ,
+        selected.wallTargetPenetrationFraction,
+        selected.wallHardPenetrationFraction,
+        selected.wallCompressionStiffnessGain,
+        selected.wallCompressionStiffnessPower,
         true);
+}
+
+BoundaryWallSegment EvaluateFunctionWallSegment(uint SourceID, uint BoundaryID)
+{
+    FunctionWallSegment selected = SelectFunctionWallSegment(SourceID, BoundaryID);
+    return EvaluateFunctionWallSegmentContact(SourceID, selected);
+}
+
+BoundaryWallContactSet EvaluateFunctionWallContacts(uint SourceID)
+{
+    BoundaryWallContactSet contacts;
+    contacts.count = 0u;
+    float sourceRadius = P[SourceID].Data.x;
+
+    for (uint segmentIndex = 0u;
+            segmentIndex < CURVE_WALL_SEGMENT_COUNT;
+            ++segmentIndex) {
+        BoundaryWallSegment segment = EvaluateFunctionWallSegmentContact(
+            SourceID,
+            CURVE_WALL_SEGMENTS[segmentIndex]);
+        if (!segment.valid) {
+            continue;
+        }
+
+        float penetrationDepth = ParticlePenetrationDepth(
+            sourceRadius,
+            sourceRadius,
+            segment.centerDistance);
+        bool replaced = false;
+        for (uint contactIndex = 0u;
+                contactIndex < contacts.count;
+                ++contactIndex) {
+            if (contacts.segments[contactIndex].wallFlag != segment.wallFlag) {
+                continue;
+            }
+            float previousDepth = ParticlePenetrationDepth(
+                sourceRadius,
+                sourceRadius,
+                contacts.segments[contactIndex].centerDistance);
+            if (penetrationDepth > previousDepth) {
+                contacts.segments[contactIndex] = segment;
+            }
+            replaced = true;
+            break;
+        }
+        if (replaced) {
+            continue;
+        }
+        if (contacts.count >= DUP_LIST_SIZE) {
+            SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+            return contacts;
+        }
+        contacts.segments[contacts.count] = segment;
+        contacts.count += 1u;
+    }
+
+    return contacts;
 }
 
 #endif

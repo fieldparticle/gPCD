@@ -46,6 +46,8 @@ struct Particle {
     vec4 parms;                // x=mass, yzw=source-owned recoverable internal momentum
     vec4 collisionStartMomentum;  // xyz=mv at collision entry, w=active flag
     vec4 collisionStoredMomentum; // xyz=display stored mv, w=magnitude
+    vec4 tempVelocity;         // xyz=target velocity, w=target angle
+    vec4 tempParams;           // x=temp velocity type, y=rate, z/w=reserved
 
     lstr CornerList[8];
 

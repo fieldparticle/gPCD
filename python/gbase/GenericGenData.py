@@ -50,6 +50,7 @@ from gbase.pdata import (
     PTYPE_NULL,
     PTYPE_PHOTON,
     PTYPE_REFLECTION_PHOTON,
+    TEMP_VEL_TYPE_IDS,
     pdata,
 )
 import math
@@ -603,6 +604,54 @@ class GenericGenData:
                 return default
             return result
 
+        def particle_data_values(names, count, default):
+            source = (
+                particle_data
+                if particle_data and hasattr(particle_data, "get")
+                else self.itemcfg
+            )
+            if isinstance(names, str):
+                names = (names,)
+            selected_name = None
+            values = None
+            for name in names:
+                if source.get(name) is not None:
+                    selected_name = name
+                    values = source.get(name)
+                    break
+            if values is None:
+                return tuple(default)
+            try:
+                if len(values) != count:
+                    errors.append(
+                        f"PARTICLE_DATA.{selected_name} must contain exactly "
+                        f"{count} values"
+                    )
+                    return tuple(default)
+                result = tuple(float(value) for value in values)
+            except (TypeError, ValueError):
+                errors.append(f"PARTICLE_DATA.{selected_name} values must be numeric")
+                return tuple(default)
+            if not all(math.isfinite(value) for value in result):
+                errors.append(f"PARTICLE_DATA.{selected_name} values must be finite")
+                return tuple(default)
+            return result
+
+        def particle_data_temp_velocity_type():
+            source = (
+                particle_data
+                if particle_data and hasattr(particle_data, "get")
+                else self.itemcfg
+            )
+            value = str(source.get("temp_vel_type", "none")).strip().lower()
+            if value not in ("none", "directional", "magnitude"):
+                errors.append(
+                    "PARTICLE_DATA.temp_vel_type must be none, directional, "
+                    "or magnitude"
+                )
+                return "none"
+            return value
+
         try:
             target_penetration_fraction = float(
                 particle_data.get(
@@ -643,6 +692,13 @@ class GenericGenData:
             "compression_stiffness_power",
             2.0,
         )
+        temp_velocity = particle_data_values(
+            ("temp_velocity", "temp_vel"),
+            4,
+            (0.0, 0.0, 0.0, 0.0),
+        )
+        temp_vel_type = particle_data_temp_velocity_type()
+        temp_vel_rate = particle_data_float("temp_vel_rate", 0.0)
 
         if target_penetration_fraction is not None:
             if not math.isfinite(target_penetration_fraction):
@@ -659,6 +715,7 @@ class GenericGenData:
             ("min_compression_frames", min_compression_frames),
             ("compression_stiffness_gain", compression_stiffness_gain),
             ("compression_stiffness_power", compression_stiffness_power),
+            ("temp_vel_rate", temp_vel_rate),
         ):
             if field_value < 0.0:
                 errors.append(f"{field_name} must not be negative")
@@ -915,6 +972,9 @@ class GenericGenData:
         self.min_compression_frames = min_compression_frames
         self.compression_stiffness_gain = compression_stiffness_gain
         self.compression_stiffness_power = compression_stiffness_power
+        self.temp_velocity = temp_velocity
+        self.temp_vel_type = temp_vel_type
+        self.temp_vel_rate = temp_vel_rate
         return True
 
     def report_collision_feasibility(self):
@@ -1380,6 +1440,9 @@ class GenericGenData:
         material_id=0,
         collision_stiffness_q=None,
         ptype=None,
+        temp_velocity=None,
+        temp_vel_type=None,
+        temp_vel_rate=None,
     ):
         material_id = int(material_id)
         if material_id not in self.material_properties_by_id:
@@ -1407,6 +1470,28 @@ class GenericGenData:
             if collision_stiffness_q is None
             else collision_stiffness_q
         )
+        temp_velocity = (
+            getattr(self, "temp_velocity", (0.0, 0.0, 0.0, 0.0))
+            if temp_velocity is None
+            else temp_velocity
+        )
+        particle.temp_velocity_x = float(temp_velocity[0])
+        particle.temp_velocity_y = float(temp_velocity[1])
+        particle.temp_velocity_z = float(temp_velocity[2])
+        particle.temp_velocity_w = float(temp_velocity[3])
+        temp_vel_type = (
+            getattr(self, "temp_vel_type", "none")
+            if temp_vel_type is None
+            else temp_vel_type
+        )
+        particle.temp_vel_type = float(
+            TEMP_VEL_TYPE_IDS.get(str(temp_vel_type).strip().lower(), 0.0)
+        )
+        particle.temp_vel_rate = float(
+            getattr(self, "temp_vel_rate", 0.0)
+            if temp_vel_rate is None
+            else temp_vel_rate
+        )
         self.p_list.append(particle)
         return particle
 
@@ -1431,6 +1516,9 @@ class GenericGenData:
                 mass=configured["mass"],
                 material_id=configured.get("material_id", 0),
                 collision_stiffness_q=configured["collision_stiffness_q"],
+                temp_velocity=self.temp_velocity,
+                temp_vel_type=self.temp_vel_type,
+                temp_vel_rate=self.temp_vel_rate,
             )
 
         if self.number_active_particles != self.number_configured_particles:
@@ -1462,7 +1550,7 @@ class GenericGenData:
         self.p_list.append(particle)
         return particle
 
-    def curve_marker_points(self, segment, maximum_spacing=1.0):
+    def curve_marker_points(self, segment, maximum_spacing=0.5):
         """Return sampled points used only for boundary-sentinel placement."""
         return sample_points(segment, maximum_spacing)
 
@@ -1515,7 +1603,7 @@ class GenericGenData:
             f"  markers added per segment: {segment_marker_counts}\n"
             "  occupancy rule: boundary markers are cell-locality sentinels\n"
             "  marker position: integer cell center\n"
-            "  maximum sampled function interval: 1 cell"
+            "  maximum sampled function interval: 0.5 cell"
         )
         print(report_text)
         self.write_validation_log(report_text)
@@ -3847,7 +3935,7 @@ class GenericGenData:
                 separator = (
                     "," if segment_index + 1 < len(active_curve_wall_segments) else ""
                 )
-                values = ", ".join(f"{float(value):.9f}" for value in segment[:10])
+                values = ", ".join(f"{float(value):.9f}" for value in segment)
                 output.write(f"    [{values}]{separator}\n")
             output.write(");\n")
 

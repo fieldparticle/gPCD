@@ -62,6 +62,11 @@ particle_streams = (
     hard_penetration_fraction = 0.75;
     min_compression_frames = 3.0;
     stream_velocity = [ 0.05, 0.0, 0.0 ];
+    // Type: "directional" relaxes velocity toward temp_velocity.xyz.
+    temp_vel_type = "directional";
+    temp_velocity = [0.05, 0.0, 0.0, 0.0];
+    temp_vel_rate = 0.0002;
+
   }
 );
 
@@ -108,26 +113,33 @@ curve_wall_segments = {
             };
             segment03 = {
                 boundary_kind = "regular";
-                length = 20;
-                a1 = 0.25;
-                a2 = -0.00625;
+                length = 2;
+                a1 = 0;
+                a2 = 0;
                 a3 = 0;
             };
             segment05 = {
+                boundary_kind = "regular";
+                length = 20;
+                a1 = 0;
+                a2 = 0.01875;
+                a3 = -0.000625;
+            };
+            segment07 = {
                 boundary_kind = "regular";
                 length = 5;
                 a1 = 0;
                 a2 = 0;
                 a3 = 0;
             };
-            segment07 = {
+            segment09 = {
                 boundary_kind = "regular";
                 length = 20;
                 a1 = 0;
                 a2 = -0.00625;
                 a3 = 0;
             };
-            segment09 = {
+            segment11 = {
                 boundary_kind = "regular";
                 length = 10;
                 a1 = 0;
@@ -154,26 +166,33 @@ curve_wall_segments = {
             };
             segment04 = {
                 boundary_kind = "regular";
-                length = 20;
-                a1 = -0.25;
-                a2 = 0.00625;
+                length = 2;
+                a1 = 0;
+                a2 = 0;
                 a3 = 0;
             };
             segment06 = {
+                boundary_kind = "regular";
+                length = 20;
+                a1 = 0;
+                a2 = -0.01875;
+                a3 = 0.000625;
+            };
+            segment08 = {
                 boundary_kind = "regular";
                 length = 5;
                 a1 = 0;
                 a2 = 0;
                 a3 = 0;
             };
-            segment08 = {
+            segment10 = {
                 boundary_kind = "regular";
                 length = 20;
                 a1 = 0;
                 a2 = 0.00625;
                 a3 = 0;
             };
-            segment10 = {
+            segment12 = {
                 boundary_kind = "regular";
                 length = 10;
                 a1 = 0;

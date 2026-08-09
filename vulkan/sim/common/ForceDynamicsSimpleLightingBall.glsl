@@ -26,10 +26,20 @@ LightingBallCollisionResult NoLightingBallCollision()
     return LightingBallCollisionResult(
         false,
         true,
-        BoundaryWallSegment(vec3(0.0), 0.0, 0.0, LIGHTING_BALL_WALL_FLAG, false));
+        BoundaryWallSegment(
+            vec3(0.0),
+            0.0,
+            0.0,
+            LIGHTING_BALL_WALL_FLAG,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            false));
 }
 
-// Python source: ForceDynamics.py:489
+// Python source: ForceDynamics.py:534
 BoundaryWallSegment EvaluateLightingBallContact(uint SourceID)
 {
     if (LIGHTING_BALL_ENABLED == 0u || LIGHTING_BALL_RADIUS <= 0.0) {
@@ -38,6 +48,11 @@ BoundaryWallSegment EvaluateLightingBallContact(uint SourceID)
             0.0,
             0.0,
             LIGHTING_BALL_WALL_FLAG,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
             false);
     }
 
@@ -52,6 +67,11 @@ BoundaryWallSegment EvaluateLightingBallContact(uint SourceID)
             0.0,
             0.0,
             LIGHTING_BALL_WALL_FLAG,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
             false);
     }
 
@@ -66,6 +86,11 @@ BoundaryWallSegment EvaluateLightingBallContact(uint SourceID)
             0.0,
             contactCenterDistance,
             LIGHTING_BALL_WALL_FLAG,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
             false);
     }
 
@@ -81,10 +106,15 @@ BoundaryWallSegment EvaluateLightingBallContact(uint SourceID)
         overlapArea,
         contactCenterDistance,
         LIGHTING_BALL_WALL_FLAG,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
         true);
 }
 
-// Python source: ForceDynamics.py:528
+// Python source: ForceDynamics.py:573
 LightingBallCollisionResult ProcessLightingBallCollision(
     uint SourceID,
     inout vec3 totalForce)

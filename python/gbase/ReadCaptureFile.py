@@ -18,6 +18,10 @@ particle_dtype = np.dtype([
     ("VelRadB", np.float32, 4),
     ("Data", np.float32, 4),
     ("parms", np.float32, 4),
+    ("collisionStartMomentum", np.float32, 4),
+    ("collisionStoredMomentum", np.float32, 4),
+    ("tempVelocity", np.float32, 4),
+    ("tempParams", np.float32, 4),
     ("CornerList", lstr_dtype, 8),
     ("contactCount", np.uint32),
     ("colFlg", np.uint32),
@@ -39,6 +43,12 @@ input_particle_dtype = np.dtype([
     ("molar_mass", np.float64),
     ("material_id", np.float64),
     ("collision_stiffness_q", np.float64),
+    ("temp_velocity_x", np.float64),
+    ("temp_velocity_y", np.float64),
+    ("temp_velocity_z", np.float64),
+    ("temp_velocity_w", np.float64),
+    ("temp_vel_type", np.float64),
+    ("temp_vel_rate", np.float64),
 ])
 
 CSV_FIELDS = [

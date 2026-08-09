@@ -79,6 +79,19 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		std::string err = "Cannot open benchmarking data file::" + dataFile;
 		throw std::runtime_error(err.c_str());
 	}
+	input_file.seekg(0, std::ios::end);
+	std::streamoff dataFileSize = input_file.tellg();
+	input_file.seekg(0, std::ios::beg);
+	if (dataFileSize % static_cast<std::streamoff>(sizeof(pdata)) != 0)
+	{
+		std::ostringstream objtxt;
+		objtxt << m_Name
+			<< "ResourceVertexParticle::Particle binary record size mismatch. "
+			<< "Regenerate data. File:" << dataFile
+			<< " Size:" << dataFileSize
+			<< " pdata:" << sizeof(pdata) << std::ends;
+		throw std::runtime_error(objtxt.str().c_str());
+	}
 
 	pdata part_pos;
 
@@ -109,22 +122,30 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 	{
 		input_file.read((char*)&part_pos, sizeof(part_pos));
 		Particle part{};
+		bool isNullParticle = part_pos.pnum == 0.0 || part_pos.ptype == -1.0;
+		if (isNullParticle && m_NumParticles != 0)
+		{
+			std::ostringstream objtxt;
+			objtxt << m_Name
+				<< "ResourceVertexParticle::Unexpected null particle record. "
+				<< "Regenerate data. P:" << part_pos.pnum
+				<< "<" << part_pos.rx << "," << part_pos.ry << "," << part_pos.rz
+				<< ">" << std::ends;
+			throw std::runtime_error(objtxt.str().c_str());
+		}
 
 
 		// Check to see if this flow type is resevior before checkig the lower bounds
 		// since position is <-99,-99,-99> or  <-99,-99,1.0> in 2D
-		if (true)
+		if (!isNullParticle)
 		{
 			if (part_pos.rx < 0.5 || part_pos.ry < 0.5 || part_pos.rz < 0.5)
 			{
 				std::ostringstream  objtxt;
-				if (m_NumParticles != 0)
-				{
-					objtxt << m_Name << "ResourceVertexParticle::Particle location below bounds P:" <<
-						part_pos.pnum << "<" << part_pos.rx << "," << part_pos.ry << "," << part_pos.rz
-						<< ">" << std::ends;
-					throw std::runtime_error(objtxt.str().c_str());
-				}
+				objtxt << m_Name << "ResourceVertexParticle::Particle location below bounds P:" <<
+					part_pos.pnum << "<" << part_pos.rx << "," << part_pos.ry << "," << part_pos.rz
+					<< ">" << std::ends;
+				throw std::runtime_error(objtxt.str().c_str());
 			}
 		}
 
@@ -142,6 +163,12 @@ void ResourceVertexParticle::Create(uint32_t BindPoint)
 		part.parms			= glm::vec4(part_pos.molar_mass, 0.0, 0.0, 0.0);
 		part.collisionStartMomentum = glm::vec4(0.0f);
 		part.collisionStoredMomentum = glm::vec4(0.0f);
+		part.tempVelocity	= glm::vec4(
+			part_pos.temp_velocity_x,
+			part_pos.temp_velocity_y,
+			part_pos.temp_velocity_z,
+			part_pos.temp_velocity_w);
+		part.tempParams		= glm::vec4(part_pos.temp_vel_type, part_pos.temp_vel_rate, 0.0f, 0.0f);
 		part.colFlg			= 0;
 		part.material_id	= static_cast<float>(part_pos.material_id);
 		part.contactCount	= 0;

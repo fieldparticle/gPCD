@@ -10,27 +10,27 @@
 dt								= 0.01;
 
 // Required: binary particle file consumed by the Python runner.
-output_file_prefix 				= "CDNozzle_Vk001";
+output_file_prefix 				= "CDNozzle_Vk";
 obj_file_name 					= "C:/_DJ/gPCD/vulkan/sim/CDNozzle/CDNozzle_Vk.obj";
 
 // Required: Python viewer zoom.
-zoom							= 5.5;
+zoom							= 24.2;
 
 // ============================================================================
 
 
 // Required for Python plotter: axis limits for the particle preview.
-x_axis_lims 			= [0.0, 470.0];
-y_axis_lims 			= [10.0,40.0];
+x_axis_lims 			= [0.0, 1175.0];
+y_axis_lims 			= [25.0,100.0];
 z_axis_lims 			= [0.75,1.25];
 
 
 // Required: explicit cell counts for the cell-array domain.
-cell_array_width 		= 500;
-cell_array_height 		= 40;
+cell_array_width 		= 1250;
+cell_array_height 		= 100;
 cell_array_depth 		= 5;
 
-view_center 			= [450, 25, 2];
+view_center 			= [1100, 62.5, 2];
 
 // Frame when the piston begins moving.
 piston_start_frame 		= 20;
@@ -43,30 +43,39 @@ piston_start_frame 		= 20;
 //];
 
 death_bounds 			= [
-							1, 498,
-							12, 38,
+							2.5, 1245,
+							30, 95,
 							0, 4
 							];
 
+// Optional: Vulkan clear/background color for generated scene review.
+//clear_color = {red = 1.0; green = 1.0; blue = 1.0; alpha = 1.0;};
+clear_color = {red = 0.0; green = 0.0; blue = 0.0; alpha = 1.0;};
 particle_streams = (
   {
     name 						= "reservoir_substance";
-    material_id 				= 3;
-    radius 						= 0.15;
-    particle_separation_distance = 0.005;
-    particle_spacing_x 			= 0.005;
-    particle_spacing_y 			= 0.005;
-    collision_stiffness_q 		= 16.0;
-    compression_stiffness_gain 	= 8.0;
+	//ollisoins
+    //material_id 				= 1;
+	// HSV
+	material_id 				= 3;
+	//IA
+	//material_id 				= 4;
+    radius 						= 0.35;
+    particle_separation_distance = 0.9;
+    particle_spacing_x 			= 0.1;
+    particle_spacing_y 			= 0.1;
+    collision_stiffness_q 		= 0.5;
+    compression_stiffness_gain 	= 1.0;
     compression_stiffness_power = 2.0;
-    target_penetration_fraction = 0.5;
-    hard_penetration_fraction 	= 0.75;
+    target_penetration_fraction = 0.7;
+    hard_penetration_fraction 	= 0.9;
     min_compression_frames 		= 3.0;
-    stream_velocity 			= [ 0.1, 0.0, 0.0 ];
+    stream_velocity 			= [ 0.5, 0.0, 0.0 ];
     // Type: "directional" relaxes velocity toward temp_velocity.xyz.
-    temp_vel_type = "directional";
+    //temp_vel_type = "directional";
+	temp_vel_type = "none";
     temp_velocity = [0.1, 0.0, 0.0, 0.0];
-    temp_vel_rate = 0.0002;
+    temp_vel_rate = 0.00001;
 
   }
 );
@@ -77,11 +86,11 @@ particle_plane_z 			= 1.5;
 // Visual-only piston symbol written to the generated .tst for Vulkan display.
 piston_visual = {
     enabled 		= true;
-    y_min 			= 15.0;
-    y_max 			= 35.0;
-    head_length 	= 10.0;
-    rod_length 		= 10.0;
-    rod_height 		= 4.0;
+    y_min 			= 37.5;
+    y_max 			= 87.5;
+    head_length 	= 25.0;
+    rod_length 		= 25.0;
+    rod_height 		= 10.0;
     z 				= 1.5;
     head_color 		= {red = 0.0; green = 0.8; blue = 1.0; alpha = 1.0;};
     rod_color 		= {red = 0.0; green = 0.45; blue = 0.7; alpha = 1.0;};
@@ -97,52 +106,54 @@ piston_visual = {
 // Boundary particles are cell-locality sentinels; they are not wall geometry.
 curve_wall_segments = {
     lower_wall = {
-        function 						= "y_of_x";
-        normal_sign 					= -1;
-        wall_flag 						= 3;
-		boundary_visual_material_id 	= 6;
-		boundary_particle_material_id	= 6;
+        function 							= "y_of_x";
+        normal_sign 						= -1;
+        wall_flag 							= 3;
+        wall_collision_stiffness_q 			= 0.0;
+        wall_target_penetration_fraction 	= 0.90; wall_hard_penetration_fraction 		= 0.99;
+        wall_compression_stiffness_gain 	= 0.0;
+        wall_compression_stiffness_power 	= 1.0;
         segments = {
             wall3 = {
                 boundary_kind 	= "reservoir";
-                u_start 		= 2;
-                length 			= 400;
-                f_start 		= 15;
+                u_start 		= 5;
+                length 			= 1000;
+                f_start 		= 37.5;
                 a1 				= 0;
                 a2 				= 0;
                 a3 				= 0;
             };
             segment03 = {
                 boundary_kind 	= "regular";
-                length 			= 2;
+                length 			= 5;
                 a1 				= 0;
                 a2 				= 0;
                 a3 				= 0;
             };
             segment05 = {
                 boundary_kind 	= "regular";
-                length 			= 20;
+                length 			= 125;
                 a1 				= 0;
-                a2 				= 0.024375;
-                a3 				= -0.0008125;
+                a2 				= 0.0012;
+                a3 				= -0.0000064;
             };
             segment07 = {
                 boundary_kind 	= "regular";
-                length 			= 5;
+                length 			= 12.5;
                 a1 				= 0;
                 a2 				= 0;
                 a3 				= 0;
             };
             segment09 = {
                 boundary_kind 	= "regular";
-                length 			= 20;
+                length 			= 50;
                 a1 				= 0;
-                a2 				= -0.008125;
+                a2 				= -0.0025;
                 a3 				= 0;
             };
             segment11 = {
                 boundary_kind 	= "regular";
-                length 			= 10;
+                length 			= 25;
                 a1 				= 0;
                 a2 				= 0;
                 a3 				= 0;
@@ -150,52 +161,55 @@ curve_wall_segments = {
         };
     };
     upper_wall = {
-        function 						= "y_of_x";
-        normal_sign 					= 1;
-        wall_flag 						= 4;
-		boundary_visual_material_id 	= 5;
-		boundary_particle_material_id	= 5;
+        function 		= "y_of_x";
+        normal_sign 	= 1;
+        wall_flag 		= 4;
+        wall_collision_stiffness_q = 4.0;
+        wall_target_penetration_fraction = 0.35;
+        wall_hard_penetration_fraction = 0.55;
+        wall_compression_stiffness_gain = 8.0;
+        wall_compression_stiffness_power = 2.0;
         segments = {
             wall4 = {
                 boundary_kind = "reservoir";
-                u_start 		= 2;
-                length 			= 400;
-                f_start 		= 35;
+                u_start 		= 5;
+                length 			= 1000;
+                f_start 		= 87.5;
                 a1 				= 0;
                 a2 				= 0;
                 a3 				= 0;
             };
             segment04 = {
                 boundary_kind 	= "regular";
-                length 			= 2;
+                length 			= 5;
                 a1 				= 0;
                 a2 				= 0;
                 a3 				= 0;
             };
             segment06 = {
                 boundary_kind 	= "regular";
-                length 			= 20;
+                length 			= 125;
                 a1 				= 0;
-                a2			 	= -0.024375;
-                a3 				= 0.0008125;
+                a2			 	= -0.0012;
+                a3 				= 0.0000064;
             };
             segment08 = {
                 boundary_kind 	= "regular";
-                length 			= 5;
+                length 			= 12.5;
                 a1 				= 0;
                 a2 				= 0;
                 a3 				= 0;
             };
             segment10 = {
                 boundary_kind 	= "regular";
-                length 			= 20;
+                length 			= 50;
                 a1 				= 0;
-                a2 				= 0.008125;
+                a2 				= 0.0025;
                 a3 				= 0;
             };
             segment12 = {
                 boundary_kind 	= "regular";
-                length 			= 10;
+                length 			= 25;
                 a1 				= 0;
                 a2 				= 0;
                 a3 				= 0;

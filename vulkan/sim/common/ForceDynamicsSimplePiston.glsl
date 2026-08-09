@@ -7,13 +7,13 @@
 
 #if defined(FORCE_DYNAMICS_SIMPLE_PISTON_AVAILABLE)
 
-// Python source: ForceDynamics.py:616
+// Python source: ForceDynamics.py:661
 bool PistonEnabled()
 {
     return true;
 }
 
-// Python source: ForceDynamics.py:605
+// Python source: ForceDynamics.py:650
 float GetPistonPosition(uint frame)
 {
     uint pistonStartFrame = uint(piston_start_frame);
@@ -31,7 +31,7 @@ float GetPistonPosition(uint frame)
     return min(position, piston_x_stop);
 }
 
-// Python source: ForceDynamics.py:630
+// Python source: ForceDynamics.py:675
 vec3 GetPistonVelocity(uint frame)
 {
     uint pistonStartFrame = uint(piston_start_frame);
@@ -47,7 +47,7 @@ vec3 GetPistonVelocity(uint frame)
         piston_velocity_z);
 }
 
-// Python source: ForceDynamics.py:641
+// Python source: ForceDynamics.py:686
 BoundaryWallSegment EvaluatePistonWall(uint SourceID)
 {
     vec3 sourcePosition = GetParticlePosition(SourceID).xyz;
@@ -61,14 +61,34 @@ BoundaryWallSegment EvaluatePistonWall(uint SourceID)
     vec3 normal = vec3(-1.0, 0.0, 0.0);
     float centerDistance = abs(ghost.x - sourcePosition.x);
     if (centerDistance >= 2.0 * radius) {
-        return BoundaryWallSegment(normal, 0.0, centerDistance, 1u, false);
+        return BoundaryWallSegment(
+            normal,
+            0.0,
+            centerDistance,
+            1u,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            false);
     }
 
     float overlapArea = particle_overlap_area(radius, radius, centerDistance);
-    return BoundaryWallSegment(normal, overlapArea, centerDistance, 1u, true);
+    return BoundaryWallSegment(
+        normal,
+        overlapArea,
+        centerDistance,
+        1u,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        true);
 }
 
-// Python source: ForceDynamics.py:655
+// Python source: ForceDynamics.py:700
 bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
 {
     if (!PistonEnabled()) { return true; }
@@ -87,7 +107,12 @@ bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
 
     vec3 pistonVelocity = GetPistonVelocity(uint(ShaderFlags.frameNum));
     if (!CheckPenetrationStepResolution(
-            SourceID, segment.normal, sourceRadius, pistonVelocity)) {
+            SourceID,
+            segment.normal,
+            sourceRadius,
+            pistonVelocity,
+            CONTACT_WALL,
+            -1.0)) {
         return false;
     }
     if (!RegisterMaximumDepthConstraint(
@@ -95,7 +120,9 @@ bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
             segment.normal,
             penetrationDepth,
             sourceRadius,
-            pistonVelocity)) {
+            pistonVelocity,
+            CONTACT_WALL,
+            -1.0)) {
         return false;
     }
 
@@ -107,6 +134,11 @@ bool ProcessPistonCollision(uint SourceID, inout vec3 totalForce)
         segment.overlapArea,
         penetrationDepth,
         pistonVelocity,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
         true);
     return AccumulateContactForce(SourceID, contact, totalForce);
 }
@@ -128,7 +160,9 @@ bool CheckResolvedPistonContactStep(uint SourceID)
         segment.normal,
         penetrationDepth,
         sourceRadius,
-        GetPistonVelocity(uint(ShaderFlags.frameNum)));
+        GetPistonVelocity(uint(ShaderFlags.frameNum)),
+        CONTACT_WALL,
+        -1.0);
 }
 
 bool RegisterResolvedPistonContactStep(uint SourceID)
@@ -148,7 +182,9 @@ bool RegisterResolvedPistonContactStep(uint SourceID)
         segment.normal,
         penetrationDepth,
         sourceRadius,
-        GetPistonVelocity(uint(ShaderFlags.frameNum)));
+        GetPistonVelocity(uint(ShaderFlags.frameNum)),
+        CONTACT_WALL,
+        -1.0);
 }
 
 #endif

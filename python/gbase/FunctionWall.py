@@ -17,6 +17,15 @@ FUNCTION_AXIS_BY_NAME = {
     "x_of_y": AXIS_Y,
 }
 
+WALL_PARAMETER_DEFAULT = -1.0
+WALL_PARAMETER_FIELDS = (
+    "wall_collision_stiffness_q",
+    "wall_target_penetration_fraction",
+    "wall_hard_penetration_fraction",
+    "wall_compression_stiffness_gain",
+    "wall_compression_stiffness_power",
+)
+
 
 def _required_field(segment_name, segment_config, field_name, errors):
     if field_name not in segment_config:
@@ -74,6 +83,24 @@ def _optional_material_id(segment_name, segment_config, field_name, fallback, er
     return material_id
 
 
+def _optional_nonnegative_wall_parameter(segment_name, segment_config, field_name, errors):
+    value = _optional_number(segment_name, segment_config, field_name, errors)
+    if value is None:
+        return WALL_PARAMETER_DEFAULT
+    if value < 0.0:
+        errors.append(f"curve_wall_segments.{segment_name}.{field_name} must not be negative")
+    return value
+
+
+def _optional_fraction_wall_parameter(segment_name, segment_config, field_name, errors):
+    value = _optional_number(segment_name, segment_config, field_name, errors)
+    if value is None:
+        return WALL_PARAMETER_DEFAULT
+    if not 0.0 < value < 1.0:
+        errors.append(f"curve_wall_segments.{segment_name}.{field_name} must be between 0 and 1")
+    return value
+
+
 def parse_segment(segment_name, segment_config):
     """Parse one canonical key-value wall segment into numeric internal form."""
     errors = []
@@ -127,6 +154,36 @@ def parse_segment(segment_name, segment_config):
         else legacy_material_id,
         errors,
     )
+    wall_collision_stiffness_q = _optional_nonnegative_wall_parameter(
+        segment_name,
+        segment_config,
+        "wall_collision_stiffness_q",
+        errors,
+    )
+    wall_target_penetration_fraction = _optional_fraction_wall_parameter(
+        segment_name,
+        segment_config,
+        "wall_target_penetration_fraction",
+        errors,
+    )
+    wall_hard_penetration_fraction = _optional_fraction_wall_parameter(
+        segment_name,
+        segment_config,
+        "wall_hard_penetration_fraction",
+        errors,
+    )
+    wall_compression_stiffness_gain = _optional_nonnegative_wall_parameter(
+        segment_name,
+        segment_config,
+        "wall_compression_stiffness_gain",
+        errors,
+    )
+    wall_compression_stiffness_power = _optional_nonnegative_wall_parameter(
+        segment_name,
+        segment_config,
+        "wall_compression_stiffness_power",
+        errors,
+    )
 
     if u_start is not None and u_end is not None and abs(u_end - u_start) <= 1.0e-12:
         errors.append(f"curve_wall_segments.{segment_name} has zero length")
@@ -140,6 +197,15 @@ def parse_segment(segment_name, segment_config):
         errors.append(
             f"curve_wall_segments.{segment_name}.wall_flag "
             "must be a positive integer"
+        )
+    if (
+        wall_target_penetration_fraction >= 0.0
+        and wall_hard_penetration_fraction >= 0.0
+        and wall_hard_penetration_fraction <= wall_target_penetration_fraction
+    ):
+        errors.append(
+            f"curve_wall_segments.{segment_name}.wall_hard_penetration_fraction "
+            "must be greater than wall_target_penetration_fraction"
         )
 
     values = (
@@ -155,6 +221,11 @@ def parse_segment(segment_name, segment_config):
         wall_flag,
         boundary_particle_material_id,
         boundary_visual_material_id,
+        wall_collision_stiffness_q,
+        wall_target_penetration_fraction,
+        wall_hard_penetration_fraction,
+        wall_compression_stiffness_gain,
+        wall_compression_stiffness_power,
     )
     if errors or any(value is None for value in values):
         return None, errors
@@ -222,6 +293,7 @@ def _prepare_group_segment(segment_name, segment_config, previous_segment):
         _wall_flag,
         _boundary_particle_material_id,
         _boundary_visual_material_id,
+        *_wall_parameters,
     ) = segment_values(previous_segment)
 
     if "u_start" not in prepared_config:
@@ -312,15 +384,19 @@ def parse_keyed_curve_wall_segments(raw_segments):
 
 def segment_values(segment):
     """Return function-wall values with particle and visual material ids."""
+    wall_defaults = (WALL_PARAMETER_DEFAULT,) * len(WALL_PARAMETER_FIELDS)
     if len(segment) == 10:
         values = tuple(float(value) for value in segment)
-        return (*values, 0.0, 0.0)
+        return (*values, 0.0, 0.0, *wall_defaults)
     if len(segment) == 11:
         values = tuple(float(value) for value in segment)
-        return (*values, values[10])
-    if len(segment) != 12:
-        raise ValueError("function wall segment must contain 10, 11, or 12 values")
-    return tuple(float(value) for value in segment)
+        return (*values, values[10], *wall_defaults)
+    if len(segment) == 12:
+        values = tuple(float(value) for value in segment)
+        return (*values, *wall_defaults)
+    if len(segment) == 17:
+        return tuple(float(value) for value in segment)
+    raise ValueError("function wall segment must contain 10, 11, 12, or 17 values")
 
 
 def evaluate_function(segment, independent_value):
@@ -338,6 +414,7 @@ def evaluate_function(segment, independent_value):
         _wall_flag,
         _boundary_particle_material_id,
         _boundary_visual_material_id,
+        *_wall_parameters,
     ) = segment_values(segment)
     du = float(independent_value) - u_start
     value = f_start + a1 * du + a2 * du * du + a3 * du * du * du
@@ -371,6 +448,7 @@ def evaluate_wall_at_point(segment, point):
         wall_flag,
         boundary_particle_material_id,
         _boundary_visual_material_id,
+        *_wall_parameters,
     ) = segment_values(segment)
     independent_axis = int(round(independent_axis))
     if independent_axis not in (AXIS_X, AXIS_Y):
@@ -443,6 +521,7 @@ def bounds(segment):
         _wall_flag,
         _boundary_particle_material_id,
         _boundary_visual_material_id,
+        *_wall_parameters,
     ) = segment_values(segment)
     independent_axis = int(round(independent_axis))
     samples = [u_start, u_end]
@@ -457,7 +536,7 @@ def bounds(segment):
     return min(x_values), max(x_values), min(y_values), max(y_values)
 
 
-def sample_points(segment, maximum_spacing=1.0):
+def sample_points(segment, maximum_spacing=0.5):
     """Return sampled wall points along a function-wall segment."""
     (
         _boundary_kind,
@@ -472,6 +551,7 @@ def sample_points(segment, maximum_spacing=1.0):
         _wall_flag,
         _boundary_particle_material_id,
         _boundary_visual_material_id,
+        *_wall_parameters,
     ) = segment_values(segment)
     independent_axis = int(round(independent_axis))
     length = abs(u_end - u_start)

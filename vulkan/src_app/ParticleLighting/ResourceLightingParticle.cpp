@@ -140,6 +140,14 @@ void ResourceLightingParticle::Create(uint32_t BindPoint)
 		part.Data			= glm::vec4(part_pos.radius, part_pos.collision_stiffness_q, evaluatorID, part_pos.state_flg);
 		part.ptype			= particleType;
 		part.parms			= glm::vec4(part_pos.molar_mass, 0.0, 0.0, 0.0);
+		part.collisionStartMomentum = glm::vec4(0.0f);
+		part.collisionStoredMomentum = glm::vec4(0.0f);
+		part.tempVelocity	= glm::vec4(
+			part_pos.temp_velocity_x,
+			part_pos.temp_velocity_y,
+			part_pos.temp_velocity_z,
+			part_pos.temp_velocity_w);
+		part.tempParams		= glm::vec4(part_pos.temp_vel_type, part_pos.temp_vel_rate, 0.0f, 0.0f);
 		part.colFlg			= 0;
 		part.material_id	= static_cast<float>(part_pos.material_id);
 		part.contactCount	= 0;

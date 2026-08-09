@@ -45,5 +45,11 @@ struct pdata
 	double molar_mass;
 	double material_id;	// material/species id; independent of ptype boundary role
 	double collision_stiffness_q;
+	double temp_velocity_x;
+	double temp_velocity_y;
+	double temp_velocity_z;
+	double temp_velocity_w;
+	double temp_vel_type;
+	double temp_vel_rate;
 
 } ;

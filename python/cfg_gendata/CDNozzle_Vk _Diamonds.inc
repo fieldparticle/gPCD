@@ -51,7 +51,7 @@ death_bounds 			= [
 particle_streams = (
   {
     name 						= "reservoir_substance";
-	material_id 				= 3;
+	material_id 				= 4;
     radius 						= 0.05;
 	//was 0.0005
     particle_separation_distance = 0.15;
@@ -61,10 +61,17 @@ particle_streams = (
     compression_stiffness_gain 	= 1.0;
     compression_stiffness_power = 1.0;
     target_penetration_fraction = 0.5;
-    hard_penetration_fraction 	= 0.75;
+    hard_penetration_fraction 	= 0.9;
     min_compression_frames 		= 3.0;
 	//was 0.5
     stream_velocity 			= [ 0.002, 0.0, 0.0 ];
+	
+	
+    // Type: "directional" relaxes velocity toward temp_velocity.xyz.
+    temp_vel_type = "directional";
+    temp_velocity = [0.002, 0.0, 0.0, 0.0];
+    temp_vel_rate = 0.0002;
+
   }
 );
 
@@ -109,7 +116,7 @@ curve_wall_segments = {
             };
             segment03 = {
                 boundary_kind 	= "regular";
-                length 			= 10;
+                length 			= 2;
                 a1 				= 0;
                 a2 				= 0;
                 a3 				= 0;
@@ -160,7 +167,7 @@ curve_wall_segments = {
             };
             segment04 = {
                 boundary_kind 	= "regular";
-                length 			= 10;
+                length 			= 2;
                 a1 				= 0;
                 a2 				= 0;
                 a3 				= 0;

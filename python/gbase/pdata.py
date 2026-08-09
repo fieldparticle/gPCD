@@ -19,6 +19,9 @@ PTYPE_MOBILE = 0.0
 PTYPE_PHOTON = -2.0
 PTYPE_REFLECTION_PHOTON = -3.0
 PTYPE_BOUNDARY = 2.0
+TEMP_VEL_TYPE_NONE = 0.0
+TEMP_VEL_TYPE_DIRECTIONAL = 1.0
+TEMP_VEL_TYPE_MAGNITUDE = 2.0
 BOUNDARY_EVALUATOR_NONE = PTYPE_MOBILE
 BOUNDARY_EVALUATOR_HORIZONTAL = 1.0
 BOUNDARY_EVALUATOR_VERTICAL = 2.0
@@ -32,6 +35,12 @@ BOUNDARY_EVALUATOR_IDS = {
     "cd_nozzle_wall": BOUNDARY_EVALUATOR_CD_NOZZLE,
     "linear_wall": BOUNDARY_EVALUATOR_LINEAR,
     "function_wall": BOUNDARY_EVALUATOR_FUNCTION_WALL,
+}
+
+TEMP_VEL_TYPE_IDS = {
+    "none": TEMP_VEL_TYPE_NONE,
+    "directional": TEMP_VEL_TYPE_DIRECTIONAL,
+    "magnitude": TEMP_VEL_TYPE_MAGNITUDE,
 }
 
 
@@ -58,6 +67,8 @@ class pdata(ctypes.Structure):
       wall-evaluator dispatch.
     - ``state_flg`` becomes ``Data.w``.
     - ``molar_mass`` becomes ``parms.x``.
+    - ``temp_velocity_x/y/z/w`` become runtime ``tempVelocity``.
+    - ``temp_vel_type`` and ``temp_vel_rate`` become runtime ``tempParams.x/y``.
 
     ``state_flg`` lifecycle values are copied to runtime ``Data.w``:
 
@@ -89,5 +100,11 @@ class pdata(ctypes.Structure):
         ("molar_mass", ctypes.c_double),  # Particle mass; copied to Vulkan parms.x.
         ("material_id", ctypes.c_double),    # Material/species id; independent of boundary dispatch.
         ("collision_stiffness_q", ctypes.c_double),  # Particle-owned collision stiffness; copied to Data.y.
+        ("temp_velocity_x", ctypes.c_double),  # Target temperature/preferred velocity x.
+        ("temp_velocity_y", ctypes.c_double),  # Target temperature/preferred velocity y.
+        ("temp_velocity_z", ctypes.c_double),  # Target temperature/preferred velocity z.
+        ("temp_velocity_w", ctypes.c_double),  # Target angle.
+        ("temp_vel_type", ctypes.c_double),    # TEMP_VEL_TYPE_* code.
+        ("temp_vel_rate", ctypes.c_double),    # Per-frame relaxation rate.
         ]
         
