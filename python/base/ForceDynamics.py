@@ -338,22 +338,6 @@ class ForceContactDynamics:
         normal_x, normal_y = evaluation["normal"]
         wall_x, wall_y = evaluation["wall_point"]
         radius = float(self.particles[SourceID].Data.x)
-        offset = self.WallContactOffsetDistance(radius)
-        ghost_x = wall_x + normal_x * (radius - offset)
-        ghost_y = wall_y + normal_y * (radius - offset)
-        ghost_z = float(source_position.z)
-        dx = ghost_x - float(source_position.x)
-        dy = ghost_y - float(source_position.y)
-        dz = ghost_z - float(source_position.z)
-        center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
-        if center_distance >= 2.0 * radius:
-            return None
-        normal = (normal_x, normal_y, 0.0)
-        overlap_area = self.particle_overlap_area(
-            radius,
-            radius,
-            center_distance,
-        )
         (
             _boundary_kind,
             _independent_axis,
@@ -373,6 +357,22 @@ class ForceContactDynamics:
             wall_compression_stiffness_gain,
             wall_compression_stiffness_power,
         ) = segment_values(segment)
+        offset = self.WallContactOffsetDistance(radius)
+        ghost_x = wall_x + normal_x * (radius - offset)
+        ghost_y = wall_y + normal_y * (radius - offset)
+        ghost_z = float(source_position.z)
+        dx = ghost_x - float(source_position.x)
+        dy = ghost_y - float(source_position.y)
+        dz = ghost_z - float(source_position.z)
+        center_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if center_distance >= 2.0 * radius:
+            return None
+        normal = (normal_x, normal_y, 0.0)
+        overlap_area = self.particle_overlap_area(
+            radius,
+            radius,
+            center_distance,
+        )
         return (
             *normal,
             overlap_area,

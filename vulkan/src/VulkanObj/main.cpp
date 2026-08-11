@@ -33,17 +33,17 @@
 
 #include "VulkanObj/VulkanApp.hpp"
 #include "windows.h"
-
+#include "particleOnly/ExternalProcess.hpp"
 MsgStream			mout;
 ConfigObj*			CfgTst;
 ConfigObj*			MpsApp;
 ConfigObj*			CfgApp;
-#include "windows.h"
+
 int ParseCommandLine(int argc, const char* argv[], ConfigObj* cfg_file);
 #include "tcpip/TCPSObj.hpp"
 #include "tcpip/TCPCObj.hpp"
 
-void LaunchExecutable(std::string path, std::string cmd) ;
+
 int main(int argc, const char* argv[]) try
 {
 
@@ -92,11 +92,16 @@ int main(int argc, const char* argv[]) try
 	// Check working directory
 	mout << "Working Directory :" << cwd.string().c_str() << ende;
 	TCPObj* tcps = nullptr;
-
+	bool video_cap = false;
+	std::string video_cap_dir = {};
+	std::string video_app_path = {};
+	std::string video_exe = {};
+	std::string video_cmd_line = {};
+	ExternalProcess vid_proc;
 	// Need to go to settings->System->Display->Graphics
 	// Down to GPU Prefernce Set to High performance
 	SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
-
+	int ret = 0;
 	// If the auto flag is set this will be a verf-perf run
 	if (CfgApp->GetBool("application.doAuto", true) == true)
 	{
@@ -125,7 +130,25 @@ int main(int argc, const char* argv[]) try
 		}
 #endif
 		CfgTst->Create(testfile);
+		
+		if (CfgApp->CheckKey("application.video_cap"))
+		{
+			video_cap = CfgApp->GetBool("application.video_cap", true);
+			if (video_cap == true)
+			{
+				video_cap_dir = CfgApp->GetString("application.video_cap_dir", true);
+				video_app_path = CfgApp->GetString("application.video_exe_path", true);
+				video_exe = CfgApp->GetString("application.video_exe", true);
+				video_cmd_line = CfgApp->GetString("application.video_cmd_line", true);
+				//std::string video_app = "C:\\Program Files\\obs - studio\\bin\\64bit";
+				
+				vid_proc.Start(video_exe, video_app_path, video_cap_dir, video_cmd_line);
 
+				
+			}
+
+		}
+		
 		bool show_cell_boundary_cube	= CfgApp->GetBool("application.show_cell_boundary_cube", true);
 		bool show_wall_as_boundary_cube = CfgApp->GetBool("application.show_wall_as_boundary_cube", true);
 		bool particle_as_spheres		= CfgApp->GetBool("application.particle_as_spheres", true);
@@ -139,7 +162,7 @@ int main(int argc, const char* argv[]) try
 		{
 			if (ParticleLighting(pf, nullptr, nullptr, false))
 			{
-				return 1;
+				ret = 1;
 			}
 
 		}
@@ -150,7 +173,7 @@ int main(int argc, const char* argv[]) try
 			
 			if (ParticleBoundaryandSphere(pf, nullptr, nullptr, false))
 			{
-				return 1;
+				ret = 1;
 			}
 		}
 		// If this has a boundary and no spheres.
@@ -159,7 +182,7 @@ int main(int argc, const char* argv[]) try
 		{
 			if (ParticleBoundaryOnly(pf, nullptr, nullptr, false))
 			{
-				return 1;
+				ret = 1;
 			}
 
 		}*/
@@ -168,11 +191,14 @@ int main(int argc, const char* argv[]) try
 		{
 			if (ParticleOnly(pf, nullptr, nullptr, false))
 			{
-				return 1;
+				ret = 1;
 			}
 		}
 	}
-	return 0;
+	if (video_cap == true)
+		vid_proc.Terminate(0);
+
+	return ret;
 }
 	
 

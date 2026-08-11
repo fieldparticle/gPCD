@@ -243,6 +243,7 @@
     <ClInclude Include="..\..\src_app\particleOnly\ContainerCompute.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\ContainerGraphics.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\DrawParticleOnly.hpp" />
+    <ClInclude Include="..\..\src_app\particleOnly\ExternalProcess.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\FrameBuffer.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\ParticleOnly.hpp" />
     <ClInclude Include="..\..\src_app\particleOnly\ParticleStruct.hpp" />
@@ -361,6 +362,7 @@
     <ClCompile Include="..\..\src_app\particleOnly\ContainerCompute.cpp" />
     <ClCompile Include="..\..\src_app\particleOnly\ContainerGraphics.cpp" />
     <ClCompile Include="..\..\src_app\particleOnly\DrawParticleOnly.cpp" />
+    <ClCompile Include="..\..\src_app\particleOnly\ExternalProcess.cpp" />
     <ClCompile Include="..\..\src_app\particleOnly\FrameBuffer.cpp" />
     <ClCompile Include="..\..\src_app\particleOnly\NoPerfLoop.cpp" />
     <ClCompile Include="..\..\src_app\particleOnly\ParticleOnly.cpp" />

@@ -30,14 +30,21 @@
 %*
 %******************************************************************/
 #include "VulkanObj/VulkanApp.hpp"
-void LaunchExecutable(std::string path, std::string cmd) 
+void LaunchExecutable(std::string path, std::string cmd, PROCESS_INFORMATION &processInfo)
 {
     STARTUPINFO info = { sizeof(info) };  
-    PROCESS_INFORMATION processInfo;
+    //PROCESS_INFORMATION processInfo;
 	
 	LPSTR s = const_cast<char *>(cmd.c_str());
     if (!CreateProcess(path.c_str(), s, NULL, NULL, TRUE, 0, NULL, NULL, &info, &processInfo)) 
 	{
-		mout << "Failed to Launch Cpature app." << ende;
+		mout << "Failed to Launch Capture app." << ende;
     }
+	
+}
+void CloseExecutable(PROCESS_INFORMATION& processInfo, STARTUPINFO& info)
+{
+	CloseHandle(processInfo.hProcess);
+	CloseHandle(processInfo.hThread);
+
 }

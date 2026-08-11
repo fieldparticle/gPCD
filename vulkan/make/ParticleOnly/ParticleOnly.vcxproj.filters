@@ -297,6 +297,9 @@
     <ClInclude Include="..\..\src_app\ParticleLighting\PipelineGraphicsPoints.hpp">
       <Filter>Lighting</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src_app\particleOnly\ExternalProcess.hpp">
+      <Filter>vulkanobj</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\libconfig\scanctx.c">
@@ -571,6 +574,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src_app\ParticleLighting\PipelineGraphicsPoints.cpp">
       <Filter>Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src_app\particleOnly\ExternalProcess.cpp">
+      <Filter>vulkanobj</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

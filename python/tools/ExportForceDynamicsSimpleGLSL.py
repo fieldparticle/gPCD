@@ -4521,6 +4521,15 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
         1,
     )
     body = body.replace(
+        """    uint duplicateTargets[DUP_LIST_SIZE];
+    uint duplicateCount = 0u;""",
+        """    uint duplicateTargets[DUP_LIST_SIZE];
+    uint duplicateCount = 0u;
+    uint duplicateWalls[DUP_LIST_SIZE];
+    uint duplicateWallCount = 0u;""",
+        1,
+    )
+    body = body.replace(
         """                            if (photonSource) {
                                 photonVelocity = ReflectFixedSpeed(
                                     photonVelocity,
@@ -4572,7 +4581,7 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                                     sphereRgb = photon_deposit_material_color_rgb(
                                         depositFraction,
                                         preTransferMass,
-                                        uint(round(P[SourceID].material_id)));
+                                        sphereMaterialID);
                                 }
                                 else if (sphereBehavior == PHOTON_SURFACE_BEHAVIOR_ABSORB)
                                 {
@@ -4766,6 +4775,295 @@ bool RecycleLightingPhotonIfDead(uint SourceID, float previousBirthFrame)
                     }
                     continue;
                 }""",
+    )
+    body = body.replace(
+        """                hasLocalBoundaryMarker = true;
+                continue;""",
+        """                if (photonSource) {
+                    BoundaryWallSegment segment =
+                        EvaluateConfiguredWallSegment(SourceID, TargetID);
+                    if (!segment.valid) {
+                        continue;
+                    }
+                    bool duplicateWall = false;
+                    for (uint duplicateIndex = 0u;
+                            duplicateIndex < duplicateWallCount;
+                            ++duplicateIndex) {
+                        if (duplicateWalls[duplicateIndex] == segment.wallFlag) {
+                            duplicateWall = true;
+                            break;
+                        }
+                    }
+                    if (duplicateWall) {
+                        continue;
+                    }
+                    if (duplicateWallCount >= DUP_LIST_SIZE) {
+                        SetError(ERROR_CONTACT_LIST_MISSING, SourceID);
+                        return;
+                    }
+                    duplicateWalls[duplicateWallCount] = segment.wallFlag;
+                    duplicateWallCount += 1u;
+                    fpml_profile_count_wall_hit();
+#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
+                    RectangleWallSegment selectedPhotonWall =
+                        SelectRectangleWallSegment(SourceID, TargetID);
+                    uint surfaceMaterialID = boundary_light_surface_material_id(
+                        BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL,
+                        selectedPhotonWall.wallFlag,
+                        uint(round(P[TargetID].material_id)));
+#else
+                    uint surfaceMaterialID = uint(round(P[TargetID].material_id));
+#endif
+                    uint surfaceBehavior =
+                        boundary_light_material_surface_behavior(surfaceMaterialID);
+#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
+                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_REFLECT &&
+                            reflecting_wall_light_map_is_target(selectedPhotonWall) &&
+                            !IsReflectionPhotonParticle(SourceID)) {
+                        continue;
+                    }
+#endif
+                    P[SourceID].colFlg = 1u;
+                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_NONE) {
+                        continue;
+                    }
+
+                    vec3 incidenceNormal = boundary_light_wall_incidence_normal(
+                        SourceID,
+                        TargetID,
+                        segment.normal);
+                    float depositFraction = photon_deposit_fraction(
+                        photonVelocity,
+                        incidenceNormal,
+                        surfaceMaterialID);
+                    float preTransferMass = photon_relative_mass(SourceID);
+                    float remainingMass =
+                        reduce_photon_mass_by_deposit_fraction(
+                            SourceID,
+                            depositFraction);
+
+                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_ABSORB) {
+                        vec3 grayRgb = photon_deposit_energy_gray_rgb(
+                            depositFraction,
+                            preTransferMass);
+#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
+                        if (!reflecting_wall_light_map_is_target(selectedPhotonWall))
+                        {
+                            DepositLightingSurfaceWallVertexSplat(
+                                selectedPhotonWall,
+                                photonPosition,
+                                grayRgb);
+                        }
+#endif
+                        retire_photon(SourceID);
+                        continue;
+                    }
+
+                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR) {
+                        if (IsReflectionPhotonParticle(SourceID)) {
+                            fpml_profile_count_reflection_pickup();
+                            photon_set_payload_rgb(
+                                SourceID,
+                                photon_pickup_material_rgb(SourceID, surfaceMaterialID));
+                            photonVelocity = ReverseFixedSpeed(photonVelocity);
+                            photonReflected = true;
+                            continue;
+                        }
+                        vec3 surfaceRgb = photon_deposit_material_color_rgb(
+                            depositFraction,
+                            preTransferMass,
+                            surfaceMaterialID);
+                        uint cellID = boundary_light_cell_address(
+                            GetParticlePosition(TargetID).xyz);
+#if FPML_ENABLE_SURFACE_DEPOSIT && FPML_ENABLE_WALL_DEPOSIT
+                        if (cellID != npos && cellID < MAX_CELL_ARRAY_LOCATIONS) {
+                            BoundaryLight[cellID].rgb_valid = vec4(surfaceRgb, 1.0);
+                        }
+#endif
+#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
+                        if (!reflecting_wall_light_map_is_target(selectedPhotonWall))
+                        {
+                            DepositLightingSurfaceWallVertexSplat(
+                                selectedPhotonWall,
+                                photonPosition,
+                                surfaceRgb);
+                        }
+#endif
+                        if (remainingMass >
+                                boundary_light_material_photon_min_relative_mass(
+                                    uint(round(P[SourceID].material_id)))) {
+                            photonVelocity =
+                                ReflectFixedSpeed(photonVelocity, segment.normal);
+                            photonReflected = true;
+                        }
+                        continue;
+                    }
+
+                    if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_REFLECT) {
+                        if (!IsReflectionPhotonParticle(SourceID)) {
+                            continue;
+                        }
+                        vec3 payloadRgb = photon_carried_payload_rgb(SourceID);
+                        if (photon_payload_valid(SourceID)) {
+                            uint cellID = boundary_light_cell_address(
+                                GetParticlePosition(TargetID).xyz);
+#if FPML_ENABLE_SURFACE_DEPOSIT && FPML_ENABLE_WALL_DEPOSIT
+                            if (cellID != npos && cellID < MAX_CELL_ARRAY_LOCATIONS) {
+                                BoundaryLight[cellID].rgb_valid = vec4(payloadRgb, 1.0);
+                            }
+#endif
+#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
+                            uint texelIndex = npos;
+                            if (reflecting_wall_light_map_texel_index(
+                                    selectedPhotonWall,
+                                    photonPosition,
+                                    texelIndex))
+                            {
+                                ReflectingWallLightMap[texelIndex].light =
+                                    vec4(payloadRgb, 1.0);
+                                reflecting_wall_photon_splat_deposit(
+                                    SourceID,
+                                    selectedPhotonWall,
+                                    photonPosition,
+                                    payloadRgb);
+                            }
+                            if (!reflecting_wall_light_map_is_target(selectedPhotonWall))
+                            {
+                                DepositLightingSurfaceWallVertexSplat(
+                                    selectedPhotonWall,
+                                    photonPosition,
+                                    payloadRgb);
+                            }
+#endif
+                        }
+                        retire_photon(SourceID);
+                        return;
+                    }
+                    continue;
+                }
+
+                hasLocalBoundaryMarker = true;
+                continue;""",
+        1,
+    )
+    body = body.replace(
+        """            if (photonSource) {
+                photonVelocity =
+                    ReflectFixedSpeed(photonVelocity, segment.normal);
+                photonReflected = true;
+                P[SourceID].colFlg = 1u;
+                continue;
+            }""",
+        """            if (photonSource) {
+                fpml_profile_count_wall_hit();
+#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
+                RectangleWallSegment selectedPhotonWall =
+                    SelectRectangleWallSegment(SourceID, 0u);
+                uint surfaceMaterialID = boundary_light_surface_material_id(
+                    BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL,
+                    selectedPhotonWall.wallFlag,
+                    segment.wallFlag);
+#else
+                uint surfaceMaterialID = segment.wallFlag;
+#endif
+                uint surfaceBehavior =
+                    boundary_light_material_surface_behavior(surfaceMaterialID);
+                P[SourceID].colFlg = 1u;
+                if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_NONE) {
+                    continue;
+                }
+
+                vec3 incidenceNormal = boundary_light_wall_incidence_normal(
+                    SourceID,
+                    0u,
+                    segment.normal);
+                float depositFraction = photon_deposit_fraction(
+                    photonVelocity,
+                    incidenceNormal,
+                    surfaceMaterialID);
+                float preTransferMass = photon_relative_mass(SourceID);
+                float remainingMass =
+                    reduce_photon_mass_by_deposit_fraction(
+                        SourceID,
+                        depositFraction);
+
+                if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_ABSORB) {
+                    vec3 grayRgb = photon_deposit_energy_gray_rgb(
+                        depositFraction,
+                        preTransferMass);
+#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
+                    DepositLightingSurfaceWallVertexSplat(
+                        selectedPhotonWall,
+                        photonPosition,
+                        grayRgb);
+#endif
+                    retire_photon(SourceID);
+                    continue;
+                }
+
+                if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_SURFACE_COLOR) {
+                    if (IsReflectionPhotonParticle(SourceID)) {
+                        fpml_profile_count_reflection_pickup();
+                        photon_set_payload_rgb(
+                            SourceID,
+                            photon_pickup_material_rgb(SourceID, surfaceMaterialID));
+                        photonVelocity = ReverseFixedSpeed(photonVelocity);
+                        photonReflected = true;
+                        continue;
+                    }
+                    vec3 surfaceRgb = photon_deposit_material_color_rgb(
+                        depositFraction,
+                        preTransferMass,
+                        surfaceMaterialID);
+#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
+                    DepositLightingSurfaceWallVertexSplat(
+                        selectedPhotonWall,
+                        photonPosition,
+                        surfaceRgb);
+#endif
+                    if (remainingMass >
+                            boundary_light_material_photon_min_relative_mass(
+                                uint(round(P[SourceID].material_id)))) {
+                        photonVelocity =
+                            ReflectFixedSpeed(photonVelocity, segment.normal);
+                        photonReflected = true;
+                    }
+                    continue;
+                }
+
+                if (surfaceBehavior == PHOTON_SURFACE_BEHAVIOR_REFLECT) {
+                    if (!IsReflectionPhotonParticle(SourceID)) {
+                        continue;
+                    }
+                    vec3 payloadRgb = photon_carried_payload_rgb(SourceID);
+                    if (photon_payload_valid(SourceID)) {
+#if defined(FORCE_DYNAMICS_SIMPLE_RECTANGLE_WALL_GLSL)
+                        uint texelIndex = npos;
+                        if (reflecting_wall_light_map_texel_index(
+                                selectedPhotonWall,
+                                photonPosition,
+                                texelIndex))
+                        {
+                            ReflectingWallLightMap[texelIndex].light =
+                                vec4(payloadRgb, 1.0);
+                            reflecting_wall_photon_splat_deposit(
+                                SourceID,
+                                selectedPhotonWall,
+                                photonPosition,
+                                payloadRgb);
+                        }
+                        DepositLightingSurfaceWallVertexSplat(
+                            selectedPhotonWall,
+                            photonPosition,
+                            payloadRgb);
+#endif
+                    }
+                    retire_photon(SourceID);
+                    return;
+                }
+                continue;
+            }""",
+        1,
     )
     body = body.replace(
         "    vec3 totalForce = vec3(0.0);",

@@ -20,11 +20,16 @@ struct FunctionWallSegment
     float a3;
     float normalSign;
     uint wallFlag;
+    float wallCollisionStiffnessQ;
+    float wallTargetPenetrationFraction;
+    float wallHardPenetrationFraction;
+    float wallCompressionStiffnessGain;
+    float wallCompressionStiffnessPower;
 };
 
 const uint CURVE_WALL_SEGMENT_COUNT = 0u;
 const FunctionWallSegment CURVE_WALL_SEGMENTS[1] = FunctionWallSegment[1](
-    FunctionWallSegment(0u, 0u, 0.000000000, 0.000000000, 0.000000000, 0.000000000, 0.000000000, 0.000000000, 1.000000000, 0u)
+    FunctionWallSegment(0u, 0u, 0.000000000, 0.000000000, 0.000000000, 0.000000000, 0.000000000, 0.000000000, 1.000000000, 0u, -1.000000000, -1.000000000, -1.000000000, -1.000000000, -1.000000000)
 );
 
 struct RectangleWallSegment
@@ -110,4 +115,5 @@ const LightingSurfaceWallMetadata LIGHTING_SURFACE_WALLS[2] = LightingSurfaceWal
 
 #define HAS_BOUNDARY
 #define HAS_SPHERE
+#define HAS_LIGHTING_SPHERE
 #endif

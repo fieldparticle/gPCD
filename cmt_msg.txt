@@ -1,12 +1,11 @@
 Current status:
-    - Wall-owned stiffness changes are reaching generated Vulkan wall metadata.
-    - The lower-wall visual response is dominated by velocity constraints, not soft wall stiffness.
-    - CDNozzle_Vk.inc is now heavily documented as the reference nozzle include.
+	- LightingBall wall shadows and reflections are restored through marker-owned photon wall events.
+	- Ordinary wall dynamics remain source-owned so CDNozzle boundary markers stay sentinels.
+	- Sphere lighting deposit uses the contacted sphere material instead of photon debug material.
 
 Code Changes:
-    - Documented CDNozzle_Vk.inc with nozzle stations, stream packing, wall semantics, and segment intent.
-    - Updated dynamics docs to distinguish wall soft force from wall velocity constraints.
-    - Added ProblemEvolution notes for wall stiffness versus constraint behavior.
-    - Added ProblemEvolution notes for the CDNozzle Vulkan reference include.
+	- Updated FPML export generation to handle photon wall lighting from boundary marker TargetID.
+	- Regenerated FPML.comp with duplicate wall-flag suppression for photon wall splats.
+	- Updated Dynamics docs for the LightingBall photon-wall/source-owned wall split.
 
-Next: Add explicit per-wall controls for max-depth/contact-step constraints so wall force and wall containment can be isolated.
+Next: Retest LightingBall_Vk visually and confirm the ball color, shadow wall, and reflecting-wall splats are all correct.

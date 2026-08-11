@@ -84,4 +84,3 @@ int ParticleBoundaryandSphere(PerfObj* perObj, TCPObj* tcp, TCPObj* tcpapp, bool
 
 int glsl(std::vector<std::string>& InputArgs, std::vector<char>& OutPutSPV);
 void GLFWError(int err, const char* err_str);
-void LaunchExecutable(std::string path, std::string cmd) ;

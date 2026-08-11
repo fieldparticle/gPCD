@@ -14,7 +14,7 @@ output_file_prefix 				= "CDNozzle_Vk";
 obj_file_name 					= "C:/_DJ/gPCD/vulkan/sim/CDNozzle/CDNozzle_Vk.obj";
 
 // Required: Python viewer zoom.
-zoom							= 15.2;
+zoom							= 24.2;
 
 // ============================================================================
 
@@ -49,17 +49,17 @@ death_bounds 			= [
 							];
 
 // Optional: Vulkan clear/background color for generated scene review.
-//clear_color = {red = 1.0; green = 1.0; blue = 1.0; alpha = 1.0;};
-clear_color = {red = 0.0; green = 0.0; blue = 0.0; alpha = 1.0;};
+clear_color = {red = 1.0; green = 1.0; blue = 1.0; alpha = 1.0;};
+//clear_color = {red = 0.0; green = 0.0; blue = 0.0; alpha = 1.0;};
 particle_streams = (
   {
     name 						= "reservoir_substance";
 	//ollisoins
     //material_id 				= 1;
 	// HSV
-	material_id 				= 3;
+	//material_id 				= 3;
 	//IA
-	//material_id 				= 4;
+	material_id 				= 4;
     radius 						= 0.35;
     particle_separation_distance = 0.9;
     particle_spacing_x 			= 0.05;
@@ -113,6 +113,8 @@ curve_wall_segments = {
 		wall_target_penetration_fraction 	= 0.90; wall_hard_penetration_fraction 		= 0.99;
 		wall_compression_stiffness_gain 	= 0.0;
 		wall_compression_stiffness_power 	= 1.0;
+		boundary_visual_material_id 		= 5;
+		boundary_particle_material_id		= 5;
         segments = {
             wall3 = {
                 boundary_kind 	= "reservoir";
@@ -169,6 +171,8 @@ curve_wall_segments = {
         wall_hard_penetration_fraction = 0.55;
         wall_compression_stiffness_gain = 8.0;
         wall_compression_stiffness_power = 2.0;
+		boundary_visual_material_id 		= 5;
+		boundary_particle_material_id		= 5;
         segments = {
             wall4 = {
                 boundary_kind = "reservoir";

@@ -128,6 +128,7 @@ death_bounds = [
 //   radius is the physical particle radius used by contact detection.
 //
 // The values below make a dense, small-particle reference case.
+
 particle_streams = (
   {
     name = "reservoir_substance";
@@ -444,3 +445,85 @@ pdata_from_file = true;
 
 // Required when study is true. Kept at zero for this single reference case.
 num_studies = 0;
+// LIVE: material table. Particles default to material_id 0 unless explicitly tagged.
+material_properties = (
+  {
+    material_id 		= 0;
+    name 				= "substance";
+    relative_mass 		= 1.0;
+    thermal_velocity 	= 0.0;
+    color_mode 			= "VELOCITY_ANGLE";
+    color_map 			= "HSV";
+    point_size 			= 1.5;
+    cell_density 		= 0.0;
+  },
+  {
+    material_id 		= 1;
+    name 				= "collision substance";
+    relative_mass 		= 1.0;
+    thermal_velocity 	= 0.0;
+    color_mode 			= "COLLISION";
+    color_map 			= "SOLID";
+    collision_color 	= [1.0, 0.0, 0.0, 1.0];
+    non_collision_color = [0.0, 1.0, 0.0, 1.0];
+    point_size 			= 3.0;
+    cell_density 		= 0.0;
+  },
+  {
+    material_id 		= 3;
+    name 				= "substance_color_lim";
+    relative_mass 		= 1.0;
+    thermal_velocity 	= 0.0;
+    color_mode 			= "VELOCITY_ANGLE";
+    color_map 			= "HSV";
+    point_size 			= 3.0;
+    cell_density 		= 0.0;
+	//capture_angle0 		= [0.0, 2.0, 2.0];
+
+  },
+  {
+    material_id 		= 4;
+    name 				= "substance_internal_energy";
+    relative_mass 		= 1.0;
+    thermal_velocity 	= 0.0;
+    color_mode 			= "INTERNAL_MOMENTUM";
+    color_map 			= "GRAY_LINEAR";
+	start_mom			= 0.0;
+	end_mom				= 0.1;
+    point_size 			= 3.0;
+    cell_density 		= 0.0;
+
+  },
+  {
+    // Boundary particles are cell-locality sentinels only. Analytic wall
+    // segments own the boundary geometry and collision behavior.
+    material_id 				= 5;
+    name 						= "boundary sentinel";
+    particle_type 				= "BOUNDARY";
+    relative_mass 				= 1.0;
+    thermal_velocity 			= 0.0;
+    color_mode 					= "SOLID";
+    color_map 					= "SOLID";
+    color 						= [0.0, 0.0, 0.0, 1.0];
+    point_size 					= 1.0;
+    cell_density 				= 0.0;
+    debug_visible 				= false;
+    debug_color 				= [0.0, 1.0, 0.0, 1.0];
+  },
+{
+    // Boundary particles are cell-locality sentinels only. Analytic wall
+    // segments own the boundary geometry and collision behavior.
+    material_id 				= 6;
+    name 						= "boundary sentinel";
+    particle_type 				= "BOUNDARY";
+    relative_mass 				= 1.0;
+    thermal_velocity 			= 0.0;
+    color_mode 					= "SOLID";
+    color_map 					= "SOLID";
+    color 						= [1.0, 1.0, 1.0, 1.0];
+    point_size 					= 1.0;
+    cell_density 				= 0.0;
+    debug_visible 				= false;
+    debug_color 				= [0.0, 1.0, 0.0, 1.0];
+  }
+);

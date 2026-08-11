@@ -180,7 +180,7 @@ int NoPerfLoop(PerfObj* perfObj, TCPObj* tcp, TCPObj* tcpsapp,DrawObj* DrawInsta
 						tcpsapp->SetBufSize(MpsApp->GetInt("buffer_size",true));
 		
 						tcpsapp->Create();
-						LaunchExecutable("CaptureApp.exe", "none") ;
+						//LaunchExecutable("CaptureApp.exe", "none") ;
 						mout << "Connecting to capture thread." << ende;
 						std::cout << "Listening for CaptureApp" << std::endl;
 						tcpsapp->Connect();
