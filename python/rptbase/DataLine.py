@@ -1,4 +1,4 @@
-from gbase.gPCDData import *
+from rptbase.gPCDData import *
 from gbase.AttrDictFields import *
 
 class DataLine(AttrDictFields):

@@ -1,11 +1,11 @@
 Current status:
-	- LightingBall wall shadows and reflections are restored through marker-owned photon wall events.
-	- Ordinary wall dynamics remain source-owned so CDNozzle boundary markers stay sentinels.
-	- Sphere lighting deposit uses the contacted sphere material instead of photon debug material.
+	- LightingBall full Vulkan sphere surface has been rolled back to the 32 x 64 baseline.
+	- UFBall.obj, UFBall.mesh.cfg, generated LightingBall_Vk.tst, and boundary metadata now agree on 2112 vertices and 3968 sphere triangles.
+	- Dynamics docs record the mesh-resolution investigation and the current visual retest target.
 
 Code Changes:
-	- Updated FPML export generation to handle photon wall lighting from boundary marker TargetID.
-	- Regenerated FPML.comp with duplicate wall-flag suppression for photon wall splats.
-	- Updated Dynamics docs for the LightingBall photon-wall/source-owned wall split.
+	- Set LightingBall_Vk.inc sphere_lat_segments/sphere_lon_segments to 32/64.
+	- Regenerated the editable LightingBall sphere OBJ/mesh sidecar and LightingBall_Vk data outputs.
+	- Updated LightingBall, boundary-space lighting, todo, and ProblemEvolution docs for the 32 x 64 baseline.
 
-Next: Retest LightingBall_Vk visually and confirm the ball color, shadow wall, and reflecting-wall splats are all correct.
+Next: Retest LightingBall_Vk visually and compare the front/back sphere boundary against the recorded smooth version.

@@ -371,6 +371,11 @@ vec4 boundary_light_reflecting_wall_base(vec4 baseColor)
 
 void boundary_light_main()
 {
+	if (ShaderFlags.DrawInstance == 2.0 && surfaceAlbedo.a <= 0.0)
+	{
+		discard;
+	}
+
 	if (renderSurfaceType == BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL)
 	{
 		vec4 lightMapColor =

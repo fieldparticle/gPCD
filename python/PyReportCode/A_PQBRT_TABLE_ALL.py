@@ -1,13 +1,13 @@
-from gbase.ReportClass import *
+from rptbase.ReportClass import *
 
 import os
 import inspect
-from gbase.TrendLine import *
+from rptbase.TrendLine import *
 import re
 from gbase.AttrDictFields import *
 from gbase.ConfigUtility import *
-from gbase.ValuesDataBase import *
-from gbase.gPCDData import *
+from rptbase.ValuesDataBase import *
+from rptbase.gPCDData import *
 class A_PQBRT_TABLE_ALL():
 
     def __init__(self,itemcfg,base):

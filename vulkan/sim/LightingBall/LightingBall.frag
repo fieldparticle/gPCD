@@ -26,6 +26,7 @@ layout(binding = 1) uniform UniformBufferObject{
 #include "params.glsl"
 #include "sphere.glsl"
 #include "..\common\constants.glsl"
+#include "..\common\push.glsl"
 #include "..\common\util.glsl"
 #include "boundary.glsl"
 #include "..\common\BoundaryLightRecord.glsl"

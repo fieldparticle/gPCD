@@ -7,7 +7,7 @@
 // ============================================================================
 
 // Required: simulation timestep.
-dt								= 0.01;
+dt								= 0.5;
 
 // Required: binary particle file consumed by the Python runner.
 output_file_prefix 				= "CDNozzle_Vk";
@@ -60,17 +60,17 @@ particle_streams = (
 	material_id 				= 3;
 	//IA
 	//material_id 				= 4;
-    radius 						= 0.35;
-    particle_separation_distance = 0.9;
-    particle_spacing_x 			= 0.05;
-    particle_spacing_y 			= 0.05;
-    collision_stiffness_q 		= 0.5;
-    compression_stiffness_gain 	= 1.0;
+    radius 						= 0.15;
+    particle_separation_distance = 0.5;
+    particle_spacing_x 			= 0.5;
+    particle_spacing_y 			= 0.5;
+    collision_stiffness_q 		= 16.0;
+    compression_stiffness_gain 	= 8.0;
     compression_stiffness_power = 2.0;
-    target_penetration_fraction = 0.7;
-    hard_penetration_fraction 	= 0.9;
+    target_penetration_fraction = 0.5;
+    hard_penetration_fraction 	= 0.75;
     min_compression_frames 		= 3.0;
-    stream_velocity 			= [ 0.5, 0.0, 0.0 ];
+    stream_velocity 			= [ 0.02, 0.0, 0.0 ];
     // Type: "directional" relaxes velocity toward temp_velocity.xyz.
     //temp_vel_type = "directional";
 	temp_vel_type = "none";
@@ -110,10 +110,9 @@ curve_wall_segments = {
         normal_sign 						= -1;
         wall_flag 							= 3;
 		wall_collision_stiffness_q 			= 0.05;
-		wall_target_penetration_fraction 	= 0.90; 
-		wall_hard_penetration_fraction 		= 0.99;
-		wall_compression_stiffness_gain 	= 0.0;
-		wall_compression_stiffness_power 	= 1.0;
+		wall_target_penetration_fraction 	= 0.10; wall_hard_penetration_fraction 		= 0.19;
+		wall_compression_stiffness_gain 	= 5.0;
+		wall_compression_stiffness_power 	= 16.0;
         segments = {
             wall3 = {
                 boundary_kind 	= "reservoir";
@@ -226,6 +225,7 @@ pdata_from_file 		= true;
 
 // Required when study is true; otherwise kept at zero.
 num_studies 			= 0;
+
 // LIVE: material table. Particles default to material_id 0 unless explicitly tagged.
 material_properties = (
   {

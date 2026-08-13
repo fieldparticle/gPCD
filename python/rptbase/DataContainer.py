@@ -1,13 +1,13 @@
-from gbase.gPCDData import *
+from rptbase.gPCDData import *
 
 from gbase.AttrDictFields import *
-from gbase.DataLine import *
+from rptbase.DataLine import *
 import math
 import numpy as np
 import pandas as pd
 from PyQt6.QtWidgets import QMessageBox
-from gbase.CSVData import *
-from gbase.ValuesDataBase import *
+from rptbase.CSVData import *
+from rptbase.ValuesDataBase import *
 
 class DataContainer():
 

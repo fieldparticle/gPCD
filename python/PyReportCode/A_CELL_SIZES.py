@@ -5,8 +5,8 @@ from gbase.TrendLine import *
 import re
 from gbase.AttrDictFields import *
 from gbase.ConfigUtility import *
-from gbase.ValuesDataBase import *
-from gbase.gPCDData import gPCDData
+from rptbase.ValuesDataBase import *
+from rptbase.gPCDData import gPCDData
 class A_CELL_SIZES():
 
     def __init__(self,itemcfg,base):

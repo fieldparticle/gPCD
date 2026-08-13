@@ -18,12 +18,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import linregress
 
-from gbase.ValuesDataBase import *
+from rptbase.ValuesDataBase import *
 from gbase.AttrDictFields import *
 
 data_list = []
 N0 = 10_0000   
-from gbase.PlotterClass import *
+from rptbase.PlotterClass import *
 
 class A_PQBR_LOGLOG_REGRESS(PlotterClass):
     

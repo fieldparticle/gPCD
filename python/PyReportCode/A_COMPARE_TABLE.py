@@ -5,7 +5,7 @@ import re
 import pandas as pd
 from gbase.AttrDictFields import *
 from gbase.ConfigUtility import *
-from gbase.ValuesDataBase import *
+from rptbase.ValuesDataBase import *
 class A_COMPARE_TABLE():
 
     def __init__(self,itemcfg,base):

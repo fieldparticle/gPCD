@@ -1,7 +1,7 @@
 import sys
 from PyQt6.QtWidgets import QTabWidget
 from PyQt6.QtCore import Qt
-#from TabFormReport import *
+from TabFormReport import *
 from TabFormGenData import *
 #from TabFormCDNOZ import *
 
@@ -18,16 +18,16 @@ class UtilityTabs(QTabWidget):
         ## Create the tabs
         self.tabFormGenData = TabGenData()        
         #self.TabFormCDNOZ = TabFormCDNOZ()        
-        #self.tabFormReport = TabFormReport()
+        self.tabFormReport = TabFormReport()
         
-        
+        self.addTab(self.tabFormReport, 'Reports')
         self.addTab(self.tabFormGenData, 'Generate Data')
-        #self.addTab(self.tabFormReport, 'Reports')
+        
         #self.addTab(self.TabFormCDNOZ, 'CD Nozzle')
         
         
         
         #self.TabFormCDNOZ.Create(self.bobj)
         self.tabFormGenData.Create(self.bobj)
-        #self.tabFormReport.Create(self.bobj)
+        self.tabFormReport.Create(self.bobj)
       

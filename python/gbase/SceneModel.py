@@ -485,6 +485,14 @@ def apply_scene_model(config):
             continue
         if enabled is None:
             continue
+        render_enabled = _as_optional_bool(
+            obj.get("render_enabled"),
+            True,
+            errors,
+            f"{context}.render_enabled",
+        )
+        if render_enabled is None:
+            continue
 
         object_type = _as_required_string(obj.get("type"), errors, f"{context}.type")
         object_type = None if object_type is None else object_type.lower()
@@ -526,6 +534,7 @@ def apply_scene_model(config):
                         int(sphere_config["material_id"]),
                         initial_surface_color=initial_surface_color,
                         deposit_radius=deposit_radius,
+                        render_enabled=render_enabled,
                         sphere_lat_segments=int(sphere_config["sphere_lat_segments"]),
                         sphere_lon_segments=int(sphere_config["sphere_lon_segments"]),
                         obj_file=obj_file,
@@ -550,6 +559,7 @@ def apply_scene_model(config):
                         int(rectangle_config["material_id"]),
                         initial_surface_color=initial_surface_color,
                         deposit_radius=deposit_radius,
+                        render_enabled=render_enabled,
                         rectangle_u_segments=int(
                             rectangle_config["rectangle_u_segments"]
                         ),
@@ -577,6 +587,7 @@ def apply_scene_model(config):
                         int(curve_config["material_id"]),
                         initial_surface_color=initial_surface_color,
                         deposit_radius=deposit_radius,
+                        render_enabled=render_enabled,
                         obj_file=obj_file,
                         mesh_file=mesh_file,
                     )

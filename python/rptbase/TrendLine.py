@@ -3,7 +3,7 @@ import pandas as pd
 import math
 from scipy.stats import linregress
 from scipy.optimize import curve_fit
-from gbase.ValuesDataBase import *
+from rptbase.ValuesDataBase import *
 
 def quadratic_model(x, a, b, c):
     return a * x**2 + b * x + c

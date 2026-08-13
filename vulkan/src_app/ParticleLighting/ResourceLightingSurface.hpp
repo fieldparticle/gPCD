@@ -50,6 +50,7 @@ private:
 		uint32_t rectangleVSegments,
 		uint32_t sphereLatSegments,
 		uint32_t sphereLonSegments,
+		bool renderEnabled,
 		uint32_t& emittedVertexID);
 	void BuildRectangleSurface(
 		uint32_t surfaceID,
@@ -57,6 +58,7 @@ private:
 		const glm::vec4& initialSurfaceColor,
 		uint32_t rectangleUSegments,
 		uint32_t rectangleVSegments,
+		bool renderEnabled,
 		uint32_t& emittedVertexID);
 	void BuildSphereSurface(
 		uint32_t surfaceID,
@@ -64,6 +66,7 @@ private:
 		const glm::vec4& initialSurfaceColor,
 		uint32_t sphereLatSegments,
 		uint32_t sphereLonSegments,
+		bool renderEnabled,
 		uint32_t& emittedVertexID);
 	void AppendSurfaceVertex(
 		const glm::vec3& position,
@@ -74,6 +77,7 @@ private:
 		uint32_t materialID,
 		const glm::vec4& initialSurfaceColor,
 		const glm::vec4& albedo,
+		bool renderEnabled,
 		uint32_t& emittedVertexID);
 
 	std::vector<LightingSurfaceVertex> m_SurfaceVertices;

@@ -1,11 +1,11 @@
-from gbase.ReportClass import *
+from rptbase.ReportClass import *
 import os
 import inspect
-from gbase.TrendLine import *
+from rptbase.TrendLine import *
 import re
 from gbase.AttrDictFields import *
 from gbase.ConfigUtility import *
-from gbase.ValuesDataBase import *
+from rptbase.ValuesDataBase import *
 class A_TABLE_CURVATURE():
 
     def __init__(self,itemcfg,base):

@@ -2,9 +2,9 @@ import numpy as np
 import matplotlib.pyplot as mplt
 import csv
 import math
-from gbase.ValuesDataBase import *
+from rptbase.ValuesDataBase import *
 from gbase.AttrDictFields import *
-from gbase.PlotterClass import *
+from rptbase.PlotterClass import *
 
 class A_FPS_GMS_CMS(PlotterClass):
     

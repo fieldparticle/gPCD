@@ -3968,6 +3968,10 @@ class GenericGenData:
                 )
                 output.write(f'        surface_id = {int(surface_object["surface_id"])};\n')
                 output.write(f'        material_id = {int(surface_object["material_id"])};\n')
+                output.write(
+                    "        render_enabled = "
+                    f"{'true' if surface_object.get('render_enabled', True) else 'false'};\n"
+                )
                 initial_surface_color = surface_object.get(
                     "initial_surface_color",
                     (0.0, 0.0, 0.0, 1.0),

@@ -55,7 +55,10 @@ class ReportClass():
             gdir = "".join(previewTex.rsplit(self.itemcfg.tex_dir))
             sgdir = ''.join( c for c in gdir if  c not in '/' )
     #                print(sgdir)    
-            w = "\t\t\\includegraphics[width=" +  str(self.itemcfg.plot_width) +  "in]{" + sgdir + "}\n"
+            if "plot_height" in self.itemcfg:
+                w = "\t\t\\includegraphics[width=" + str(self.itemcfg.plot_width) +  "in,height=" + str(self.itemcfg.plot_height) + "in]{" + sgdir + "}\n"
+            else:
+                w = "\t\t\\includegraphics[width=" +  str(self.itemcfg.plot_width) +  "in]{" + sgdir + "}\n"
             f.write(w)
             refname = os.path.splitext(os.path.basename(gdir))[0]
             w = "\\hspace{" + str(self.itemcfg.hspace) + "in}\n"

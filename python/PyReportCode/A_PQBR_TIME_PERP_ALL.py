@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import csv
 import math
-from gbase.ValuesDataBase import *
+from rptbase.ValuesDataBase import *
 from gbase.AttrDictFields import *
-from gbase.PlotterClass import *
+from rptbase.PlotterClass import *
 
 class A_PQBR_TIME_PERP_ALL(PlotterClass):
 

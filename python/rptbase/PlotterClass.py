@@ -1,6 +1,6 @@
-from gbase.ValuesDataBase import *
+from rptbase.ValuesDataBase import *
 from gbase.AttrDictFields import *
-from gbase.DataLine import *
+from rptbase.DataLine import *
 import math
 import numpy as np
 import pandas as pd

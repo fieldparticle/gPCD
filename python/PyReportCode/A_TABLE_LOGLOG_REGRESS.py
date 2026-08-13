@@ -1,11 +1,11 @@
-from gbase.ReportClass import *
+from rptbase.ReportClass import *
 import os
 import inspect
 import pandas as pd
 import re
 from gbase.AttrDictFields import *
 from gbase.ConfigUtility import *
-from gbase.ValuesDataBase import *
+from rptbase.ValuesDataBase import *
 class A_TABLE_LOGLOG_REGRESS():
 
     def __init__(self,itemcfg,base):

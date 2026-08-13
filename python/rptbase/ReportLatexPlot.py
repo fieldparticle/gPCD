@@ -1,8 +1,8 @@
 
-from gbase.ReportClass import *
+from rptbase.ReportClass import *
 import os
 import inspect
-from gbase.TrendLine import *
+from rptbase.TrendLine import *
 import re
 from gbase.AttrDictFields import *
 from gbase.ConfigUtility import *

@@ -6,7 +6,8 @@ scene_model = {
   objects = (
     {
       name 				= "lighting_sphere";
-      enabled 			= false;
+      enabled 			= true;
+      render_enabled 	= false;
       type 				= "sphere";
       center 			= [20.0, 20.0, 20.0];
       radius 			= 4.0;
@@ -31,7 +32,8 @@ scene_model = {
     },
     {
       name 					= "shadow_wall";
-      enabled 				= false;
+      enabled 				= true;
+      render_enabled 		= false;
       type 					= "rectangle";
       origin 				= [27.0, 14.0, 14.0];
       u_axis 				= "y";
@@ -49,7 +51,8 @@ scene_model = {
     },
     {
       name 					= "reflecting_wall";
-      enabled 				= false;
+      enabled 				= true;
+      render_enabled 		= false;
       type 					= "rectangle";
       origin 				= [13.0, 14.0, 5.0];
       u_axis 				= "x";
@@ -152,7 +155,7 @@ particle_streams = (
     spacing_factor 					= 1.05;
 
     inlet_axis 						= "x";
-    inlet_value 					= 24.0;
+    inlet_value 					= 24.5;
 
     span_u_axis 					= "y";
     span_u_min 						= 14.0;

@@ -35,6 +35,7 @@ namespace
 		uint32_t rectangleVSegments = 0u;
 		uint32_t sphereLatSegments = 0u;
 		uint32_t sphereLonSegments = 0u;
+		bool renderEnabled = true;
 	};
 
 	struct LightingSurfaceMeshObject
@@ -507,6 +508,19 @@ namespace
 		return static_cast<uint32_t>(value);
 	}
 
+	bool ReadOptionalBool(
+		config_setting_t* object,
+		int objectIndex,
+		const char* fieldName,
+		bool defaultValue)
+	{
+		(void)objectIndex;
+		int value = defaultValue ? 1 : 0;
+		if (config_setting_lookup_bool(object, fieldName, &value) != CONFIG_TRUE)
+			return defaultValue;
+		return value != 0;
+	}
+
 	glm::vec4 ReadInitialSurfaceColor(
 		config_setting_t* object,
 		int objectIndex)
@@ -666,9 +680,12 @@ void ResourceLightingSurface::AppendSurfaceVertex(
 	uint32_t materialID,
 	const glm::vec4& initialSurfaceColor,
 	const glm::vec4& albedo,
+	bool renderEnabled,
 	uint32_t& emittedVertexID)
 {
 	LightingSurfaceVertex vertex{};
+	glm::vec4 renderAlbedo = albedo;
+	renderAlbedo.w = renderEnabled ? 1.0f : 0.0f;
 	vertex.pos = glm::vec4(position, static_cast<float>(surfaceID));
 	vertex.normal_flag = glm::vec4(SafeNormalize(normal), static_cast<float>(materialID));
 	vertex.light = initialSurfaceColor;
@@ -677,7 +694,7 @@ void ResourceLightingSurface::AppendSurfaceVertex(
 		uv.y,
 		static_cast<float>(emittedVertexID),
 		static_cast<float>(surfaceType));
-	vertex.albedo = albedo;
+	vertex.albedo = renderAlbedo;
 
 	m_SurfaceVertices.push_back(vertex);
 	emittedVertexID++;
@@ -689,6 +706,7 @@ void ResourceLightingSurface::BuildRectangleSurface(
 	const glm::vec4& initialSurfaceColor,
 	uint32_t rectangleUSegments,
 	uint32_t rectangleVSegments,
+	bool renderEnabled,
 	uint32_t& emittedVertexID)
 {
 	if (surfaceID == ResourceLightingReflectingWall::SurfaceID)
@@ -701,6 +719,7 @@ void ResourceLightingSurface::BuildRectangleSurface(
 			throw std::runtime_error(errtxt.str().c_str());
 		}
 
+		size_t baseVertex = m_SurfaceVertices.size();
 		m_ReflectingWall->AppendSurface(
 			surfaceID,
 			materialID,
@@ -710,6 +729,15 @@ void ResourceLightingSurface::BuildRectangleSurface(
 			m_SurfaceVertices,
 			m_SurfaceIndices,
 			emittedVertexID);
+		if (!renderEnabled)
+		{
+			for (size_t vertexIndex = baseVertex;
+				vertexIndex < m_SurfaceVertices.size();
+				++vertexIndex)
+			{
+				m_SurfaceVertices[vertexIndex].albedo.w = 0.0f;
+			}
+		}
 		return;
 	}
 
@@ -782,6 +810,7 @@ void ResourceLightingSurface::BuildRectangleSurface(
 				materialID,
 				initialSurfaceColor,
 				glm::vec4(1.0f),
+				renderEnabled,
 				emittedVertexID);
 		}
 	}
@@ -812,6 +841,7 @@ void ResourceLightingSurface::BuildSphereSurface(
 	const glm::vec4& initialSurfaceColor,
 	uint32_t sphereLatSegments,
 	uint32_t sphereLonSegments,
+	bool renderEnabled,
 	uint32_t& emittedVertexID)
 {
 	if (!CfgTst->CheckKey("Lighting_ball"))
@@ -852,6 +882,7 @@ void ResourceLightingSurface::BuildSphereSurface(
 				materialID,
 				initialSurfaceColor,
 				glm::vec4(1.0f),
+				renderEnabled,
 				emittedVertexID);
 		}
 	}
@@ -902,6 +933,7 @@ void ResourceLightingSurface::LoadObjSurface(
 	uint32_t rectangleVSegments,
 	uint32_t sphereLatSegments,
 	uint32_t sphereLonSegments,
+	bool renderEnabled,
 	uint32_t& emittedVertexID)
 {
 	(void)sphereLatSegments;
@@ -915,6 +947,7 @@ void ResourceLightingSurface::LoadObjSurface(
 			initialSurfaceColor,
 			rectangleUSegments,
 			rectangleVSegments,
+			renderEnabled,
 			emittedVertexID);
 		return;
 	}
@@ -1024,6 +1057,7 @@ void ResourceLightingSurface::LoadObjSurface(
 			vertexMaterialIDs[vertexIndex],
 			initialSurfaceColor,
 			vertexAlbedos[vertexIndex],
+			renderEnabled,
 			emittedVertexID);
 	}
 
@@ -1103,6 +1137,8 @@ void ResourceLightingSurface::LoadLightingSurfaceObjects()
 			surfaceConfig.materialID = static_cast<uint32_t>(materialID);
 			surfaceConfig.initialSurfaceColor =
 				ReadInitialSurfaceColor(object, index);
+			surfaceConfig.renderEnabled =
+				ReadOptionalBool(object, index, "render_enabled", true);
 			if (surfaceType == BOUNDARY_LIGHT_SURFACE_RECTANGLE_WALL)
 			{
 				surfaceConfig.rectangleUSegments =
@@ -1140,6 +1176,7 @@ void ResourceLightingSurface::LoadLightingSurfaceObjects()
 				surfaceConfig.rectangleVSegments,
 				surfaceConfig.sphereLatSegments,
 				surfaceConfig.sphereLonSegments,
+				surfaceConfig.renderEnabled,
 				emittedVertexID);
 		}
 	}
